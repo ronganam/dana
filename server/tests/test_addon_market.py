@@ -360,10 +360,20 @@ async def test_disable(c: TestClient) -> None:
 # --- 4. The catalog ----------------------------------------------------------------------------------
 
 async def test_catalog(c: TestClient) -> None:
-    shipped = catalog.parse(json.loads((testenv.SERVER.parent / "catalog.json").read_text(encoding="utf-8")))
-    check("catalog.json in the repository: the hello entry waits for its release commit (skipped, with the reason)",
-          shipped.entries == [] and any(p.startswith("hello:") and "commit" in p for p in shipped.problems),
-          shipped.problems)
+    shipped = catalog.parse(json.loads(catalog.BUNDLED.read_text(encoding="utf-8")))
+    check("server/catalog.json (shipped in the image): every entry is valid, hello among them",
+          [e.name for e in shipped.entries] == ["hello"] and shipped.problems == [], shipped.problems)
+    saved_file = os.environ.pop("DANA_CATALOG_FILE")
+    os.environ["DANA_CATALOG_URL"] = "http://127.0.0.1:9/catalog.json"
+    try:
+        fallback = catalog.load(fresh=True)
+    finally:
+        os.environ["DANA_CATALOG_FILE"] = saved_file
+        del os.environ["DANA_CATALOG_URL"]
+    check("catalog URL unreachable: the shipped copy is used, with a notice naming the URL",
+          [e.name for e in fallback.entries] == ["hello"] and "127.0.0.1:9" in fallback.notice
+          and fallback.origin == "http://127.0.0.1:9/catalog.json", fallback.notice)
+    check("catalog from a file: no notice", catalog.load(fresh=True).notice == "")
     src = {"repo": "https://example.invalid/r.git", "path": "", "ref": "c" * 40}
     iconed = catalog.parse({"addons": [{"name": "iconed", "icon": "cloud-sun", "source": src},
                                        {"name": "badicon", "icon": "Cloud Sun", "source": src}]})

@@ -1,5 +1,5 @@
 {
- "about": "Dana's addon catalog (docs/addons.md, \"The catalog\"). Each source.ref is a full commit hash: an entry is exactly one version of its addon. Entries that are not valid are skipped by servers, with the reason in their log.",
+ "about": "Dana's addon catalog (docs/addons.md, \"The catalog\"). Each source.ref is a full commit hash: an entry is exactly one version of its addon. Entries that are not valid are skipped by servers, with the reason in their log. Servers read this file from GitHub, and use the copy shipped in their image when that cannot be read.",
  "addons": [
   {
    "name": "hello",
@@ -13,7 +13,7 @@
    "source": {
     "repo": "https://github.com/ronganam/dana",
     "path": "examples/addons/hello",
-    "ref": "FILL-AT-RELEASE: the full commit hash of the release this entry points to"
+    "ref": "2841637e4b90cac67b1c845c80b32277eda28e54"
    }
   }
  ]

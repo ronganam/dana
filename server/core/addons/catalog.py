@@ -1,12 +1,13 @@
-"""The addon catalog: ``catalog.json`` at the repository root, read by the
-server and the CLI (../docs/addons.md, "The catalog").
+"""The addon catalog: ``server/catalog.json``, read by the server and the CLI
+(../docs/addons.md, "The catalog").
 
 ``{"addons": [{name, title, description, icon, author, homepage, tags, min_dana,
 source: {repo, path, ref}}]}`` (``icon``: optional, a Lucide icon name); ``ref`` is a full commit hash, so an entry
 always means exactly one version of the addon. Read from ``DANA_CATALOG_FILE``
 (a local file: tests, offline servers) or ``DANA_CATALOG_URL`` (default
 :data:`DEFAULT_URL`), with a short timeout, and kept for
-:data:`CACHE_SECONDS`. An entry that is not valid (a missing field, a ref that
+:data:`CACHE_SECONDS`. When the URL cannot be read, the copy shipped with this
+release (:data:`BUNDLED`) is used instead, with a ``notice`` saying so. An entry that is not valid (a missing field, a ref that
 is not a full commit, a name that is not an identifier, a repeated name) is
 skipped and its reason logged and returned with the entries.
 """
@@ -26,7 +27,9 @@ from core.addons.install import FULL_COMMIT, InstallError, Source, check_path, c
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_URL = "https://raw.githubusercontent.com/ronganam/dana/master/catalog.json"
+DEFAULT_URL = "https://raw.githubusercontent.com/ronganam/dana/master/server/catalog.json"
+# The catalog this release was built with (in the image next to core/).
+BUNDLED = Path(__file__).resolve().parents[2] / "catalog.json"
 TIMEOUT_SECONDS = 5.0
 CACHE_SECONDS = 600.0
 MAX_BYTES = 1_000_000
@@ -63,6 +66,8 @@ class Catalog:
     entries: List[Entry]
     problems: List[str] = field(default_factory=list)
     origin: str = ""
+    # Why the shipped copy is shown instead of the one at ``origin`` ("" when it was read).
+    notice: str = ""
 
     def get(self, name: str) -> Optional[Entry]:
         return next((e for e in self.entries if e.name == name), None)
@@ -149,27 +154,41 @@ def _read(where: str) -> bytes:
     return Path(where).expanduser().read_bytes()
 
 
-def load(*, fresh: bool = False) -> Catalog:
-    """The catalog (blocking: from a thread in the server), cached for :data:`CACHE_SECONDS`.
-
-    Raises:
-        CatalogError: it cannot be read or is not a catalog.
-    """
-    where = origin()
-    hit = _cache.get(where)
-    if hit is not None and not fresh and time.monotonic() - hit[0] < CACHE_SECONDS:
-        return hit[1]
-    try:
-        raw = _read(where)
-    except Exception as e:
-        raise CatalogError(f"The catalog at {where} cannot be read ({type(e).__name__}: {e}).") from e
+def _parse_bytes(raw: bytes, where: str) -> Catalog:
     if len(raw) > MAX_BYTES:
         raise CatalogError(f"The catalog at {where} is larger than {MAX_BYTES} bytes.")
     try:
         data = json.loads(raw.decode("utf-8"))
     except ValueError as e:
         raise CatalogError(f"The catalog at {where} is not JSON ({e}).") from e
-    catalog = parse(data, where)
+    return parse(data, where)
+
+
+def load(*, fresh: bool = False) -> Catalog:
+    """The catalog (blocking: from a thread in the server), cached for :data:`CACHE_SECONDS`.
+
+    A URL that cannot be read falls back to :data:`BUNDLED` (``notice`` says why).
+
+    Raises:
+        CatalogError: it cannot be read or is not a catalog (nor is the shipped copy, for a URL).
+    """
+    where = origin()
+    hit = _cache.get(where)
+    if hit is not None and not fresh and time.monotonic() - hit[0] < CACHE_SECONDS:
+        return hit[1]
+    try:
+        catalog = _parse_bytes(_read(where), where)
+    except Exception as e:
+        reason = str(e) if isinstance(e, CatalogError) else \
+            f"The catalog at {where} cannot be read ({type(e).__name__}: {e})."
+        if not where.startswith(("http://", "https://")) or not BUNDLED.is_file():
+            if isinstance(e, CatalogError):
+                raise
+            raise CatalogError(reason) from e
+        logger.warning(f"{reason} Using the catalog shipped with this release.")
+        catalog = _parse_bytes(BUNDLED.read_bytes(), str(BUNDLED))
+        catalog.origin = where
+        catalog.notice = f"{reason} Showing the catalog this release shipped with."
     _cache[where] = (time.monotonic(), catalog)
     return catalog
 

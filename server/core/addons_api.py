@@ -653,7 +653,7 @@ async def catalog_api(request: web.Request) -> web.Response:
     installed = install.installed(addon_dirs.installed_dir())
     return web.json_response({"origin": cat.origin, "dana_version": catalog.dana_version(),
                               "entries": [catalog_entry_payload(e, present, installed) for e in cat.entries],
-                              "problems": cat.problems, "restart_needed": bool(pending_changes())})
+                              "problems": cat.problems, "notice": cat.notice, "restart_needed": bool(pending_changes())})
 
 
 def _install_refused(message: str, status: int = 400, error: str = "install_refused") -> web.Response:

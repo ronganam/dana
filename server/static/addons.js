@@ -575,7 +575,8 @@
     const problems = (c.problems || []).length ? `<details class="itg-note itg-problems"><summary>${c.problems.length} catalog ${c.problems.length === 1 ? "entry was" : "entries were"} skipped</summary>
         <ul>${c.problems.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></details>` : "";
     const form = s.gitForm || {};
-    return `<section class="itg-group" data-group="catalog">${head}
+    const notice = c.notice ? `<div class="itg-note"><i data-lucide="cloud-off"></i><span>${esc(c.notice)}</span></div>` : "";
+    return `<section class="itg-group" data-group="catalog">${head}${notice}
       <div class="itg-note warn"><i data-lucide="shield-alert"></i><span>${esc(FULL_ACCESS)}</span></div>
       ${entries}${problems}
       <details class="itg-card itg-git" data-git${form.repo || form.ref ? " open" : ""}><summary>Install from a git repository</summary>
