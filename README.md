@@ -41,6 +41,10 @@ cp .env.example .env
 
 Then connect integrations on the web UI (Settings → Integrations) or with `bin/users.py`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
 
+## Your own deployment
+
+Run Dana as upstream ships it and keep what is yours in a **site** folder beside it: deploy settings, your own plugins, the apps' server address and TV setup, and notes for you and your coding agents. Start from `site.example/`. Updating is then `git pull`, and your deployment never drifts from Dana: [`docs/site.md`](docs/site.md).
+
 ## Build the apps
 
 ```bash
@@ -48,12 +52,12 @@ cd android
 ./gradlew :app:assemblePhoneDebug     # the phone app; :app:assembleKioskDebug, :app:assembleTvDebug, :wear:assembleDebug
 ```
 
-JDK 21 and the Android SDK are needed. Point the app at your server in its Settings. Direct push needs your own Firebase project (`android/docs/release.md` → Local defaults); without it the app works and syncs when opened.
+JDK 21 and the Android SDK are needed. Point the app at your server in its Settings. Direct push needs your own Firebase project (your site's `google-services.json`: `android/docs/release.md` → Your site); without it the app works and syncs when opened.
 
 ## Extend it
 
 - A new integration is a package in `server/integrations/<kind>/`: declare the kind, write its tools as typed Python functions with docstrings (the schema is generated), and it shows up for users who connect it. Start with [`server/docs/access.md`](server/docs/access.md) → Integration.
-- Something private to your setup can stay out of the repository as a **plugin**: the same code in your own folder, loaded with `DANA_PLUGIN_DIRS` ([`server/docs/plugins.md`](server/docs/plugins.md)).
+- Something only your setup needs can stay out of the repository as a **plugin** in your site's `plugins/`: the same code as a built-in kind ([`server/docs/plugins.md`](server/docs/plugins.md); a working example: [`server/examples/plugins/hello/`](server/examples/plugins/hello/)).
 - Every area has a doc: start from [`server/AGENTS.md`](server/AGENTS.md) and [`android/AGENTS.md`](android/AGENTS.md). They are written for people and coding agents alike.
 
 ## Contributing

@@ -42,7 +42,7 @@ INTEGRATION_ENV = (
     "WAHA_URL", "WAHA_API_KEY", "WAHA_TOKEN", "WAHA_SESSION", "WHATSAPP_VOICE_TELEGRAM_CHAT_ID",
     "GOOGLE_REFRESH_TOKEN", "GOOGLE_CALENDAR_ID", "FRIGATE_URL",
 )
-IDENTITY_ENV = ("DANA_PLUGIN_DIRS", "CREDENTIALS_KEY", "API_TOKEN", "ALLOWED_TELEGRAM_USER_IDS", "TELEGRAM_CHAT_ID",
+IDENTITY_ENV = ("DANA_PLUGIN_DIRS", "DANA_SITE", "CREDENTIALS_KEY", "API_TOKEN", "ALLOWED_TELEGRAM_USER_IDS", "TELEGRAM_CHAT_ID",
                 "OWNER_NAME", "OWNER_CONTEXT", "OWNER_PRONOUN", "OWNER_OTHER_NAMES")
 
 # The first admin of every test database: a made-up person.
@@ -81,6 +81,7 @@ def isolate(name: str) -> str:
     for env in INTEGRATION_ENV + IDENTITY_ENV:
         os.environ.pop(env, None)
     os.environ.update(OWNER_ENV)
+    os.environ["DANA_PLUGIN_DIRS"] = ""  # never your site's plugins (a test that wants plugins sets it)
     path = scratch_path(f"{name}.sqlite3")
     os.environ["DATABASE_PATH"] = path
     return path

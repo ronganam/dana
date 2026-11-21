@@ -4,20 +4,28 @@ A **plugin** is an integration kind (`docs/access.md`, "Integration") that lives
 
 ## Loading
 
-`DANA_PLUGIN_DIRS` names one or more folders, separated by `:` (`os.pathsep`). Every sub-folder that has a `kind.py` is imported as `integrations.<name>` after the built-in kinds, in folder order and then by name (`integrations/__init__.py`, `PLUGIN_KINDS`). A plugin with a built-in kind's name, or two plugins with one name, stop the start. Folders that do not exist are skipped. The tests never load plugins: `testenv.isolate()` clears the variable.
+A deployment keeps its plugins in its site's `plugins/` folder (`site/plugins/` at the repository root, or `$DANA_SITE/plugins`; `../docs/site.md`). `DANA_PLUGIN_DIRS` (folders separated by `:`, `os.pathsep`) replaces that default when set; empty means none. Every sub-folder that has a `kind.py` is imported as `integrations.<name>` after the built-in kinds, in folder order and then by name (`integrations/__init__.py`, `PLUGIN_KINDS`). A plugin with a built-in kind's name, or two plugins with one name, stop the start. Folders that do not exist are skipped. The tests never load your plugins: `testenv.isolate()` sets `DANA_PLUGIN_DIRS=""`.
 
 | Where | How |
 |---|---|
-| Local run | `DANA_PLUGIN_DIRS=/path/to/my-plugins` in `.env` |
+| Running from a checkout | The site's `plugins/`, with nothing to set |
 | Container image | Loads `/app/plugins` (the `plugins/` folder of the build context; only its `README.md` is tracked) |
-| `bin/deploy` | Copies the kinds of the folders in `DANA_IMAGE_PLUGINS` (`deploy.env`) into `plugins/` of the clean checkout before it builds |
+| `bin/deploy` | Copies the site's plugin kinds (or those of the folders in `DANA_IMAGE_PLUGINS`) into `plugins/` of the clean build checkout, and adds `-p<hash>` of their files to the release name |
 
 A user's connection of a plugin kind is a row in `integrations` like any other. If the plugin is later missing, the row is ignored: the kind is not offered and its tools are not listed.
 
 ## Writing one
 
+Start from the complete example, [`examples/plugins/hello/`](../examples/plugins/hello/): a kind with a setting, a tool, a line of instructions and an HTTP route. `test_plugins.py` loads that exact folder, so it shows the current framework.
+
+```bash
+cp -r server/examples/plugins/hello site/plugins/my_kind   # then rename hello → my_kind inside
 ```
-my-plugins/
+
+The parts, on a kind that reads a device on your network:
+
+```
+site/plugins/
   weather_station/
     __init__.py     # imports the kind and its tools
     kind.py         # the Integration

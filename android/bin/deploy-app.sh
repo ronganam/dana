@@ -23,8 +23,10 @@
 # keystore.properties at repo root for release signing (see AGENTS.md).
 
 set -euo pipefail
-# Your devices and server: android/local.env (gitignored; local.env.example).
-[[ -r "$(dirname "${BASH_SOURCE[0]}")/../local.env" ]] && . "$(dirname "${BASH_SOURCE[0]}")/../local.env"
+# Your devices and server: your site's android.env (site/android.env at the repository
+# root, or $DANA_SITE/android.env; docs/release.md, "Your site").
+SITE="${DANA_SITE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/site}"
+[[ -r "$SITE/android.env" ]] && . "$SITE/android.env"
 
 REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_DIR"
@@ -91,7 +93,7 @@ fi
 # --- Publish to the assistant server ---
 if [[ $SKIP_UPLOAD -eq 0 ]]; then
   [[ -n "$PUBLISH_TOKEN" || -z "${APP_PUBLISH_TOKEN_CMD:-}" ]] || PUBLISH_TOKEN="$(eval "$APP_PUBLISH_TOKEN_CMD")"
-  [[ -n "$SERVER_URL" ]] || { echo "ERROR: SERVER_URL not set (env, local.env or --server)" >&2; exit 1; }
+  [[ -n "$SERVER_URL" ]] || { echo "ERROR: SERVER_URL not set (env, site/android.env or --server)" >&2; exit 1; }
   [[ -n "$PUBLISH_TOKEN" ]] || { echo "ERROR: APP_PUBLISH_TOKEN not set (env or --token)" >&2; exit 1; }
   echo "==> Publishing to $SERVER_URL"
   publish() {

@@ -8,7 +8,7 @@
 #      image), after bin/test, never at once;
 #   2. when it changes what the images contain (server/core/, integrations/, static/,
 #      main.py, requirements.txt, Dockerfile, VERSION, bin/users.py, bank-worker/) and
-#      server/deploy.env exists, deploys it: `server/bin/deploy` builds
+#      your site has a deploy.env (site/deploy.env, or $DANA_SITE/deploy.env), deploys it: `server/bin/deploy` builds
 #      "<VERSION>-<commit>", pushes it and sets the GitOps tags.
 # Android changes are not tested here (./gradlew in android/; docs in android/AGENTS.md).
 # A failure stops the push. Push without deploying: DANA_NO_DEPLOY=1 git push …
@@ -57,8 +57,8 @@ if printf '%s\n' "$changed" | grep -qE '^(server/Dockerfile|server/requirements\
 fi
 
 if printf '%s\n' "$changed" | grep -qE '^(server/(core/|integrations/|static/|bank-worker/|main\.py$|requirements\.txt$|Dockerfile$|VERSION$|bin/users\.py$)|\(everything\)$)'; then
-  if [ ! -r "${DANA_DEPLOY_CONFIG:-$root/server/deploy.env}" ]; then
-    echo "pre-push: no server/deploy.env: tested, not deploying."
+  if [ ! -r "${DANA_DEPLOY_CONFIG:-${DANA_SITE:-$root/site}/deploy.env}" ]; then
+    echo "pre-push: no site/deploy.env: tested, not deploying."
   elif [ -n "${DANA_NO_DEPLOY:-}" ]; then
     echo "pre-push: DANA_NO_DEPLOY set: pushing without a deploy."
   elif [ "$fast_forward" = 0 ]; then

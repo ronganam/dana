@@ -1,4 +1,6 @@
-# Maintainer-local notes and settings (AGENTS.md): never committed
+# Your deployment's site folder (docs/site.md; start from site.example/): never committed here
+/site
+# Personal agent notes (e.g. CLAUDE.local.md -> site/AGENTS.md)
 AGENTS.local.md
 CLAUDE.local.md
 

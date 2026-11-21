@@ -52,7 +52,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
   | money | bank / card logins (sources, credentials encrypted) synced by the bank-worker sidecar (`bank-worker/`), SMS sign-in codes from the phone, transactions, categories, dashboards (fixed / yearly / everyday / one-off spending, cash flow, the balance forecast without one-offs, insights: `integrations/money/dashboard.py`), Psagot Trade portfolios read-only through a quick-view device (`integrations/money/portfolio.py`, `bank-worker/src/psagot.js`), the Pluxee (Cibus) meal card read-only on the browser (budget, cycles, meals, never spending; each cycle's overflow matched to its monthly card line: `integrations/money/meals.py`, `bank-worker/src/pluxee.js`), ways to save and spending to watch with the user's choices, targets and verified outcomes (`integrations/money/savings.py`; Bank of Israel rates `reference.py`; price checks on request through `llm.search`: `market.py`), the web Money tab (`static/money*.js`, with the Save view: ways to save, spending to watch, price checks, targets; the Meal card view) | `docs/money.md` |
   | cameras | Frigate behind `/api/frigate/*` (no tools) | `docs/dashboard.md` |
   | ops | kubectl + sandboxed Python (admin only) | — |
-  | *plugins* | kinds kept outside the repository, loaded from `DANA_PLUGIN_DIRS` | `docs/plugins.md` |
+  | *plugins* | a deployment's own kinds, in its site's `plugins/` (or `DANA_PLUGIN_DIRS`); a tested example in `examples/plugins/hello/` | `docs/plugins.md` |
 
 - **Database** SQLite through `core/db` (`get_db_connection()`); ordered migrations in `core/db/migrations/` (`mNNNN_<name>.py`, found by name, each docstring says what it changes), applied at startup after a snapshot → `docs/operations.md` (Database schema).
 - **Users and access** (`core/users.py`, `core/access.py`, `core/auth.py`): every web request and Telegram update resolves to a `User`, bound as the current user (`users.acting_as`); sessions, runs, approvals, undo, learned phrases, usage and every background loop are per user. Levels `admin` / `member`; a tool the user lacks is refused like a made-up name; server-wide endpoints use `@requires(capability)`. Managing users: `bin/users.py`, `/api/integrations*` and the web Integrations page. Security rules (cross-user) → `docs/access.md`.
@@ -79,10 +79,10 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 
 ## Deploy (summary — details in `docs/operations.md`)
 
-- Commit, `git push origin master` → the pre-push hook runs `bin/test` (a failure stops the push) and, if the push changed the app and `deploy.env` exists, `bin/deploy` builds `<VERSION>-<commit>`, pushes the images and (optionally) bumps the tag in your GitOps repo. No VERSION bump needed to ship (bump it to name a release). With `bin/deploy --wait`, wait for `<VERSION>-<short commit> true` on the pod before verifying.
+- Commit, `git push origin master` → the pre-push hook runs `bin/test` (a failure stops the push) and, if the push changed the app and the site has a `deploy.env` (`../site/`, `../docs/site.md`), `bin/deploy` builds `<VERSION>-<commit>[-p<plugins hash>]` with the site's plugins, pushes the images and (optionally) bumps the tag in your GitOps repo. No VERSION bump needed to ship (bump it to name a release). `bin/deploy --wait` waits for the pod to run it; verify after that.
 - Config: env vars listed in `docs/configuration.md`; secrets never get printed or committed.
 - Production debugging (logs, DB inspection without sqlite3, API endpoints): `docs/operations.md`.
-- A maintainer's own deployment (where it runs, its secret store, devices) is not in the repository: read `../AGENTS.local.md` when it exists.
+- A deployment's own setup (where it runs, its secret store, devices, plugins) lives in its site, never in the repository: read `../site/AGENTS.md` when it exists.
 
 ## Docs index
 
@@ -108,7 +108,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 | `docs/gmail.md` | Gmail: the tools, approval and undo, the untrusted-content rules, why it is not offered in voice |
 | `docs/telegram-account.md` | The user's own Telegram account: the server's app, the QR sign-in, reading without marking read, the tools and the summary |
 | `docs/money.md` | The money kind: sources, the bank-worker sidecar and its client, sync and SMS codes, investment accounts (Psagot Trade, the quick-view device, holdings), meal cards (Pluxee: reCAPTCHA sign-in, the 24-hour session, cycles, the monthly card line), schedule, ingest, categories, API, check, insights, dashboards and the balance forecast, Dana's money tools, the web Money tab |
-| `docs/plugins.md` | Integration kinds kept outside the repository: `DANA_PLUGIN_DIRS`, how one is written, loaded, deployed and tested |
+| `docs/plugins.md` | Integration kinds kept outside the repository (a site's `plugins/`, `DANA_PLUGIN_DIRS`): how one is written, loaded, deployed and tested; the `hello` example |
 | `docs/access.md` | Users, tokens, access levels, web/Telegram identity, the current user, what is per user, `notify`; integrations (kinds, tools, connections, encrypted credentials, env import); enforcement (where the per-user tool check runs, refusals, admin-only endpoints); the multi-user design and its build phases |
 
 Keep docs current in the same commit as the code; add new areas as a doc + one line here rather than growing this file. Docs say how the parts fit together and what is built, not its history; details that live next to the code (a migration's docstring, a test script's docstring, an endpoint's handler) are not copied into a doc.

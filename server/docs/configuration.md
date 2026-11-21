@@ -60,7 +60,8 @@ No kind reads these env values for its own configuration: each reads only its co
 | `DATABASE_PATH` | SQLite path (defaults to `db.sqlite3`); its directory is the data dir for all other files. The schema comes from migrations applied at startup (`docs/operations.md` → Database schema) |
 | `DB_BUSY_TIMEOUT_MS` | how long a connection waits for a locked database (default 30000) |
 | `PORT` | web server (default 8080) |
-| `DANA_PLUGIN_DIRS` | folders of plugin kinds kept outside the repository, separated by `:` (`docs/plugins.md`); the image sets `/app/plugins` |
+| `DANA_SITE` | your deployment's site folder (`../docs/site.md`); default `site/` at the repository root |
+| `DANA_PLUGIN_DIRS` | folders of plugin kinds, separated by `:` (`docs/plugins.md`); unset: the site's `plugins/`; empty: none (the tests); the image sets `/app/plugins` |
 | `TIMEZONE` | the server's timezone (one for every user), e.g. `Asia/Jerusalem` (falls back to the first admin's Home Assistant → `TZ` → UTC) |
 | `API_TOKEN` | always a valid token of the first (admin) user for the web server/API; other users' tokens live hashed in the DB (`docs/access.md`); unset = auth disabled, every request is the first user (local dev only) |
 | `INTERNAL_HOSTS` | comma-separated `Host` values (the in-cluster Service names) allowed to post to the inbound webhook `/webhook/waha` (WAHA) without a token; every other path needs a token from any host. With a token, only a user with `manage_server` may post to it (anyone else 403) |

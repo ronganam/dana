@@ -45,15 +45,15 @@ bin/deploy-app.sh --watch-ip <watch-ip>:5555    # wear APK; uses adb wireless de
 
 The Gradle daemon runs on JDK 21 (`gradle/gradle-daemon-jvm.properties`); Gradle finds it in the usual places (`/usr/lib/jvm`, SDKMAN, Android Studio's JBR…). A JDK elsewhere: add `org.gradle.java.installations.paths=/path/to/jdk21` to `~/.gradle/gradle.properties`.
 
-## Local defaults
+## Your site
 
-What belongs to one person's setup stays out of git; the build and the scripts read it when present:
+What belongs to one deployment lives in its site folder (`../site/` at the repository root, or `$DANA_SITE`; `../docs/site.md`, template `../site.example/`). The build and the scripts read it when present:
 
-| File (gitignored) | What |
+| Site file | What |
 |---|---|
-| `app/src/phone/google-services.json` | Your Firebase project's Android config (package `app.ganam.assistant`), for direct push (FCM; the server's side: `server/docs/notifications.md`). Without it the phone builds and works, with no direct push. |
-| `local.properties` | Besides `sdk.dir`: `dana.serverUrl` (the server a fresh kiosk / TV starts with; `BuildConfig.DEFAULT_SERVER_URL`), `dana.lanDnsServers` (comma-separated LAN resolvers for the TV, `docs/tv.md` → LanDns). |
+| `android.env` | `SERVER_URL`: the server a fresh app / kiosk / TV starts with (`BuildConfig.DEFAULT_SERVER_URL`), and where `bin/deploy-app.sh` publishes. `LAN_DNS_SERVERS`: comma-separated LAN resolvers for the TV (`docs/tv.md` → LanDns). For `bin/deploy-*.sh`: `APP_PUBLISH_TOKEN` or `APP_PUBLISH_TOKEN_CMD`, `TV_SERIAL`, `KIOSK_SERIAL`, `WATCH_IP`. |
 | `tv-defaults.json` | The TV's first-run home screen (apps, Home Assistant entities, cameras, remote bindings) in `TvConfig`'s JSON shape (`BuildConfig.TV_DEFAULTS_JSON`). |
-| `keystore.properties` + the keystore | Release signing (above). |
-| `local.env` | `bin/deploy-*.sh`: `SERVER_URL`, `APP_PUBLISH_TOKEN` or `APP_PUBLISH_TOKEN_CMD`, `TV_SERIAL`, `KIOSK_SERIAL`, `WATCH_IP` (`local.env.example`). |
+| `google-services.json` | Your Firebase project's Android config (package `app.ganam.assistant`), for direct push (FCM; the server's side: `server/docs/notifications.md`). `app/src/phone/google-services.json` is read when the site has none. Without either, the phone builds and works, with no direct push. |
+
+Secrets stay out of the site, in gitignored files here: `keystore.properties` and the keystore (release signing, above); `local.properties` holds only `sdk.dir`.
 

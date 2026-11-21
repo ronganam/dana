@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Android clients of **Dana** (the assistant). The server is `../server` (its `AGENTS.md` / `docs/` cover the APIs); the repository map is `../AGENTS.md`. This file is the map — read the matching `docs/` file before changing an area. Your own devices (serials), server and publish token are not in the repository: `local.env` (`local.env.example`) and `../AGENTS.local.md` when it exists.
+Android clients of **Dana** (the assistant). The server is `../server` (its `AGENTS.md` / `docs/` cover the APIs); the repository map is `../AGENTS.md`. This file is the map — read the matching `docs/` file before changing an area. Your own server, devices (serials), TV defaults, Firebase config and publish token are not in the repository: they live in your site (`../site/android.env`, `tv-defaults.json`, `google-services.json`; `../docs/site.md`), and `../site/AGENTS.md` describes the deployment when it exists.
 
 ## Modules and variants
 
@@ -40,7 +40,7 @@ Build only the variant you need (`:app:assemblePhoneDebug`, not `assembleDebug`)
 ./gradlew :wear:testDebugUnitTest          # the watch's JVM unit tests (wear/src/test: the shopping model)
 
 # Publish phone + watch APKs to the server (bumps versionName/Code of :app and :wear; notes without semicolons).
-# SERVER_URL and the publish token (or APP_PUBLISH_TOKEN_CMD) come from local.env.
+# SERVER_URL and the publish token (or APP_PUBLISH_TOKEN_CMD) come from ../site/android.env.
 bin/deploy-app.sh --bump X.Y.Z --notes "What changed"
 ```
 
@@ -50,7 +50,7 @@ The phone also offers published versions in Settings → App Update. Commit the 
 - `:app` and `:wear` must be signed with the **same key**, or every watch→phone message is silently dropped.
 - Release builds run R8 (phone flavor: pass-through via `proguard-phone.pro`); kiosk/TV deploy scripts also force AOT compilation.
 - The Gradle daemon runs on JDK 21 (`gradle/gradle-daemon-jvm.properties`; a JDK outside the usual places: `org.gradle.java.installations.paths` in `~/.gradle/gradle.properties`); `gradle.properties` turns on the build cache, configuration cache and parallel builds; keep build logic configuration-cache safe (no `project` access at execution time).
-- Personal setup stays in gitignored files the build reads when present: `app/src/phone/google-services.json` (direct push), `local.properties` (`dana.serverUrl`, `dana.lanDnsServers`), `tv-defaults.json`, `keystore.properties` — `docs/release.md` → Local defaults.
+- A deployment's setup lives in its site, which the build reads when present: `../site/android.env` (`SERVER_URL`, `LAN_DNS_SERVERS`), `tv-defaults.json`, `google-services.json` (direct push). Release signing stays in the gitignored `keystore.properties` — `docs/release.md` → Your site.
 
 ## Architecture (shared)
 

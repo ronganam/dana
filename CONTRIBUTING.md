@@ -11,6 +11,7 @@ Thanks for looking. Dana started as one household's assistant, so the bar for a 
 
 ```bash
 git config core.hooksPath .githooks          # pushing master runs the server tests
+cp -r site.example site                      # your deployment's folder (docs/site.md); optional for contributing
 cd server
 python3.14 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env
@@ -41,6 +42,7 @@ cd android
 - A server payload change that a client reads updates that client (and its fixtures) in the same pull request.
 - User-facing text calls the assistant Dana; internal identifiers that start with `ganam` stay as they are ([`AGENTS.md`](AGENTS.md)).
 - No new dependency without a reason in the pull request.
+- Something only your own deployment needs belongs in your site (a plugin, a setting), not in Dana's code; a missing extension point is a welcome pull request ([`docs/site.md`](docs/site.md)).
 
 ## Pull requests
 

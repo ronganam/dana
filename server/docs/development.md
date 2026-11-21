@@ -8,7 +8,7 @@ How to iterate on Dana quickly without losing quality. It covers the inner loop,
 |---|---|---|
 | While editing | `bin/test --changed` (only the scripts touched by, or importing, what changed) or `bin/test <word>` | seconds |
 | Before a commit | `bin/test` (everything, side by side; prints only failures) | ~1.5 min |
-| On push to master | the pre-push hook runs `bin/test` (and the image's test stage when the Dockerfile or requirements change), then `bin/deploy` builds and deploys (when `deploy.env` exists), all on your machine | ~2.5 min + rollout |
+| On push to master | the pre-push hook runs `bin/test` (and the image's test stage when the Dockerfile or requirements change), then `bin/deploy` builds and deploys (when the site has a `deploy.env`), all on your machine | ~2.5 min + rollout |
 
 - Don't run the suite "to see where we are" at the start of a task. The last commit passed the suite, so a failure you see is yours.
 - A script that fails once in parallel and passes alone is reported as **flaky**, not failed. Look at it when it happens often, but it doesn't block.
