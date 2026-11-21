@@ -1,12 +1,12 @@
 """Context chats: a chat opened from an item ("Ask the assistant" from a
-suggestion, call, notification, task, person, weekly review, transaction or saving idea), and the
-on-screen context of one turn (core/session_runner.py).
+suggestion, call, notification, task, person, weekly review, transaction or
+saving idea), and the on-screen context of one turn (core/session_runner.py).
 
-A composer over the addons: each addon builds its own card and prompt, for the
-chat's user and only from that user's own items (an addon's own kinds through
-``@addon.context_card`` / ``@addon.context``: the tasks addon's "task"); this
-module dispatches by kind, stores the session for that user and rebuilds the prompt on every
-turn (so it reflects edits and acceptance).
+A composer over the addons: each addon registers its own card, prompt and
+optional block through ``@addon.context_card`` / ``@addon.context`` /
+``@addon.context_block``; ``review`` is core's own. This module dispatches by
+kind, stores the session for that user and rebuilds the prompt on every turn
+(so it reflects edits and acceptance).
 """
 from __future__ import annotations
 
@@ -15,12 +15,9 @@ import uuid
 from typing import Any, Dict, Optional
 
 from core import users, weekly_review
+from core.addons import ContextRequest, registry, store
 from core.session import create_new_session_db, get_session_state
 from core.users import User
-from core.addons import ContextRequest, registry, store
-from addons.money import config as money_config, queries as money_queries, savings as money_savings
-from addons.people import detail as people_detail, values as people_values
-from addons.phone.calls import chat as phone_chat
 
 logger = logging.getLogger(__name__)
 
@@ -31,53 +28,37 @@ def build_chat_context(user: Optional[User], kind: str, ref_id: str) -> Dict[str
     Raises:
         LookupError: not one of their items.
         ValueError: an unknown kind.
-        NotConnected: a person without the ``people`` addon, a review without ``tasks``, a
-            transaction or a saving without ``money``.
+        NotConnected: the addon owning ``kind`` is not active for ``user``.
     """
     kind = (kind or "").strip().lower()
-    if kind == "suggestion":
-        return phone_chat.suggestion_card(user, ref_id)
-    if kind == "call":
-        return phone_chat.call_card(user, ref_id)
-    if kind == "notification":
-        return phone_chat.notification_card(user, ref_id)
-    if kind == "person":
-        store.require(user, people_values.ADDON)
-        return people_detail.chat_context(user, ref_id)
     if kind == "review":
         if user is None:
             raise LookupError("Review not found")
         weekly_review.require(user)
         return weekly_review.chat_context(user, ref_id)
-    if kind == "transaction":
-        if user is None:
-            raise LookupError("Transaction not found")
-        store.require(user, money_config.ADDON)
-        return money_queries.chat_context(user, ref_id)
-    if kind == "saving":
-        if user is None:
-            raise LookupError("Saving not found")
-        store.require(user, money_config.ADDON)
-        return money_savings.chat_context(user, ref_id)
-    try:
-        hook = registry.hook_for("context_card", kind, user)
-    except store.NotConnected:
-        raise LookupError(f"{kind.capitalize()} not found") from None
+    hook = registry.hook_for("context_card", kind, user)  # NotConnected → 403 not_connected
     if hook is not None:
         if user is None:
             raise LookupError(f"{kind.capitalize()} not found")
         return hook.func(user, ref_id)
-    kinds = ["suggestion", "call", "notification", "person", "review", "transaction", "saving",
-             *[h.key for h in registry.hooks("context_card", None)]]
+    kinds = ["review", *[h.key for h in registry.hooks("context_card", None)]]
     raise ValueError(f"kind must be one of {', '.join(kinds)}")
 
 
 def _block(user: Optional[User], kind: str, ref_id: str) -> str:
-    """Another item's description for an addon's context prompt (a task's source call); "" when there is none."""
-    if kind == "call" and ref_id:
-        _, block = phone_chat.call_block(user, ref_id)
-        return block or ""
-    return ""
+    """Another item's description for an addon's context prompt (e.g. a task's source call); "" when there is none."""
+    if not kind or not ref_id or user is None:
+        return ""
+    try:
+        hook = registry.hook_for("context_block", kind, user)
+    except store.NotConnected:
+        return ""
+    if hook is None:
+        return ""
+    try:
+        return str(hook.func(user, ref_id) or "")
+    except Exception:
+        return ""
 
 
 def start_context_session(user: User, kind: str, ref_id: str) -> Dict[str, Any]:
@@ -101,29 +82,11 @@ def context_prompt(user: Optional[User], ctx: Optional[Dict[str, Any]]) -> Optio
     """System context for an attached item (``{kind, ref_id}``) of ``user``.
     Never raises (None when the item is gone or not theirs)."""
     try:
-        if not ctx:
+        if not ctx or user is None:
             return None
         kind, ref = ctx.get("kind"), ctx.get("ref_id")
-        if kind == "suggestion":
-            return phone_chat.suggestion_prompt(user, ref)
-        if kind == "notification":
-            return phone_chat.notification_prompt(user, ref)
-        if kind == "call":
-            return phone_chat.call_prompt(user, ref)
-        if kind == "person":
-            return people_detail.context_prompt(user, ref)
         if kind == "review":
-            return weekly_review.context_prompt(user, ref) if user is not None else None
-        if kind == "transaction":
-            if user is None or not store.is_connected(user, money_config.ADDON):
-                return None
-            return money_queries.context_prompt(user, ref)
-        if kind == "saving":
-            if user is None or not store.is_connected(user, money_config.ADDON):
-                return None
-            return money_savings.context_prompt(user, ref)
-        if user is None:
-            return None
+            return weekly_review.context_prompt(user, ref)
         try:
             hook = registry.hook_for("context", str(kind or ""), user)
         except store.NotConnected:

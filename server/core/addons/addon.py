@@ -63,11 +63,13 @@ EVENT_NAME = re.compile(r"^[a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+$")
 DAILY = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 # Composer hooks: their functions are plain (not async): composers call them in
 # a worker thread, next to their own database reads.
-SYNC_HOOKS = ("now_cards", "day_items", "briefing", "review", "search", "selfcheck", "context", "context_card")
+SYNC_HOOKS = ("now_cards", "day_items", "briefing", "review", "search", "selfcheck", "context", "context_card",
+              "context_block")
 # Hooks declared for a key (a card prefix, a section key, a check key, an item
 # type, a context kind): one addon per key and kind across every addon (the
 # loader fails the later addon that repeats one).
-KEYED_HOOKS = ("now_action", "briefing", "review", "review_action", "selfcheck", "context", "context_card")
+KEYED_HOOKS = ("now_action", "briefing", "review", "review_action", "selfcheck", "context", "context_card",
+               "context_block")
 
 
 @dataclass(frozen=True)
@@ -552,6 +554,11 @@ class Addon:
         """``def f(user, ref_id) -> dict``: the card attached to a chat opened
         from this addon's item of ``kind``; raise LookupError when it is not theirs."""
         return self._hook("context_card", kind)
+
+    def context_block(self, kind: str) -> Callable[[F], F]:
+        """``def f(user, ref_id) -> str``: a plain description of this addon's
+        item of ``kind`` for another addon's context prompt (e.g. a task's source call)."""
+        return self._hook("context_block", kind)
 
 
 def _require_async(addon: str, what: str, func: Callable[..., Any]) -> None:

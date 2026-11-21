@@ -17,7 +17,9 @@ import logging
 import re
 from typing import Any, Dict, List, Optional
 
-from core.addons import Connection
+from core.addons import Approval, Connection
+from core.addons.hooks import clean
+from core.users import User
 from addons.homeassistant import client as ha_api
 from addons.homeassistant.addon import addon
 from addons.homeassistant.config import TV, TV_CHANNEL, setting
@@ -173,7 +175,13 @@ async def get_ha_exposed_entities(conn: Connection) -> str:
 # Tool 2 — call_ha_service
 # ---------------------------------------------------------------------------
 
-@addon.tool(acts_outside=True)
+def _describe_ha_service(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    what = f"{a.get('domain') or '?'}.{a.get('service') or '?'}"
+    return Approval(f"Home: {what} on {a.get('entity_id') or 'a device'}", "Home", "🏠", "Go ahead?",
+                    facts=[("Data", a.get("service_data"))])
+
+
+@addon.tool(acts_outside=True, describe=_describe_ha_service)
 async def call_ha_service(
     conn: Connection,
     domain: str,
@@ -348,7 +356,15 @@ async def _wait_for_adb_ready(conn: Connection, entity_id: str, timeout: float =
         await asyncio.sleep(1.5)
 
 
-@addon.tool(acts_outside=True)
+def _describe_tv(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    detail = a.get("app_id") or a.get("channel") or a.get("query") or a.get("video_id") \
+        or a.get("title_id") or a.get("command") or ""
+    return Approval(f"TV: {str(a.get('action') or 'command').replace('_', ' ')}"
+                    + (f" “{clean(detail, 80)}”" if detail else ""), "TV", "📺", "Go ahead?",
+                    facts=[("Device", a.get("entity_id"))])
+
+
+@addon.tool(acts_outside=True, describe=_describe_tv)
 async def control_android_tv(
     conn: Connection,
     action: str,

@@ -3,11 +3,12 @@ to pick between options, web search, and sharing an item with another user
 (offered only on a server with more than one user)."""
 
 import logging
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 from core import clock, users
 from core.users import User
-from core.addons import Connection, sharing, store
+from core.addons import Approval, Connection, sharing, store
+from core.addons.hooks import clean
 from addons.essentials.addon import addon
 
 logger = logging.getLogger(__name__)
@@ -147,7 +148,18 @@ def _find_user(owner: User, name: str) -> Optional[User]:
     return partial[0] if len(partial) == 1 else None
 
 
-@addon.tool(confirm=True, available=sharing.tool_available)
+def _describe_share_item(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    what = str(a.get("item_type") or "item").replace("_", " ")
+    level = str(a.get("level") or "").strip().lower()
+    item = f"“{clean(a.get('item'), 80)}”"
+    who = clean(a.get("user"), 80)
+    if level == "none":
+        return Approval(f"Stop sharing the {what} {item} with {who}", "Stop sharing", "🔒", "Stop sharing it?")
+    return Approval(f"Share the {what} {item} with {who}", "Share", "🤝", "Share it?",
+                    facts=[("They can", {"read": "see it", "edit": "see and change it"}.get(level, level))])
+
+
+@addon.tool(confirm=True, available=sharing.tool_available, describe=_describe_share_item)
 def share_item(conn: Connection, item_type: str, item: str, user: str, level: str) -> str:
     """Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.
 
