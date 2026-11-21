@@ -1,3 +1,8 @@
+# Direct dependencies (what the code imports). The image installs the pinned set in
+# requirements.lock: after changing this file, regenerate it (docs/operations.md →
+# Dependencies).
+aiohttp>=3.9
+yarl>=1.9
 aiogram>=3.0.0
 litellm>=1.108.3
 # litellm>=1.105 eagerly imports its MCP gateway on every tools= call and that

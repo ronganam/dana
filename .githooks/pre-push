@@ -4,10 +4,10 @@
 # Pushing master/main:
 #   1. runs the server's `bin/test` on a clean checkout of the pushed commit when it
 #      changes anything under server/ or examples/ besides docs; when it changes server/Dockerfile
-#      or server/requirements.txt also the image's `test` stage (the suite on the exact
+#      or server/requirements.lock also the image's `test` stage (the suite on the exact
 #      image), after bin/test, never at once;
 #   2. when it changes what the images contain (server/core/, addons/, static/,
-#      main.py, requirements.txt, Dockerfile, VERSION, bin/users.py, bank-worker/) and
+#      main.py, requirements.lock, Dockerfile, VERSION, bin/users.py, bank-worker/) and
 #      your site has a deploy.env (site/deploy.env, or $DANA_SITE/deploy.env), deploys it: `server/bin/deploy` builds
 #      "<VERSION>-<commit>", pushes it and sets the GitOps tags.
 # Android changes are not tested here (./gradlew in android/; docs in android/AGENTS.md).
@@ -50,13 +50,13 @@ python="$root/server/.venv/bin/python"; [ -x "$python" ] || python=python3
 echo "pre-push: bin/test on ${tested:0:7} (skip once with git push --no-verify)"
 (cd "$checkout/server" && "$python" bin/test) || { echo "pre-push: tests failed; nothing pushed."; exit 1; }
 
-if printf '%s\n' "$changed" | grep -qE '^(server/Dockerfile|server/requirements\.txt|\(everything\))$'; then
+if printf '%s\n' "$changed" | grep -qE '^(server/Dockerfile|server/requirements\.(txt|lock)|\(everything\))$'; then
   echo "pre-push: the image changed: running the suite in the image's test stage"
   docker build --target test -q -t dana:test "$checkout/server" >/dev/null \
     || { echo "pre-push: the image's test stage failed (docker build --target test server); nothing pushed."; exit 1; }
 fi
 
-if printf '%s\n' "$changed" | grep -qE '^(server/(core/|addons/|static/|bank-worker/|main\.py$|requirements\.txt$|Dockerfile$|VERSION$|bin/users\.py$)|\(everything\)$)'; then
+if printf '%s\n' "$changed" | grep -qE '^(server/(core/|addons/|static/|bank-worker/|main\.py$|requirements\.(txt|lock)$|Dockerfile$|VERSION$|bin/users\.py$)|\(everything\)$)'; then
   if [ ! -r "${DANA_DEPLOY_CONFIG:-${DANA_SITE:-$root/site}/deploy.env}" ]; then
     echo "pre-push: no site/deploy.env: tested, not deploying."
   elif [ -n "${DANA_NO_DEPLOY:-}" ]; then

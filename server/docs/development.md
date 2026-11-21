@@ -17,7 +17,7 @@ How to iterate on Dana quickly without losing quality. It covers the inner loop,
 - **Running the real server:**
   1. Run `DANA_LOCAL_SOURCE=1 bin/local-env.sh up` once. It starts the real image against stub services, with your working tree mounted.
   2. After changing Python code, run `bin/local-env.sh restart` (a few seconds, no rebuild). Static files take effect when the browser reloads.
-  3. Rebuild only after changing `requirements.txt` or the `Dockerfile`: `bin/local-env.sh build`.
+  3. Rebuild only after changing `requirements.lock` or the `Dockerfile`: `bin/local-env.sh build`.
   4. The end-to-end rehearsal is `bin/local-env.sh test`. See `docs/local-testing.md`.
 - **A migration or anything touching production data:** rehearse it on a copy of the production database first, with `DANA_LOCAL_DB=<copy> bin/local-env.sh up` (`docs/local-testing.md`, "Against a copy of a real database"). Keep the copy outside the repo and delete it afterwards.
 

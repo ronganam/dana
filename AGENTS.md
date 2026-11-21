@@ -28,7 +28,7 @@
 ```bash
 git config core.hooksPath .githooks
 cp -r site.example site      # or link your own site: ln -s ~/my-dana-site site
-cd server && python3.14 -m venv .venv && .venv/bin/pip install -r requirements.txt && cp .env.example .env
+cd server && python3 -m venv .venv && .venv/bin/pip install -r requirements.lock && cp .env.example .env  # Python 3.12+, tested on 3.14
 ```
 
 Contributor docs for people: `README.md`, `CONTRIBUTING.md`.
