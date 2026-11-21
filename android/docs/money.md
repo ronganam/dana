@@ -1,6 +1,6 @@
 # Money (phone)
 
-The Money place sits under More (only with the `money` kind) and takes it over: `ui/shell/destinations/MoneyDestination.kt` is a wide place — unfolded, a side pane (header, month switcher, "Synced …", the banners, the views as rows) beside a ~808dp stage holding the view, with a transaction or saving item as a 380dp pane beside it when the stage is ≥ 760dp, else over it; on the cover one column (header, banners, the views as a sideways strip, the view) with the item full screen and Back closing it. The live loop (`GET changes` every 30 s, 5 s while a sync runs or a code is pending) runs while Money is on screen. `ui/viewmodels/MoneyController.kt` is its core: the view, the month, the filter, the open detail, the overview, sources and categories, the revision that bumps after a write or a sync, and `write()` (a change with Undo). The server contract (payloads, categories, the forecast, the meal card and portfolio rules) is the server repo's `docs/money.md`; the web Money tab (`static/money-dash.js`, `money-core.js`, `money.css`) is the reference for numbers, words and look.
+The Money place sits under More (only with the `money` add-on) and takes it over: `ui/shell/destinations/MoneyDestination.kt` is a wide place — unfolded, a side pane (header, month switcher, "Synced …", the banners, the views as rows) beside a ~808dp stage holding the view, with a transaction or saving item as a 380dp pane beside it when the stage is ≥ 760dp, else over it; on the cover one column (header, banners, the views as a sideways strip, the view) with the item full screen and Back closing it. The live loop (`GET changes` every 30 s, 5 s while a sync runs or a code is pending) runs while Money is on screen. `ui/viewmodels/MoneyController.kt` is its core: the view, the month, the filter, the open detail, the overview, sources and categories, the revision that bumps after a write or a sync, and `write()` (a change with Undo). The server contract (payloads, categories, the forecast, the meal card and portfolio rules) is the server repo's `docs/money.md`; the web Money tab (`static/money-dash.js`, `money-core.js`, `money.css`) is the reference for numbers, words and look.
 
 ## Dashboards
 
@@ -59,7 +59,7 @@ The tab appears only with a meal card.
 
 ### Tests
 
-`app/src/test/.../money/MoneyDashTextTest.kt`, `MoneyDashGeometryTest.kt` and `MoneyDashHoldingsTest.kt` run against `money_web.json`, `money_portfolio_web.json` and `money_meals_web.json`, copied from the server repo's `test_fixtures/` (synthetic data, today 18 Nov 2026). Their expectations are those of the server's `test_web_money.mjs`. When the server's payloads change, copy the fixtures again.
+`app/src/test/.../money/MoneyDashTextTest.kt`, `MoneyDashGeometryTest.kt` and `MoneyDashHoldingsTest.kt` run against `money_web.json`, `money_portfolio_web.json` and `money_meals_web.json`, read straight from `server/tests/fixtures/` (synthetic data, today 18 Nov 2026). Their expectations are those of the server's `test_web_money.mjs`. Every amount is written by `data/money/MoneyFormat` in the user's currency (`/api/me` `currency`) and the phone's locale; the unit tests pin en-US.
 
 ## Transactions, Accounts, Save
 
