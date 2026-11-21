@@ -462,7 +462,7 @@ fun FloatingAssistantOverlay(
                                         item(key = "remembers_hidden") {
                                             io.github.ronganam.dana.ui.screens.chat.MemoryLine(
                                                 if (messages.any { !it.isThinking }) "Dana also remembers earlier messages" else "Dana remembers the last conversation",
-                                                modifier = Modifier.padding(horizontal = 20.dp).animateItemPlacement()
+                                                modifier = Modifier.padding(horizontal = 20.dp).animateItem(fadeInSpec = null, fadeOutSpec = null)
                                             )
                                         }
                                     }
@@ -471,7 +471,7 @@ fun FloatingAssistantOverlay(
                                             is io.github.ronganam.dana.data.chat.ThreadModel.Row.MemoryLine ->
                                                 io.github.ronganam.dana.ui.screens.chat.MemoryLine(
                                                     row.label,
-                                                    modifier = Modifier.padding(horizontal = 20.dp).animateItemPlacement()
+                                                    modifier = Modifier.padding(horizontal = 20.dp).animateItem(fadeInSpec = null, fadeOutSpec = null)
                                                 )
                                             is io.github.ronganam.dana.data.chat.ThreadModel.Row.Message -> {
                                                 val msg = row.msg
@@ -485,7 +485,7 @@ fun FloatingAssistantOverlay(
                                                         modifier = Modifier
                                                             .fillMaxWidth()
                                                             .padding(horizontal = 20.dp)
-                                                            .animateItemPlacement()
+                                                            .animateItem(fadeInSpec = null, fadeOutSpec = null)
                                                             .then(faded)
                                                     )
                                                 } else {
@@ -496,7 +496,7 @@ fun FloatingAssistantOverlay(
                                                         tapToSpeech = tapToSpeech,
                                                         serverUrl = viewModel.serverConfig.url,
                                                         apiToken = viewModel.serverConfig.token,
-                                                        modifier = Modifier.animateItemPlacement().then(faded)
+                                                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).then(faded)
                                                     )
                                                 }
                                             }
@@ -510,7 +510,7 @@ fun FloatingAssistantOverlay(
                                             io.github.ronganam.dana.ui.shell.UndoRows(
                                                 undos,
                                                 onUndo = { viewModel.chatController.undo(it) },
-                                                modifier = Modifier.padding(horizontal = 24.dp).animateItemPlacement()
+                                                modifier = Modifier.padding(horizontal = 24.dp).animateItem(fadeInSpec = null, fadeOutSpec = null)
                                             )
                                         }
                                     }
@@ -534,7 +534,7 @@ fun FloatingAssistantOverlay(
                                                 onCancel = { viewModel.cancelSelection() },
                                                 modifier = Modifier
                                                     .padding(horizontal = 20.dp)
-                                                    .animateItemPlacement()
+                                                    .animateItem(fadeInSpec = null, fadeOutSpec = null)
                                             )
                                         }
                                     }

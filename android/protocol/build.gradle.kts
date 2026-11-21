@@ -8,14 +8,14 @@ plugins {
 
 android {
     namespace = "io.github.ronganam.dana.protocol"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         minSdk = 26
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     testOptions {
         unitTests.isReturnDefaultValues = true
@@ -24,15 +24,15 @@ android {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_1_8)
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
 dependencies {
     // DataMap for the /dana_config and /dana/version data items.
-    implementation("com.google.android.gms:play-services-wearable:18.1.0")
+    implementation("com.google.android.gms:play-services-wearable:20.0.1")
 
     testImplementation("junit:junit:4.13.2")
     // Android's org.json is a stub off-device.
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
 }
