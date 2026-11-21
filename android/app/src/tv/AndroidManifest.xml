@@ -47,9 +47,9 @@
         tools:replace="android:name"
         android:banner="@drawable/tv_banner">
         <!-- Phone-only: the notification Inbox listener. -->
-        <service android:name="app.ganam.assistant.data.notifications.DanaNotificationListener" tools:node="remove" />
-        <activity android:name="app.ganam.assistant.NotificationAlertActivity" tools:node="remove" />
-        <activity android:name="app.ganam.assistant.SuggestionsPopupActivity" tools:node="remove" />
+        <service android:name="io.github.ronganam.dana.data.notifications.DanaNotificationListener" tools:node="remove" />
+        <activity android:name="io.github.ronganam.dana.NotificationAlertActivity" tools:node="remove" />
+        <activity android:name="io.github.ronganam.dana.SuggestionsPopupActivity" tools:node="remove" />
 
         <activity
             android:name=".tv.TvHomeActivity"
@@ -61,7 +61,7 @@
             android:resumeWhilePausing="true"
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode"
-            android:theme="@style/Theme.GanamAssistant"
+            android:theme="@style/Theme.Dana"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -80,11 +80,11 @@
             android:name=".tv.AssistantActivity"
             android:exported="false"
             android:launchMode="singleTask"
-            android:taskAffinity="app.ganam.assistant.tv.assistant"
+            android:taskAffinity="io.github.ronganam.dana.tv.assistant"
             android:excludeFromRecents="true"
             android:screenOrientation="landscape"
             android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode"
-            android:theme="@style/Theme.GanamAssistant.VoiceSession"
+            android:theme="@style/Theme.Dana.VoiceSession"
             android:windowSoftInputMode="adjustResize" />
 
         <service
@@ -92,8 +92,8 @@
             android:exported="false"
             android:foregroundServiceType="microphone">
             <meta-data
-                android:name="app.ganam.assistant.wake.ACTIVITY"
-                android:value="app.ganam.assistant.tv.AssistantActivity" />
+                android:name="io.github.ronganam.dana.wake.ACTIVITY"
+                android:value="io.github.ronganam.dana.tv.AssistantActivity" />
         </service>
 
         <service
@@ -126,9 +126,9 @@
         <receiver android:name=".BootReceiver" tools:node="remove" />
         <receiver android:name=".data.sync.CallUploadReceiver" tools:node="remove" />
         <receiver android:name=".push.AgentSessionReceiver" tools:node="remove" />
-        <service android:name=".GanamVoiceInteractionService" tools:node="remove" />
-        <service android:name=".GanamVoiceInteractionSessionService" tools:node="remove" />
-        <service android:name=".GanamRecognitionService" tools:node="remove" />
+        <service android:name=".DanaVoiceInteractionService" tools:node="remove" />
+        <service android:name=".DanaVoiceInteractionSessionService" tools:node="remove" />
+        <service android:name=".DanaRecognitionService" tools:node="remove" />
         <service android:name=".CallRecordingObserverService" tools:node="remove" />
         <service android:name=".data.wear.WearMessageListenerService" tools:node="remove" />
     </application>

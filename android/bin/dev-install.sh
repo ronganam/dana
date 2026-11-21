@@ -2,8 +2,8 @@
 # The inner loop: build one debug app, install it on an EMULATOR and open it.
 #
 # Usage:
-#   bin/dev-install.sh phone                # :app phone debug → emulator-5554 (AVD "ganam")
-#   bin/dev-install.sh watch                # :wear debug      → emulator-5556 (AVD "dana_watch")
+#   bin/dev-install.sh phone                # :app phone debug → emulator-5554 (AVD $PHONE_AVD, default "dana_phone")
+#   bin/dev-install.sh watch                # :wear debug      → emulator-5556 (AVD $WATCH_AVD, default "dana_watch")
 #   bin/dev-install.sh kiosk|tv -s emulator-5554
 #   bin/dev-install.sh phone --boot         # boot the AVD first if it isn't running
 #   bin/dev-install.sh phone --no-open      # install only
@@ -12,6 +12,11 @@
 # TV get release builds through bin/deploy-*.sh. Builds one variant only, so
 # Gradle never touches the other module or flavors.
 set -euo pipefail
+# PHONE_AVD / WATCH_AVD may come from your site's android.env (docs/release.md, "Your site").
+SITE="${DANA_SITE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/site}"
+[[ -r "$SITE/android.env" ]] && . "$SITE/android.env"
+PHONE_AVD="${PHONE_AVD:-dana_phone}"
+WATCH_AVD="${WATCH_AVD:-dana_watch}"
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
@@ -30,13 +35,13 @@ done
 
 case "$TARGET" in
   phone) TASK=:app:assemblePhoneDebug; APK=app/build/outputs/apk/phone/debug/app-phone-debug.apk
-         ACT=app.ganam.assistant/.MainActivity; AVD=ganam; DEFAULT_SERIAL=emulator-5554 ;;
+         ACT=io.github.ronganam.dana/.MainActivity; AVD=$PHONE_AVD; DEFAULT_SERIAL=emulator-5554 ;;
   kiosk) TASK=:app:assembleKioskDebug; APK=app/build/outputs/apk/kiosk/debug/app-kiosk-debug.apk
-         ACT=app.ganam.assistant.kiosk/.KioskActivity; AVD=ganam; DEFAULT_SERIAL=emulator-5554 ;;
+         ACT=io.github.ronganam.dana.kiosk/.KioskActivity; AVD=$PHONE_AVD; DEFAULT_SERIAL=emulator-5554 ;;
   tv)    TASK=:app:assembleTvDebug; APK=app/build/outputs/apk/tv/debug/app-tv-debug.apk
-         ACT=app.ganam.assistant.tv/.TvHomeActivity; AVD=ganam; DEFAULT_SERIAL=emulator-5554 ;;
+         ACT=io.github.ronganam.dana.tv/.TvHomeActivity; AVD=$PHONE_AVD; DEFAULT_SERIAL=emulator-5554 ;;
   watch) TASK=:wear:assembleDebug; APK=wear/build/outputs/apk/debug/wear-debug.apk
-         ACT=app.ganam.assistant/app.ganam.assistant.wear.MainActivity; AVD=dana_watch; DEFAULT_SERIAL=emulator-5556 ;;
+         ACT=io.github.ronganam.dana/io.github.ronganam.dana.wear.MainActivity; AVD=$WATCH_AVD; DEFAULT_SERIAL=emulator-5556 ;;
   -h|--help) usage 0 ;;
   *) echo "Unknown target: $TARGET (phone, watch, kiosk, tv)" >&2; usage 1 ;;
 esac
