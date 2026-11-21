@@ -76,9 +76,11 @@ for name, why in (("weather", "already exists"), ("tasks", "official"), ("Bad-Na
     r = dana("addons", "new", name)
     check(f"new {name}: refused ({why})", r.returncode == 1 and why in r.stderr, r.stdout + r.stderr)
 
-shape = [f.replace("tide_chart", "hello") for f in made if not f.startswith("worker/")]
-missing = [f for f in shape if not (EXAMPLE / f).is_file()]
-check("examples/addons/hello has the scaffold's shape (every file new --web writes, at its path)", not missing, missing)
+# The example lives at the repository root, outside the image's server/ (the container's test stage).
+if EXAMPLE.parent.is_dir():
+    shape = [f.replace("tide_chart", "hello") for f in made if not f.startswith("worker/")]
+    missing = [f for f in shape if not (EXAMPLE / f).is_file()]
+    check("examples/addons/hello has the scaffold's shape (every file new --web writes, at its path)", not missing, missing)
 
 print(f"\n{'All checks passed' if not failures else f'{failures} check(s) failed'}")
 raise SystemExit(1 if failures else 0)
