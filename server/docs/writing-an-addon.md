@@ -1,6 +1,6 @@
 # Writing an addon
 
-An addon is a folder with an `addon.py`; everything it adds to Dana is declared on the `addon` object there or with `@addon.<hook>` in its other modules. Official addons and yours are written the same way. The design (and what is not built yet) is [`../../docs/addons.md`](../../docs/addons.md).
+An addon is a folder with an `addon.py`; everything it adds to Dana is declared on the `addon` object there or with `@addon.<hook>` in its other modules. Official addons and yours are written the same way. The full architecture is in [`../../docs/addons.md`](../../docs/addons.md).
 
 ## Start from the scaffold
 
@@ -22,6 +22,7 @@ my_addon/
   web/              its page: script, style             served at /addons/<name>/web/<file> (web=Web(...); "A web page")
   worker/           Dockerfile of a sidecar             built by bin/deploy as <image>-<name> (worker=Worker(...))
   migrations/       m0001_baseline.py, m0002_…          its own tables
+  requirements.txt  extra Python packages (optional)    checked at load; installed into the image
   tests/            test_*.py                           run by bin/test
 ```
 
@@ -192,7 +193,7 @@ VERSION, NAME = 1, "baseline"
 def up(conn): conn.execute("CREATE TABLE my_items (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL)")
 ```
 
-Numbered 1, 2, 3… per addon, found by file name, applied at start in `needs` order (after a snapshot) and recorded in `schema_migrations (addon, version, name, applied_at)`. Non-official addons' migrations run in their own transaction and a failure unloads only that addon. `up` runs inside the runner's transaction: never commit. A change is the next file; never edit a shipped one. An addon touches only its own tables (it may reference core's, or another addon's only when `needs` declares it) and every query filters by the user. Never `CREATE TABLE` outside a migration.
+Numbered 1, 2, 3… per addon, found by file name, applied at start in `needs` order (after a snapshot) and recorded in `schema_migrations (addon, version, name, applied_at)`. Non-official addons' migrations run in their own transaction and a failure unloads only that addon. `up` runs inside the runner's transaction: never commit. A change is the next file; never edit a shipped one. An addon touches only its own tables (it may reference core's, or another addon's only when `needs` declares it) and every query filters by the user (`core.addons.UserTable` provides user-scoped CRUD helpers for common tables; `tests/test_sql_scope.py` checks that every query on a table with a `user_id` column filters by `user_id` or carries a `# scoped:` comment). Never `CREATE TABLE` outside a migration.
 
 ## Routes
 

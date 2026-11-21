@@ -117,7 +117,7 @@ async def hook(client, user, agent: str, event: Dict[str, Any], host: str = "lap
 
 
 def claude(name: str, **fields) -> Dict[str, Any]:
-    return {"session_id": "s-1", "hook_event_name": name, "cwd": "/home/x/projects/ganam-assistant",
+    return {"session_id": "s-1", "hook_event_name": name, "cwd": "/home/x/projects/dana",
             "transcript_path": "/tmp/t.jsonl", **fields}
 
 
@@ -147,7 +147,7 @@ async def test_flow(client) -> None:
     s = latest_list(ANN)
     check("prompt: the session runs, titled by the prompt's first line, pushed at once",
           r["change"] == "status" and len(s) == 1 and s[0]["status"] == "running"
-          and s[0]["title"] == "Fix the push retry" and s[0]["project"] == "ganam-assistant"
+          and s[0]["title"] == "Fix the push retry" and s[0]["project"] == "dana"
           and s[0]["agent"] == "claude" and s[0]["host"] == "laptop" and s[0]["id"] == "claude:s-1"
           and s[0]["rev"] == 1 and len(PINGS) == 1 and PINGS[0]["type"] == "agent_sessions", (r, s, PINGS))
 
@@ -307,7 +307,7 @@ async def test_subagents(client) -> None:
 
     # Claude Code's own subagent: same session id, its events carry agent_id.
     def main_(name: str, **f) -> Dict[str, Any]:
-        return {"session_id": "p-1", "hook_event_name": name, "cwd": "/w/ganam-assistant", **f}
+        return {"session_id": "p-1", "hook_event_name": name, "cwd": "/w/dana", **f}
 
     await hook(client, ANN, "claude", main_("UserPromptSubmit", prompt="Delegated task node:delegated-task:x"), **t3)
     check("T3 thread title over the prompt", entry(ANN, "claude:p-1").get("title") == "Data feature ideas")

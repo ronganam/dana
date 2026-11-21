@@ -200,7 +200,7 @@ The merchant memory (`classify.py`, each taking an open connection): `alias(conn
 
 `signals.py`. A payment notification on the phone becomes a transaction at once and pulls that card's sync earlier. Two ways in:
 
-- **Google Wallet** (`com.google.android.apps.walletnfcrel`), already in the Inbox: `processing.schedule` hands every batch of new notification ids to the phone addon's observers (`addons/phone/notifications/observers.py`), where `addon.py` registers `signals.observe` (the phone addon never imports money). It records the user's own new Wallet notifications, only for users with `money`.
+- **Google Wallet** (`com.google.android.apps.walletnfcrel`), already in the Inbox: `processing.schedule` emits `phone.notification.ingested`, which `addons/money/hooks.py` receives via `@addon.on("phone.notification.ingested")` and hands to `signals.observe` (the phone addon never imports money). It records the user's own new Wallet notifications, only for users with `money`.
 - **The card / bank apps** (`com.onoapps.cal4u` Cal, `com.ideomobile.hapoalim`, `com.max.android`, `com.isracard.isracardapp`) never reach the Inbox: the phone posts them to `POST /api/money/signals`:
 
   ```json

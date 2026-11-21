@@ -1,0 +1,36 @@
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: /server
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: gradle
+    directory: /android
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /extensions/raycast-assistant
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: npm
+    directory: /server/addons/money_il/worker
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /server
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: docker
+    directory: /server/addons/money_il/worker
+    schedule:
+      interval: weekly
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
