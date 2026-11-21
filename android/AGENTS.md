@@ -77,7 +77,7 @@ The phone also offers published versions in Settings → App Update. Commit the 
 | `DanaVoiceInteractionService` | System-level voice interaction (BIND_VOICE_INTERACTION) |
 | `DanaVoiceInteractionSessionService` | Voice session handling, runs in `:session` process |
 | `DanaRecognitionService` | Custom speech recognition service |
-| `CallRecordingObserverService` | Foreground service for call recording detection/upload |
+| `CallRecordingObserverService` | Foreground service for call recording detection/upload; runs only once the user turns call recordings on |
 | `DanaNotificationListener` | Notification access → Dana's Inbox, plus bank sign-in codes / bank and card notifications for the `money` kind (`data/money/`; phone flavor only) |
 | `DanaMessagingService` | FCM wake-up pings → `PhoneEvents.catchUp` (phone flavor only; see `docs/notifications.md`) |
 | `SuggestionsPopupActivity` | New suggestions pop-up (server push → `SuggestionsReceiver.show`) |
@@ -113,6 +113,7 @@ The phone also offers published versions in Settings → App Update. Commit the 
 | `docs/wear.md` | Watch app: performance rules, hands-free turns, phone bridge, alarm, tiles / complications, the Shopping screen (and its debug fake phone) |
 | `docs/kiosk.md` | Wall-tablet kiosk, wake word, voice turn tuning |
 | `docs/tv.md` | Dana TV: home override, key service, camera PiP, TCL/MTK quirks |
+| `docs/permissions.md` | Every permission and special access, per flavor; distribution (sideload / your server, not Play); call recordings opt-in |
 | `docs/release.md` | Setup (SDK, JDK), HTTPS / cleartext, signing, in-app updates, R8/AOT, local defaults (Firebase config, server URL, TV defaults) |
 | `DESIGN.md` | "Ink & Paper" design system |
 

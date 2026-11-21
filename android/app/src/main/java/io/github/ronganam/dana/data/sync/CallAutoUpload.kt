@@ -26,14 +26,34 @@ import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
 
-/** User settings for automatic call uploads (DanaPrefs). */
+/** User settings for call recordings and their automatic upload (DanaPrefs). */
 object CallUploadSettings {
+    private const val KEY_ENABLED = "call_recordings_enabled"
     private const val KEY_AUTO = "call_auto_upload"
     private const val KEY_THRESHOLD = "call_auto_threshold_seconds"
     private const val KEY_WIFI = "call_upload_wifi_only"
     private const val KEY_SKIP = "call_skip_contacts"
 
     private fun prefs(c: Context) = ServerConfig.prefs(c)
+
+    /**
+     * Watching for call recordings at all (off until the user turns it on in
+     * Settings): only phones whose dialer saves recordings to Recordings/Call
+     * (Samsung's built-in call recorder) have any.
+     */
+    fun enabled(c: Context): Boolean = prefs(c).getBoolean(KEY_ENABLED, false)
+    fun setEnabled(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_ENABLED, v).apply()
+
+    /** The permission that lets the app read the recordings folder. */
+    val storagePermission: String
+        get() = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+            Manifest.permission.READ_MEDIA_AUDIO
+        } else {
+            Manifest.permission.READ_EXTERNAL_STORAGE
+        }
+
+    fun canWatch(c: Context): Boolean =
+        enabled(c) && c.checkSelfPermission(storagePermission) == PackageManager.PERMISSION_GRANTED
 
     fun autoUpload(c: Context): Boolean = prefs(c).getBoolean(KEY_AUTO, true)
     fun setAutoUpload(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_AUTO, v).apply()
