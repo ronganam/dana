@@ -174,7 +174,7 @@ class MainActivity : ComponentActivity() {
         try {
             when {
                 type.startsWith("audio/") && uri != null -> {
-                    vm.setSharedAudioUri(uri)
+                    vm.callsController.setSharedAudioUri(uri)
                     vm.navigateTo("calls")
                 }
                 type.startsWith("image/") && uri != null -> {

@@ -72,11 +72,11 @@ fun DanaShell(viewModel: MainViewModel) {
     // The ask bar's text searches your things (2+ characters, debounced in the controller).
     LaunchedEffect(shell.askDraft.text) { viewModel.searchController.setQuery(shell.askDraft.text) }
     // Text shared from another app lands in the ask bar, thread open.
-    val draft by viewModel.draftText.collectAsState()
+    val draft by viewModel.chatController.draftText.collectAsState()
     LaunchedEffect(draft) {
         draft?.let {
             shell.askDraft = TextFieldValue(it, TextRange(it.length))
-            viewModel.consumeDraft()
+            viewModel.chatController.consumeDraft()
             shell.openThread()
         }
     }
@@ -137,7 +137,7 @@ fun DanaShell(viewModel: MainViewModel) {
                         },
                         onAsk = {
                             shell.openThread()
-                            if (viewModel.sendChatMessage(query.trim())) shell.askDraft = TextFieldValue("")
+                            if (viewModel.chatController.sendChatMessage(query.trim())) shell.askDraft = TextFieldValue("")
                         }
                     )
                 },

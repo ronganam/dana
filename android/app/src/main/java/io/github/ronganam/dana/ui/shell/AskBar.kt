@@ -69,23 +69,23 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val sheet = layout != ShellLayout.FULL
     val threadOpen by shell.threadOpen.collectAsState()
     val screen by shell.screen.collectAsState()
-    val messages by viewModel.chatMessages.collectAsState()
-    val isRecording by viewModel.isRecording.collectAsState()
-    val isStreaming by viewModel.isStreaming.collectAsState()
-    val isCallActive by viewModel.isCallActive.collectAsState()
-    val pendingImage by viewModel.pendingImageUri.collectAsState()
+    val messages by viewModel.chatController.chatMessages.collectAsState()
+    val isRecording by viewModel.chatController.isRecording.collectAsState()
+    val isStreaming by viewModel.chatController.isStreaming.collectAsState()
+    val isCallActive by viewModel.callController.isCallActive.collectAsState()
+    val pendingImage by viewModel.chatController.pendingImageUri.collectAsState()
     val serverStatus by viewModel.serverStatus.collectAsState()
     val context = LocalContext.current
     val draft = shell.askDraft
 
     val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         if (granted) {
-            viewModel.startVoiceRecording()
+            viewModel.chatController.startVoiceRecording()
             if (sheet) shell.openThread()
         }
     }
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
-        if (uri != null) viewModel.setPendingImage(uri)
+        if (uri != null) viewModel.chatController.setPendingImage(uri)
     }
 
     fun send() {
@@ -94,17 +94,17 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
         // Open first: on the cover that pins what is open, so the message carries it.
         if (sheet) shell.openThread()
         // Keep the text when the server is unreachable so it can be sent again.
-        if (viewModel.sendChatMessage(text)) shell.askDraft = TextFieldValue("")
+        if (viewModel.chatController.sendChatMessage(text)) shell.askDraft = TextFieldValue("")
     }
 
     fun mic() {
         when {
-            isCallActive -> viewModel.endRealtimeCall()
-            isRecording -> viewModel.stopVoiceRecording()
+            isCallActive -> viewModel.callController.endCall()
+            isRecording -> viewModel.chatController.stopVoiceRecording()
             ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ->
                 micPermission.launch(Manifest.permission.RECORD_AUDIO)
             else -> {
-                viewModel.startVoiceRecording()
+                viewModel.chatController.startVoiceRecording()
                 if (sheet) shell.openThread()
             }
         }
@@ -153,7 +153,7 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     contentScale = ContentScale.Crop,
                     modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
                 )
-                IconButton(onClick = { viewModel.clearPendingImage() }) {
+                IconButton(onClick = { viewModel.chatController.clearPendingImage() }) {
                     Icon(Icons.Filled.Close, contentDescription = "Remove the image", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             }
@@ -230,7 +230,7 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                         when {
                             isRecording || isCallActive -> mic()
                             hasText -> send()
-                            isStreaming -> viewModel.stopAssistant()
+                            isStreaming -> viewModel.chatController.stopAssistant()
                             else -> mic()
                         }
                     },
