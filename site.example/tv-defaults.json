@@ -1,0 +1,13 @@
+{
+ "favorites": ["com.google.android.youtube.tv", "com.netflix.ninja"],
+ "entities": ["light.living_room", "climate.living_room"],
+ "cameras": [
+  {"id": "front", "name": "Front door", "url": "rtsp://frigate.local:8554/front", "snapshot": ""}
+ ],
+ "bindings": [
+  {"key": 165, "press": "SHORT", "action": {"type": "pip", "camera": "front"}}
+ ],
+ "pip_corner": "BOTTOM_RIGHT",
+ "pip_scale": 0.33,
+ "home_override": true
+}

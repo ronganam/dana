@@ -3,13 +3,15 @@
 # install it over adb. It is not published to the server's update channel.
 #
 # Usage:
-#   bin/deploy-kiosk.sh                    # release build → $ANDROID_SERIAL, else $KIOSK_SERIAL (local.env), else the only adb device
+#   bin/deploy-kiosk.sh                    # release build → $ANDROID_SERIAL, else $KIOSK_SERIAL (site/android.env), else the only adb device
 #   bin/deploy-kiosk.sh -s <serial>
 #   bin/deploy-kiosk.sh --debug            # debug build (allows `run-as` and audio injection)
 #   bin/deploy-kiosk.sh --set-home         # also make it the default home app
 set -euo pipefail
-# Your devices and server: android/local.env (gitignored; local.env.example).
-[[ -r "$(dirname "${BASH_SOURCE[0]}")/../local.env" ]] && . "$(dirname "${BASH_SOURCE[0]}")/../local.env"
+# Your devices and server: your site's android.env (site/android.env at the repository
+# root, or $DANA_SITE/android.env; docs/release.md, "Your site").
+SITE="${DANA_SITE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/site}"
+[[ -r "$SITE/android.env" ]] && . "$SITE/android.env"
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 SERIAL="${ANDROID_SERIAL:-${KIOSK_SERIAL:-}}"; VARIANT=Release; SET_HOME=0

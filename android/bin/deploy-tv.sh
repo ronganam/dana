@@ -5,7 +5,7 @@
 # right to re-enable that service after its own updates (TCL drops it).
 #
 # Usage:
-#   bin/deploy-tv.sh                       # release build → $ANDROID_SERIAL, else $TV_SERIAL (local.env)
+#   bin/deploy-tv.sh                       # release build → $ANDROID_SERIAL, else $TV_SERIAL (site/android.env)
 #   bin/deploy-tv.sh -s 192.168.1.20:5555
 #   bin/deploy-tv.sh --debug               # debug build (logs every remote key)
 #   DANA_API_TOKEN=… bin/deploy-tv.sh      # also hand it the server's API token
@@ -14,8 +14,10 @@
 # adb auth: a TV that already trusts another adb key (e.g. Home Assistant's) needs it:
 #   adb kill-server; ADB_VENDOR_KEYS=<that key> adb start-server
 set -euo pipefail
-# Your devices and server: android/local.env (gitignored; local.env.example).
-[[ -r "$(dirname "${BASH_SOURCE[0]}")/../local.env" ]] && . "$(dirname "${BASH_SOURCE[0]}")/../local.env"
+# Your devices and server: your site's android.env (site/android.env at the repository
+# root, or $DANA_SITE/android.env; docs/release.md, "Your site").
+SITE="${DANA_SITE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/site}"
+[[ -r "$SITE/android.env" ]] && . "$SITE/android.env"
 cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 SERIAL="${ANDROID_SERIAL:-${TV_SERIAL:-}}"; VARIANT=Release; SERVER=""

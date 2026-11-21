@@ -30,6 +30,3 @@ replay_pid*.log
 # Your own setup, never committed (docs/release.md, "Local defaults"):
 # Firebase config, devices / publish token, the TV's first-run defaults, agent notes
 /app/src/phone/google-services.json
-/local.env
-/tv-defaults.json
-AGENTS.local.md

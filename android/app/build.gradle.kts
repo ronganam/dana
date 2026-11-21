@@ -15,13 +15,19 @@ val keystoreProperties = Properties().apply {
     if (f.exists()) f.inputStream().use { load(it) }
 }
 
+// Your deployment's site folder (docs/release.md, "Your site"): ../site at the
+// repository root, or $DANA_SITE.
+val siteDir: File = System.getenv("DANA_SITE")?.takeIf { it.isNotBlank() }?.let { File(it) }
+    ?: rootProject.file("../site")
+
 // Firebase (direct push, phone only) is initialised by hand from these values
 // instead of the google-services plugin, which would also demand a config for
-// the kiosk and TV builds. src/phone/google-services.json comes from your own
-// Firebase project and is gitignored (docs/release.md); without it the phone
-// build has no direct push.
+// the kiosk and TV builds. google-services.json comes from your own Firebase
+// project: your site's, else src/phone/ (gitignored; docs/release.md); without it
+// the phone build has no direct push.
 @Suppress("UNCHECKED_CAST")
-val firebaseConfig: Map<String, String> = file("src/phone/google-services.json").let { gs ->
+val firebaseConfig: Map<String, String> = File(siteDir, "google-services.json")
+    .takeIf { it.exists() }.let { it ?: file("src/phone/google-services.json") }.let { gs ->
     if (!gs.exists()) return@let listOf("FIREBASE_PROJECT_ID", "FIREBASE_SENDER_ID", "FIREBASE_APP_ID", "FIREBASE_API_KEY")
         .associateWith { "" }
     val json = groovy.json.JsonSlurper().parse(gs) as Map<String, Any>
@@ -37,17 +43,18 @@ val firebaseConfig: Map<String, String> = file("src/phone/google-services.json")
     )
 }
 
-// Your own defaults, from files that stay on your machine (docs/release.md, "Local
-// defaults"): local.properties (`dana.serverUrl`, `dana.lanDnsServers`) and
-// tv-defaults.json (the TV's first-run home screen, in TvConfig's JSON shape).
-val localProperties = Properties().apply {
-    val f = rootProject.file("local.properties")
+// Your deployment's defaults, from its site folder: android.env (SERVER_URL: the app's
+// default server; LAN_DNS_SERVERS: the TV's LAN DNS fallback; KEY=value lines, the
+// same file bin/deploy-*.sh source) and tv-defaults.json (the TV's first-run home
+// screen, in TvConfig's JSON shape). Without a site the apps have no defaults.
+val siteEnv = Properties().apply {
+    val f = File(siteDir, "android.env")
     if (f.exists()) f.inputStream().use { load(it) }
 }
-fun localValue(key: String): String = localProperties.getProperty(key, "").trim()
+fun siteValue(key: String): String = siteEnv.getProperty(key, "").trim().removeSurrounding("\"").removeSurrounding("'")
 fun quoted(s: String): String =
     "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n").replace("\r", "") + "\""
-val tvDefaultsJson: String = rootProject.file("tv-defaults.json").let { if (it.exists()) it.readText().trim() else "" }
+val tvDefaultsJson: String = File(siteDir, "tv-defaults.json").let { if (it.exists()) it.readText().trim() else "" }
 
 android {
     namespace = "app.ganam.assistant"
@@ -61,9 +68,9 @@ android {
         versionName = "8.5.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The server address a fresh install of the kiosk / TV starts with ("": set it in the app).
-        buildConfigField("String", "DEFAULT_SERVER_URL", quoted(localValue("dana.serverUrl")))
+        buildConfigField("String", "DEFAULT_SERVER_URL", quoted(siteValue("SERVER_URL")))
         // LAN resolvers the TV asks when the system DNS has no answer (comma-separated).
-        buildConfigField("String", "LAN_DNS_SERVERS", quoted(localValue("dana.lanDnsServers")))
+        buildConfigField("String", "LAN_DNS_SERVERS", quoted(siteValue("LAN_DNS_SERVERS")))
     }
 
     signingConfigs {
