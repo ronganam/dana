@@ -17,10 +17,9 @@
 .usg-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .usg-filter svg { width: 12px; height: 12px; }
 .usg-note { display: flex; gap: 8px; align-items: flex-start; margin-top: 10px; padding: 8px 12px; border-radius: var(--radius-card);
-  background: rgba(255,149,0,.08); color: var(--prio-medium); font-size: 12.5px; line-height: 1.4; }
+  background: rgb(var(--amber-rgb) / .08); color: var(--prio-medium); font-size: 12.5px; line-height: 1.4; }
 .usg-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
-.usg-skel { height: 120px; border-radius: var(--radius-card); background: var(--canvas-soft); animation: usg-pulse 1.2s ease-in-out infinite; }
-@keyframes usg-pulse { 50% { opacity: .5; } }
+.usg-skel { height: 120px; border-radius: var(--radius-card); background: var(--canvas-soft); }
 .usg-error { display: flex; flex-direction: column; gap: 4px; color: var(--body); }
 .usg-error strong { color: var(--ink); }
 

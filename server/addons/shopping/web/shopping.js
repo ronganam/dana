@@ -459,7 +459,7 @@
         ? `<div class="shp-empty"><i data-lucide="shopping-cart"></i><strong>Shopping isn't turned on</strong><span>An admin can connect it for you in Settings → Addons.</span></div>`
         : S.status === "error"
           ? `<div class="shp-empty"><i data-lucide="cloud-off"></i><strong>Couldn't load the list</strong><span>${C.esc(S.error)}</span><button class="btn-secondary" data-act="retry">Try again</button></div>`
-          : `<div class="shp-skel"></div><div class="shp-skel short"></div>`;
+          : `<div class="shp-skel dn-shimmer"></div><div class="shp-skel dn-shimmer short"></div>`;
       $("shp-list").innerHTML = ""; $("shp-usuals").innerHTML = ""; $("shp-empty").innerHTML = ""; $("shp-invites").innerHTML = "";
       renderHeader();
       icons();

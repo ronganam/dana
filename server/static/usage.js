@@ -119,7 +119,7 @@
     const el = $("usg-hero");
     if (S.error && !S.data) { el.innerHTML = `<div class="usg-error"><strong>Couldn't load usage</strong><span>${esc(S.error)}</span></div>`; return; }
     const d = S.data;
-    if (!d) { el.innerHTML = `<div class="usg-skel"></div>`; return; }
+    if (!d) { el.innerHTML = `<div class="usg-skel dn-shimmer"></div>`; return; }
     const t = d.totals;
     const range = RANGES.find((r) => r.id === S.range) || RANGES[2];
     let delta = "";

@@ -36,7 +36,7 @@ const calls = [
 check("contact: the receiver when I called, the caller when they did, Unknown for nobody",
   eq(calls.map(C.contactOf), ["Noa Levi", "Gal", "Unknown", "Unknown"]));
 check("avatar colour: steady for a name, one of the palette", C.avatarColor("Gal") === C.avatarColor("Gal")
-  && /^#[0-9a-f]{6}$/.test(C.avatarColor("Noa Levi")) && /^#[0-9a-f]{6}$/.test(C.avatarColor("")));
+  && /^(rose|sky|sage|plum|amber|teal)$/.test(C.avatarColor("Noa Levi")) && /^(rose|sky|sage|plum|amber|teal)$/.test(C.avatarColor("")));
 check("search: none gives every call, a copy", eq(C.filterCalls(calls, "").map((c) => c.id), ["c1", "c2", "c3", "c4"]) && C.filterCalls(calls, "") !== calls);
 check("search: caller, receiver, title or summary, any case",
   eq(C.filterCalls(calls, "noa").map((c) => c.id), ["c1"]) && eq(C.filterCalls(calls, " GAL ").map((c) => c.id), ["c2"])

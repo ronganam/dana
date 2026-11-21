@@ -202,7 +202,7 @@ function renderDebugSessionDetail() {
                     <div class="dbg-meta-row">
                         <span class="badge-tag">${escapeHtml(d.agent_model || "unknown model")}</span>
                         <span class="badge-tag">${history.length} messages</span>
-                        ${d.pending_approval ? `<span class="badge-tag" style="background:rgba(255,179,0,0.15);color:var(--connecting-amber);">pending approval</span>` : ""}
+                        ${d.pending_approval ? `<span class="badge-tag" style="background:var(--amber-tint);color:var(--amber-text);">pending approval</span>` : ""}
                         ${lastUpdated ? `<span class="badge-tag">${escapeHtml(formatTime(lastUpdated))}</span>` : ""}
                     </div>
                 </div>

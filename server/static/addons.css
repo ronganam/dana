@@ -1,7 +1,8 @@
-/* Addons screen (static/addons.js). App tokens from styles.css; state colours reuse the app's own (listening
-   green = on, medium priority amber = needs setup, high priority red = error), always with a text label.
+/* Addons screen (static/addons.js). App tokens from styles.css; states are pills in the named hues (sage = on,
+   amber = needs setup, rose = error), tint + hue text, always with a text label.
    Logical properties (inline-start / end) so the page mirrors under dir="rtl". */
-#panel-addons, #itg-welcome-modal { --itg-ok: var(--listening-green); --itg-warn: var(--prio-medium); --itg-bad: var(--prio-high); }
+#panel-addons, #itg-welcome-modal { --itg-ok: var(--sage); --itg-warn: var(--amber); --itg-bad: var(--rose);
+  --itg-ok-text: var(--sage-text); --itg-warn-text: var(--amber-text); --itg-bad-text: var(--rose-text); }
 .itg-scroll { flex: 1; overflow-y: auto; padding: 18px 20px 60px; }
 .itg-inner { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
 
@@ -11,8 +12,8 @@
 .itg-picker { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; color: var(--body-strong); }
 .itg-picker select { max-width: 360px; }
 .itg-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--radius-card);
-  border: 1px solid var(--itg-warn); background: rgba(255,149,0,.10); color: var(--ink); font-size: 13px; line-height: 1.4; }
-.itg-banner svg { width: 16px; height: 16px; color: var(--itg-warn); flex-shrink: 0; }
+  border: 1px solid var(--itg-warn); background: rgb(var(--amber-rgb) / .10); color: var(--ink); font-size: 13px; line-height: 1.4; }
+.itg-banner svg { width: 16px; height: 16px; color: var(--itg-warn-text); flex-shrink: 0; }
 .itg-banner span { flex: 1; min-width: 180px; }
 .itg-restart { border-color: var(--hairline-strong); background: var(--canvas-soft); }
 .itg-restart svg { color: var(--ink); }
@@ -39,23 +40,24 @@
 .itg-row-name { font-size: 14px; font-weight: 500; }
 .itg-row-desc { font-size: 12.5px; color: var(--mute); line-height: 1.35; }
 .itg-row-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--body); font-family: var(--font-mono); overflow-wrap: anywhere; }
-.itg-row-reason { font-size: 12px; color: var(--itg-bad); line-height: 1.35; }
+.itg-row-reason { font-size: 12px; color: var(--itg-bad-text); line-height: 1.35; }
 .itg-chev { width: 16px; height: 16px; color: var(--mute); flex-shrink: 0; }
 [dir="rtl"] .itg-chev, [dir="rtl"] .itg-suggest-go svg { transform: scaleX(-1); }
 
 /* States */
-.itg-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mute); white-space: nowrap; flex-shrink: 0; }
+.itg-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mute); white-space: nowrap; flex-shrink: 0;
+  padding: 2px 9px 2px 7px; border-radius: var(--radius-full); background: rgb(var(--ink-rgb) / .05); }
 .itg-dot { width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--hairline-strong); }
-.itg-state.on { color: var(--body-strong); }
+.itg-state.on { color: var(--itg-ok-text); background: var(--sage-tint); }
 .itg-state.on .itg-dot { background: var(--itg-ok); }
-.itg-state.setup { color: var(--itg-warn); }
+.itg-state.setup { color: var(--itg-warn-text); background: var(--amber-tint); }
 .itg-state.setup .itg-dot { background: transparent; border: 1.5px solid var(--itg-warn); }
-.itg-state.error, .itg-state.failed { color: var(--itg-bad); }
+.itg-state.error, .itg-state.failed { color: var(--itg-bad-text); background: var(--rose-tint); }
 .itg-state.error .itg-dot, .itg-state.failed .itg-dot { background: var(--itg-bad); }
 .itg-state.server-off .itg-dot, .itg-state.locked .itg-dot { background: transparent; border: 1px solid var(--mute); }
 .itg-badge { display: inline-block; margin-inline-start: 8px; padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid var(--hairline-strong);
   font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; letter-spacing: .4px; text-transform: uppercase; color: var(--body-strong); vertical-align: 1px; }
-.itg-badge.installed { border-color: rgba(255,149,0,.45); color: var(--itg-warn); }
+.itg-badge.installed { border-color: rgb(var(--amber-rgb) / .45); color: var(--itg-warn-text); }
 
 /* The welcome (on the page and over the app on first run) */
 .itg-welcome { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
@@ -105,15 +107,15 @@
 .itg-flabel { font-size: 13px; font-weight: 500; color: var(--ink); }
 .itg-flabel em { font-style: normal; font-weight: 400; color: var(--mute); margin-inline-start: 4px; }
 .itg-set { font-size: 11px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .5px; color: var(--mute); }
-.itg-set.on { color: var(--itg-ok); }
+.itg-set.on { color: var(--itg-ok-text); }
 .itg-help { font-size: 12.5px; color: var(--body); line-height: 1.45; }
 .itg-help-link { display: inline-flex; align-items: center; gap: 3px; color: var(--ink); white-space: nowrap; }
 .itg-help-link svg { width: 12px; height: 12px; }
 .itg-what, .itg-rule { font-size: 12px; color: var(--mute); line-height: 1.4; }
-.itg-ferr { font-size: 12.5px; color: var(--itg-bad); line-height: 1.4; overflow-wrap: anywhere; }
+.itg-ferr { font-size: 12.5px; color: var(--itg-bad-text); line-height: 1.4; overflow-wrap: anywhere; }
 .itg-ferr.hidden, .itg-status.hidden { display: none; }
 .itg-remove { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--body); cursor: pointer; }
-.itg-remove input { accent-color: var(--ink); }
+.itg-remove input { accent-color: var(--accent); }
 .itg-ro { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 9px 12px;
   border: 1px dashed var(--hairline-strong); border-radius: var(--radius-md); }
 .itg-ro-val { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
@@ -122,7 +124,7 @@
 .itg-lock svg { width: 13px; height: 13px; }
 .itg-note { display: flex; gap: 8px; align-items: flex-start; padding: 9px 12px; border-radius: var(--radius-card); background: var(--canvas);
   border: 1px solid var(--hairline); color: var(--body); font-size: 13px; line-height: 1.45; }
-.itg-note.warn { background: rgba(255,149,0,.08); border-color: rgba(255,149,0,.35); color: var(--itg-warn); }
+.itg-note.warn { background: rgb(var(--amber-rgb) / .08); border-color: rgb(var(--amber-rgb) / .35); color: var(--itg-warn-text); }
 .itg-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; }
 .itg-opts { font-size: 12px; color: var(--mute); }
 .itg-opts:empty { display: none; }
@@ -135,10 +137,10 @@
 .itg-disconnect { margin-inline-start: auto; }
 .itg-status { font-size: 13.5px; color: var(--body); line-height: 1.45; overflow-wrap: anywhere; padding: 10px 12px; border-radius: var(--radius-card);
   border: 1px solid var(--hairline); background: var(--canvas-soft); }
-.itg-status.ok { color: var(--itg-ok); border-color: rgba(52,199,89,.4); }
-.itg-status.bad { color: var(--itg-bad); border-color: rgba(255,59,48,.4); }
+.itg-status.ok { color: var(--itg-ok-text); border-color: rgb(var(--sage-rgb) / .4); }
+.itg-status.bad { color: var(--itg-bad-text); border-color: rgb(var(--rose-rgb) / .4); }
 .itg-admin .itg-installed { font-family: var(--font-mono); font-size: 11.5px; color: var(--mute); overflow-wrap: anywhere; }
-.itg-danger { color: var(--itg-bad); border-color: rgba(255,59,48,.4); }
+.itg-danger { color: var(--itg-bad-text); border-color: rgb(var(--rose-rgb) / .4); }
 
 /* The catalog */
 .itg-entry { border-bottom: 1px solid var(--hairline); }
@@ -165,9 +167,8 @@
 .itg-confirm .itg-note { margin-bottom: 14px; }
 
 /* Loading and errors */
-.itg-skel { height: 220px; border-radius: var(--radius-card); background: var(--canvas-soft); animation: itg-pulse 1.2s ease-in-out infinite; }
+.itg-skel { height: 220px; border-radius: var(--radius-card); background: var(--canvas-soft); }
 .itg-skel.short { height: 120px; }
-@keyframes itg-pulse { 50% { opacity: .5; } }
 .itg-error { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; color: var(--body); font-size: 13.5px; }
 .itg-error strong { color: var(--ink); }
 
@@ -181,4 +182,3 @@
   .itg-picker select { max-width: none; }
   .itg-step { padding-inline-start: 32px; }
 }
-@media (prefers-reduced-motion: reduce) { .itg-skel { animation: none; } }

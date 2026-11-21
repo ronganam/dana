@@ -18,6 +18,21 @@
     const HVAC_ICONS = { off: 'power', cool: 'snowflake', heat: 'flame', fan_only: 'fan' };
     const FAN_ICONS = { auto: 'gauge', low: 'chevrons-down', mid: 'minus', high: 'chevrons-up' };
 
+    // A value that changed after its first fill crossfades in (dashboard.css .dash-changed): on the wall
+    // tablet only values that change and presses move. The clock is set directly (it changes every second).
+    function setValue(el, text) {
+        if (!el) return;
+        text = String(text);
+        if (el.textContent === text) return;
+        const first = !el.dataset.filled;
+        el.textContent = text;
+        el.dataset.filled = '1';
+        if (first) return;
+        el.classList.remove('dash-changed');
+        void el.offsetWidth;   // restart the animation (once per changed value)
+        el.classList.add('dash-changed');
+    }
+
     let climateState = { hvac_mode: 'off', fan_mode: 'auto', temperature: 21, current_temperature: '--', humidity: '--' };
     let relayoutCam = null;   // assigned once the camera fitter is defined below
     let camScale = 1;
@@ -552,9 +567,9 @@
             climateState.current_temperature = a.current_temperature ?? '--';
             climateState.humidity = a.current_humidity ?? '--';
 
-            document.getElementById('cur-temp').textContent = climateState.current_temperature + '°';
-            document.getElementById('target-temp').textContent = climateState.temperature + '°';
-            document.getElementById('climate-humidity').querySelector('span').textContent = climateState.humidity + '%';
+            setValue(document.getElementById('cur-temp'), climateState.current_temperature + '°');
+            setValue(document.getElementById('target-temp'), climateState.temperature + '°');
+            setValue(document.getElementById('climate-humidity').querySelector('span'), climateState.humidity + '%');
 
             renderHvacModes();
             renderFanModes();
@@ -626,7 +641,7 @@
                 body: JSON.stringify({ domain: 'climate', service: 'set_temperature', entity_id: CLIMATE_ENTITY, service_data: { temperature: temp } })
             });
             climateState.temperature = temp;
-            document.getElementById('target-temp').textContent = temp + '°';
+            setValue(document.getElementById('target-temp'), temp + '°');
         } catch(e) { console.error('setTemperature error:', e); }
     }
 
@@ -664,7 +679,7 @@
             if (phoneR.ok) {
                 const d = await phoneR.json();
                 const pct = parseInt(d.state) || 0;
-                document.getElementById('phone-pct').textContent = pct + '%';
+                setValue(document.getElementById('phone-pct'), pct + '%');
                 document.getElementById('phone-pct').style.color = battColor(pct);
                 document.getElementById('phone-bar').style.width = pct + '%';
                 document.getElementById('phone-bar').style.background = battColor(pct);
@@ -672,7 +687,7 @@
             if (watchR.ok) {
                 const d = await watchR.json();
                 const pct = parseInt(d.state) || 0;
-                document.getElementById('watch-pct').textContent = pct + '%';
+                setValue(document.getElementById('watch-pct'), pct + '%');
                 document.getElementById('watch-pct').style.color = battColor(pct);
                 document.getElementById('watch-bar').style.width = pct + '%';
                 document.getElementById('watch-bar').style.background = battColor(pct);
@@ -743,9 +758,10 @@
     }
 
     const CAL_COLORS = [
-        'rgba(255,45,85,0.28)', 'rgba(0,122,255,0.28)', 'rgba(52,199,89,0.28)',
-        'rgba(175,82,222,0.28)', 'rgba(255,149,0,0.28)', 'rgba(90,200,250,0.28)',
-        'rgba(255,59,48,0.28)', 'rgba(255,204,0,0.28)'
+        // the named hues (dashboard.css) at 28%: sky, sage, plum, amber, teal, rose, ember
+        'rgba(90,167,240,0.28)', 'rgba(95,191,138,0.28)', 'rgba(184,146,242,0.28)',
+        'rgba(242,169,59,0.28)', 'rgba(61,191,179,0.28)', 'rgba(240,112,154,0.28)',
+        'rgba(255,106,61,0.28)'
     ];
     function calColor(calId) {
         let h = 0;

@@ -45,8 +45,8 @@
     const amt = (v, o, cls) => C.moneyHtml(v, o, cls);
     const whole = (v, o = {}) => C.moneyHtml(v, { cents: false, ...o });
     const heb = (s) => esc(C.isolateHebrew(s));
-    const skelCard = (title, body = `<div class="mny-chart-skel"></div>`) => `<section class="mny-card"><div class="mny-card-head"><span>${esc(title)}</span></div>${body}</section>`;
-    const rowsSkel = (n) => `<div class="mny-row-skel"></div>`.repeat(n);
+    const skelCard = (title, body = `<div class="mny-chart-skel dn-shimmer"></div>`) => `<section class="mny-card"><div class="mny-card-head"><span>${esc(title)}</span></div>${body}</section>`;
+    const rowsSkel = (n) => `<div class="mny-row-skel dn-shimmer"></div>`.repeat(n);
     const monthName = (m, o = {}) => C.monthLabel(m, { short: true, year: false, ...o });
     const gridY = (g, ticks) => ticks.map((t) => `<line class="mny-grid-l${t.zero ? " zero" : ""}" x1="${g.L}" x2="${g.W - g.R}" y1="${t.y}" y2="${t.y}"/>`
       + `<text class="mny-axis" x="${g.L - 6}" y="${t.y + 3.5}" text-anchor="end">${esc(t.text)}</text>`).join("");
@@ -70,7 +70,7 @@
     function overview(el) {
       const ov = got("overview");
       if (!ov) {
-        el.innerHTML = `<div class="mny-tiles">${`<div class="mny-tile mny-skel"></div>`.repeat(4)}</div>
+        el.innerHTML = `<div class="mny-tiles">${`<div class="mny-tile dn-row mny-skel dn-shimmer"></div>`.repeat(4)}</div>
           <div class="mny-ov-grid">${skelCard("Insights", rowsSkel(4))}${skelCard("Everyday pace")}</div>`;
         return;
       }
@@ -89,32 +89,32 @@
     function tilesHtml(ov, inProgress, fc) {
       const out = [];
       const net = C.netTile(ov, got("cashflow"));
-      out.push(`<button class="mny-tile" data-go="cashflow">
+      out.push(`<button class="mny-tile dn-row" data-go="cashflow">
         <span class="mny-tl">${esc(net.label)}</span>
         <span class="mny-tv ${net.value < 0 ? "neg" : "in"}">${amt(net.value, { sign: "plus" })}</span>
         <span class="mny-ts strong">${esc(net.rate)}${net.typical ? ` · ${esc(net.typical)}` : ""}</span>
         <span class="mny-ts">${esc(net.sub)}</span></button>`);
       const ev = C.everydayTile(ov.everyday, inProgress);
-      out.push(`<button class="mny-tile" data-go="spending">
+      out.push(`<button class="mny-tile dn-row" data-go="spending">
         <span class="mny-tl">Everyday spending</span>
         <span class="mny-tv">${amt(ev.value, { sign: "none" })}</span>
         ${ev.track ? `<span class="mny-ts strong">${ev.dir ? icon(ev.dir === "up" ? "trending-up" : "trending-down", `mny-ts-i ${ev.dir}`) : ""}${esc(ev.track)}</span>` : ""}
         <span class="mny-ts">${esc(ev.typical || (inProgress ? "so far this month" : "in all"))}</span></button>`);
       const bt = C.balanceTile(fc, today());
       if (bt) {
-        out.push(`<button class="mny-tile" data-go="cashflow" data-anchor="mny-bal">
+        out.push(`<button class="mny-tile dn-row" data-go="cashflow" data-anchor="mny-bal">
           <span class="mny-tl">Balance ahead</span>
           <span class="mny-tv${bt.value < 0 ? " neg" : ""}">${amt(bt.value)}</span>
           ${bt.low ? `<span class="mny-ts strong${bt.tone === "bad" ? " bad" : ""}">${esc(bt.low)}</span>` : ""}
           ${bt.end ? `<span class="mny-ts">${esc(bt.end)}</span>` : ""}</button>`);
       } else {
-        out.push(`<button class="mny-tile" data-go="spending" data-anchor="mny-big">
+        out.push(`<button class="mny-tile dn-row" data-go="spending" data-anchor="mny-big">
           <span class="mny-tl">One-offs</span>
           <span class="mny-tv">${amt(ov.one_off || 0, { sign: "none" })}</span>
           <span class="mny-ts">${ov.set_aside ? `Set aside ${C.moneyText(ov.set_aside, { cents: false, sign: "none" })}` : "left out of everyday spending"}</span></button>`);
       }
       const fx = C.fixedTile(ov);
-      out.push(`<button class="mny-tile" data-go="cashflow" data-anchor="mny-fixed">
+      out.push(`<button class="mny-tile dn-row" data-go="cashflow" data-anchor="mny-fixed">
         <span class="mny-tl">Fixed costs</span>
         <span class="mny-tv">${amt(fx.value, { sign: "none" })}<em>/ month</em></span>
         ${fx.share ? `<span class="mny-ts strong">${esc(fx.share)}</span>` : ""}
@@ -134,7 +134,7 @@
         const l = it.link || {};
         const attrs = l.view ? ` data-link-view="${esc(l.view)}"${l.category ? ` data-link-category="${esc(l.category)}"` : ""}${l.id ? ` data-link-id="${esc(l.id)}"` : ""}` : "";
         const tag = l.view ? "button" : "div";
-        return `<${tag} class="mny-ins tone-${esc(it.tone || "info")}"${attrs}>
+        return `<${tag} class="mny-ins dn-row tone-${esc(it.tone || "info")}"${attrs}>
           <span class="mny-ins-icon">${icon(INSIGHT_ICONS[it.kind] || "info")}</span>
           <span class="mny-ins-main"><span class="mny-ins-title" dir="ltr">${heb(it.title)}</span>${it.detail ? `<span class="mny-ins-detail" dir="ltr">${heb(it.detail)}</span>` : ""}</span>
           ${l.view ? icon("chevron-right", "mny-chev") : ""}</${tag}>`;
@@ -144,7 +144,7 @@
     function upcomingHtml() {
       const b = got("balance");
       const head = `<div class="mny-card-head"><span>Coming up</span><span class="mny-head-hint">next 45 days</span></div>`;
-      if (!b) return head + `<div class="mny-spark-skel mny-chart-skel"></div>` + rowsSkel(4);
+      if (!b) return head + `<div class="mny-spark-skel dn-shimmer mny-chart-skel"></div>` + rowsSkel(4);
       const fc = b.forecast;
       if (!fc) return `${head}<div class="mny-empty">Add a bank account to see what's coming.</div>`;
       const up = C.upcoming(fc, 45);
@@ -203,7 +203,7 @@
     function paceHtml() {
       const p = got("pace");
       const head = (legend = "") => `<div class="mny-card-head"><span>Everyday pace</span>${legend}</div>`;
-      if (!p) return head() + `<div class="mny-chart-skel"></div>`;
+      if (!p) return head() + `<div class="mny-chart-skel dn-shimmer"></div>`;
       const hasThis = (p.this_month || []).some((v) => v != null && v > 0);
       const legend = `<div class="mny-legend">
         <span><i class="mny-key this"></i>${isCurrent() ? "This month" : esc(monthName(p.month))}</span>
@@ -378,7 +378,7 @@
         <button role="radio" aria-checked="${mode === "everything"}" class="${mode === "everything" ? "on" : ""}" data-spend-mode="everything" title="Every charge, one-offs too">Everything</button></span>`;
       const d = monthsData();
       const head = `<div class="mny-card-head"><span>12 months</span>${seg}</div>`;
-      if (!d) return head + `<div class="mny-chart-skel short"></div>`;
+      if (!d) return head + `<div class="mny-chart-skel dn-shimmer short"></div>`;
       if (!d.months.some((m) => m.total > 0)) return `${head}<div class="mny-empty">No spending in these 12 months yet.</div>`;
       return head + `<div class="mny-chart-wrap" id="mny-months-wrap"></div><div class="mny-legend wrap" id="mny-months-legend"></div>
         <div class="mny-chart-note">${mode === "everyday" ? "Without one-offs" : "Every charge, one-offs too"} · click a month to open it</div>`;
@@ -467,7 +467,7 @@
     function cfHtml() {
       const cf = got("cashflow");
       const head = `<div class="mny-card-head"><span>Money in and out</span><span class="mny-head-hint">12 months to ${esc(C.monthLabel(S.month, { short: true }))}</span></div>`;
-      if (!cf) return head + `<div class="mny-chart-skel"></div>`;
+      if (!cf) return head + `<div class="mny-chart-skel dn-shimmer"></div>`;
       if (!cf.months.some((m) => m.income || m.spent || m.set_aside)) return `${head}<div class="mny-empty">Nothing in or out in these 12 months yet.</div>`;
       return head + `<div class="mny-chart-wrap" id="mny-cf-wrap"></div><div class="mny-legend wrap" id="mny-cf-legend"></div>
         <div class="mny-cf-totals">${esc(C.cashflowTotalsText(cf))}</div>
@@ -515,7 +515,7 @@
         `<button role="radio" aria-checked="${S.horizon === d}" class="${S.horizon === d ? "on" : ""}" data-horizon="${d}">${label}</button>`).join("")}</span>`;
       const head = `<div class="mny-card-head"><span>Bank balance</span>${seg}</div>`;
       const b = got("balance");
-      if (!b) return head + `<div class="mny-chart-skel"></div>`;
+      if (!b) return head + `<div class="mny-chart-skel dn-shimmer"></div>`;
       if (!b.history.length && !b.forecast) return `${head}<div class="mny-empty">Add a bank account to see its balance and where it's heading.</div>`;
       const fc = b.forecast;
       const now = fc ? fc.balance : b.history[b.history.length - 1].balance;
@@ -602,7 +602,7 @@
     function investments(el) {
       const p = got("portfolio");
       if (!p) {
-        el.innerHTML = `<div class="mny-tiles">${`<div class="mny-tile mny-skel"></div>`.repeat(4)}</div>
+        el.innerHTML = `<div class="mny-tiles">${`<div class="mny-tile dn-row mny-skel dn-shimmer"></div>`.repeat(4)}</div>
           <div class="mny-cols inv"><div class="mny-col">${skelCard("Portfolio value")}</div><div class="mny-col">${skelCard("Allocation", rowsSkel(4))}</div></div>`;
         return;
       }
@@ -628,13 +628,13 @@
 
     function invTilesHtml(t) {
       const signed = (v, o = {}) => (v == null ? `<span class="mny-muted">—</span>` : amt(v, { sign: "plus", cents: false, ...o }));
-      return `<div class="mny-tile"><span class="mny-tl">Portfolio value</span>
+      return `<div class="mny-tile dn-row"><span class="mny-tl">Portfolio value</span>
           <span class="mny-tv">${whole(t.value.value)}</span><span class="mny-ts">${esc(t.value.sub)}</span></div>
-        <div class="mny-tile"><span class="mny-tl">Today</span>
+        <div class="mny-tile dn-row"><span class="mny-tl">Today</span>
           <span class="mny-tv ${t.today.tone}">${signed(t.today.value, { cents: true })}</span><span class="mny-ts">${esc(t.today.sub)}</span></div>
-        <div class="mny-tile"><span class="mny-tl">Profit</span>
+        <div class="mny-tile dn-row"><span class="mny-tl">Profit</span>
           <span class="mny-tv ${t.profit.tone}">${signed(t.profit.value)}</span><span class="mny-ts">${esc(t.profit.sub)}</span></div>
-        <div class="mny-tile"><span class="mny-tl">Cash</span>
+        <div class="mny-tile dn-row"><span class="mny-tl">Cash</span>
           <span class="mny-tv">${whole(t.cash.value)}</span><span class="mny-ts">${esc(t.cash.sub || "not invested")}</span></div>`;
     }
 
@@ -722,7 +722,7 @@
     function meals(el) {
       const m = got("meals");
       if (!m) {
-        el.innerHTML = `<div class="mny-tiles">${`<div class="mny-tile mny-skel"></div>`.repeat(4)}</div>
+        el.innerHTML = `<div class="mny-tiles">${`<div class="mny-tile dn-row mny-skel dn-shimmer"></div>`.repeat(4)}</div>
           <div class="mny-cols inv"><div class="mny-col">${skelCard("Cycles", rowsSkel(6))}</div><div class="mny-col">${skelCard("Places", rowsSkel(5))}</div></div>`;
         return;
       }
@@ -746,13 +746,13 @@
     }
 
     function mealTilesHtml(t) {
-      return `<div class="mny-tile"><span class="mny-tl">Left this cycle</span>
+      return `<div class="mny-tile dn-row"><span class="mny-tl">Left this cycle</span>
           <span class="mny-tv">${whole(t.left.value)}</span><span class="mny-ts">${esc(t.left.sub)}</span></div>
-        <div class="mny-tile"><span class="mny-tl">Pace</span>
+        <div class="mny-tile dn-row"><span class="mny-tl">Pace</span>
           <span class="mny-tv ${t.pace.tone}">${esc(t.pace.text)}</span><span class="mny-ts">${esc(t.pace.sub)}</span></div>
-        <div class="mny-tile"><span class="mny-tl">On your card</span>
+        <div class="mny-tile dn-row"><span class="mny-tl">On your card</span>
           <span class="mny-tv">${whole(t.card.value)}</span><span class="mny-ts">${esc(t.card.sub)}</span></div>
-        <div class="mny-tile"><span class="mny-tl">Meals</span>
+        <div class="mny-tile dn-row"><span class="mny-tl">Meals</span>
           <span class="mny-tv">${esc(String(t.count.value))}</span><span class="mny-ts">${esc(t.count.sub)}</span></div>`;
     }
 
@@ -798,7 +798,7 @@
     function save(el) {
       const sv = got("savings");
       if (!sv) {
-        el.innerHTML = `<div class="mny-tiles sv">${`<div class="mny-tile mny-skel"></div>`.repeat(2)}</div>
+        el.innerHTML = `<div class="mny-tiles sv">${`<div class="mny-tile dn-row mny-skel dn-shimmer"></div>`.repeat(2)}</div>
           <div class="mny-cols sv"><div class="mny-col">${skelCard("Ways to save", rowsSkel(5))}</div><div class="mny-col">${skelCard("Spending to watch", rowsSkel(3))}</div></div>`;
         return;
       }
@@ -806,9 +806,9 @@
       const t = C.saveTiles(sv, day);
       const parts = C.saveSections(sv.items, day);
       el.innerHTML = `<div class="mny-tiles sv">
-          <div class="mny-tile"><span class="mny-tl">${icon("piggy-bank")}Could save</span>
+          <div class="mny-tile dn-row"><span class="mny-tl">${icon("piggy-bank")}Could save</span>
             <span class="mny-tv in">${esc(t.could.text)}</span><span class="mny-ts">${esc(t.could.sub)}</span></div>
-          <div class="mny-tile"><span class="mny-tl">${icon("circle-check")}Saved so far</span>
+          <div class="mny-tile dn-row"><span class="mny-tl">${icon("circle-check")}Saved so far</span>
             <span class="mny-tv">${whole(t.saved.value)}</span><span class="mny-ts">${esc(t.saved.sub)}</span></div>
         </div>
         <div class="mny-sv-source">${icon("info", "mny-ts-i")}<span>${esc(t.source)}</span></div>

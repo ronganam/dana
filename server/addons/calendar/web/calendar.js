@@ -39,7 +39,7 @@
         </div>`;
     } else {
       cont.innerHTML = r.body.map((ev) => `
-        <div class="task-card" style="margin-bottom:8px;">
+        <div class="task-card dn-row" style="margin-bottom:8px;">
             <div style="flex:1;">
                 <strong style="font-size:14px;color:var(--ink);">${api.esc(ev.summary || "Event")}</strong>
                 <div style="display:flex;gap:8px;font-size:11.5px;color:var(--mute);margin-top:4px;">

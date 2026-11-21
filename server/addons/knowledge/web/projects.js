@@ -255,7 +255,7 @@
     const decisionCards = decisions.map((s) => sectionCard(s)).join("");
     const noteCards = notes.map((s) => sectionCard(s)).join("");
     const addCard = (kind, label) => canEdit()
-      ? `<button class="prj-card prj-card-add" data-act="new-section" data-kind="${kind}"><i data-lucide="plus"></i><span>${label}</span></button>` : "";
+      ? `<button class="prj-card dn-row prj-card-add" data-act="new-section" data-kind="${kind}"><i data-lucide="plus"></i><span>${label}</span></button>` : "";
 
     return `<div class="prj-wrap" dir="${projectDir()}">
       ${hero}${budgetCard}
@@ -264,7 +264,7 @@
       ${notes.length || canEdit() ? `<div class="prj-h2"><h2>${t("Notes", "הערות")}</h2></div><div class="prj-grid">${noteCards}${addCard("notes", t("Add notes", "הערות חדשות"))}</div>` : ""}
       ${loose.length ? `<div class="prj-h2"><h2>${t("Other items", "פריטים נוספים")}</h2><span>${loose.length}</span></div><div class="prj-items">${loose.map(itemRow).join("")}</div>` : ""}
       ${tasks.length ? `<div class="prj-h2"><h2>${t("Tasks", "משימות")}</h2><span>${tasks.length}</span></div><div class="prj-items">${tasks.map((t) =>
-        `<div class="prj-item prj-task ${t.status === "done" ? "done" : ""}"><i data-lucide="${t.status === "done" ? "circle-check" : "circle"}"></i><span dir="auto">${esc(t.title)}</span></div>`).join("")}</div>` : ""}
+        `<div class="prj-item dn-row prj-task ${t.status === "done" ? "done" : ""}"><i data-lucide="${t.status === "done" ? "circle-check" : "circle"}"></i><span dir="auto">${esc(t.title)}</span></div>`).join("")}</div>` : ""}
     </div>`;
   }
 
@@ -275,7 +275,7 @@
     const price = st.price ? (st.price.min === st.price.max ? C.shortMoney(st.price.min) : `${C.shortMoney(st.price.min)}–${C.shortMoney(st.price.max)}`) : "";
     const chips = s.kind === "options" ? mine.slice(0, 5).map((e) =>
       `<span class="prj-mini ${e.decision || "option"}" dir="auto">${e.decision === "chosen" ? "✓ " : ""}${esc(e.title)}</span>`).join("") : "";
-    return `<button class="prj-card prj-sec-card ${st.decided ? "decided" : ""}" data-act="open-section" data-id="${esc(s.id)}">
+    return `<button class="prj-card dn-row prj-sec-card ${st.decided ? "decided" : ""}" data-act="open-section" data-id="${esc(s.id)}">
       <div class="prj-card-top">
         <span class="prj-card-icon">${esc(s.icon || (s.kind === "options" ? "⚖️" : "📝"))}</span>
         <span class="prj-card-title" dir="auto">${esc(s.title)}</span>
@@ -294,7 +294,7 @@
   function itemRow(e) {
     const files = e.files?.length || 0;
     const sub = e.url ? C.host(e.url) : C.preview(e.summary || e.body, 90);
-    return `<button class="prj-item" data-act="open-entry" data-id="${esc(e.id)}">
+    return `<button class="prj-item dn-row" data-act="open-entry" data-id="${esc(e.id)}">
       <i data-lucide="${e.url ? "link" : e.kind === "record" ? "id-card" : "sticky-note"}"></i>
       <span class="prj-item-text"><span class="prj-item-title" dir="auto">${esc(e.title || t("Untitled", "ללא שם"))}</span>${sub ? `<span class="prj-item-sub" dir="auto">${esc(sub)}</span>` : ""}</span>
       ${files ? `<span class="prj-item-files"><i data-lucide="paperclip"></i>${files}</span>` : ""}
@@ -380,7 +380,7 @@
     const vals = (s.columns || []).slice(0, 5).map((col) =>
       `<div class="prj-kv ${best[col.key]?.has(e.id) ? "best" : ""}"><dt dir="auto">${esc(col.name)}</dt><dd>${C.valueHtml(col, C.valueOf(e, col), lang())}</dd></div>`).join("");
     const files = e.files?.length || 0;
-    return `<button class="prj-card prj-opt-card ${e.decision || "option"}" data-act="open-entry" data-id="${esc(e.id)}">
+    return `<button class="prj-card dn-row prj-opt-card ${e.decision || "option"}" data-act="open-entry" data-id="${esc(e.id)}">
       <div class="prj-card-top"><span class="prj-card-title" dir="auto">${esc(e.title)}</span>${decisionPill(e)}</div>
       ${vals ? `<dl class="prj-kvs">${vals}</dl>` : `<div class="prj-card-preview" dir="auto">${esc(C.preview(e.body))}</div>`}
       <div class="prj-card-meta">${files ? `<span><i data-lucide="paperclip"></i>${t(C.plural(files, "file"), C.heCount(files, "קובץ אחד", "קבצים"))}</span>` : ""}${e.body ? `<span><i data-lucide="file-text"></i>${t("Details", "פרטים")}</span>` : ""}</div>

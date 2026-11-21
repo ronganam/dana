@@ -29,7 +29,9 @@
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const icons = () => { try { window.lucide?.createIcons(); } catch (_) { /* ignore */ } };
-  const hue = (s) => { let h = 0; for (const c of String(s || "")) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  // A steady named hue for a name (styles.css tokens; ember is the accent, left out).
+  const HUES = ["amber", "sage", "teal", "sky", "plum", "rose"];
+  const hue = (s) => { let h = 0; for (const c of String(s || "")) h = (h * 31 + c.charCodeAt(0)) % 997; return HUES[h % HUES.length]; };
   const rtl = (s) => /[֐-׿]/.test(String(s || "")) ? ' dir="auto"' : "";
 
   async function api(path, opts = {}) {
@@ -63,7 +65,7 @@
   const dur = (s) => (!s ? "" : s < 60 ? `${s}s` : `${Math.round(s / 60)} min`);
 
   function avatar(p, size = "") {
-    return `<span class="ppl-avatar ${size}" style="--h:${hue(p.name)}">${esc(p.initials || "?")}</span>`;
+    return `<span class="ppl-avatar ${size}" style="--av:var(--${hue(p.name)}-tint);--av-text:var(--${hue(p.name)}-text)">${esc(p.initials || "?")}</span>`;
   }
 
   // ---------- list ----------
@@ -100,7 +102,7 @@
       p.birthday_in_days != null ? `<span class="ppl-tag" title="Birthday">🎂 ${p.birthday_in_days === 0 ? "today" : p.birthday_in_days + "d"}</span>` : "",
       p.open_tasks ? `<span class="ppl-tag" title="Open tasks">${p.open_tasks} open</span>` : "",
     ].join("");
-    return `<button class="ppl-row ${S.openId === p.id ? "active" : ""}" data-id="${p.id}">
+    return `<button class="ppl-row dn-row ${S.openId === p.id ? "active" : ""}" data-id="${p.id}">
       ${avatar(p)}
       <span class="ppl-row-main"><span class="ppl-row-name"${rtl(p.name)}>${esc(p.name)}</span><span class="ppl-row-meta">${meta.join(" · ")}</span></span>
       <span class="ppl-row-flags">${flags}</span></button>`;
@@ -127,7 +129,7 @@
     S.openId = id;
     $.root.classList.add("detail-open");
     $.list.querySelectorAll(".ppl-row").forEach((r) => r.classList.toggle("active", r.dataset.id === id));
-    $.detail.innerHTML = `<div class="ppl-detail"><div class="ppl-skel"></div></div>`;
+    $.detail.innerHTML = `<div class="ppl-detail"><div class="ppl-skel dn-shimmer"></div></div>`;
     try {
       S.person = await api(`/api/people/${id}`);
     } catch (e) {

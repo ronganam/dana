@@ -90,6 +90,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 | Doc | Read before touching |
 |---|---|
 | `docs/development.md` | How to work fast: the test loop, the local environment, splitting work across parallel agents and the brief they get, shipping small |
+| `docs/web-design.md` | The web UI's look: tokens (Ink / Paper themes, the named hues and their tints), where colour goes, the motion tokens and patterns (`Dana.motion`), the dashboard as a low-power target |
 | `docs/notifications.md` | Notification ingest/triage/suggestions/summaries/escalation, web Inbox, phone push (`addons/phone/push.py`) |
 | `docs/calls.md` | Call upload/transcription/analysis, suggestions, task links, context chats |
 | `docs/tasks-and-triggers.md` | Task triggers (time / location / car / wake) |

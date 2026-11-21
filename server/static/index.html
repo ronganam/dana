@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Dana</title>
     <!-- PWA & Mobile Meta -->
-    <meta name="theme-color" content="#2b2622">
+    <meta name="theme-color" content="#2b2521" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#f3ede1" media="(prefers-color-scheme: light)">
+    <!-- Settings → Theme (app-settings.js), applied before the first paint -->
+    <script>try { var dt = localStorage.getItem("dana_theme"); if (dt === "light" || dt === "dark") document.documentElement.dataset.theme = dt; } catch (e) {}</script>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Dana">
@@ -261,6 +264,15 @@
                         <div class="settings-input-group">
                             <label class="settings-label" for="settings-api-token">API Token (Optional)</label>
                             <input type="password" class="settings-input" id="settings-api-token" placeholder="Bearer Token">
+                        </div>
+
+                        <div class="settings-input-group">
+                            <span class="settings-label" id="settings-theme-label">Theme</span>
+                            <div class="segmented-control" id="settings-theme" role="radiogroup" aria-labelledby="settings-theme-label">
+                                <button type="button" class="segmented-btn" role="radio" data-theme-choice="system">System</button>
+                                <button type="button" class="segmented-btn" role="radio" data-theme-choice="dark">Ink</button>
+                                <button type="button" class="segmented-btn" role="radio" data-theme-choice="light">Paper</button>
+                            </div>
                         </div>
 
                         <button class="btn-primary" id="btn-save-settings">Save Settings</button>

@@ -77,7 +77,7 @@
 
   function avatar(contact, cls = "") {
     const color = C.avatarColor(contact);
-    return `<div class="call-avatar ${cls}" style="background:${color}25;color:${color};">${esc(contact.charAt(0).toUpperCase())}</div>`;
+    return `<div class="call-avatar ${cls}" style="background:var(--${color}-tint);color:var(--${color}-text);">${esc(contact.charAt(0).toUpperCase())}</div>`;
   }
 
   function renderList() {
@@ -88,7 +88,7 @@
     list.innerHTML = shown.map((c) => {
       const contact = C.contactOf(c);
       return `
-        <div class="call-compact-row ${c.id === S.selected ? "active" : ""}" data-id="${esc(c.id)}">
+        <div class="call-compact-row dn-row ${c.id === S.selected ? "active" : ""}" data-id="${esc(c.id)}">
           ${avatar(contact)}
           <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:2px;">
             <div style="display:flex;align-items:center;justify-content:space-between;">

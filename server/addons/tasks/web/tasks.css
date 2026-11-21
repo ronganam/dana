@@ -44,14 +44,14 @@
   font-size: 13px;
   color: var(--body);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--t-state);
 }
 .filter-nav-item:hover {
-  background: rgba(247, 245, 240, 0.05);
+  background: rgb(var(--ink-rgb) / 0.05);
   color: var(--ink);
 }
 .filter-nav-item.active {
-  background: rgba(247, 245, 240, 0.12);
+  background: var(--accent-tint);
   color: var(--ink);
   font-weight: 600;
 }
@@ -61,7 +61,7 @@
   font-family: var(--font-mono);
 }
 .filter-nav-item.active .count-badge {
-  color: var(--ink);
+  color: var(--accent-text);
 }
 .task-group-section {
   display: flex;
@@ -79,11 +79,11 @@
   cursor: pointer;
   user-select: none;
   border-radius: var(--radius-md);
-  background: rgba(247, 245, 240, 0.03);
+  background: rgb(var(--ink-rgb) / 0.03);
   transition: background 0.15s;
 }
 .task-group-header:hover {
-  background: rgba(247, 245, 240, 0.08);
+  background: rgb(var(--ink-rgb) / 0.08);
 }
 .task-group-header .chevron {
   transition: transform 0.2s ease;
@@ -112,14 +112,14 @@
   cursor: pointer;
   flex-shrink: 0;
   margin-top: 1px;
-  transition: all 0.15s;
+  transition: var(--t-state);
 }
 .task-checkbox.prio-high { border-color: var(--prio-high); }
 .task-checkbox.prio-medium { border-color: var(--prio-medium); }
 .task-checkbox.prio-low { border-color: var(--prio-low); }
 .task-checkbox.completed {
-  background: var(--mute);
-  border-color: var(--mute);
+  background: var(--hue, var(--sage));
+  border-color: var(--hue, var(--sage));
 }
 .task-content {
   flex: 1;
@@ -196,7 +196,7 @@
   padding: 8px 10px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
-  background: rgba(247, 245, 240, 0.02);
+  background: rgb(var(--ink-rgb) / 0.02);
 }
 .trigger-label {
   display: flex;
@@ -208,7 +208,7 @@
   user-select: none;
 }
 .trigger-label input {
-  accent-color: var(--ink);
+  accent-color: var(--accent);
 }
 .trigger-val {
   align-self: stretch;
@@ -265,3 +265,30 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* A reminder's group colour: a 3px bar at the row's start (the group chip carries its tint). */
+.task-card, .task-card.active, .task-card:hover { border-inline-start: 3px solid var(--hue, var(--hairline)); }
+
+/* Completing (Dana.motion.complete adds .dn-completing): the check fills with the group's hue and its mark
+   draws in, the strike-through grows across the title; then the shell fades and collapses the row. */
+.task-checkbox { position: relative; }
+.task-checkbox::after {
+  content: ""; position: absolute; width: 6px; height: 11px; margin-top: -2px;
+  border: solid var(--canvas); border-width: 0 2.5px 2.5px 0; opacity: 0; transform: rotate(45deg) scale(0.3);
+}
+.dn-completing .task-checkbox {
+  background: var(--hue, var(--sage)); border-color: var(--hue, var(--sage));
+  transition: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
+}
+.dn-completing .task-checkbox::after {
+  opacity: 1; transform: rotate(45deg) scale(1);
+  transition: opacity var(--dur-fast) var(--ease-decel), transform var(--dur-base) var(--ease-decel);
+}
+.task-title { position: relative; align-self: flex-start; }
+.task-title::after {
+  content: ""; position: absolute; inset-inline: 0; top: 52%; height: 1.5px; background: var(--mute);
+  transform: scaleX(0); transform-origin: left center; pointer-events: none;
+}
+[dir="rtl"] .task-title::after, .task-title:dir(rtl)::after { transform-origin: right center; }
+.dn-completing .task-title { color: var(--mute); transition: color var(--dur-base) var(--ease-standard); }
+.dn-completing .task-title::after { transform: scaleX(1); transition: transform var(--dur-base) var(--ease-decel); }

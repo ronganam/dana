@@ -3,18 +3,19 @@
  */
 (() => {
   "use strict";
-  const COLORS = ["#ff2d55", "#007aff", "#34c759", "#af52de", "#ff9500", "#5ac8fa"];
+  // The named hues of the web tokens (styles.css), ember left out: it is the accent.
+  const HUES = ["rose", "sky", "sage", "plum", "amber", "teal"];
 
   /** The other side of a call: the receiver when the caller is "Me", else the caller ("Unknown" for none). */
   function contactOf(call) {
     return call.caller === "Me" ? (call.receiver || "Unknown") : (call.caller || "Unknown");
   }
 
-  /** A steady colour for a name (the same name, the same colour). */
+  /** A steady hue name for a name (the same name, the same hue): the avatar is var(--<hue>-tint) / -text. */
   function avatarColor(name) {
     let hash = 0;
     for (let i = 0; i < (name || "").length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    return COLORS[Math.abs(hash) % COLORS.length];
+    return HUES[Math.abs(hash) % HUES.length];
   }
 
   /** The calls whose caller, receiver, title or summary contain `q` (any case); all of them for none. */

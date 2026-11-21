@@ -63,7 +63,18 @@
   // ---------- helpers ----------
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const icons = () => { try { window.lucide?.createIcons(); } catch (_) { /* ignore */ } };
-  const hue = (s) => { let h = 0; for (const c of String(s || "")) h = (h * 31 + c.charCodeAt(0)) % 360; return h; };
+  // An app's tile takes a named hue (styles.css): messaging teal, calendar and mail sky, calls sage, contacts
+  // plum; any other app a steady hue from its package name.
+  const KIND_HUES = [[/whatsapp|telegram|messag|sms|signal|chat/i, "teal"], [/calendar|mail/i, "sky"],
+    [/dialer|phone|call/i, "sage"], [/contact/i, "plum"]];
+  const HUES = ["amber", "sage", "teal", "sky", "plum", "rose"];
+  const hue = (s) => {
+    const kind = KIND_HUES.find(([re]) => re.test(String(s || "")));
+    if (kind) return kind[1];
+    let h = 0; for (const c of String(s || "")) h = (h * 31 + c.charCodeAt(0)) % 997;
+    return HUES[h % HUES.length];
+  };
+  const avatarStyle = (s) => `--av:var(--${hue(s)}-tint);--av-text:var(--${hue(s)}-text)`;
   const initial = (s) => (String(s || "?").trim()[0] || "?").toUpperCase();
 
   async function api(path, opts = {}) {
@@ -229,9 +240,9 @@
       : S.view === "snoozed"
         ? `<button class="icon-btn" data-act="unsnooze" title="Wake now"><i data-lucide="bell-ring"></i></button>`
         : `<button class="icon-btn" data-act="restore" title="Restore"><i data-lucide="undo-2"></i></button>`;
-    return `<div class="ibx-row ${prioClass(n)}${indent ? " indent" : ""}${sel ? " selected" : ""}${S.openId === n.id ? " open" : ""}" data-id="${esc(n.id)}" role="option" aria-selected="${sel}">
+    return `<div class="ibx-row dn-row ${prioClass(n)}${indent ? " indent" : ""}${sel ? " selected" : ""}${S.openId === n.id ? " open" : ""}" data-id="${esc(n.id)}" role="option" aria-selected="${sel}">
       <span class="ibx-check" data-act="select" role="checkbox" aria-checked="${sel}" title="Select (x)"></span>
-      ${indent ? "" : `<span class="ibx-avatar" style="--h:${hue(n.package)}">${esc(initial(appName(n)))}<span class="emo">${esc(n.category_emoji || "")}</span></span>`}
+      ${indent ? "" : `<span class="ibx-avatar" style="${avatarStyle(n.package)}">${esc(initial(appName(n)))}<span class="emo">${esc(n.category_emoji || "")}</span></span>`}
       <div class="ibx-main">
         <div class="ibx-line1"><span class="ibx-title" dir="auto">${esc(title)}</span><span class="ibx-age">${esc(age(n.posted_at))}</span></div>
         ${meta.length ? `<div class="ibx-meta" dir="auto">${meta.join(" · ")}</div>` : ""}
@@ -316,7 +327,7 @@
         const urgent = g.items.filter((n) => n.priority === "urgent" || n.priority === "important").length;
         const sum = isActiveView() && !S.q ? sums?.apps?.[g.pkg] : null;
         html += `<div class="ibx-group" data-group="${esc(g.pkg)}">
-          <span class="ibx-avatar" style="--h:${hue(g.pkg)}">${esc(initial(g.name))}</span>
+          <span class="ibx-avatar" style="${avatarStyle(g.pkg)}">${esc(initial(g.name))}</span>
           <div class="ibx-main">
             <div class="ibx-group-name"><i data-lucide="${coll ? "chevron-right" : "chevron-down"}" style="width:14px;height:14px;color:var(--mute)"></i>${esc(g.name)}
               <span class="ibx-pill">${g.items.length}</span>${urgent ? `<span class="ibx-pill warn">${urgent} important</span>` : ""}</div>
@@ -404,7 +415,7 @@
     $.detail.innerHTML = `<div class="ibx-detail" data-id="${esc(n.id)}">
       <div class="ibx-detail-head">
         <button class="icon-btn ibx-close" data-act="close" title="Back"><i data-lucide="arrow-left"></i></button>
-        <span class="ibx-avatar lg" style="--h:${hue(n.package)}">${esc(initial(appName(n)))}<span class="emo">${esc(n.category_emoji || "")}</span></span>
+        <span class="ibx-avatar lg" style="${avatarStyle(n.package)}">${esc(initial(appName(n)))}<span class="emo">${esc(n.category_emoji || "")}</span></span>
         <div class="who"><div class="app">${esc(appName(n))}</div><div class="sub" dir="auto">${esc([who(n), when(n.posted_at)].filter(Boolean).join(" · "))}</div></div>
         <button class="btn-secondary" data-act="ask"><i data-lucide="sparkles"></i>Ask Dana</button>
       </div>

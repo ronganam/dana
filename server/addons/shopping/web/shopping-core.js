@@ -394,7 +394,7 @@
       parts.push({ key: "bought", html: `<div class="shp-bought-head${v.boughtOpen ? " open" : ""}">`
         + `<button type="button" class="shp-bought-toggle" data-act="bought" aria-expanded="${v.boughtOpen}">${icon("chevron-right", "shp-chev")}<span>Bought</span><em>${v.boughtCount}</em></button>`
         + (v.canEdit ? `<button type="button" class="shp-clear" data-act="clear">Clear</button>` : "") + `</div>` });
-      if (v.boughtOpen) for (const r of v.bought) parts.push({ key: `b:${r.id}`, html: renderRow(r, v.canEdit).replace('class="shp-row', 'class="shp-row is-bought') });
+      if (v.boughtOpen) for (const r of v.bought) parts.push({ key: `b:${r.id}`, html: renderRow(r, v.canEdit).replace('class="shp-row', 'class="shp-row dn-row is-bought') });
     }
     return parts;
   }

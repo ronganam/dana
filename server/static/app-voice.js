@@ -14,7 +14,15 @@ let sphereCtx = sphereCanvas ? sphereCanvas.getContext("2d") : null;
 let sphereAnimId = null;
 let spherePhase = 0;
 
+// The orb's colours come from the theme's tokens (styles.css: --ember-rgb, --amber-rgb, --ink-rgb).
+function sphereHue(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(`--${name}-rgb`).trim() || "255 106 61";
+}
+
+// Idle: one still frame. Listening (a voice message or a call): it breathes until listening stops; nothing
+// animates otherwise (life-spec: no infinite animation outside an active state).
 function renderSiriSphere() {
+    sphereAnimId = null;
     if (!sphereCtx || !sphereCanvas) return;
     const w = sphereCanvas.width;
     const h = sphereCanvas.height;
@@ -23,74 +31,65 @@ function renderSiriSphere() {
     sphereCtx.clearRect(0, 0, w, h);
 
     const listening = isRecording || isCallActive;
+    const ember = sphereHue("ember");
 
     if (!listening) {
-        // Idle warm breathing orb (monochrome warm tint)
-        spherePhase += 0.025;
-        const breathe = 1 + 0.08 * Math.sin(spherePhase);
-        const radius = (w * 0.35) * breathe;
-
-        const grad = sphereCtx.createRadialGradient(cx, cy, 0, cx, cy, radius);
-        grad.addColorStop(0, "rgba(247, 245, 240, 0.95)");
-        grad.addColorStop(0.5, "rgba(218, 210, 193, 0.6)");
-        grad.addColorStop(1, "rgba(43, 38, 34, 0)");
-
+        const radius = w * 0.34;
+        const grad = sphereCtx.createRadialGradient(cx, cy - radius * 0.25, 0, cx, cy, radius);
+        grad.addColorStop(0, `rgb(${ember} / 0.95)`);
+        grad.addColorStop(0.65, `rgb(${ember} / 0.55)`);
+        grad.addColorStop(1, `rgb(${ember} / 0)`);
         sphereCtx.fillStyle = grad;
         sphereCtx.beginPath();
         sphereCtx.arc(cx, cy, radius, 0, Math.PI * 2);
         sphereCtx.fill();
-    } else {
-        // Actively listening / calling: multi-color rotating cyan/magenta gradient with ripples
-        spherePhase += 0.08;
-        const breathe = 1 + 0.15 * Math.sin(spherePhase * 2);
-        const baseRadius = (w * 0.32) * breathe;
-
-        // Outer expanding ripple
-        const rippleR = (baseRadius * 1.5) + (baseRadius * 0.4 * Math.sin(spherePhase));
-        const rippleGrad = sphereCtx.createRadialGradient(cx, cy, baseRadius * 0.5, cx, cy, rippleR);
-        rippleGrad.addColorStop(0, "rgba(0, 240, 255, 0.25)");
-        rippleGrad.addColorStop(0.6, "rgba(208, 0, 255, 0.15)");
-        rippleGrad.addColorStop(1, "rgba(0, 0, 0, 0)");
-        sphereCtx.fillStyle = rippleGrad;
-        sphereCtx.beginPath();
-        sphereCtx.arc(cx, cy, rippleR, 0, Math.PI * 2);
-        sphereCtx.fill();
-
-        // Orb 1: Cyan/Blue
-        const ox1 = cx + Math.sin(spherePhase) * 4;
-        const oy1 = cy + Math.sin(spherePhase + 1) * 3;
-        const g1 = sphereCtx.createRadialGradient(ox1, oy1, 0, ox1, oy1, baseRadius);
-        g1.addColorStop(0, "rgba(0, 240, 255, 0.9)");
-        g1.addColorStop(1, "rgba(0, 240, 255, 0)");
-        sphereCtx.fillStyle = g1;
-        sphereCtx.beginPath();
-        sphereCtx.arc(ox1, oy1, baseRadius, 0, Math.PI * 2);
-        sphereCtx.fill();
-
-        // Orb 2: Magenta/Pink
-        const ox2 = cx - Math.sin(spherePhase + 2) * 4;
-        const oy2 = cy - Math.sin(spherePhase + 3) * 3;
-        const g2 = sphereCtx.createRadialGradient(ox2, oy2, 0, ox2, oy2, baseRadius);
-        g2.addColorStop(0, "rgba(208, 0, 255, 0.85)");
-        g2.addColorStop(1, "rgba(208, 0, 255, 0)");
-        sphereCtx.fillStyle = g2;
-        sphereCtx.beginPath();
-        sphereCtx.arc(ox2, oy2, baseRadius, 0, Math.PI * 2);
-        sphereCtx.fill();
-
-        // White center core
-        const gCore = sphereCtx.createRadialGradient(cx, cy, 0, cx, cy, baseRadius * 0.5);
-        gCore.addColorStop(0, "rgba(247, 245, 240, 0.95)");
-        gCore.addColorStop(1, "rgba(247, 245, 240, 0)");
-        sphereCtx.fillStyle = gCore;
-        sphereCtx.beginPath();
-        sphereCtx.arc(cx, cy, baseRadius * 0.5, 0, Math.PI * 2);
-        sphereCtx.fill();
+        return;
     }
+
+    spherePhase += 0.08;
+    const amber = sphereHue("amber");
+    const ink = sphereHue("ink");
+    const breathe = 1 + 0.12 * Math.sin(spherePhase * 2);
+    const baseRadius = (w * 0.32) * breathe;
+
+    const ox = cx + Math.sin(spherePhase) * 3;
+    const oy = cy + Math.sin(spherePhase + 1) * 2;
+    const g1 = sphereCtx.createRadialGradient(ox, oy, 0, ox, oy, baseRadius * 1.25);
+    g1.addColorStop(0, `rgb(${amber} / 0.85)`);
+    g1.addColorStop(1, `rgb(${amber} / 0)`);
+    sphereCtx.fillStyle = g1;
+    sphereCtx.beginPath();
+    sphereCtx.arc(ox, oy, baseRadius * 1.25, 0, Math.PI * 2);
+    sphereCtx.fill();
+
+    const g2 = sphereCtx.createRadialGradient(cx, cy, 0, cx, cy, baseRadius);
+    g2.addColorStop(0, `rgb(${ember} / 0.95)`);
+    g2.addColorStop(1, `rgb(${ember} / 0)`);
+    sphereCtx.fillStyle = g2;
+    sphereCtx.beginPath();
+    sphereCtx.arc(cx, cy, baseRadius, 0, Math.PI * 2);
+    sphereCtx.fill();
+
+    const gCore = sphereCtx.createRadialGradient(cx, cy, 0, cx, cy, baseRadius * 0.45);
+    gCore.addColorStop(0, `rgb(${ink} / 0.9)`);
+    gCore.addColorStop(1, `rgb(${ink} / 0)`);
+    sphereCtx.fillStyle = gCore;
+    sphereCtx.beginPath();
+    sphereCtx.arc(cx, cy, baseRadius * 0.45, 0, Math.PI * 2);
+    sphereCtx.fill();
 
     sphereAnimId = requestAnimationFrame(renderSiriSphere);
 }
+
+/** Redraws the orb for the current state: starts the breathing when listening begins, and the still
+ *  frame after it ends (also after a theme change). */
+function wakeSphere() {
+    const listening = isRecording || isCallActive;
+    sphereBtn?.classList.toggle("listening", listening);
+    if (!sphereAnimId) renderSiriSphere();
+}
 renderSiriSphere();
+window.matchMedia?.("(prefers-color-scheme: light)").addEventListener?.("change", wakeSphere);
 
 // Voice Recording via Microphone (Siri Orb click)
 sphereBtn?.addEventListener("click", () => {
@@ -108,7 +107,7 @@ sphereBtn?.addEventListener("click", () => {
 async function startVoiceRecording() {
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        isRecording = true;
+        isRecording = true; wakeSphere();
         chatInputWrapper?.classList.add("listening");
         chatTextInput.placeholder = "Listening...";
         recordedAudioChunks = [];
@@ -126,7 +125,7 @@ async function startVoiceRecording() {
     } catch (e) {
         console.error("Mic access error:", e);
         alert("Could not access microphone: " + e.message);
-        isRecording = false;
+        isRecording = false; wakeSphere();
         chatInputWrapper?.classList.remove("listening");
         chatTextInput.placeholder = "Ask me anything...";
     }
@@ -136,7 +135,7 @@ function stopVoiceRecording() {
     if (mediaRecorder && mediaRecorder.state !== "inactive") {
         mediaRecorder.stop();
     }
-    isRecording = false;
+    isRecording = false; wakeSphere();
     chatInputWrapper?.classList.remove("listening");
     chatTextInput.placeholder = "Ask me anything...";
 }
@@ -166,7 +165,7 @@ btnChatCall?.addEventListener("click", () => {
 btnCallHangup?.addEventListener("click", endRealtimeCall);
 
 function startRealtimeCall() {
-    isCallActive = true;
+    isCallActive = true; wakeSphere();
     callStatus = "connecting";
     chatCallBanner.classList.remove("hidden");
     callBannerStatus.textContent = "Connecting to Realtime server...";
@@ -199,8 +198,8 @@ function startRealtimeCall() {
                 } else if (data.type === "status") {
                     callStatus = data.status || "listening";
                     callBannerStatus.textContent = data.message || callStatus;
-                    if (callStatus === "speaking") callPulseOrb.style.background = "var(--orb-cyan)";
-                    else if (callStatus === "tool_running") callPulseOrb.style.background = "var(--orb-magenta)";
+                    if (callStatus === "speaking") callPulseOrb.style.background = "var(--accent)";
+                    else if (callStatus === "tool_running") callPulseOrb.style.background = "var(--amber)";
                     else callPulseOrb.style.background = "var(--listening-green)";
                 }
             } catch (err) {
@@ -221,7 +220,7 @@ function startRealtimeCall() {
 }
 
 function endRealtimeCall() {
-    isCallActive = false;
+    isCallActive = false; wakeSphere();
     callStatus = "idle";
     if (realtimeWs) {
         try { realtimeWs.close(); } catch (e) {}

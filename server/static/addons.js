@@ -389,7 +389,7 @@
       return `<div class="itg-card itg-error"><strong>Couldn't load addons</strong><span>${esc(s.error)}</span>
         <button class="btn-secondary" data-retry><i data-lucide="refresh-cw"></i>Try again</button></div>`;
     }
-    if (!s.items) return `<div class="itg-skel"></div><div class="itg-skel short"></div>`;
+    if (!s.items) return `<div class="itg-skel dn-shimmer"></div><div class="itg-skel dn-shimmer short"></div>`;
     const g = groupItems(s.items);
     const ui = s.ui || {};
     const section = (id, title, sub, items, extra = "") => (items.length || extra) ? `
@@ -568,7 +568,7 @@
       return `<section class="itg-group" data-group="catalog">${head}<div class="itg-card itg-error"><strong>Couldn't read the catalog</strong><span>${esc(s.catalogError)}</span>
         <button class="btn-secondary" data-catalog-retry><i data-lucide="refresh-cw"></i>Try again</button></div></section>`;
     }
-    if (!s.catalog) return `<section class="itg-group" data-group="catalog">${head}<div class="itg-skel short"></div></section>`;
+    if (!s.catalog) return `<section class="itg-group" data-group="catalog">${head}<div class="itg-skel dn-shimmer short"></div></section>`;
     const c = s.catalog, ui = s.catalogUi || {};
     const entries = c.entries.length ? `<div class="itg-card itg-rows">${c.entries.map((e) => renderCatalogEntry(e, ui[e.name])).join("")}</div>`
       : `<div class="itg-card itg-empty"><i data-lucide="package"></i><span>The catalog lists no addons yet.</span></div>`;

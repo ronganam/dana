@@ -1,43 +1,49 @@
 /* ==========================================================================
-   DANA — WARP DESIGN SYSTEM (DESIGN.md)
-   Warm near-charcoal canvas, Inter typography, DM Mono code, tight geometry.
+   DANA — the web design system ("Ember"; server/docs/web-design.md)
+   Warm ink canvas, Inter body, DM Mono labels, Instrument Serif headlines, one ember accent, hairline rows.
+   Two themes: Ink (dark, the default) and Paper (light): the system's choice, or Settings → Theme
+   (html[data-theme]). Seven named hues colour-code kinds, each with a tint (fills) and a text variant
+   (4.5:1 on its tint). Motion: the --dur-* / --ease-* tokens, opacity and transform only; reduced motion
+   turns it off. Never hardcode a colour in a screen: use these tokens.
    ========================================================================== */
 
 /* --- 1. Design Tokens --- */
 :root {
-  /* Surfaces & Canvas */
-  --canvas: #2b2622;
-  --canvas-soft: #383330;
-  --canvas-raised: #403a36;
-  --hairline: #3f3a36;
-  --hairline-strong: #4a443f;
+  color-scheme: dark;
+
+  /* Surfaces & Canvas (Ink) */
+  --canvas: #2b2521;
+  --canvas-soft: #38302b;
+  --canvas-raised: #423933;
+  --hairline: #423a34;
+  --hairline-strong: #4f463f;
+  --scrim: rgba(0, 0, 0, 0.55);
+  --well: rgba(0, 0, 0, 0.28);          /* code, JSON and transcript wells */
+  --shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
 
   /* Typography Colors */
   --primary: #f7f5f0;
-  --on-primary: #2b2622;
+  --on-primary: #2b2521;
   --ink: #f7f5f0;
+  --ink-rgb: 247 245 240;               /* washes: rgb(var(--ink-rgb) / .08) */
   --body-strong: #dad2c1;
   --body: #c9c0ad;
   --mute: #aea69c;
 
-  /* Functional / Semantic Colors */
-  --destructive: #ff453a;
-  --listening-green: #34c759;
-  --connecting-amber: #ffb300;
-  --orb-cyan: #00f0ff;
-  --orb-magenta: #d000ff;
-  --orb-coral: #ff3b30;
-
-  /* Category colors */
-  --cat-personal: #ff2d55;
-  --cat-work: #007aff;
-  --cat-general: #34c759;
-  --cat-other: #af52de;
-
-  /* Priority colors */
-  --prio-high: #ff3b30;
-  --prio-medium: #ff9500;
-  --prio-low: #007aff;
+  /* Hues (life-spec "Ember"): -rgb for alphas, the hue for bars / dots / icons, -tint for fills,
+     -text where the hue is text. Same values on the phone, TV and watch. */
+  --tint-a: 0.14;
+  --ember-rgb: 255 106 61;   --ember-text: #fd9371;
+  --amber-rgb: 242 169 59;   --amber-text: #f2a93b;
+  --sage-rgb: 95 191 138;    --sage-text: #71c596;
+  --teal-rgb: 61 191 179;    --teal-text: #53c5ba;
+  --sky-rgb: 90 167 240;     --sky-text: #7db8ef;
+  --plum-rgb: 184 146 242;   --plum-text: #c5a5f0;
+  --rose-rgb: 240 112 154;   --rose-text: #f297b2;
+  --on-accent: #1f0a02;
+  --accent-warm: #ff8a52;               /* the far end of the primary-button gradient */
+  --accent-on-ink: #d1401a;             /* the accent on an --ink surface (toasts, user bubbles) */
+  --glow-a: 0.07;                       /* the static ember glow at the top of the canvas */
 
   /* Typography */
   --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -54,10 +60,92 @@
   --radius-sheet: 12px;    /* Modals & Bottom sheets */
   --radius-full: 9999px;   /* Circular icon buttons & status dots */
 
+  /* Motion */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-standard: cubic-bezier(.2, 0, 0, 1);
+  --ease-decel: cubic-bezier(.05, .7, .1, 1);
+  --ease-accel: cubic-bezier(.3, 0, .8, .15);
+  --stagger: 30ms;
+  --rise: 8px;
+  --slide: 12px;
+  /* hover / press / selection changes: short, never layout */
+  --t-state: background-color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard),
+    color var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
+
   /* Layout */
   --rail-width: 80px;
   --topbar-height: 56px;
   --bottomnav-height: 62px;
+}
+
+/* Paper: the light theme. Kept in two places on purpose: the system's choice, and Settings → Theme. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --canvas: #f3ede1; --canvas-soft: #faf6ee; --canvas-raised: #fffcf6;
+    --hairline: #e0d6c4; --hairline-strong: #cdbfa7;
+    --scrim: rgba(26, 21, 17, 0.38); --well: rgba(90, 70, 40, 0.07); --shadow: 0 10px 30px rgba(60, 40, 20, 0.16);
+    --primary: #1a1511; --on-primary: #faf6ee; --ink: #1a1511; --ink-rgb: 26 21 17;
+    --body-strong: #3a3029; --body: #4a4036; --mute: #6b6050;
+    --tint-a: 0.12;
+    --ember-rgb: 209 64 26;   --ember-text: #a13518;
+    --amber-rgb: 168 106 0;   --amber-text: #7d5005;
+    --sage-rgb: 46 125 82;    --sage-text: #2a6644;
+    --teal-rgb: 31 122 114;   --teal-text: #1e645d;
+    --sky-rgb: 47 111 181;    --sky-text: #2a5b91;
+    --plum-rgb: 112 68 184;   --plum-text: #6b41ae;
+    --rose-rgb: 184 58 100;   --rose-text: #9c3355;
+    --on-accent: #ffffff; --accent-warm: #e2582a; --accent-on-ink: #ff6a3d; --glow-a: 0.06;
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --canvas: #f3ede1; --canvas-soft: #faf6ee; --canvas-raised: #fffcf6;
+  --hairline: #e0d6c4; --hairline-strong: #cdbfa7;
+  --scrim: rgba(26, 21, 17, 0.38); --well: rgba(90, 70, 40, 0.07); --shadow: 0 10px 30px rgba(60, 40, 20, 0.16);
+  --primary: #1a1511; --on-primary: #faf6ee; --ink: #1a1511; --ink-rgb: 26 21 17;
+  --body-strong: #3a3029; --body: #4a4036; --mute: #6b6050;
+  --tint-a: 0.12;
+  --ember-rgb: 209 64 26;   --ember-text: #a13518;
+  --amber-rgb: 168 106 0;   --amber-text: #7d5005;
+  --sage-rgb: 46 125 82;    --sage-text: #2a6644;
+  --teal-rgb: 31 122 114;   --teal-text: #1e645d;
+  --sky-rgb: 47 111 181;    --sky-text: #2a5b91;
+  --plum-rgb: 112 68 184;   --plum-text: #6b41ae;
+  --rose-rgb: 184 58 100;   --rose-text: #9c3355;
+  --on-accent: #ffffff; --accent-warm: #e2582a; --accent-on-ink: #ff6a3d; --glow-a: 0.06;
+}
+
+/* Derived tokens: one definition, both themes (they read the -rgb values above). */
+:root {
+  --ember: rgb(var(--ember-rgb)); --ember-tint: rgb(var(--ember-rgb) / var(--tint-a));
+  --amber: rgb(var(--amber-rgb)); --amber-tint: rgb(var(--amber-rgb) / var(--tint-a));
+  --sage: rgb(var(--sage-rgb));   --sage-tint: rgb(var(--sage-rgb) / var(--tint-a));
+  --teal: rgb(var(--teal-rgb));   --teal-tint: rgb(var(--teal-rgb) / var(--tint-a));
+  --sky: rgb(var(--sky-rgb));     --sky-tint: rgb(var(--sky-rgb) / var(--tint-a));
+  --plum: rgb(var(--plum-rgb));   --plum-tint: rgb(var(--plum-rgb) / var(--tint-a));
+  --rose: rgb(var(--rose-rgb));   --rose-tint: rgb(var(--rose-rgb) / var(--tint-a));
+  --accent: var(--ember); --accent-tint: var(--ember-tint); --accent-text: var(--ember-text);
+  --accent-gradient: linear-gradient(135deg, var(--ember), var(--accent-warm));
+  --focus-ring: 0 0 0 2px rgb(var(--ember-rgb) / 0.45);
+
+  /* Semantic names the screens use, on the hues */
+  --destructive: var(--rose);
+  --listening-green: var(--sage);
+  --connecting-amber: var(--amber);
+  --cat-personal: var(--rose);
+  --cat-work: var(--sky);
+  --cat-general: var(--sage);
+  --cat-other: var(--plum);
+  --prio-high: var(--rose);
+  --prio-medium: var(--amber);
+  --prio-low: var(--sky);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root { --dur-fast: 1ms; --dur-base: 1ms; --dur-slow: 1ms; --stagger: 0ms; --rise: 0px; --slide: 0px; }
 }
 
 /* --- 2. Base Reset & Layout --- */
@@ -81,8 +169,9 @@ html, body {
 }
 
 /* Subtle warm radial background matching AnimatedBackground.kt */
+/* A faint static ember glow at the top of the canvas (life-spec "Depth"); it never moves. */
 body {
-  background-image: radial-gradient(circle at 50% 42%, rgba(247, 245, 240, 0.025) 0%, transparent 90%);
+  background-image: radial-gradient(120% 55% at 50% -12%, rgb(var(--ember-rgb) / var(--glow-a)) 0%, transparent 70%);
   background-repeat: no-repeat;
   background-attachment: fixed;
 }
@@ -149,19 +238,19 @@ a {
   width: 40px;
   height: 40px;
   border-radius: var(--radius-full);
-  background: rgba(247, 245, 240, 0.08);
+  background: var(--accent-tint);
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 500;
   font-size: 1.15rem;
-  color: rgba(247, 245, 240, 0.85);
+  color: var(--accent-text);
   margin-bottom: 16px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: var(--t-state);
 }
 .nav-rail-brand:hover {
-  background: rgba(247, 245, 240, 0.15);
+  background: rgb(var(--ember-rgb) / 0.24);
 }
 
 .nav-rail-items {
@@ -183,7 +272,7 @@ a {
   justify-content: center;
   gap: 3px;
   color: var(--body);
-  transition: all 0.15s ease;
+  transition: var(--t-state);
   position: relative;
 }
 .rail-btn svg, .rail-btn i {
@@ -200,19 +289,31 @@ a {
   opacity: 0.75;
 }
 .rail-btn:hover {
-  background: rgba(247, 245, 240, 0.05);
+  background: rgb(var(--ink-rgb) / 0.05);
   color: var(--ink);
 }
 .rail-btn:hover svg, .rail-btn:hover i {
   opacity: 0.9;
 }
 .rail-btn.active {
-  background: rgba(247, 245, 240, 0.10);
+  background: var(--accent-tint);
   color: var(--ink);
+}
+/* The current place: an accent pill and a 3px accent line at the rail's edge */
+.rail-btn.active::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: -6px;
+  top: 12px;
+  bottom: 12px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
 }
 .rail-btn.active svg, .rail-btn.active i {
   opacity: 1;
   stroke-width: 2.2;
+  color: var(--accent-text);
 }
 .rail-btn.active span {
   font-weight: 500;
@@ -262,7 +363,7 @@ a {
   color: var(--body);
   border-radius: var(--radius-md);
   padding: 4px 0;
-  transition: all 0.15s ease;
+  transition: var(--t-state);
 }
 .bottom-nav-btn svg, .bottom-nav-btn i {
   width: 20px;
@@ -274,12 +375,28 @@ a {
   font-weight: 400;
 }
 .bottom-nav-btn.active {
-  background: rgba(247, 245, 240, 0.10);
   color: var(--ink);
 }
 .bottom-nav-btn.active svg, .bottom-nav-btn.active i {
   opacity: 1;
+  color: var(--accent-text);
 }
+/* Phone: the current place's icon sits on an accent pill */
+.bottom-nav-btn.active::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  left: 0;
+  right: 0;
+  width: 52px;
+  max-width: calc(100% - 4px);
+  height: 28px;
+  margin: 0 auto;
+  border-radius: var(--radius-full);
+  background: var(--accent-tint);
+  z-index: -1;
+}
+.bottom-nav-btn { isolation: isolate; }
 .bottom-nav-btn.active span {
   font-weight: 500;
 }
@@ -362,11 +479,11 @@ a {
   align-items: center;
   justify-content: center;
   color: var(--body-strong);
-  transition: all 0.15s ease;
+  transition: var(--t-state);
   background: transparent;
 }
 .icon-btn:hover {
-  background: rgba(247, 245, 240, 0.08);
+  background: rgb(var(--ink-rgb) / 0.08);
   color: var(--ink);
 }
 .icon-btn svg, .icon-btn i {
@@ -381,13 +498,13 @@ a {
   color: var(--destructive);
 }
 .icon-btn.destructive:hover {
-  background: rgba(255, 69, 58, 0.15);
+  background: rgb(var(--rose-rgb) / 0.15);
 }
 
 /* Primary and Ghost Buttons */
 .btn-primary {
-  background: var(--ink);
-  color: var(--on-primary);
+  background: var(--accent-gradient);
+  color: var(--on-accent);
   font-size: 13.5px;
   font-weight: 500;
   border-radius: var(--radius-sm);
@@ -396,14 +513,10 @@ a {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: all 0.15s ease;
+  transition: var(--t-state);
 }
 .btn-primary:hover {
   opacity: 0.92;
-  transform: translateY(-0.5px);
-}
-.btn-primary:active {
-  transform: translateY(0);
 }
 
 .btn-secondary {
@@ -418,7 +531,7 @@ a {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: all 0.15s ease;
+  transition: var(--t-state);
 }
 .btn-secondary:hover {
   background: var(--canvas-raised);
@@ -428,7 +541,7 @@ a {
 .btn-destructive-outline {
   background: transparent;
   color: var(--destructive);
-  border: 1px solid rgba(255, 69, 58, 0.4);
+  border: 1px solid rgb(var(--rose-rgb) / 0.4);
   font-size: 13.5px;
   font-weight: 500;
   border-radius: var(--radius-sm);
@@ -437,10 +550,10 @@ a {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  transition: all 0.15s ease;
+  transition: var(--t-state);
 }
 .btn-destructive-outline:hover {
-  background: rgba(255, 69, 58, 0.12);
+  background: rgb(var(--rose-rgb) / 0.12);
   border-color: var(--destructive);
 }
 
@@ -452,20 +565,20 @@ a {
   width: 48px;
   height: 48px;
   border-radius: var(--radius-card);
-  background: var(--ink);
-  color: var(--on-primary);
+  background: var(--accent-gradient);
+  color: var(--on-accent);
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
   z-index: 40;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  transition: transform var(--dur-fast) var(--ease-standard), opacity var(--dur-fast) var(--ease-standard);
 }
 .fab-btn:hover {
   transform: scale(1.05);
 }
 .fab-btn:active {
-  transform: scale(0.96);
+  transform: scale(0.97);
 }
 .fab-btn svg, .fab-btn i {
   width: 22px;
@@ -603,7 +716,7 @@ a {
   color: var(--body);
   min-width: 0;
 }
-.chat-sidebar-item:hover { background: rgba(247, 245, 240, 0.05); }
+.chat-sidebar-item:hover { background: rgb(var(--ink-rgb) / 0.05); }
 .chat-sidebar-item.active { background: var(--canvas-soft); color: var(--ink); }
 .chat-sidebar-item.shared { border: 1px solid var(--hairline); }
 .chat-sidebar-icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--mute); }
@@ -645,17 +758,17 @@ a {
     z-index: 20;
     width: min(300px, 85vw);
     transform: translateX(-100%);
-    transition: transform 0.2s ease;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4);
+    transition: transform var(--dur-base) var(--ease-standard);
   }
-  .chat-layout.sidebar-open .chat-sidebar { transform: none; }
+  .chat-layout.sidebar-open .chat-sidebar { transform: none; box-shadow: 4px 0 24px rgba(0, 0, 0, 0.4); }
   .chat-layout.sidebar-hidden .chat-sidebar { display: flex; }
   .chat-layout.sidebar-open .chat-sidebar-backdrop {
     display: block;
     position: absolute;
     inset: 0;
     z-index: 15;
-    background: rgba(0, 0, 0, 0.45);
+    background: var(--scrim);
+    animation: dn-fade var(--dur-base) var(--ease-standard);
   }
   .chat-sidebar-del { opacity: 1; }
 }
@@ -726,7 +839,7 @@ a {
   font-weight: 600;
   padding: 2px 6px;
   border-radius: var(--radius-xs);
-  background: rgba(247, 245, 240, 0.12);
+  background: rgb(var(--ink-rgb) / 0.12);
   color: var(--ink);
 }
 .call-status-text {
@@ -739,7 +852,7 @@ a {
   gap: 8px;
 }
 .call-live-transcript {
-  background: rgba(0, 0, 0, 0.2);
+  background: var(--well);
   padding: 8px 12px;
   border-radius: var(--radius-lg);
   font-style: italic;
@@ -782,7 +895,7 @@ a {
   font-size: 14.5px;
   line-height: 1.55;
   word-break: break-word;
-  transition: all 0.15s ease;
+  transition: var(--t-state);
 }
 
 .chat-bubble.user {
@@ -791,7 +904,7 @@ a {
   border-radius: 18px 18px 4px 18px;
 }
 .chat-bubble.user a {
-  color: #1a4d8c;
+  color: var(--accent-on-ink);
   text-decoration: underline;
 }
 
@@ -802,7 +915,7 @@ a {
   border-radius: 18px 18px 18px 4px;
 }
 .chat-bubble.assistant a {
-  color: #93c5fd;
+  color: var(--sky-text);
   text-decoration: underline;
 }
 
@@ -819,14 +932,14 @@ a {
   font-size: 11px;
   padding: 2px 6px;
   border-radius: var(--radius-xs);
-  background: rgba(247, 245, 240, 0.08);
+  background: rgb(var(--ink-rgb) / 0.08);
   color: var(--body);
   display: inline-flex;
   align-items: center;
   gap: 4px;
 }
 .chat-bubble-act-btn:hover {
-  background: rgba(247, 245, 240, 0.16);
+  background: rgb(var(--ink-rgb) / 0.16);
   color: var(--ink);
 }
 
@@ -840,12 +953,12 @@ a {
 .markdown-body code {
   font-family: var(--font-mono);
   font-size: 12.5px;
-  background: rgba(247, 245, 240, 0.08);
+  background: rgb(var(--ink-rgb) / 0.08);
   padding: 2px 5px;
   border-radius: var(--radius-xs);
 }
 .markdown-body pre {
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--well);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   padding: 10px 12px;
@@ -889,12 +1002,12 @@ a {
   user-select: none;
 }
 .tool-call-header:hover {
-  background: rgba(247, 245, 240, 0.03);
+  background: rgb(var(--ink-rgb) / 0.03);
 }
 .tool-icon-badge {
   font-size: 13px;
   padding: 2px 6px;
-  background: rgba(247, 245, 240, 0.12);
+  background: var(--teal-tint);
   border-radius: var(--radius-xs);
   color: var(--ink);
 }
@@ -916,7 +1029,7 @@ a {
   font-weight: 600;
   padding: 2px 6px;
   border-radius: var(--radius-xs);
-  background: rgba(255, 69, 58, 0.15);
+  background: rgb(var(--rose-rgb) / 0.15);
   color: var(--destructive);
 }
 .tool-call-time {
@@ -937,7 +1050,7 @@ a {
   width: 10px;
   height: 10px;
   border: 1.5px solid var(--hairline);
-  border-top-color: var(--ink);
+  border-top-color: var(--accent);
   border-radius: 50%;
   animation: tool-spin 0.7s linear infinite;
 }
@@ -951,13 +1064,13 @@ a {
   font-family: var(--font-mono);
 }
 .iteration-card {
-  border-color: rgba(245, 158, 11, 0.4);
+  border-color: rgb(var(--amber-rgb) / 0.4);
 }
 .iteration-summary {
   font-size: 13px;
   line-height: 1.5;
   color: var(--body);
-  background: var(--surface-2, rgba(0, 0, 0, 0.03));
+  background: var(--surface-2, var(--well));
   border: 1px solid var(--hairline);
   border-radius: var(--radius-xs);
   padding: 10px 12px;
@@ -992,7 +1105,7 @@ a {
   text-transform: uppercase;
 }
 .tool-json-box {
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--well);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   padding: 8px 10px;
@@ -1010,15 +1123,15 @@ a {
 .tool-approval-box {
   margin-top: 4px;
   padding: 12px;
-  background: rgba(255, 69, 58, 0.06);
-  border: 1px solid rgba(255, 69, 58, 0.3);
+  background: var(--accent-tint);
+  border: 1px solid rgb(var(--ember-rgb) / 0.35);
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
 .tool-approval-title {
-  color: var(--destructive);
+  color: var(--accent-text);
   font-weight: 600;
   font-size: 12.5px;
 }
@@ -1058,18 +1171,18 @@ a {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  background: rgba(247, 245, 240, 0.04);
+  background: rgb(var(--ink-rgb) / 0.04);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-md);
   cursor: pointer;
   transition: background 0.15s;
 }
 .selection-option-row:hover {
-  background: rgba(247, 245, 240, 0.08);
+  background: rgb(var(--ink-rgb) / 0.08);
 }
 .selection-option-row.selected {
-  background: rgba(247, 245, 240, 0.12);
-  border-color: var(--ink);
+  background: var(--accent-tint);
+  border-color: var(--accent);
 }
 
 /* Typing Indicator */
@@ -1083,7 +1196,7 @@ a {
   width: 6px;
   height: 6px;
   border-radius: var(--radius-full);
-  background: var(--mute);
+  background: var(--accent);
   animation: typingPulse 1.2s infinite ease-in-out;
 }
 .typing-dot:nth-child(2) { animation-delay: 0.2s; }
@@ -1115,10 +1228,10 @@ a {
 }
 .chat-input-wrapper.listening {
   border-color: var(--listening-green);
-  box-shadow: 0 0 12px rgba(52, 199, 89, 0.2);
+  box-shadow: 0 0 0 3px var(--sage-tint);
 }
 .chat-input-wrapper:focus-within {
-  border-color: var(--hairline-strong);
+  border-color: rgb(var(--ember-rgb) / 0.55);
 }
 
 .chat-input {
@@ -1139,7 +1252,7 @@ a {
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--well);
   border-bottom: 1px solid var(--hairline);
   border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
 }
@@ -1206,16 +1319,16 @@ a {
   gap: 6px;
   white-space: nowrap;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--t-state);
 }
 .chip:hover {
   color: var(--ink);
   border-color: var(--hairline-strong);
 }
 .chip.active {
-  background: rgba(247, 245, 240, 0.14);
-  color: var(--ink);
-  border-color: var(--ink);
+  background: var(--accent-tint);
+  color: var(--accent-text);
+  border-color: rgb(var(--ember-rgb) / 0.55);
 }
 
 .tasks-scroll-list {
@@ -1238,14 +1351,14 @@ a {
   align-items: flex-start;
   gap: 12px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: var(--t-state);
 }
 .task-card:hover {
   border-color: var(--hairline-strong);
   background: var(--canvas-raised);
 }
 .task-card.active {
-  border-color: var(--ink);
+  border-color: rgb(var(--ember-rgb) / 0.7);
   background: var(--canvas-raised);
 }
 
@@ -1253,7 +1366,7 @@ a {
   font-size: 11px;
   padding: 2px 7px;
   border-radius: var(--radius-xs);
-  background: rgba(247, 245, 240, 0.08);
+  background: rgb(var(--ink-rgb) / 0.08);
   color: var(--body-strong);
   display: inline-flex;
   align-items: center;
@@ -1275,7 +1388,7 @@ a {
 .project-tab {
   padding: 8px 14px;
   border-radius: var(--radius-card) var(--radius-card) 0 0;
-  background: rgba(56, 51, 48, 0.5);
+  background: rgb(var(--ink-rgb) / 0.04);
   color: var(--body);
   display: inline-flex;
   align-items: center;
@@ -1284,7 +1397,7 @@ a {
   cursor: pointer;
   position: relative;
   white-space: nowrap;
-  transition: all 0.15s;
+  transition: var(--t-state);
 }
 .project-tab:hover {
   background: var(--canvas-soft);
@@ -1302,7 +1415,7 @@ a {
   left: 0;
   right: 0;
   height: 3px;
-  background: var(--ink);
+  background: var(--accent);
   border-radius: 3px 3px 0 0;
 }
 
@@ -1315,14 +1428,14 @@ a {
   flex-direction: column;
   gap: 6px;
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--t-state);
 }
 .knowledge-entry-card:hover {
   border-color: var(--hairline-strong);
   background: var(--canvas-raised);
 }
 .knowledge-entry-card.active {
-  border-color: var(--ink);
+  border-color: rgb(var(--ember-rgb) / 0.7);
 }
 
 /* Fields in detail view */
@@ -1349,7 +1462,7 @@ a {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: rgba(247, 245, 240, 0.035);
+  background: rgb(var(--ink-rgb) / 0.035);
   border: 1px solid var(--hairline);
   border-radius: var(--radius-card);
   padding: 9px 12px;
@@ -1357,7 +1470,7 @@ a {
   transition: background 0.15s, border-color 0.15s;
 }
 .entry-field-row:hover {
-  background: rgba(247, 245, 240, 0.06);
+  background: rgb(var(--ink-rgb) / 0.06);
   border-color: var(--hairline-strong);
 }
 .entry-field-name {
@@ -1372,7 +1485,7 @@ a {
   font-size: 9.5px;
   padding: 1px 5px;
   border-radius: var(--radius-xs);
-  background: rgba(247, 245, 240, 0.08);
+  background: rgb(var(--ink-rgb) / 0.08);
   color: var(--mute);
   text-transform: uppercase;
   font-weight: 500;
@@ -1398,7 +1511,7 @@ a {
   gap: 4px;
 }
 .entry-field-val.val-url a {
-  color: #38bdf8;
+  color: var(--sky-text);
   text-decoration: none;
   display: inline-flex;
   align-items: center;
@@ -1443,7 +1556,7 @@ a {
   padding: 4px 6px;
 }
 .entry-draft-field-row .field-checkbox-toggle input[type="checkbox"] {
-  accent-color: var(--ink);
+  accent-color: var(--accent);
   width: 16px;
   height: 16px;
   cursor: pointer;
@@ -1501,10 +1614,10 @@ a {
   transition: background 0.12s ease;
 }
 .project-entries-table tbody tr:hover {
-  background: rgba(247, 245, 240, 0.045);
+  background: rgb(var(--ink-rgb) / 0.045);
 }
 .project-entries-table tbody tr.active {
-  background: rgba(247, 245, 240, 0.08);
+  background: rgb(var(--ink-rgb) / 0.08);
 }
 .project-entries-table tbody td {
   padding: 10px 14px;
@@ -1598,7 +1711,7 @@ a {
   color: var(--ink);
 }
 .column-picker-item input[type="checkbox"] {
-  accent-color: var(--ink);
+  accent-color: var(--accent);
   cursor: pointer;
 }
 .column-picker-actions {
@@ -1667,7 +1780,7 @@ a {
   transition: border-color 0.15s;
 }
 .settings-input:focus {
-  border-color: var(--hairline-strong);
+  border-color: rgb(var(--ember-rgb) / 0.55);
 }
 
 .settings-links {
@@ -1687,10 +1800,10 @@ a {
   font-size: 13px;
   font-weight: 500;
   color: var(--ink);
-  transition: all 0.15s;
+  transition: var(--t-state);
 }
 .settings-link-tile:hover {
-  background: rgba(247, 245, 240, 0.05);
+  background: rgb(var(--ink-rgb) / 0.05);
   border-color: var(--hairline-strong);
 }
 
@@ -1702,8 +1815,7 @@ a {
   left: 0;
   width: 100vw;
   height: 100vh;
-  background: rgba(0, 0, 0, 0.65);
-  backdrop-filter: blur(4px);
+  background: var(--scrim);
   z-index: 200;
   align-items: center;
   justify-content: center;
@@ -1711,6 +1823,7 @@ a {
 }
 .modal-overlay.open {
   display: flex;
+  animation: dn-fade var(--dur-base) var(--ease-standard);
 }
 
 .modal-sheet {
@@ -1724,7 +1837,7 @@ a {
   flex-direction: column;
   overflow: hidden;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
-  animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: dn-sheet var(--dur-slow) var(--ease-decel);
 }
 
 .modal-header {
@@ -1778,7 +1891,7 @@ a {
   transition: border-color 0.15s;
 }
 .form-control:focus {
-  border-color: var(--hairline-strong);
+  border-color: rgb(var(--ember-rgb) / 0.55);
 }
 textarea.form-control {
   resize: vertical;
@@ -1803,11 +1916,12 @@ textarea.form-control {
   color: var(--body);
   border-radius: var(--radius-sm);
   cursor: pointer;
-  transition: all 0.15s;
+  transition: var(--t-state);
 }
 .segmented-btn.active {
-  background: var(--ink);
-  color: var(--on-primary);
+  background: var(--accent-tint);
+  color: var(--accent-text);
+  box-shadow: inset 0 0 0 1px rgb(var(--ember-rgb) / 0.45);
   font-weight: 600;
 }
 
@@ -1870,13 +1984,13 @@ textarea.form-control {
   height: 8px;
   border-radius: var(--radius-full);
   background: var(--listening-green);
-  box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.5);
+  box-shadow: 0 0 0 0 rgb(var(--sage-rgb) / 0.5);
   animation: debugPulse 1.6s infinite;
 }
 @keyframes debugPulse {
-  0% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0.45); }
-  70% { box-shadow: 0 0 0 6px rgba(52, 199, 89, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(52, 199, 89, 0); }
+  0% { box-shadow: 0 0 0 0 rgb(var(--sage-rgb) / 0.45); }
+  70% { box-shadow: 0 0 0 6px rgb(var(--sage-rgb) / 0); }
+  100% { box-shadow: 0 0 0 0 rgb(var(--sage-rgb) / 0); }
 }
 #debug-live-logs {
   flex: 1;
@@ -1913,8 +2027,8 @@ textarea.form-control {
   margin-top: 6px;
 }
 .dbg-error-box {
-  border: 1px solid rgba(255, 69, 58, 0.35);
-  background: rgba(255, 69, 58, 0.06);
+  border: 1px solid rgb(var(--rose-rgb) / 0.35);
+  background: rgb(var(--rose-rgb) / 0.06);
   border-radius: var(--radius-card);
   padding: 10px 12px;
   display: flex;
@@ -1932,7 +2046,7 @@ textarea.form-control {
 }
 .dbg-box {
   border: 1px solid var(--hairline);
-  background: rgba(247, 245, 240, 0.02);
+  background: rgb(var(--ink-rgb) / 0.02);
   border-radius: var(--radius-card);
   padding: 10px 12px;
   display: flex;
@@ -1964,9 +2078,9 @@ textarea.form-control {
   padding: 1px 6px;
   border-radius: var(--radius-xs);
 }
-.dbg-role.role-user { background: rgba(0, 122, 255, 0.16); color: #6cb0ff; }
-.dbg-role.role-assistant { background: rgba(52, 199, 89, 0.16); color: #6fe08c; }
-.dbg-role.role-tool { background: rgba(175, 82, 222, 0.16); color: #d0a0f0; }
+.dbg-role.role-user { background: rgb(var(--sky-rgb) / 0.16); color: var(--sky-text); }
+.dbg-role.role-assistant { background: rgb(var(--sage-rgb) / 0.16); color: var(--sage-text); }
+.dbg-role.role-tool { background: rgb(var(--plum-rgb) / 0.16); color: var(--plum-text); }
 .dbg-msg-idx {
   font-family: var(--font-mono);
   font-size: 10px;
@@ -1990,13 +2104,13 @@ textarea.form-control {
   justify-content: space-between;
   gap: 8px;
   padding: 6px 10px;
-  background: rgba(247, 245, 240, 0.04);
+  background: rgb(var(--ink-rgb) / 0.04);
   cursor: pointer;
   font-size: 11.5px;
   color: var(--ink);
 }
 .dbg-toolcall-head:hover {
-  background: rgba(247, 245, 240, 0.08);
+  background: rgb(var(--ink-rgb) / 0.08);
 }
 .dbg-chevron {
   width: 14px;
@@ -2012,7 +2126,7 @@ textarea.form-control {
   line-height: 1.45;
   color: var(--body-strong);
   padding: 8px 10px;
-  background: rgba(0, 0, 0, 0.35);
+  background: var(--well);
   white-space: pre-wrap;
   word-break: break-word;
   margin: 0;
@@ -2129,8 +2243,8 @@ textarea.form-control {
   height: 1em;
   margin-left: 2px;
   vertical-align: text-bottom;
-  background: var(--ink);
-  opacity: 0.7;
+  background: var(--accent);
+  opacity: 0.85;
   animation: stream-caret-blink 1s steps(2, start) infinite;
 }
 @keyframes stream-caret-blink { to { visibility: hidden; } }
@@ -2146,5 +2260,92 @@ textarea.form-control {
   padding: 6px 12px;
 }
 .chat-bubble.error {
-  border-color: rgba(255, 69, 58, 0.5);
+  border-color: rgb(var(--rose-rgb) / 0.5);
+}
+
+/* --- 14. Motion (life-spec "Ember"; server/docs/web-design.md) ---
+   Opacity and transform only, the --dur-* / --ease-* tokens, nothing infinite outside an active state;
+   prefers-reduced-motion collapses the durations (section 1). The JS side is Dana.motion (static/dana.js). */
+@keyframes dn-fade { from { opacity: 0; } }
+@keyframes dn-rise { from { opacity: 0; transform: translateY(var(--rise)); } }
+@keyframes dn-slide-in { from { opacity: 0; transform: translateX(calc(var(--slide) * var(--dn-dir, 1))); } }
+@keyframes dn-sheet { from { opacity: 0; transform: translateY(24px); } }
+@keyframes dn-flash { from { opacity: 1; } to { opacity: 0; } }
+@keyframes dn-roll { from { opacity: 0; transform: translateY(40%); } }
+/* toasts centred with translateX(-50%) */
+@keyframes dn-toast { from { opacity: 0; transform: translate(-50%, var(--rise)); } to { opacity: 1; transform: translate(-50%, 0); } }
+@keyframes dn-ring { from { opacity: 0.55; transform: scale(0.9); } to { opacity: 0; transform: scale(1.45); } }
+
+/* Switching screens: the screen arriving crossfades and slides in the direction of travel (app-nav.js
+   sets --dn-dir: 1 forward down the navigation, -1 back up it). A panel going from display:none to shown
+   starts it again, so nothing else needs resetting. */
+.screen-panel.active { animation: dn-slide-in var(--dur-base) var(--ease-decel); }
+
+/* Rows arriving on a screen's first load (Dana.motion.arrive): fade and rise, the first eight 30 ms apart.
+   A page marks its list rows with .dn-row; --dn-i is a row's place among its siblings. */
+.dn-arrive :nth-child(1) { --dn-i: 0; }
+.dn-arrive :nth-child(2) { --dn-i: 1; }
+.dn-arrive :nth-child(3) { --dn-i: 2; }
+.dn-arrive :nth-child(4) { --dn-i: 3; }
+.dn-arrive :nth-child(5) { --dn-i: 4; }
+.dn-arrive :nth-child(6) { --dn-i: 5; }
+.dn-arrive :nth-child(7) { --dn-i: 6; }
+.dn-arrive :nth-child(8) { --dn-i: 7; }
+.dn-arrive :is(.dn-row, .itg-row, .itg-card, .usg-row, .rv-item, .chat-sidebar-item, .settings-card) {
+  animation: dn-rise var(--dur-slow) var(--ease-decel) both;
+  animation-delay: calc(var(--stagger) * var(--dn-i, 0));
+}
+.dn-arrive :is(.dn-row, .itg-row, .itg-card, .usg-row, .rv-item, .chat-sidebar-item, .settings-card):nth-child(n+9) { animation: none; }
+
+/* Chat: a new message rises in (app-chat.js marks only messages that were not on screen before). */
+.dn-new { animation: dn-rise var(--dur-base) var(--ease-decel) both; }
+
+/* Press: a quick scale, everywhere something is tapped. */
+:is(.btn-primary, .btn-secondary, .btn-destructive-outline, .btn-ghost-danger, .chip, .icon-btn, .rail-btn, .bottom-nav-btn,
+  .segmented-btn, .task-card, .chat-sidebar-item, .settings-link-tile, .selection-option-row, .filter-nav-item, .ibx-link,
+  .chat-bubble-act-btn, .project-tab, .knowledge-entry-card):active:not(:disabled) {
+  transform: scale(0.97);
+}
+:is(.btn-secondary, .btn-destructive-outline, .chip, .icon-btn, .rail-btn, .bottom-nav-btn, .segmented-btn, .chat-sidebar-item,
+  .settings-link-tile, .selection-option-row) { transition: var(--t-state); }
+
+/* Keyboard focus: the accent ring. */
+:is(button, a, [tabindex], .chip, .rail-btn, .bottom-nav-btn):focus-visible { box-shadow: var(--focus-ring); outline: none; }
+
+/* Data that just updated (Dana.motion.flash): an accent tint that fades out over ~600 ms. */
+.dn-flash { position: relative; }
+.dn-flash::after {
+  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  background: var(--accent-tint); animation: dn-flash 600ms var(--ease-standard) forwards;
+}
+
+/* A changed number (Dana.motion.number): the new value rolls in. */
+.dn-roll { display: inline-block; animation: dn-roll var(--dur-base) var(--ease-decel); }
+
+/* Completing a row (Dana.motion.complete): the page draws .dn-completing, then the row fades and collapses
+   (the one list-layout animation allowed). */
+.dn-collapse {
+  height: 0 !important; min-height: 0 !important; margin-top: 0 !important; margin-bottom: 0 !important;
+  padding-top: 0 !important; padding-bottom: 0 !important; border-width: 0 !important; opacity: 0; overflow: hidden;
+  transition: height var(--dur-base) var(--ease-accel), opacity var(--dur-fast) var(--ease-accel),
+    padding var(--dur-base) var(--ease-accel), margin var(--dur-base) var(--ease-accel);
+}
+
+/* Listening: a gentle pulse ring around the mic orb, only while it listens (app-voice.js toggles .listening). */
+.siri-sphere-btn.listening::after {
+  content: ""; position: absolute; inset: 0; border-radius: var(--radius-full); pointer-events: none;
+  border: 2px solid var(--accent); animation: dn-ring 1.4s var(--ease-decel) infinite;
+}
+
+/* Skeletons: one shimmer band sweeps across while the data loads (a page's skeleton takes .dn-shimmer). */
+@keyframes dn-shimmer { from { transform: translateX(-100%); } to { transform: translateX(100%); } }
+.dn-shimmer { position: relative; overflow: hidden; }
+.dn-shimmer::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(90deg, transparent, rgb(var(--ink-rgb) / 0.07), transparent);
+  animation: dn-shimmer 1.4s var(--ease-standard) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .siri-sphere-btn.listening::after, .dn-shimmer::after, .typing-dot { animation: none; }
 }

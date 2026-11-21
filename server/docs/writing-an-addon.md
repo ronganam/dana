@@ -242,7 +242,7 @@ Dana.panel({
 | `api.toast(text)`, `api.visible()`, `api.icons()`, `api.esc(text)` | a short message; whether this page is on screen; draw `<i data-lucide>` icons; HTML-escape |
 | `api.store.get(key, fallback)` / `.set` / `.remove` | `localStorage` that never throws |
 
-A page uses only its own elements and `api`. It builds on the shell's tokens and classes (`static/styles.css`: `--ink`, `--canvas`, `.top-bar`, `.btn-primary`, `.chip`, `.form-control`; `static/kit.css`: `.ibx` list and detail panes, toolbars, modals, fields). Put pure logic in a `web/<x>-core.js` that sets `globalThis.<Name>` and test it with `tests/test_web_<x>.mjs` (the official pages do: shopping, projects, money, tasks, calls).
+A page uses only its own elements and `api`. It builds on the shell's tokens and classes (`static/styles.css`: `--ink`, `--canvas`, the named hues `--sage` / `--sage-tint` / `--sage-text` …, `.top-bar`, `.btn-primary`, `.chip`, `.form-control`; `static/kit.css`: `.ibx` list and detail panes, toolbars, modals, fields) and the shared motion (`api.motion`: rows marked `.dn-row` rise in on the page's first opening, `complete(row)`, `flash(el)`, `number(el, text)`, skeletons with `.dn-shimmer`); `docs/web-design.md` says which colour means what and which motion goes where. Put pure logic in a `web/<x>-core.js` that sets `globalThis.<Name>` and test it with `tests/test_web_<x>.mjs` (the official pages do: shopping, projects, money, tasks, calls).
 
 ### Workers
 

@@ -229,15 +229,30 @@ chatTextInput?.addEventListener("keydown", (e) => {
     }
 });
 
+// How many messages of this session are on screen: only one past them rises in (styles.css .dn-new), so a
+// streaming reply that changes its id (thinking → live → saved) rises once; a session's first draw and
+// older pages added on top come in quietly.
+let drawnCount = 0;
+let drawnSession = null;
+let drawQuietOnce = false;
+function startDrawing() {
+    const quiet = drawQuietOnce || drawnSession !== currentSessionId;
+    drawnSession = currentSessionId;
+    drawQuietOnce = false;
+    const from = quiet ? Infinity : drawnCount;
+    drawnCount = chatMessages.length;
+    return from;
+}
+
 // Render Chat Messages
 function renderChatMessages() {
     if (!chatMessagesEl) return;
+    const newFrom = startDrawing();
     if (chatMessages.length === 0) {
         chatMessagesEl.innerHTML = `
                 <div class="pane-empty-state" style="margin-top:auto;margin-bottom:auto;">
-                    <div class="nav-rail-brand" style="width:52px;height:52px;font-size:1.4rem;margin-bottom:8px;">G</div>
-                    <strong style="color:var(--ink);font-size:15px;">How can I help you today?</strong>
-                    <span style="font-size:13px;max-width:320px;">Ask about your schedule, reminders, phone calls, or run Home Assistant automations.</span>
+                    <strong style="color:var(--ink);font-family:var(--font-serif);font-style:italic;font-weight:400;font-size:30px;line-height:1.1;">Nothing said yet<span style="color:var(--accent, var(--ember));">.</span></strong>
+                    <span style="font-size:13px;max-width:320px;">Ask about your day, your reminders and calls, or the house.</span>
                 </div>
             `;
         return;
@@ -270,6 +285,9 @@ function renderChatMessages() {
         }
         const firstChild = chatMessagesEl.children.length;
         renderChatMessage(msg);
+        if (idx >= newFrom) {
+            for (let i = firstChild; i < chatMessagesEl.children.length; i++) chatMessagesEl.children[i].classList.add("dn-new");
+        }
         if (divider && idx < divider.index) {
             for (let i = firstChild; i < chatMessagesEl.children.length; i++) chatMessagesEl.children[i].classList.add("chat-forgotten");
         }
@@ -360,7 +378,7 @@ function renderChatMessage(msg) {
                 <div class="selection-options">
                     ${msg.options.map((opt, idx) => `
                         <div class="selection-option-row" data-idx="${idx}">
-                            <input type="${msg.multiple ? "checkbox" : "radio"}" name="sel_${msg.id}" ${msg.multiple ? "" : "name='opt'"} style="accent-color:var(--ink);">
+                            <input type="${msg.multiple ? "checkbox" : "radio"}" name="sel_${msg.id}" ${msg.multiple ? "" : "name='opt'"} style="accent-color:var(--accent);">
                             <span style="font-size:13.5px;">${escapeHtml(opt.label || opt)}</span>
                         </div>
                     `).join("")}
@@ -739,6 +757,7 @@ async function loadSession(sid) {
             const msgs = sessionData.messages || sessionData.history;
             if (msgs && Array.isArray(msgs)) {
                 chatMessages = mapServerMessages(msgs);
+                drawQuietOnce = true;   // the session's history comes in at once, not message by message
                 renderChatMessages();
                 if (chatMessagesEl) chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
             }
@@ -769,6 +788,7 @@ async function loadEarlierThreadMessages() {
         chatMessages = older.filter(m => !known.has(m.id)).concat(chatMessages);
         threadInfo.hasMore = !!data.has_more;
         threadInfo.before = data.before ?? null;
+        drawQuietOnce = true;
         renderChatMessages();
         // Keep the reader where they were.
         if (chatMessagesEl) chatMessagesEl.scrollTop += chatMessagesEl.scrollHeight - height;

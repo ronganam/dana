@@ -11,32 +11,47 @@
 }
 
 /* ==========================================================================
-   DANA — DASHBOARD (WARP DESIGN SYSTEM)
-   Warm near-charcoal canvas matching static/styles.css. Kiosk-first layout:
-   fills the viewport exactly (100dvh), never scrolls the page.
+   DANA — THE BEDROOM DASHBOARD (/dashboard; server/docs/web-design.md, docs/dashboard.md)
+   The Ink tokens and named hues of static/styles.css, Ink only (a bedroom at night). Kiosk-first layout:
+   fills the viewport exactly (100dvh), never scrolls the page. A low-power target (a 2018 tablet's
+   WebView): colour yes; motion only for presses and values that change (.dash-changed), no entrance,
+   stagger, shimmer or glow. Plain hex / rgba values here, no rgb(var() / a), for older WebViews.
    ========================================================================== */
 
-/* --- Design Tokens (shared with styles.css) --- */
+/* --- Design Tokens (the Ink values of styles.css) --- */
 :root {
-    --canvas: #2b2622;
-    --canvas-soft: #383330;
-    --canvas-raised: #403a36;
-    --hairline: #3f3a36;
-    --hairline-strong: #4a443f;
+    --canvas: #2b2521;
+    --canvas-soft: #38302b;
+    --canvas-raised: #423933;
+    --hairline: #423a34;
+    --hairline-strong: #4f463f;
 
     --ink: #f7f5f0;
-    --on-primary: #2b2622;
+    --on-primary: #2b2521;
     --body-strong: #dad2c1;
     --body: #c9c0ad;
     --mute: #aea69c;
 
-    --listening-green: #34c759;
-    --connecting-amber: #ffb300;
-    --destructive: #ff453a;
+    /* Hues (dark values) and their 14% tints */
+    --ember: #ff6a3d;  --ember-tint: rgba(255, 106, 61, 0.14);  --ember-text: #fd9371;  --on-accent: #1f0a02;
+    --amber: #f2a93b;  --amber-tint: rgba(242, 169, 59, 0.14);
+    --sage: #5fbf8a;   --sage-tint: rgba(95, 191, 138, 0.14);
+    --teal: #3dbfb3;   --teal-tint: rgba(61, 191, 179, 0.14);
+    --sky: #5aa7f0;    --sky-tint: rgba(90, 167, 240, 0.14);
+    --plum: #b892f2;   --plum-tint: rgba(184, 146, 242, 0.14);
+    --rose: #f0709a;   --rose-tint: rgba(240, 112, 154, 0.14);
 
-    --prio-high: #ff3b30;
-    --prio-medium: #ff9500;
-    --prio-low: #007aff;
+    --listening-green: var(--sage);
+    --connecting-amber: var(--amber);
+    --destructive: var(--rose);
+
+    --prio-high: var(--rose);
+    --prio-medium: var(--amber);
+    --prio-low: var(--sky);
+
+    --dur-fast: 120ms;
+    --dur-base: 200ms;
+    --ease-standard: cubic-bezier(.2, 0, 0, 1);
 
     --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 
@@ -59,8 +74,6 @@ body {
     --zoom-scale: 1;
     position: relative;
     background-color: var(--canvas);
-    background-image: radial-gradient(circle at 50% 42%, rgba(247, 245, 240, 0.025) 0%, transparent 90%);
-    background-attachment: fixed;
     color: var(--ink);
     font-family: var(--font-inter);
     display: grid;
@@ -184,8 +197,8 @@ a { color: inherit; text-decoration: none; }
     display: none;
     align-items: center;
     gap: 8px;
-    background: rgba(43, 38, 34, 0.92);
-    border: 1px solid rgba(255, 69, 58, 0.55);
+    background: rgba(43, 37, 33, 0.92);
+    border: 1px solid rgba(240, 112, 154, 0.55);
     color: var(--destructive);
     font-size: 12px;
     font-weight: 500;
@@ -308,11 +321,11 @@ html[data-url-zoom][data-layout="tiny"] .clock-time { font-size: 24px; letter-sp
     display: flex; align-items: center; justify-content: center;
     color: var(--body-strong);
     font-size: 15px;
-    transition: all 0.15s;
+    transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
     padding: 0 4px;
 }
 .ctrl-group button:hover { background: var(--hairline-strong); color: var(--ink); }
-.ctrl-group button:active { background: var(--ink); color: var(--on-primary); }
+.ctrl-group button:active { background: var(--ember-tint); color: var(--ember-text); transform: scale(0.97); }
 .ctrl-group button svg, .ctrl-group button i { width: 13px; height: 13px; }
 .ctrl-group .ctrl-label {
     font-size: 10px; font-weight: 500; color: var(--mute);
@@ -346,11 +359,11 @@ html[data-url-zoom][data-layout="tiny"] .clock-time { font-size: 24px; letter-sp
     color: var(--body-strong);
     font-size: 15px;
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
+    transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
     -webkit-user-select: none; user-select: none;
 }
 .temp-btn:hover { background: var(--hairline-strong); color: var(--ink); }
-.temp-btn:active { background: var(--ink); color: var(--on-primary); }
+.temp-btn:active { background: var(--ember-tint); color: var(--ember-text); transform: scale(0.97); }
 .temp-value {
     font-size: 17px; font-weight: 600; min-width: 32px; text-align: center;
     font-variant-numeric: tabular-nums;
@@ -376,15 +389,16 @@ html[data-url-zoom][data-layout="tiny"] .clock-time { font-size: 24px; letter-sp
     background: var(--canvas-raised);
     color: var(--body);
     display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s;
+    transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard),
+        transform var(--dur-fast) var(--ease-standard);
 }
 .mode-pill:hover { background: var(--hairline-strong); color: var(--ink); }
-.mode-pill:active { transform: scale(0.96); }
+.mode-pill:active { transform: scale(0.97); }
 .mode-pill svg, .mode-pill i { width: 16px; height: 16px; }
 .mode-pill.active {
-    background: var(--ink);
-    border-color: var(--ink);
-    color: var(--on-primary);
+    background: var(--ember-tint);
+    border-color: var(--ember);
+    color: var(--ember-text);
 }
 .mode-row .fan-off {
     flex: 1;
@@ -423,7 +437,7 @@ html[data-url-zoom][data-layout="tiny"] .clock-time { font-size: 24px; letter-sp
 }
 .batt-fill {
     height: 100%; border-radius: 3px;
-    transition: width 0.6s ease, background 0.6s ease;
+    transition: background-color 0.6s ease;
 }
 
 /* --- Tasks Card --- */
@@ -471,7 +485,7 @@ html[data-url-zoom][data-layout="tiny"] .clock-time { font-size: 24px; letter-sp
 /* Morning briefing on top of the tasks card (until noon). */
 .brief-item {
     padding: 5px 8px; margin-bottom: 4px; border-radius: 6px;
-    background: rgba(255,149,0,0.10); border-inline-start: 2px solid var(--prio-medium);
+    background: var(--amber-tint); border-inline-start: 2px solid var(--amber);
 }
 .brief-item.rtl { direction: rtl; text-align: right; }
 .brief-head { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.25; }
@@ -515,7 +529,7 @@ html[data-layout="tiny"] { --cal-h: clamp(96px, 14vh, 130px); }
     overflow: hidden;
 }
 .cal-day.today {
-    border-color: var(--hairline-strong);
+    border-color: rgba(255, 106, 61, 0.45);
     background: var(--canvas-raised);
 }
 .cal-day .cd-head {
@@ -532,8 +546,8 @@ html[data-layout="tiny"] { --cal-h: clamp(96px, 14vh, 130px); }
     font-variant-numeric: tabular-nums;
 }
 .cal-day.today .cd-num {
-    background: var(--ink);
-    color: var(--on-primary);
+    background: var(--ember);
+    color: var(--on-accent);
     width: 26px; height: 26px;
     border-radius: var(--radius-full);
     display: flex; align-items: center; justify-content: center;
@@ -746,3 +760,9 @@ html[data-night] #night-dim { opacity: var(--night-dim, 0.55); }
 .ask-dana[hidden] { display: none; }
 .ask-dana svg { width: 26px; height: 26px; }
 .ask-dana:active { background: var(--canvas-soft); }
+
+/* A value that changed (not its first fill: dashboard.js setValue) crossfades in. The one motion on the
+   tablet besides presses and the live dot. */
+@keyframes dash-changed { from { opacity: 0.25; } to { opacity: 1; } }
+.dash-changed { animation: dash-changed var(--dur-base) var(--ease-standard); }
+@media (prefers-reduced-motion: reduce) { .dash-changed { animation: none; } }

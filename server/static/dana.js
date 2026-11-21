@@ -14,7 +14,8 @@
  *   });
  *
  * `api` is the same object every time: { addon, page, me, base, fetch, json, call, stream, toast, open,
- * openSession, badge, visible, piece, icons, esc, store } (each described where it is built, `makeApi`).
+ * openSession, badge, visible, piece, icons, esc, store, motion } (each described where it is built, `makeApi`;
+ * `motion` is `Dana.motion`, below).
  * Nothing else of the shell is a page's business: no globals, no other page's elements.
  * Works in Node too (no DOM until a page mounts): tests/test_web_panels.mjs.
  */
@@ -64,6 +65,56 @@
     try { data = await r.json(); } catch (_) { /* empty */ }
     return { status: r.status, body: data };
   }
+
+  /* Motion the shell and pages share (server/docs/web-design.md): the CSS lives in styles.css (.dn-*), on
+   * opacity and transform only; with reduced motion each one is instant. */
+  // Nothing animates where nobody sees it: a hidden page (a background tab) gets every change at once.
+  const hidden = () => Boolean(root.document && root.document.hidden);
+  const reduced = () => hidden() || Boolean(root.matchMedia && root.matchMedia("(prefers-reduced-motion: reduce)").matches);
+  const later = (fn, ms) => root.setTimeout(fn, ms);
+  const frame = (fn) => (root.requestAnimationFrame && !hidden() ? root.requestAnimationFrame(fn) : later(fn, 16));
+  const motion = {
+    /** Whether motion is off: the user asked for reduced motion, or the page is hidden. */
+    reduced,
+    /** Rows arriving: elements added inside `el` during the next `ms` rise in, the first eight staggered.
+     *  Call it on a screen's first load only, never on a refresh. */
+    arrive(el, ms = 1200) {
+      if (!el || !el.classList || reduced()) return;
+      el.classList.add("dn-arrive");
+      later(() => el.classList.remove("dn-arrive"), ms);
+    },
+    /** Data that just updated: a brief accent tint over `el` that fades out (~600 ms). */
+    flash(el) {
+      if (!el || !el.classList || reduced()) return;
+      el.classList.remove("dn-flash");
+      frame(() => frame(() => {
+        el.classList.add("dn-flash");
+        later(() => el.classList.remove("dn-flash"), 700);
+      }));
+    },
+    /** Completing a row: `.dn-completing` (the page draws its check and strike-through), then the row fades
+     *  and collapses; resolves when it is gone (~400 ms), at once with reduced motion. */
+    complete(el) {
+      if (!el || !el.classList || reduced()) return Promise.resolve();
+      el.classList.add("dn-completing");
+      return new Promise((resolve) => {
+        later(() => {
+          el.style.height = `${el.offsetHeight}px`;
+          frame(() => { el.classList.add("dn-collapse"); later(resolve, 200); });
+        }, 220);
+      });
+    },
+    /** A number that changed: sets `el`'s text and rolls the new value in (no counting loop). */
+    number(el, text) {
+      if (!el) return;
+      const next = String(text);
+      if (el.textContent === next) return;
+      el.textContent = next;
+      if (reduced() || !el.classList) return;
+      el.classList.remove("dn-roll");
+      frame(() => frame(() => el.classList.add("dn-roll")));
+    },
+  };
 
   function makeApi(addon, page, panelUrl) {
     return {
@@ -124,6 +175,8 @@
         set(k, v) { try { root.localStorage.setItem(k, String(v)); } catch (_) { /* ignore */ } },
         remove(k) { try { root.localStorage.removeItem(k); } catch (_) { /* ignore */ } },
       },
+      /** Shared motion: arrive(el), flash(el), complete(el) → Promise, number(el, text), reduced(). */
+      motion,
     };
   }
 
@@ -168,5 +221,6 @@
     /** A test or the shell names the page a script URL belongs to before running it. */
     expect(url, addon, page) { owners.set(bare(absolute(url)), { addon, page }); },
     sibling,
+    motion,
   };
 })();

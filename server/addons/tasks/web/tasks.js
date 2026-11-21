@@ -59,7 +59,7 @@
         </div>
         <div class="filter-sidebar-section" style="margin-top:auto;border-top:1px solid var(--hairline);padding-top:12px;">
           <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--body);cursor:pointer;padding:4px;">
-            <input type="checkbox" id="task-toggle-completed" style="accent-color:var(--ink);"><span>Show completed</span>
+            <input type="checkbox" id="task-toggle-completed" style="accent-color:var(--accent);"><span>Show completed</span>
           </label>
         </div>
       </div>
@@ -183,7 +183,7 @@
     const group = S.groups.find((g) => g.id === (t.group_id || t.groupId));
     const tag = (text, style = "") => `<span class="badge-tag"${style}>${esc(text)}</span>`;
     return `
-      <div class="task-card ${t.id === S.selected ? "active" : ""}" data-id="${esc(t.id)}">
+      <div class="task-card dn-row ${t.id === S.selected ? "active" : ""}" data-id="${esc(t.id)}"${group && group.color ? ` style="--hue:${esc(group.color)}"` : ""}>
         <div class="task-checkbox prio-${esc(p)} ${done ? "completed" : ""}" data-check="${esc(t.id)}">
           ${done ? `<i data-lucide="check" style="width:14px;height:14px;stroke-width:3;color:var(--on-primary);"></i>` : ""}
         </div>
@@ -191,7 +191,7 @@
           <span class="task-title ${done ? "completed" : ""}">${esc(t.title)}</span>
           ${t.description ? `<span class="task-desc">${esc(t.description)}</span>` : ""}
           <div class="task-tags-row">
-            ${group ? tag(`${group.emoji || "📁"} ${group.name}`, ` style="background:${esc(group.color ? group.color + "22" : "rgba(247,245,240,0.1)")};color:${esc(group.color || "var(--ink)")};"`) : ""}
+            ${group ? tag(`${group.emoji || "📁"} ${group.name}`, ` style="background:${esc(group.color ? group.color + "22" : "rgb(var(--ink-rgb) / .1)")};color:${esc(group.color || "var(--ink)")};"`) : ""}
             ${trig.time ? tag(`⏰ ${String(trig.time).replace("T", " ")}`) : ""}
             ${trig.location && typeof trig.location === "object" ? tag(`📍 ${trig.location.location || ""} (${trig.location.event || "arrive"})`) : ""}
             ${trig.car ? tag(`🚗 Car (${trig.car})`) : ""}
@@ -312,12 +312,20 @@
     if (r.status >= 200 && r.status < 300) await load(); else A.toast("Could not save the reminder");
   }
 
+  const cardOf = (id) => $("tasks-scroll-list").querySelector(`.task-card[data-id="${CSS.escape(id)}"]`);
+
+  /** Done: the check fills and draws, the title is struck through, the row fades and collapses (~400 ms,
+   *  Dana.motion.complete) while the change is saved. Back to active: the row returns with a highlight. */
   async function setDone(id, done) {
+    const card = cardOf(id);
+    const leaving = done && card ? A.motion.complete(card) : null;
     await save(id, { status: done ? "completed" : "needs_action" });
     const t = S.tasks.find((x) => x.id === id);
     if (t) t.status = done ? "completed" : "needs_action";
+    if (leaving) await leaving;
     renderFilters();
     renderList();
+    if (!done) A.motion.flash(cardOf(id));
   }
 
   // ---------- the new-reminder modal ----------
@@ -355,7 +363,7 @@
   // ---------- the group manager ----------
   function renderGroups() {
     $("group-manager-list").innerHTML = S.groups.map((g) => `
-      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgba(247,245,240,0.03);border:1px solid var(--hairline);border-radius:var(--radius-md);">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 10px;background:rgb(var(--ink-rgb) / .03);border:1px solid var(--hairline);border-radius:var(--radius-md);">
         <div style="display:flex;align-items:center;gap:8px;">
           <span>${esc(g.emoji || "📁")}</span>
           <strong style="font-size:13px;color:var(--ink);">${esc(g.name)}</strong>

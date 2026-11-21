@@ -590,7 +590,7 @@
     const catBtn = flow
       ? `<span class="mny-catchip flow" title="${esc(C.statusExplain(t, companyOf(t)))}">${esc(flow)}</span>`
       : `<button class="mny-catchip${t.category ? "" : " none"}" data-cat-for="${esc(t.id)}" title="${esc(t.category ? `${t.category_label}: change the category` : "Pick a category")}">${t.group ? `<span class="mny-sw ${seriesCls(t.group)}"></span>` : ""}<span class="mny-catchip-t">${esc(t.category ? t.category_label : "Uncategorized")}</span></button>`;
-    return `<div class="mny-row${S.openId === t.id ? " open" : ""}${t.status === "unmatched" ? " unmatched" : ""}" role="button" tabindex="0" data-open-txn="${esc(t.id)}">
+    return `<div class="mny-row dn-row${S.openId === t.id ? " open" : ""}${t.status === "unmatched" ? " unmatched" : ""}" role="button" tabindex="0" data-open-txn="${esc(t.id)}">
       <span class="mny-row-icon ${cls}">${icon(ic)}</span>
       <span class="mny-row-main">
         <span class="mny-row-top"><bdi dir="auto" class="mny-merchant">${esc(t.merchant || t.description || "—")}</bdi>${badges}</span>
@@ -603,7 +603,7 @@
   function renderTxns() {
     const el = $("mny-txns");
     if (!el) return;
-    if (!S.txLoaded && !S.txError) { el.innerHTML = `<div class="mny-day-head skel"></div>` + `<div class="mny-row-skel tall"></div>`.repeat(6); return; }
+    if (!S.txLoaded && !S.txError) { el.innerHTML = `<div class="mny-day-head skel dn-shimmer"></div>` + `<div class="mny-row-skel dn-shimmer tall"></div>`.repeat(6); return; }
     if (S.txError && !S.txns.length) { el.innerHTML = `<div class="mny-empty">${esc(S.txError)} <button class="mny-link" data-act="retry-tx">Try again</button></div>`; return; }
     const shown = S.f.category === "uncategorized" ? S.txns.filter(C.needsCategory) : S.txns;
     if (!shown.length && !S.next) {
@@ -758,7 +758,7 @@
   function renderSources() {
     const el = $("mny-sources");
     const list = S.sources;
-    if (!list) { el.innerHTML = `<div class="mny-card mny-skel" style="height:180px"></div>`; return; }
+    if (!list) { el.innerHTML = `<div class="mny-card mny-skel dn-shimmer" style="height:180px"></div>`; return; }
     const now = Date.now();
     const cards = list.map((s) => {
       const st = C.sourceStatus(s, now);

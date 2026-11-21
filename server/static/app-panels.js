@@ -160,7 +160,7 @@ function setPanelBadge(page, value, tone = "") {
 function paintBadges() {
     document.querySelectorAll("[data-badge]").forEach(b => {
         const { text, tone } = panelBadges.get(b.dataset.badge) || { text: "", tone: "" };
-        b.textContent = text;
+        window.Dana.motion.number(b, text);   // a changed count rolls in
         b.dataset.tone = tone;
         b.classList.toggle("hidden", !text);
     });

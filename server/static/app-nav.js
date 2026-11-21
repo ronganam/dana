@@ -21,6 +21,13 @@ const CORE_PIECES = {
 };
 
 let previousTab = null;
+const visitedScreens = new Set();   // screens opened once: their rows rise in only the first time
+
+/** A screen's place in the navigation (core and addon buttons in their order); -1 when it has none. */
+function navIndex(tabId) {
+    const navTab = tabId === "addons" ? "settings" : tabId;
+    return [...document.querySelectorAll(".rail-btn[data-tab]")].findIndex(b => b.getAttribute("data-tab") === navTab);
+}
 
 function highlightNav(tabId) {
     // Addons is a page of Settings: Settings stays the highlighted tab.
@@ -31,12 +38,20 @@ function highlightNav(tabId) {
 }
 
 function switchTab(tabId, arg = null) {
+    // The screen arriving slides in from the side it lies on in the navigation (styles.css, Motion).
+    const dir = navIndex(tabId) < navIndex(activeTab) ? -1 : 1;
     if (tabId !== activeTab) previousTab = activeTab;
     activeTab = tabId;
     highlightNav(tabId);
     document.querySelectorAll(".screen-panel").forEach(panel => {
-        panel.classList.toggle("active", panel.id === `panel-${tabId}`);
+        const on = panel.id === `panel-${tabId}`;
+        if (on) panel.style.setProperty("--dn-dir", dir);
+        panel.classList.toggle("active", on);
     });
+    if (!visitedScreens.has(tabId)) {
+        visitedScreens.add(tabId);
+        window.Dana?.motion.arrive(document.getElementById(`panel-${tabId}`));
+    }
 
     // Trigger screen data loading
     if (tabId !== "debug") stopDebugPolling();

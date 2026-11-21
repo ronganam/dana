@@ -124,7 +124,7 @@
       const isSelected = m.key === activeMemoryKey;
 
       return `
-          <div class="memory-row-item ${isSelected ? "active" : ""}" data-key="${esc(m.key)}">
+          <div class="memory-row-item dn-row ${isSelected ? "active" : ""}" data-key="${esc(m.key)}">
             <div class="memory-cat-bar" style="background:${catColor};"></div>
             <div style="flex:1;overflow:hidden;display:flex;flex-direction:column;gap:2px;">
               <strong style="font-size:13.5px;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
