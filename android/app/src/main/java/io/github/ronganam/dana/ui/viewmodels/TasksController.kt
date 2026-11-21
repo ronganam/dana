@@ -3,6 +3,8 @@ package io.github.ronganam.dana.ui.viewmodels
 import android.content.Context
 import io.github.ronganam.dana.data.models.Task
 import io.github.ronganam.dana.data.models.TaskGroup
+import io.github.ronganam.dana.data.models.Triggers
+import io.github.ronganam.dana.data.network.TaskChanges
 import io.github.ronganam.dana.data.sync.SubmitResult
 import io.github.ronganam.dana.data.sync.TaskActionQueue
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,7 +12,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -49,7 +50,7 @@ class TasksController(private val ctx: ControllerContext, private val appContext
         ctx.scope.launch {
             _isLoadingTasks.value = true
             try {
-                ctx.load("Tasks") { ctx.api.getTasks() }?.let { _tasks.value = it }
+                ctx.load("Tasks") { ctx.api.tasks.tasks() }?.let { _tasks.value = it }
             } finally {
                 _isLoadingTasks.value = false
             }
@@ -57,27 +58,15 @@ class TasksController(private val ctx: ControllerContext, private val appContext
         }
     }
 
-    fun createTask(title: String, description: String?, priority: String, dueDate: String?, triggers: JSONObject?, groupId: String?) {
-        ctx.action("Couldn't create task") {
-            ctx.api.createTaskDetailed(title, description, priority, dueDate, triggers, groupId).also { if (it) fetchTasks() }
-        }
-    }
-
-    fun updateTask(taskId: String, title: String, description: String?, priority: String, dueDate: String?, status: String, triggers: JSONObject?, groupId: String?) {
-        ctx.action("Couldn't update task") {
-            ctx.api.updateTaskDetailed(taskId, title, description, priority, dueDate, status, triggers, groupId).also { if (it) fetchTasks() }
-        }
-    }
-
     fun updateTaskStatus(taskId: String, newStatus: String) {
         ctx.action("Couldn't update task") {
-            ctx.api.updateTaskStatus(taskId, newStatus).also { if (it) fetchTasks() }
+            ctx.api.tasks.update(taskId, TaskChanges(status = newStatus)).also { if (it) fetchTasks() }
         }
     }
 
     fun deleteTask(taskId: String) {
         ctx.action("Couldn't delete task") {
-            ctx.api.deleteTask(taskId).also { if (it) fetchTasks() }
+            ctx.api.tasks.delete(taskId).also { if (it) fetchTasks() }
         }
     }
 
@@ -85,7 +74,7 @@ class TasksController(private val ctx: ControllerContext, private val appContext
         ctx.scope.launch {
             _isLoadingGroups.value = true
             try {
-                ctx.load("TaskGroups") { ctx.api.getTaskGroups() }?.let { _taskGroups.value = it }
+                ctx.load("TaskGroups") { ctx.api.tasks.groups() }?.let { _taskGroups.value = it }
             } finally {
                 _isLoadingGroups.value = false
             }
@@ -94,19 +83,19 @@ class TasksController(private val ctx: ControllerContext, private val appContext
 
     fun createTaskGroup(name: String, emoji: String, color: String, description: String?) {
         ctx.action("Couldn't create group") {
-            ctx.api.createTaskGroup(name, emoji, color, description).also { if (it) fetchTaskGroups() }
+            ctx.api.tasks.createGroup(name, emoji, color, description).also { if (it) fetchTaskGroups() }
         }
     }
 
     fun updateTaskGroup(id: String, name: String, emoji: String, color: String, description: String?) {
         ctx.action("Couldn't update group") {
-            ctx.api.updateTaskGroup(id, name, emoji, color, description).also { if (it) fetchTaskGroups() }
+            ctx.api.tasks.updateGroup(id, name, emoji, color, description).also { if (it) fetchTaskGroups() }
         }
     }
 
     fun deleteTaskGroup(id: String) {
         ctx.action("Couldn't delete group") {
-            ctx.api.deleteTaskGroup(id).also { if (it) fetchTasks() }
+            ctx.api.tasks.deleteGroup(id).also { if (it) fetchTasks() }
         }
     }
 
@@ -124,7 +113,7 @@ class TasksController(private val ctx: ControllerContext, private val appContext
 
     fun fetchZones() {
         ctx.scope.launch {
-            val zones = ctx.load("Zones") { ctx.api.getZones() }
+            val zones = ctx.load("Zones") { ctx.api.tasks.zones() }
             _zones.value = zones?.map { it.name } ?: listOf("Home")
         }
     }
@@ -155,7 +144,7 @@ class TasksController(private val ctx: ControllerContext, private val appContext
             }
             SubmitResult.REJECTED -> {
                 ctx.messages.post("$failure: the server rejected the request")
-                ctx.load("Tasks") { ctx.api.getTasks() }?.let { _tasks.value = it }
+                ctx.load("Tasks") { ctx.api.tasks.tasks() }?.let { _tasks.value = it }
             }
         }
     }
@@ -164,7 +153,7 @@ class TasksController(private val ctx: ControllerContext, private val appContext
      * Change some fields of a reminder: [local] updates the list right away,
      * [fields] go to `PUT /api/tasks/{id}` (queued when the server can't be reached).
      */
-    fun edit(taskId: String, fields: JSONObject, failure: String = "Couldn't save the reminder", local: (Task) -> Task) {
+    fun edit(taskId: String, fields: TaskChanges, failure: String = "Couldn't save the reminder", local: (Task) -> Task) {
         applyLocal(taskId) { local(it).copy(updatedAt = nowStamp()) }
         ctx.scope.launch { report(TaskActionQueue.update(appContext, taskId, fields), failure) }
     }
@@ -182,13 +171,12 @@ class TasksController(private val ctx: ControllerContext, private val appContext
     }
 
     /** Set the reminder's triggers; [undoLabel] shows "Moved to …" with Undo (drops on the day strip). */
-    fun setTriggers(taskId: String, triggers: JSONObject, undoLabel: String? = null) {
-        val before = _tasks.value.firstOrNull { it.id == taskId }?.triggers
-        edit(taskId, JSONObject().put("triggers", triggers)) { it.copy(triggers = triggers.toString()) }
+    fun setTriggers(taskId: String, triggers: Triggers, undoLabel: String? = null) {
+        val before = _tasks.value.firstOrNull { it.id == taskId }?.triggers ?: Triggers()
+        edit(taskId, TaskChanges(triggers = triggers)) { it.copy(triggers = triggers) }
         if (undoLabel != null) {
             ctx.messages.postUndoable(undoLabel, onUndo = {
-                val old = try { JSONObject(before ?: "{}") } catch (e: Exception) { JSONObject() }
-                edit(taskId, JSONObject().put("triggers", old)) { it.copy(triggers = old.toString()) }
+                edit(taskId, TaskChanges(triggers = before)) { it.copy(triggers = before) }
             })
         }
     }
@@ -213,7 +201,7 @@ class TasksController(private val ctx: ControllerContext, private val appContext
             },
             onTimeout = {
                 ctx.action("Couldn't delete the reminder") {
-                    ctx.api.deleteTask(taskId).also { if (!it) fetchTasks() }
+                    ctx.api.tasks.delete(taskId).also { if (!it) fetchTasks() }
                 }
             }
         )
@@ -222,8 +210,8 @@ class TasksController(private val ctx: ControllerContext, private val appContext
     /** "+ Add a reminder": create it, then [onCreated] with its id (to open it in the editor). */
     fun quickAdd(title: String, groupId: String?, onCreated: (String) -> Unit) {
         ctx.action("Couldn't add the reminder") {
-            val id = ctx.api.createTaskReturningId(title, groupId)
-            ctx.load("Tasks") { ctx.api.getTasks() }?.let { _tasks.value = it }
+            val id = ctx.api.tasks.createReturningId(title, groupId)
+            ctx.load("Tasks") { ctx.api.tasks.tasks() }?.let { _tasks.value = it }
             if (id != null) onCreated(id)
             id != null
         }

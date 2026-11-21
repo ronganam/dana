@@ -31,6 +31,7 @@ jobs:
               - '.github/workflows/ci.yml'
             android:
               - 'android/**'
+              - 'server/tests/fixtures/**'
               - '.github/workflows/ci.yml'
 
   server:
@@ -68,6 +69,17 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      # The contract tests read the server's fixtures (server/tests/fixtures,
+      # a test resources dir of :app); a copy kept under android/ must match.
+      - name: Server fixtures are not copied stale
+        run: |
+          status=0
+          while IFS= read -r f; do
+            if ! cmp -s "$f" "../server/tests/fixtures/$(basename "$f")"; then
+              echo "::error file=android/$f::differs from server/tests/fixtures/$(basename "$f")"; status=1
+            fi
+          done < <(find . -path '*/build' -prune -o \( -name '*_web.json' -o -name 'golden.sse' \) -type f -print)
+          exit $status
       # Unit tests, the phone and watch debug APKs, lint (app: new issues only, over
       # app/lint-baseline.xml), and the kiosk / TV flavors compiled.
       - run: >-

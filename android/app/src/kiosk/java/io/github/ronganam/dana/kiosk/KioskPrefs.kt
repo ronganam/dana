@@ -3,6 +3,7 @@ package io.github.ronganam.dana.kiosk
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import io.github.ronganam.dana.wake.WakePrefs
+import androidx.core.content.edit
 
 /** Kiosk-only settings; server, token and voice settings live in [WakePrefs]. */
 object KioskPrefs {
@@ -25,7 +26,7 @@ object KioskPrefs {
         followUp: Boolean
     ) {
         ServerConfig.save(context, serverUrl, apiToken)
-        WakePrefs.prefs(context).edit().putString(KEY_PATH, path.trim()).apply()
+        WakePrefs.prefs(context).edit { putString(KEY_PATH, path.trim()) }
         WakePrefs.saveVoice(context, threshold = threshold, speak = speak, followUp = followUp)
     }
 }

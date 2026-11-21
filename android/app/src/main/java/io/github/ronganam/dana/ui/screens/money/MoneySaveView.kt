@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.ui.components.rememberCopyText
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -19,12 +21,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDirection
@@ -81,7 +81,7 @@ internal fun SaveView(money: MoneyController, modifier: Modifier = Modifier) {
                 val t = MoneySave.tiles(s, today(day))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                     Tile("Could save", t.could, t.couldSub, Success, Modifier.weight(1f).fillMaxHeight())
-                    Tile("Saved so far", MoneyLedger.whole(t.saved), t.savedSub, MaterialTheme.colorScheme.onSurface, Modifier.weight(1f).fillMaxHeight())
+                    Tile("Saved so far", MoneyFormat.whole(t.saved), t.savedSub, MaterialTheme.colorScheme.onSurface, Modifier.weight(1f).fillMaxHeight())
                 }
                 Muted(t.source, Modifier.padding(top = 8.dp))
                 val parts = remember(s) { MoneySave.parts(s.items, day) }
@@ -244,7 +244,7 @@ private fun SavingBody(money: MoneyController, it: SavingItem, day: String?) {
     val busy = it.key in busySet
     val today = today(day)
     val uri = LocalUriHandler.current
-    val clipboard = LocalClipboardManager.current
+    val copy = rememberCopyText()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 28.dp)) {
         Text(MoneySave.isolateHebrew(it.title), style = MaterialTheme.typography.titleLarge.merge(Sentence).copy(fontWeight = FontWeight.SemiBold))
         if (it.summary.isNotEmpty()) Text(MoneySave.isolateHebrew(it.summary), style = MaterialTheme.typography.bodyMedium.merge(Sentence), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
@@ -327,7 +327,7 @@ private fun SavingBody(money: MoneyController, it: SavingItem, day: String?) {
             Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(10.dp)).padding(12.dp)) {
                 Text(sc.text, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Rtl), modifier = Modifier.fillMaxWidth())
                 InkButton("Copy", modifier = Modifier.padding(top = 8.dp)) {
-                    clipboard.setText(AnnotatedString(sc.text))
+                    copy(sc.text)
                     money.ctx.messages.post("Copied")
                 }
             }
@@ -406,11 +406,11 @@ private fun TargetBlock(money: MoneyController, it: SavingItem, editing: Boolean
     }
     if (editing) Column(Modifier.padding(top = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Spend at most ₪", style = MaterialTheme.typography.bodyMedium)
+            Text("Spend at most ${MoneyFormat.symbol}", style = MaterialTheme.typography.bodyMedium)
             InkField(draft, { v -> ledger.setTargetDraft(v) }, "650", Modifier.width(110.dp).padding(horizontal = 6.dp), keyboard = KeyboardType.Number, onDone = { ledger.submitTarget(it.key) }, ltr = true)
             Text("a month", style = MaterialTheme.typography.bodyMedium)
         }
-        it.suggestedTarget?.let { s -> Muted("Halfway back to before is ${MoneyLedger.whole(s)}.", Modifier.padding(top = 6.dp)) }
+        it.suggestedTarget?.let { s -> Muted("Halfway back to before is ${MoneyFormat.whole(s)}.", Modifier.padding(top = 6.dp)) }
         error?.let { e -> Text(e, color = Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InkButton(if (it.target != null) "Save target" else "Set target", emphasis = InkEmphasis.SOLID, enabled = !busy) { ledger.submitTarget(it.key) }

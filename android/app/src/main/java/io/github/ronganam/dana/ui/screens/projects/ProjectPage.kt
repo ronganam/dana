@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.projects
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -196,16 +197,16 @@ internal fun BudgetCard(b: BudgetInfo) {
     Boxed(Modifier.fillMaxWidth()) {
         MonoLabel(t("Committed", "סגור"))
         Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 2.dp)) {
-            Text(ProjectsCore.money(b.committed), style = MaterialTheme.typography.headlineMedium.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr))
+            Text(MoneyFormat.major(b.committed), style = MaterialTheme.typography.headlineMedium.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr))
             b.budget?.let {
-                Text(" " + t("of", "מתוך") + " " + ProjectsCore.money(it), style = MaterialTheme.typography.bodyMedium,
+                Text(" " + t("of", "מתוך") + " " + MoneyFormat.major(it), style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(start = 6.dp, bottom = 5.dp))
             }
         }
         if (b.budget != null && b.pct != null && b.left != null) {
             Bar(b.pct, over = b.left < 0, modifier = Modifier.padding(vertical = 8.dp))
             Text(
-                if (b.left >= 0) t("Left:", "נשאר:") + " " + ProjectsCore.money(b.left) else t("Over budget:", "חריגה:") + " " + ProjectsCore.money(-b.left),
+                if (b.left >= 0) t("Left:", "נשאר:") + " " + MoneyFormat.major(b.left) else t("Over budget:", "חריגה:") + " " + MoneyFormat.major(-b.left),
                 style = MaterialTheme.typography.bodySmall,
                 color = if (b.left < 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
             )

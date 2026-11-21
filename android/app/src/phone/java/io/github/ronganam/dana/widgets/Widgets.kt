@@ -1,9 +1,9 @@
 package io.github.ronganam.dana.widgets
 
+import androidx.core.content.edit
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
 import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
@@ -48,6 +48,7 @@ import io.github.ronganam.dana.MainActivity
 import io.github.ronganam.dana.data.sync.TaskActionQueue
 import org.json.JSONArray
 import org.json.JSONObject
+import androidx.core.net.toUri
 
 // ---- Ink & Paper colours (day / night) ----
 internal object W {
@@ -217,7 +218,7 @@ class SuggestionAction : ActionCallback {
         WaitingWidget().updateAll(context)
         runCatching {
             val api = ServerConfig.load(context).api()
-            if (accept) api.acceptSuggestion(id) else api.dismissSuggestion(id)
+            if (accept) api.calls.accept(id) else api.calls.dismiss(id)
         }.onFailure { Log.w("Widgets", "Suggestion action failed", it) }
         WidgetRefreshWorker.refreshNow(context)
     }
@@ -251,7 +252,7 @@ class PeopleWidget : GlanceAppWidget() {
                                 if (sub.isNotEmpty()) Text(sub, style = style(if (p.drifting) W.warning else W.mute, 11), maxLines = 1)
                             }
                             if (p.phone.isNotBlank()) {
-                                Tap("☎", actionStartActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:${p.phone}")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)), W.accent)
+                                Tap("☎", actionStartActivity(Intent(Intent.ACTION_DIAL, "tel:${p.phone}".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)), W.accent)
                             }
                         }
                     }
@@ -300,7 +301,7 @@ private object Snapshot {
         }
         o.put(key, kept)
         if (removed && countKey != null) o.put(countKey, (o.optInt(countKey) - 1).coerceAtLeast(0))
-        prefs.edit().putString("widget_snapshot", o.toString()).commit()
+        prefs.edit(commit = true) { putString("widget_snapshot", o.toString()) }
     }
 }
 

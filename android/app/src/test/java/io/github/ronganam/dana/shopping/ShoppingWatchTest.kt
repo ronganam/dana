@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.shopping
 
+import io.github.ronganam.dana.data.network.HttpResult
 import io.github.ronganam.dana.data.shopping.ShoppingOp
 import io.github.ronganam.dana.data.shopping.ShoppingStore
 import io.github.ronganam.dana.data.shopping.ShoppingWatch
@@ -19,7 +20,7 @@ import java.nio.file.Files
 /** The watch's `/shopping_action` on the phone: the request it makes, the answer (`ok`, `queued`, `error`, `ref`). */
 class ShoppingWatchTest {
     private lateinit var dir: File
-    private val list = "a142b3bd0785"
+    private val list = ShoppingFixture.list
     private var online = true
     private var reply: (String, String) -> Pair<Int, String> = { m, p ->
         when {
@@ -34,10 +35,10 @@ class ShoppingWatchTest {
         dir,
         ShoppingStore.Transport { m, p, b ->
             if (!online) throw IOException("unreachable")
-            sent += Triple(m, p, b)
-            reply(m, p)
+            sent += Triple(m, p, b?.let { JSONObject(it.toString()) })
+            reply(m, p).let { (code, text) -> HttpResult(code, text) }
         },
-        me = { Who("d3b2f55f2a70", "Noa Peretz") },
+        me = { ShoppingFixture.noa },
         scheduleRetry = {},
         immediateTimeoutMs = 2_000
     )

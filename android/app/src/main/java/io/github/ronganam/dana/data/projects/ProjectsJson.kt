@@ -1,133 +1,170 @@
 package io.github.ronganam.dana.data.projects
 
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.LenientList
+import io.github.ronganam.dana.data.network.LenientListSerializer
+import io.github.ronganam.dana.data.network.OptString
+import io.github.ronganam.dana.data.network.TextList
+import io.github.ronganam.dana.data.network.toJsonElement
+import io.github.ronganam.dana.data.network.toPlain
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 
-/** org.json ↔ the Projects models (payloads: server integrations/knowledge/api.py, test_fixtures/projects_web.json). */
+/*
+ * The Projects payloads (server addons/knowledge/api.py, server/tests/fixtures/projects_web.json)
+ * ↔ the Projects models, read and written with ApiJson.
+ */
+
+/** A number the server may send as a number or as text ("4500"); null when it is neither. */
+private fun JsonElement?.number(): Double? =
+    (this as? JsonPrimitive)?.takeIf { it !is JsonNull }?.let { it.doubleOrNull ?: it.content.toDoubleOrNull() }
+
+@Serializable
+internal data class ProjectWire(
+    val id: String = "", val title: String = "", val description: OptString = null, val icon: OptString = null,
+    val color: OptString = null, val status: OptString = null, val targetDate: OptString = null, val budget: JsonElement? = null,
+    val entryCount: Int = 0, val taskCount: Int = 0, val sectionCount: Int = 0, val decisions: Int = 0, val decided: Int = 0,
+    val committed: JsonElement? = null, val sharedBy: OptString = null, val access: OptString = null, val createdAt: OptString = null
+) {
+    fun toModel() = Project(
+        id, title, description.orEmpty(), icon.orEmpty(), color.orEmpty(), status ?: "active", targetDate, budget.number(),
+        entryCount, taskCount, sectionCount, decisions, decided, committed.number() ?: 0.0, sharedBy, access, createdAt
+    )
+}
+
+@Serializable
+internal data class ColumnWire(
+    val key: String = "", val name: String = "", val type: OptString = null, val role: OptString = null,
+    val best: OptString = null, val options: TextList = emptyList()
+) {
+    fun toModel() = Column(key, name, type ?: "text", role.orEmpty(), best.orEmpty(), options)
+}
+
+@Serializable
+internal data class SectionWire(
+    val id: String = "", val projectId: String = "", val title: String = "", val kind: OptString = null, val icon: OptString = null,
+    val summary: OptString = null, val columns: LenientList<ColumnWire> = emptyList(), val position: Int = 0
+) {
+    fun toModel() = Section(id, projectId, title, kind ?: "notes", icon.orEmpty(), summary.orEmpty(), columns.map { it.toModel() }, position)
+}
+
+@Serializable
+internal data class FieldWire(val name: String = "", val type: OptString = null, val value: JsonElement? = null) {
+    /** [EntryField.value] is plain Kotlin: String, Long / Double, Boolean or null. */
+    fun toModel() = EntryField(name, type ?: "text", value.toPlain()?.let { if (it is Map<*, *> || it is List<*>) value.toString() else it })
+}
+
+@Serializable
+internal data class FileWire(
+    val id: String = "", val entryId: String = "", val name: String = "", val mime: OptString = null, val size: Long = 0,
+    val note: OptString = null, val source: OptString = null, val transcript: OptString = null, val url: OptString = null
+) {
+    fun toModel() = EntryFile(id, entryId, name, mime.orEmpty(), size, note.orEmpty(), source.orEmpty(), transcript, url ?: "/api/entries/$entryId/files/$id")
+}
+
+@Serializable
+internal data class EntryWire(
+    val id: String = "", val projectId: String = "", val sectionId: OptString = null, val kind: OptString = null, val title: String = "",
+    val body: OptString = null, val fields: LenientList<FieldWire> = emptyList(), val decision: OptString = null, val url: OptString = null,
+    val summary: OptString = null, val transcript: OptString = null, val files: LenientList<FileWire> = emptyList(),
+    val sharedBy: OptString = null, val access: OptString = null, val createdAt: OptString = null
+) {
+    fun toModel() = Entry(
+        id, projectId, sectionId, kind ?: "note", title, body.orEmpty(), fields.map { it.toModel() }.filter { it.name.isNotBlank() },
+        decision.orEmpty(), url, summary, transcript, files.map { it.toModel() }, sharedBy, access, createdAt
+    )
+}
+
+@Serializable
+internal data class TaskWire(val id: String = "", val title: String = "", val status: OptString = null)
+
+@Serializable
+internal data class ItemsWire(
+    val project: ProjectWire = ProjectWire(),
+    val sections: LenientList<SectionWire> = emptyList(),
+    val entries: LenientList<EntryWire> = emptyList(),
+    val tasks: LenientList<TaskWire> = emptyList()
+) {
+    fun toModel() = ProjectItems(
+        project.toModel(), sections.map { it.toModel() }.sortedBy { it.position }, entries.map { it.toModel() },
+        tasks.map { ProjectTask(it.id, it.title, it.status ?: "pending") }
+    )
+}
+
+/** One value of an entry as a PUT sends it (`value: null` included: it clears the value). */
+@Serializable
+data class FieldBody(val name: String, val type: String, val value: JsonElement = JsonNull)
+
+/** A section column as a PUT / POST sends it (keys kept, see [ProjectsCore.columnsPayload]). */
+@Serializable
+data class ColumnBody(
+    val name: String,
+    val type: String,
+    val key: String? = null,
+    val role: String? = null,
+    val best: String? = null,
+    val options: List<String>? = null
+)
+
+/** A project's fields to write (`POST /api/projects`, `PUT /api/projects/{id}`); null = leave as is. */
+@Serializable
+data class ProjectChanges(
+    val title: String? = null,
+    val icon: String? = null,
+    val description: String? = null,
+    val targetDate: String? = null,
+    val budget: String? = null,
+    val color: String? = null,
+    val status: String? = null
+)
+
+/** A section's fields to write; null = leave as is. */
+@Serializable
+data class SectionChanges(
+    val title: String? = null,
+    val icon: String? = null,
+    val kind: String? = null,
+    val summary: String? = null,
+    val columns: List<ColumnBody>? = null
+)
+
+/** An entry's fields to write (`POST /api/entries`, `PUT /api/entries/{id}`); null = leave as is, `section_id: ""` = no section. */
+@Serializable
+data class EntryChanges(
+    val projectId: String? = null,
+    val sectionId: String? = null,
+    val title: String? = null,
+    val kind: String? = null,
+    val body: String? = null,
+    val decision: String? = null,
+    val fields: List<FieldBody>? = null
+)
+
 object ProjectsJson {
+    fun projects(text: String): List<Project> =
+        ApiJson.decodeFromString(LenientListSerializer(ProjectWire.serializer()), text.ifBlank { "[]" }).map { it.toModel() }
 
-    private fun JSONObject.str(key: String): String? =
-        if (!has(key) || isNull(key)) null else optString(key).takeIf { it.isNotEmpty() }
+    fun items(text: String): ProjectItems = ApiJson.decodeFromString(ItemsWire.serializer(), text.ifBlank { "{}" }).toModel()
 
-    private fun JSONObject.num(key: String): Double? =
-        if (!has(key) || isNull(key)) null else (opt(key) as? Number)?.toDouble() ?: optString(key).toDoubleOrNull()
+    fun entry(element: JsonElement): Entry = ApiJson.decodeFromJsonElement(EntryWire.serializer(), element).toModel()
 
-    private fun JSONArray?.objects(): List<JSONObject> =
-        if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it) }
-
-    fun projects(arr: JSONArray): List<Project> = arr.objects().map(::project)
-
-    fun project(o: JSONObject) = Project(
-        id = o.optString("id"),
-        title = o.optString("title"),
-        description = o.str("description").orEmpty(),
-        icon = o.str("icon").orEmpty(),
-        color = o.str("color").orEmpty(),
-        status = o.str("status") ?: "active",
-        targetDate = o.str("target_date"),
-        budget = o.num("budget"),
-        entryCount = o.optInt("entry_count", 0),
-        taskCount = o.optInt("task_count", 0),
-        sectionCount = o.optInt("section_count", 0),
-        decisions = o.optInt("decisions", 0),
-        decided = o.optInt("decided", 0),
-        committed = o.num("committed") ?: 0.0,
-        sharedBy = o.str("shared_by"),
-        access = o.str("access"),
-        createdAt = o.str("created_at")
-    )
-
-    fun column(o: JSONObject) = Column(
-        key = o.optString("key"),
-        name = o.optString("name"),
-        type = o.str("type") ?: "text",
-        role = o.str("role").orEmpty(),
-        best = o.str("best").orEmpty(),
-        options = o.optJSONArray("options")?.let { a -> (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() } }.orEmpty()
-    )
-
-    fun section(o: JSONObject) = Section(
-        id = o.optString("id"),
-        projectId = o.optString("project_id"),
-        title = o.optString("title"),
-        kind = o.str("kind") ?: "notes",
-        icon = o.str("icon").orEmpty(),
-        summary = o.str("summary").orEmpty(),
-        columns = o.optJSONArray("columns").objects().map(::column),
-        position = o.optInt("position", 0)
-    )
-
-    /** A JSON value as Kotlin: String / Number / Boolean, null for JSON null. */
-    private fun plain(v: Any?): Any? = when (v) {
-        null, JSONObject.NULL -> null
-        is Number, is Boolean, is String -> v
-        else -> v.toString()
-    }
-
-    fun field(o: JSONObject) = EntryField(
-        name = o.optString("name"),
-        type = o.str("type") ?: "text",
-        value = plain(if (o.has("value")) o.opt("value") else null)
-    )
-
-    fun file(o: JSONObject) = EntryFile(
-        id = o.optString("id"),
-        entryId = o.optString("entry_id"),
-        name = o.optString("name"),
-        mime = o.str("mime").orEmpty(),
-        size = o.optLong("size", 0),
-        note = o.str("note").orEmpty(),
-        source = o.str("source").orEmpty(),
-        transcript = o.str("transcript"),
-        url = o.str("url") ?: "/api/entries/${o.optString("entry_id")}/files/${o.optString("id")}"
-    )
-
-    fun entry(o: JSONObject) = Entry(
-        id = o.optString("id"),
-        projectId = o.optString("project_id"),
-        sectionId = o.str("section_id"),
-        kind = o.str("kind") ?: "note",
-        title = o.optString("title"),
-        body = o.str("body").orEmpty(),
-        fields = o.optJSONArray("fields").objects().map(::field).filter { it.name.isNotBlank() },
-        decision = o.str("decision").orEmpty(),
-        url = o.str("url"),
-        summary = o.str("summary"),
-        transcript = o.str("transcript"),
-        files = o.optJSONArray("files").objects().map(::file),
-        sharedBy = o.str("shared_by"),
-        access = o.str("access"),
-        createdAt = o.str("created_at")
-    )
-
-    fun task(o: JSONObject) = ProjectTask(o.optString("id"), o.optString("title"), o.str("status") ?: "pending")
-
-    fun items(o: JSONObject) = ProjectItems(
-        project = project(o.optJSONObject("project") ?: JSONObject()),
-        sections = o.optJSONArray("sections").objects().map(::section).sortedBy { it.position },
-        entries = o.optJSONArray("entries").objects().map(::entry),
-        tasks = o.optJSONArray("tasks").objects().map(::task)
-    )
+    fun file(element: JsonElement): EntryFile = ApiJson.decodeFromJsonElement(FileWire.serializer(), element).toModel()
 
     // ── Writes ──
 
-    fun fieldsJson(fields: List<EntryField>): JSONArray = JSONArray().apply {
-        fields.forEach { f ->
-            put(JSONObject().put("name", f.name).put("type", f.type).put("value", f.value ?: JSONObject.NULL))
-        }
-    }
+    fun fieldsBody(fields: List<EntryField>): List<FieldBody> = fields.map { FieldBody(it.name, it.type, it.value.toJsonElement()) }
 
-    /** What a section's PUT / POST sends for its columns (keys kept, see [ProjectsCore.columnsPayload]). */
-    fun columnsJson(columns: List<Column>): JSONArray = JSONArray().apply {
-        columns.forEach { c ->
-            put(JSONObject().apply {
-                put("name", c.name)
-                put("type", c.type)
-                if (c.key.isNotEmpty()) put("key", c.key)
-                if (c.role == "price") put("role", "price")
-                if (c.best.isNotEmpty()) put("best", c.best)
-                if (c.type == "select" && c.options.isNotEmpty()) put("options", JSONArray(c.options))
-            })
-        }
+    fun columnsBody(columns: List<Column>): List<ColumnBody> = columns.map { c ->
+        ColumnBody(
+            name = c.name,
+            type = c.type,
+            key = c.key.ifEmpty { null },
+            role = "price".takeIf { c.role == "price" },
+            best = c.best.ifEmpty { null },
+            options = c.options.takeIf { c.type == "select" && it.isNotEmpty() }
+        )
     }
 }

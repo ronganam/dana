@@ -86,10 +86,10 @@ class AssistantSession(
         // open with no speech would leave an empty chat behind every time.
         val firstOpen = WakeBus.lastClosedAt == 0L
         val stale = now - WakeBus.lastClosedAt > NEW_SESSION_AFTER_MS
-        if (firstOpen || (stale && vm.chatMessages.value.isNotEmpty())) {
+        if (firstOpen || (stale && vm.chatController.chatMessages.value.isNotEmpty())) {
             vm.startNewSession(saveOld = true)
         }
-        spoken = vm.chatMessages.value.filter { !it.isUser }.mapTo(HashSet()) { speechKey(it.message) }
+        spoken = vm.chatController.chatMessages.value.filter { !it.isUser }.mapTo(HashSet()) { speechKey(it.message) }
         turnHadReply = false
         followUps = 0
         lastInteractionAt = now
@@ -103,13 +103,13 @@ class AssistantSession(
 
     private fun startListening() {
         speaker.stop()
-        vm.startVoiceRecording()
+        vm.chatController.startVoiceRecording()
     }
 
     fun close() {
         if (!visible) return
         driverJob?.cancel()
-        vm.stopVoiceRecording()
+        vm.chatController.stopVoiceRecording()
         speaker.stop()
         visible = false
         WakeBus.lastClosedAt = System.currentTimeMillis()
@@ -138,7 +138,7 @@ class AssistantSession(
         driverJob?.cancel()
         driverJob = scope.launch {
             launch {
-                vm.chatMessages.collect { messages ->
+                vm.chatController.chatMessages.collect { messages ->
                     for (m in messages) {
                         if (m.isUser && m.message.isNotBlank()) OpenTimer.mark("transcript shown")
                         if (!m.isUser && m.message.isNotBlank() && m.toolCall == null) OpenTimer.mark("reply text shown")
@@ -154,13 +154,13 @@ class AssistantSession(
             var idleSince = System.currentTimeMillis()
             while (isActive) {
                 delay(250)
-                val recording = vm.isRecording.value
-                val busy = recording || vm.isStreaming.value || speaker.speaking.value
+                val recording = vm.chatController.isRecording.value
+                val busy = recording || vm.chatController.isStreaming.value || speaker.speaking.value
                 if (recording && speaker.speaking.value) speaker.stop() // asked again mid-reply
                 val now = System.currentTimeMillis()
                 if (busy || now - lastInteractionAt < 1000) { idleSince = now; continue }
 
-                val waitingOnUser = vm.pendingApproval.value != null || vm.selectionRequest.value != null
+                val waitingOnUser = vm.chatController.pendingApproval.value != null || vm.chatController.selectionRequest.value != null
                 if (turnHadReply && !waitingOnUser && WakePrefs.followUp(context) && followUps < MAX_FOLLOW_UPS) {
                     turnHadReply = false
                     followUps++

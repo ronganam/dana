@@ -57,9 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.ClipboardManager
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -76,6 +74,7 @@ import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import io.github.ronganam.dana.R
 
 /** Header: live state kicker on the left, four sheet actions on the right. */
 @Composable
@@ -193,7 +192,7 @@ internal fun AssistantStage(isRecording: Boolean, modifier: Modifier = Modifier)
 internal fun AssistantTurn(
     msg: ChatMessage,
     context: Context,
-    clipboard: ClipboardManager,
+    copy: (String) -> Unit,
     tapToSpeech: io.github.ronganam.dana.ui.components.TapToSpeech,
     serverUrl: String,
     apiToken: String,
@@ -214,8 +213,8 @@ internal fun AssistantTurn(
                         },
                         onLongPress = {
                             if (!msg.isThinking) {
-                                clipboard.setText(AnnotatedString(msg.message))
-                                Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                                copy(msg.message)
+                                Toast.makeText(context, R.string.toast_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                             }
                         }
                     )

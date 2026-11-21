@@ -1,18 +1,20 @@
 package io.github.ronganam.dana
 
+import androidx.annotation.StringRes
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.github.ronganam.dana.data.models.Briefing
 import io.github.ronganam.dana.data.models.PersonCard
 import io.github.ronganam.dana.data.wear.WearCards
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.PeopleApi
+import androidx.core.content.edit
+import io.github.ronganam.dana.R
 
 /** Opens the person's page (People screen) from a card, widget or notification. */
 const val EXTRA_OPEN_PERSON_ID = "io.github.ronganam.dana.OPEN_PERSON_ID"
@@ -35,8 +37,8 @@ object DanaCards {
     private const val CH_PEOPLE = "dana_people"
     private const val CH_REVIEW = "dana_review"
 
-    private fun channel(nm: NotificationManager, id: String, name: String, importance: Int) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) nm.createNotificationChannel(NotificationChannel(id, name, importance))
+    private fun channel(context: Context, nm: NotificationManager, id: String, @StringRes name: Int, importance: Int) {
+        nm.createNotificationChannel(NotificationChannel(id, context.getString(name), importance))
     }
 
     private fun openApp(context: Context, code: Int, extras: Intent.() -> Unit): PendingIntent =
@@ -59,7 +61,7 @@ object DanaCards {
 
     fun cachedBriefing(context: Context): Briefing? {
         val raw = ServerConfig.prefs(context).getString(KEY_BRIEFING, null) ?: return null
-        return runCatching { Briefing.from(JSONObject(raw)) }.getOrNull()
+        return PeopleApi.briefing(raw)
     }
 
     fun storeBriefing(context: Context, b: Briefing) {
@@ -69,15 +71,14 @@ object DanaCards {
 
     /** Store without asking the widgets to refresh (used by the widget refresh itself). */
     fun storeBriefingQuietly(context: Context, b: Briefing) {
-        ServerConfig.prefs(context).edit().putString(KEY_BRIEFING, b.toJson().toString()).apply()
+        ServerConfig.prefs(context).edit { putString(KEY_BRIEFING, PeopleApi.briefingText(b)) }
     }
 
-    fun showBriefing(context: Context, d: JSONObject) {
-        val b = Briefing.from(d)
+    fun showBriefing(context: Context, b: Briefing) {
         if (b.headline.isBlank()) return
         storeBriefing(context, b)
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        channel(nm, CH_BRIEFING, "Morning briefing", NotificationManager.IMPORTANCE_DEFAULT)
+        channel(context, nm, CH_BRIEFING, R.string.channel_briefing, NotificationManager.IMPORTANCE_DEFAULT)
         val style = NotificationCompat.InboxStyle().setBigContentTitle("☀️ ${b.headline}")
         b.points.forEach { style.addLine(it) }
         post(context, "briefing", 1, NotificationCompat.Builder(context, CH_BRIEFING)
@@ -93,12 +94,10 @@ object DanaCards {
 
     // --- Person card before a meeting ---
 
-    fun showMeetingCard(context: Context, d: JSONObject) {
-        val c = PersonCard.from(d.optJSONObject("card") ?: return)
-        val event = d.optString("event_title")
-        val mins = d.optInt("minutes")
+    /** The `context_card` push: [c] before a meeting called [event], [mins] from now. */
+    fun showMeetingCard(context: Context, c: PersonCard, event: String, mins: Int) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        channel(nm, CH_PEOPLE, "Before you meet someone", NotificationManager.IMPORTANCE_HIGH)
+        channel(context, nm, CH_PEOPLE, R.string.channel_people, NotificationManager.IMPORTANCE_HIGH)
         val title = "${c.name} · $event"
         val lines = listOf(c.headline) + c.summaryLines()
         val style = NotificationCompat.InboxStyle().setBigContentTitle(title)
@@ -116,12 +115,11 @@ object DanaCards {
 
     // --- Weekly review ---
 
-    fun showReviewReady(context: Context, d: JSONObject) {
-        val headline = d.optString("headline").ifBlank { "Weekly review" }
-        val items = d.optInt("items")
+    /** The `weekly_review` push: [items] things to decide, [summaryLines] the review's summary. */
+    fun showReviewReady(context: Context, headline: String, items: Int, summaryLines: List<String>) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        channel(nm, CH_REVIEW, "Weekly review", NotificationManager.IMPORTANCE_DEFAULT)
-        val summary = d.optJSONArray("summary")?.let { a -> (0 until a.length()).joinToString(" · ") { a.optString(it) } }.orEmpty()
+        channel(context, nm, CH_REVIEW, R.string.channel_review, NotificationManager.IMPORTANCE_DEFAULT)
+        val summary = summaryLines.joinToString(" · ")
         post(context, "weekly_review", 3, NotificationCompat.Builder(context, CH_REVIEW)
             .setSmallIcon(android.R.drawable.ic_menu_agenda)
             .setContentTitle("🗓️ Weekly review — $headline")

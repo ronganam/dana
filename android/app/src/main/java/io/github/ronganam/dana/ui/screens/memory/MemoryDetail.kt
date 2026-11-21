@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.memory
 
+import io.github.ronganam.dana.ui.components.rememberCopyText
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -17,9 +18,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -28,6 +27,7 @@ import io.github.ronganam.dana.ui.components.MonoLabel
 import io.github.ronganam.dana.ui.screens.common.DotLabel
 import io.github.ronganam.dana.ui.screens.common.auto
 import io.github.ronganam.dana.ui.theme.Danger
+import io.github.ronganam.dana.R
 
 /** Read-first view of one memory: serif topic, generous selectable body, quiet actions. */
 @Composable
@@ -37,7 +37,7 @@ internal fun MemoryDetailPane(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val clipboard = LocalClipboardManager.current
+    val copy = rememberCopyText()
     val context = LocalContext.current
     var confirmDelete by remember { mutableStateOf(false) }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -73,8 +73,8 @@ internal fun MemoryDetailPane(
             }
             FilledTonalButton(
                 onClick = {
-                    clipboard.setText(AnnotatedString(memory.value))
-                    android.widget.Toast.makeText(context, "Copied", android.widget.Toast.LENGTH_SHORT).show()
+                    copy(memory.value)
+                    android.widget.Toast.makeText(context, R.string.toast_copied, android.widget.Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.heightIn(min = 48.dp)
             ) { Text("Copy") }

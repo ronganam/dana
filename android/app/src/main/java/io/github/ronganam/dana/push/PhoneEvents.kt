@@ -14,8 +14,16 @@ import io.github.ronganam.dana.ReminderReceiver
 import io.github.ronganam.dana.SuggestionsReceiver
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.PeopleApi
+import io.github.ronganam.dana.data.network.long
+import io.github.ronganam.dana.data.network.text
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.contentOrNull
 import java.util.UUID
+import androidx.core.content.edit
+import io.github.ronganam.dana.R
 
 /**
  * Direct push from the server (replaces the Home Assistant companion route).
@@ -43,7 +51,7 @@ object PhoneEvents {
     fun deviceId(context: Context): String {
         val prefs = ServerConfig.prefs(context)
         return prefs.getString(KEY_DEVICE, null) ?: UUID.randomUUID().toString().also {
-            prefs.edit().putString(KEY_DEVICE, it).apply()
+            prefs.edit { putString(KEY_DEVICE, it) }
         }
     }
 
@@ -62,11 +70,11 @@ object PhoneEvents {
         val prefs = ServerConfig.prefs(context)
         try {
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-            val res = ServerConfig.load(context).api().registerPush(deviceId(context), token, Build.MODEL, version)
-            prefs.edit().putString(KEY_TOKEN, token).putLong(KEY_REGISTERED_AT, System.currentTimeMillis()).apply()
+            val res = ServerConfig.load(context).api().devices.registerPush(deviceId(context), token, Build.MODEL, version)
+            prefs.edit { putString(KEY_TOKEN, token); putLong(KEY_REGISTERED_AT, System.currentTimeMillis()) }
             // A fresh install starts from now instead of replaying old events.
-            if (!prefs.contains(KEY_SEQ)) prefs.edit().putLong(KEY_SEQ, res.optLong("latest_seq")).apply()
-            Log.i(TAG, "Registered for push (latest ${res.optLong("latest_seq")})")
+            if (!prefs.contains(KEY_SEQ)) prefs.edit { putLong(KEY_SEQ, res) }
+            Log.i(TAG, "Registered for push (latest $res)")
         } catch (e: Exception) {
             Log.w(TAG, "Push registration failed", e)
         }
@@ -83,47 +91,46 @@ object PhoneEvents {
             repeat(5) {  // at most 5 pages of 50
                 val after = prefs.getLong(KEY_SEQ, 0)
                 val res = try {
-                    api.getPhoneEvents(after, deviceId(context))
+                    api.devices.phoneEvents(after, deviceId(context))
                 } catch (e: Exception) {
                     Log.w(TAG, "Couldn't fetch events", e)
                     return
                 }
-                val latest = res.optLong("latest")
+                val latest = res.latest
                 // The server no longer knows this phone (token dropped, DB restored):
                 // register again, otherwise pings would silently stop.
-                if (!res.optBoolean("registered", true)) {
+                if (!res.registered) {
                     Log.w(TAG, "Server forgot this device; registering again")
-                    prefs.edit().remove(KEY_TOKEN).apply()
+                    prefs.edit { remove(KEY_TOKEN) }
                     PushSetup.ensureRegistered(context)
                 }
-                val events = res.optJSONArray("events")
-                if (events == null || events.length() == 0) {
+                val events = res.events
+                if (events.isEmpty()) {
                     // The server's numbering went back (restored database): follow it.
-                    if (latest < after) prefs.edit().putLong(KEY_SEQ, latest).apply()
+                    if (latest < after) prefs.edit { putLong(KEY_SEQ, latest) }
                     return
                 }
-                for (i in 0 until events.length()) {
-                    val ev = events.getJSONObject(i)
+                for (ev in events) {
                     try {
-                        dispatch(context, ev.optString("type"), ev.optJSONObject("data") ?: JSONObject())
+                        dispatch(context, ev.type, ev.data)
                     } catch (e: Exception) {
-                        Log.e(TAG, "Event ${ev.optLong("seq")} (${ev.optString("type")}) failed", e)
+                        Log.e(TAG, "Event ${ev.seq} (${ev.type}) failed", e)
                     }
-                    prefs.edit().putLong(KEY_SEQ, ev.optLong("seq")).apply()
+                    prefs.edit { putLong(KEY_SEQ, ev.seq) }
                 }
-                if (events.length() < 50) return
+                if (events.size < 50) return
             }
         }
     }
 
-    private suspend fun dispatch(context: Context, type: String, d: JSONObject) {
-        fun s(k: String) = d.optString(k).takeIf { it.isNotBlank() && it != "null" }
+    private suspend fun dispatch(context: Context, type: String, d: JsonObject) {
+        fun s(k: String) = d.text(k)?.takeIf { it.isNotBlank() }
         Log.i(TAG, "Event: $type")
         if (type in REFRESHING) io.github.ronganam.dana.data.sync.LiveRefresh.ping(type)
         when (type) {
             "alert" -> NotificationAlertReceiver.Alert.from(d)?.let { NotificationAlertReceiver.show(context, it) }
             "suggestions" -> {
-                val ids = d.optJSONArray("ids")?.let { a -> (0 until a.length()).map { a.getString(it) } }.orEmpty()
+                val ids = (d["ids"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
                 if (ids.isNotEmpty()) {
                     SuggestionsReceiver.show(context, ids, s("heading"), "${s("source_type")}:${s("source_id") ?: ids.first()}")
                 }
@@ -137,10 +144,19 @@ object PhoneEvents {
             "otp_request" -> s("request_id")?.let { io.github.ronganam.dana.data.money.MoneyCodes.handle(context, it) }
             "notify" -> notify(context, s("title") ?: "Dana", s("text").orEmpty(), s("tag"), s("channel") ?: "messages")
             // The shopping list changed (silent): refresh the cache, the widget and the watch.
-            "shopping" -> s("list_id")?.let { io.github.ronganam.dana.data.shopping.ShoppingSync.onPush(context, it, d.optLong("version")) }
-            "briefing" -> io.github.ronganam.dana.DanaCards.showBriefing(context, d)
-            "context_card" -> io.github.ronganam.dana.DanaCards.showMeetingCard(context, d)
-            "weekly_review" -> io.github.ronganam.dana.DanaCards.showReviewReady(context, d)
+            "shopping" -> s("list_id")?.let { io.github.ronganam.dana.data.shopping.ShoppingSync.onPush(context, it, d.long("version") ?: 0L) }
+            "briefing" -> io.github.ronganam.dana.DanaCards.showBriefing(context, PeopleApi.briefing(d))
+            "context_card" -> (d["card"] as? JsonObject)?.let { card ->
+                io.github.ronganam.dana.DanaCards.showMeetingCard(
+                    context, PeopleApi.card(card), s("event_title").orEmpty(), d.long("minutes")?.toInt() ?: 0
+                )
+            }
+            "weekly_review" -> io.github.ronganam.dana.DanaCards.showReviewReady(
+                context,
+                s("headline") ?: "Weekly review",
+                d.long("items")?.toInt() ?: 0,
+                (d["summary"] as? JsonArray).orEmpty().map { (it as? JsonPrimitive)?.contentOrNull.orEmpty() }
+            )
             // The laptop's coding-agent sessions (the whole list each time): live notifications.
             "agent_sessions" -> AgentSessions.show(context, d)
             else -> Log.w(TAG, "Unknown event type $type (newer server?)")
@@ -148,18 +164,16 @@ object PhoneEvents {
     }
 
     private val channels = mapOf(
-        "messages" to Triple("dana_messages", "Messages from Dana", NotificationManager.IMPORTANCE_HIGH),
-        "important" to Triple("dana_important", "Important (from Dana)", NotificationManager.IMPORTANCE_HIGH),
-        "digest" to Triple("dana_digest", "Notification digest", NotificationManager.IMPORTANCE_DEFAULT),
+        "messages" to Triple("dana_messages", R.string.channel_messages, NotificationManager.IMPORTANCE_HIGH),
+        "important" to Triple("dana_important", R.string.channel_important, NotificationManager.IMPORTANCE_HIGH),
+        "digest" to Triple("dana_digest", R.string.channel_digest, NotificationManager.IMPORTANCE_DEFAULT),
     )
 
     /** A plain notification from the server (voice transcripts, the digest, …). */
     private fun notify(context: Context, title: String, text: String, tag: String?, channel: String) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val (id, name, importance) = channels[channel] ?: channels.getValue("messages")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(NotificationChannel(id, name, importance))
-        }
+        nm.createNotificationChannel(NotificationChannel(id, context.getString(name), importance))
         // "Robin shared their shopping list with you" opens Shopping (under More).
         val open = if (tag?.startsWith("shopping-invite-") == true) {
             android.content.Intent(context, io.github.ronganam.dana.MainActivity::class.java)

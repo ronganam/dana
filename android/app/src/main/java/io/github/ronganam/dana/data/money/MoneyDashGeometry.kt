@@ -100,7 +100,7 @@ object MoneyDashGeometry {
         val pLow = known(low)
         val pHigh = known(high)
         val band = if (pHigh.size > 1 && pLow.size == pHigh.size) pHigh + pLow.reversed() else emptyList()
-        val ticks = listOf(0.0, 0.5, 1.0).map { f -> Tick(top * f, r1(box.t + box.plotH - f * box.plotH), MoneyDashText.compact(top * f)) }
+        val ticks = listOf(0.0, 0.5, 1.0).map { f -> Tick(top * f, r1(box.t + box.plotH - f * box.plotH), MoneyFormat.compact(top * f)) }
         val labelDays = listOf(1, 5, 10, 15, 20, 25, n).distinct().filter { d -> d <= n && !(d != n && n - d < 3) }
         return PaceGeo(
             box, n, top, ticks, pThis, pTyp, band,
@@ -178,7 +178,7 @@ object MoneyDashGeometry {
             if (lastVisible >= 0) segs[lastVisible] = segs[lastVisible].copy(top = true)
             MonthBar(m.month, m.label, m.total, x, r1(bw), r1(box.l + i * slot), r1(slot), r1(x + bw / 2), segs)
         }
-        val ticks = listOf(0.0, 0.5, 1.0).map { f -> Tick(top * f, r1(base - f * box.plotH), MoneyDashText.compact(top * f)) }
+        val ticks = listOf(0.0, 0.5, 1.0).map { f -> Tick(top * f, r1(base - f * box.plotH), MoneyFormat.compact(top * f)) }
         val every = if (months.size > 8) 2 else 1
         val xLabels = bars.mapIndexed { i, b -> XLabel(b.month, b.cx, MoneyDashText.monthShort(b.month), (months.size - 1 - i) % every == 0) }
         val legend = SERIES.filter { it in present }.map { k -> Legend(k, SERIES_LABELS[k] ?: payload.groups.firstOrNull { it.key == k }?.label ?: k) }
@@ -296,13 +296,13 @@ object MoneyDashGeometry {
         if (first >= 0) present += "net"
         val ticks = mutableListOf<Tick>()
         if (up > 0) {
-            ticks += Tick(up, r1(zero - up * unit), MoneyDashText.compact(up))
-            if (up * unit > 40) ticks += Tick(up / 2, r1(zero - up / 2 * unit), MoneyDashText.compact(up / 2))
+            ticks += Tick(up, r1(zero - up * unit), MoneyFormat.compact(up))
+            if (up * unit > 40) ticks += Tick(up / 2, r1(zero - up / 2 * unit), MoneyFormat.compact(up / 2))
         }
-        ticks += Tick(0.0, zero, "₪0", zero = true)
+        ticks += Tick(0.0, zero, MoneyFormat.compact(0.0), zero = true)
         if (down > 0) {
-            if (down * unit > 40) ticks += Tick(-down / 2, r1(zero + down / 2 * unit), MoneyDashText.compact(-down / 2))
-            ticks += Tick(-down, r1(zero + down * unit), MoneyDashText.compact(-down))
+            if (down * unit > 40) ticks += Tick(-down / 2, r1(zero + down / 2 * unit), MoneyFormat.compact(-down / 2))
+            ticks += Tick(-down, r1(zero + down * unit), MoneyFormat.compact(-down))
         }
         val every = if (months.size > 8) 2 else 1
         val xLabels = bars.mapIndexed { i, b -> XLabel(b.month, b.cx, MoneyDashText.monthShort(b.month), (months.size - 1 - i) % every == 0) }
@@ -404,7 +404,7 @@ object MoneyDashGeometry {
         val points = byDate.values.sortedBy { it.date }.map { it.copy(x = x(it.date), y = y(it.value.toDouble())) }
         return LineGeo(
             box, dLo, dHi,
-            ticks = if (!includeZero) emptyList() else ticks.map { Tick(it, y(it), MoneyDashText.compact(it), it == 0.0) },
+            ticks = if (!includeZero) emptyList() else ticks.map { Tick(it, y(it), MoneyFormat.compact(it), it == 0.0) },
             history = hist.map { Pt(x(it.date), y(it.balance.toDouble())) },
             forecast = series.map { Pt(x(it.date), y(it.balance.toDouble())) },
             band = band,
@@ -459,7 +459,7 @@ object MoneyDashGeometry {
         val line = points.map { Pt(it.x, it.y) }
         val geo = LineGeo(
             box, dLo, dHi,
-            ticks = ticks.map { Tick(it, y(it), MoneyDashText.compact(it), it == 0.0) },
+            ticks = ticks.map { Tick(it, y(it), MoneyFormat.compact(it), it == 0.0) },
             history = line, forecast = emptyList(), band = emptyList(), low = null, todayX = null, zeroY = null,
             points = points, xLabels = monthLabels(start, end, box.plotW, x, labelSpacing)
         )

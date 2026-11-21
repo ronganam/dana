@@ -7,7 +7,10 @@ import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
+import android.app.Application
+import androidx.annotation.StringRes
+import io.github.ronganam.dana.wear.R
 import androidx.lifecycle.viewModelScope
 import android.os.SystemClock
 import io.github.ronganam.dana.wear.data.PhoneNode
@@ -59,22 +62,24 @@ data class WearPendingExtension(
     val summary: String
 )
 
-class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
+class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnMessageReceivedListener {
+    private fun str(@StringRes id: Int): String = getApplication<Application>().getString(id)
+
 
     private lateinit var appContext: Context
     private lateinit var prefs: WearPrefs
 
-    private val _statusText = MutableStateFlow("Ready")
+    private val _statusText = MutableStateFlow(str(R.string.status_ready))
     val statusText: StateFlow<String> = _statusText.asStateFlow()
 
     private val _isRecording = MutableStateFlow(false)
     val isRecording: StateFlow<Boolean> = _isRecording.asStateFlow()
 
-    private val _lastAssistantResponse = MutableStateFlow("Tap the microphone to speak.")
+    private val _lastAssistantResponse = MutableStateFlow(str(R.string.tap_mic_to_speak))
     val lastAssistantResponse: StateFlow<String> = _lastAssistantResponse.asStateFlow()
 
     private val _chatMessages = MutableStateFlow<List<WearChatMessage>>(
-        listOf(WearChatMessage(UUID.randomUUID().toString(), "Tap the microphone below to start talking.", false))
+        listOf(WearChatMessage(UUID.randomUUID().toString(), str(R.string.tap_mic_to_start), false))
     )
     val chatMessages: StateFlow<List<WearChatMessage>> = _chatMessages.asStateFlow()
 
@@ -119,10 +124,10 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         prefs = WearPrefs(appContext)
 
         _chatMessages.value = listOf(
-            WearChatMessage(UUID.randomUUID().toString(), "Tap the microphone below to start talking.", false)
+            WearChatMessage(UUID.randomUUID().toString(), str(R.string.tap_mic_to_start), false)
         )
-        _lastAssistantResponse.value = "Tap the microphone to speak."
-        _statusText.value = "Ready"
+        _lastAssistantResponse.value = str(R.string.tap_mic_to_speak)
+        _statusText.value = str(R.string.status_ready)
 
         // Register message listener to receive phone replies
         Wearable.getMessageClient(appContext).addListener(this)
@@ -162,7 +167,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
             if (_currentSessionId.value.isEmpty()) {
                 // Fresh process: pick the conversation back up.
                 _currentSessionId.value = THREAD_ID
-                _statusText.value = "Loading chat..."
+                _statusText.value = str(R.string.status_loading_chat)
                 loadSessionHistory(THREAD_ID)
             }
             return
@@ -176,12 +181,12 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
 
     fun reloadConfiguration() {
         // Only refresh config from prefs — do NOT change session or load history
-        _statusText.value = "Ready"
+        _statusText.value = str(R.string.status_ready)
     }
 
     private fun getPhoneNodeId(action: (String) -> Unit) {
         PhoneNode.get(appContext) { nodeId ->
-            if (nodeId != null) action(nodeId) else _statusText.value = "Phone not found"
+            if (nodeId != null) action(nodeId) else _statusText.value = str(R.string.phone_not_found)
         }
     }
 
@@ -205,7 +210,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         _currentSessionId.value = THREAD_ID
         markActivity()
         _pendingApproval.value = null
-        _statusText.value = "Loading chat..."
+        _statusText.value = str(R.string.status_loading_chat)
         loadSessionHistory(THREAD_ID)
     }
 
@@ -213,8 +218,8 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
     fun startNewChat() {
         _currentSessionId.value = THREAD_ID
         resetConversationState()
-        _lastAssistantResponse.value = "Tap the microphone to speak."
-        _statusText.value = "Ready"
+        _lastAssistantResponse.value = str(R.string.tap_mic_to_speak)
+        _statusText.value = str(R.string.status_ready)
     }
 
     /**
@@ -244,7 +249,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         _pendingApproval.value = null
         _pendingSelection.value = null
         _pendingExtension.value = null
-        _lastAssistantResponse.value = "Say something to Dana."
+        _lastAssistantResponse.value = str(R.string.say_something)
         _chatMessages.value = emptyList()
     }
 
@@ -278,7 +283,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         if (!handsFree) WearPerf.start("mic tap")
         _isRecording.value = true
         markActivity()
-        _statusText.value = "Listening..."
+        _statusText.value = str(R.string.status_listening)
 
         val turn = VoiceTurn(sessionId, handsFree)
         voiceTurn = turn
@@ -353,7 +358,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
                 val elapsed = SystemClock.uptimeMillis() - startedAt
                 when {
                     !heardSpeech && elapsed > NO_SPEECH_TIMEOUT_MS -> {
-                        viewModelScope.launch { cancelVoiceRecording("Didn't hear anything. Tap the mic to talk.") }
+                        viewModelScope.launch { cancelVoiceRecording(str(R.string.heard_nothing)) }
                         break
                     }
                     heardSpeech && quietMs >= END_SILENCE_MS -> {
@@ -378,7 +383,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
             turn.endPath = WearPaths.VOICE_CANCEL
             viewModelScope.launch {
                 if (voiceTurn === turn) {
-                    _statusText.value = "Mic error"
+                    _statusText.value = str(R.string.status_mic_error)
                     _isRecording.value = false
                 }
             }
@@ -399,7 +404,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         val phoneId = PhoneNode.await(appContext)
         if (phoneId == null) {
             withContext(Dispatchers.Main) {
-                if (voiceTurn === turn && _isRecording.value) cancelVoiceRecording("Phone not found")
+                if (voiceTurn === turn && _isRecording.value) cancelVoiceRecording(str(R.string.phone_not_found))
             }
             return
         }
@@ -441,7 +446,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         val turn = voiceTurn ?: return
         if (!_isRecording.value) return
         if (turn.heardSpeech || !turn.handsFree) stopVoiceRecording()
-        else cancelVoiceRecording("Tap the mic to talk.")
+        else cancelVoiceRecording(str(R.string.tap_mic_to_talk))
     }
 
     /** Stop listening without sending anything to the assistant. */
@@ -465,12 +470,12 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
             it.endPath = WearPaths.VOICE_STOP
             it.stopRequested = true
         }
-        _statusText.value = "Processing voice..."
+        _statusText.value = str(R.string.status_processing_voice)
     }
 
     fun sendTextMessage(text: String) {
         if (text.isBlank()) return
-        _statusText.value = "Thinking..."
+        _statusText.value = str(R.string.status_thinking)
         awaitingReply = true
         markActivity()
 
@@ -486,7 +491,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
     }
 
     fun approveAction(approved: Boolean) {
-        _statusText.value = if (approved) "Executing..." else "Denying..."
+        _statusText.value = if (approved) str(R.string.status_executing) else str(R.string.status_denying)
         _pendingApproval.value = null
         awaitingReply = true
         markActivity()
@@ -509,21 +514,21 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
                 when (path) {
                     WearPaths.response(WearPaths.GET_SESSION_DETAIL) -> {
                         parseResponseJson(JSONObject(jsonString))
-                        _statusText.value = "Ready"
+                        _statusText.value = str(R.string.status_ready)
                     }
                     WearPaths.response(WearPaths.CREATE_SESSION) -> {
                         // Arrives while listening has often already started;
                         // don't wipe a transcript or the "Listening" status.
                         if (!_isRecording.value && !awaitingReply) {
-                            _lastAssistantResponse.value = "New conversation ready."
-                            _statusText.value = "Ready"
+                            _lastAssistantResponse.value = str(R.string.new_conversation_ready)
+                            _statusText.value = str(R.string.status_ready)
                         }
                     }
                     WearPaths.response(WearPaths.SEND_MESSAGE), WearPaths.response(WearPaths.APPROVE_ACTION), WearPaths.RESPONSE_VOICE_STREAM -> {
                         val json = JSONObject(jsonString)
                         if (json.has("error")) {
                             awaitingReply = false
-                            _statusText.value = "Error: " + json.optString("error")
+                            _statusText.value = getApplication<Application>().getString(R.string.error_detail, json.optString("error"))
                             return@launch
                         }
                         // Live frames from the phone bridge: the transcript as
@@ -536,19 +541,19 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
                         // A bare transcription frame can precede the answer.
                         val isFinal = json.has("status") || json.has("response") || json.has("messages")
                         if (!isFinal && json.optString("transcription").isNotEmpty()) {
-                            _statusText.value = "Thinking..."
+                            _statusText.value = str(R.string.status_thinking)
                         }
                         if (isFinal) {
                             if (json.optString("response").isNotEmpty()) WearPerf.mark("reply text shown")
                             awaitingReply = false
                             markActivity()
-                            _statusText.value = "Ready"
+                            _statusText.value = str(R.string.status_ready)
                         }
                     }
                     WearPaths.RESPONSE_ERROR -> {
                         awaitingReply = false
                         val json = JSONObject(jsonString)
-                        _statusText.value = "Error: " + json.optString("error", "Failed")
+                        _statusText.value = getApplication<Application>().getString(R.string.error_detail, json.optString("error", str(R.string.failed)))
                     }
                 }
             } catch (e: Exception) {
@@ -568,7 +573,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
                 val id = obj.optString("id", UUID.randomUUID().toString())
                 val toolCallObj = obj.optJSONObject("toolCall")
                 if (toolCallObj != null) {
-                    val name = toolCallObj.optString("toolName", toolCallObj.optString("tool_name", toolCallObj.optString("name", "Tool")))
+                    val name = toolCallObj.optString("toolName", toolCallObj.optString("tool_name", toolCallObj.optString("name", str(R.string.tool))))
                     val summary = toolCallObj.optString("toolSummary", toolCallObj.optString("tool_summary", toolCallObj.optString("summary", name)))
                     val args = toolCallObj.optString("toolArgs", toolCallObj.optString("tool_args", toolCallObj.optString("parameters", "")))
                     list.add(WearChatMessage(
@@ -627,7 +632,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
 
             for (i in 0 until toolCalls.length()) {
                 val tc = toolCalls.getJSONObject(i)
-                val name = tc.optString("toolName", tc.optString("tool_name", tc.optString("name", "Tool")))
+                val name = tc.optString("toolName", tc.optString("tool_name", tc.optString("name", str(R.string.tool))))
                 val summary = tc.optString("toolSummary", tc.optString("tool_summary", tc.optString("summary", name)))
                 val args = tc.optString("toolArgs", tc.optString("tool_args", tc.optString("parameters", tc.optString("args", ""))))
                 val toolCallId = tc.optString("toolCallId", tc.optString("tool_call_id", tc.optString("id", "")))
@@ -661,7 +666,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         // The phone bridge forwards prompts the run is blocked on. Tool cards
         // carry no approval flag, so the dedicated block is authoritative.
         json.optJSONObject("pending_approval")?.let { pa ->
-            val name = pa.optString("tool_name", pa.optString("name", "Action"))
+            val name = pa.optString("tool_name", pa.optString("name", str(R.string.action)))
             _pendingApproval.value = WearToolApproval(name, "", "")
         }
         json.optJSONObject("selection_request")?.let { sel ->
@@ -699,7 +704,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         _pendingExtension.value = null
         awaitingReply = true
         markActivity()
-        _statusText.value = "Continuing..."
+        _statusText.value = str(R.string.status_continuing)
 
         val payload = JSONObject().apply {
             put("session_id", sessionId)
@@ -713,7 +718,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         _pendingExtension.value = null
         awaitingReply = true
         markActivity()
-        _statusText.value = "Wrapping up..."
+        _statusText.value = str(R.string.status_wrapping_up)
 
         val payload = JSONObject().apply {
             put("session_id", sessionId)
@@ -725,7 +730,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
     fun submitSelection(indices: List<Int>) {
         val request = _pendingSelection.value ?: return
         _pendingSelection.value = null
-        _statusText.value = "Submitting..."
+        _statusText.value = str(R.string.status_submitting)
         awaitingReply = true
         markActivity()
 

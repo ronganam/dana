@@ -43,6 +43,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.Locale
+import androidx.core.content.edit
 
 class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(context),
     TextToSpeech.OnInitListener,
@@ -109,11 +110,9 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT
             )
-            w.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             w.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            w.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-            w.statusBarColor = android.graphics.Color.TRANSPARENT
-            w.navigationBarColor = android.graphics.Color.TRANSPARENT
+            // Transparent system bars, content drawn behind them.
+            WindowCompat.enableEdgeToEdge(w)
 
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                 val params = w.attributes
@@ -121,8 +120,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
                 w.attributes = params
             }
 
-            w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            WindowCompat.setDecorFitsSystemWindows(w, false)
+            softInputResize(w)
         }
 
         tts = TextToSpeech(context, this)
@@ -210,7 +208,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
                 params.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 w.attributes = params
             }
-            w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            softInputResize(w)
             WindowCompat.setDecorFitsSystemWindows(w, false)
         }
 
@@ -219,29 +217,29 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
         val idleThresholdMs = 2 * 60 * 1000L // 2 minutes
 
         val isIdleTooLong = (now - lastActiveTime) > idleThresholdMs
-        val hasMessages = mainViewModel.chatMessages.value.isNotEmpty()
+        val hasMessages = mainViewModel.chatController.chatMessages.value.isNotEmpty()
 
         if (isIdleTooLong || !hasMessages) {
             mainViewModel.startNewSession(saveOld = true)
         }
-        prefs.edit().putLong("last_active_timestamp", now).apply()
+        prefs.edit { putLong("last_active_timestamp", now) }
 
         // Brief delay before auto-starting voice recording to let session initialize
         // and avoid picking up ambient noise during transition
         delayedVoiceRecordingJob?.cancel()
         delayedVoiceRecordingJob = CoroutineScope(Dispatchers.Main).launch {
             kotlinx.coroutines.delay(400)
-            mainViewModel.startVoiceRecording()
+            mainViewModel.chatController.startVoiceRecording()
         }
 
         // Speak replies as they finish. What is on screen when the sheet opens
         // was said before; later replies are spoken once each, by text (the
         // thread's stored copies replace the live bubbles when a run ends).
         spokenReplies.clear()
-        mainViewModel.chatMessages.value.filter { isSpeakable(it) }.forEach { rememberSpoken(it.message) }
-        var lastUserId = mainViewModel.chatMessages.value.lastOrNull { it.isUser }?.id
+        mainViewModel.chatController.chatMessages.value.filter { isSpeakable(it) }.forEach { rememberSpoken(it.message) }
+        var lastUserId = mainViewModel.chatController.chatMessages.value.lastOrNull { it.isUser }?.id
         voiceCollectionJob = CoroutineScope(Dispatchers.Main).launch {
-            mainViewModel.chatMessages.collect { messages ->
+            mainViewModel.chatController.chatMessages.collect { messages ->
                 val isMuted = prefs.getBoolean("is_muted", false)
                 // A new user turn supersedes anything still queued.
                 val userId = messages.lastOrNull { it.isUser }?.id
@@ -293,6 +291,8 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
         screenShare.onAssist(structure, content)
     }
 
+    // Android 10+ (older versions call the overload above).
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.Q)
     override fun onHandleAssist(state: AssistState) {
         // One call per visible activity (split screen): the focused one is what he is looking at.
         android.util.Log.d(
@@ -360,7 +360,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
             keyCode == android.view.KeyEvent.KEYCODE_VOICE_ASSIST ||
             keyCode == android.view.KeyEvent.KEYCODE_HEADSETHOOK ||
             keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
-            mainViewModel.stopVoiceRecording()
+            mainViewModel.chatController.stopVoiceRecording()
             return true
         }
         return super.onKeyUp(keyCode, event)
@@ -378,8 +378,8 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
 
         delayedVoiceRecordingJob?.cancel()
         delayedVoiceRecordingJob = null
-        mainViewModel.stopVoiceRecording()
-        prefs.edit().putLong("last_active_timestamp", System.currentTimeMillis()).apply()
+        mainViewModel.chatController.stopVoiceRecording()
+        prefs.edit { putLong("last_active_timestamp", System.currentTimeMillis()) }
         voiceCollectionJob?.cancel()
         voiceCollectionJob = null
         tts?.stop()
@@ -409,5 +409,13 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         store.clear()
         tts?.shutdown()
+    }
+
+    /** Below Android 11 the IME insets reach Compose only in adjustResize mode; later versions send them with edge-to-edge. */
+    private fun softInputResize(w: android.view.Window) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
+            @Suppress("DEPRECATION")
+            w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
     }
 }

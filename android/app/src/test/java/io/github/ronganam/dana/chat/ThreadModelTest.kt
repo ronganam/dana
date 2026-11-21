@@ -4,8 +4,9 @@ import io.github.ronganam.dana.data.chat.ThreadModel
 import io.github.ronganam.dana.data.chat.UndoAction
 import io.github.ronganam.dana.data.chat.UndoItem
 import io.github.ronganam.dana.data.models.ChatMessage
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -96,11 +97,7 @@ class ThreadModelTest {
 
     @Test
     fun parsesUndos() {
-        val arr = JSONArray()
-            .put(JSONObject().put("id", "a1").put("label", "Added milk to the shopping list"))
-            .put(JSONObject().put("id", "a1").put("label", "dupe"))
-            .put(JSONObject().put("label", "no id"))
-            .put(JSONObject().put("id", "b2"))
+        val arr = obj("""[{"id":"a1","label":"Added milk to the shopping list"},{"id":"a1","label":"dupe"},{"label":"no id"},{"id":"b2"}]""") as JsonArray
         assertEquals(
             listOf(UndoAction("a1", "Added milk to the shopping list"), UndoAction("b2", "Undo")),
             ThreadModel.parseUndos(arr)
@@ -137,6 +134,8 @@ class ThreadModelTest {
     private fun local(id: String, text: String, isUser: Boolean = true) =
         ChatMessage(id = id, sender = if (isUser) "You" else "Dana", message = text, isUser = isUser)
 
+    private fun obj(text: String) = ApiJson.parseToJsonElement(text)
+
     private val thread = listOf(user(1, "a"), dana(2, "b"), user(3, "c"), dana(4, "d"))
     private fun known(from: Int?, expires: Long? = now + 60_000) = ThreadModel.Memory.Known(from, expires)
 
@@ -146,9 +145,9 @@ class ThreadModelTest {
 
     @Test
     fun memoryParsesTheStateFields() {
-        assertEquals(ThreadModel.Memory.Unknown, ThreadModel.parseMemory(JSONObject("{}")))
-        assertEquals(ThreadModel.Memory.Known(null, null), ThreadModel.parseMemory(JSONObject("""{"context_from_seq":null,"context_expires_at":null}""")))
-        assertEquals(ThreadModel.Memory.Known(7, 1_763_550_000_500L), ThreadModel.parseMemory(JSONObject("""{"context_from_seq":7,"context_expires_at":1763550000.5}""")))
+        assertEquals(ThreadModel.Memory.Unknown, ThreadModel.parseMemory(obj("{}") as JsonObject))
+        assertEquals(ThreadModel.Memory.Known(null, null), ThreadModel.parseMemory(obj("""{"context_from_seq":null,"context_expires_at":null}""") as JsonObject))
+        assertEquals(ThreadModel.Memory.Known(7, 1_763_550_000_500L), ThreadModel.parseMemory(obj("""{"context_from_seq":7,"context_expires_at":1763550000.5}""") as JsonObject))
     }
 
     @Test

@@ -7,7 +7,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -67,10 +68,18 @@ class NowListActions(
 @Composable
 fun NowListPane(state: NowListState, handlers: NowHandlers, actions: NowListActions, wide: Boolean) {
     val pull = rememberPullToRefreshState()
-    if (pull.isRefreshing) LaunchedEffect(true) { actions.refresh() }
-    LaunchedEffect(state.loading) { if (!state.loading) pull.endRefresh() }
+    var pullRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(state.loading) { if (!state.loading) pullRefreshing = false }
 
-    Box(Modifier.fillMaxSize().nestedScroll(pull.nestedScrollConnection)) {
+    PullToRefreshBox(
+        isRefreshing = pullRefreshing, onRefresh = { pullRefreshing = true; actions.refresh() }, state = pull, modifier = Modifier.fillMaxSize(),
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pull, isRefreshing = pullRefreshing, modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, color = MaterialTheme.colorScheme.primary
+            )
+        }
+    ) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)) {
             item(key = "head") { Header(state) }
             item(key = "needs") {
@@ -153,10 +162,6 @@ fun NowListPane(state: NowListState, handlers: NowHandlers, actions: NowListActi
                 items(state.later.size, key = { "l_$it" }) { i -> LaterRow(state.later[i].first, state.later[i].second) }
             }
         }
-        if (pull.progress > 0f || pull.isRefreshing) PullToRefreshContainer(
-            state = pull, modifier = Modifier.align(Alignment.TopCenter),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.primary
-        )
     }
 }
 

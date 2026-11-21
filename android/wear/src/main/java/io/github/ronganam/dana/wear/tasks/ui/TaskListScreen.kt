@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.wear.tasks.ui
 
+import androidx.compose.ui.focus.FocusRequester
 import io.github.ronganam.dana.wear.ui.components.rotaryScroll
 
 import io.github.ronganam.dana.wear.ui.theme.DanaWear
@@ -17,11 +18,12 @@ import androidx.wear.compose.foundation.ExperimentalWearFoundationApi
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.foundation.rememberActiveFocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.wear.compose.material.*
 import io.github.ronganam.dana.wear.tasks.TasksViewModel
 import io.github.ronganam.dana.wear.tasks.WearTask
+import io.github.ronganam.dana.wear.R
+import androidx.compose.ui.res.stringResource
 
 private sealed interface TaskListRow {
     val key: String
@@ -33,8 +35,8 @@ private sealed interface TaskListRow {
     }
 }
 
-private fun buildTaskRows(tasks: List<WearTask>): List<TaskListRow> {
-    val grouped = tasks.groupBy { it.groupName?.takeIf { g -> g.isNotBlank() } ?: "General" }
+private fun buildTaskRows(tasks: List<WearTask>, general: String): List<TaskListRow> {
+    val grouped = tasks.groupBy { it.groupName?.takeIf { g -> g.isNotBlank() } ?: general }
     val rows = mutableListOf<TaskListRow>()
     grouped.entries.sortedBy { it.key.lowercase() }.forEach { (name, groupTasks) ->
         rows.add(TaskListRow.Header(name, groupTasks.firstNotNullOfOrNull { it.groupEmoji }))
@@ -54,10 +56,11 @@ fun TaskListScreen(
     val statusText by viewModel.statusText.collectAsState()
     var expandedTaskId by remember { mutableStateOf<String?>(null) }
 
-    val rows = remember(tasks) { buildTaskRows(tasks) }
+    val general = stringResource(R.string.tasks_group_general)
+    val rows = remember(tasks, general) { buildTaskRows(tasks, general) }
 
     val listState = rememberScalingLazyListState()
-    val focusRequester = rememberActiveFocusRequester()
+    val focusRequester = remember { FocusRequester() }
 
     Scaffold(
         positionIndicator = {
@@ -74,7 +77,7 @@ fun TaskListScreen(
         ) {
             item {
                 Text(
-                    text = "Tasks",
+                    text = stringResource(R.string.label_tasks),
                     style = MaterialTheme.typography.caption1,
                     color = MaterialTheme.colors.secondary
                 )
@@ -128,7 +131,7 @@ fun TaskListScreen(
             item {
                 CompactChip(
                     onClick = { viewModel.refreshTasks() },
-                    label = { Text("Refresh") },
+                    label = { Text(stringResource(R.string.refresh)) },
                     colors = ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -200,7 +203,7 @@ private fun TaskChip(
                         val formatted = formatDueDate(task.dueDate)
                         if (formatted.isNotEmpty()) {
                             Text(
-                                text = if (isOverdue) "Overdue: $formatted" else "Due: $formatted",
+                                text = stringResource(if (isOverdue) R.string.task_overdue else R.string.task_due, formatted),
                                 style = MaterialTheme.typography.caption2,
                                 color = if (isOverdue) MaterialTheme.colors.error else MaterialTheme.colors.secondary
                             )
@@ -221,7 +224,7 @@ private fun TaskChip(
             ) {
                 CompactChip(
                     onClick = onComplete,
-                    label = { Text("Done") },
+                    label = { Text(stringResource(R.string.done)) },
                     colors = ChipDefaults.chipColors(
                         backgroundColor = DanaWear.Success.copy(alpha = 0.2f),
                         contentColor = DanaWear.Success
@@ -230,7 +233,7 @@ private fun TaskChip(
                 )
                 CompactChip(
                     onClick = onSnooze,
-                    label = { Text("Snooze") },
+                    label = { Text(stringResource(R.string.snooze)) },
                     colors = ChipDefaults.chipColors(
                         backgroundColor = DanaWear.Info.copy(alpha = 0.2f),
                         contentColor = DanaWear.Info

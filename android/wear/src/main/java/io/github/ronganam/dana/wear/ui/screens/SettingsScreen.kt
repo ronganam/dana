@@ -19,11 +19,12 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.wear.compose.foundation.ExperimentalWearFoundationApi
-import androidx.wear.compose.foundation.rememberActiveFocusRequester
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.*
 import io.github.ronganam.dana.wear.ui.WearViewModel
+import io.github.ronganam.dana.wear.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalWearFoundationApi::class)
 @Composable
@@ -31,7 +32,7 @@ fun SettingsScreen(
     viewModel: WearViewModel
 ) {
     val listState = rememberScalingLazyListState()
-    val focusRequester = rememberActiveFocusRequester()
+    val focusRequester = remember { FocusRequester() }
 
     val context = LocalContext.current
     val ownVersion = remember {
@@ -60,7 +61,7 @@ fun SettingsScreen(
         ) {
             item {
                 Text(
-                    text = "Watch Settings",
+                    text = stringResource(R.string.watch_settings),
                     style = MaterialTheme.typography.caption1,
                     color = MaterialTheme.colors.secondary
                 )
@@ -73,13 +74,13 @@ fun SettingsScreen(
                 ) {
                     Column {
                         Text(
-                            text = "Auto-Synced via Phone",
+                            text = stringResource(R.string.auto_synced),
                             style = MaterialTheme.typography.caption2,
                             color = MaterialTheme.colors.primary
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Conversation: the shared thread",
+                            text = stringResource(R.string.conversation_shared_thread),
                             style = MaterialTheme.typography.body2,
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
@@ -94,10 +95,10 @@ fun SettingsScreen(
                         viewModel.reloadConfiguration()
                     },
                     label = {
-                        Text("Reload Config", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(stringResource(R.string.reload_config), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     },
                     icon = {
-                        Icon(Icons.Default.Sync, contentDescription = "Reload")
+                        Icon(Icons.Default.Sync, contentDescription = stringResource(R.string.reload))
                     },
                     colors = ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth()
@@ -106,7 +107,7 @@ fun SettingsScreen(
 
             item {
                 Text(
-                    text = "Watch app v$ownVersion",
+                    text = stringResource(R.string.watch_app_version, ownVersion),
                     style = MaterialTheme.typography.caption2,
                     color = MaterialTheme.colors.secondary
                 )
@@ -115,7 +116,7 @@ fun SettingsScreen(
             if (phoneVersionCode > 0) {
                 item {
                     Text(
-                        text = "Phone app v$phoneVersionCode",
+                        text = stringResource(R.string.phone_app_version, phoneVersionCode.toString()),
                         style = MaterialTheme.typography.caption2,
                         color = MaterialTheme.colors.secondary
                     )

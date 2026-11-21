@@ -5,9 +5,9 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.github.ronganam.dana.R
 
 /**
  * A task reminder from the server (`reminder` push event, see
@@ -34,18 +34,16 @@ object ReminderReceiver {
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "reminders_channel"
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                channelId,
-                "Reminders & Alarms",
-                NotificationManager.IMPORTANCE_HIGH
-            ).apply {
-                description = "Used for urgent task reminders and alarms"
-                enableVibration(true)
-                setShowBadge(true)
-            }
-            notificationManager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            channelId,
+            context.getString(R.string.channel_reminders),
+            NotificationManager.IMPORTANCE_HIGH
+        ).apply {
+            description = context.getString(R.string.channel_reminders_description)
+            enableVibration(true)
+            setShowBadge(true)
         }
+        notificationManager.createNotificationChannel(channel)
 
         val fullScreenIntent = Intent(context, ReminderActivity::class.java).apply {
             putExtra("task_id", taskId)
@@ -55,11 +53,7 @@ object ReminderReceiver {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
         }
 
-        val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
         val fullScreenPendingIntent = PendingIntent.getActivity(
             context,
@@ -68,13 +62,11 @@ object ReminderReceiver {
             pendingFlags
         )
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            notificationManager.createNotificationChannel(
-                NotificationChannel(QUIET_CHANNEL, "Reminders (screen open)", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Kept while the reminder screen is showing (the screen rings itself)"
-                }
-            )
-        }
+        notificationManager.createNotificationChannel(
+            NotificationChannel(QUIET_CHANNEL, context.getString(R.string.channel_reminders_quiet), NotificationManager.IMPORTANCE_LOW).apply {
+                description = context.getString(R.string.channel_reminders_quiet_description)
+            }
+        )
         // The reminder screen opens by itself and plays the alarm on its own,
         // so its notification only stays in the shade: no heads-up over it.
         val popping = android.provider.Settings.canDrawOverlays(context)

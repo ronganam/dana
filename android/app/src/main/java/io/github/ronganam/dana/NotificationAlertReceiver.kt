@@ -1,13 +1,14 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.text
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.github.ronganam.dana.R
 
 /**
  * The server's `alert` push event (see [io.github.ronganam.dana.push.PhoneEvents])
@@ -34,15 +35,13 @@ object NotificationAlertReceiver {
         Log.i(TAG, "Alert for ${alert.app}: ${alert.title}")
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Urgent notifications", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Phone notifications Dana thinks you shouldn't miss"
-                    enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 600, 150, 600, 150, 600, 900, 600, 150, 600)
-                }
-            )
-        }
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL, context.getString(R.string.channel_urgent), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = context.getString(R.string.channel_urgent_description)
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 600, 150, 600, 150, 600, 900, 600, 150, 600)
+            }
+        )
         val dnd = nm.currentInterruptionFilter.let {
             it != NotificationManager.INTERRUPTION_FILTER_ALL && it != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
         }
@@ -54,13 +53,11 @@ object NotificationAlertReceiver {
             context, alert.notificationId, screen,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_QUIET, "Urgent notifications (screen open)", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Kept while the alert screen is showing (the screen rings itself)"
-                }
-            )
-        }
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_QUIET, context.getString(R.string.channel_urgent_quiet), NotificationManager.IMPORTANCE_LOW).apply {
+                description = context.getString(R.string.channel_urgent_quiet_description)
+            }
+        )
         // The alert screen opens by itself and rings + vibrates on its own, so
         // its notification only stays in the shade: no heads-up over the screen.
         val popping = !dnd && android.provider.Settings.canDrawOverlays(context)
@@ -112,7 +109,7 @@ object NotificationAlertReceiver {
 
         companion object {
             /** From the server's `alert` event. */
-            fun from(json: org.json.JSONObject): Alert? = build { k -> json.optString(k).takeIf { it.isNotBlank() && it != "null" } }
+            fun from(json: kotlinx.serialization.json.JsonObject): Alert? = build { k -> json.text(k)?.takeIf { it.isNotBlank() } }
 
             /** From our own activity intent. */
             fun from(intent: Intent): Alert? = build { k -> intent.getStringExtra(k)?.takeIf { it.isNotBlank() } }

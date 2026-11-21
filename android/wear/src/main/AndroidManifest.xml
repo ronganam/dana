@@ -23,7 +23,7 @@
         android:allowBackup="true"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:label="Dana"
+        android:label="@string/app_name"
         android:supportsRtl="true"
         android:theme="@android:style/Theme.DeviceDefault">
 
@@ -51,7 +51,7 @@
             android:name=".tasks.TasksActivity"
             android:exported="true"
             android:icon="@mipmap/ic_tasks"
-            android:label="Tasks"
+            android:label="@string/label_tasks"
             android:taskAffinity="io.github.ronganam.dana.tasks"
             android:theme="@android:style/Theme.DeviceDefault">
             <intent-filter>
@@ -65,7 +65,7 @@
             android:name=".shopping.ShoppingActivity"
             android:exported="true"
             android:icon="@mipmap/ic_shopping"
-            android:label="Shopping"
+            android:label="@string/label_shopping"
             android:taskAffinity="io.github.ronganam.dana.shopping"
             android:theme="@android:style/Theme.DeviceDefault">
             <intent-filter>
@@ -133,7 +133,7 @@
         <service
             android:name=".complications.EventComplicationService"
             android:exported="true"
-            android:label="Dana · Events"
+            android:label="@string/label_events"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -145,7 +145,7 @@
         <service
             android:name=".complications.Event2ComplicationService"
             android:exported="true"
-            android:label="Dana · Events 2"
+            android:label="@string/label_events_2"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -157,7 +157,7 @@
         <service
             android:name=".complications.Event3ComplicationService"
             android:exported="true"
-            android:label="Dana · Events 3"
+            android:label="@string/label_events_3"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -169,7 +169,7 @@
         <service
             android:name=".complications.Event4ComplicationService"
             android:exported="true"
-            android:label="Dana · Events 4"
+            android:label="@string/label_events_4"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -181,7 +181,7 @@
         <service
             android:name=".complications.TaskComplicationService"
             android:exported="true"
-            android:label="Dana · Tasks"
+            android:label="@string/label_tasks_c"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -193,7 +193,7 @@
         <service
             android:name=".complications.Task2ComplicationService"
             android:exported="true"
-            android:label="Dana · Tasks 2"
+            android:label="@string/label_tasks_2"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -205,7 +205,7 @@
         <service
             android:name=".complications.Task3ComplicationService"
             android:exported="true"
-            android:label="Dana · Tasks 3"
+            android:label="@string/label_tasks_3"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -217,7 +217,7 @@
         <service
             android:name=".complications.Task4ComplicationService"
             android:exported="true"
-            android:label="Dana · Tasks 4"
+            android:label="@string/label_tasks_4"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -230,7 +230,7 @@
         <service
             android:name=".tiles.CalendarTileService"
             android:exported="true"
-            android:label="Calendar"
+            android:label="@string/label_calendar"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter>
                 <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
@@ -240,7 +240,7 @@
         <service
             android:name=".tiles.TasksTileService"
             android:exported="true"
-            android:label="Tasks"
+            android:label="@string/label_tasks"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter>
                 <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
@@ -272,7 +272,7 @@
         <service
             android:name=".tiles.TodayTileService"
             android:exported="true"
-            android:label="Today"
+            android:label="@string/label_today"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter>
                 <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
@@ -282,7 +282,7 @@
         <service
             android:name=".tiles.WaitingTileService"
             android:exported="true"
-            android:label="Waiting on you"
+            android:label="@string/label_waiting"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter>
                 <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
@@ -292,7 +292,7 @@
         <service
             android:name=".tiles.ShoppingTileService"
             android:exported="true"
-            android:label="Shopping"
+            android:label="@string/label_shopping"
             android:permission="com.google.android.wearable.permission.BIND_TILE_PROVIDER">
             <intent-filter>
                 <action android:name="androidx.wear.tiles.action.BIND_TILE_PROVIDER" />
@@ -302,7 +302,7 @@
         <service
             android:name=".complications.InboxComplicationService"
             android:exported="true"
-            android:label="Dana Inbox"
+            android:label="@string/label_inbox"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
@@ -314,7 +314,7 @@
         <service
             android:name=".complications.ShoppingComplicationService"
             android:exported="true"
-            android:label="Shopping list"
+            android:label="@string/label_shopping_list"
             android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
             <intent-filter>
                 <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />

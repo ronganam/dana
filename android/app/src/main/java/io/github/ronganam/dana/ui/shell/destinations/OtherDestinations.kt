@@ -45,11 +45,11 @@ import io.github.ronganam.dana.ui.viewmodels.Place
 fun rememberMoreDestination(viewModel: MainViewModel): Destination {
     val shell = viewModel.shellController
     val item by shell.more.collectAsState()
-    val kinds by viewModel.kinds.collectAsState()
+    val addons by viewModel.addons.collectAsState()
     val toMore = { shell.selectMore(null) }
     // Its integration went away (disconnected): back to More's list.
-    LaunchedEffect(item, kinds) {
-        if ((item == MoreItem.SHOPPING && "shopping" !in kinds) || (item == MoreItem.MONEY && "money" !in kinds)) toMore()
+    LaunchedEffect(item, addons) {
+        if ((item == MoreItem.SHOPPING && "shopping" !in addons) || (item == MoreItem.MONEY && "money" !in addons)) toMore()
     }
     return when (item) {
         MoreItem.SHOPPING -> takeOver(rememberShoppingDestination(viewModel), toMore)
@@ -88,16 +88,16 @@ private fun takeOver(inner: Destination, toMore: () -> Unit) = Destination(
 @Composable
 private fun MoreList(viewModel: MainViewModel, selected: MoreItem?) {
     val shell = viewModel.shellController
-    val calls by viewModel.calls.collectAsState()
+    val calls by viewModel.callsController.calls.collectAsState()
     val people by viewModel.peopleController.people.collectAsState()
-    val kinds by viewModel.kinds.collectAsState()
+    val addons by viewModel.addons.collectAsState()
     val shoppingScreen by viewModel.shoppingController.screen.collectAsState()
     val toBuy = shoppingScreen?.takeIf { it.isActive }?.counts?.toBuy ?: 0
     val wide = LocalShellLayout.current != ShellLayout.STACKED
     LaunchedEffect(Unit) { viewModel.peopleController.fetch() }
     val rows = listOfNotNull(
-        Triple(MoreItem.SHOPPING, if (toBuy > 0) "$toBuy to buy" else "the list", setOf(MoreItem.SHOPPING)).takeIf { "shopping" in kinds },
-        Triple(MoreItem.MONEY, "spending · accounts · savings", setOf(MoreItem.MONEY)).takeIf { "money" in kinds },
+        Triple(MoreItem.SHOPPING, if (toBuy > 0) "$toBuy to buy" else "the list", setOf(MoreItem.SHOPPING)).takeIf { "shopping" in addons },
+        Triple(MoreItem.MONEY, "spending · accounts · savings", setOf(MoreItem.MONEY)).takeIf { "money" in addons },
         Triple(MoreItem.CALLS, calls.size.takeIf { it > 0 }?.toString().orEmpty(), setOf(MoreItem.CALLS)),
         Triple(MoreItem.PEOPLE, people.size.takeIf { it > 0 }?.toString().orEmpty(), setOf(MoreItem.PEOPLE)),
         Triple(MoreItem.ABOUT, "what Dana knows · settings", setOf(MoreItem.ABOUT, MoreItem.SETTINGS, MoreItem.MEMORY))

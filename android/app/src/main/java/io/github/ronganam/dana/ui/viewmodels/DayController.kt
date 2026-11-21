@@ -21,7 +21,7 @@ class DayController(private val ctx: ControllerContext) {
         ctx.scope.launch {
             val today = LocalDate.now()
             val events = ctx.load("DayEvents") {
-                ctx.api.getCalendarEventsBetween("${today}T00:00:00", "${today.plusDays(1)}T00:00:00")
+                ctx.api.tasks.calendarEvents("${today}T00:00:00", "${today.plusDays(1)}T00:00:00")
             } ?: return@launch
             loadedFor = today
             _events.value = events

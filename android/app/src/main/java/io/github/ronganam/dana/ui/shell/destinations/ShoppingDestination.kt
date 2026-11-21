@@ -21,7 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -259,7 +259,7 @@ private fun LazyListScope.aisles(sc: ShoppingController, ui: ShoppingUi, surface
             AisleHeader(g.key, g.name, g.rows.count { !it.checked })
         }
         items(g.rows, key = { it.id }) { r ->
-            Box(Modifier.animateItemPlacement()) { Row(sc, ui, r, surface) }
+            Box(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)) { Row(sc, ui, r, surface) }
         }
     }
 }
@@ -273,7 +273,7 @@ private fun LazyListScope.bought(sc: ShoppingController, ui: ShoppingUi, surface
     }
     items(ui.model.bought, key = { "b-" + it.id }) { r ->
         val open by sc.boughtOpen.collectAsState()
-        if (open) Box(Modifier.animateItemPlacement()) { Row(sc, ui, r, surface) }
+        if (open) Box(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)) { Row(sc, ui, r, surface) }
     }
 }
 

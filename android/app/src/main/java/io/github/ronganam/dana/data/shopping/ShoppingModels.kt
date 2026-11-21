@@ -1,12 +1,16 @@
 package io.github.ronganam.dana.data.shopping
 
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.LenientList
+import io.github.ronganam.dana.data.network.OptString
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
 
 /**
  * The shopping list as the server sends it (`GET /api/shopping` and every
- * write's answer; server repo `docs/shopping.md` → API). Parsed by hand with
- * org.json like the rest of the app; [ShoppingJson.screen] is the one entry.
+ * write's answer; server `docs/shopping.md` → API). Read with ApiJson;
+ * [ShoppingJson.screen] is the one entry.
  */
 data class Who(val id: String, val name: String)
 
@@ -78,73 +82,125 @@ data class WriteAnswer(val screen: ShoppingScreen, val undo: UndoRef?, val resul
 /** The Share sheet's data (`GET / PUT /api/sharing/shopping_list/{id}`). */
 data class SharePayload(val sharedWith: List<ListPerson>, val users: List<Who>)
 
-/** Reading and writing the shopping payloads. */
-object ShoppingJson {
-    private fun JSONObject.str(key: String): String =
-        if (isNull(key)) "" else optString(key, "")
+/** Why the server refused a shopping request (`error`, its `message`, `max` for `too_many`). */
+@Serializable
+data class ShoppingRefusal(val error: String = "", val message: String = "", val max: Int? = null)
 
-    private fun JSONObject.strOrNull(key: String): String? = str(key).takeIf { it.isNotEmpty() }
+@Serializable
+private data class WhoWire(val id: String = "", val name: String = "") {
+    fun toModel(): Who? = if (id.isEmpty()) null else Who(id, name)
+}
 
-    private fun objs(a: JSONArray?): List<JSONObject> =
-        if (a == null) emptyList() else (0 until a.length()).mapNotNull { a.optJSONObject(it) }
+@Serializable
+private data class PersonWire(val id: String = "", val name: String = "", val access: String = "")
 
-    fun who(o: JSONObject?): Who? = o?.let { val id = it.str("id"); if (id.isEmpty()) null else Who(id, it.str("name")) }
+@Serializable
+private data class ListWire(
+    val id: String = "", val name: String = "", val access: String = "", val owner: WhoWire? = null,
+    val people: LenientList<PersonWire> = emptyList(), val version: Long = 0
+)
 
-    fun item(o: JSONObject): ShoppingItem = ShoppingItem(
-        id = o.str("id"),
-        name = o.str("name"),
-        quantity = o.str("quantity"),
-        note = o.str("note"),
-        category = o.str("category").ifEmpty { "other" },
-        checked = o.optBoolean("checked", false),
-        checkedAt = o.strOrNull("checked_at"),
-        checkedBy = who(o.optJSONObject("checked_by")),
-        addedBy = who(o.optJSONObject("added_by")),
-        createdAt = o.strOrNull("created_at")
+@Serializable
+private data class ItemWire(
+    val id: String = "", val name: String = "", val quantity: String = "", val note: String = "", val category: String = "",
+    val checked: Boolean = false, val checkedAt: OptString = null, val checkedBy: WhoWire? = null, val addedBy: WhoWire? = null,
+    val createdAt: OptString = null
+) {
+    fun toModel() = ShoppingItem(
+        id, name, quantity, note, category.ifEmpty { "other" }, checked, checkedAt, checkedBy?.toModel(), addedBy?.toModel(), createdAt
     )
+}
 
-    /** The screen payload; null when it has no `list` (an error body, an old server). */
-    fun screen(o: JSONObject): ShoppingScreen? {
-        val l = o.optJSONObject("list") ?: return null
-        val list = ShoppingList(
-            id = l.str("id"),
-            name = l.str("name"),
-            access = l.str("access").ifEmpty { "owner" },
-            owner = who(l.optJSONObject("owner")),
-            people = objs(l.optJSONArray("people")).map { ListPerson(it.str("id"), it.str("name"), it.str("access")) },
-            version = l.optLong("version", 0)
-        )
-        if (list.id.isEmpty()) return null
-        val items = objs(o.optJSONArray("items")).map(::item).filter { it.id.isNotEmpty() }
-        val counts = o.optJSONObject("counts")
+@Serializable
+private data class AisleWire(val key: String = "", val name: String = "")
+
+@Serializable
+private data class UsualWire(val name: String = "", val category: String = "", val times: Int = 0) {
+    fun toModel() = Usual(name, category, times)
+}
+
+@Serializable
+private data class InviteWire(val listId: String = "", val name: String = "", val owner: WhoWire? = null, val access: String = "")
+
+@Serializable
+private data class ListRefWire(val id: String = "", val name: String = "", val owner: WhoWire? = null, val access: String = "", val active: Boolean = false)
+
+@Serializable
+private data class CountsWire(val toBuy: Int? = null, val bought: Int? = null)
+
+@Serializable
+private data class UndoWire(val id: String = "", val label: String = "")
+
+@Serializable
+private data class AddResultWire(val id: String = "", val name: String = "", val status: String = "")
+
+@Serializable
+private data class ScreenWire(
+    val list: ListWire? = null,
+    val categories: LenientList<AisleWire> = emptyList(),
+    val items: LenientList<ItemWire> = emptyList(),
+    val counts: CountsWire? = null,
+    val usuals: LenientList<UsualWire> = emptyList(),
+    val invites: LenientList<InviteWire> = emptyList(),
+    val lists: LenientList<ListRefWire> = emptyList(),
+    val undo: UndoWire? = null,
+    val results: LenientList<AddResultWire> = emptyList(),
+    val suggestions: LenientList<UsualWire> = emptyList()
+) {
+    fun toScreen(): ShoppingScreen? {
+        val l = list ?: return null
+        if (l.id.isEmpty()) return null
+        val shown = items.map { it.toModel() }.filter { it.id.isNotEmpty() }
         return ShoppingScreen(
-            list = list,
-            categories = objs(o.optJSONArray("categories")).map { Aisle(it.str("key"), it.str("name")) },
-            items = items,
-            counts = Counts(
-                counts?.optInt("to_buy", items.count { !it.checked }) ?: items.count { !it.checked },
-                counts?.optInt("bought", items.count { it.checked }) ?: items.count { it.checked }
-            ),
-            usuals = objs(o.optJSONArray("usuals")).map { Usual(it.str("name"), it.str("category"), it.optInt("times")) },
-            invites = objs(o.optJSONArray("invites")).map { Invite(it.str("list_id"), it.str("name"), who(it.optJSONObject("owner")), it.str("access")) },
-            lists = objs(o.optJSONArray("lists")).map {
-                ListRef(it.str("id"), it.str("name"), who(it.optJSONObject("owner")), it.str("access"), it.optBoolean("active"))
-            }
+            list = ShoppingList(l.id, l.name, l.access.ifEmpty { "owner" }, l.owner?.toModel(), l.people.map { ListPerson(it.id, it.name, it.access) }, l.version),
+            categories = categories.map { Aisle(it.key, it.name) },
+            items = shown,
+            counts = Counts(counts?.toBuy ?: shown.count { !it.checked }, counts?.bought ?: shown.count { it.checked }),
+            usuals = usuals.map { it.toModel() },
+            invites = invites.map { Invite(it.listId, it.name, it.owner?.toModel(), it.access) },
+            lists = lists.map { ListRef(it.id, it.name, it.owner?.toModel(), it.access, it.active) }
         )
     }
+}
 
-    fun answer(o: JSONObject): WriteAnswer? {
-        val screen = screen(o) ?: return null
-        val undo = o.optJSONObject("undo")?.let { u -> u.str("id").takeIf { it.isNotEmpty() }?.let { UndoRef(it, u.str("label")) } }
-        val results = objs(o.optJSONArray("results")).map { AddResult(it.str("id"), it.str("name"), it.str("status")) }
-        return WriteAnswer(screen, undo, results)
+@Serializable
+private data class SharedWithWire(val userId: String = "", val name: String = "", val level: String = "")
+
+@Serializable
+private data class ShareWire(val sharedWith: LenientList<SharedWithWire> = emptyList(), val users: LenientList<WhoWire> = emptyList())
+
+/** Reading the shopping payloads (text or an already-parsed JSON tree). */
+object ShoppingJson {
+    private fun wire(text: String): ScreenWire? =
+        runCatching { ApiJson.decodeFromString(ScreenWire.serializer(), text.ifBlank { "{}" }) }.getOrNull()
+
+    private fun wire(element: JsonElement): ScreenWire? =
+        runCatching { ApiJson.decodeFromJsonElement(ScreenWire.serializer(), element) }.getOrNull()
+
+    /** The screen payload; null when it has no `list` (an error body, an old server) or doesn't read. */
+    fun screen(text: String): ShoppingScreen? = wire(text)?.toScreen()
+
+    fun screen(element: JsonElement): ShoppingScreen? = wire(element)?.toScreen()
+
+    /** A write's answer: its screen, `undo` and `results`. */
+    fun answer(text: String): WriteAnswer? {
+        val w = wire(text) ?: return null
+        val screen = w.toScreen() ?: return null
+        return WriteAnswer(screen, w.undo?.takeIf { it.id.isNotEmpty() }?.let { UndoRef(it.id, it.label) }, w.results.map { AddResult(it.id, it.name, it.status) })
     }
 
-    fun usuals(o: JSONObject): List<Usual> =
-        objs(o.optJSONArray("suggestions")).map { Usual(it.str("name"), it.str("category"), it.optInt("times")) }
+    /** `GET /api/shopping/suggestions` → `suggestions`. */
+    fun usuals(text: String): List<Usual> = wire(text)?.suggestions.orEmpty().map { it.toModel() }
 
-    fun share(o: JSONObject): SharePayload = SharePayload(
-        sharedWith = objs(o.optJSONArray("shared_with")).map { ListPerson(it.str("user_id"), it.str("name"), it.str("level")) },
-        users = objs(o.optJSONArray("users")).mapNotNull { who(it) }
-    )
+    fun share(text: String): SharePayload {
+        val w = runCatching { ApiJson.decodeFromString(ShareWire.serializer(), text.ifBlank { "{}" }) }.getOrDefault(ShareWire())
+        return SharePayload(w.sharedWith.map { ListPerson(it.userId, it.name, it.level) }, w.users.mapNotNull { it.toModel() })
+    }
+
+    /** An error body; null when it isn't JSON. */
+    fun refusal(text: String): ShoppingRefusal? =
+        runCatching { ApiJson.decodeFromString(ShoppingRefusal.serializer(), text) }.getOrNull()
+
+    /** The error fields of an object already read. */
+    fun refusal(o: JsonObject): ShoppingRefusal = runCatching { ApiJson.decodeFromJsonElement(ShoppingRefusal.serializer(), o) }.getOrDefault(ShoppingRefusal())
 }

@@ -2,22 +2,38 @@ package io.github.ronganam.dana.shopping
 
 import io.github.ronganam.dana.data.shopping.ShoppingJson
 import io.github.ronganam.dana.data.shopping.ShoppingScreen
-import org.json.JSONObject
+import io.github.ronganam.dana.data.shopping.Who
+import io.github.ronganam.dana.data.network.ApiJson
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.int
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 
 /**
- * Real server payloads: `test_fixtures/shopping_web.json` of the server repo
- * (captured from its routes by `test_shopping_users.py`), copied into the test
- * resources. Each key holds `{status, body}`.
+ * Real server payloads: `server/tests/fixtures/shopping_web.json`
+ * (captured from its routes by `server/addons/shopping/tests/test_shopping_users.py`), read
+ * from there (a test resources dir). Each key holds `{status, body}`.
  */
 object ShoppingFixture {
-    private val all: JSONObject by lazy {
+    private val all: JsonObject by lazy {
         val text = ShoppingFixture::class.java.classLoader!!.getResource("shopping_web.json")!!.readText()
-        JSONObject(text)
+        ApiJson.parseToJsonElement(text) as JsonObject
     }
 
-    fun body(key: String): JSONObject = JSONObject(all.getJSONObject(key).getJSONObject("body").toString())
-    fun raw(key: String): String = all.getJSONObject(key).getJSONObject("body").toString()
-    fun status(key: String): Int = all.getJSONObject(key).getInt("status")
+    /** The body as parsed JSON. */
+    fun obj(key: String): JsonObject = all.getValue(key).jsonObject.getValue("body").jsonObject
+    /** The body as the server sent it. */
+    fun body(key: String): String = obj(key).toString()
+    fun raw(key: String): String = body(key)
+    fun status(key: String): Int = all.getValue(key).jsonObject.getValue("status").jsonPrimitive.int
     fun screen(key: String): ShoppingScreen = ShoppingJson.screen(body(key))!!
-    fun keys(): List<String> = all.keys().asSequence().toList()
+    fun keys(): List<String> = all.keys.toList()
+
+    /** The ids the server made for this capture: the owner's shared list, its owner (Noa) and the member (Tom). */
+    val list: String get() = screen("owner_shared").list.id
+    val noa: Who get() = screen("owner_shared").list.owner!!
+    val tom: Who get() = screen("owner_shared").items.mapNotNull { it.addedBy }.first { it.name == "Tom Hadad" }
+
+    /** The undo id a write answer carries. */
+    fun undoId(key: String): String = ShoppingJson.answer(body(key))!!.undo!!.id
 }

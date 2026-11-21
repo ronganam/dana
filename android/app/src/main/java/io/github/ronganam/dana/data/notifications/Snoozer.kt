@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -21,6 +20,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import io.github.ronganam.dana.R
 
 /**
  * Snoozing phone notifications, shared by the Inbox and the alert screen.
@@ -64,7 +64,7 @@ object Snoozer {
     /** Server first (throws when it fails), then the shade and return reminders. */
     suspend fun snooze(context: Context, api: ApiService, targets: List<Target>, untilMillis: Long) {
         if (targets.isEmpty()) return
-        val keys = api.snoozeNotifications(targets.map { it.id }, untilMillis)
+        val keys = api.notifications.snooze(targets.map { it.id }, untilMillis)
         applyOnPhone(context, targets, keys, untilMillis)
     }
 
@@ -89,7 +89,7 @@ object Snoozer {
     /** Wake them now (undo / "Unsnooze"). Ones Android snoozed return to the shade at their time. */
     suspend fun wake(context: Context, api: ApiService, ids: List<String>, keys: List<String> = emptyList()) {
         if (ids.isEmpty()) return
-        api.snoozeNotifications(ids, null)
+        api.notifications.snooze(ids, null)
         ids.forEach { SnoozeReturnWorker.cancel(context, it) }
         DanaNotificationListener.unsnooze(keys)
     }
@@ -111,13 +111,11 @@ class SnoozeReturnWorker(appContext: Context, params: WorkerParameters) : Corout
         val title = inputData.getString(KEY_TITLE)
 
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Snoozed notifications", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "A notification you snoozed in Dana is back"
-                }
-            )
-        }
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL, ctx.getString(R.string.channel_snoozed), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = ctx.getString(R.string.channel_snoozed_description)
+            }
+        )
         val open = PendingIntent.getActivity(
             ctx, id.hashCode(),
             Intent(ctx, MainActivity::class.java).apply {

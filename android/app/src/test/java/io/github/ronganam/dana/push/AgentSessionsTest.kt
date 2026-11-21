@@ -3,20 +3,23 @@ package io.github.ronganam.dana.push
 import io.github.ronganam.dana.push.AgentSessions.Session
 import io.github.ronganam.dana.push.AgentSessions.Shown
 import io.github.ronganam.dana.push.AgentSessions.Step
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class AgentSessionsTest {
+    private fun obj(text: String) = ApiJson.parseToJsonElement(text) as JsonObject
+
     private fun session(id: String, status: String, rev: Int) = Session(
         id, "claude", "laptop", "dana", "Fix it", status, "Editing push.py", "", 1, 3, rev, 0L, 0L,
     )
 
     @Test
     fun parsesTheServerPayload() {
-        val s = Session.from(JSONObject(
+        val s = Session.from(obj(
             """{"id":"claude:s-1","agent":"claude","host":"laptop","project":"dana","title":"Fix",
                "status":"waiting","activity":"Needs permission","summary":"","steps_done":2,"steps_total":5,
                "tools":7,"rev":3,"started_at":"2026-11-17T07:00:00+00:00","updated_at":"2026-11-17T07:12:30+00:00"}"""
@@ -27,7 +30,7 @@ class AgentSessionsTest {
         assertEquals(2, s.stepsDone)
         assertEquals(5, s.stepsTotal)
         assertEquals(12 * 60_000L + 30_000L, s.updatedMs - s.startedMs)
-        assertNull(Session.from(JSONObject("""{"status":"running"}""")))
+        assertNull(Session.from(obj("""{"status":"running"}""")))
     }
 
     @Test
@@ -56,7 +59,7 @@ class AgentSessionsTest {
 
     @Test
     fun parsesSubagents() {
-        val s = Session.from(JSONObject(
+        val s = Session.from(obj(
             """{"id":"claude:p","status":"running","rev":1,"subagents":[
                {"id":"claude:p/a1","title":"Explore","status":"done","activity":"Done","summary":"Found it"},
                {"id":"claude:k","title":"Gmail kind","status":"running","activity":"Editing kind.py","summary":""},

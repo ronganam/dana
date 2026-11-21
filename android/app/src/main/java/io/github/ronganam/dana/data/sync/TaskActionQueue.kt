@@ -12,8 +12,16 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.LenientListSerializer
+import io.github.ronganam.dana.data.network.TaskChanges
+import io.github.ronganam.dana.data.network.TaskSnooze
+import io.github.ronganam.dana.data.network.text
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 import java.util.UUID
 
@@ -53,27 +61,27 @@ object TaskActionQueue {
         val taskId: String,
         /** "status" (payload: {status}), "snooze" (payload: snooze body) or "update" (payload: changed fields). */
         val kind: String,
-        val payload: JSONObject,
+        val payload: JsonObject,
         val createdAt: Long
     )
 
     suspend fun complete(context: Context, taskId: String): SubmitResult = setStatus(context, taskId, "completed")
 
     suspend fun setStatus(context: Context, taskId: String, status: String): SubmitResult =
-        submit(context, newAction(taskId, KIND_STATUS, JSONObject().put("status", status)))
+        submit(context, newAction(taskId, KIND_STATUS, buildJsonObject { put("status", status) }))
 
-    suspend fun snooze(context: Context, taskId: String, payload: JSONObject): SubmitResult =
-        submit(context, newAction(taskId, KIND_SNOOZE, payload))
+    suspend fun snooze(context: Context, taskId: String, snooze: TaskSnooze): SubmitResult =
+        submit(context, newAction(taskId, KIND_SNOOZE, ApiJson.encodeToJsonElement(TaskSnooze.serializer(), snooze) as JsonObject))
 
     /**
      * Change some of a task's fields (`PUT /api/tasks/{id}` with only those
      * keys: title, description, priority, triggers, group_id…). Edits made in
      * the reminder editor while offline merge into one queued update.
      */
-    suspend fun update(context: Context, taskId: String, fields: JSONObject): SubmitResult =
-        submit(context, newAction(taskId, KIND_UPDATE, fields))
+    suspend fun update(context: Context, taskId: String, fields: TaskChanges): SubmitResult =
+        submit(context, newAction(taskId, KIND_UPDATE, ApiJson.encodeToJsonElement(TaskChanges.serializer(), fields) as JsonObject))
 
-    private fun newAction(taskId: String, kind: String, payload: JSONObject) =
+    private fun newAction(taskId: String, kind: String, payload: JsonObject) =
         Action(UUID.randomUUID().toString(), taskId, kind, payload, System.currentTimeMillis())
 
     suspend fun submit(context: Context, action: Action): SubmitResult = withContext(Dispatchers.IO) {
@@ -135,9 +143,9 @@ object TaskActionQueue {
     private suspend fun attempt(context: Context, action: Action): Int = try {
         val api = ServerConfig.load(context).api()
         when (action.kind) {
-            KIND_STATUS -> api.updateTaskStatusCode(action.taskId, action.payload.optString("status", "completed"))
-            KIND_SNOOZE -> api.snoozeTaskCode(action.taskId, action.payload)
-            KIND_UPDATE -> api.updateTaskFieldsCode(action.taskId, action.payload)
+            KIND_STATUS -> api.tasks.updateCode(action.taskId, TaskChanges(status = action.payload.text("status") ?: "completed"))
+            KIND_SNOOZE -> api.tasks.snoozeCode(action.taskId, ApiJson.decodeFromJsonElement(TaskSnooze.serializer(), action.payload))
+            KIND_UPDATE -> api.tasks.updateCode(action.taskId, ApiJson.decodeFromJsonElement(TaskChanges.serializer(), action.payload))
             else -> 400
         }
     } catch (e: CancellationException) {
@@ -163,8 +171,7 @@ object TaskActionQueue {
     internal fun merge(queue: List<Action>, action: Action): List<Action> {
         if (action.kind == KIND_UPDATE) {
             val earlier = queue.firstOrNull { it.taskId == action.taskId && it.kind == KIND_UPDATE }
-            val payload = JSONObject(earlier?.payload?.toString() ?: "{}")
-            action.payload.keys().forEach { payload.put(it, action.payload.get(it)) }
+            val payload = JsonObject(earlier?.payload.orEmpty() + action.payload)
             return queue.filter { it !== earlier } + action.copy(payload = payload)
         }
         return queue.filter { it.taskId != action.taskId || it.kind == KIND_UPDATE } + action
@@ -194,31 +201,23 @@ object TaskActionQueue {
         }
     }
 
-    internal fun encode(actions: List<Action>): String = JSONArray().apply {
-        actions.forEach {
-            put(JSONObject().apply {
-                put("id", it.id)
-                put("task_id", it.taskId)
-                put("kind", it.kind)
-                put("payload", it.payload)
-                put("created_at", it.createdAt)
-            })
-        }
-    }.toString()
+    /** One queued action as `pending_task_actions.json` keeps it. */
+    @Serializable
+    private data class StoredAction(
+        val id: String = "",
+        val taskId: String = "",
+        val kind: String = "",
+        val payload: JsonObject = JsonObject(emptyMap()),
+        val createdAt: Long = 0
+    )
 
-    internal fun decode(text: String): List<Action> {
-        val arr = JSONArray(text)
-        return (0 until arr.length()).mapNotNull { i ->
-            val o = arr.optJSONObject(i) ?: return@mapNotNull null
-            Action(
-                id = o.optString("id"),
-                taskId = o.optString("task_id"),
-                kind = o.optString("kind"),
-                payload = o.optJSONObject("payload") ?: JSONObject(),
-                createdAt = o.optLong("created_at")
-            )
-        }.filter { it.id.isNotEmpty() && it.taskId.isNotEmpty() }
-    }
+    internal fun encode(actions: List<Action>): String =
+        ApiJson.encodeToString(ListSerializer(StoredAction.serializer()), actions.map { StoredAction(it.id, it.taskId, it.kind, it.payload, it.createdAt) })
+
+    internal fun decode(text: String): List<Action> =
+        ApiJson.decodeFromString(LenientListSerializer(StoredAction.serializer()), text)
+            .map { Action(it.id, it.taskId, it.kind, it.payload, it.createdAt) }
+            .filter { it.id.isNotEmpty() && it.taskId.isNotEmpty() }
 
     private const val KIND_STATUS = "status"
     private const val KIND_SNOOZE = "snooze"

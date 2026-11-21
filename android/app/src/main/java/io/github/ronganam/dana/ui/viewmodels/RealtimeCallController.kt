@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.ui.viewmodels
 
+import android.os.Build
+import android.media.AudioDeviceInfo
 import android.content.Context
 import android.content.SharedPreferences
 import android.media.AudioManager
@@ -12,6 +14,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.core.content.edit
 
 /** Continuous realtime voice call (OpenAI Realtime relayed by the server). */
 class RealtimeCallController(
@@ -51,7 +54,7 @@ class RealtimeCallController(
 
     fun setRealtimeModel(model: String) {
         _selectedRealtimeModel.value = model
-        prefs.edit().putString(KEY_MODEL, model).apply()
+        prefs.edit { putString(KEY_MODEL, model) }
     }
 
     fun toggleCallMute() {
@@ -64,7 +67,7 @@ class RealtimeCallController(
         val on = !_isSpeakerOn.value
         _isSpeakerOn.value = on
         try {
-            audioManager()?.isSpeakerphoneOn = on
+            audioManager()?.let { setSpeaker(it, on) }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to toggle speaker: ${e.message}")
         }
@@ -138,11 +141,22 @@ class RealtimeCallController(
     private fun audioManager(): AudioManager? =
         appContext.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
 
+    /** Route call audio to the loudspeaker or back (the communication device on Android 12+). */
+    private fun setSpeaker(am: AudioManager, on: Boolean) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            if (on) am.availableCommunicationDevices.firstOrNull { it.type == AudioDeviceInfo.TYPE_BUILTIN_SPEAKER }?.let { am.setCommunicationDevice(it) }
+            else am.clearCommunicationDevice()
+        } else {
+            @Suppress("DEPRECATION")
+            am.isSpeakerphoneOn = on
+        }
+    }
+
     private fun applyCallAudioRoute() {
         try {
             audioManager()?.let { am ->
                 am.mode = AudioManager.MODE_IN_COMMUNICATION
-                am.isSpeakerphoneOn = _isSpeakerOn.value
+                setSpeaker(am, _isSpeakerOn.value)
             }
         } catch (e: Exception) {
             Log.w(TAG, "Failed to apply call audio route: ${e.message}")
@@ -152,7 +166,7 @@ class RealtimeCallController(
     private fun restoreAudioRoute() {
         try {
             audioManager()?.let { am ->
-                am.isSpeakerphoneOn = false
+                setSpeaker(am, false)
                 if (am.mode == AudioManager.MODE_IN_COMMUNICATION) am.mode = AudioManager.MODE_NORMAL
             }
         } catch (e: Exception) {

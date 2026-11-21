@@ -1,7 +1,6 @@
 package io.github.ronganam.dana.ui.screens.people
 
 import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -24,7 +23,8 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material3.*
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -51,6 +51,7 @@ import io.github.ronganam.dana.ui.screens.common.QuietEmptyState
 import io.github.ronganam.dana.ui.theme.Space
 import io.github.ronganam.dana.ui.theme.Warning
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
+import androidx.core.net.toUri
 
 private val SORTS = listOf("recent" to "Recent", "drifting" to "Been a while", "name" to "A–Z")
 
@@ -79,7 +80,7 @@ fun PeopleScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
     }
 
     val call: (String) -> Unit = { phone ->
-        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+$phone")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent(Intent.ACTION_DIAL, "tel:+$phone".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
     val needCount = people.count { it.needsYou() }
     val kicker = buildList {
@@ -107,7 +108,7 @@ fun PeopleScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
             onAsk = { id -> viewModel.openContextChat("person", id) },
             onOpenCall = viewModel::openCall,
             onCall = call,
-            onCompleteTask = { id -> viewModel.updateTaskStatus(id, "completed"); selectedId?.let { c.reload(it) } },
+            onCompleteTask = { id -> viewModel.tasksController.updateTaskStatus(id, "completed"); selectedId?.let { c.reload(it) } },
             onSave = c::save,
             onHide = c::hide,
         )
@@ -154,15 +155,23 @@ private fun PeopleList(
     val showPinned = !searching && sort == "recent" && pinned.isNotEmpty()
 
     val pull = rememberPullToRefreshState()
-    if (pull.isRefreshing) LaunchedEffect(true) { onRefresh() }
-    LaunchedEffect(loading) { if (!loading) pull.endRefresh() }
+    var pullRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(loading) { if (!loading) pullRefreshing = false }
 
     Column(Modifier.fillMaxSize()) {
         SearchField(query, onQuery, placeholder = if (people.isNotEmpty() && !searching) "Search ${people.size} people" else "Search people",
             modifier = Modifier.padding(horizontal = Space.screen).padding(top = Space.xs))
         TextTabs(SORTS, sort, onSort, Modifier.padding(horizontal = Space.sm, vertical = Space.xs))
 
-        Box(Modifier.fillMaxSize().nestedScroll(pull.nestedScrollConnection)) {
+        PullToRefreshBox(
+        isRefreshing = pullRefreshing, onRefresh = { pullRefreshing = true; onRefresh() }, state = pull, modifier = Modifier.fillMaxSize(),
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pull, isRefreshing = pullRefreshing, modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, color = MaterialTheme.colorScheme.primary
+            )
+        }
+    ) {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 24.dp)) {
                 if (showPinned) {
                     item(key = "pinned") {
@@ -194,9 +203,6 @@ private fun PeopleList(
                     Box(Modifier.fillMaxWidth().padding(top = 48.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(28.dp), strokeWidth = 2.5.dp) }
                 }
             }
-            // material3 1.2 draws the indicator's disc even at rest; only show it while pulling/refreshing.
-            if (pull.progress > 0f || pull.isRefreshing) PullToRefreshContainer(state = pull, modifier = Modifier.align(Alignment.TopCenter),
-                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.primary)
         }
     }
 }

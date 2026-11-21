@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.reminders
 
+import io.github.ronganam.dana.data.network.TaskChanges
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.foundation.clickable
@@ -34,7 +35,6 @@ import io.github.ronganam.dana.ui.components.isolate
 import io.github.ronganam.dana.ui.shell.rememberNow
 import io.github.ronganam.dana.ui.viewmodels.TasksController
 import kotlinx.coroutines.delay
-import org.json.JSONObject
 import java.time.LocalDateTime
 
 /**
@@ -77,10 +77,11 @@ fun ReminderEditor(
     fun commitText() {
         val t = latestTitle.trim()
         val n = latestNote.trim()
-        val fields = JSONObject()
-        if (t.isNotEmpty() && t != current.title.trim()) fields.put("title", t)
-        if (n != current.description.orEmpty().trim()) fields.put("description", n)
-        if (fields.length() == 0) return
+        val fields = TaskChanges(
+            title = t.takeIf { it.isNotEmpty() && it != current.title.trim() },
+            description = n.takeIf { it != current.description.orEmpty().trim() }
+        )
+        if (fields.isEmpty) return
         tasks.edit(current.id, fields) { it.copy(title = if (t.isNotEmpty()) t else it.title, description = n.ifEmpty { null }) }
     }
     LaunchedEffect(task.id, title, note) {
@@ -185,7 +186,7 @@ fun ReminderEditor(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 groups.sortedBy { it.sortOrder }.forEach { g ->
                     InkChoice(g.name, g.id == task.groupId) {
-                        tasks.edit(task.id, JSONObject().put("group_id", g.id)) {
+                        tasks.edit(task.id, TaskChanges(groupId = g.id)) {
                             it.copy(groupId = g.id, groupName = g.name, groupEmoji = g.emoji, groupColor = g.color)
                         }
                     }
@@ -198,7 +199,7 @@ fun ReminderEditor(
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 listOf("low" to "Low", "medium" to "Normal", "high" to "Important").forEach { (value, label) ->
                     InkChoice(label, p == value || (value == "medium" && p !in setOf("low", "high"))) {
-                        tasks.edit(task.id, JSONObject().put("priority", value)) { it.copy(priority = value) }
+                        tasks.edit(task.id, TaskChanges(priority = value)) { it.copy(priority = value) }
                     }
                 }
             }

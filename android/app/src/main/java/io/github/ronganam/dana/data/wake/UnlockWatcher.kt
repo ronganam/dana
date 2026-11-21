@@ -16,9 +16,10 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import java.time.LocalDate
 import java.time.LocalTime
+import androidx.core.content.edit
 
 /**
- * The morning wake signal (server `core/webhooks.py::handle_wake`): the first
+ * The morning wake signal (server `server/core/wake.py`): the first
  * unlocks of the day between 05:00 and 12:00 are reported to the server, which
  * confirms from the screen history that the user is really up and then fires the
  * wake reminders and the briefing. An alarm ringing or a glance at the clock
@@ -68,7 +69,7 @@ object UnlockWatcher {
         val prefs = ServerConfig.prefs(context)
         if (prefs.getString(KEY_DONE, null) == LocalDate.now().toString()) return
         if (now - prefs.getLong(KEY_LAST, 0) < MIN_GAP_MS) return
-        prefs.edit().putLong(KEY_LAST, now).apply()
+        prefs.edit { putLong(KEY_LAST, now) }
         WorkManager.getInstance(context).enqueueUniqueWork(
             "wake_unlock", ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<UnlockReportWorker>()
@@ -79,7 +80,7 @@ object UnlockWatcher {
     }
 
     internal fun markDone(context: Context) {
-        ServerConfig.prefs(context).edit().putString(KEY_DONE, LocalDate.now().toString()).apply()
+        ServerConfig.prefs(context).edit { putString(KEY_DONE, LocalDate.now().toString()) }
     }
 }
 
@@ -89,7 +90,7 @@ class UnlockReportWorker(context: Context, params: WorkerParameters) : Coroutine
         // A report delayed over an hour (no network) is no longer a wake signal.
         if (System.currentTimeMillis() - at > 60 * 60 * 1000L) return Result.success()
         return try {
-            val status = ServerConfig.load(applicationContext).api().reportUnlock(at)
+            val status = ServerConfig.load(applicationContext).api().devices.reportUnlock(at)
             Log.i("UnlockWatcher", "Unlock reported: $status")
             if (status == "done") UnlockWatcher.markDone(applicationContext)
             Result.success()

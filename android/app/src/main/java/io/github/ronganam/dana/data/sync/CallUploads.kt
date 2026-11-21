@@ -28,6 +28,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import io.github.ronganam.dana.R
 
 /**
  * Call-recording uploads.
@@ -52,14 +53,12 @@ object CallUploads {
     const val KEY_NUMBER = "number"
 
     fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Call recordings", NotificationManager.IMPORTANCE_DEFAULT)
-                    .apply { description = "Handles call recording detection and upload progress" }
-            )
-        }
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, context.getString(R.string.channel_call_recordings), NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = context.getString(R.string.channel_call_recordings_description) }
+        )
     }
 
     /** Queue [file] for upload. [replace] restarts a failed/finished attempt. */
@@ -226,14 +225,14 @@ class CallUploadWorker(appContext: Context, params: WorkerParameters) : Coroutin
         }
 
         val failure: String = try {
-            val result = ServerConfig.load(ctx).api().uploadCall(
+            val result = ServerConfig.load(ctx).api().calls.upload(
                 file, contact, "Me", timestamp,
                 durationSeconds = duration, direction = direction, phoneNumber = number
             )
             if (result != null) {
                 CallUploadStore.mark(ctx, file.name, CallUploadStore.State.UPLOADED)
-                val callId = result.optString("id")
-                val status = result.optString("status")
+                val callId = result.id.orEmpty()
+                val status = result.status.orEmpty()
                 if (callId.isNotEmpty()) {
                     // Quiet "analysing" line; CallResultWorker replaces it with the result.
                     CallUploads.notify(ctx, file.name, baseNotification(

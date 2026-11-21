@@ -70,8 +70,8 @@ private fun whyLabel(why: String): Pair<String, Boolean> = when (why) {
     else -> why.replace('_', ' ').replaceFirstChar { it.uppercase() } to false
 }
 
-private val NICE_DAY = DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault())
-private val RANGE_DAY = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+private val NICE_DAY: DateTimeFormatter get() = DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault())
+private val RANGE_DAY: DateTimeFormatter get() = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
 
 private fun niceDate(iso: String?): String? = iso?.take(10)?.let { runCatching { NICE_DAY.format(LocalDate.parse(it)) }.getOrNull() }
 

@@ -57,6 +57,7 @@ import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.common.byScript
 import io.github.ronganam.dana.ui.theme.DanaSerif
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /*
  * The pieces of Shopping (under More) (`ShoppingDestination` arranges them per
@@ -386,15 +387,18 @@ fun ItemRow(
     LaunchedEffect(removing) {
         if (removing) { delay(1_000); removing = false }
     }
-    val state = rememberSwipeToDismissBoxState(confirmValueChange = { value ->
-        if (value != SwipeToDismissBoxValue.Settled && !removing) {
-            removing = true
-            onRemove()
-        }
-        false
-    })
+    val state = rememberSwipeToDismissBoxState()
+    val swipeScope = rememberCoroutineScope()
     SwipeToDismissBox(
         state = state,
+        // The row never stays swiped away: the removal shows as the list changes.
+        onDismiss = { value ->
+            if (value != SwipeToDismissBoxValue.Settled && !removing) {
+                removing = true
+                onRemove()
+            }
+            swipeScope.launch { state.reset() }
+        },
         enableDismissFromStartToEnd = canEdit,
         enableDismissFromEndToStart = canEdit,
         backgroundContent = {

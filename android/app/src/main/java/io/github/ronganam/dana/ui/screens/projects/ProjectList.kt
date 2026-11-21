@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.projects
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -140,8 +141,8 @@ private fun ProjectRow(p: Project, today: LocalDate, selected: Boolean, onClick:
                 if (line.isNotEmpty()) Kicker(line, Modifier.fillMaxWidth().padding(top = 3.dp))
                 if (budget != null) {
                     Text(
-                        if (budget.budget != null) "${ProjectsCore.shortMoney(budget.committed)} ${lang.t("of", "מתוך")} ${ProjectsCore.shortMoney(budget.budget)}"
-                        else "${ProjectsCore.shortMoney(budget.committed)} ${lang.t("committed", "סגור")}",
+                        if (budget.budget != null) "${MoneyFormat.thousands(budget.committed)} ${lang.t("of", "מתוך")} ${MoneyFormat.thousands(budget.budget)}"
+                        else "${MoneyFormat.thousands(budget.committed)} ${lang.t("committed", "סגור")}",
                         style = MaterialTheme.typography.bodySmall.byContent(), color = muted, modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
                     )
                 }

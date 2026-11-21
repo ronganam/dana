@@ -53,6 +53,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import androidx.core.content.edit
 
 /**
  * The Shopping widget: what is left to buy in the server's order, aisle by
@@ -212,7 +213,7 @@ object ShoppingWidgetSync {
         val prefs = ServerConfig.prefs(context)
         val o = runCatching { JSONObject(prefs.getString("widget_snapshot", "{}") ?: "{}") }.getOrDefault(JSONObject())
         ShoppingSnapshot.merge(o, ShoppingSnapshot.fields(ShoppingSync.get(context).shown()))
-        prefs.edit().putString("widget_snapshot", o.toString()).apply()
+        prefs.edit { putString("widget_snapshot", o.toString()) }
         return o
     }
 }

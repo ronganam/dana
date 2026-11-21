@@ -1,10 +1,10 @@
 import java.util.Properties
-import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 // Release signing credentials — see AGENTS.md "Release signing". Loaded from
@@ -58,7 +58,7 @@ val tvDefaultsJson: String = File(siteDir, "tv-defaults.json").let { if (it.exis
 
 android {
     namespace = "io.github.ronganam.dana"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.ronganam.dana"
@@ -135,6 +135,11 @@ android {
             kotlin.directories += "src/wake/java"
             assets.directories += "src/wake/assets"
         }
+        // The server's captured payloads (`*_web.json`, `golden.sse`) are the
+        // contract tests' fixtures, read where the server writes them.
+        getByName("test") {
+            resources.directories += "../../server/tests/fixtures"
+        }
     }
 
     buildTypes {
@@ -147,8 +152,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
@@ -163,62 +168,60 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Money and dates are written the way the phone's locale writes them: tests pin en-US.
+        unitTests.all {
+            it.systemProperty("user.language", "en")
+            it.systemProperty("user.country", "US")
+        }
     }
 }
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_1_8)
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
-composeCompiler {
-    // Strong skipping (on by default since Kotlin 2.0.20) changes when
-    // composables skip recomposition; kept off so the Kotlin 2 upgrade doesn't
-    // change how screens update. The flag goes away in Kotlin 2.5: turn strong
-    // skipping on (and test the screens) before moving past 2.4.
-    @Suppress("DEPRECATION_ERROR")
-    featureFlags.add(ComposeFeatureFlag.StrongSkipping.disabled())
-}
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("androidx.activity:activity-ktx:1.9.0")
-    implementation("com.google.android.material:material:1.11.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.4")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("io.coil-kt:coil-compose:2.5.0")
+    implementation("androidx.core:core-ktx:1.19.1")
+    implementation("androidx.appcompat:appcompat:1.8.0")
+    implementation("androidx.activity:activity-ktx:1.13.0")
+    implementation("com.google.android.material:material:1.14.0")
+    implementation("com.squareup.okhttp3:okhttp:5.5.1")
+    // Typed server payloads (data/network/*Api.kt): parsed only in the data layer.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation("io.coil-kt:coil-compose:2.7.0")
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.04.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-graphics")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.activity:activity-compose:1.9.0")
-    implementation("androidx.navigation:navigation-compose:2.7.7")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
-    implementation("com.google.android.gms:play-services-wearable:18.1.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.navigation:navigation-compose:2.10.2")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.1")
+    implementation("com.google.android.gms:play-services-wearable:20.0.1")
     // The phone ↔ watch Data Layer contract, shared with :wear.
     implementation(project(":protocol"))
     // Retries for queued reminder actions and call-recording uploads.
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
     // Phone only: direct push from the server (FCM wake-up pings).
-    "phoneImplementation"("com.google.firebase:firebase-messaging:24.1.0")
+    "phoneImplementation"("com.google.firebase:firebase-messaging:26.0.2")
     // Phone only: home-screen widgets (widgets/).
-    "phoneImplementation"("androidx.glance:glance-appwidget:1.1.1")
+    "phoneImplementation"("androidx.glance:glance-appwidget:1.2.0")
     // Kiosk + TV: runs the openWakeWord models ("Hey Dana") on-device.
-    "kioskImplementation"("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
-    "tvImplementation"("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")
+    "kioskImplementation"("com.microsoft.onnxruntime:onnxruntime-android:1.32.0")
+    "tvImplementation"("com.microsoft.onnxruntime:onnxruntime-android:1.32.0")
     // TV only: camera picture-in-picture plays go2rtc's RTSP restream.
-    "tvImplementation"("androidx.media3:media3-exoplayer:1.4.1")
-    "tvImplementation"("androidx.media3:media3-exoplayer-rtsp:1.4.1")
+    "tvImplementation"("androidx.media3:media3-exoplayer:1.11.1")
+    "tvImplementation"("androidx.media3:media3-exoplayer-rtsp:1.11.1")
 
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
-    testImplementation("org.json:json:20240303")
-    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("org.json:json:20260814")
+    testImplementation("com.squareup.okhttp3:mockwebserver:5.5.1")
 }

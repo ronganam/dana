@@ -17,7 +17,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 /**
- * The Save view against the server's payloads: `test_fixtures/money_savings_web.json`
+ * The Save view against the server's payloads: `server/tests/fixtures/money_savings_web.json`
  * of the server repo (synthetic), the same assertions as its `test_web_money.mjs`.
  */
 class MoneySaveTest {

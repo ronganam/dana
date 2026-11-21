@@ -18,7 +18,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Bank sign-in codes for the server's `money` kind. When Dana's server signs
+ * Bank sign-in codes for the server's `money` add-on. When Dana's server signs
  * in to a bank that texts a one-time code, it pushes `otp_request` with only
  * a request id. [handle] fetches the request (`GET
  * /api/money/code-requests/{id}`) and, while it is pending, **arms** it:
@@ -150,7 +150,7 @@ object MoneyCodes {
         if (!rid.matches(ID)) return
         val app = context.applicationContext
         val o = try {
-            ServerConfig.load(app).api().getMoneyCodeRequest(rid)
+            ServerConfig.load(app).api().money.codeRequest(rid)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -230,7 +230,7 @@ object MoneyCodes {
                 var wait = 2_000L
                 while (true) {
                     val status = try {
-                        ServerConfig.load(context).api().postMoneyCode(req.id, code)
+                        ServerConfig.load(context).api().money.postCode(req.id, code)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {

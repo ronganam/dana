@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.viewmodels
 
+import io.github.ronganam.dana.data.network.SuggestionEdits
 import io.github.ronganam.dana.SuggestionsReceiver
 import android.content.Context
 import io.github.ronganam.dana.data.models.CallSuggestion
@@ -17,7 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONObject
+import androidx.core.content.edit
 
 /** Which slice of the Inbox is shown. */
 enum class InboxView(val label: String) {
@@ -89,7 +90,7 @@ class NotificationsController(
 
     fun setGroupByApp(on: Boolean) {
         _groupByApp.value = on
-        prefs.edit().putBoolean("group_by_app", on).apply()
+        prefs.edit { putBoolean("group_by_app", on) }
     }
 
     fun setView(v: InboxView) {
@@ -109,14 +110,14 @@ class NotificationsController(
         ctx.scope.launch {
             _loading.value = true
             try {
-                ctx.load("Notifications") { ctx.api.getNotifications("active") }?.let { (list, counts) ->
+                ctx.load("Notifications") { ctx.api.notifications.list("active") }?.let { (list, counts) ->
                     _items.value = list
                     _counts.value = counts
                     _loadedOnce.value = true
                 }
                 if (_view.value == InboxView.SNOOZED) fetchSnoozed()
                 fetchSummaries()
-                ctx.load("InboxSuggestions") { ctx.api.getSuggestions("pending", source = "all") }?.let {
+                ctx.load("InboxSuggestions") { ctx.api.calls.suggestions("pending", source = "all") }?.let {
                     _suggestions.value = it
                     SuggestionsReceiver.reconcile(appContext, it.map { s -> s.id }.toSet())
                 }
@@ -128,13 +129,13 @@ class NotificationsController(
 
     /** A rewrite running on the server shows up a few seconds later, not at the next 20 s poll. */
     private suspend fun fetchSummaries() {
-        ctx.load("InboxSummaries") { ctx.api.getNotificationSummaries() }?.let { s ->
+        ctx.load("InboxSummaries") { ctx.api.notifications.summaries() }?.let { s ->
             _summaries.value = s
             if (s.refreshing && summaryRecheck?.isActive != true) {
                 summaryRecheck = ctx.scope.launch {
                     repeat(3) {
                         delay(4_000)
-                        val next = ctx.load("InboxSummaries") { ctx.api.getNotificationSummaries() } ?: return@launch
+                        val next = ctx.load("InboxSummaries") { ctx.api.notifications.summaries() } ?: return@launch
                         _summaries.value = next
                         if (!next.refreshing) return@launch
                     }
@@ -145,7 +146,7 @@ class NotificationsController(
 
     fun fetchHistory() {
         ctx.scope.launch {
-            ctx.load("NotificationHistory") { ctx.api.getNotifications("dismissed", limit = 200) }?.let { (list, _) ->
+            ctx.load("NotificationHistory") { ctx.api.notifications.list("dismissed", limit = 200) }?.let { (list, _) ->
                 _history.value = list
             }
         }
@@ -153,7 +154,7 @@ class NotificationsController(
 
     fun fetchSnoozed() {
         ctx.scope.launch {
-            ctx.load("SnoozedNotifications") { ctx.api.getNotifications("snoozed", limit = 300) }?.let { (list, counts) ->
+            ctx.load("SnoozedNotifications") { ctx.api.notifications.list("snoozed", limit = 300) }?.let { (list, counts) ->
                 _snoozed.value = list.sortedBy { it.snoozedUntil ?: "" }
                 _counts.value = counts
             }
@@ -240,7 +241,7 @@ class NotificationsController(
         if (dismissSuggestions) reconcileSuggestionNotifications()
         ctx.scope.launch {
             try {
-                val keys = ctx.api.setNotificationStatus(idSet.toList(), "dismissed", dismissSuggestions = dismissSuggestions)
+                val keys = ctx.api.notifications.setStatus(idSet.toList(), "dismissed", dismissSuggestions = dismissSuggestions)
                 DanaNotificationListener.cancel(keys)
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -268,7 +269,7 @@ class NotificationsController(
         _history.value = _history.value.filterNot { it.id in ids }
         _counts.value = recount(_items.value, _counts.value)
         ctx.action("Couldn't restore") {
-            ctx.api.setNotificationStatus(ids, "active")
+            ctx.api.notifications.setStatus(ids, "active")
             true
         }
     }
@@ -286,7 +287,7 @@ class NotificationsController(
     fun setRule(n: PhoneNotification, action: String) {
         ctx.scope.launch {
             try {
-                if (ctx.api.setNotificationRule(n.packageName, action)) {
+                if (ctx.api.notifications.setRule(n.packageName, action)) {
                     ctx.messages.post(
                         when (action) {
                             "mute" -> "${n.appName} will be suggested to dismiss"
@@ -312,7 +313,7 @@ class NotificationsController(
         if (list.isEmpty()) return
         ctx.scope.launch {
             try {
-                val ok = list.count { ctx.api.setNotificationRule(it, action) }
+                val ok = list.count { ctx.api.notifications.setRule(it, action) }
                 ctx.messages.post(
                     when (action) {
                         "mute" -> "$ok app${if (ok == 1) "" else "s"} will be suggested to dismiss"
@@ -332,7 +333,7 @@ class NotificationsController(
 
     fun setAppRule(packageName: String, action: String) {
         ctx.action("Couldn't save the rule") {
-            ctx.api.setNotificationRule(packageName, action).also { if (it) { fetchApps(); fetch() } }
+            ctx.api.notifications.setRule(packageName, action).also { if (it) { fetchApps(); fetch() } }
         }
     }
 
@@ -342,12 +343,12 @@ class NotificationsController(
         _items.value = _items.value.filterNot { it.packageName == packageName }
         _counts.value = recount(_items.value, _counts.value)
         ctx.action("Couldn't delete that app's notifications") {
-            ctx.api.deleteNotificationsForApp(packageName).also { if (it) { fetch(); fetchApps() } }
+            ctx.api.notifications.deleteForApp(packageName).also { if (it) { fetch(); fetchApps() } }
         }
     }
 
     fun fetchApps() {
-        ctx.scope.launch { ctx.load("NotificationApps") { ctx.api.getNotificationApps() }?.let { _apps.value = it } }
+        ctx.scope.launch { ctx.load("NotificationApps") { ctx.api.notifications.apps() }?.let { _apps.value = it } }
     }
 
     // --- Suggestions --------------------------------------------------------------
@@ -356,16 +357,16 @@ class NotificationsController(
         _busy.value = if (busy) _busy.value + id else _busy.value - id
     }
 
-    fun acceptSuggestion(s: CallSuggestion, overrides: JSONObject = JSONObject()) {
+    fun acceptSuggestion(s: CallSuggestion, overrides: SuggestionEdits = SuggestionEdits.None) {
         if (s.id in _busy.value) return
         setBusy(s.id, true)
         ctx.scope.launch {
             try {
-                val result = ctx.api.acceptSuggestion(s.id, overrides)
+                val result = ctx.api.calls.accept(s.id, overrides)
                 _suggestions.value = _suggestions.value.filterNot { it.id == s.id }
                 dropEmbedded(setOf(s.id))
                 reconcileSuggestionNotifications()
-                ctx.messages.post(if (result.optString("kind") == "event") "Added to your calendar" else "Reminder created")
+                ctx.messages.post(if (result.kind == "event") "Added to your calendar" else "Reminder created")
                 onSuggestionsChanged()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
@@ -389,7 +390,7 @@ class NotificationsController(
         reconcileSuggestionNotifications()
         ctx.scope.launch {
             try {
-                ctx.api.dismissSuggestions(ids.toList())
+                ctx.api.calls.dismissMany(ids.toList())
                 onSuggestionsChanged()
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e

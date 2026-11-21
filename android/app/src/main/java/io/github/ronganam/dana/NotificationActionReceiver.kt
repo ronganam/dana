@@ -26,24 +26,24 @@ object NotificationActionReceiver {
         }
         val api = ServerConfig.load(context).api()
         val req = try {
-            api.getNotificationRequest(rid)
+            api.notifications.request(rid)
         } catch (e: Exception) {
             Log.w(TAG, "Couldn't fetch request $rid", e)
             return
         }
-        if (req.optString("status") != "pending") return
-        val key = req.optString("key").takeIf { it.isNotBlank() }
-        val action = req.optString("action")
+        if (req.status != "pending") return
+        val key = req.key?.takeIf { it.isNotBlank() }
+        val action = req.action.orEmpty()
         val error = withContext(Dispatchers.Main) {
             if (action == "open") {
                 if (DanaNotificationListener.open(context, key)) null else "It's no longer in the notification shade"
             } else {
-                DanaNotificationListener.perform(context, key, action, req.optString("text"))
+                DanaNotificationListener.perform(context, key, action, req.text.orEmpty())
             }
         }
         Log.i(TAG, "Request $rid ($action): ${error ?: "done"}")
         try {
-            api.finishNotificationRequest(rid, error == null, error)
+            api.notifications.finishRequest(rid, error == null, error)
         } catch (e: Exception) {
             Log.w(TAG, "Couldn't report request $rid", e)
         }

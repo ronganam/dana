@@ -31,7 +31,7 @@ fun rememberProjectsDestination(viewModel: MainViewModel): Destination {
     val list by c.list.collectAsState()
 
     // Fresh on arrival and whenever the app comes back to the front (Dana may have changed things).
-    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
             if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) c.refresh()

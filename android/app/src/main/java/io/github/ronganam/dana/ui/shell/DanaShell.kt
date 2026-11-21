@@ -52,8 +52,8 @@ fun DanaShell(viewModel: MainViewModel) {
     // The needs-you number (the Notifications screen's, else Now's copy of it); nothing when zero.
     val notificationsBadge = overview?.counts?.needsYou ?: nowPayload?.notifications?.needsYou ?: 0
     val search by viewModel.searchController.state.collectAsState()
-    val kinds by viewModel.kinds.collectAsState()
-    val projectsOn = "knowledge" in kinds
+    val addons by viewModel.addons.collectAsState()
+    val projectsOn = "knowledge" in addons
     val places = remember(projectsOn) { Place.values().filter { it != Place.PROJECTS || projectsOn } }
     // Projects went away (disconnected): back to Now.
     LaunchedEffect(projectsOn, place) { if (!projectsOn && place == Place.PROJECTS) shell.go(Place.NOW) }
@@ -72,11 +72,11 @@ fun DanaShell(viewModel: MainViewModel) {
     // The ask bar's text searches your things (2+ characters, debounced in the controller).
     LaunchedEffect(shell.askDraft.text) { viewModel.searchController.setQuery(shell.askDraft.text) }
     // Text shared from another app lands in the ask bar, thread open.
-    val draft by viewModel.draftText.collectAsState()
+    val draft by viewModel.chatController.draftText.collectAsState()
     LaunchedEffect(draft) {
         draft?.let {
             shell.askDraft = TextFieldValue(it, TextRange(it.length))
-            viewModel.consumeDraft()
+            viewModel.chatController.consumeDraft()
             shell.openThread()
         }
     }
@@ -137,7 +137,7 @@ fun DanaShell(viewModel: MainViewModel) {
                         },
                         onAsk = {
                             shell.openThread()
-                            if (viewModel.sendChatMessage(query.trim())) shell.askDraft = TextFieldValue("")
+                            if (viewModel.chatController.sendChatMessage(query.trim())) shell.askDraft = TextFieldValue("")
                         }
                     )
                 },

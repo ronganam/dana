@@ -17,12 +17,12 @@ import kotlin.math.roundToLong
 
 /**
  * The pure part of Transactions, the detail, Accounts and the banners (the
- * web's `static/money-core.js`): the list items and the detail
+ * web's `server/static/money-core.js`): the list items and the detail
  * (`GET /api/money/transactions…`), day grouping, tones, badges, the
  * "Counts as" choices, the filters ↔ query, the category taxonomy, account
  * names, a login's state and the words of answers and errors. Every number is
  * the server's (agorot, signed: money out is negative). Tested in
- * `MoneyLedgerTest` against the server's `test_fixtures/money_web.json`.
+ * `MoneyLedgerTest` against `server/tests/fixtures/money_web.json`.
  */
 
 /** A row's badge: provisional | pending | unmatched | installment (n/total) | foreign (amount, currency). */
@@ -159,7 +159,6 @@ object MoneyLedger {
     const val MINUS = "−"
     private const val FSI = "⁨"
     private const val PDI = "⁩"
-    private val CURRENCY = mapOf("ILS" to "₪", "USD" to "$", "EUR" to "€", "GBP" to "£")
     private val INCOME_FLOWS = setOf("income", "transfer_in")
     private val FLOW_CHIPS = mapOf("card_bill" to "Card bill", "own_transfer" to "Between your accounts")
     private val CATEGORY_SOURCES = mapOf(
@@ -181,34 +180,7 @@ object MoneyLedger {
 
     // ---------- money ----------
 
-    /**
-     * Agorot → "₪1,234.50" like the web's `money()`: [sign] "minus" ("−" on
-     * money out), "plus" (also "+" on money in), "none" (absolute); [cents]
-     * true, false (whole, rounded) or null ("auto": drop ".00").
-     */
-    fun money(agorot: Long, sign: String = "minus", cents: Boolean? = true): String {
-        val a = abs(agorot)
-        val body = if (cents == false) group3(Math.round(a / 100.0)) else {
-            val c = a % 100
-            group3(a / 100) + if (cents == null && c == 0L) "" else "." + c.toString().padStart(2, '0')
-        }
-        val s = "₪$body"
-        if (sign == "none" || agorot == 0L || (cents == false && Math.round(a / 100.0) == 0L)) return s
-        if (agorot < 0) return MINUS + s
-        return if (sign == "plus") "+$s" else s
-    }
-
-    fun whole(agorot: Long): String = money(agorot, cents = false)
-
     private fun group3(n: Long): String = String.format(Locale.US, "%,d", n)
-
-    /** A foreign amount in its minor units → "$5.00", "€35.00", "5.00 CHF" (absolute). */
-    fun foreignText(amount: Long, currency: String): String {
-        val a = abs(amount)
-        val body = group3(a / 100) + "." + (a % 100).toString().padStart(2, '0')
-        val sym = CURRENCY[currency.uppercase()]
-        return if (sym != null) sym + body else "$body $currency".trim()
-    }
 
     // ---------- dates ----------
 
@@ -340,7 +312,7 @@ object MoneyLedger {
     }
 
     /** The amount as the row shows it: "+₪15,000.00" for money in, "−₪25.00" out. */
-    fun amountText(t: Txn): String = money(t.amount, sign = if (amountTone(t) == "in") "plus" else "minus")
+    fun amountText(t: Txn): String = MoneyFormat.amount(t.amount, if (amountTone(t) == "in") MoneyFormat.Sign.PLUS else MoneyFormat.Sign.MINUS)
 
     /** The row's badges. [company] names the card company ("Cal"). */
     fun badges(t: Txn, company: String?): List<BadgeText> {
@@ -352,7 +324,7 @@ object MoneyLedger {
                 "pending" -> out += BadgeText("pending", "Pending", "$who lists it as pending: the amount or date may still change.")
                 "unmatched" -> out += BadgeText("unmatched", "Not charged?", "Your phone saw this payment but it never appeared on the card: probably declined or reversed. Not counted.")
                 "installment" -> out += BadgeText("installment", "${b.number}/${b.total}", "Payment ${b.number} of ${b.total}")
-                "foreign" -> out += BadgeText("foreign", foreignText(b.amount, b.currency), "Paid in ${b.currency}")
+                "foreign" -> out += BadgeText("foreign", MoneyFormat.foreign(b.amount, b.currency), "Paid in ${b.currency}")
             }
         }
         if (t.amount > 0 && t.flow == "refund") out += BadgeText("refund", "Refund", "Money back: it reduces spending")
@@ -477,8 +449,8 @@ object MoneyLedger {
 
     /** The amount chip: "₪100 – ₪500", "₪100 or more", "up to ₪49.90"; null without either. */
     fun amountChip(min: String, max: String): String? {
-        val a = num(min)?.let { money((it.toDouble() * 100).roundToLong(), cents = null) }
-        val b = num(max)?.let { money((it.toDouble() * 100).roundToLong(), cents = null) }
+        val a = num(min)?.let { MoneyFormat.major(it.toDouble(), cents = null) }
+        val b = num(max)?.let { MoneyFormat.major(it.toDouble(), cents = null) }
         return when {
             a != null && b != null -> "$a – $b"
             a != null -> "$a or more"

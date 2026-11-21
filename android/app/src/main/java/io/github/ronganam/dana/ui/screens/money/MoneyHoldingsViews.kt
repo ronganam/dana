@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.money.Holding
 import io.github.ronganam.dana.data.money.MoneyDashGeometry
 import io.github.ronganam.dana.data.money.MoneyDashText
-import io.github.ronganam.dana.data.money.MoneyDashText.Sign
+import io.github.ronganam.dana.data.money.MoneyFormat.Sign
 import io.github.ronganam.dana.data.money.MoneyMeals
 import io.github.ronganam.dana.data.money.MoneyPortfolio
 import io.github.ronganam.dana.ui.components.Rule
@@ -55,12 +56,12 @@ internal fun InvestmentsView(d: Dash) {
 private fun InvestmentsLoaded(d: Dash, p: MoneyPortfolio) {
     val t = MoneyDashText.portfolioTiles(p, ZonedDateTime.now())
     fun tone(s: String): Color? = when (s) { "in" -> MoneyPalette.good; "neg" -> MoneyPalette.bad; else -> null }
-    fun signed(v: Long?, cents: Boolean = false) = v?.let { MoneyDashText.money(it, Sign.PLUS, cents) } ?: "—"
+    fun signed(v: Long?, cents: Boolean = false) = v?.let { MoneyFormat.amount(it, Sign.PLUS, cents) } ?: "—"
     Tiles(listOf(
-        TileData("Portfolio value", MoneyDashText.whole(t.value.value ?: 0), sub = t.value.sub),
+        TileData("Portfolio value", MoneyFormat.whole(t.value.value ?: 0), sub = t.value.sub),
         TileData("Today", signed(t.today.value, cents = true), tone = tone(t.today.tone), sub = t.today.sub),
         TileData("Profit", signed(t.profit.value), tone = tone(t.profit.tone), sub = t.profit.sub),
-        TileData("Cash", MoneyDashText.whole(t.cash.value ?: 0), sub = t.cash.sub.ifEmpty { "not invested" })
+        TileData("Cash", MoneyFormat.whole(t.cash.value ?: 0), sub = t.cash.sub.ifEmpty { "not invested" })
     ), d.twoCols)
     DashSections(d.twoCols, listOf(
         0 to { ValueSection(d, p) },
@@ -110,7 +111,7 @@ private fun Allocation(p: MoneyPortfolio) {
                     Key(MoneyPalette.slot(s.slot), Modifier.padding(end = 10.dp))
                     Box(Modifier.weight(1f).padding(end = 8.dp)) { Name(s.name) }
                     Text(s.text, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 12.dp))
-                    Amount(MoneyDashText.whole(s.value), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.widthIn(min = 76.dp))
+                    Amount(MoneyFormat.whole(s.value), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.widthIn(min = 76.dp))
                 }
             }
         }
@@ -125,7 +126,7 @@ private fun Holdings(p: MoneyPortfolio) {
         val many = p.accounts.size > 1
         p.accounts.forEach { a ->
             if (many) Meta(
-                MoneyDashText.accountName(a.label, a.number, "investment", a.companyName) + " · " + MoneyDashText.whole(a.value),
+                MoneyDashText.accountName(a.label, a.number, "investment", a.companyName) + " · " + MoneyFormat.whole(a.value),
                 Modifier.padding(top = 14.dp, bottom = 4.dp)
             )
             if (a.holdings.isEmpty()) Empty("No holdings in this account.")
@@ -137,8 +138,8 @@ private fun Holdings(p: MoneyPortfolio) {
 @Composable
 private fun HoldingRow(h: Holding, total: Long) {
     val meta = listOfNotNull(
-        h.quantity?.let { "${MoneyDashText.quantityText(it)} × ${MoneyDashText.unitPrice(h.price, h.currency)}" },
-        h.currency?.takeIf { it.uppercase() !in setOf("ILS", "NIS") },
+        h.quantity?.let { "${MoneyDashText.quantityText(it)} × ${MoneyFormat.unitPrice(h.price, h.currency)}" },
+        h.currency?.takeIf { !MoneyFormat.isUsers(it) },
         if (total > 0 && h.value != null && h.value != 0L) "${MoneyDashText.pctText(h.value.toDouble() / total * 100, signed = false, digits = 1)} of the portfolio" else null,
         h.security?.let { "#$it" }
     ).joinToString(" · ")
@@ -153,9 +154,9 @@ private fun HoldingRow(h: Holding, total: Long) {
             Meta(meta)
         }
         Column(horizontalAlignment = Alignment.End) {
-            Amount(h.value?.let { MoneyDashText.whole(it) } ?: "—", MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+            Amount(h.value?.let { MoneyFormat.whole(it) } ?: "—", MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
             h.profit?.let {
-                Amount(MoneyDashText.money(it, Sign.PLUS, cents = false) + (h.profitPct?.let { pc -> " · ${MoneyDashText.pctText(pc)}" } ?: ""),
+                Amount(MoneyFormat.amount(it, Sign.PLUS, cents = false) + (h.profitPct?.let { pc -> " · ${MoneyDashText.pctText(pc)}" } ?: ""),
                     MaterialTheme.typography.bodySmall, tone)
             }
         }
@@ -180,7 +181,7 @@ private fun Activity(d: Dash, p: MoneyPortfolio) {
                     Meta(x.meta.joinToString(" · "))
                 }
                 if (x.amount != 0L) Amount(
-                    MoneyDashText.money(x.amount, Sign.PLUS), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                    MoneyFormat.amount(x.amount, Sign.PLUS), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                     if (x.tone == "in") MoneyPalette.good else Color.Unspecified
                 )
             }
@@ -207,9 +208,9 @@ internal fun MealsView(d: Dash) {
 @Composable
 private fun MealsLoaded(d: Dash, m: MoneyMeals, t: MoneyDashText.MealTiles) {
     Tiles(listOf(
-        TileData("Left this cycle", MoneyDashText.whole(t.left.value ?: 0), sub = t.left.sub),
+        TileData("Left this cycle", MoneyFormat.whole(t.left.value ?: 0), sub = t.left.sub),
         TileData("Pace", t.pace.text, tone = if (t.pace.tone == "neg") MoneyPalette.bad else null, sub = t.pace.sub),
-        TileData("On your card", MoneyDashText.whole(t.card.value ?: 0), sub = t.card.sub),
+        TileData("On your card", MoneyFormat.whole(t.card.value ?: 0), sub = t.card.sub),
         TileData("Meals", (t.count.value ?: 0).toString(), sub = t.count.sub)
     ), d.twoCols)
     DashSections(d.twoCols, listOf(
@@ -233,8 +234,8 @@ private fun Cycles(d: Dash, m: MoneyMeals) {
                 Column(Modifier.fillMaxWidth().padding(vertical = 10.dp)) {
                     Row(verticalAlignment = Alignment.Bottom) {
                         Text(b.label, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), modifier = Modifier.weight(1f))
-                        Amount(MoneyDashText.whole(b.budget), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
-                        if (b.card != 0L) Amount("  + ${MoneyDashText.money(b.card, Sign.NONE)}", MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold), MoneyPalette.cardPart)
+                        Amount(MoneyFormat.whole(b.budget), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                        if (b.card != 0L) Amount("  + ${MoneyFormat.amount(b.card, Sign.NONE)}", MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.SemiBold), MoneyPalette.cardPart)
                     }
                     Row(
                         Modifier
@@ -244,8 +245,8 @@ private fun Cycles(d: Dash, m: MoneyMeals) {
                             .clip(RoundedCornerShape(4.dp))
                             .background(MaterialTheme.colorScheme.outlineVariant)
                             .semantics {
-                                contentDescription = "${b.label}: ${MoneyDashText.whole(b.budget)} from the budget" +
-                                    if (b.card != 0L) ", ${MoneyDashText.money(b.card)} on your card" else ""
+                                contentDescription = "${b.label}: ${MoneyFormat.whole(b.budget)} from the budget" +
+                                    if (b.card != 0L) ", ${MoneyFormat.amount(b.card)} on your card" else ""
                             },
                         horizontalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
@@ -274,14 +275,14 @@ private fun Cycles(d: Dash, m: MoneyMeals) {
 private fun Places(m: MoneyMeals) {
     DashSection("Places", trailing = { Hint("most visits first") }) {
         if (m.places.isEmpty()) Empty("No meals yet.") else {
-            if (m.kinds.size > 1) Meta(m.kinds.joinToString(" · ") { "${it.label}: ${it.count} · ${MoneyDashText.whole(it.total)}" }, Modifier.padding(vertical = 8.dp))
+            if (m.kinds.size > 1) Meta(m.kinds.joinToString(" · ") { "${it.label}: ${it.count} · ${MoneyFormat.whole(it.total)}" }, Modifier.padding(vertical = 8.dp))
             m.places.forEach { p ->
                 DashRow {
                     Column(Modifier.weight(1f).padding(end = 10.dp)) {
                         Name(p.place)
                         Meta("${p.count} ${if (p.count == 1) "visit" else "visits"}")
                     }
-                    Amount(MoneyDashText.whole(p.total), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+                    Amount(MoneyFormat.whole(p.total), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
                 }
             }
         }
@@ -297,7 +298,7 @@ private fun LatestMeals(d: Dash, m: MoneyMeals) {
             val meta = listOfNotNull(
                 MoneyDashText.shortDate(x.date, d.today) + if (time.isNotEmpty()) ", $time" else "",
                 if (x.orderType == "delivery") "Delivery" else null,
-                if (x.cardPaid != 0L) "${MoneyDashText.money(x.cardPaid)} on your card" else null,
+                if (x.cardPaid != 0L) "${MoneyFormat.amount(x.cardPaid)} on your card" else null,
                 if (!x.active) "Cancelled" else null
             ).joinToString(" · ")
             val muted = MaterialTheme.colorScheme.onSurfaceVariant
@@ -306,7 +307,7 @@ private fun LatestMeals(d: Dash, m: MoneyMeals) {
                     Name(x.place ?: "—", strike = !x.active, color = if (x.active) Color.Unspecified else muted)
                     Meta(meta)
                 }
-                Amount(MoneyDashText.money(x.total, Sign.NONE), MaterialTheme.typography.bodyMedium.copy(
+                Amount(MoneyFormat.amount(x.total, Sign.NONE), MaterialTheme.typography.bodyMedium.copy(
                     fontWeight = FontWeight.SemiBold,
                     textDecoration = if (x.active) null else androidx.compose.ui.text.style.TextDecoration.LineThrough
                 ), if (x.active) Color.Unspecified else muted)

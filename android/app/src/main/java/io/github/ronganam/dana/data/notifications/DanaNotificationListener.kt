@@ -99,7 +99,7 @@ class DanaNotificationListener : NotificationListenerService() {
 
     /** Queue [sbn] when it is new content; true if something was queued. */
     private fun capture(sbn: StatusBarNotification): Boolean {
-        // Bank / card apps go to the money kind instead, never to the Inbox
+        // Bank / card apps go to the money add-on instead, never to the Inbox
         // (whatever "skip banking apps" says), while the user has it.
         if (MoneySignals.routes(this, sbn.packageName)) return captureMoney(sbn)
         val item = try {
@@ -110,7 +110,7 @@ class DanaNotificationListener : NotificationListenerService() {
         } ?: return false
         AppIcons.remember(this, sbn)
         sbn.notification?.contentIntent?.let { pi -> synchronized(contentIntents) { contentIntents[sbn.key] = pi } }
-        val fingerprint = "${sbn.key}\u0000${item.optString("title")}\u0000${item.optString("text")}"
+        val fingerprint = "${sbn.key}\u0000${item.title}\u0000${item.text}"
         synchronized(recent) {
             if (recent.containsKey(fingerprint)) return false
             recent[fingerprint] = System.currentTimeMillis()
