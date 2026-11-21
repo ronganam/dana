@@ -125,7 +125,7 @@ class TasksController(private val ctx: ControllerContext, private val appContext
     fun fetchZones() {
         ctx.scope.launch {
             val zones = ctx.load("Zones") { ctx.api.getZones() }
-            _zones.value = zones?.map { it.name } ?: listOf("Home", "Work")
+            _zones.value = zones?.map { it.name } ?: listOf("Home")
         }
     }
 

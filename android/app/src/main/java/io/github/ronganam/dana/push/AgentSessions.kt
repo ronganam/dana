@@ -33,7 +33,7 @@ import java.time.OffsetDateTime
  * - done / failed → the same notification turns into a normal one that
  *   alerts once (per `rev`, the server's status-change counter).
  * - a running session missing from the list (ended, gone silent) → cancelled.
- * - subagents (Claude Code's own, T3 Code delegated children) come inside
+ * - subagents (Claude Code's own, delegated child sessions) come inside
  *   their parent's entry (`subagents`; the server folds the group's status
  *   into the parent's): one segment each on the parent's progress bar
  *   (green done, blue running, orange waiting, red failed) when it has no
@@ -55,8 +55,6 @@ object AgentSessions {
     private const val STALE_MS = 60L * 60 * 1000
     const val ACTION_HIDE = "io.github.ronganam.dana.AGENT_SESSION_HIDE"
     const val EXTRA_ID = "agent_session_id"
-    private const val T3_HOST = "app.t3.codes"
-    private const val T3_PACKAGE = "com.t3tools.t3code"
 
     /** One of a session's subagents. */
     data class Sub(val id: String, val title: String, val status: String, val activity: String, val summary: String) {
@@ -181,15 +179,13 @@ object AgentSessions {
     }
 
     /**
-     * Tapping a session: its T3 Code thread when the hook sent one (straight
-     * into the T3 Code app when it is installed, so it doesn't depend on Android
-     * having verified the app link; else the browser), otherwise Dana.
+     * Tapping a session: the `open_url` the server sent (https only), handed to
+     * whichever app handles that link (an app that verified the link's domain,
+     * else the browser); without one, Dana.
      */
     private fun tapIntent(context: Context, s: Session): PendingIntent {
         val intent = if (s.openUrl.isNotEmpty()) {
-            Intent(Intent.ACTION_VIEW, Uri.parse(s.openUrl)).apply {
-                if (Uri.parse(s.openUrl).host == T3_HOST && installed(context, T3_PACKAGE)) setPackage(T3_PACKAGE)
-            }
+            Intent(Intent.ACTION_VIEW, Uri.parse(s.openUrl)).addCategory(Intent.CATEGORY_BROWSABLE)
         } else {
             Intent(context, MainActivity::class.java)
         }
@@ -197,9 +193,6 @@ object AgentSessions {
         return PendingIntent.getActivity(context, s.id.hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
-
-    private fun installed(context: Context, pkg: String): Boolean =
-        runCatching { context.packageManager.getPackageInfo(pkg, 0); true }.getOrDefault(false)
 
     private fun hide(context: Context, s: Session): Notification.Action {
         val intent = Intent(context, AgentSessionReceiver::class.java).setAction(ACTION_HIDE).putExtra(EXTRA_ID, s.id)

@@ -29,7 +29,7 @@ object WearReminderSync {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_ZONES, null)
         return raw?.let { runCatching { org.json.JSONArray(it).let { a -> List(a.length()) { i -> a.getString(i) } } }.getOrNull() }
             ?.takeIf { it.isNotEmpty() }
-            ?: listOf("Home", "Work")
+            ?: listOf("Home")
     }
 
     fun notificationId(taskId: String) = taskId.hashCode()

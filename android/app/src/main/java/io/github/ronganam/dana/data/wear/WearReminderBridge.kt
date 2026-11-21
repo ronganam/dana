@@ -54,12 +54,12 @@ object WearReminderBridge {
         refreshZones(app)
     }
 
-    /** Home Assistant zones for the watch's place snoozes (last known; fallbacks before the first fetch). */
+    /** Home Assistant zones for place snoozes (last known; before the first fetch only Home Assistant's own "Home"). */
     fun cachedZones(context: Context): List<String> {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_ZONES, null)
         return raw?.let { runCatching { JSONArray(it).let { a -> List(a.length()) { i -> a.getString(i) } } }.getOrNull() }
             ?.takeIf { it.isNotEmpty() }
-            ?: listOf("Home", "Work")
+            ?: listOf("Home")
     }
 
     fun refreshZones(context: Context) {
