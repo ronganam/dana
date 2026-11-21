@@ -12,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import io.github.ronganam.dana.wear.ui.theme.DanaWearTheme
+import io.github.ronganam.dana.wear.R
 
 /**
  * The Shopping screen: opened from the Shopping complication and tile, the
@@ -25,7 +26,7 @@ class ShoppingActivity : ComponentActivity() {
         WatchShopping.init(this)
         val speech = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
             .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            .putExtra(RecognizerIntent.EXTRA_PROMPT, "What to add?")
+            .putExtra(RecognizerIntent.EXTRA_PROMPT, getString(R.string.what_to_add))
         val canSpeak = speech.resolveActivity(packageManager) != null
 
         setContent {

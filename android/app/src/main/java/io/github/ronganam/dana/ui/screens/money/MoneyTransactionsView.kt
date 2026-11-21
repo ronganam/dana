@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -155,11 +156,11 @@ private fun DayHeader(d: TxnDay, today: LocalDate) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
             MonoLabel(MoneyLedger.dayLabel(d.date, today), Modifier.weight(1f))
-            if (d.income > 0) Text(MoneyLedger.money(d.income, sign = "plus"), style = MaterialTheme.typography.labelMedium.merge(MoneyNumbers), color = toneColor("in"))
+            if (d.income > 0) Text(MoneyFormat.amount(d.income, sign = MoneyFormat.Sign.PLUS), style = MaterialTheme.typography.labelMedium.merge(MoneyNumbers), color = toneColor("in"))
             if (d.income > 0 && d.spent != 0L) Spacer(Modifier.width(10.dp))
             when {
-                d.spent > 0 -> Text(MoneyLedger.money(d.spent, sign = "none"), style = MaterialTheme.typography.labelMedium.merge(MoneyNumbers), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                d.spent < 0 -> Text(MoneyLedger.money(-d.spent, sign = "plus"), style = MaterialTheme.typography.labelMedium.merge(MoneyNumbers), color = toneColor("in"))
+                d.spent > 0 -> Text(MoneyFormat.amount(d.spent, sign = MoneyFormat.Sign.NONE), style = MaterialTheme.typography.labelMedium.merge(MoneyNumbers), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                d.spent < 0 -> Text(MoneyFormat.amount(-d.spent, sign = MoneyFormat.Sign.PLUS), style = MaterialTheme.typography.labelMedium.merge(MoneyNumbers), color = toneColor("in"))
             }
         }
         Rule()
@@ -426,10 +427,10 @@ private fun AmountPanel(min: String, max: String, onShow: (String, String) -> Un
     var lo by remember { mutableStateOf(min) }
     var hi by remember { mutableStateOf(max) }
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 18.dp, vertical = 10.dp)) {
-        Muted("Absolute shekels: money out and in alike")
+        Muted("Absolute amounts: money out and in alike")
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-            InkField(lo, { lo = it }, "0", Modifier.weight(1f), label = "At least (₪)", keyboard = KeyboardType.Decimal, imeAction = ImeAction.Next, ltr = true)
-            InkField(hi, { hi = it }, "Any", Modifier.weight(1f), label = "At most (₪)", keyboard = KeyboardType.Decimal, onDone = { onShow(lo, hi) }, ltr = true)
+            InkField(lo, { lo = it }, "0", Modifier.weight(1f), label = MoneyFormat.label("At least"), keyboard = KeyboardType.Decimal, imeAction = ImeAction.Next, ltr = true)
+            InkField(hi, { hi = it }, "Any", Modifier.weight(1f), label = MoneyFormat.label("At most"), keyboard = KeyboardType.Decimal, onDone = { onShow(lo, hi) }, ltr = true)
         }
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InkButton("Clear") { onShow("", "") }

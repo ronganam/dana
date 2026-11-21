@@ -132,7 +132,7 @@ class WakeWordService : Service() {
         val nm = getSystemService(NotificationManager::class.java)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Wake word", NotificationManager.IMPORTANCE_MIN)
+                NotificationChannel(CHANNEL, getString(R.string.channel_wake_word), NotificationManager.IMPORTANCE_MIN)
             )
         }
         val open = PendingIntent.getActivity(

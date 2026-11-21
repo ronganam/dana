@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.projects
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -272,7 +273,7 @@ private fun CompareTable(s: Section, options: List<Entry>, openId: String?, gutt
                                 Cmp.Files -> lang.t("Files", "קבצים")
                                 Cmp.Notes -> lang.t("Notes", "הערות")
                             }
-                            Kicker(label + if (c is Cmp.Value && c.col.role == "price") " ₪" else "")
+                            Kicker(label + if (c is Cmp.Value && c.col.role == "price") " ${MoneyFormat.symbol}" else "")
                         }
                     }
                 }

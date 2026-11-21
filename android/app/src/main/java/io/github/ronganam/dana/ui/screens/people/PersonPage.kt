@@ -1,7 +1,6 @@
 package io.github.ronganam.dana.ui.screens.people
 
 import android.content.Intent
-import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -47,6 +46,7 @@ import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.common.auto
 import io.github.ronganam.dana.ui.theme.Space
 import io.github.ronganam.dana.ui.theme.Warning
+import androidx.core.net.toUri
 
 /** Max reading width so the page doesn't stretch on a tablet or the TV. */
 private val PAGE_MAX = 720.dp
@@ -98,7 +98,7 @@ fun PersonPage(
             }
         } else BoxWithConstraints(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
             val whatsApp: (String) -> Unit = { ph ->
-                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://wa.me/$ph")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, "https://wa.me/$ph".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
             }
             val head: LazyListScope.() -> Unit = {
                 item(key = "hero") { Hero(p, actions = if (onBack == null) ({ personActions(p) }) else null) }

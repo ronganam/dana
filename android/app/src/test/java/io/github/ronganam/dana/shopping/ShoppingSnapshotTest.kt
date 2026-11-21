@@ -16,7 +16,7 @@ class ShoppingSnapshotTest {
     fun itemsToBuyInTheServersOrderWithTheirAisles() {
         val f = ShoppingSnapshot.fields(ShoppingFixture.screen("owner_shared"))
         assertEquals(12, f.getInt("shopping_count"))
-        assertEquals("a142b3bd0785", f.getString("shopping_list_id"))
+        assertEquals(ShoppingFixture.list, f.getString("shopping_list_id"))
         assertEquals(20L, f.getLong("shopping_version"))
         assertTrue(f.getBoolean("shopping_can_edit"))
         val items = f.getJSONArray("shopping")

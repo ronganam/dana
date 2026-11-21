@@ -5,7 +5,10 @@ import io.github.ronganam.dana.protocol.TaskStatusRequest
 import io.github.ronganam.dana.protocol.WearPaths
 import android.content.Context
 import android.util.Log
-import androidx.lifecycle.ViewModel
+import androidx.lifecycle.AndroidViewModel
+import android.app.Application
+import androidx.annotation.StringRes
+import io.github.ronganam.dana.wear.R
 import androidx.lifecycle.viewModelScope
 import io.github.ronganam.dana.wear.data.WearPrefs
 import com.google.android.gms.wearable.MessageClient
@@ -18,7 +21,9 @@ import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
 
-class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
+class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnMessageReceivedListener {
+    private fun str(@StringRes id: Int): String = getApplication<Application>().getString(id)
+
 
     companion object {
         private const val TAG = "TasksViewModel"
@@ -32,7 +37,7 @@ class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    private val _statusText = MutableStateFlow("Loading...")
+    private val _statusText = MutableStateFlow(str(R.string.tasks_status_loading))
     val statusText: StateFlow<String> = _statusText.asStateFlow()
 
     fun initialize(context: Context) {
@@ -45,14 +50,14 @@ class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
     fun refreshTasks() {
         Log.d(TAG, "refreshTasks() — requesting phone node")
         _isLoading.value = true
-        _statusText.value = "Loading..."
+        _statusText.value = str(R.string.tasks_status_loading)
         getPhoneNodeId { phoneId ->
             Log.d(TAG, "refreshTasks() — sending ${WearPaths.GET_TASKS} to $phoneId")
             Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.GET_TASKS, null)
                 .addOnSuccessListener { Log.d(TAG, "refreshTasks() — message sent successfully") }
                 .addOnFailureListener { e ->
                     Log.e(TAG, "refreshTasks() — failed to send message", e)
-                    _statusText.value = "Send error"
+                    _statusText.value = str(R.string.tasks_status_send_error)
                     _isLoading.value = false
                 }
         }
@@ -116,20 +121,20 @@ class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
                         }
                         _tasks.value = list
                         _isLoading.value = false
-                        _statusText.value = if (list.isEmpty()) "No tasks" else ""
+                        _statusText.value = if (list.isEmpty()) str(R.string.tasks_status_none) else ""
                     }
                     WearPaths.response(WearPaths.UPDATE_TASK_STATUS), WearPaths.response(WearPaths.SNOOZE_TASK) -> {
                         refreshTasks()
                     }
                     WearPaths.RESPONSE_ERROR -> {
                         val json = JSONObject(jsonString)
-                        _statusText.value = "Error: ${json.optString("error", "Failed")}"
+                        _statusText.value = getApplication<Application>().getString(R.string.error_detail, json.optString("error", str(R.string.failed)))
                         _isLoading.value = false
                     }
                 }
             } catch (e: Exception) {
                 Log.e("TasksViewModel", "Error parsing response: $path", e)
-                _statusText.value = "Error"
+                _statusText.value = str(R.string.tasks_status_error)
                 _isLoading.value = false
             }
         }
@@ -145,13 +150,13 @@ class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
                     action(nodeId)
                 } else {
                     Log.w(TAG, "getPhoneNodeId() — no connected phone!")
-                    _statusText.value = "Phone not found"
+                    _statusText.value = str(R.string.phone_not_found)
                     _isLoading.value = false
                 }
             }
             .addOnFailureListener { e ->
                 Log.e(TAG, "getPhoneNodeId() — failed", e)
-                _statusText.value = "Connection error"
+                _statusText.value = str(R.string.tasks_status_connection_error)
                 _isLoading.value = false
             }
     }

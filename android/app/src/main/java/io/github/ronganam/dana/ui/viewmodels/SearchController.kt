@@ -37,7 +37,7 @@ class SearchController(private val ctx: ControllerContext) {
         job = ctx.scope.launch {
             delay(250)
             try {
-                val results = ctx.api.search(q, limit = 5)
+                val results = ctx.api.now.search(q, limit = 5)
                 if (_state.value.query == q) _state.value = State(q, results, searching = false)
             } catch (e: CancellationException) {
                 throw e
@@ -58,7 +58,7 @@ class SearchController(private val ctx: ControllerContext) {
             "person" -> "People"
             "call" -> "Calls"
             "notification" -> "Notifications"
-            "note" -> "Projects" // project entries and projects (server core/search.py)
+            "note" -> "Projects" // project entries and projects (server/core/search.py)
             "shopping" -> "Shopping"
             else -> kind.replaceFirstChar { it.uppercase() }
         }

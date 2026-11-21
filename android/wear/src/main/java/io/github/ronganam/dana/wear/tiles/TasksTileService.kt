@@ -19,6 +19,7 @@ import com.google.common.util.concurrent.ListenableFuture
 import io.github.ronganam.dana.wear.data.WearPrefs
 import org.json.JSONArray
 import kotlin.math.sqrt
+import io.github.ronganam.dana.wear.R
 
 class TasksTileService : TileService() {
 
@@ -91,11 +92,11 @@ class TasksTileService : TileService() {
 
         var row = 0
 
-        column.addContent(buildPaddedText("TASKS (${tasks.size})", COLOR_ORANGE, 12f, true, row++, totalRows))
+        column.addContent(buildPaddedText(getString(R.string.tile_tasks_count, tasks.size), COLOR_ORANGE, 12f, true, row++, totalRows))
         column.addContent(Spacer.Builder().setHeight(DimensionBuilders.dp(3f)).build())
 
         if (tasks.isEmpty()) {
-            column.addContent(buildPaddedText("All clear!", COLOR_LIGHT_GRAY, 12f, false, row++, totalRows))
+            column.addContent(buildPaddedText(getString(R.string.tile_all_clear), COLOR_LIGHT_GRAY, 12f, false, row++, totalRows))
         } else {
             var displayed = 0
             for ((group, groupTasks) in visibleGroups) {
@@ -110,7 +111,7 @@ class TasksTileService : TileService() {
             }
             if (tasks.size > MAX_TASKS) {
                 column.addContent(buildPaddedText(
-                    "+${tasks.size - MAX_TASKS} more",
+                    getString(R.string.tile_more, tasks.size - MAX_TASKS),
                     COLOR_LIGHT_GRAY, 10f, false, row++, totalRows
                 ))
             }

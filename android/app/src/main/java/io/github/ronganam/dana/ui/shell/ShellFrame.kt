@@ -204,7 +204,7 @@ internal fun FullFrame(dest: Destination, slots: ShellSlots, titleCell: @Composa
                     Box(Modifier.layoutId("whole")) { dest.list() }
                 } else {
                     Box(Modifier.layoutId("list").background(tint).edgeRule(end = true)) { dest.list() }
-                    Box(Modifier.layoutId("stage")) { dest.stage?.invoke() }
+                    Box(Modifier.layoutId("stage")) { dest.stage() }
                 }
                 Box(Modifier.layoutId("nav").edgeRule(end = true)) { slots.nav() }
                 Box(Modifier.layoutId("strip").edgeRule(bottom = true)) { slots.strip() }

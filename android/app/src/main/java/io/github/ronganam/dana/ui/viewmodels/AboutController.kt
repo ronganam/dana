@@ -4,6 +4,7 @@ import io.github.ronganam.dana.data.models.AboutFact
 import io.github.ronganam.dana.data.models.AboutPage
 import io.github.ronganam.dana.data.models.LearnedPhrase
 import io.github.ronganam.dana.data.models.SelfCheck
+import io.github.ronganam.dana.data.network.UndoOutcome
 import io.github.ronganam.dana.data.network.ApiException
 import io.github.ronganam.dana.data.network.ApiService
 import kotlinx.coroutines.CancellationException
@@ -39,9 +40,9 @@ class AboutController(private val ctx: ControllerContext) {
     fun refresh() {
         ctx.scope.launch {
             _loading.value = true
-            val about = async { ctx.load("About") { ctx.api.getAbout() } }
-            val phrases = async { ctx.load("Shortcuts") { ctx.api.getShortcuts() } }
-            val checks = async { ctx.load("Checks") { ctx.api.getChecks() } }
+            val about = async { ctx.load("About") { ctx.api.about.page() } }
+            val phrases = async { ctx.load("Shortcuts") { ctx.api.about.shortcuts() } }
+            val checks = async { ctx.load("Checks") { ctx.api.about.checks() } }
             val a = about.await()
             if (a != null) _page.value = a
             _failed.value = a == null && _page.value == null
@@ -56,7 +57,7 @@ class AboutController(private val ctx: ControllerContext) {
         val t = text.trim()
         if (t.isEmpty()) return
         ctx.action("Couldn't add that") {
-            val (fact, undoId) = ctx.api.addAboutFact(t, section)
+            val (fact, undoId) = ctx.api.about.addFact(t, section)
             reload()
             if (fact != null) offerUndo("Added", undoId)
             true
@@ -69,7 +70,7 @@ class AboutController(private val ctx: ControllerContext) {
         if (t.isEmpty() || t == fact.text) return
         replaceFact(fact.id) { it.copy(text = t, sourceKind = "edited") }
         ctx.action("Couldn't save the change") {
-            val undoId = ctx.api.updateAboutFact(fact.id, t, null)
+            val undoId = ctx.api.about.updateFact(fact.id, t, null)
             reload()
             offerUndo("Saved", undoId)
             true
@@ -82,7 +83,7 @@ class AboutController(private val ctx: ControllerContext) {
         _page.value = before?.let { p -> p.copy(sections = p.sections.map { s -> s.copy(facts = s.facts.filterNot { it.id == fact.id }) }) }
         ctx.scope.launch {
             try {
-                val undoId = ctx.api.deleteAboutFact(fact.id)
+                val undoId = ctx.api.about.deleteFact(fact.id)
                 offerUndo("Forgot it", undoId)
             } catch (e: CancellationException) {
                 throw e
@@ -99,7 +100,7 @@ class AboutController(private val ctx: ControllerContext) {
         _phrases.value = before.filterNot { it.id == p.id }
         ctx.scope.launch {
             try {
-                if (!ctx.api.deleteShortcut(p.id)) _phrases.value = before
+                if (!ctx.api.about.deleteShortcut(p.id)) _phrases.value = before
                 ctx.messages.post("“${p.phrase}” goes through Dana again")
             } catch (e: CancellationException) {
                 throw e
@@ -114,7 +115,7 @@ class AboutController(private val ctx: ControllerContext) {
     fun ignore(check: SelfCheck) {
         ctx.scope.launch {
             try {
-                val r = ctx.api.ignoreCheck(check.key, 7)
+                val r = ctx.api.about.ignoreCheck(check.key, 7)
                 reloadChecks()
                 offerUndo(r.message.ifBlank { "Ignored for a week" }, r.undoId) { reloadChecks() }
             } catch (e: CancellationException) {
@@ -130,11 +131,11 @@ class AboutController(private val ctx: ControllerContext) {
     }
 
     private suspend fun reload() {
-        ctx.load("About") { ctx.api.getAbout() }?.let { _page.value = it }
+        ctx.load("About") { ctx.api.about.page() }?.let { _page.value = it }
     }
 
     private suspend fun reloadChecks() {
-        ctx.load("Checks") { ctx.api.getChecks() }?.let { _checks.value = it }
+        ctx.load("Checks") { ctx.api.about.checks() }?.let { _checks.value = it }
     }
 
     private fun offerUndo(text: String, undoId: String?, after: suspend () -> Unit = { reload() }) {
@@ -145,9 +146,9 @@ class AboutController(private val ctx: ControllerContext) {
         ctx.messages.postUndoable(text, onUndo = {
             ctx.scope.launch {
                 try {
-                    when (ctx.api.undo(undoId)) {
-                        ApiService.UndoOutcome.DONE -> ctx.messages.post("Undone.")
-                        ApiService.UndoOutcome.TOO_LATE -> ctx.messages.post("Too late to undo that")
+                    when (ctx.api.now.undo(undoId)) {
+                        UndoOutcome.DONE -> ctx.messages.post("Undone.")
+                        UndoOutcome.TOO_LATE -> ctx.messages.post("Too late to undo that")
                     }
                 } catch (e: CancellationException) {
                     throw e

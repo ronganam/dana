@@ -3,6 +3,7 @@ package io.github.ronganam.dana.data.network
 import android.content.Context
 import android.content.SharedPreferences
 import io.github.ronganam.dana.BuildConfig
+import androidx.core.content.edit
 
 /**
  * The Dana server this app talks to and its API token — the one place that
@@ -40,7 +41,7 @@ data class ServerConfig(val url: String, val token: String) {
         /** Save a server and token as typed in a settings screen; returns what was stored. */
         fun save(context: Context, url: String, token: String): ServerConfig {
             val config = ServerConfig(normalize(url), token.trim())
-            prefs(context).edit().putString(KEY_URL, config.url).putString(KEY_TOKEN, config.token).apply()
+            prefs(context).edit { putString(KEY_URL, config.url); putString(KEY_TOKEN, config.token) }
             return config
         }
 

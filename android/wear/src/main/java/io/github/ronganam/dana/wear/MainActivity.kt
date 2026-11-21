@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.wear
 
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -29,6 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import io.github.ronganam.dana.wear.R
+import androidx.compose.ui.res.stringResource
 
 class MainActivity : ComponentActivity() {
 
@@ -47,7 +50,7 @@ class MainActivity : ComponentActivity() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "This is the Dana watch app.\nPlease install it on your watch.",
+                            text = stringResource(R.string.not_a_phone_app),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(16.dp)
                         )
@@ -64,7 +67,7 @@ class MainActivity : ComponentActivity() {
                 checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
             ) add(android.Manifest.permission.POST_NOTIFICATIONS)
         }
-        if (missing.isNotEmpty()) requestPermissions(missing.toTypedArray(), 101)
+        if (missing.isNotEmpty()) permissionRequest.launch(missing.toTypedArray())
 
         WearConfigReceiver.onConfigUpdated = {
             runOnUiThread {
@@ -129,9 +132,9 @@ class MainActivity : ComponentActivity() {
         handledNewIntent = handleIntent(intent)
     }
 
-    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 101 && hasMicPermission()) wearViewModel?.onAppOpened(true)
+    /** The mic (and notifications): once the mic is allowed, the app opens listening as it would have. */
+    private val permissionRequest = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        if (hasMicPermission()) wearViewModel?.onAppOpened(true)
     }
 
     private fun hasMicPermission() =

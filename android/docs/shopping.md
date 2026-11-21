@@ -14,7 +14,7 @@ The shopping list on the phone: Shopping under More in the shell (it takes over 
 | `ShoppingSync.kt` | The one store of the process (shared by the screen, the widget, pushes, the watch bridge, `PendingSyncWorker`) |
 | `ShoppingSnapshot.kt` / `ShoppingWatch.kt` | The widget snapshot's shopping fields (also the watch's) / the watch's `/shopping_action` |
 | `ShoppingShortcut.kt` | The launcher shortcut "Shopping" (dynamic; phone flavor only) |
-| `data/network/Me.kt` | `GET /api/me` cached in `DanaPrefs` (`me_id`, `me_name`, `me_kinds`) |
+| `data/network/Me.kt` | `GET /api/me` cached in `DanaPrefs` (`me_id`, `me_name`, `me_addons`, `me_languages`, `me_currency`) |
 | `ui/viewmodels/ShoppingController.kt` | The place's controller: enabled, the screen, the live stream, add / suggestions, tap-linger, editor, invitations, list switching, share sheet |
 | `ui/screens/shopping/ShoppingParts.kt` | Header, invitation banner, usuals, add field, suggestions, aisle header, row, Bought, empty state, editor and share sheet contents |
 | `ui/shell/destinations/ShoppingDestination.kt` | The place: cover (one column + bottom add dock + sheets) and wide (side: header / invites / usuals / Bought or the editor; stage: aisles + add dock) |
@@ -23,7 +23,7 @@ The shopping list on the phone: Shopping under More in the shell (it takes over 
 
 ## The place
 
-- Shown only when `/api/me` `kinds` has `shopping` (`ShoppingController.enabled`, from the cached `Me` at start, refreshed on start / foreground). A 403 `not_connected` drops the kind. Without it: no nav entry, no shortcut, and a shell on Shopping goes back to Now. The previous (tabbed) layout has no Shopping screen.
+- Shown only when `/api/me` `addons` has `shopping` (`ShoppingController.enabled`, from the cached `Me` at start, refreshed on start / foreground). A 403 `not_connected` drops the add-on it names (`addon`). Without it: no nav entry, no shortcut, and a shell on Shopping goes back to Now. The previous (tabbed) layout has no Shopping screen.
 - Nav label "Shopping" + the count to buy of the active list. Route `"shopping"` (`EXTRA_OPEN_SCREEN`) from the launcher shortcut, the widget header, a shopping search result and the invitation notification (tag `shopping-invite-…`).
 - Keeps the screen on while visible (`view.keepScreenOn`).
 - **Touch**: tap a row = tick (light haptic); the row stays a moment (`LINGER_MS` 900, ticked look), then moves to Bought; the snackbar has Undo (`POST /api/undo/{id}` with the write's `undo.id`). Swipe either way = remove with Undo. Long press or the pencil = the editor sheet (name, quantity −/+, note, aisle chips, Remove); it saves on close, a 409 `duplicate` stays in the sheet ("Pita is already on the list."), and closing again with the refusal standing discards the change. **One column**: the check sits at the start and the pencil at the end, and every name, quantity chip and note starts next to the check whatever its language (an absolute `TextAlign` from the layout direction); each text still runs in its own direction (`byScript`), so Hebrew reads right to left inside its line. The same in Bought; only the editor's fields take their text's direction.
@@ -72,4 +72,4 @@ A tick from the watch: `/shopping_action {action: "check" \| "uncheck", id, list
 
 - Android's regex engine (ICU) rejects the inline `(?U)` flag: the text rules use `[\s\p{Z}]` and `\p{Nd}` (`ShoppingModelTest` guards it). A `PatternSyntaxException` there crashed the place on open.
 - `rememberSwipeToDismissBoxState` is saveable: a row that comes back (Undo of a swipe) would restore as dismissed and be removed again. `confirmValueChange` calls `onRemove` once and returns false.
-- Tests: `app/src/test/.../shopping/` (`ShoppingModelTest`, `ShoppingOpsTest`, `ShoppingStoreTest` with a scripted server, `ShoppingSnapshotTest`) (`ShoppingWatchTest` for the watch's requests) against `app/src/test/resources/shopping_web.json`, a copy of the server's `test_fixtures/shopping_web.json`: copy it again when the server's payloads change.
+- Tests: `app/src/test/.../shopping/` (`ShoppingModelTest`, `ShoppingOpsTest`, `ShoppingStoreTest` with a scripted server, `ShoppingSnapshotTest`) (`ShoppingWatchTest` for the watch's requests) against the server's own `server/tests/fixtures/shopping_web.json` (read from there, never copied; a server change that breaks the app fails these tests).

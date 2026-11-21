@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.reminders
 
+import io.github.ronganam.dana.data.models.Triggers
+import io.github.ronganam.dana.data.network.ApiJson
 import io.github.ronganam.dana.data.models.Task
 import io.github.ronganam.dana.data.models.TaskGroup
 import io.github.ronganam.dana.ui.screens.reminders.Bucket
@@ -26,6 +28,9 @@ class ReminderModelTest {
     private val now = LocalDateTime.of(2026, 11, 14, 18, 40)
 
     private fun task(id: String, triggers: String? = null, due: String? = null, group: String? = null, status: String = "needs_action") =
+        task(id, Triggers.of(triggers?.let { ApiJson.parseToJsonElement(it) }), due, group, status)
+
+    private fun task(id: String, triggers: Triggers, due: String? = null, group: String? = null, status: String = "needs_action") =
         Task(id, "Task $id", null, "medium", due, status, triggers, null, null, groupId = group)
 
     @Test
@@ -71,11 +76,13 @@ class ReminderModelTest {
     @Test
     fun triggersRoundTrip() {
         val w = RemindWhen.At(LocalDateTime.of(2026, 11, 14, 21, 0))
-        assertEquals("2026-11-14T21:00:00", w.toTriggers().getString("time"))
-        val t = task("a", RemindWhen.Place("Home", leave = true).toTriggers().toString())
-        assertEquals(RemindWhen.Place("Home", leave = true), remindWhen(t))
-        assertEquals(RemindWhen.Wake, remindWhen(task("b", RemindWhen.Wake.toTriggers().toString())))
-        assertEquals(RemindWhen.None, remindWhen(task("c", RemindWhen.None.toTriggers().toString())))
+        assertEquals("2026-11-14T21:00:00", w.toTriggers().time)
+        val wire = ApiJson.encodeToString(Triggers.serializer(), RemindWhen.Place("Home", leave = true).toTriggers())
+        assertEquals("""{"location":{"location":"Home","event":"leave"}}""", wire)
+        assertEquals(RemindWhen.Place("Home", leave = true), remindWhen(task("a", wire)))
+        assertEquals(RemindWhen.Wake, remindWhen(task("b", RemindWhen.Wake.toTriggers())))
+        assertEquals("{}", ApiJson.encodeToString(Triggers.serializer(), RemindWhen.None.toTriggers()))
+        assertEquals(RemindWhen.None, remindWhen(task("c", RemindWhen.None.toTriggers())))
     }
 
     @Test

@@ -1,11 +1,51 @@
 <resources>
     <string name="app_name">Dana</string>
-    <string name="server_url_hint">Server URL (e.g. https://dana.example.com)</string>
-    <string name="api_token_hint">API Token (Optional)</string>
-    <string name="save_settings">Save Settings</string>
-    <string name="set_default_assistant">Set Default Assistant</string>
-    <string name="listening_text">Listening...</string>
-    <string name="processing_text">Processing...</string>
-    <string name="approve">Approve</string>
-    <string name="deny">Deny</string>
+    <string name="label_notification_inbox">Dana notification inbox</string>
+
+    <!-- Notification channels (Settings → Notifications) -->
+    <string name="channel_call_recordings">Call recordings</string>
+    <string name="channel_call_recordings_description">Handles call recording detection and upload progress</string>
+    <string name="channel_urgent">Urgent notifications</string>
+    <string name="channel_urgent_description">Phone notifications Dana thinks you shouldn\'t miss</string>
+    <string name="channel_urgent_quiet">Urgent notifications (screen open)</string>
+    <string name="channel_urgent_quiet_description">Kept while the alert screen is showing (the screen rings itself)</string>
+    <string name="channel_suggestions">Suggestions to review</string>
+    <string name="channel_suggestions_description">Reminders and events Dana suggests after a call or a message</string>
+    <string name="channel_suggestions_quiet">Suggestions to review (screen open)</string>
+    <string name="channel_suggestions_quiet_description">Kept while the review screen is already showing</string>
+    <string name="channel_reminders">Reminders &amp; Alarms</string>
+    <string name="channel_reminders_description">Used for urgent task reminders and alarms</string>
+    <string name="channel_reminders_quiet">Reminders (screen open)</string>
+    <string name="channel_reminders_quiet_description">Kept while the reminder screen is showing (the screen rings itself)</string>
+    <string name="channel_snoozed">Snoozed notifications</string>
+    <string name="channel_snoozed_description">A notification you snoozed in Dana is back</string>
+    <string name="channel_sessions_live">Coding sessions (live)</string>
+    <string name="channel_sessions_live_description">Claude Code and Codex sessions while they run</string>
+    <string name="channel_sessions_alert">Coding sessions (finished / needs you)</string>
+    <string name="channel_sessions_alert_description">A coding session finished, failed or is waiting for you</string>
+    <string name="channel_briefing">Morning briefing</string>
+    <string name="channel_people">Before you meet someone</string>
+    <string name="channel_review">Weekly review</string>
+    <string name="channel_messages">Messages from Dana</string>
+    <string name="channel_important">Important (from Dana)</string>
+    <string name="channel_digest">Notification digest</string>
+
+    <!-- Toasts -->
+    <string name="toast_couldnt_open_app">Couldn\'t open %1$s</string>
+    <string name="toast_couldnt_dismiss">Couldn\'t dismiss: %1$s</string>
+    <string name="server_unreachable">server unreachable</string>
+    <string name="toast_snoozing">Snoozing · %1$s</string>
+    <string name="toast_session_id_copied">Session ID copied!</string>
+    <string name="toast_copied_to_clipboard">Copied to clipboard</string>
+    <string name="toast_copied">Copied</string>
+    <string name="toast_settings_saved">Settings Saved</string>
+    <string name="toast_couldnt_open_settings">Could not open settings</string>
+    <string name="toast_couldnt_launch_installer">Could not launch installer</string>
+    <string name="toast_download_failed">Download failed — try again</string>
+    <string name="toast_needs_audio_access">Dana needs access to audio files to see call recordings</string>
+    <string name="toast_nothing_new_to_upload">Nothing new to upload</string>
+    <plurals name="toast_uploading_recordings">
+        <item quantity="one">Uploading %d recordings in the background</item>
+        <item quantity="other">Uploading %d recordings in the background</item>
+    </plurals>
 </resources>

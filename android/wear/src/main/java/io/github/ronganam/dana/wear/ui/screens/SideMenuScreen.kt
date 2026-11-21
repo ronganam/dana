@@ -29,6 +29,8 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.*
 import io.github.ronganam.dana.wear.ui.WearViewModel
+import io.github.ronganam.dana.wear.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalWearFoundationApi::class)
 @Composable
@@ -56,7 +58,7 @@ fun SideMenuScreen(
         ) {
         item {
             Text(
-                text = "Dana",
+                text = stringResource(R.string.app_name),
                 style = MaterialTheme.typography.caption1,
                 color = MaterialTheme.colors.secondary
             )
@@ -69,7 +71,7 @@ fun SideMenuScreen(
                     viewModel.showThread()
                     onSessionSelected()
                 },
-                label = { Text("Latest in the thread", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                label = { Text(stringResource(R.string.latest_in_thread), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 icon = { Icon(Icons.AutoMirrored.Filled.Chat, contentDescription = null) },
                 colors = ChipDefaults.primaryChipColors(),
                 modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
@@ -82,7 +84,7 @@ fun SideMenuScreen(
                     viewModel.startNewChat()
                     onSessionSelected()
                 },
-                label = { Text("Clear the screen", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                label = { Text(stringResource(R.string.clear_the_screen), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
                 colors = ChipDefaults.secondaryChipColors(),
                 modifier = Modifier.fillMaxWidth()
@@ -95,7 +97,7 @@ fun SideMenuScreen(
                 onClick = {
                     context.startActivity(Intent(context, ShoppingActivity::class.java))
                 },
-                label = { Text("Shopping", maxLines = 1) },
+                label = { Text(stringResource(R.string.label_shopping), maxLines = 1) },
                 icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) },
                 colors = ChipDefaults.secondaryChipColors(),
                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
@@ -106,8 +108,8 @@ fun SideMenuScreen(
             Spacer(modifier = Modifier.height(6.dp))
             Chip(
                 onClick = onNavigateToSettings,
-                label = { Text("Settings & Sync", maxLines = 1) },
-                icon = { Icon(Icons.Default.Settings, contentDescription = "Settings") },
+                label = { Text(stringResource(R.string.settings_and_sync), maxLines = 1) },
+                icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings)) },
                 colors = ChipDefaults.secondaryChipColors(),
                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
             )

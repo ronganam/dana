@@ -10,7 +10,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import io.github.ronganam.dana.data.network.ApiException
 import io.github.ronganam.dana.data.network.Me
 import io.github.ronganam.dana.data.shopping.ShoppingItem
-import io.github.ronganam.dana.data.shopping.ShoppingJson
+import io.github.ronganam.dana.data.shopping.ShoppingAnswer
+import io.github.ronganam.dana.data.shopping.ShoppingEvent
+import io.github.ronganam.dana.data.shopping.WriteAnswer
 import io.github.ronganam.dana.data.shopping.ShoppingOp
 import io.github.ronganam.dana.data.shopping.ShoppingOps
 import io.github.ronganam.dana.data.shopping.ShoppingScreen
@@ -33,9 +35,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import java.io.IOException
-import java.net.URLEncoder
 
 /**
  * The Shopping screen (server repo `docs/shopping.md`; phone side
@@ -51,7 +51,7 @@ import java.net.URLEncoder
 class ShoppingController(private val ctx: ControllerContext, private val appContext: Context) {
     private val store: ShoppingStore = ShoppingSync.get(appContext)
 
-    private val _enabled = MutableStateFlow(Me.cached(appContext)?.has(KIND) == true)
+    private val _enabled = MutableStateFlow(Me.cached(appContext)?.has(ADDON) == true)
     /** The user has the `shopping` integration (`/api/me`): the place, its count and the shortcut. */
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
 
@@ -125,8 +125,8 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
             // Someone else now (another token or server): the kept list and its queue were theirs.
             if (before != null && before != info.id) forgetAccount()
             me = Who(info.id, info.name)
-            setEnabled(info.has(KIND))
-            if (info.has(KIND)) refresh()
+            setEnabled(info.has(ADDON))
+            if (info.has(ADDON)) refresh()
         }
     }
 
@@ -159,17 +159,17 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
         ctx.scope.launch {
             val looking = _viewing.value
             if (looking != null) {
-                val (code, json) = call("GET", "/api/shopping?list=${enc(looking.list.id)}")
+                val answer = ctx.api.shopping.screen(looking.list.id)
                 when {
-                    code in 200..299 -> json?.let(ShoppingJson::screen)?.let { _viewing.value = it }
-                    code == 404 -> backToActive()
+                    answer.ok -> answer.value?.let { _viewing.value = it }
+                    answer.code == 404 -> backToActive()
                 }
                 return@launch
             }
             val (code, body) = store.refresh()
             _failed.value = code == -1
-            if (code == 403 && body?.optString("error") == "not_connected") {
-                Me.drop(appContext, KIND)
+            if (code == 403 && body?.error == "not_connected") {
+                Me.drop(appContext, ADDON)
                 setEnabled(false)
             }
             if (code in 200..299) checkShareable()
@@ -190,7 +190,7 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
             while (isActive) {
                 val following = _viewing.value?.list?.id
                 try {
-                    ctx.api.shoppingEvents(following) { event, data -> onEvent(event, data) }
+                    ctx.api.shopping.events(following, ::onEvent)
                     backoff = 1_000L
                 } catch (e: CancellationException) {
                     throw e
@@ -217,12 +217,12 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
         if (liveJob?.isActive == true) { stopLive(); startLive() }
     }
 
-    private fun onEvent(event: String, data: JSONObject) {
-        when (event) {
+    private fun onEvent(event: ShoppingEvent) {
+        when (event.type) {
             "changed" -> {
                 val held = _viewing.value ?: store.state.value.server
-                val version = data.optLong("version")
-                when (ShoppingOps.onChanged(data.optString("list_id"), version, held, if (store.busy) 1 else 0)) {
+                val version = event.version
+                when (ShoppingOps.onChanged(event.listId, version, held, if (store.busy) 1 else 0)) {
                     ShoppingOps.Reload.NOW -> refresh()
                     ShoppingOps.Reload.LATER -> ctx.scope.launch {
                         // After the own writes land: their answers may already carry this version.
@@ -254,8 +254,8 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
         if (q.isEmpty() || screen.value?.list?.canEdit != true) { _suggestions.value = emptyList(); return }
         suggestJob = ctx.scope.launch {
             delay(180)
-            val (code, json) = call("GET", "/api/shopping/suggestions?q=${enc(q)}${listQuery()}")
-            _suggestions.value = if (code in 200..299 && json != null) ShoppingJson.usuals(json)
+            val answer = ctx.api.shopping.suggestions(q, listParam())
+            _suggestions.value = if (answer.ok && answer.value != null) answer.value
             else {
                 // Offline: the usuals the kept list knows.
                 val key = ShoppingText.nameKey(q)
@@ -391,9 +391,9 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
     /** `POST /api/undo/{id}`, then the list is read again. */
     fun undo(undoId: String) {
         ctx.scope.launch {
-            val (code, json) = call("POST", "/api/undo/${enc(undoId)}")
-            val (ok, text) = ShoppingView.undoText(code, json)
-            if (!ok) ctx.messages.post(if (code == -1) "Couldn't undo: the server can't be reached." else text)
+            val answer = ctx.api.shopping.undo(undoId)
+            val (ok, text) = ShoppingView.undoText(answer.code, answer.refusal)
+            if (!ok) ctx.messages.post(if (answer.code == -1) "Couldn't undo: the server can't be reached." else text)
             refresh()
         }
     }
@@ -452,8 +452,7 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
     fun answerInvite(inviteListId: String, action: String, moveItems: Boolean) {
         _inviteUi.value = _inviteUi.value + (inviteListId to "busy")
         ctx.scope.launch {
-            val body = JSONObject().put("action", action).apply { if (action == "use") put("move_items", moveItems) }
-            screenWrite("POST", "/api/shopping/invites/${enc(inviteListId)}", body)
+            screenWrite { ctx.api.shopping.answerInvite(inviteListId, action, moveItems) }
             _inviteUi.value = _inviteUi.value - inviteListId
         }
     }
@@ -461,9 +460,9 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
     /** "Look at it" (a read-only invitation, a view-only list in the menu): shown with `?list=`. */
     fun lookAt(id: String) {
         ctx.scope.launch {
-            val (code, json) = call("GET", "/api/shopping?list=${enc(id)}")
-            val s = json?.takeIf { code in 200..299 }?.let(ShoppingJson::screen)
-            if (s == null) { ctx.messages.post(ShoppingView.errorText(code, json)); return@launch }
+            val answer = ctx.api.shopping.screen(id)
+            val s = answer.value
+            if (s == null) { ctx.messages.post(ShoppingView.errorText(answer.code, answer.refusal)); return@launch }
             _viewing.value = s
             _editor.value = null
             restartLive()
@@ -483,30 +482,29 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
         if (_viewing.value == null && id == screen.value?.list?.id) return
         ctx.scope.launch {
             _viewing.value = null
-            screenWrite("PUT", "/api/shopping/active", JSONObject().put("list_id", id))
+            screenWrite { ctx.api.shopping.setActive(id) }
             restartLive()
         }
     }
 
     /** A write answered with a screen (invitations, switching lists): keep it and offer its Undo. */
-    private suspend fun screenWrite(method: String, path: String, body: JSONObject) {
-        val (code, text) = try {
-            ctx.api.jsonCall(method, path, body)
+    private suspend fun screenWrite(write: suspend () -> ShoppingAnswer<WriteAnswer>) {
+        val result = try {
+            write()
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
             ctx.messages.post("You're offline — nothing was changed.")
             return
         }
-        val json = runCatching { JSONObject(text) }.getOrNull()
-        if (code !in 200..299 || json == null) {
-            ctx.messages.post(ShoppingView.errorText(code, json))
+        if (!result.ok) {
+            ctx.messages.post(ShoppingView.errorText(result.code, result.refusal))
             refresh()
             return
         }
-        val answer = ShoppingJson.answer(json)
+        val answer = result.value
         if (answer != null) {
-            store.accept(answer.screen, text)
+            store.accept(answer.screen, result.raw)
             answer.undo?.let { u -> ctx.messages.postUndoable(ShoppingView.undoLabel(u.label), onUndo = { undo(u.id) }) }
         }
         refresh()
@@ -518,9 +516,9 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
         val s = store.state.value.server ?: return
         if (!s.list.isOwner || _shareable.value?.first == s.list.id) return
         ctx.scope.launch {
-            val (code, json) = call("GET", "/api/sharing/shopping_list/${enc(s.list.id)}")
-            if (code in 200..299 && json != null) {
-                val model = ShoppingView.share(ShoppingJson.share(json))
+            val answer = ctx.api.shopping.share(s.list.id)
+            if (answer.ok && answer.value != null) {
+                val model = ShoppingView.share(answer.value)
                 _shareable.value = s.list.id to (model.people.isNotEmpty() || model.others.isNotEmpty())
             }
         }
@@ -530,9 +528,9 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
         val id = screen.value?.list?.takeIf { it.isOwner }?.id ?: return
         _share.value = Share(null)
         ctx.scope.launch {
-            val (code, json) = call("GET", "/api/sharing/shopping_list/${enc(id)}")
-            _share.value = if (code in 200..299 && json != null) Share(ShoppingView.share(ShoppingJson.share(json)))
-            else Share(null, ShoppingView.errorText(code, json))
+            val answer = ctx.api.shopping.share(id)
+            _share.value = if (answer.ok && answer.value != null) Share(ShoppingView.share(answer.value))
+            else Share(null, ShoppingView.errorText(answer.code, answer.refusal))
         }
     }
 
@@ -542,9 +540,9 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
         val current = _share.value ?: return
         _share.value = current.copy(busy = true, error = null)
         ctx.scope.launch {
-            val (code, json) = call("PUT", "/api/sharing/shopping_list/${enc(id)}", JSONObject().put("user_id", userId).put("level", level))
-            _share.value = if (code in 200..299 && json != null) Share(ShoppingView.share(ShoppingJson.share(json)))
-            else current.copy(busy = false, error = ShoppingView.errorText(code, json))
+            val answer = ctx.api.shopping.setShare(id, userId, level)
+            _share.value = if (answer.ok && answer.value != null) Share(ShoppingView.share(answer.value))
+            else current.copy(busy = false, error = ShoppingView.errorText(answer.code, answer.refusal))
             refresh()
         }
     }
@@ -553,23 +551,12 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
 
     // ---------- helpers ----------
 
-    private fun listQuery(): String = _viewing.value?.list?.id?.let { "&list=${enc(it)}" } ?: listId.takeIf { it.isNotEmpty() }?.let { "&list=${enc(it)}" }.orEmpty()
-
-    /** A request whose answer is JSON: status (-1 unreachable) and the parsed body. */
-    private suspend fun call(method: String, path: String, body: JSONObject? = null): Pair<Int, JSONObject?> = try {
-        val (code, text) = ctx.api.jsonCall(method, path, body)
-        code to runCatching { JSONObject(text) }.getOrNull()
-    } catch (e: CancellationException) {
-        throw e
-    } catch (e: Exception) {
-        -1 to null
-    }
-
-    private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")
+    /** The list a suggestion is for: the one looked at, else the active one ([listId]); null = the server's active list. */
+    private fun listParam(): String? = _viewing.value?.list?.id ?: listId.takeIf { it.isNotEmpty() }
 
     companion object {
         private const val TAG = "Shopping"
-        const val KIND = "shopping"
+        const val ADDON = "shopping"
         /** A ticked row stays in its aisle this long (a second tap puts it back), then moves to Bought. */
         const val LINGER_MS = 900L
     }

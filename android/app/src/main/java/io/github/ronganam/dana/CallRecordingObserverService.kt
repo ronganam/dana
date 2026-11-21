@@ -16,6 +16,7 @@ import io.github.ronganam.dana.data.sync.CallUploads
 import io.github.ronganam.dana.data.sync.CallUploadSettings
 import io.github.ronganam.dana.data.sync.RecordingInspector
 import java.io.File
+import io.github.ronganam.dana.R
 
 class CallRecordingObserverService : Service() {
 
@@ -51,11 +52,7 @@ class CallRecordingObserverService : Service() {
             }
             val intent = Intent(context, CallRecordingObserverService::class.java)
             try {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    context.startForegroundService(intent)
-                } else {
-                    context.startService(intent)
-                }
+                context.startForegroundService(intent)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start CallRecordingObserverService", e)
             }
@@ -119,11 +116,7 @@ class CallRecordingObserverService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun startForegroundService() {
-        val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
 
         val rescanIntent = Intent(this, CallRecordingObserverService::class.java).apply {
             action = RESCAN_ACTION
@@ -158,19 +151,26 @@ class CallRecordingObserverService : Service() {
         }
 
         Log.i(TAG, "Starting to watch directory: $RECORDINGS_DIR")
-        
         // Watch for CLOSE_WRITE because it's only triggered when a file is fully written and closed.
-        fileObserver = object : FileObserver(directory, CLOSE_WRITE) {
-            override fun onEvent(event: Int, fileName: String?) {
-                if (fileName != null) {
-                    Log.i(TAG, "File event detected: $fileName, event: $event")
-                    val fullFile = File(directory, fileName)
-                    handleNewFile(fullFile)
-                }
-            }
+        fileObserver = recordingsObserver(directory) { fileName, event ->
+            Log.i(TAG, "File event detected: $fileName, event: $event")
+            handleNewFile(File(directory, fileName))
         }
         fileObserver?.startWatching()
     }
+
+    /** A CLOSE_WRITE observer of [directory] (the File constructor is Android 10+; older phones take the path). */
+    private fun recordingsObserver(directory: File, onWritten: (String, Int) -> Unit): FileObserver =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            object : FileObserver(directory, CLOSE_WRITE) {
+                override fun onEvent(event: Int, fileName: String?) { if (fileName != null) onWritten(fileName, event) }
+            }
+        } else {
+            @Suppress("DEPRECATION")
+            object : FileObserver(directory.path, CLOSE_WRITE) {
+                override fun onEvent(event: Int, fileName: String?) { if (fileName != null) onWritten(fileName, event) }
+            }
+        }
 
     private val inspector = java.util.concurrent.Executors.newSingleThreadExecutor()
 
@@ -236,16 +236,12 @@ class CallRecordingObserverService : Service() {
         if (!filename.startsWith("Call") || !filename.endsWith(".m4a")) {
             return null
         }
-        
         // Strip "Call" prefix and extension
         val nameAndDateTime = filename.substring(4, filename.length - 4).trim()
-        
         val parts = nameAndDateTime.split("_")
         if (parts.size < 3) return null
-        
         val timePart = parts.last()
         val datePart = parts[parts.size - 2]
-        
         val rawName = parts.subList(0, parts.size - 2).joinToString("_")
         val cleanName = rawName
             .replace("\u200e", "")
@@ -261,11 +257,9 @@ class CallRecordingObserverService : Service() {
         val year = "20" + datePart.substring(0, 2)
         val month = datePart.substring(2, 4)
         val day = datePart.substring(4, 6)
-        
         val hour = timePart.substring(0, 2)
         val minute = timePart.substring(2, 4)
         val second = timePart.substring(4, 6)
-        
         val isoTimestamp = "$year-$month-${day}T$hour:$minute:$second"
         
         return CallInfo(cleanName, isoTimestamp)
@@ -278,12 +272,7 @@ class CallRecordingObserverService : Service() {
             putExtra(EXTRA_CONTACT_NAME, contactName)
             putExtra(EXTRA_TIMESTAMP, timestamp)
         }
-        
-        val pendingFlags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        } else {
-            PendingIntent.FLAG_UPDATE_CURRENT
-        }
+        val pendingFlags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         
         val uploadPendingIntent = PendingIntent.getService(
             this,
@@ -291,7 +280,6 @@ class CallRecordingObserverService : Service() {
             uploadIntent,
             pendingFlags
         )
-        
         val notificationId = file.name.hashCode()
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
@@ -305,7 +293,6 @@ class CallRecordingObserverService : Service() {
             )
             .setAutoCancel(true)
             .build()
-            
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(notificationId, notification)
     }
@@ -336,17 +323,15 @@ class CallRecordingObserverService : Service() {
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Call recordings",
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Handles call recording detection and upload progress"
-            }
-            val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            manager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            getString(R.string.channel_call_recordings),
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = getString(R.string.channel_call_recordings_description)
         }
+        val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        manager.createNotificationChannel(channel)
     }
 
     override fun onDestroy() {

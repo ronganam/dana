@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 import io.github.ronganam.dana.data.network.ApiService
+import io.github.ronganam.dana.data.network.ChatApi
 import io.github.ronganam.dana.ui.viewmodels.ChatController
 import io.github.ronganam.dana.ui.viewmodels.ControllerContext
 import io.github.ronganam.dana.ui.viewmodels.UserMessages
@@ -142,7 +143,7 @@ class ChatControllerStreamTest {
     private fun sse(vararg events: JSONObject): String =
         events.joinToString("") { ev -> (if (ev.has("seq")) "id: ${ev.getInt("seq")}\n" else "") + "data: $ev\n\n" }
 
-    /** Stamp events with run_id + consecutive seq, like core/runs.py does. */
+    /** Stamp events with run_id + consecutive seq, like server/core/runs.py does. */
     private fun runEvents(runId: String, startSeq: Int, vararg events: JSONObject): Array<JSONObject> =
         events.mapIndexed { i, e -> e.put("run_id", runId).put("seq", startSeq + i) }.toTypedArray()
 
@@ -199,6 +200,29 @@ class ChatControllerStreamTest {
         assertEquals("Need to add a task.", thoughts.reasoning)
         assertTrue("reasoning sits above the tool card", messages.indexOf(thoughts) < messages.indexOfFirst { it.toolCall != null })
         assertEquals("one answer bubble, built from deltas", 1, messages.count { it.message == "Added milk." })
+        assertFalse(messages.any { it.isThinking || it.isStreaming })
+        assertEquals("", chat.chatStatusText.value)
+    }
+
+    /**
+     * The server's own stream (`server/tests/fixtures/golden.sse`, captured by
+     * its run stream test): reasoning, two tools run side by side, the
+     * streamed answer, `run_end` and the closing `state`.
+     */
+    @Test
+    fun theServersGoldenStreamRenders() {
+        val golden = javaClass.classLoader!!.getResource("golden.sse")!!.readText()
+        messageResponse = MockResponse().setHeader("Content-Type", "text/event-stream").setBody(golden)
+
+        assertTrue(chat.sendChatMessage("look up a and b"))
+        waitUntil(what = "stream to finish") { !chat.isStreaming.value && chat.chatMessages.value.any { it.message == "Both lookups done." } }
+
+        val messages = chat.chatMessages.value
+        assertEquals("look up a and b", messages.first().message)
+        val tools = messages.mapNotNull { it.toolCall }
+        assertEquals(listOf("zz_slow_lookup", "zz_slow_lookup"), tools.map { it.toolName })
+        assertTrue(tools.none { it.isRunning || it.isPreparing })
+        assertEquals("one answer bubble", 1, messages.count { it.message == "Both lookups done." })
         assertFalse(messages.any { it.isThinking || it.isStreaming })
         assertEquals("", chat.chatStatusText.value)
     }
@@ -587,15 +611,15 @@ class ChatControllerStreamTest {
     @Test
     fun parsesServerTimestamps() {
         // SQLite CURRENT_TIMESTAMP (UTC, no zone)
-        assertEquals(1_700_000_000_000L, ChatController.parseServerTimestamp("2023-11-14 22:13:20"))
+        assertEquals(1_700_000_000_000L, ChatApi.parseServerTimestamp("2023-11-14 22:13:20"))
         // ISO with micros and offset
-        assertEquals(1_700_000_000_000L, ChatController.parseServerTimestamp("2023-11-15T00:13:20.123456+02:00"))
-        assertEquals(1_700_000_000_000L, ChatController.parseServerTimestamp("2023-11-14T22:13:20Z"))
-        assertEquals(1_700_000_000_000L, ChatController.parseServerTimestamp("1700000000"))
-        assertEquals(null, ChatController.parseServerTimestamp(""))
-        assertEquals(null, ChatController.parseServerTimestamp("null"))
-        assertEquals(null, ChatController.parseServerTimestamp("yesterday"))
-        assertNotNull(ChatController.parseServerTimestamp("2025-01-02T03:04"))
+        assertEquals(1_700_000_000_000L, ChatApi.parseServerTimestamp("2023-11-15T00:13:20.123456+02:00"))
+        assertEquals(1_700_000_000_000L, ChatApi.parseServerTimestamp("2023-11-14T22:13:20Z"))
+        assertEquals(1_700_000_000_000L, ChatApi.parseServerTimestamp("1700000000"))
+        assertEquals(null, ChatApi.parseServerTimestamp(""))
+        assertEquals(null, ChatApi.parseServerTimestamp("null"))
+        assertEquals(null, ChatApi.parseServerTimestamp("yesterday"))
+        assertNotNull(ChatApi.parseServerTimestamp("2025-01-02T03:04"))
     }
 
     // --- Fakes ---------------------------------------------------------------

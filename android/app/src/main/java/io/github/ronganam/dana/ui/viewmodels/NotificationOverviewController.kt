@@ -6,6 +6,7 @@ import io.github.ronganam.dana.data.models.NotificationsOverview
 import io.github.ronganam.dana.data.models.OverviewApp
 import io.github.ronganam.dana.data.models.PhoneNotification
 import io.github.ronganam.dana.data.models.RuleSuggestion
+import io.github.ronganam.dana.data.network.UndoOutcome
 import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.notifications.DanaNotificationListener
 import io.github.ronganam.dana.data.notifications.NotificationSettings
@@ -79,7 +80,7 @@ class NotificationOverviewController(
         ctx.scope.launch {
             _loading.value = true
             try {
-                val o = ctx.load("NotificationsOverview") { ctx.api.getNotificationsOverview() }
+                val o = ctx.load("NotificationsOverview") { ctx.api.notifications.overview() }
                 if (o != null) {
                     _overview.value = o
                     _failed.value = false
@@ -104,7 +105,7 @@ class NotificationOverviewController(
         recheck = ctx.scope.launch {
             repeat(3) {
                 delay(4_000)
-                val o = ctx.load("NotificationsOverview") { ctx.api.getNotificationsOverview() } ?: return@launch
+                val o = ctx.load("NotificationsOverview") { ctx.api.notifications.overview() } ?: return@launch
                 _overview.value = o
                 if (!o.summariesRefreshing) return@launch
             }
@@ -113,7 +114,7 @@ class NotificationOverviewController(
 
     fun fetchApp(packageName: String) {
         ctx.scope.launch {
-            ctx.load("AppNotifications") { ctx.api.getAppNotifications(packageName) }?.let {
+            ctx.load("AppNotifications") { ctx.api.notifications.forApp(packageName) }?.let {
                 _appItems.value = _appItems.value + (packageName to it)
             }
         }
@@ -146,7 +147,7 @@ class NotificationOverviewController(
         val o = _overview.value
         if (o == null) {
             // Not loaded yet (Now's "Clear noise" right after start): let the server count.
-            clear("Couldn't clear the noise", { "${it.message} · on the phone too" }) { ctx.api.clearNotifications(bucket = "dismiss") }
+            clear("Couldn't clear the noise", { "${it.message} · on the phone too" }) { ctx.api.notifications.clear(bucket = "dismiss") }
             return
         }
         val n = o.counts.noise
@@ -157,7 +158,7 @@ class NotificationOverviewController(
         val quietPkgs = o.quietApps.map { it.packageName }.toSet()
         _overview.value = OverviewMath.withoutNoise(o)
         _appItems.value = _appItems.value.mapValues { (pkg, list) -> if (pkg in quietPkgs) emptyList() else list.filterNot { it.bucket == "dismiss" } }
-        clear("Couldn't clear the noise", { "Cleared $n · on the phone too" }) { ctx.api.clearNotifications(bucket = "dismiss") }
+        clear("Couldn't clear the noise", { "Cleared $n · on the phone too" }) { ctx.api.notifications.clear(bucket = "dismiss") }
     }
 
     /** "Clear" on an app: everything waiting from it. */
@@ -166,13 +167,13 @@ class NotificationOverviewController(
         if (app.count == 0) return
         _overview.value = OverviewMath.withoutApp(o, app.packageName)
         _appItems.value = _appItems.value + (app.packageName to emptyList())
-        clear("Couldn't clear ${app.app}", { "Cleared ${app.count} from ${app.app}" }) { ctx.api.clearNotifications(packageName = app.packageName) }
+        clear("Couldn't clear ${app.app}", { "Cleared ${app.count} from ${app.app}" }) { ctx.api.notifications.clear(packageName = app.packageName) }
     }
 
     /** "Clear" on one notification. */
     fun clearOne(n: PhoneNotification) {
         dropLocally(n)
-        clear("Couldn't clear it", { "Cleared" }) { ctx.api.clearNotifications(ids = listOf(n.id)) }
+        clear("Couldn't clear it", { "Cleared" }) { ctx.api.notifications.clear(ids = listOf(n.id)) }
         cancelAlert(n.id)
     }
 
@@ -194,7 +195,7 @@ class NotificationOverviewController(
         dropLocally(n)
         ctx.scope.launch {
             try {
-                DanaNotificationListener.cancel(ctx.api.clearNotifications(ids = listOf(n.id)).cancelKeys)
+                DanaNotificationListener.cancel(ctx.api.notifications.clear(ids = listOf(n.id)).cancelKeys)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -233,7 +234,7 @@ class NotificationOverviewController(
     private fun undo(undoId: String) {
         ctx.scope.launch {
             try {
-                if (ctx.api.undo(undoId) == ApiService.UndoOutcome.TOO_LATE) ctx.messages.post("Too late to undo that")
+                if (ctx.api.now.undo(undoId) == UndoOutcome.TOO_LATE) ctx.messages.post("Too late to undo that")
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -277,7 +278,7 @@ class NotificationOverviewController(
                     AppRule.NORMAL -> "Dana decides for ${app.app}"
                     AppRule.QUIET -> "${app.app} will stay quiet"
                 }
-                val r = ctx.api.changeNotificationRule(app.packageName, rule.serverAction)
+                val r = ctx.api.notifications.changeRule(app.packageName, rule.serverAction)
                 val message = r.message.takeIf { it.isNotBlank() && it != "Done" } ?: text
                 val undoId = r.undoId
                 if (undoId != null) ctx.messages.postUndoable(message, onUndo = { undo(undoId) }) else ctx.messages.post(message)
@@ -300,7 +301,7 @@ class NotificationOverviewController(
         }
         ctx.scope.launch {
             try {
-                val r = ctx.api.answerRuleSuggestion(s.packageName, accept)
+                val r = ctx.api.notifications.answerRuleSuggestion(s.packageName, accept)
                 val undoId = r.undoId
                 if (undoId != null) ctx.messages.postUndoable(r.message, onUndo = { undo(undoId) }) else ctx.messages.post(r.message)
             } catch (e: CancellationException) {

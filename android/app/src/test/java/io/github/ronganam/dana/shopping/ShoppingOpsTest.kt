@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.shopping
 
+import org.json.JSONObject
 import io.github.ronganam.dana.data.shopping.AddPart
 import io.github.ronganam.dana.data.shopping.ShoppingOp
 import io.github.ronganam.dana.data.shopping.ShoppingOps
@@ -13,8 +14,8 @@ import org.junit.Test
 
 /** Changes applied on screen (the server's add rules), versions, requests and the queue's encoding. */
 class ShoppingOpsTest {
-    private val me = Who("d3b2f55f2a70", "Noa Peretz")
-    private val now = "2026-11-16T15:00:00Z"
+    private val me = ShoppingFixture.noa
+    private val now = "2100-01-01T15:00:00Z" // after any capture of the fixture
     private val s = ShoppingFixture.screen("owner_shared")
     private val list = s.list.id
 
@@ -119,7 +120,7 @@ class ShoppingOpsTest {
         val add = ShoppingOps.request(ShoppingOp.Add("o1", list, listOf(AddPart("client-id-1", "חלב", "2", "3%"), AddPart("client-id-2", "Bread"))))
         assertEquals("POST", add.method)
         assertEquals("/api/shopping/items?list=$list", add.path)
-        val items = add.body!!.getJSONArray("items")
+        val items = JSONObject(add.body.toString()).getJSONArray("items")
         assertEquals("client-id-1", items.getJSONObject(0).getString("id"))
         assertEquals("חלב", items.getJSONObject(0).getString("name"))
         assertEquals("2", items.getJSONObject(0).getString("quantity"))
@@ -134,7 +135,7 @@ class ShoppingOpsTest {
         )
         for (op in ops) assertTrue(op.toString(), ShoppingOps.request(op).path.endsWith("?list=$list"))
         assertEquals("/api/shopping/items/i%201?list=$list", ShoppingOps.request(ops[0]).path)
-        assertEquals(true, ShoppingOps.request(ops[0]).body!!.getBoolean("checked"))
+        assertEquals(true, JSONObject(ShoppingOps.request(ops[0]).body.toString()).getBoolean("checked"))
         assertEquals("DELETE", ShoppingOps.request(ops[2]).method)
     }
 

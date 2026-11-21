@@ -23,7 +23,7 @@ object WearSyncManager {
     ) {
         try {
             val phoneVersionCode = try {
-                context.packageManager.getPackageInfo(context.packageName, 0).longVersionCode.toInt()
+                androidx.core.content.pm.PackageInfoCompat.getLongVersionCode(context.packageManager.getPackageInfo(context.packageName, 0)).toInt()
             } catch (e: Exception) { 0 }
 
             val putDataMapReq = PutDataMapRequest.create(WearPaths.CONFIG).apply {

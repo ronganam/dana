@@ -17,6 +17,7 @@ import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import io.github.ronganam.dana.wear.R
 
 /** Small protolayout helpers shared by the Today and Waiting tiles. */
 internal object DanaTile {
@@ -26,7 +27,7 @@ internal object DanaTile {
         LayoutElementBuilders.Text.Builder()
             .setText(s)
             .setMaxLines(lines)
-            .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
+            .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE)
             .setMultilineAlignment(LayoutElementBuilders.TEXT_ALIGN_CENTER)
             .setFontStyle(
                 LayoutElementBuilders.FontStyle.Builder()
@@ -101,7 +102,7 @@ class TodayTileService : TileService() {
     private fun build(s: JSONObject): LayoutElementBuilders.LayoutElement {
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         val col = DanaTile.column()
-        col.addContent(DanaTile.text("TODAY", COLOR_ORANGE, 11f, bold = true))
+        col.addContent(DanaTile.text(getString(R.string.tile_today), COLOR_ORANGE, 11f, bold = true))
         col.addContent(DanaTile.gap(2f))
 
         val headline = s.optString("briefing_headline").takeIf { it.isNotBlank() && s.optString("briefing_date") == today }
@@ -131,7 +132,7 @@ class TodayTileService : TileService() {
             }
         }
         if (headline == null && shown == 0) {
-            col.addContent(DanaTile.text(if (s.length() == 0) "Open Dana on the phone" else "Nothing due. Enjoy.", COLOR_LIGHT_GRAY, 12f, lines = 2))
+            col.addContent(DanaTile.text(getString(if (s.length() == 0) R.string.open_dana_on_phone else R.string.tile_nothing_due), COLOR_LIGHT_GRAY, 12f, lines = 2))
         }
         return DanaTile.screen(col.build(), DanaTile.launch("io.github.ronganam.dana.wear.tasks.TasksActivity", "open_tasks"))
     }
@@ -173,16 +174,16 @@ class WaitingTileService : TileService() {
         val count = s.optInt("suggestion_count")
         val top = s.optJSONArray("suggestions")?.optJSONObject(0)
         val col = DanaTile.column()
-        col.addContent(DanaTile.text(if (count > 0) "WAITING ON YOU · $count" else "WAITING ON YOU", COLOR_ORANGE, 11f, bold = true))
+        col.addContent(DanaTile.text(if (count > 0) getString(R.string.tile_waiting_count, count) else getString(R.string.tile_waiting), COLOR_ORANGE, 11f, bold = true))
         col.addContent(DanaTile.gap(4f))
         if (top == null) {
-            col.addContent(DanaTile.text("Nothing waiting ✓", COLOR_LIGHT_GRAY, 13f))
+            col.addContent(DanaTile.text(getString(R.string.tile_nothing_waiting), COLOR_LIGHT_GRAY, 13f))
             return DanaTile.screen(col.build(), null)
         }
         val id = top.optString("id")
         col.addContent(DanaTile.text(top.optString("title"), COLOR_WHITE, 13f, bold = true, lines = 3))
         col.addContent(DanaTile.gap(2f))
-        col.addContent(DanaTile.text(if (top.optString("source") == "notification") "from a notification" else "from a call", COLOR_GRAY, 10f))
+        col.addContent(DanaTile.text(getString(if (top.optString("source") == "notification") R.string.tile_from_notification else R.string.tile_from_call), COLOR_GRAY, 10f))
         col.addContent(DanaTile.gap(8f))
         val cls = "io.github.ronganam.dana.wear.cards.SuggestionActionActivity"
         col.addContent(

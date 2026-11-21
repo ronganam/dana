@@ -30,7 +30,6 @@ P = phone, K = kiosk, T = TV, W = watch.
 | `READ_MEDIA_AUDIO` (Android 13+) / `READ_EXTERNAL_STORAGE` (≤ 12, `maxSdkVersion=32`) | P | Reading call recordings from `Recordings/Call` (`CallRecordingObserverService`, "Upload past recordings"). Asked only when the user turns call recordings on. |
 | `READ_CALL_LOG` | P | Who a recorded call was with, its number and direction (`RecordingInspector`). Asked with call recordings, or from Settings → Call recordings. |
 | `READ_PHONE_STATE` | P | The caller card: notice the phone ringing (`CallerCardReceiver`). Asked at first launch. |
-| `READ_MEDIA_IMAGES` | P K | Declared; no code reads the media store for images today (shared and picked images come with their own URI grant). A candidate to drop. |
 | `REQUEST_INSTALL_PACKAGES` | P | In-app updates from your server (`UpdateManager` → the system installer; FileProvider serves the APK). The user allows "Install unknown apps" for Dana once. |
 | `WRITE_SECURE_SETTINGS` | T | Granted over adb only (`bin/deploy-tv.sh`: `pm grant`): `KeyServiceGuard` switches the accessibility button service back on after an update. Without the grant the TV works; the service must then be re-enabled by hand after updates. |
 | `com.google.android.c2dm.permission.RECEIVE` | P (*library*: Firebase) | Direct push (FCM, `DanaMessagingService`); only does something when the build has a `google-services.json`. |

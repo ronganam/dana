@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.viewmodels
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.money.CheckReply
 import io.github.ronganam.dana.data.money.MoneyApi
 import io.github.ronganam.dana.data.money.MoneyApiError
@@ -439,7 +440,7 @@ class MoneyLedgerState(val money: MoneyController) {
 
     fun submitTarget(key: String) {
         val target = MoneySave.targetAgorot(_targetDraft.value)
-        if (target == null) { _targetError.value = "Type the most to spend a month in whole shekels, for example 650."; return }
+        if (target == null) { _targetError.value = "Type the most to spend a month as a whole amount, for example 650."; return }
         _targetError.value = null
         patchSaving(key, JSONObject().put("target", target))
     }

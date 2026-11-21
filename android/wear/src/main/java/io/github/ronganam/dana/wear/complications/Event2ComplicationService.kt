@@ -10,6 +10,7 @@ import androidx.wear.watchface.complications.data.RangedValueComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import io.github.ronganam.dana.wear.data.WearPrefs
+import io.github.ronganam.dana.wear.R
 
 class Event2ComplicationService : SuspendingComplicationDataSourceService() {
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
@@ -65,14 +66,14 @@ class Event2ComplicationService : SuspendingComplicationDataSourceService() {
                 value = 0f,
                 min = 0f,
                 max = 7f,
-                contentDescription = PlainComplicationText.Builder("Review").build()
+                contentDescription = PlainComplicationText.Builder(getString(R.string.preview_event_review)).build()
             ).setText(PlainComplicationText.Builder("11:30").build())
-             .setTitle(PlainComplicationText.Builder("Review").build())
+             .setTitle(PlainComplicationText.Builder(getString(R.string.preview_event_review)).build())
              .build()
         }
         return ShortTextComplicationData.Builder(
             text = PlainComplicationText.Builder("11:30").build(),
-            contentDescription = PlainComplicationText.Builder("Review").build()
-        ).setTitle(PlainComplicationText.Builder("Review").build()).build()
+            contentDescription = PlainComplicationText.Builder(getString(R.string.preview_event_review)).build()
+        ).setTitle(PlainComplicationText.Builder(getString(R.string.preview_event_review)).build()).build()
     }
 }

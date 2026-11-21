@@ -1,9 +1,10 @@
 package io.github.ronganam.dana.ui.screens.reminders
 
 import io.github.ronganam.dana.data.models.Task
+import io.github.ronganam.dana.data.models.LocationTrigger
 import io.github.ronganam.dana.data.models.TaskGroup
+import io.github.ronganam.dana.data.models.Triggers
 import io.github.ronganam.dana.ui.shell.DaySlot
-import org.json.JSONObject
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -29,12 +30,12 @@ sealed class RemindWhen {
     object Wake : RemindWhen()
 
     /** The `triggers` object for the task API (replaces every trigger the task had). */
-    fun toTriggers(): JSONObject = when (this) {
-        None -> JSONObject()
-        is At -> JSONObject().put("time", formatTrigger(time))
-        is Place -> JSONObject().put("location", JSONObject().put("location", zone).put("event", if (leave) "leave" else "arrive"))
-        is Car -> JSONObject().put("car", if (leave) "leave" else "enter")
-        Wake -> JSONObject().put("wake", true)
+    fun toTriggers(): Triggers = when (this) {
+        None -> Triggers()
+        is At -> Triggers(time = formatTrigger(time))
+        is Place -> Triggers(location = LocationTrigger(zone, if (leave) "leave" else "arrive"))
+        is Car -> Triggers(car = if (leave) "leave" else "enter")
+        Wake -> Triggers(wake = true)
     }
 
     val kind: String get() = when (this) {
@@ -65,21 +66,16 @@ fun parseTriggerTime(raw: String?): LocalDateTime? {
     return null
 }
 
-internal fun triggersOf(task: Task): JSONObject =
-    try { JSONObject(task.triggers ?: "{}") } catch (e: Exception) { JSONObject() }
-
-private fun JSONObject.str(key: String): String? = optString(key).takeIf { it.isNotBlank() && it != "null" }
-
 /** Every trigger the task has, in the editor's order (time, place, car, wake). */
 fun remindWhens(task: Task): List<RemindWhen> {
-    val t = triggersOf(task)
+    val t = task.triggers
     val out = mutableListOf<RemindWhen>()
-    parseTriggerTime(t.str("time"))?.let { out += RemindWhen.At(it) }
-    t.optJSONObject("location")?.let { loc ->
-        loc.str("location")?.let { out += RemindWhen.Place(it, loc.optString("event") == "leave") }
+    parseTriggerTime(t.time)?.let { out += RemindWhen.At(it) }
+    t.location?.let { loc ->
+        loc.location?.takeIf { it.isNotBlank() }?.let { out += RemindWhen.Place(it, loc.event == "leave") }
     }
-    t.str("car")?.let { out += RemindWhen.Car(it == "leave") }
-    if (t.optBoolean("wake", false)) out += RemindWhen.Wake
+    t.car?.takeIf { it.isNotBlank() && it != "null" }?.let { out += RemindWhen.Car(it == "leave") }
+    if (t.wake == true) out += RemindWhen.Wake
     return out
 }
 

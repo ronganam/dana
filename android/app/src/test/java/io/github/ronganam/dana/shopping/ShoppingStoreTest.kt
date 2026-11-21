@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.shopping
 
+import io.github.ronganam.dana.data.network.HttpResult
 import io.github.ronganam.dana.data.shopping.AddPart
 import io.github.ronganam.dana.data.shopping.ShoppingOp
 import io.github.ronganam.dana.data.shopping.ShoppingStore
@@ -23,8 +24,8 @@ import java.nio.file.Files
 /** The store: the disk cache, optimistic changes, the offline queue (order, client ids, dropped-when-gone, restarts), Undo. */
 class ShoppingStoreTest {
     private lateinit var dir: File
-    private val me = Who("d3b2f55f2a70", "Noa Peretz")
-    private val list = "a142b3bd0785"
+    private val me = ShoppingFixture.noa
+    private val list = ShoppingFixture.list
 
     /** A scripted server: answers per request, or unreachable. Records what it was sent. */
     private inner class FakeServer {
@@ -39,8 +40,9 @@ class ShoppingStoreTest {
         }
         val transport = ShoppingStore.Transport { m, p, b ->
             if (!online) throw IOException("unreachable")
-            sent += Triple(m, p, b)
-            answer(m, p, b)
+            val body = b?.let { JSONObject(it.toString()) }
+            sent += Triple(m, p, body)
+            answer(m, p, body).let { (code, text) -> HttpResult(code, text) }
         }
         fun writes() = sent.filter { it.first != "GET" }
     }
@@ -73,7 +75,7 @@ class ShoppingStoreTest {
         val bananas = s.shown()!!.items.first { it.name == "bananas" }
         val outcome = s.submit(ShoppingOp.Check("o1", list, bananas.id, true, "bananas"))
         assertTrue(outcome is ShoppingStore.Outcome.Sent)
-        assertEquals("0b2e817d7fd3", (outcome as ShoppingStore.Outcome.Sent).answer?.undo?.id)
+        assertEquals(ShoppingFixture.undoId("check"), (outcome as ShoppingStore.Outcome.Sent).answer?.undo?.id)
         assertEquals("/api/shopping/items/${bananas.id}?list=$list", server.writes().single().second)
         assertTrue(s.state.value.inflight.isEmpty() && s.state.value.queued.isEmpty())
     }
@@ -87,7 +89,7 @@ class ShoppingStoreTest {
         val avocado = s.shown()!!.items.first { it.name == "Avocado" }
         val outcome = s.submit(ShoppingOp.Remove("o1", list, avocado.id, "Avocado"))
         assertTrue(outcome is ShoppingStore.Outcome.Rejected)
-        assertEquals("read_only", (outcome as ShoppingStore.Outcome.Rejected).body?.optString("error"))
+        assertEquals("read_only", (outcome as ShoppingStore.Outcome.Rejected).body?.error)
         assertTrue("reverted", s.shown()!!.items.any { it.id == avocado.id })
         assertFalse(File(dir, ShoppingStore.QUEUE).exists())
     }
@@ -183,7 +185,7 @@ class ShoppingStoreTest {
         server.online = true
         assertEquals(0, s.flush())
         assertEquals(listOf("POST"), server.writes().map { it.first })
-        assertEquals(ShoppingStore.Cancel.Sent("8702857c9de9"), s.cancel("o2"))
+        assertEquals(ShoppingStore.Cancel.Sent(ShoppingFixture.undoId("add")), s.cancel("o2"))
         assertEquals(ShoppingStore.Cancel.Gone, s.cancel("o2"))
         assertEquals(ShoppingStore.Cancel.Gone, s.cancel("never"))
     }

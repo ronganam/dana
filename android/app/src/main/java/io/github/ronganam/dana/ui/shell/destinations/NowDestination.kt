@@ -2,7 +2,7 @@ package io.github.ronganam.dana.ui.shell.destinations
 
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import io.github.ronganam.dana.data.models.NowAction
@@ -52,7 +52,7 @@ fun rememberNowDestination(viewModel: MainViewModel): Destination {
     val fresh by nc.fresh.collectAsState()
     val quietOpen by shell.quietOpen.collectAsState()
     val events by viewModel.dayController.events.collectAsState()
-    val tasks by viewModel.tasks.collectAsState()
+    val tasks by viewModel.tasksController.tasks.collectAsState()
     val now by rememberNow()
     val wide = LocalShellLayout.current != ShellLayout.STACKED
 

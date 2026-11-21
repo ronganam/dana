@@ -1,0 +1,189 @@
+<resources>
+    <string name="app_name">Dana</string>
+
+    <!-- Launcher entries, tiles and complications (manifest labels) -->
+    <string name="label_tasks">Tasks</string>
+    <string name="label_shopping">Shopping</string>
+    <string name="label_events">Dana · Events</string>
+    <string name="label_events_2">Dana · Events 2</string>
+    <string name="label_events_3">Dana · Events 3</string>
+    <string name="label_events_4">Dana · Events 4</string>
+    <string name="label_tasks_c">Dana · Tasks</string>
+    <string name="label_tasks_2">Dana · Tasks 2</string>
+    <string name="label_tasks_3">Dana · Tasks 3</string>
+    <string name="label_tasks_4">Dana · Tasks 4</string>
+    <string name="label_calendar">Calendar</string>
+    <string name="label_today">Today</string>
+    <string name="label_waiting">Waiting on you</string>
+    <string name="label_inbox">Dana Inbox</string>
+    <string name="label_shopping_list">Shopping list</string>
+
+    <!-- Common -->
+    <string name="phone_not_connected">Phone not connected</string>
+    <string name="phone_not_found">Phone not found</string>
+    <string name="done">Done</string>
+    <string name="snooze">Snooze</string>
+    <string name="cancel">Cancel</string>
+    <string name="accepted">Accepted</string>
+    <string name="dismissed">Dismissed</string>
+    <string name="open_dana_on_phone">Open Dana on the phone</string>
+
+    <!-- The phone module build -->
+    <string name="not_a_phone_app">This is the Dana watch app.\nPlease install it on your watch.</string>
+
+    <!-- Notification channels -->
+    <string name="channel_caller">Who\'s calling</string>
+    <string name="channel_caller_description">What\'s going on with the person calling you</string>
+    <string name="channel_cards">Briefing &amp; meetings</string>
+    <string name="channel_cards_description">Morning briefing and who you\'re about to meet</string>
+    <string name="channel_reminders">Task Reminders</string>
+    <string name="channel_reminders_description">Urgent task reminders forwarded from phone</string>
+    <string name="reminder_notification_text">Task Reminder</string>
+    <string name="reminder_snooze_hour">Snooze 1hr</string>
+
+    <!-- Assistant -->
+    <string name="status_ready">Ready</string>
+    <string name="status_loading_chat">Loading chat...</string>
+    <string name="status_listening">Listening...</string>
+    <string name="status_mic_error">Mic error</string>
+    <string name="status_processing_voice">Processing voice...</string>
+    <string name="status_thinking">Thinking...</string>
+    <string name="status_executing">Executing...</string>
+    <string name="status_denying">Denying...</string>
+    <string name="status_continuing">Continuing...</string>
+    <string name="status_wrapping_up">Wrapping up...</string>
+    <string name="status_submitting">Submitting...</string>
+    <string name="tap_mic_to_speak">Tap the microphone to speak.</string>
+    <string name="tap_mic_to_start">Tap the microphone below to start talking.</string>
+    <string name="say_something">Say something to Dana.</string>
+    <string name="heard_nothing">Didn\'t hear anything. Tap the mic to talk.</string>
+    <string name="tap_mic_to_talk">Tap the mic to talk.</string>
+    <string name="new_conversation_ready">New conversation ready.</string>
+    <string name="tool">Tool</string>
+    <string name="action">Action</string>
+    <string name="approve_tool">Approve Tool?</string>
+    <string name="deny">Deny</string>
+    <string name="approve">Approve</string>
+    <string name="choose_an_option">Choose an option</string>
+    <string name="step_limit_reached">Step limit reached</string>
+    <string name="stop_here">Stop here</string>
+    <string name="give_more_steps">Give more steps</string>
+    <string name="stop">Stop</string>
+    <string name="speak">Speak</string>
+
+    <!-- Side menu and settings -->
+    <string name="latest_in_thread">Latest in the thread</string>
+    <string name="clear_the_screen">Clear the screen</string>
+    <string name="settings_and_sync">Settings &amp; Sync</string>
+    <string name="settings">Settings</string>
+    <string name="watch_settings">Watch Settings</string>
+    <string name="auto_synced">Auto-Synced via Phone</string>
+    <string name="conversation_shared_thread">Conversation: the shared thread</string>
+    <string name="reload_config">Reload Config</string>
+    <string name="reload">Reload</string>
+    <string name="watch_app_version">Watch app v%1$s</string>
+    <string name="phone_app_version">Phone app v%1$s</string>
+
+    <!-- Tasks -->
+    <string name="tasks_status_loading">Loading...</string>
+    <string name="tasks_status_send_error">Send error</string>
+    <string name="tasks_status_none">No tasks</string>
+    <string name="error_detail">Error: %1$s</string>
+    <string name="failed">Failed</string>
+    <string name="tasks_status_error">Error</string>
+    <string name="tasks_status_connection_error">Connection error</string>
+    <string name="tasks_group_general">General</string>
+    <string name="refresh">Refresh</string>
+    <string name="task_overdue">Overdue: %1$s</string>
+    <string name="task_due">Due: %1$s</string>
+    <string name="snooze_15_minutes">15 minutes</string>
+    <string name="snooze_1_hour">1 hour</string>
+    <string name="snooze_3_hours">3 hours</string>
+    <string name="snooze_1_day">1 day</string>
+
+    <!-- The reminder screen -->
+    <string name="reminder_snooze_15_min">15 min</string>
+    <string name="reminder">Reminder</string>
+    <string name="reminder_kicker">Reminder · %1$s</string>
+    <string name="reminder_kicker_trigger">Reminder · %1$s · %2$s</string>
+    <string name="trigger_place">Place</string>
+    <string name="trigger_car">Car</string>
+    <string name="trigger_wake">Wake</string>
+    <string name="snooze_group_time">Time</string>
+    <string name="snooze_in">In %1$s</string>
+    <string name="snooze_wake_up">Wake up</string>
+    <string name="snooze_wake_sentence">When I wake up</string>
+    <string name="snooze_group_car">Car</string>
+    <string name="snooze_get_in">Get in</string>
+    <string name="snooze_the_car">the car</string>
+    <string name="snooze_get_in_sentence">When I get in the car</string>
+    <string name="snooze_get_out">Get out</string>
+    <string name="snooze_of_the_car">of the car</string>
+    <string name="snooze_get_out_sentence">When I get out of the car</string>
+    <string name="snooze_group_place">Place</string>
+    <string name="snooze_arrive">Arrive</string>
+    <string name="snooze_at">at %1$s</string>
+    <string name="snooze_arrive_sentence">When I arrive at %1$s</string>
+    <string name="snooze_leave">Leave</string>
+    <string name="snooze_leave_sentence">When I leave %1$s</string>
+    <string name="snooze_short_15">15m</string>
+    <string name="snooze_short_60">1h</string>
+    <string name="snooze_short_180">3h</string>
+    <string name="snooze_short_1440">1d</string>
+    <string name="snooze_short_minutes">%1$dm</string>
+    <string name="dismiss">Dismiss</string>
+    <string name="turn_crown_to_snooze">TURN CROWN TO SNOOZE</string>
+    <string name="snooze_group">SNOOZE · %1$s</string>
+    <string name="previous">Previous</string>
+    <string name="next">Next</string>
+
+    <!-- Shopping -->
+    <string name="what_to_add">What to add?</string>
+    <string name="phone_unreachable_waiting">Phone not reachable · %1$d waiting</string>
+    <string name="all_done">All done.</string>
+    <string name="no_list_yet">No list yet.</string>
+    <string name="open_dana_on_your_phone">Open Dana on your phone.</string>
+    <string name="nothing_to_buy">Nothing to buy.</string>
+    <string name="add_by_voice_or_tell">Add by voice, or tell Dana.</string>
+    <string name="mark_as_bought">Mark as bought</string>
+    <plurals name="ticked_off">
+        <item quantity="one">%d ticked off</item>
+        <item quantity="other">%d ticked off</item>
+    </plurals>
+    <string name="add_by_voice">Add by voice</string>
+    <string name="add">Add</string>
+    <string name="put_back">Put back</string>
+    <string name="bought">Bought</string>
+    <string name="to_buy">To buy</string>
+    <string name="undo_item">Undo %1$s</string>
+    <string name="undo">Undo</string>
+
+    <!-- Tiles -->
+    <string name="tile_shopping">SHOPPING</string>
+    <string name="tile_shopping_count">SHOPPING · %1$d</string>
+    <string name="tile_nothing_to_buy">Nothing to buy</string>
+    <string name="tile_more">+%1$d more</string>
+    <string name="tile_view_only">view only</string>
+    <string name="tile_today">TODAY</string>
+    <string name="tile_tomorrow">TOMORROW</string>
+    <string name="tile_no_events">"  No events"</string>
+    <string name="tile_more_indented">"  +%1$d more"</string>
+    <string name="tile_nothing_due">Nothing due. Enjoy.</string>
+    <string name="tile_waiting">WAITING ON YOU</string>
+    <string name="tile_waiting_count">WAITING ON YOU · %1$d</string>
+    <string name="tile_nothing_waiting">Nothing waiting ✓</string>
+    <string name="tile_from_notification">from a notification</string>
+    <string name="tile_from_call">from a call</string>
+    <string name="tile_tasks_count">TASKS (%1$d)</string>
+    <string name="tile_all_clear">All clear!</string>
+
+    <!-- Complication previews in the watch-face editor -->
+    <string name="preview_event_standup">Standup</string>
+    <string name="preview_event_review">Review</string>
+    <string name="preview_event_yoga">Yoga</string>
+    <string name="preview_event_dinner">Dinner</string>
+    <string name="preview_task_groceries">Groceries</string>
+    <string name="preview_task_docs">Docs</string>
+    <string name="preview_task_report">Report</string>
+    <string name="preview_task_meeting">Meeting</string>
+</resources>

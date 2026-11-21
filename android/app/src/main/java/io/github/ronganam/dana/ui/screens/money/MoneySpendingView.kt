@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -21,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.money.MoneyDashGeometry
 import io.github.ronganam.dana.data.money.MoneyDashText
-import io.github.ronganam.dana.data.money.MoneyDashText.Sign
+import io.github.ronganam.dana.data.money.MoneyFormat.Sign
 import io.github.ronganam.dana.data.money.MoneyMerchants
 import io.github.ronganam.dana.data.money.MoneyMonths
 import io.github.ronganam.dana.data.money.MoneyTrends
@@ -124,12 +125,12 @@ private fun WhereItWent(d: Dash, t: MoneyTrends?, focus: String?, focusGroup: St
     val expanded by d.dash.expanded.collectAsState()
     val groups = t?.groups?.filter { it.live() }.orEmpty()
     val total = groups.sumOf { it.total }
-    DashSection("Where it went", trailing = if (t != null) ({ HeadNum(MoneyDashText.money(total, Sign.NONE)) }) else null) {
+    DashSection("Where it went", trailing = if (t != null) ({ HeadNum(MoneyFormat.amount(total, Sign.NONE)) }) else null) {
         if (t == null) SkelRows(6) else {
             val oneOffs = t.oneOffs.sumOf { kotlin.math.abs(it.amount) }
             Meta(
                 (if (t.inProgress) "${t.elapsed} of ${t.days} days" else t.label) + " · one-offs left out" +
-                    (if (oneOffs > 0) " (${MoneyDashText.whole(oneOffs, Sign.NONE)}, below)" else ""),
+                    (if (oneOffs > 0) " (${MoneyFormat.whole(oneOffs, Sign.NONE)}, below)" else ""),
                 Modifier.padding(vertical = 8.dp)
             )
             Rule()
@@ -156,8 +157,8 @@ private fun WhereItWent(d: Dash, t: MoneyTrends?, focus: String?, focusGroup: St
 private fun TrendRow(x: TrendLine, t: MoneyTrends, color: Color, sub: Boolean, on: Boolean, onTap: () -> Unit, expand: (() -> Unit)? = null, open: Boolean = false) {
     val vs = MoneyDashText.vsTypical(x, t.inProgress)
     val parts = buildList {
-        if (t.inProgress && x.onTrack != null && x.onTrack != x.total) add("on track ${MoneyDashText.whole(x.onTrack)}")
-        if (x.typical > 0) add("typical ${MoneyDashText.whole(x.typical)}")
+        if (t.inProgress && x.onTrack != null && x.onTrack != x.total) add("on track ${MoneyFormat.whole(x.onTrack)}")
+        if (x.typical > 0) add("typical ${MoneyFormat.whole(x.typical)}")
     }
     val accent = MaterialTheme.colorScheme.primary
     Row(
@@ -181,7 +182,7 @@ private fun TrendRow(x: TrendLine, t: MoneyTrends, color: Color, sub: Boolean, o
         }
         SparkBars(x.months, color, partial = t.inProgress, modifier = Modifier.padding(end = 10.dp))
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.widthIn(min = 76.dp)) {
-            Amount(MoneyDashText.money(x.total, Sign.NONE), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
+            Amount(MoneyFormat.amount(x.total, Sign.NONE), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold))
             if (vs.text.isNotEmpty()) Text(vs.text, style = MaterialTheme.typography.labelSmall, color = deltaColor(vs.dir), maxLines = 1)
         }
         if (expand != null) {
@@ -219,7 +220,7 @@ private fun Movers(t: MoneyTrends?, setFocus: (String?) -> Unit) {
                             Box(Modifier.size(8.dp).background(MoneyPalette.series(MoneyDashGeometry.seriesOf(m.group)), CircleShape))
                             Text(m.label, Modifier.padding(start = 6.dp), style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium), maxLines = 1)
                         }
-                        Meta("${if (t.inProgress) "on track for " else ""}${MoneyDashText.whole(m.value)} · typical ${MoneyDashText.whole(m.typical)}")
+                        Meta("${if (t.inProgress) "on track for " else ""}${MoneyFormat.whole(m.value)} · typical ${MoneyFormat.whole(m.typical)}")
                     }
                     Amount(MoneyDashText.moverDelta(m), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), deltaColor(m.direction))
                 }
@@ -268,7 +269,7 @@ private fun TopMerchants(d: Dash, tax: Taxonomy, focus: String?, focusGroup: Str
                 val color = MoneyPalette.series(MoneyDashGeometry.seriesOf(tax.group(x.category)))
                 val sub = listOfNotNull(
                     x.categoryLabel ?: "Uncategorized", "${x.count}×",
-                    if (x.count > 1) "avg ${MoneyDashText.whole(x.average, Sign.NONE)}" else null,
+                    if (x.count > 1) "avg ${MoneyFormat.whole(x.average, Sign.NONE)}" else null,
                     if (x.oneOff) "one-off" else null
                 ).joinToString(" · ")
                 DashRow(onClick = { d.money.openTransactions(TxnFilter(q = x.merchant, allTime = true)) }) {
@@ -277,7 +278,7 @@ private fun TopMerchants(d: Dash, tax: Taxonomy, focus: String?, focusGroup: Str
                         Meta(sub, maxLines = 1)
                     }
                     SparkBars(x.months, color, modifier = Modifier.padding(end = 10.dp))
-                    Amount(MoneyDashText.money(x.total, Sign.NONE), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.widthIn(min = 72.dp))
+                    Amount(MoneyFormat.amount(x.total, Sign.NONE), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.widthIn(min = 72.dp))
                 }
             }
         }
@@ -287,7 +288,7 @@ private fun TopMerchants(d: Dash, tax: Taxonomy, focus: String?, focusGroup: Str
 @Composable
 private fun BigPurchases(d: Dash, t: MoneyTrends?) {
     val list = t?.oneOffs.orEmpty()
-    DashSection("Big purchases", trailing = if (list.isNotEmpty()) ({ HeadNum(MoneyDashText.money(list.sumOf { kotlin.math.abs(it.amount) }, Sign.NONE)) }) else null) {
+    DashSection("Big purchases", trailing = if (list.isNotEmpty()) ({ HeadNum(MoneyFormat.amount(list.sumOf { kotlin.math.abs(it.amount) }, Sign.NONE)) }) else null) {
         when {
             t == null -> SkelRows(2)
             list.isEmpty() -> Empty("No one-offs in ${t.label}.")
@@ -308,7 +309,7 @@ private fun BigRow(d: Dash, x: OneOff) {
             Name(name)
             Meta(MoneyDashText.shortDate(x.purchaseDate, d.today) + (x.categoryLabel?.let { " · $it" } ?: ""))
         }
-        Amount(MoneyDashText.money(x.amount, Sign.NONE), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.padding(end = 10.dp))
+        Amount(MoneyFormat.amount(x.amount, Sign.NONE), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.padding(end = 10.dp))
         InkButton("Not a one-off") {
             val body = JSONObject().put("one_off", false)
             d.money.write("Couldn't change it", undoText = "⁨$name⁩: not a one-off") { d.money.api.patch("/transactions/${x.id}", body) }

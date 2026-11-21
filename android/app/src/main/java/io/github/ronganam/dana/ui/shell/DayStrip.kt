@@ -88,7 +88,7 @@ private val HM = DateTimeFormatter.ofPattern("HH:mm")
 @Composable
 fun DayStrip(viewModel: MainViewModel, onNow: () -> Unit, modifier: Modifier = Modifier) {
     val events by viewModel.dayController.events.collectAsState()
-    val tasks by viewModel.tasks.collectAsState()
+    val tasks by viewModel.tasksController.tasks.collectAsState()
     val now by rememberNow()
     LaunchedEffect(now.toLocalDate()) { viewModel.dayController.refreshIfStale() }
     val items = remember(events, tasks, now) { dayItems(events, tasks, now) }

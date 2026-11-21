@@ -1,9 +1,7 @@
 package io.github.ronganam.dana.data.money
 
 import io.github.ronganam.dana.data.money.MoneyLedger.isolate
-import io.github.ronganam.dana.data.money.MoneyLedger.money
 import io.github.ronganam.dana.data.money.MoneyLedger.shortDate
-import io.github.ronganam.dana.data.money.MoneyLedger.whole
 import org.json.JSONObject
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -22,7 +20,7 @@ import kotlin.math.roundToInt
  * parts and their sections, the chips, the actions of each status and their
  * PATCH bodies, the Undo lines, price checks (states, answers, offers),
  * targets and outcomes. Only formatting: every number is the server's.
- * Tested in `MoneySaveTest` against `test_fixtures/money_savings_web.json`.
+ * Tested in `MoneySaveTest` against `server/tests/fixtures/money_savings_web.json`.
  */
 
 data class Saving(val low: Long, val high: Long, val basis: String)
@@ -248,11 +246,11 @@ object MoneySave {
         val hi = max(t.low, t.high)
         val r = sv.rate
         return SaveTiles(
-            could = if (whole(lo) == whole(hi)) whole(hi) else "${whole(lo)}–${whole(hi)}",
+            could = if (MoneyFormat.whole(lo) == MoneyFormat.whole(hi)) MoneyFormat.whole(hi) else "${MoneyFormat.whole(lo)}–${MoneyFormat.whole(hi)}",
             couldSub = if (t.count > 0) "a year · ${plural(t.count, "idea")}" else "No open idea with a saving right now",
             saved = t.saved,
             savedSub = when {
-                t.savedYearly != 0L -> "≈ ${whole(t.savedYearly)} a year"
+                t.savedYearly != 0L -> "≈ ${MoneyFormat.whole(t.savedYearly)} a year"
                 t.saved != 0L -> ""
                 else -> "Counted once something you did shows in your charges"
             },
@@ -267,11 +265,11 @@ object MoneySave {
         if (s != null && (s.low != 0L || s.high != 0L)) {
             val lo = min(s.low, s.high)
             val hi = max(s.low, s.high)
-            return Chip("save", if (whole(lo) == whole(hi)) "+${whole(hi)}/yr" else "+${whole(lo)}–${whole(hi)}/yr")
+            return Chip("save", if (MoneyFormat.whole(lo) == MoneyFormat.whole(hi)) "+${MoneyFormat.whole(hi)}/yr" else "+${MoneyFormat.whole(lo)}–${MoneyFormat.whole(hi)}/yr")
         }
         val stake = item.atStake ?: return null
         if (stake == 0L) return null
-        return if (item.type in AT_STAKE_ONCE) Chip("stake", "${whole(stake)} spent") else Chip("stake", "${whole(stake)}/yr at stake")
+        return if (item.type in AT_STAKE_ONCE) Chip("stake", "${MoneyFormat.whole(stake)} spent") else Chip("stake", "${MoneyFormat.whole(stake)}/yr at stake")
     }
 
     private fun minutesText(m: Int): String = if (m < 60) "$m min" else {
@@ -343,7 +341,7 @@ object MoneySave {
             return "${isolate(line?.merchant ?: key)}: $said"
         }
         if (body.has("answers")) return "Answer saved · $name"
-        if (body.has("target")) return if (body.isNull("target")) "Stopped tracking · $name" else "Target ${whole(body.optLong("target"))} a month · $name"
+        if (body.has("target")) return if (body.isNull("target")) "Stopped tracking · $name" else "Target ${MoneyFormat.whole(body.optLong("target"))} a month · $name"
         val words = when (body.str("status")) {
             "doing" -> "On it"
             "done" -> "Done"
@@ -356,15 +354,15 @@ object MoneySave {
         return "$words · $name"
     }
 
-    /** Whole shekels typed for a monthly target ("650", "₪1,200") → agorot; null unless 1…1,000,000 shekels. */
+    /** Whole units typed for a monthly target ("650", "₪1,200") → minor units; null unless 1…1,000,000. */
     fun targetAgorot(text: String?): Long? {
-        val s = (text ?: "").replace(Regex("[₪,\\s]"), "")
+        val s = (text ?: "").replace(MoneyFormat.symbol, "").replace(Regex("[,\\s]"), "")
         if (!Regex("^\\d{1,7}$").matches(s)) return null
         val n = s.toLong()
         return if (n in 1..1_000_000) n * 100 else null
     }
 
-    /** The target field's starting text: the target, else the suggested one, in whole shekels. */
+    /** The target field's starting text: the target, else the suggested one, in whole units. */
     fun targetDraft(item: SavingItem): String {
         val a = item.target?.monthly ?: item.suggestedTarget ?: 0L
         val n = Math.round(a / 100.0)
@@ -473,7 +471,7 @@ object MoneySave {
 
     private fun offerTable(m: Market?, today: LocalDate?): OfferTable? {
         if (m == null) return null
-        fun mo(v: Long) = "${money(v)} a month"
+        fun mo(v: Long) = "${MoneyFormat.amount(v)} a month"
         fun pctOff(p: Double?) = "${pctText(p, signed = false, digits = 1)} off"
         fun row(name: String?, plan: String?, cells: List<OfferCell>, it: JSONObject) = OfferRow(name ?: "", plan ?: "", cells, safeSource(it.optJSONObject("source")))
         fun d(o: JSONObject, k: String): Double? = if (o.isNull(k) || !o.has(k)) null else o.optDouble(k)
@@ -525,7 +523,7 @@ object MoneySave {
     fun outcomeText(o: Outcome?): OutcomeText? {
         if (o == null) return null
         return when (o.state) {
-            "confirmed" -> OutcomeText("good", if (o.saved != 0L) "Saved ${whole(o.saved)} so far" else "It worked", if (o.savedYearly != 0L) "≈ ${whole(o.savedYearly)} a year" else "", o.detail)
+            "confirmed" -> OutcomeText("good", if (o.saved != 0L) "Saved ${MoneyFormat.whole(o.saved)} so far" else "It worked", if (o.savedYearly != 0L) "≈ ${MoneyFormat.whole(o.savedYearly)} a year" else "", o.detail)
             "no_change" -> OutcomeText("warn", "No change in your charges yet", "", o.detail)
             else -> OutcomeText("wait", "Waiting to see it in your charges", "", o.detail)
         }
@@ -537,21 +535,21 @@ object MoneySave {
         return TargetProgress(
             bar = if (t.monthly > 0) min(100, Math.round(t.thisMonth.toDouble() / t.monthly * 100).toInt()) else 0,
             over = over,
-            text = "${whole(t.thisMonth)} of ${whole(t.monthly)} this month",
+            text = "${MoneyFormat.whole(t.thisMonth)} of ${MoneyFormat.whole(t.monthly)} this month",
             track = when { over -> "Over the target"; t.onTrack == true -> "On track"; t.onTrack == false -> "Off track"; else -> "" },
             tone = when { over || t.onTrack == false -> "bad"; t.onTrack == true -> "good"; else -> "" },
             left = t.daysLeft?.let { "${plural(it, "day")} left" } ?: "",
             months = t.months.map { m ->
                 val label = runCatching { YearMonth.parse(m.month).month.getDisplayName(java.time.format.TextStyle.SHORT, Locale.ENGLISH) }.getOrDefault(m.month)
-                MonthText(m.month, label, "${whole(m.spent)} of ${whole(m.target)}", m.under)
+                MonthText(m.month, label, "${MoneyFormat.whole(m.spent)} of ${MoneyFormat.whole(m.target)}", m.under)
             },
-            saved = if (t.saved != 0L) "${whole(t.saved)} saved so far" else ""
+            saved = if (t.saved != 0L) "${MoneyFormat.whole(t.saved)} saved so far" else ""
         )
     }
 
     fun subitemText(s: SubItem, today: LocalDate?): SubItemText = SubItemText(
-        amount = "${money(s.amount, sign = "none")} ${PER[s.cadence] ?: ""}".trim(),
-        yearly = s.yearly?.takeIf { it != 0L }?.let { "${whole(it)} a year" } ?: "",
+        amount = "${MoneyFormat.amount(s.amount, MoneyFormat.Sign.NONE)} ${PER[s.cadence] ?: ""}".trim(),
+        yearly = s.yearly?.takeIf { it != 0L }?.let { "${MoneyFormat.whole(it)} a year" } ?: "",
         next = when {
             !s.active -> if (s.choice == "cancel") "No charge since you cancelled" else "Not charged lately"
             s.nextDate != null -> "next ${shortDate(s.nextDate, today)}"

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.projects
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.projects.Column
 import io.github.ronganam.dana.data.projects.Entry
 import io.github.ronganam.dana.data.projects.EntryField
@@ -18,7 +19,7 @@ import java.time.LocalDate
 /** The port of the web panel's projects-core.js: numbers, best values, order, states, countdown, budget, editor payloads. */
 class ProjectsCoreTest {
 
-    private val items get() = ProjectsJson.items(ProjectsFixture.json.getJSONObject("items_owner"))
+    private val items get() = ProjectsJson.items(ProjectsFixture.text("items_owner"))
 
     @Test
     fun readsNumbersLikeTheServer() {
@@ -35,11 +36,11 @@ class ProjectsCoreTest {
 
     @Test
     fun formatsMoney() {
-        assertEquals("₪13,400", ProjectsCore.money(13400.0))
-        assertEquals("-₪500", ProjectsCore.money(-500.0))
-        assertEquals("₪13.4k", ProjectsCore.shortMoney(13400.0))
-        assertEquals("₪150k", ProjectsCore.shortMoney(150000.0))
-        assertEquals("₪900", ProjectsCore.shortMoney(900.0))
+        assertEquals("₪13,400", MoneyFormat.major(13400.0))
+        assertEquals("−₪500", MoneyFormat.major(-500.0))
+        assertEquals("₪13.4k", MoneyFormat.thousands(13400.0))
+        assertEquals("₪150k", MoneyFormat.thousands(150000.0))
+        assertEquals("₪900", MoneyFormat.thousands(900.0))
         assertEquals("4.5", ProjectsCore.number(4.5))
         assertEquals("1,200", ProjectsCore.number(1200.0))
     }
@@ -117,7 +118,7 @@ class ProjectsCoreTest {
         assertEquals(150000.0, fromItems.budget!!, 0.0)
         assertEquals(136600.0, fromItems.left!!, 0.0)
         assertEquals(9, fromItems.pct)
-        val fromList = ProjectsCore.budgetInfo(ProjectsJson.projects(ProjectsFixture.json.getJSONArray("list_owner"))[0])!!
+        val fromList = ProjectsCore.budgetInfo(ProjectsJson.projects(ProjectsFixture.text("list_owner"))[0])!!
         assertEquals(13400.0, fromList.committed, 0.0)
         assertNull(ProjectsCore.budgetInfo(Project("p", "Empty")))
         assertEquals(100, ProjectsCore.budgetInfo(Project("p", "Over", budget = 100.0, committed = 250.0))!!.pct)
@@ -196,7 +197,7 @@ class ProjectsCoreTest {
         assertEquals(Lang.HE, ProjectsCore.langOf(Project("p", "Trip"), listOf(Section("s", "p", "דירות"))))
         val list = listOf(Project("a", "A", status = "archived"), Project("b", "B"), Project("c", "C"))
         assertEquals(listOf("b", "c", "a"), ProjectsCore.orderProjects(list).map { it.id })
-        val p = ProjectsJson.projects(ProjectsFixture.json.getJSONArray("list_owner"))[0]
+        val p = ProjectsJson.projects(ProjectsFixture.text("list_owner"))[0]
         assertEquals("בעוד 305 ימים · 1/2 הוחלטו", ProjectsCore.projectLine(p, LocalDate.of(2026, 11, 19)))
         assertEquals("3 items", ProjectsCore.projectLine(Project("p", "Garden", entryCount = 3), LocalDate.of(2026, 11, 19)))
     }

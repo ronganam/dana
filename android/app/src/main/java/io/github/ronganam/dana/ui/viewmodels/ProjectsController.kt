@@ -16,6 +16,9 @@ import io.github.ronganam.dana.data.projects.ProjectsApi
 import io.github.ronganam.dana.data.projects.ProjectsApiError
 import io.github.ronganam.dana.data.projects.ProjectsCore
 import io.github.ronganam.dana.data.projects.ProjectsJson
+import io.github.ronganam.dana.data.projects.EntryChanges
+import io.github.ronganam.dana.data.projects.ProjectChanges
+import io.github.ronganam.dana.data.projects.SectionChanges
 import io.github.ronganam.dana.data.projects.Section
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -25,8 +28,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 import java.io.File
+import androidx.core.net.toUri
 
 /** A project or section editor's draft (lives here so a fold / unfold keeps it). */
 sealed class ProjectsEditor {
@@ -300,7 +303,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
     }
 
     /** PUT the entry with [changes]; the answer replaces it locally. */
-    fun putEntry(entryId: String, changes: JSONObject, done: String? = null, listChanged: Boolean = false) =
+    fun putEntry(entryId: String, changes: EntryChanges, done: String? = null, listChanged: Boolean = false) =
         act("Couldn't save") {
             api.updateEntry(entryId, changes)?.let(::replaceEntry) ?: reloadItems()
             done?.let { ctx.messages.post(it) }
@@ -311,7 +314,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
         if (entry.decision == decision) return
         // Shown at once; the server's answer confirms it.
         replaceEntry(entry.copy(decision = decision))
-        putEntry(entry.id, JSONObject().put("decision", decision),
+        putEntry(entry.id, EntryChanges(decision = decision),
             done = if (decision == "chosen") "Chosen: ${entry.title}" else null, listChanged = true)
     }
 
@@ -319,7 +322,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
         _editing.value = null
         val fields = ProjectsCore.setField(entry.fields, col, raw)
         replaceEntry(entry.copy(fields = fields))
-        putEntry(entry.id, JSONObject().put("fields", ProjectsJson.fieldsJson(fields)), listChanged = true)
+        putEntry(entry.id, EntryChanges(fields = ProjectsJson.fieldsBody(fields)), listChanged = true)
     }
 
     fun rename(entry: Entry, title: String) {
@@ -327,18 +330,18 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
         val t = title.trim()
         if (t.isEmpty() || t == entry.title) return
         replaceEntry(entry.copy(title = t))
-        putEntry(entry.id, JSONObject().put("title", t))
+        putEntry(entry.id, EntryChanges(title = t))
     }
 
     fun saveBody(entry: Entry, body: String) {
         _editing.value = null
         replaceEntry(entry.copy(body = body))
-        putEntry(entry.id, JSONObject().put("body", body))
+        putEntry(entry.id, EntryChanges(body = body))
     }
 
     fun move(entry: Entry, sectionId: String?) {
         if (entry.sectionId == sectionId) return
-        putEntry(entry.id, JSONObject().put("section_id", sectionId ?: ""), done = "Moved", listChanged = true)
+        putEntry(entry.id, EntryChanges(sectionId = sectionId ?: ""), done = "Moved", listChanged = true)
         if (_sectionId.value != null) _sectionId.value = sectionId
     }
 
@@ -350,9 +353,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
         if (t.isEmpty()) return
         val s = section()
         act("Couldn't add") {
-            val body = JSONObject().put("project_id", pid).put("title", t)
-                .put("kind", if (s?.isOptions == true) "record" else "note")
-            s?.let { body.put("section_id", it.id) }
+            val body = EntryChanges(projectId = pid, title = t, kind = if (s?.isOptions == true) "record" else "note", sectionId = s?.id)
             val created = api.createEntry(body)
             if (created != null) {
                 _items.value?.let { _items.value = it.copy(entries = it.entries + created) }
@@ -394,7 +395,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
         val s = section() ?: return
         val text = _summaryDraft.value ?: return
         act("Couldn't save the summary") {
-            api.updateSection(s.id, JSONObject().put("summary", text))
+            api.updateSection(s.id, SectionChanges(summary = text))
             _summaryDraft.value = null
             _items.value?.let { _items.value = it.copy(sections = it.sections.map { x -> if (x.id == s.id) x.copy(summary = text) else x }) }
             reloadItems()
@@ -476,7 +477,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
     fun openLink(link: String) {
         try {
             val action = if (link.startsWith("tel:")) Intent.ACTION_DIAL else Intent.ACTION_VIEW
-            appContext.startActivity(Intent(action, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            appContext.startActivity(Intent(action, link.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (e: ActivityNotFoundException) {
             ctx.messages.post("No app opens that link")
         }
@@ -523,13 +524,14 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
         val title = d.title.trim()
         if (title.isEmpty()) return
         act("Couldn't save the project") {
-            val body = JSONObject()
-                .put("title", title)
-                .put("icon", d.icon.trim().ifEmpty { "📁" })
-                .put("description", d.description.trim())
-                .put("target_date", d.targetDate.trim())
-                .put("budget", d.budget.trim())
-            if (d.color.isNotBlank()) body.put("color", d.color)
+            val body = ProjectChanges(
+                title = title,
+                icon = d.icon.trim().ifEmpty { "📁" },
+                description = d.description.trim(),
+                targetDate = d.targetDate.trim(),
+                budget = d.budget.trim(),
+                color = d.color.takeIf { it.isNotBlank() }
+            )
             if (d.id == null) {
                 val id = api.createProject(body)
                 _editor.value = null
@@ -548,7 +550,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
         val d = _editor.value as? ProjectsEditor.ProjectDraft ?: return
         val id = d.id ?: return
         act("Couldn't archive") {
-            api.updateProject(id, JSONObject().put("status", if (d.status == "archived") "active" else "archived"))
+            api.updateProject(id, ProjectChanges(status = if (d.status == "archived") "active" else "archived"))
             _editor.value = null
             loadList()
             reloadItems()
@@ -574,9 +576,12 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
         val pid = _projectId.value ?: return
         if (title.isEmpty()) return
         act("Couldn't save the section") {
-            val body = JSONObject().put("title", title).put("icon", d.icon.trim()).put("kind", d.kind)
-            if (d.kind == "options") body.put("columns", ProjectsJson.columnsJson(ProjectsCore.columnsPayload(d.columns)))
-            else if (d.id == null) body.put("columns", org.json.JSONArray())
+            val columns = when {
+                d.kind == "options" -> ProjectsJson.columnsBody(ProjectsCore.columnsPayload(d.columns))
+                d.id == null -> emptyList()
+                else -> null
+            }
+            val body = SectionChanges(title = title, icon = d.icon.trim(), kind = d.kind, columns = columns)
             if (d.id == null) {
                 val id = api.createSection(pid, body)
                 _editor.value = null

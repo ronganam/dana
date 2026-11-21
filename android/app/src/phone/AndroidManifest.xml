@@ -13,7 +13,6 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- In-app updates: lets the app hand the downloaded APK to the system installer -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
@@ -157,7 +156,7 @@
         <service
             android:name=".data.notifications.DanaNotificationListener"
             android:exported="true"
-            android:label="Dana notification inbox"
+            android:label="@string/label_notification_inbox"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />

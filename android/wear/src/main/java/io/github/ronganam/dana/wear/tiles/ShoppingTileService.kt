@@ -10,6 +10,7 @@ import io.github.ronganam.dana.wear.shopping.ShopState
 import io.github.ronganam.dana.wear.shopping.WatchShopping
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
+import io.github.ronganam.dana.wear.R
 
 /**
  * Shopping: how many items are left and the first few, in aisle order (the
@@ -30,12 +31,12 @@ class ShoppingTileService : TileService() {
         val open = DanaTile.launch(ACTIVITY, "open_shopping")
         val list = s.list
         val count = Shop.toBuy(s, now)
-        col.addContent(DanaTile.text(if (count > 0) "SHOPPING · $count" else "SHOPPING", COLOR_ORANGE, 11f, bold = true))
+        col.addContent(DanaTile.text(if (count > 0) getString(R.string.tile_shopping_count, count) else getString(R.string.tile_shopping), COLOR_ORANGE, 11f, bold = true))
         col.addContent(DanaTile.gap(6f))
         val items = Shop.items(s, now).filter { !it.ticked }.map { it.item }
         when {
-            list == null -> col.addContent(DanaTile.text("Open Dana on the phone", COLOR_LIGHT_GRAY, 13f, lines = 2))
-            items.isEmpty() -> col.addContent(DanaTile.text("Nothing to buy", COLOR_LIGHT_GRAY, 14f))
+            list == null -> col.addContent(DanaTile.text(getString(R.string.open_dana_on_phone), COLOR_LIGHT_GRAY, 13f, lines = 2))
+            items.isEmpty() -> col.addContent(DanaTile.text(getString(R.string.tile_nothing_to_buy), COLOR_LIGHT_GRAY, 14f))
             else -> {
                 val shown = items.take(MAX_LINES)
                 shown.forEach { item ->
@@ -46,13 +47,13 @@ class ShoppingTileService : TileService() {
                 val more = count - shown.size
                 if (more > 0) {
                     col.addContent(DanaTile.gap(2f))
-                    col.addContent(DanaTile.text("+$more more", COLOR_GRAY, 12f))
+                    col.addContent(DanaTile.text(getString(R.string.tile_more, more), COLOR_GRAY, 12f))
                 }
             }
         }
         if (list?.canEdit == false) {
             col.addContent(DanaTile.gap(4f))
-            col.addContent(DanaTile.text("view only", COLOR_GRAY, 11f))
+            col.addContent(DanaTile.text(getString(R.string.tile_view_only), COLOR_GRAY, 11f))
         }
         return DanaTile.screen(col.build(), open)
     }

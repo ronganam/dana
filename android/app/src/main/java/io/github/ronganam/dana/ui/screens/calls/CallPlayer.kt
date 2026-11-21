@@ -98,8 +98,8 @@ internal fun CallPlayer(call: PhoneCall, player: CallAudioPlayer, modifier: Modi
     }
     val isThis = player.currentPlayingCallId.value == call.id
     val playing = isThis && player.isPlaying.value
-    val totalMs = if (isThis && player.duration.value > 0) player.duration.value else call.durationSeconds * 1000
-    val posMs = if (isThis) player.currentPosition.value.toInt() else 0
+    val totalMs = if (isThis && player.duration.intValue > 0) player.duration.intValue else call.durationSeconds * 1000
+    val posMs = if (isThis) player.currentPosition.floatValue.toInt() else 0
     val progress = if (totalMs > 0) (posMs.toFloat() / totalMs).coerceIn(0f, 1f) else 0f
 
     Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {

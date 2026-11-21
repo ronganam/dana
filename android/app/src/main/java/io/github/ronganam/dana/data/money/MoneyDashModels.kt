@@ -5,7 +5,7 @@ import org.json.JSONObject
 
 // The payloads of the Money dashboards (server docs/money.md → "Page API and
 // insights", "Dashboards", "Investment accounts", "Meal cards"; the routes in
-// integrations/money/api.py). Amounts are agorot, dates ISO `YYYY-MM-DD`.
+// server/addons/money/api.py). Amounts are agorot, dates ISO `YYYY-MM-DD`.
 // Each parser reads one route's answer and never throws on a missing field.
 
 internal fun JSONObject.str(key: String): String? = if (!has(key) || isNull(key)) null else optString(key).ifBlank { null }

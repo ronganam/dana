@@ -37,7 +37,9 @@ import io.github.ronganam.dana.data.models.ChatContext
 import io.github.ronganam.dana.ui.theme.Danger
 import io.github.ronganam.dana.ui.theme.Space
 import io.github.ronganam.dana.ui.theme.Warning
-import org.json.JSONObject
+import io.github.ronganam.dana.data.models.LocationTrigger
+import io.github.ronganam.dana.data.models.Triggers
+import io.github.ronganam.dana.data.network.SuggestionEdits
 import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
@@ -109,16 +111,16 @@ fun friendlyDateTime(value: String?): String? {
 }
 
 /** Human trigger descriptions, e.g. ["⏰ Tomorrow 09:00", "📍 Arrive home"]. */
-fun describeTriggers(triggers: JSONObject?): List<String> {
+fun describeTriggers(triggers: Triggers?): List<String> {
     if (triggers == null) return emptyList()
     val out = mutableListOf<String>()
-    triggers.optString("time").takeIf { it.isNotBlank() && it != "null" }?.let { out += "⏰ ${friendlyDateTime(it)}" }
-    triggers.optJSONObject("location")?.let { loc ->
-        val place = loc.optString("location")
-        if (place.isNotBlank()) out += "📍 ${if (loc.optString("event") == "leave") "Leave" else "Arrive"} ${place.replaceFirstChar { it.uppercase() }}"
+    triggers.time?.takeIf { it.isNotBlank() }?.let { out += "⏰ ${friendlyDateTime(it)}" }
+    triggers.location?.let { loc ->
+        val place = loc.location.orEmpty()
+        if (place.isNotBlank()) out += "📍 ${if (loc.event == "leave") "Leave" else "Arrive"} ${place.replaceFirstChar { it.uppercase() }}"
     }
-    triggers.optString("car").takeIf { it.isNotBlank() && it != "null" }?.let { out += if (it == "leave") "🚗 Leaving the car" else "🚗 Getting in the car" }
-    if (triggers.optBoolean("wake", false)) out += "☀️ When I wake up"
+    triggers.car?.takeIf { it.isNotBlank() }?.let { out += if (it == "leave") "🚗 Leaving the car" else "🚗 Getting in the car" }
+    if (triggers.wake == true) out += "☀️ When I wake up"
     return out
 }
 
@@ -538,7 +540,7 @@ fun SuggestionSourceBlock(
 fun SuggestionEditSheet(
     suggestion: CallSuggestion,
     groups: List<String>,
-    onCreate: (JSONObject) -> Unit,
+    onCreate: (SuggestionEdits) -> Unit,
     onAsk: () -> Unit,
     onCancel: () -> Unit,
     sourceBlock: (@Composable () -> Unit)? = null,
@@ -551,14 +553,14 @@ fun SuggestionEditSheet(
     var due by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.dueDate.orEmpty()) }
     var priority by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.priority) }
     var group by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.group.orEmpty()) }
-    var reminder by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.triggers.optString("time").takeIf { it != "null" }.orEmpty()) }
-    val initialLoc = suggestion.triggers.optJSONObject("location")
+    var reminder by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.triggers.time.orEmpty()) }
+    val initialLoc = suggestion.triggers.location
     var placeOn by rememberSaveable(suggestion.id) { mutableStateOf(initialLoc != null) }
-    var placeZone by rememberSaveable(suggestion.id) { mutableStateOf(initialLoc?.optString("location").orEmpty().ifBlank { "Home" }) }
-    var placeEvent by rememberSaveable(suggestion.id) { mutableStateOf(if (initialLoc?.optString("event") == "leave") "leave" else "arrive") }
-    var carOn by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.triggers.optString("car").let { it.isNotBlank() && it != "null" }) }
-    var carEvent by rememberSaveable(suggestion.id) { mutableStateOf(if (suggestion.triggers.optString("car") == "leave") "leave" else "enter") }
-    var wakeOn by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.triggers.optBoolean("wake")) }
+    var placeZone by rememberSaveable(suggestion.id) { mutableStateOf(initialLoc?.location.orEmpty().ifBlank { "Home" }) }
+    var placeEvent by rememberSaveable(suggestion.id) { mutableStateOf(if (initialLoc?.event == "leave") "leave" else "arrive") }
+    var carOn by rememberSaveable(suggestion.id) { mutableStateOf(!suggestion.triggers.car.isNullOrBlank()) }
+    var carEvent by rememberSaveable(suggestion.id) { mutableStateOf(if (suggestion.triggers.car == "leave") "leave" else "enter") }
+    var wakeOn by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.triggers.wake == true) }
     val context = LocalContext.current
     // Zones (Home, Work, …) come from Home Assistant; fall back to the last cached list.
     var zones by remember { mutableStateOf(Zones.cached(context)) }
@@ -720,26 +722,21 @@ fun SuggestionEditSheet(
             if (!isAlert) Button(
                 onClick = {
                     if (isEvent) {
-                        onCreate(JSONObject().apply {
-                            put("title", title.trim())
-                            put("start", start.trim().replace(' ', 'T') + ":00")
-                            put("end", end.trim().ifEmpty { null }?.let { it.replace(' ', 'T') + ":00" } ?: JSONObject.NULL)
-                            put("location", place.trim().ifEmpty { JSONObject.NULL })
-                        })
+                        onCreate(SuggestionEdits.Event(
+                            title = title.trim(),
+                            start = start.trim().replace(' ', 'T') + ":00",
+                            end = end.trim().ifEmpty { null }?.let { it.replace(' ', 'T') + ":00" },
+                            location = place.trim().ifEmpty { null }
+                        ))
                         return@Button
                     }
-                    val triggers = JSONObject()
-                    if (reminder.isNotBlank()) triggers.put("time", reminder.trim())
-                    if (placeOn) triggers.put("location", JSONObject().put("location", placeZone).put("event", placeEvent))
-                    if (carOn) triggers.put("car", carEvent)
-                    if (wakeOn) triggers.put("wake", true)
-                    onCreate(JSONObject().apply {
-                        put("title", title.trim())
-                        put("due_date", due.trim().ifEmpty { JSONObject.NULL })
-                        put("priority", priority)
-                        if (group.isNotBlank()) put("group", group)
-                        put("triggers", triggers)
-                    })
+                    val triggers = Triggers(
+                        time = reminder.trim().takeIf { reminder.isNotBlank() },
+                        location = if (placeOn) LocationTrigger(placeZone, placeEvent) else null,
+                        car = carEvent.takeIf { carOn },
+                        wake = true.takeIf { wakeOn }
+                    )
+                    onCreate(SuggestionEdits.Task(title.trim(), due.trim().ifEmpty { null }, priority, group.ifBlank { null }, triggers))
                 },
                 enabled = title.isNotBlank() && (if (isEvent) startValid && endValid else dueValid && reminderValid),
                 modifier = Modifier.weight(1f)

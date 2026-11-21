@@ -1,7 +1,11 @@
 package io.github.ronganam.dana.data.money
 
 import android.content.Context
+import io.github.ronganam.dana.data.network.ApiClient
+import io.github.ronganam.dana.data.network.ApiJson
 import io.github.ronganam.dana.data.network.ApiService
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import io.github.ronganam.dana.data.network.Me
 import org.json.JSONObject
 import java.net.URLEncoder
@@ -26,7 +30,7 @@ class MoneyApiError(
  * The `/api/money/…` routes (server docs/money.md → API, Page API). Every
  * answer is JSON, amounts in agorot; non-2xx throws [MoneyApiError], an
  * unreachable server `IOException`. A 403 `not_connected` also forgets the
- * kind ([Me.drop]) so More hides Money.
+ * add-on ([Me.drop]) so More hides Money.
  */
 class MoneyApi(private val context: Context, private val api: () -> ApiService) {
 
@@ -40,11 +44,11 @@ class MoneyApi(private val context: Context, private val api: () -> ApiService) 
 
     private suspend fun call(method: String, path: String, body: JSONObject?): JSONObject {
         val full = if (path.startsWith("/api/")) path else "/api/money$path"
-        val (code, text) = api().jsonCall(method, full, body)
+        val (code, text) = api().http.call(method, full, body?.let { ApiJson.parseToJsonElement(it.toString()) })
         val json = runCatching { JSONObject(text) }.getOrDefault(JSONObject())
         if (code !in 200..299) {
             val error = json.optString("error")
-            if (code == 403 && error == "not_connected") Me.drop(context, KIND)
+            if (code == 403 && error == "not_connected") Me.drop(context, ADDON)
             throw MoneyApiError(
                 code = code,
                 error = error,
@@ -66,7 +70,7 @@ class MoneyApi(private val context: Context, private val api: () -> ApiService) 
     }
 
     companion object {
-        const val KIND = "money"
+        const val ADDON = "money"
 
         fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
 
@@ -78,5 +82,26 @@ class MoneyApi(private val context: Context, private val api: () -> ApiService) 
             }
             return if (parts.isEmpty()) "" else "?" + parts.joinToString("&")
         }
+    }
+}
+
+/** What the phone itself sends the money add-on: bank sign-in codes and bank / card app notifications. */
+class MoneyDeviceApi(private val http: ApiClient) {
+    /** `GET /api/money/code-requests/{id}`: what the server waits for (`status`, `senders`, `code_regex`, `expires_at`). */
+    suspend fun codeRequest(id: String): JSONObject =
+        JSONObject(http.text(http.request("/api/money/code-requests/${MoneyApi.enc(id)}"), "Couldn't fetch the code request", "{}"))
+
+    /**
+     * Hand the server the sign-in code from the bank's SMS. Returns the HTTP
+     * status only (200 taken, 400 `bad_code`, 404, 409 `not_pending`);
+     * unreachable throws IOException. Nothing here logs the code.
+     */
+    suspend fun postCode(id: String, code: String): Int =
+        http.call("POST", "/api/money/code-requests/${MoneyApi.enc(id)}", buildJsonObject { put("code", code) }).code
+
+    /** `POST /api/money/signals`: bank / card app notifications. HTTP status + body (`accepted`, or `error`). */
+    suspend fun postSignals(notifications: org.json.JSONArray): Pair<Int, JSONObject> {
+        val r = http.call("POST", "/api/money/signals", ApiJson.parseToJsonElement(JSONObject().put("notifications", notifications).toString()))
+        return r.code to runCatching { JSONObject(r.body) }.getOrDefault(JSONObject())
     }
 }

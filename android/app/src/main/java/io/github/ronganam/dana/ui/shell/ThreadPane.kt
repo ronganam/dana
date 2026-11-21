@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.ui.shell
 
+import io.github.ronganam.dana.data.network.pretty
+import kotlinx.serialization.json.JsonPrimitive
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -71,13 +73,13 @@ import java.time.ZoneId
 fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modifier = Modifier) {
     val chat = viewModel.chatController
     val shell = viewModel.shellController
-    val messages by viewModel.chatMessages.collectAsState()
-    val sessionContext by viewModel.sessionContext.collectAsState()
-    val selectionRequest by viewModel.selectionRequest.collectAsState()
-    val pendingExtension by viewModel.pendingExtension.collectAsState()
-    val statusText by viewModel.chatStatusText.collectAsState()
-    val chatModels by viewModel.chatModels.collectAsState()
-    val chatModel by viewModel.chatModel.collectAsState()
+    val messages by viewModel.chatController.chatMessages.collectAsState()
+    val sessionContext by viewModel.chatController.sessionContext.collectAsState()
+    val selectionRequest by viewModel.chatController.selectionRequest.collectAsState()
+    val pendingExtension by viewModel.chatController.pendingExtension.collectAsState()
+    val statusText by viewModel.chatController.chatStatusText.collectAsState()
+    val chatModels by viewModel.chatController.models.collectAsState()
+    val chatModel by viewModel.chatController.chatModel.collectAsState()
     val gapMinutes by chat.gapMinutes.collectAsState()
     val hasOlder by chat.hasOlder.collectAsState()
     val loadingOlder by chat.loadingOlder.collectAsState()
@@ -113,7 +115,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
         val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: return@LaunchedEffect
         if (lastVisible >= info.totalItemsCount - 2) listState.scrollBy(10_000f)
     }
-    val pendingApproval by viewModel.pendingApproval.collectAsState()
+    val pendingApproval by viewModel.chatController.pendingApproval.collectAsState()
     LaunchedEffect(selectionRequest, pendingExtension, pendingApproval) {
         if ((selectionRequest != null || pendingExtension != null || pendingApproval != null) && listState.layoutInfo.totalItemsCount > 0) {
             kotlinx.coroutines.delay(150)
@@ -135,7 +137,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
             if (statusText.isNotEmpty()) {
                 MonoLabel(statusText, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
             } else {
-                if (chatModels.isNotEmpty()) ModelPickerChip(models = chatModels, selectedId = chatModel, onSelect = { viewModel.setChatModel(it) })
+                if (chatModels.isNotEmpty()) ModelPickerChip(models = chatModels, selectedId = chatModel, onSelect = { viewModel.chatController.setChatModel(it) })
                 Spacer(Modifier.weight(1f))
             }
             if (inThread && chat.isThreadMode && memory.remembersAt(memoryNow)) {
@@ -166,7 +168,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                 item(key = "context_card") {
                     ContextAttachmentCard(
                         context = ctxCard,
-                        onPrompt = { prompt -> viewModel.sendChatMessage(prompt) },
+                        onPrompt = { prompt -> viewModel.chatController.sendChatMessage(prompt) },
                         onOpenSource = ctxCard.callId?.let { cid -> { io.github.ronganam.dana.CallDebriefActivity.open(context, cid) } },
                         showPrompts = messages.none { it.isUser }
                     )
@@ -188,8 +190,8 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
             }
             items(rows, key = { it.key }) { row ->
                 when (row) {
-                    is ThreadModel.Row.Separator -> QuietSeparator(row.label, Modifier.animateItemPlacement())
-                    is ThreadModel.Row.MemoryLine -> MemoryLine(row.label, Modifier.animateItemPlacement())
+                    is ThreadModel.Row.Separator -> QuietSeparator(row.label, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
+                    is ThreadModel.Row.MemoryLine -> MemoryLine(row.label, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
                     is ThreadModel.Row.Message -> {
                         val msg = row.msg
                         val faded = if (row.forgotten) Modifier.alpha(FORGOTTEN_ALPHA) else Modifier
@@ -197,11 +199,11 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                             ToolCallCard(
                                 messageId = msg.id,
                                 entry = msg.toolCall,
-                                onToggleCollapse = { id -> viewModel.toggleToolCallCollapse(id) },
-                                onApprove = { approved -> viewModel.approveAction(approved) },
-                                modifier = Modifier.fillMaxWidth().animateItemPlacement().then(faded)
+                                onToggleCollapse = { id -> viewModel.chatController.toggleToolCallCollapse(id) },
+                                onApprove = { approved -> viewModel.chatController.approveAction(approved) },
+                                modifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = null, fadeOutSpec = null).then(faded)
                             )
-                        } else Column(Modifier.animateItemPlacement().then(faded)) {
+                        } else Column(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).then(faded)) {
                             ChatBubble(
                                 msg = msg,
                                 tts = tts,
@@ -232,21 +234,21 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                             toolArgs = p.toolArgs
                         ),
                         onToggleCollapse = {},
-                        onApprove = { approved -> viewModel.approveAction(approved) },
-                        modifier = Modifier.fillMaxWidth().animateItemPlacement()
+                        onApprove = { approved -> viewModel.chatController.approveAction(approved) },
+                        modifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = null, fadeOutSpec = null)
                     )
                 }
             }
             if (undos.isNotEmpty()) {
-                item(key = "undos") { UndoRows(undos, onUndo = { chat.undo(it) }, modifier = Modifier.animateItemPlacement()) }
+                item(key = "undos") { UndoRows(undos, onUndo = { chat.undo(it) }, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)) }
             }
             selectionRequest?.let { sel ->
                 item(key = "selection_request_card") {
                     SelectionCard(
                         request = sel,
-                        onSelect = { indices -> viewModel.sendSelection(indices) },
-                        onCancel = { viewModel.cancelSelection() },
-                        modifier = Modifier.animateItemPlacement()
+                        onSelect = { indices -> viewModel.chatController.sendSelection(indices) },
+                        onCancel = { viewModel.chatController.cancelSelection() },
+                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
                     )
                 }
             }
@@ -254,9 +256,9 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                 item(key = "pending_extension_card") {
                     IterationPromptCard(
                         summary = ext.summary,
-                        onExtend = { viewModel.extendIterations() },
-                        onStop = { viewModel.declineIterations() },
-                        modifier = Modifier.animateItemPlacement()
+                        onExtend = { viewModel.chatController.extendIterations() },
+                        onStop = { viewModel.chatController.declineIterations() },
+                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
                     )
                 }
             }
@@ -264,8 +266,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
     }
 }
 
-private fun prettyArgs(raw: String): String =
-    runCatching { org.json.JSONObject(raw).toString(2) }.getOrDefault(raw)
+private fun prettyArgs(raw: String): String = JsonPrimitive(raw).pretty()
 
 /**
  * "New topic": Dana forgets the conversation so far (the messages stay).

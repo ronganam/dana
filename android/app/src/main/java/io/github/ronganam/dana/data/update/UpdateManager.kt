@@ -8,7 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import java.io.File
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
@@ -24,11 +27,24 @@ data class AppVersionInfo(
     val releaseNotes: String
 )
 
+/** One artifact's entry of `GET /api/app/version` (its version keys are camelCase). */
+@Serializable
+private data class VersionEntry(
+    @SerialName("versionName") val versionName: String = "",
+    @SerialName("versionCode") val versionCode: Int = 0,
+    val file: String = "",
+    val sha256: String = "",
+    val size: Long = 0,
+    val releaseNotes: String = ""
+) {
+    fun toInfo(artifact: String) = AppVersionInfo(artifact, versionName, versionCode, file, sha256, size, releaseNotes)
+}
+
 /**
  * Checks the Dana server for new app versions and performs the
  * download + system-installer handoff.
  *
- * Server endpoints (the server's core/app_updates.py):
+ * Server endpoints (server/core/app_updates.py):
  *   GET {server}/api/app/version          -> {"phone": {...}, "wear": {...}}
  *   GET {server}/api/app/download/{file}  -> the APK
  */
@@ -48,18 +64,9 @@ object UpdateManager {
                         Log.d(TAG, "version check HTTP ${response.code} for $base")
                         return@withContext null
                     }
-                    val body = response.body?.string() ?: return@withContext null
-                    val obj = JSONObject(body)
-                    val entry = obj.optJSONObject(artifact) ?: return@withContext null
-                    AppVersionInfo(
-                        artifact = artifact,
-                        versionName = entry.optString("versionName"),
-                        versionCode = entry.optInt("versionCode", 0),
-                        file = entry.optString("file"),
-                        sha256 = entry.optString("sha256"),
-                        size = entry.optLong("size", 0L),
-                        releaseNotes = entry.optString("release_notes")
-                    )
+                    val body = response.body.string()
+                    val entry = (ApiJson.parseToJsonElement(body) as? JsonObject)?.get(artifact) as? JsonObject ?: return@withContext null
+                    ApiJson.decodeFromJsonElement(VersionEntry.serializer(), entry).toInfo(artifact)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Update check failed: ${e.message}")
@@ -91,7 +98,7 @@ object UpdateManager {
                     Log.w(TAG, "APK download HTTP ${response.code}")
                     return@withContext null
                 }
-                val body = response.body ?: return@withContext null
+                val body = response.body
                 val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
                 val target = File(updatesDir, info.file)
                 val digest = MessageDigest.getInstance("SHA-256")

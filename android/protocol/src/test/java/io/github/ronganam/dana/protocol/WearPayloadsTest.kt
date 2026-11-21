@@ -27,9 +27,6 @@ class WearPayloadsTest {
         val json = wire(place.toJson())
         assertFalse(json.has("minutes"))
         assertEquals(place, SnoozeRequest.fromJson(json))
-        val server = place.serverPayload()
-        assertFalse(server.has("task_id"))
-        assertEquals("arrive", server.getString("event"))
     }
 
     @Test fun taskStatusAndReply() {

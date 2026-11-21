@@ -3,7 +3,6 @@ package io.github.ronganam.dana.tv
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
-import android.net.Uri
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -34,6 +33,7 @@ import io.github.ronganam.dana.R
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import androidx.core.net.toUri
 
 /**
  * Camera picture-in-picture over whatever is on screen.
@@ -78,7 +78,7 @@ object CameraPip {
             service != null -> service to WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
             Settings.canDrawOverlays(context) -> context.applicationContext to WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else -> {
-                Toast.makeText(context, "Enable the Dana TV button service to show cameras", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, R.string.toast_enable_tv_button_service, Toast.LENGTH_LONG).show()
                 return
             }
         }
@@ -180,7 +180,7 @@ object CameraPip {
     }
 
     private fun resolveHost(url: String): String = runCatching {
-        val uri = Uri.parse(url)
+        val uri = url.toUri()
         val host = uri.host ?: return url
         val ip = LanDns.resolveToIp(host)
         if (ip == host) url else url.replaceFirst("//$host", "//$ip")
@@ -207,7 +207,15 @@ object CameraPip {
             all.filter { it.softwareOnly }.ifEmpty { all }
         }
         val videoOnly = RenderersFactory { handler, videoListener, _, _, _ ->
-            arrayOf(MediaCodecVideoRenderer(ctx, softwareFirst, 0L, handler, videoListener, 50))
+            arrayOf(
+                MediaCodecVideoRenderer.Builder(ctx)
+                    .setMediaCodecSelector(softwareFirst)
+                    .setAllowedJoiningTimeMs(0L)
+                    .setEventHandler(handler)
+                    .setEventListener(videoListener)
+                    .setMaxDroppedFramesToNotify(50)
+                    .build()
+            )
         }
         val p = ExoPlayer.Builder(ctx, videoOnly)
             .setLooper(pipHandler.looper)
@@ -252,7 +260,7 @@ object CameraPip {
             RtspMediaSource.Factory()
                 .setForceUseRtpTcp(true)
                 .setTimeoutMs(8_000)
-                .createMediaSource(MediaItem.fromUri(Uri.parse(url)))
+                .createMediaSource(MediaItem.fromUri(url.toUri()))
         )
         p.playWhenReady = true
         p.prepare()

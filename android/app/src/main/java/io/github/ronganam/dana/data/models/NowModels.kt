@@ -2,7 +2,7 @@ package io.github.ronganam.dana.data.models
 
 /*
  * Now, the Notifications screen and search (server docs/now.md). Parsed in
- * data/network/NowJson.kt. Every field the server may leave out is nullable
+ * data/network/NowApi.kt. Every field the server may leave out is nullable
  * or has a default; unknown fields are ignored.
  */
 
@@ -19,6 +19,7 @@ data class NowPayload(
     val calendarOk: Boolean
 )
 
+@kotlinx.serialization.Serializable
 data class NowNotificationCounts(val total: Int = 0, val noise: Int = 0, val needsYou: Int = 0)
 
 /**
@@ -44,8 +45,8 @@ data class NowItem(
 data class NowAction(
     val action: String,
     val label: String,
-    /** The action's own args (JSON object as text, so the model stays plain data). */
-    val argsJson: String? = null,
+    /** The action's own args, sent back as they came. */
+    val args: kotlinx.serialization.json.JsonObject = kotlinx.serialization.json.JsonObject(emptyMap()),
     val client: Boolean = false
 )
 
@@ -89,8 +90,8 @@ sealed class NowBlock {
     data class Choices(override val label: String?, val key: String, val options: List<Option>) : NowBlock() {
         data class Option(
             val label: String,
-            /** The value as JSON text (an object, a string, a number…). */
-            val valueJson: String,
+            /** The value (an object, a string, a number…), sent back as it came. */
+            val value: kotlinx.serialization.json.JsonElement,
             val selected: Boolean,
             val actionLabel: String?,
             val message: String?
@@ -99,7 +100,7 @@ sealed class NowBlock {
 
     /** The checked values go as a list in `args[key]` with the primary. */
     data class Checks(override val label: String?, val key: String, val options: List<Option>) : NowBlock() {
-        data class Option(val label: String, val valueJson: String, val checked: Boolean)
+        data class Option(val label: String, val value: kotlinx.serialization.json.JsonElement, val checked: Boolean)
     }
 
     data class Unknown(val type: String, override val label: String?) : NowBlock()
@@ -142,6 +143,7 @@ data class NotificationsOverview(
     val summariesRefreshing: Boolean
 )
 
+@kotlinx.serialization.Serializable
 data class OverviewCounts(val total: Int = 0, val noise: Int = 0, val needsYou: Int = 0, val snoozed: Int = 0)
 
 /**

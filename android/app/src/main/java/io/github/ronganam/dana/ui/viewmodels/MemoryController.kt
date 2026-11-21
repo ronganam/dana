@@ -19,7 +19,7 @@ class MemoryController(private val ctx: ControllerContext) {
         ctx.scope.launch {
             _isLoadingMemories.value = true
             try {
-                ctx.load("Memories") { ctx.api.getMemories() }?.let { _memories.value = it }
+                ctx.load("Memories") { ctx.api.tasks.memories() }?.let { _memories.value = it }
             } finally {
                 _isLoadingMemories.value = false
             }
@@ -28,7 +28,7 @@ class MemoryController(private val ctx: ControllerContext) {
 
     fun createMemory(key: String, value: String, category: String) {
         ctx.action("Couldn't save memory") {
-            ctx.api.createMemory(key, value, category).also { if (it) fetchMemories() }
+            ctx.api.tasks.createMemory(key, value, category).also { if (it) fetchMemories() }
         }
     }
 
@@ -36,9 +36,9 @@ class MemoryController(private val ctx: ControllerContext) {
         ctx.action("Couldn't update memory") {
             // The API has no rename: write the new key first, then drop the old
             // one, so a failure can't lose the memory.
-            val ok = ctx.api.createMemory(newKey, value, category)
+            val ok = ctx.api.tasks.createMemory(newKey, value, category)
             if (ok && oldKey != newKey) {
-                ctx.api.deleteMemory(oldKey)
+                ctx.api.tasks.deleteMemory(oldKey)
             }
             if (ok) fetchMemories()
             ok
@@ -47,7 +47,7 @@ class MemoryController(private val ctx: ControllerContext) {
 
     fun deleteMemory(key: String) {
         ctx.action("Couldn't delete memory") {
-            ctx.api.deleteMemory(key).also { if (it) fetchMemories() }
+            ctx.api.tasks.deleteMemory(key).also { if (it) fetchMemories() }
         }
     }
 }

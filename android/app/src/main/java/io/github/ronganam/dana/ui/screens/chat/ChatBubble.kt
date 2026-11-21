@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.chat
 
+import io.github.ronganam.dana.ui.components.rememberCopyText
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -21,10 +22,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.ChatMessage
@@ -35,6 +34,7 @@ import io.github.ronganam.dana.ui.screens.MarkdownText
 import io.github.ronganam.dana.ui.screens.TypingIndicator
 import coil.compose.AsyncImage
 import java.util.Locale
+import io.github.ronganam.dana.R
 
 /** A TextToSpeech for "tap a reply to hear it", shut down with the composable. */
 @Composable
@@ -68,7 +68,7 @@ fun ChatBubble(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
+    val copy = rememberCopyText()
     val isUser = msg.isUser
     val isHebrew = remember(msg.message) { msg.message.any { it in '\u0590'..'\u05FF' } }
     val layoutDirection = if (isHebrew) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -104,8 +104,8 @@ fun ChatBubble(
                             },
                             onLongPress = {
                                 if (!msg.isThinking) {
-                                    clipboardManager.setText(AnnotatedString(msg.message))
-                                    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                                    copy(msg.message)
+                                    Toast.makeText(context, R.string.toast_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                                 }
                             }
                         )

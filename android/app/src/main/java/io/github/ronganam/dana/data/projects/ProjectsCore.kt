@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.projects
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import java.util.Locale
@@ -38,7 +39,7 @@ data class PhoneLinks(val value: String, val tel: String, val wa: String)
 
 /**
  * The pure part of the Projects screens, ported from the web panel's
- * `static/projects-core.js` (server repo): values by column type, the best
+ * `server/static/projects-core.js`: values by column type, the best
  * value per compared column, option order, section state lines, countdown,
  * budget, the fields a value edit sends, Hebrew words and counts.
  */
@@ -47,8 +48,9 @@ object ProjectsCore {
     val DECISIONS = listOf("", "shortlist", "chosen", "rejected")
     private val DECISION_ORDER = mapOf("chosen" to 0, "shortlist" to 1, "" to 2, "rejected" to 3)
     val TYPES = listOf("text", "money", "number", "phone", "url", "date", "checkbox", "rating", "select")
-    val TYPE_LABELS = mapOf(
-        "text" to "Text", "money" to "Price (₪)", "number" to "Number", "phone" to "Phone", "url" to "Link",
+    /** The column types' names (the price label carries the user's currency). */
+    val TYPE_LABELS get() = mapOf(
+        "text" to "Text", "money" to MoneyFormat.label("Price"), "number" to "Number", "phone" to "Phone", "url" to "Link",
         "date" to "Date", "checkbox" to "Yes / no", "rating" to "Rating", "select" to "Choice"
     )
 
@@ -82,11 +84,6 @@ object ProjectsCore {
     }
 
     private fun grouped(n: Long): String = String.format(Locale.US, "%,d", n)
-    fun money(n: Double): String = (if (n < 0) "-₪" else "₪") + grouped(abs(n).roundToLong())
-    fun shortMoney(n: Double): String = if (abs(n) >= 1000) {
-        val k = (n / 100).roundToLong() / 10.0
-        "₪" + (if (k % 1.0 == 0.0) grouped(k.toLong()) else String.format(Locale.US, "%,.1f", k)) + "k"
-    } else money(n)
 
     fun number(n: Double): String =
         if (n % 1.0 == 0.0) grouped(n.toLong()) else String.format(Locale.US, "%,.2f", n).trimEnd('0').trimEnd('.')
@@ -130,7 +127,7 @@ object ProjectsCore {
         val text = v.toString()
         return when (col?.type ?: "text") {
             "money", "number" -> asNumber(v)?.let { n ->
-                ValueShown(if (col?.type == "money") money(n) else number(n), ValueShown.Style.NUMBER)
+                ValueShown(if (col?.type == "money") MoneyFormat.major(n) else number(n), ValueShown.Style.NUMBER)
             } ?: ValueShown(text, ValueShown.Style.PLAIN)
             "checkbox" -> if (v == true) ValueShown("✓ " + lang.t("Yes", "כן"), ValueShown.Style.YES)
                 else ValueShown("✕ " + lang.t("No", "לא"), ValueShown.Style.NO)
@@ -203,11 +200,11 @@ object ProjectsCore {
         return SectionState(mine.size, chosen, shortlisted, rejected, line, prices.minOrNull(), prices.maxOrNull())
     }
 
-    /** "₪12k" or "₪12k–₪14k" for a section card, "" without prices. */
+    /** "₪12k" or "₪12k–₪14k" (in the user's currency) for a section card, "" without prices. */
     fun priceRange(st: SectionState): String {
         val lo = st.priceMin ?: return ""
         val hi = st.priceMax ?: lo
-        return if (lo == hi) shortMoney(lo) else "${shortMoney(lo)}–${shortMoney(hi)}"
+        return if (lo == hi) MoneyFormat.thousands(lo) else "${MoneyFormat.thousands(lo)}–${MoneyFormat.thousands(hi)}"
     }
 
     fun countdown(iso: String?, today: LocalDate, lang: Lang): Countdown? {

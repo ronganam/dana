@@ -21,8 +21,6 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -71,8 +69,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** The Shopping screen (the list itself is shared with the widget and the watch: `ShoppingSync`). */
     val shoppingController = ShoppingController(ctx, appContext)
     val moneyController = MoneyController(ctx, appContext)
-    /** The integrations the user has connected (`/api/me`), as they change: which places and More rows show. */
-    val kinds: kotlinx.coroutines.flow.StateFlow<Set<String>> = io.github.ronganam.dana.data.network.Me.kinds(appContext)
+    /** The add-ons the user has connected (`/api/me`), as they change: which places and More rows show. */
+    val addons: kotlinx.coroutines.flow.StateFlow<Set<String>> = io.github.ronganam.dana.data.network.Me.addons(appContext)
     /** Navigation state of the new main screen (places, picks, thread sheet, on-screen context). */
     val shellController: ShellController = ShellController(
         titleFor = { kind, id -> contextTitle(kind, id) },
@@ -303,30 +301,22 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private fun syncToWear() {
         val sessionId = chatController.sessionId
         viewModelScope.launch {
-            val eventsJson = ctx.load("WearSync") { filterEventsForWatch(apiService.getCalendarEvents()) } ?: "[]"
-            val tasksJson = ctx.load("WearSync") { apiService.getTasksDueSoon() } ?: "[]"
+            val eventsJson = ctx.load("WearSync") { io.github.ronganam.dana.data.wear.WatchJson.events(eventsForWatch(apiService.tasks.calendarEvents())) } ?: "[]"
+            val tasksJson = ctx.load("WearSync") { io.github.ronganam.dana.data.wear.WatchJson.tasks(apiService.tasks.tasksDueSoon()) } ?: "[]"
             WearSyncManager.syncConfigToWear(appContext, serverConfig.url, serverConfig.token, sessionId, eventsJson, tasksJson)
         }
     }
 
-    private fun filterEventsForWatch(rawJson: String): String {
+    /** Timed events that haven't ended more than half an hour ago. */
+    private fun eventsForWatch(events: List<io.github.ronganam.dana.data.models.CalendarEvent>): List<io.github.ronganam.dana.data.models.CalendarEvent> {
         val now = Date()
         val graceMs = 30 * 60 * 1000L
-        return try {
-            val array = JSONArray(rawJson)
-            val filtered = JSONArray()
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                if (obj.optBoolean("all_day", false)) continue
-                val endStr = obj.optString("end", "")
-                if (endStr.isEmpty()) { filtered.put(obj); continue }
-                val endMs = parseIsoTime(endStr)
-                if (endMs != null && now.time > endMs + graceMs) continue
-                filtered.put(obj)
-            }
-            filtered.toString()
-        } catch (_: Exception) {
-            rawJson
+        return events.filter { e ->
+            if (e.allDay) return@filter false
+            val endStr = e.end.orEmpty()
+            if (endStr.isEmpty()) return@filter true
+            val endMs = parseIsoTime(endStr)
+            !(endMs != null && now.time > endMs + graceMs)
         }
     }
 
@@ -348,16 +338,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val navigateToRoute: StateFlow<String?> = _navigateToRoute.asStateFlow()
 
     // --- Call suggestions & context chats ---
-    val callSuggestions get() = callsController.suggestions
-    val busySuggestionIds get() = callsController.busySuggestionIds
-    val callLabelCatalog get() = callsController.labelCatalog
-    val sessionContext get() = chatController.sessionContext
-    fun fetchSuggestions() = callsController.fetchSuggestions()
-    fun fetchLabelCatalog() = callsController.fetchLabelCatalog()
-    fun acceptSuggestion(s: io.github.ronganam.dana.data.models.CallSuggestion, overrides: JSONObject = JSONObject()) =
+    fun acceptSuggestion(s: io.github.ronganam.dana.data.models.CallSuggestion, overrides: io.github.ronganam.dana.data.network.SuggestionEdits = io.github.ronganam.dana.data.network.SuggestionEdits.None) =
         callsController.acceptSuggestion(s, overrides) { tasksController.fetchTasks(); notificationsController.fetch() }
-    fun dismissSuggestion(s: io.github.ronganam.dana.data.models.CallSuggestion) = callsController.dismissSuggestion(s)
-    fun updateCallLabels(callId: String, labelIds: List<String>) = callsController.updateCallLabels(callId, labelIds)
 
     /** "Ask Dana about this": the thread opens with the item pinned as on-screen context. */
     fun openContextChat(kind: String, id: String, title: String = "") {
@@ -415,7 +397,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        super.onCleared()
         callController.endCall()
         chatController.release()
     }
@@ -425,23 +406,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     // ---------------------------------------------------------------------
 
     // Chat
-    val currentSessionId get() = chatController.currentSessionId
-    val chatMessages get() = chatController.chatMessages
-    val sessions get() = chatController.sessions
-    val pendingApproval get() = chatController.pendingApproval
-    val selectionRequest get() = chatController.selectionRequest
-    val pendingExtension get() = chatController.pendingExtension
-    val isStreaming get() = chatController.isStreaming
-    val isRecording get() = chatController.isRecording
-    val chatStatusText get() = chatController.chatStatusText
-    val pendingImageUri get() = chatController.pendingImageUri
-    val chatModels get() = chatController.models
-    val chatModel get() = chatController.chatModel
-    fun setChatModel(id: String) = chatController.setChatModel(id)
 
-    fun fetchSessions() = chatController.fetchSessions()
     fun startNewSession(@Suppress("UNUSED_PARAMETER") saveOld: Boolean = true) = chatController.startNewSession()
-    fun loadSession(targetSessionId: String) = chatController.loadSession(targetSessionId)
 
     /**
      * Show conversation [sessionId] (an approval waiting in Now): the shared
@@ -452,103 +418,26 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!(chatController.isThreadMode && sessionId == chatController.sessionId)) chatController.loadSession(sessionId)
     }
     /** Returns false when the message was not sent (server unreachable). */
-    fun sendChatMessage(message: String): Boolean = chatController.sendChatMessage(message)
-    fun stopAssistant() = chatController.stopAssistant()
-    fun approveAction(approved: Boolean) = chatController.approveAction(approved)
-    fun sendSelection(indices: List<Int>) = chatController.sendSelection(indices)
-    fun cancelSelection() = chatController.cancelSelection()
-    fun extendIterations() = chatController.extendIterations()
-    fun declineIterations() = chatController.declineIterations()
-    fun toggleToolCallCollapse(messageId: String) = chatController.toggleToolCallCollapse(messageId)
-    fun setPendingImage(uri: Uri?) = chatController.setPendingImage(uri)
-    fun clearPendingImage() = chatController.clearPendingImage()
-    val draftText get() = chatController.draftText
-    fun consumeDraft() = chatController.consumeDraft()
     fun startChatFromShare(text: String?, imageUri: Uri?) {
         chatController.startChatFromShare(text, imageUri)
         navigateTo("chat")
     }
-    fun startVoiceRecording() = chatController.startVoiceRecording()
-    fun stopVoiceRecording() = chatController.stopVoiceRecording()
 
     // Realtime call
-    val selectedRealtimeModel get() = callController.selectedRealtimeModel
-    val isCallActive get() = callController.isCallActive
-    val isCallMuted get() = callController.isCallMuted
-    val isSpeakerOn get() = callController.isSpeakerOn
-    val callStatus get() = callController.callStatus
-    val currentLiveTranscript get() = callController.currentLiveTranscript
-    val activeCallToolName get() = callController.activeCallToolName
 
-    fun setRealtimeModel(model: String) = callController.setRealtimeModel(model)
-    fun updateRealtimeModel(model: String) = callController.setRealtimeModel(model)
-    fun toggleCallMute() = callController.toggleCallMute()
-    fun toggleSpeaker() = callController.toggleSpeaker()
     fun startRealtimeCall() {
         chatController.stopVoiceRecording()
         callController.startCall()
     }
-    fun endRealtimeCall() = callController.endCall()
 
     // Tasks
-    val tasks get() = tasksController.tasks
-    val isLoadingTasks get() = tasksController.isLoadingTasks
-    val taskGroups get() = tasksController.taskGroups
-    val isLoadingGroups get() = tasksController.isLoadingGroups
-    val selectedGroupFilter get() = tasksController.selectedGroupFilter
-    val sortMode get() = tasksController.sortMode
-    val selectedTriggerFilter get() = tasksController.selectedTriggerFilter
-    val zones get() = tasksController.zones
 
-    fun fetchTasks() = tasksController.fetchTasks()
-    fun fetchZones() = tasksController.fetchZones()
-    fun createTask(title: String, description: String?, priority: String, dueDate: String?, triggers: JSONObject?, groupId: String? = null) =
-        tasksController.createTask(title, description, priority, dueDate, triggers, groupId)
-    fun updateTask(taskId: String, title: String, description: String?, priority: String, dueDate: String?, status: String, triggers: JSONObject?, groupId: String? = null) =
-        tasksController.updateTask(taskId, title, description, priority, dueDate, status, triggers, groupId)
-    fun updateTaskStatus(taskId: String, newStatus: String) = tasksController.updateTaskStatus(taskId, newStatus)
-    fun deleteTask(taskId: String) = tasksController.deleteTask(taskId)
-    fun fetchTaskGroups() = tasksController.fetchTaskGroups()
-    fun createTaskGroup(name: String, emoji: String, color: String, description: String?) =
-        tasksController.createTaskGroup(name, emoji, color, description)
-    fun updateTaskGroup(id: String, name: String, emoji: String, color: String, description: String?) =
-        tasksController.updateTaskGroup(id, name, emoji, color, description)
-    fun deleteTaskGroup(id: String) = tasksController.deleteTaskGroup(id)
-    fun setGroupFilter(groupId: String?) = tasksController.setGroupFilter(groupId)
-    fun setSortMode(mode: SortMode) = tasksController.setSortMode(mode)
-    fun setTriggerFilter(triggerType: String?) = tasksController.setTriggerFilter(triggerType)
 
     // Memories
-    val memories get() = memoryController.memories
-    val isLoadingMemories get() = memoryController.isLoadingMemories
 
-    fun fetchMemories() = memoryController.fetchMemories()
-    fun createMemory(key: String, value: String, category: String) = memoryController.createMemory(key, value, category)
-    fun updateMemory(oldKey: String, newKey: String, value: String, category: String) =
-        memoryController.updateMemory(oldKey, newKey, value, category)
-    fun deleteMemory(key: String) = memoryController.deleteMemory(key)
 
     // Call recordings
-    val calls get() = callsController.calls
-    val isLoadingCalls get() = callsController.isLoadingCalls
-    val isScanningRecordings get() = callsController.isScanningRecordings
-    val recordingSelectionList get() = callsController.recordingSelectionList
-    val uploadFormState get() = callsController.uploadFormState
-    val sharedAudioUri get() = callsController.sharedAudioUri
 
-    fun fetchCalls() = callsController.fetchCalls()
-    fun deleteCall(callId: String) = callsController.deleteCall(callId)
-    fun reanalyzeCall(callId: String, customInstructions: String?) = callsController.reanalyzeCall(callId, customInstructions)
-    fun startRecordingSelection() = callsController.startRecordingSelection()
-    fun clearRecordingSelection() = callsController.clearRecordingSelection()
-    fun showUploadForm(uri: Uri, displayName: String, context: Context) = callsController.showUploadForm(uri, displayName, context)
-    fun showUploadFormForRecording(pending: PendingRecordingFile) = callsController.showUploadFormForRecording(pending)
-    fun dismissUploadForm() = callsController.dismissUploadForm()
-    fun updateUploadField(caller: String? = null, receiver: String? = null, timestamp: String? = null, instructions: String? = null) =
-        callsController.updateUploadField(caller, receiver, timestamp, instructions)
-    fun submitUploadForm(context: Context) = callsController.submitUploadForm(context)
-    fun setSharedAudioUri(uri: Uri?) = callsController.setSharedAudioUri(uri)
-    fun clearSharedAudioUri() = callsController.clearSharedAudioUri()
 
     private companion object {
         val ISO_FORMATS = listOf(

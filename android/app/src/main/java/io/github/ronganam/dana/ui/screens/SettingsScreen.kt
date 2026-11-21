@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.BuildConfig
@@ -38,6 +39,9 @@ import io.github.ronganam.dana.ui.components.InkChip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.core.content.edit
+import androidx.core.net.toUri
+import io.github.ronganam.dana.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,7 +58,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
     val wearVersionInfo by viewModel.wearVersionInfo.collectAsState()
     val wearUpdateInfo by viewModel.wearUpdateInfo.collectAsState()
 
-    var downloadProgress by remember { mutableStateOf(-1) }
+    var downloadProgress by remember { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -122,7 +126,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                         onClick = {
                             viewModel.updateServerConfig(serverUrl, apiToken)
                             serverUrl = viewModel.serverConfig.url
-                            Toast.makeText(context, "Settings Saved", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_settings_saved, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                     ) { Text("Save") }
@@ -144,7 +148,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                             try {
                                 context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
                             } catch (e: Exception) {
-                                Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_couldnt_open_settings, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
@@ -165,7 +169,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                             checked = liveTranscription,
                             onCheckedChange = {
                                 liveTranscription = it
-                                prefs.edit().putBoolean(DeviceSpeech.PREF_KEY, it).apply()
+                                prefs.edit { putBoolean(DeviceSpeech.PREF_KEY, it) }
                             }
                         )
                     }
@@ -240,10 +244,10 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                                             downloadProgress = -1
                                             if (file != null) {
                                                 if (!UpdateManager.installApk(context, file)) {
-                                                    Toast.makeText(context, "Could not launch installer", Toast.LENGTH_LONG).show()
+                                                    Toast.makeText(context, R.string.toast_couldnt_launch_installer, Toast.LENGTH_LONG).show()
                                                 }
                                             } else {
-                                                Toast.makeText(context, "Download failed — try again", Toast.LENGTH_LONG).show()
+                                                Toast.makeText(context, R.string.toast_download_failed, Toast.LENGTH_LONG).show()
                                             }
                                         }
                                     },
@@ -261,7 +265,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                     Text(
                         text = when {
                             wearVersion == null -> "Watch app: not connected (open the watch app once)"
-                            wearBehind -> "Watch app ${wearVersion.versionName} — update ${latestWear!!.versionName} available via deploy script"
+                            wearBehind -> "Watch app ${wearVersion.versionName} — update ${latestWear.versionName} available via deploy script"
                             else -> "Watch app ${wearVersion.versionName}: up to date"
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -291,6 +295,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
 @Composable
 private fun CallRecordingSettings() {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(CallUploadSettings.enabled(context)) }
     var auto by remember { mutableStateOf(CallUploadSettings.autoUpload(context)) }
@@ -306,7 +311,7 @@ private fun CallRecordingSettings() {
     val enableLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         callLogGranted = result[android.Manifest.permission.READ_CALL_LOG] ?: callLogGranted
         if (result[CallUploadSettings.storagePermission] == false) {
-            Toast.makeText(context, "Dana needs access to audio files to see call recordings", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, R.string.toast_needs_audio_access, Toast.LENGTH_LONG).show()
         }
         CallRecordingObserverService.start(context)
     }
@@ -401,7 +406,8 @@ private fun CallRecordingSettings() {
                         backlogBusy = false
                         Toast.makeText(
                             context,
-                            if (n == 0) "Nothing new to upload" else "Uploading $n recordings in the background",
+                            if (n == 0) resources.getString(R.string.toast_nothing_new_to_upload)
+                            else resources.getQuantityString(R.plurals.toast_uploading_recordings, n, n),
                             Toast.LENGTH_LONG
                         ).show()
                     }
@@ -515,7 +521,7 @@ private fun PopUpSettings() {
     val context = LocalContext.current
     var overlay by remember { mutableStateOf(io.github.ronganam.dana.SuggestionsReceiver.canPopUp(context)) }
     var fullScreen by remember { mutableStateOf(io.github.ronganam.dana.SuggestionsReceiver.canUseFullScreen(context)) }
-    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
             if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -541,7 +547,7 @@ private fun PopUpSettings() {
                 onClick = {
                     context.startActivity(
                         android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            android.net.Uri.parse("package:${context.packageName}"))
+                            "package:${context.packageName}".toUri())
                             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                     )
                 },
@@ -555,7 +561,7 @@ private fun PopUpSettings() {
                 onClick = {
                     context.startActivity(
                         android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
-                            android.net.Uri.parse("package:${context.packageName}"))
+                            "package:${context.packageName}".toUri())
                             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                     )
                 },
@@ -575,7 +581,7 @@ private fun CallerCardSettings() {
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
     ) { missing = io.github.ronganam.dana.callcard.CallerCards.missing(context) }
     // Re-check after coming back from the overlay settings screen.
-    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
             if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) missing = io.github.ronganam.dana.callcard.CallerCards.missing(context)
@@ -612,7 +618,7 @@ private fun CallerCardSettings() {
                 if ("display over other apps" in missing) {
                     OutlinedButton(onClick = {
                         runCatching {
-                            context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${context.packageName}")))
+                            context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri()))
                         }
                     }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Allow display over other apps") }
                 }

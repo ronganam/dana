@@ -53,7 +53,12 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.PeopleApi
+import io.github.ronganam.dana.data.network.long
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import androidx.core.content.edit
 
 /**
  * Caller card: while someone known calls (or the user calls them), a floating card
@@ -102,7 +107,7 @@ object CallerCards {
         ServerConfig.prefs(context).getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(context: Context, on: Boolean) {
-        ServerConfig.prefs(context).edit().putBoolean(KEY_ENABLED, on).apply()
+        ServerConfig.prefs(context).edit { putBoolean(KEY_ENABLED, on) }
         if (!on) CallerCardOverlay.hide()
     }
 
@@ -144,7 +149,7 @@ object CallerCards {
         cached(context, number)?.let { CallerCardOverlay.show(context, it, incoming) }
         val card = withTimeoutOrNull(4000) {
             withContext(Dispatchers.IO) {
-                runCatching { ServerConfig.load(context).api().lookupCaller(number) }
+                runCatching { ServerConfig.load(context).api().people.lookupCaller(number) }
                     .onFailure { Log.d(TAG, "Lookup failed: ${it.message}") }
                     .getOrElse { return@withContext cached(context, number) }
             }
@@ -161,18 +166,22 @@ object CallerCards {
 
     private fun cached(context: Context, number: String): PersonCard? {
         val raw = ServerConfig.prefs(context).getString(CACHE, null) ?: return null
-        return runCatching { JSONObject(raw).optJSONObject(key(number))?.let { PersonCard.from(it) } }.getOrNull()
+        return runCatching { (cache(raw)[key(number)] as? JsonObject)?.let(PeopleApi::card) }.getOrNull()
     }
+
+    /** The cache: number key → the card's JSON plus `_t` (when it was kept). */
+    private fun cache(raw: String?): JsonObject =
+        runCatching { ApiJson.parseToJsonElement(raw ?: "{}") as? JsonObject }.getOrNull() ?: JsonObject(emptyMap())
 
     private fun remember(context: Context, number: String, card: PersonCard) {
         val prefs = ServerConfig.prefs(context)
-        val all = runCatching { JSONObject(prefs.getString(CACHE, "{}") ?: "{}") }.getOrDefault(JSONObject())
-        all.put(key(number), card.toJson().put("_t", System.currentTimeMillis()))
-        if (all.length() > CACHE_MAX) {  // drop the oldest
-            val keys = all.keys().asSequence().toList().sortedBy { all.optJSONObject(it)?.optLong("_t") ?: 0 }
-            keys.take(all.length() - CACHE_MAX).forEach { all.remove(it) }
+        val all = cache(prefs.getString(CACHE, "{}")).toMutableMap()
+        all[key(number)] = JsonObject(PeopleApi.cardJson(card) + ("_t" to JsonPrimitive(System.currentTimeMillis())))
+        if (all.size > CACHE_MAX) {  // drop the oldest
+            val keys = all.keys.sortedBy { (all[it] as? JsonObject)?.long("_t") ?: 0 }
+            keys.take(all.size - CACHE_MAX).forEach { all.remove(it) }
         }
-        prefs.edit().putString(CACHE, all.toString()).apply()
+        prefs.edit { putString(CACHE, JsonObject(all).toString()) }
     }
 
     private fun key(number: String) = number.filter { it.isDigit() }.takeLast(9)
@@ -181,7 +190,7 @@ object CallerCards {
         ServerConfig.prefs(context).getInt(KEY_Y, -1)
 
     internal fun saveY(context: Context, y: Int) =
-        ServerConfig.prefs(context).edit().putInt(KEY_Y, y).apply()
+        ServerConfig.prefs(context).edit { putInt(KEY_Y, y) }
 }
 
 /**

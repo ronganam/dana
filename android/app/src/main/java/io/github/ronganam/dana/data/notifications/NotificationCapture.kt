@@ -9,9 +9,16 @@ import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.CapturedNotification
+import io.github.ronganam.dana.data.network.LenientListSerializer
+import io.github.ronganam.dana.data.network.NotificationButton
+import io.github.ronganam.dana.data.network.RemovedNotification
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonObject
 import java.io.File
+import androidx.core.content.edit
 
 /**
  * What the phone sends to Dana's notification Inbox, and what it never sends.
@@ -39,14 +46,14 @@ object NotificationSettings {
     private val SENSITIVE_NAME = Regex("(?i)(bank|בנק|authenticator|password|bitwarden|1password|lastpass)")
 
     fun enabled(context: Context) = prefs(context).getBoolean(KEY_ENABLED, true)
-    fun setEnabled(context: Context, on: Boolean) = prefs(context).edit().putBoolean(KEY_ENABLED, on).apply()
+    fun setEnabled(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_ENABLED, on) }
 
     fun skipSensitive(context: Context) = prefs(context).getBoolean(KEY_SKIP_SENSITIVE, true)
-    fun setSkipSensitive(context: Context, on: Boolean) = prefs(context).edit().putBoolean(KEY_SKIP_SENSITIVE, on).apply()
+    fun setSkipSensitive(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_SKIP_SENSITIVE, on) }
 
     fun deniedPackages(context: Context): Set<String> = prefs(context).getStringSet(KEY_DENIED, emptySet())?.toSet() ?: emptySet()
-    fun deny(context: Context, pkg: String) = prefs(context).edit().putStringSet(KEY_DENIED, deniedPackages(context) + pkg).apply()
-    fun allow(context: Context, pkg: String) = prefs(context).edit().putStringSet(KEY_DENIED, deniedPackages(context) - pkg).apply()
+    fun deny(context: Context, pkg: String) = prefs(context).edit { putStringSet(KEY_DENIED, deniedPackages(context) + pkg) }
+    fun allow(context: Context, pkg: String) = prefs(context).edit { putStringSet(KEY_DENIED, deniedPackages(context) - pkg) }
 
     fun isDenied(context: Context, pkg: String, appName: String): Boolean {
         if (pkg in deniedPackages(context)) return true
@@ -80,7 +87,7 @@ object Redactor {
     }
 }
 
-/** StatusBarNotification → the JSON the server's `posted` list expects (null = skip it). */
+/** StatusBarNotification → what the server's `posted` list expects (null = skip it). */
 object NotificationExtractor {
     private val SKIP_CATEGORIES = setOf(
         Notification.CATEGORY_TRANSPORT, Notification.CATEGORY_PROGRESS, Notification.CATEGORY_SERVICE,
@@ -121,7 +128,7 @@ object NotificationExtractor {
         }
     }
 
-    fun extract(context: Context, sbn: StatusBarNotification): JSONObject? {
+    fun extract(context: Context, sbn: StatusBarNotification): CapturedNotification? {
         if (!isCapturable(context, sbn)) return null
         val pkg = sbn.packageName
         val app = appName(context, pkg, sbn)
@@ -156,29 +163,30 @@ object NotificationExtractor {
         }
         if (title.isEmpty() && text.isEmpty()) return null
 
-        return JSONObject()
-            .put("key", sbn.key)
-            .put("package", pkg)
-            .put("app_name", app)
-            .put("title", Redactor.redact(title).take(500))
-            .put("text", Redactor.redact(text).take(4000))
-            .put("sub_text", Redactor.redact(extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString().orEmpty()).take(300))
-            .put("sender", sender.take(200))
-            .put("conversation", conversation.take(200))
-            .put("is_group", isGroup)
-            .put("category", n.category ?: "")
-            .put("channel", n.channelId ?: "")
-            .put("posted_at", sbn.postTime)
-            .put("actions", actionsJson(n))
+        return CapturedNotification(
+            key = sbn.key,
+            packageName = pkg,
+            appName = app,
+            title = Redactor.redact(title).take(500),
+            text = Redactor.redact(text).take(4000),
+            subText = Redactor.redact(extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString().orEmpty()).take(300),
+            sender = sender.take(200),
+            conversation = conversation.take(200),
+            isGroup = isGroup,
+            category = n.category ?: "",
+            channel = n.channelId ?: "",
+            postedAt = sbn.postTime,
+            actions = buttons(n)
+        )
     }
 
     /** The notification's buttons (title + whether it takes typed text), pressable from Dana. */
-    fun actionsJson(n: Notification): JSONArray {
-        val out = JSONArray()
+    fun buttons(n: Notification): List<NotificationButton> {
+        val out = mutableListOf<NotificationButton>()
         n.actions?.forEach { a ->
             val title = a?.title?.toString()?.trim().orEmpty()
-            if (title.isEmpty() || a.actionIntent == null || out.length() >= 6) return@forEach
-            out.put(JSONObject().put("title", title.take(60)).put("reply", a.remoteInputs?.any { it.allowFreeFormInput } == true))
+            if (title.isEmpty() || a.actionIntent == null || out.size >= 6) return@forEach
+            out += NotificationButton(title.take(60), a.remoteInputs?.any { it.allowFreeFormInput } == true)
         }
         return out
     }
@@ -209,38 +217,44 @@ object NotificationOutbox {
     private val lock = Any()
     private var seq = System.currentTimeMillis()
 
-    data class Batch(val ids: List<Long>, val posted: JSONArray, val removed: JSONArray) {
+    data class Batch(val ids: List<Long>, val posted: List<CapturedNotification>, val removed: List<RemovedNotification>) {
         val isEmpty get() = ids.isEmpty()
     }
 
-    fun addPosted(context: Context, item: JSONObject) = add(context, "posted", item)
-    fun addRemoved(context: Context, key: String, reason: String, code: Int? = null) =
-        add(context, "removed", JSONObject().put("key", key).put("reason", reason).put("at", System.currentTimeMillis())
-            .apply { code?.let { put("code", it) } })
+    /** One queued entry of `notification_outbox.json`: `{id, type: posted | removed, data}`. */
+    @Serializable
+    private data class Entry(val id: Long = 0, val type: String = "", val data: JsonObject? = null)
 
-    private fun add(context: Context, type: String, data: JSONObject) {
+    fun addPosted(context: Context, item: CapturedNotification) =
+        add(context, "posted", ApiJson.encodeToJsonElement(CapturedNotification.serializer(), item) as JsonObject)
+
+    fun addRemoved(context: Context, key: String, reason: String, code: Int? = null) =
+        add(context, "removed", ApiJson.encodeToJsonElement(RemovedNotification.serializer(), RemovedNotification(key, reason, System.currentTimeMillis(), code)) as JsonObject)
+
+    private fun add(context: Context, type: String, data: JsonObject) {
         synchronized(lock) {
-            val arr = read(context)
-            arr.put(JSONObject().put("id", ++seq).put("type", type).put("data", data))
+            val all = read(context) + Entry(++seq, type, data)
             // Over the cap (days offline): drop the oldest, never the newest.
-            val trimmed = if (arr.length() > MAX_ITEMS) {
+            val trimmed = if (all.size > MAX_ITEMS) {
                 Log.w(TAG, "Outbox over $MAX_ITEMS items; dropping the oldest")
-                JSONArray().also { out -> for (i in arr.length() - MAX_ITEMS until arr.length()) out.put(arr.get(i)) }
-            } else arr
+                all.takeLast(MAX_ITEMS)
+            } else all
             write(context, trimmed)
         }
     }
 
     fun peek(context: Context, max: Int = 200): Batch = synchronized(lock) {
-        val arr = read(context)
         val ids = mutableListOf<Long>()
-        val posted = JSONArray()
-        val removed = JSONArray()
-        for (i in 0 until minOf(arr.length(), max)) {
-            val o = arr.optJSONObject(i) ?: continue
-            ids += o.optLong("id")
-            val data = o.optJSONObject("data") ?: continue
-            if (o.optString("type") == "removed") removed.put(data) else posted.put(data)
+        val posted = mutableListOf<CapturedNotification>()
+        val removed = mutableListOf<RemovedNotification>()
+        for (e in read(context).take(max)) {
+            ids += e.id
+            val data = e.data ?: continue
+            if (e.type == "removed") {
+                runCatching { ApiJson.decodeFromJsonElement(RemovedNotification.serializer(), data) }.getOrNull()?.let { removed += it }
+            } else {
+                runCatching { ApiJson.decodeFromJsonElement(CapturedNotification.serializer(), data) }.getOrNull()?.let { posted += it }
+            }
         }
         Batch(ids, posted, removed)
     }
@@ -249,38 +263,31 @@ object NotificationOutbox {
     fun remove(context: Context, ids: Collection<Long>) {
         if (ids.isEmpty()) return
         val drop = ids.toHashSet()
-        synchronized(lock) {
-            val arr = read(context)
-            val out = JSONArray()
-            for (i in 0 until arr.length()) {
-                val o = arr.optJSONObject(i) ?: continue
-                if (o.optLong("id") !in drop) out.put(o)
-            }
-            write(context, out)
-        }
+        synchronized(lock) { write(context, read(context).filter { it.id !in drop }) }
     }
 
-    fun size(context: Context): Int = synchronized(lock) { read(context).length() }
+    fun size(context: Context): Int = synchronized(lock) { read(context).size }
 
-    fun clear(context: Context) = synchronized(lock) { write(context, JSONArray()) }
+    fun clear(context: Context) = synchronized(lock) { write(context, emptyList()) }
 
     private fun file(context: Context) = File(context.filesDir, FILE_NAME)
 
-    private fun read(context: Context): JSONArray = try {
+    private fun read(context: Context): List<Entry> = try {
         val f = file(context)
-        if (f.exists()) JSONArray(f.readText()) else JSONArray()
+        if (f.exists()) ApiJson.decodeFromString(LenientListSerializer(Entry.serializer()), f.readText()) else emptyList()
     } catch (e: Exception) {
         Log.e(TAG, "Outbox unreadable; starting over", e)
-        JSONArray()
+        emptyList()
     }
 
-    private fun write(context: Context, arr: JSONArray) {
+    private fun write(context: Context, entries: List<Entry>) {
         // Write-then-rename so a crash mid-write never corrupts the outbox.
+        val text = ApiJson.encodeToString(ListSerializer(Entry.serializer()), entries)
         val f = file(context)
         val tmp = File(f.parentFile, "$FILE_NAME.tmp")
-        tmp.writeText(arr.toString())
+        tmp.writeText(text)
         if (!tmp.renameTo(f)) {
-            f.writeText(arr.toString())
+            f.writeText(text)
             tmp.delete()
         }
     }

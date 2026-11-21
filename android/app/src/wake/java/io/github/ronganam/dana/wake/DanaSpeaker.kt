@@ -96,7 +96,7 @@ class DanaSpeaker(context: Context) {
         private fun isInstalled(context: Context, pkg: String): Boolean =
             runCatching { context.packageManager.getPackageInfo(pkg, 0) }.isSuccess
 
-        private val HEBREW = listOf(Locale("he", "IL"), Locale("iw", "IL"), Locale("he"), Locale("iw"))
+        private val HEBREW = listOf(Locale.forLanguageTag("he-IL"), Locale.Builder().setLanguage("iw").setRegion("IL").build(), Locale.forLanguageTag("he"), Locale.Builder().setLanguage("iw").build())
 
         fun isMostlyHebrew(text: String): Boolean {
             var he = 0

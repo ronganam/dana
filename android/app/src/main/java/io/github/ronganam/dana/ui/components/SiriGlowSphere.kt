@@ -75,7 +75,7 @@ fun SiriGlowSphere(
             label = "breathingScale"
         )
     } else {
-        remember { mutableStateOf(1.0f) }
+        remember { mutableFloatStateOf(1.0f) }
     }
 
     val pulseScale = scaleAnim * breathingScale
@@ -92,7 +92,7 @@ fun SiriGlowSphere(
             label = "ripple1Radius"
         )
     } else {
-        remember { mutableStateOf(0f) }
+        remember { mutableFloatStateOf(0f) }
     }
 
     val ripple1Alpha by if (isListening) {
@@ -106,7 +106,7 @@ fun SiriGlowSphere(
             label = "ripple1Alpha"
         )
     } else {
-        remember { mutableStateOf(0f) }
+        remember { mutableFloatStateOf(0f) }
     }
 
     val ripple2Radius by if (isListening) {
@@ -120,7 +120,7 @@ fun SiriGlowSphere(
             label = "ripple2Radius"
         )
     } else {
-        remember { mutableStateOf(0f) }
+        remember { mutableFloatStateOf(0f) }
     }
 
     val ripple2Alpha by if (isListening) {
@@ -134,7 +134,7 @@ fun SiriGlowSphere(
             label = "ripple2Alpha"
         )
     } else {
-        remember { mutableStateOf(0f) }
+        remember { mutableFloatStateOf(0f) }
     }
 
     Canvas(modifier = modifier.graphicsLayer(compositingStrategy = CompositingStrategy.Offscreen)) {

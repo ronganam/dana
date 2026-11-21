@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import androidx.activity.result.contract.ActivityResultContracts
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -78,7 +79,7 @@ class MainActivity : ComponentActivity() {
         }
 
         if (ungranted.isNotEmpty()) {
-            requestPermissions(ungranted.toTypedArray(), 1001)
+            permissionRequest.launch(ungranted.toTypedArray())
         } else {
             startCallObserverService()
         }
@@ -174,7 +175,7 @@ class MainActivity : ComponentActivity() {
         try {
             when {
                 type.startsWith("audio/") && uri != null -> {
-                    vm.setSharedAudioUri(uri)
+                    vm.callsController.setSharedAudioUri(uri)
                     vm.navigateTo("calls")
                 }
                 type.startsWith("image/") && uri != null -> {
@@ -226,12 +227,8 @@ class MainActivity : ComponentActivity() {
         CallRecordingObserverService.start(this)
     }
 
-    override fun onRequestPermissionsResult(
-        requestCode: Int,
-        permissions: Array<String>,
-        grantResults: IntArray
-    ) {
-        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001) startCallObserverService()
+    /** Notifications, call recordings and the caller card: the observer starts once answered, whatever the answer. */
+    private val permissionRequest = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        startCallObserverService()
     }
 }

@@ -1,10 +1,10 @@
 import java.util.Properties
-import org.jetbrains.kotlin.compose.compiler.gradle.ComposeFeatureFlag
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 // Same release keystore as :app — phone and wear share applicationId and MUST
@@ -16,7 +16,7 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "io.github.ronganam.dana.wear"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.ronganam.dana"
@@ -48,8 +48,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     buildFeatures {
         compose = true
@@ -58,49 +58,46 @@ android {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_1_8)
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
-composeCompiler {
-    // Strong skipping (on by default since Kotlin 2.0.20) changes when
-    // composables skip recomposition; kept off so the Kotlin 2 upgrade doesn't
-    // change how screens update. The flag goes away in Kotlin 2.5: turn strong
-    // skipping on (and test the screens) before moving past 2.4.
-    @Suppress("DEPRECATION_ERROR")
-    featureFlags.add(ComposeFeatureFlag.StrongSkipping.disabled())
-}
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.13.0")
+    implementation("androidx.core:core-ktx:1.19.1")
     implementation(project(":protocol"))
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-    implementation("com.google.android.gms:play-services-wearable:18.1.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation("com.google.android.gms:play-services-wearable:20.0.1")
+    constraints {
+        // play-services-base pulls fragment 1.1.0; the permission request (ActivityResult API) needs 1.3+.
+        implementation("androidx.fragment:fragment:1.5.4")
+    }
 
-    val composeBom = platform("androidx.compose:compose-bom:2024.04.00")
+    val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.material:material-icons-extended")
-    implementation("androidx.activity:activity-compose:1.9.0")
-    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.11.1")
 
     // Wear Compose
-    implementation("androidx.wear.compose:compose-material:1.3.1")
-    implementation("androidx.wear.compose:compose-foundation:1.3.1")
-    implementation("androidx.wear.compose:compose-navigation:1.3.1")
+    implementation("androidx.wear.compose:compose-material:1.7.2")
+    implementation("androidx.wear.compose:compose-foundation:1.7.2")
+    implementation("androidx.wear.compose:compose-navigation:1.7.2")
 
     // Watch Face Complications
-    implementation("androidx.wear.watchface:watchface-complications-data-source:1.2.1")
-    implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.2.1")
+    implementation("androidx.wear.watchface:watchface-complications-data-source:1.3.0")
+    implementation("androidx.wear.watchface:watchface-complications-data-source-ktx:1.3.0")
 
     // Wear Tiles
-    implementation("androidx.wear.tiles:tiles:1.4.1")
-    implementation("androidx.wear.protolayout:protolayout:1.3.0")
-    implementation("androidx.wear.protolayout:protolayout-material:1.3.0")
-    implementation("com.google.guava:guava:32.1.3-android")
+    implementation("androidx.wear.tiles:tiles:1.6.2")
+    implementation("androidx.wear.protolayout:protolayout:1.4.2")
+    implementation("androidx.wear.protolayout:protolayout-material:1.4.2")
+    implementation("com.google.guava:guava:33.8.0-android")
 
     // JVM tests of the pure shopping model (same versions as :app; org.json because Android's is a stub off-device)
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20260814")
 }
