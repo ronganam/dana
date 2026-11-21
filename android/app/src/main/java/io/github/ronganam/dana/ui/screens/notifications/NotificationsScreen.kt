@@ -16,7 +16,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.pulltorefresh.PullToRefreshContainer
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
 import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -106,11 +107,19 @@ fun NotificationsListPane(
     actions: NotificationsActions
 ) {
     val pull = rememberPullToRefreshState()
-    if (pull.isRefreshing) LaunchedEffect(true) { actions.refresh() }
-    LaunchedEffect(loading) { if (!loading) pull.endRefresh() }
+    var pullRefreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(loading) { if (!loading) pullRefreshing = false }
     val counts = overview?.counts
 
-    Box(Modifier.fillMaxSize().nestedScroll(pull.nestedScrollConnection)) {
+    PullToRefreshBox(
+        isRefreshing = pullRefreshing, onRefresh = { pullRefreshing = true; actions.refresh() }, state = pull, modifier = Modifier.fillMaxSize(),
+        indicator = {
+            PullToRefreshDefaults.Indicator(
+                state = pull, isRefreshing = pullRefreshing, modifier = Modifier.align(Alignment.TopCenter),
+                containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, color = MaterialTheme.colorScheme.primary
+            )
+        }
+    ) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)) {
             item(key = "head") {
                 Column(Modifier.padding(horizontal = GUTTER)) {
@@ -162,10 +171,6 @@ fun NotificationsListPane(
                 }
             }
         }
-        if (pull.progress > 0f || pull.isRefreshing) PullToRefreshContainer(
-            state = pull, modifier = Modifier.align(Alignment.TopCenter),
-            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh, contentColor = MaterialTheme.colorScheme.primary
-        )
     }
 }
 

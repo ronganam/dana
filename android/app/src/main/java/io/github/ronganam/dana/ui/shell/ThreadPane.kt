@@ -188,8 +188,8 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
             }
             items(rows, key = { it.key }) { row ->
                 when (row) {
-                    is ThreadModel.Row.Separator -> QuietSeparator(row.label, Modifier.animateItemPlacement())
-                    is ThreadModel.Row.MemoryLine -> MemoryLine(row.label, Modifier.animateItemPlacement())
+                    is ThreadModel.Row.Separator -> QuietSeparator(row.label, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
+                    is ThreadModel.Row.MemoryLine -> MemoryLine(row.label, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
                     is ThreadModel.Row.Message -> {
                         val msg = row.msg
                         val faded = if (row.forgotten) Modifier.alpha(FORGOTTEN_ALPHA) else Modifier
@@ -199,9 +199,9 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                                 entry = msg.toolCall,
                                 onToggleCollapse = { id -> viewModel.toggleToolCallCollapse(id) },
                                 onApprove = { approved -> viewModel.approveAction(approved) },
-                                modifier = Modifier.fillMaxWidth().animateItemPlacement().then(faded)
+                                modifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = null, fadeOutSpec = null).then(faded)
                             )
-                        } else Column(Modifier.animateItemPlacement().then(faded)) {
+                        } else Column(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).then(faded)) {
                             ChatBubble(
                                 msg = msg,
                                 tts = tts,
@@ -233,12 +233,12 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                         ),
                         onToggleCollapse = {},
                         onApprove = { approved -> viewModel.approveAction(approved) },
-                        modifier = Modifier.fillMaxWidth().animateItemPlacement()
+                        modifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = null, fadeOutSpec = null)
                     )
                 }
             }
             if (undos.isNotEmpty()) {
-                item(key = "undos") { UndoRows(undos, onUndo = { chat.undo(it) }, modifier = Modifier.animateItemPlacement()) }
+                item(key = "undos") { UndoRows(undos, onUndo = { chat.undo(it) }, modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)) }
             }
             selectionRequest?.let { sel ->
                 item(key = "selection_request_card") {
@@ -246,7 +246,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                         request = sel,
                         onSelect = { indices -> viewModel.sendSelection(indices) },
                         onCancel = { viewModel.cancelSelection() },
-                        modifier = Modifier.animateItemPlacement()
+                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
                     )
                 }
             }
@@ -256,7 +256,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                         summary = ext.summary,
                         onExtend = { viewModel.extendIterations() },
                         onStop = { viewModel.declineIterations() },
-                        modifier = Modifier.animateItemPlacement()
+                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
                     )
                 }
             }
