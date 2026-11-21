@@ -73,6 +73,10 @@ write_addon(two, "alpha")
 write_addon(two, "broken", tools_extra="raise RuntimeError('broken on purpose')")
 write_addon(two, "badslot", ', prompt_parts=(PromptPart("nowhere", "x"),)')
 write_addon(two, "needy", ', needs=("absent",)')
+write_addon(two, "missingpkg")
+(two / "missingpkg" / "requirements.txt").write_text("# optional dep\nnonexistent-dana-pkg-xyz>=1.0\n")
+write_addon(two, "haspkg")
+(two / "haspkg" / "requirements.txt").write_text("# installed dep\npydantic>=2.0\naiohttp  # inline comment\n")
 (one / "not_an_addon").mkdir()
 
 out = run("""
@@ -98,13 +102,16 @@ out = run("""
 """, f"{one}{os.pathsep}{two}{os.pathsep}{base / 'missing'}")
 lines = lines_of(out)
 check("site addons: by needs then name, folders without addon.py skipped, a missing folder ignored",
-      lines.get("LOADED") == "['alpha', 'zeta', 'beta']", out.stdout + out.stderr[-2000:])
+      lines.get("LOADED") == "['alpha', 'haspkg', 'zeta', 'beta']", out.stdout + out.stderr[-2000:])
 check("site addons: after the official addons; the addon order is the loaded order",
       lines.get("AFTER_OFFICIAL") == "True" and lines.get("ORDER_SAME") == "True", lines)
-check("failure isolation: a site addon that fails to import, names an unknown slot or needs a missing addon is "
-      "skipped, the start goes on", lines.get("FAILED") == "['badslot', 'broken', 'needy']", lines.get("FAILED"))
+check("failure isolation: a site addon that fails to import, names an unknown slot, needs a missing addon or "
+      "has missing requirements.txt packages is skipped, the start goes on",
+      lines.get("FAILED") == "['badslot', 'broken', 'missingpkg', 'needy']", lines.get("FAILED"))
 why = lines.get("WHY", "")
-check("failure isolation: each with its reason", "nowhere" in why and "broken on purpose" in why and "absent" in why, why)
+check("failure isolation: each with its reason",
+      "nowhere" in why and "broken on purpose" in why and "absent" in why
+      and "nonexistent-dana-pkg-xyz" in why, why)
 check("failure isolation: a skipped addon leaves no tool behind", lines.get("BROKEN_TOOL") == "False")
 check("site addons: a tool only for a user who connected the addon",
       lines.get("BEFORE") == "False" and lines.get("CONNECTED") == "True False", lines)

@@ -33,7 +33,9 @@ the server runs without it. Anything it raises while importing is caught
 """
 
 import importlib
+import importlib.metadata
 import logging
+import re
 import sys
 import traceback
 from dataclasses import dataclass
@@ -136,6 +138,39 @@ def _guarded(folder: AddonFolder, step: Callable[[], None]) -> bool:
                       f"Addon({folder.name!r}, ...)")
         return False
     return True
+
+
+# Leading PEP 508 distribution name on a requirements.txt line.
+_REQ_NAME = re.compile(r"^([A-Za-z0-9](?:[A-Za-z0-9._-]*[A-Za-z0-9])?)")
+
+
+def _check_requirements(folder: AddonFolder) -> Optional[str]:
+    """Verify every package in ``folder/requirements.txt`` (when present) is
+    installed in this Python environment; returns an error message or None."""
+    req_file = folder.path / "requirements.txt"
+    if not req_file.is_file():
+        return None
+    missing: List[str] = []
+    try:
+        lines = req_file.read_text(encoding="utf-8").splitlines()
+    except OSError as e:
+        return f"could not read requirements.txt: {e}"
+    for raw in lines:
+        line = raw.split("#", 1)[0].strip()
+        if not line or line.startswith("-"):
+            continue
+        spec = line.split(";", 1)[0].strip()
+        match = _REQ_NAME.match(spec)
+        if not match:
+            continue
+        pkg = match.group(1)
+        try:
+            importlib.metadata.distribution(pkg)
+        except importlib.metadata.PackageNotFoundError:
+            missing.append(pkg)
+    if missing:
+        return f"missing package(s) from requirements.txt: {', '.join(missing)}"
+    return None
 
 
 def _manifest(folder: AddonFolder) -> Optional[Addon]:
@@ -283,6 +318,10 @@ def _load() -> Tuple[str, ...]:
             package.__path__.append(str(src.path))  # addons.<name> resolves inside that folder too
     manifests: Dict[str, Addon] = {}
     for f in folders:
+        req_err = _check_requirements(f)
+        if req_err:
+            _fail(f, req_err)
+            continue
         a = _manifest(f)
         if a is not None:
             manifests[f.name] = a

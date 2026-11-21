@@ -48,6 +48,10 @@ COPY static/ ./static/
 # Site addons (docs/writing-an-addon.md): the ones bin/deploy brings from your site; the loader reads
 # /app/addons-site when it exists (core/addon_dirs.py).
 COPY --from=site_addons --exclude=*/worker / ./addons-site/
+# Extra Python packages declared by official or site addons (addons/<name>/requirements.txt).
+RUN set -e; for req in addons/*/requirements.txt addons-site/*/requirements.txt; do \
+        if [ -f "$req" ]; then pip install --no-cache-dir -r "$req"; fi; \
+    done
 # The administration CLI (users, addons; docs/access.md, "Managing users"): kubectl exec … bin/dana users list
 COPY bin/dana ./bin/dana
 COPY cli/ ./cli/

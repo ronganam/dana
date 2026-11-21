@@ -423,6 +423,7 @@ def remove_telegram_id(telegram_user_id: int) -> bool:
     (see :func:`telegram_unlinked`)."""
     try:
         with get_db_connection() as conn:
+            # scoped: telegram_user_id is the unique PK (admin unlink)
             cur = conn.execute("DELETE FROM user_telegram WHERE telegram_user_id = ?", (int(telegram_user_id),))
             conn.commit()
     finally:
