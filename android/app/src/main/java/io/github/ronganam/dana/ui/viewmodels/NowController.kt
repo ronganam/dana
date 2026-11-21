@@ -8,8 +8,9 @@ import io.github.ronganam.dana.data.models.NowAction
 import io.github.ronganam.dana.data.models.NowItem
 import io.github.ronganam.dana.data.models.NowPayload
 import io.github.ronganam.dana.data.models.QuietEntry
+import io.github.ronganam.dana.data.network.UndoOutcome
 import io.github.ronganam.dana.data.network.ApiService
-import io.github.ronganam.dana.data.network.NowJson
+import io.github.ronganam.dana.data.network.NowApi
 import io.github.ronganam.dana.data.notifications.DanaNotificationListener
 import io.github.ronganam.dana.data.notifications.Snoozer
 import io.github.ronganam.dana.ui.screens.now.ItemDraft
@@ -24,7 +25,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.io.File
 
 /**
@@ -78,7 +80,7 @@ class NowController(
     init {
         ctx.scope.launch {
             val cached = withContext(Dispatchers.IO) {
-                runCatching { if (cacheFile.exists()) NowJson.payload(JSONObject(cacheFile.readText())) else null }.getOrNull()
+                runCatching { if (cacheFile.exists()) NowApi.parse(cacheFile.readText()) else null }.getOrNull()
             }
             if (cached != null && _payload.value == null) _payload.value = cached
         }
@@ -98,8 +100,8 @@ class NowController(
                 val token = pending.refreshStarted()
                 _loading.value = true
                 try {
-                    val raw = ctx.api.getNowRaw()
-                    val parsed = NowJson.payload(JSONObject(raw))
+                    val raw = ctx.api.now.nowText()
+                    val parsed = NowApi.parse(raw)
                     _payload.value = parsed
                     _fresh.value = true
                     _failed.value = false
@@ -173,13 +175,12 @@ class NowController(
 
     /** Dropped on a day-strip slot: `schedule {slot}`. */
     fun schedule(item: NowItem, slotKey: String, onFailed: () -> Unit = {}) {
-        send(item.id, "schedule", JSONObject().put("slot", slotKey), item, onFailed)
+        send(item.id, "schedule", JsonObject(mapOf("slot" to JsonPrimitive(slotKey))), item, onFailed)
     }
 
     /** "Add" / "×" on a quiet suggestion. */
     fun actQuiet(entry: QuietEntry, action: NowAction) {
-        val args = action.argsJson?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
-        send(entry.id, action.action, args, null) {}
+        send(entry.id, action.action, action.args, null) {}
     }
 
     /** "Dismiss all" quiet suggestions. */
@@ -189,7 +190,7 @@ class NowController(
         publishHidden()
         ctx.scope.launch {
             try {
-                val r = ctx.api.nowAct("quiet:all", "dismiss", JSONObject())
+                val r = ctx.api.now.act("quiet:all", "dismiss")
                 ids.forEach { pending.finished(it) }
                 announce(r) { ids.forEach(pending::restore); publishHidden() }
                 onChanged("suggestion")
@@ -214,7 +215,7 @@ class NowController(
         publishHidden()
         ctx.scope.launch {
             try {
-                val r = ctx.api.nowAct(item.id, "dismiss", JSONObject())
+                val r = ctx.api.now.act(item.id, "dismiss")
                 pending.finished(item.id)
                 applyOnPhone(item, "dismiss", r)
             } catch (e: CancellationException) {
@@ -228,12 +229,12 @@ class NowController(
         }
     }
 
-    private fun send(id: String, action: String, args: JSONObject, item: NowItem?, onFailed: () -> Unit) {
+    private fun send(id: String, action: String, args: JsonObject, item: NowItem?, onFailed: () -> Unit) {
         pending.add(id)
         publishHidden()
         ctx.scope.launch {
             try {
-                val r = ctx.api.nowAct(id, action, args)
+                val r = ctx.api.now.act(id, action, args)
                 pending.finished(id)
                 if (item != null) applyOnPhone(item, action, r)
                 announce(r) {
@@ -264,9 +265,9 @@ class NowController(
         ctx.messages.postUndoable(r.message, onUndo = {
             ctx.scope.launch {
                 try {
-                    when (ctx.api.undo(undoId)) {
-                        ApiService.UndoOutcome.DONE -> beforeRefresh()
-                        ApiService.UndoOutcome.TOO_LATE -> ctx.messages.post("Too late to undo that")
+                    when (ctx.api.now.undo(undoId)) {
+                        UndoOutcome.DONE -> beforeRefresh()
+                        UndoOutcome.TOO_LATE -> ctx.messages.post("Too late to undo that")
                     }
                 } catch (e: CancellationException) {
                     throw e

@@ -1,7 +1,14 @@
 package io.github.ronganam.dana.projects
 
 import io.github.ronganam.dana.data.projects.ProjectsJson
-import org.json.JSONArray
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.long
+import io.github.ronganam.dana.data.network.text
+import io.github.ronganam.dana.data.projects.ColumnBody
+import io.github.ronganam.dana.data.projects.FieldBody
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -13,7 +20,7 @@ class ProjectsJsonTest {
 
     @Test
     fun parsesTheProjectList() {
-        val list = ProjectsJson.projects(ProjectsFixture.json.getJSONArray("list_owner"))
+        val list = ProjectsJson.projects(ProjectsFixture.text("list_owner"))
         assertEquals(1, list.size)
         val p = list[0]
         assertEquals("חתונה", p.title)
@@ -33,7 +40,7 @@ class ProjectsJsonTest {
 
     @Test
     fun parsesItemsAsTheOwner() {
-        val items = ProjectsJson.items(ProjectsFixture.json.getJSONObject("items_owner"))
+        val items = ProjectsJson.items(ProjectsFixture.text("items_owner"))
         assertEquals(listOf("צלמים", "רעיונות", "DJ"), items.sections.map { it.title })
         val photo = items.sections[0]
         assertTrue(photo.isOptions)
@@ -62,7 +69,7 @@ class ProjectsJsonTest {
 
     @Test
     fun aReadShareCarriesItsAccess() {
-        val items = ProjectsJson.items(ProjectsFixture.json.getJSONObject("items_read"))
+        val items = ProjectsJson.items(ProjectsFixture.text("items_read"))
         assertEquals("read", items.project.access)
         assertEquals("Sam Example", items.project.sharedBy)
         assertFalse(items.project.canEdit)
@@ -72,15 +79,15 @@ class ProjectsJsonTest {
 
     @Test
     fun writesColumnsAndFields() {
-        val items = ProjectsJson.items(ProjectsFixture.json.getJSONObject("items_owner"))
-        val cols: JSONArray = ProjectsJson.columnsJson(items.sections[0].columns)
-        assertEquals(3, cols.length())
-        assertEquals("e4e25675", cols.getJSONObject(0).getString("key"))
-        assertEquals("price", cols.getJSONObject(0).getString("role"))
-        assertFalse(cols.getJSONObject(1).has("role"))
+        val items = ProjectsJson.items(ProjectsFixture.text("items_owner"))
+        val cols = ApiJson.encodeToJsonElement(ListSerializer(ColumnBody.serializer()), ProjectsJson.columnsBody(items.sections[0].columns)) as JsonArray
+        assertEquals(3, cols.size)
+        assertEquals("e4e25675", (cols[0] as JsonObject).text("key"))
+        assertEquals("price", (cols[0] as JsonObject).text("role"))
+        assertFalse((cols[1] as JsonObject).containsKey("role"))
 
-        val fields = ProjectsJson.fieldsJson(items.entries[0].fields)
-        assertEquals("מחיר כולל", fields.getJSONObject(0).getString("name"))
-        assertEquals(13400, fields.getJSONObject(0).getInt("value"))
+        val fields = ApiJson.encodeToJsonElement(ListSerializer(FieldBody.serializer()), ProjectsJson.fieldsBody(items.entries[0].fields)) as JsonArray
+        assertEquals("מחיר כולל", (fields[0] as JsonObject).text("name"))
+        assertEquals(13400L, (fields[0] as JsonObject).long("value"))
     }
 }

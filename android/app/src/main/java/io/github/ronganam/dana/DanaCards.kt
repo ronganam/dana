@@ -12,7 +12,7 @@ import androidx.core.app.NotificationCompat
 import io.github.ronganam.dana.data.models.Briefing
 import io.github.ronganam.dana.data.models.PersonCard
 import io.github.ronganam.dana.data.wear.WearCards
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.PeopleApi
 
 /** Opens the person's page (People screen) from a card, widget or notification. */
 const val EXTRA_OPEN_PERSON_ID = "io.github.ronganam.dana.OPEN_PERSON_ID"
@@ -59,7 +59,7 @@ object DanaCards {
 
     fun cachedBriefing(context: Context): Briefing? {
         val raw = ServerConfig.prefs(context).getString(KEY_BRIEFING, null) ?: return null
-        return runCatching { Briefing.from(JSONObject(raw)) }.getOrNull()
+        return PeopleApi.briefing(raw)
     }
 
     fun storeBriefing(context: Context, b: Briefing) {
@@ -69,11 +69,10 @@ object DanaCards {
 
     /** Store without asking the widgets to refresh (used by the widget refresh itself). */
     fun storeBriefingQuietly(context: Context, b: Briefing) {
-        ServerConfig.prefs(context).edit().putString(KEY_BRIEFING, b.toJson().toString()).apply()
+        ServerConfig.prefs(context).edit().putString(KEY_BRIEFING, PeopleApi.briefingText(b)).apply()
     }
 
-    fun showBriefing(context: Context, d: JSONObject) {
-        val b = Briefing.from(d)
+    fun showBriefing(context: Context, b: Briefing) {
         if (b.headline.isBlank()) return
         storeBriefing(context, b)
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -93,10 +92,8 @@ object DanaCards {
 
     // --- Person card before a meeting ---
 
-    fun showMeetingCard(context: Context, d: JSONObject) {
-        val c = PersonCard.from(d.optJSONObject("card") ?: return)
-        val event = d.optString("event_title")
-        val mins = d.optInt("minutes")
+    /** The `context_card` push: [c] before a meeting called [event], [mins] from now. */
+    fun showMeetingCard(context: Context, c: PersonCard, event: String, mins: Int) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         channel(nm, CH_PEOPLE, "Before you meet someone", NotificationManager.IMPORTANCE_HIGH)
         val title = "${c.name} · $event"
@@ -116,12 +113,11 @@ object DanaCards {
 
     // --- Weekly review ---
 
-    fun showReviewReady(context: Context, d: JSONObject) {
-        val headline = d.optString("headline").ifBlank { "Weekly review" }
-        val items = d.optInt("items")
+    /** The `weekly_review` push: [items] things to decide, [summaryLines] the review's summary. */
+    fun showReviewReady(context: Context, headline: String, items: Int, summaryLines: List<String>) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         channel(nm, CH_REVIEW, "Weekly review", NotificationManager.IMPORTANCE_DEFAULT)
-        val summary = d.optJSONArray("summary")?.let { a -> (0 until a.length()).joinToString(" · ") { a.optString(it) } }.orEmpty()
+        val summary = summaryLines.joinToString(" · ")
         post(context, "weekly_review", 3, NotificationCompat.Builder(context, CH_REVIEW)
             .setSmallIcon(android.R.drawable.ic_menu_agenda)
             .setContentTitle("🗓️ Weekly review — $headline")

@@ -1,7 +1,17 @@
 package io.github.ronganam.dana.data.shopping
 
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.LenientList
+import io.github.ronganam.dana.data.network.LenientListSerializer
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.addJsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
 import java.net.URLEncoder
 import java.util.UUID
 
@@ -36,7 +46,7 @@ sealed class ShoppingOp {
 data class AddPart(val itemId: String, val name: String, val quantity: String = "", val note: String = "")
 
 /** A request: method, path (with `?list=`) and JSON body (null: none). */
-data class OpRequest(val method: String, val path: String, val body: JSONObject?)
+data class OpRequest(val method: String, val path: String, val body: JsonElement?)
 
 object ShoppingOps {
 
@@ -45,17 +55,22 @@ object ShoppingOps {
 
     /** What [op] sends. Adds always go as `{items: [{name, quantity, id}]}` (client ids). */
     fun request(op: ShoppingOp): OpRequest = when (op) {
-        is ShoppingOp.Add -> OpRequest("POST", "/api/shopping/items${q(op.listId)}", JSONObject().put("items", JSONArray(op.parts.map { p ->
-            JSONObject().put("id", p.itemId).put("name", p.name).apply {
-                if (p.quantity.isNotEmpty()) put("quantity", p.quantity)
-                if (p.note.isNotEmpty()) put("note", p.note)
+        is ShoppingOp.Add -> OpRequest("POST", "/api/shopping/items${q(op.listId)}", buildJsonObject {
+            putJsonArray("items") {
+                op.parts.forEach { p ->
+                    addJsonObject {
+                        put("id", p.itemId); put("name", p.name)
+                        if (p.quantity.isNotEmpty()) put("quantity", p.quantity)
+                        if (p.note.isNotEmpty()) put("note", p.note)
+                    }
+                }
             }
-        })))
-        is ShoppingOp.Check -> OpRequest("PATCH", "/api/shopping/items/${enc(op.itemId)}${q(op.listId)}", JSONObject().put("checked", op.checked))
-        is ShoppingOp.Edit -> OpRequest("PATCH", "/api/shopping/items/${enc(op.itemId)}${q(op.listId)}", JSONObject(op.changes as Map<*, *>))
+        })
+        is ShoppingOp.Check -> OpRequest("PATCH", "/api/shopping/items/${enc(op.itemId)}${q(op.listId)}", buildJsonObject { put("checked", op.checked) })
+        is ShoppingOp.Edit -> OpRequest("PATCH", "/api/shopping/items/${enc(op.itemId)}${q(op.listId)}", JsonObject(op.changes.mapValues { JsonPrimitive(it.value) }))
         is ShoppingOp.Remove -> OpRequest("DELETE", "/api/shopping/items/${enc(op.itemId)}${q(op.listId)}", null)
         is ShoppingOp.ClearBought -> OpRequest("POST", "/api/shopping/clear-bought${q(op.listId)}", null)
-        is ShoppingOp.Forget -> OpRequest("DELETE", "/api/shopping/suggestions${q(op.listId)}", JSONObject().put("name", op.name))
+        is ShoppingOp.Forget -> OpRequest("DELETE", "/api/shopping/suggestions${q(op.listId)}", buildJsonObject { put("name", op.name) })
     }
 
     /** The add for typed text (null: nothing in it). More than 30 items is the caller's to refuse. */
@@ -170,41 +185,49 @@ object ShoppingOps {
 
     // ---------- the queue on disk ----------
 
-    fun encode(op: ShoppingOp): JSONObject {
-        val o = JSONObject().put("id", op.id).put("list_id", op.listId)
-        when (op) {
-            is ShoppingOp.Add -> o.put("type", "add").put("parts", JSONArray(op.parts.map {
-                JSONObject().put("item_id", it.itemId).put("name", it.name).put("quantity", it.quantity).put("note", it.note)
-            }))
-            is ShoppingOp.Check -> o.put("type", "check").put("item_id", op.itemId).put("checked", op.checked).put("name", op.name)
-            is ShoppingOp.Edit -> o.put("type", "edit").put("item_id", op.itemId).put("changes", JSONObject(op.changes as Map<*, *>)).put("name", op.name)
-            is ShoppingOp.Remove -> o.put("type", "remove").put("item_id", op.itemId).put("name", op.name)
-            is ShoppingOp.ClearBought -> o.put("type", "clear")
-            is ShoppingOp.Forget -> o.put("type", "forget").put("name", op.name)
-        }
-        return o
+    /** A change as the queue file keeps it (`pending_shopping.json`). */
+    @Serializable
+    private data class StoredPart(val itemId: String = "", val name: String = "", val quantity: String = "", val note: String = "")
+
+    @Serializable
+    private data class StoredOp(
+        val id: String = "",
+        val listId: String = "",
+        val type: String = "",
+        val itemId: String? = null,
+        val name: String? = null,
+        val checked: Boolean? = null,
+        val parts: LenientList<StoredPart>? = null,
+        val changes: Map<String, String>? = null
+    )
+
+    private fun stored(op: ShoppingOp): StoredOp = when (op) {
+        is ShoppingOp.Add -> StoredOp(op.id, op.listId, "add", parts = op.parts.map { StoredPart(it.itemId, it.name, it.quantity, it.note) })
+        is ShoppingOp.Check -> StoredOp(op.id, op.listId, "check", itemId = op.itemId, checked = op.checked, name = op.name)
+        is ShoppingOp.Edit -> StoredOp(op.id, op.listId, "edit", itemId = op.itemId, changes = op.changes, name = op.name)
+        is ShoppingOp.Remove -> StoredOp(op.id, op.listId, "remove", itemId = op.itemId, name = op.name)
+        is ShoppingOp.ClearBought -> StoredOp(op.id, op.listId, "clear")
+        is ShoppingOp.Forget -> StoredOp(op.id, op.listId, "forget", name = op.name)
     }
 
     /** One stored change, or null for anything unreadable (skipped, never fatal). */
-    fun decode(o: JSONObject): ShoppingOp? {
-        val id = o.optString("id")
-        val listId = o.optString("list_id")
+    private fun decode(o: StoredOp): ShoppingOp? {
+        val id = o.id
+        val listId = o.listId
         if (id.isEmpty() || listId.isEmpty()) return null
-        val itemId = o.optString("item_id")
-        val name = o.optString("name")
-        return when (o.optString("type")) {
+        val itemId = o.itemId.orEmpty()
+        val name = o.name.orEmpty()
+        return when (o.type) {
             "add" -> {
-                val a = o.optJSONArray("parts") ?: return null
-                val parts = (0 until a.length()).mapNotNull { a.optJSONObject(it) }.mapNotNull { p ->
-                    val pid = p.optString("item_id"); val pname = p.optString("name")
-                    if (pid.isEmpty() || pname.isEmpty()) null else AddPart(pid, pname, p.optString("quantity"), p.optString("note"))
+                val parts = (o.parts ?: return null).mapNotNull { p ->
+                    if (p.itemId.isEmpty() || p.name.isEmpty()) null else AddPart(p.itemId, p.name, p.quantity, p.note)
                 }
                 if (parts.isEmpty()) null else ShoppingOp.Add(id, listId, parts)
             }
-            "check" -> if (itemId.isEmpty()) null else ShoppingOp.Check(id, listId, itemId, o.optBoolean("checked"), name)
+            "check" -> if (itemId.isEmpty()) null else ShoppingOp.Check(id, listId, itemId, o.checked == true, name)
             "edit" -> {
-                val c = o.optJSONObject("changes") ?: return null
-                if (itemId.isEmpty()) null else ShoppingOp.Edit(id, listId, itemId, c.keys().asSequence().associateWith { c.optString(it) }, name)
+                val c = o.changes ?: return null
+                if (itemId.isEmpty()) null else ShoppingOp.Edit(id, listId, itemId, c, name)
             }
             "remove" -> if (itemId.isEmpty()) null else ShoppingOp.Remove(id, listId, itemId, name)
             "clear" -> ShoppingOp.ClearBought(id, listId)
@@ -213,12 +236,10 @@ object ShoppingOps {
         }
     }
 
-    fun encodeAll(ops: List<ShoppingOp>): String = JSONArray(ops.map(::encode)).toString()
+    fun encodeAll(ops: List<ShoppingOp>): String = ApiJson.encodeToString(ListSerializer(StoredOp.serializer()), ops.map(::stored))
 
-    fun decodeAll(text: String): List<ShoppingOp> {
-        val a = runCatching { JSONArray(text) }.getOrNull() ?: return emptyList()
-        return (0 until a.length()).mapNotNull { a.optJSONObject(it) }.mapNotNull(::decode)
-    }
+    fun decodeAll(text: String): List<ShoppingOp> =
+        runCatching { ApiJson.decodeFromString(LenientListSerializer(StoredOp.serializer()), text) }.getOrDefault(emptyList()).mapNotNull(::decode)
 
     /** Answers worth trying again later: no answer at all, a timeout, too many requests, a server error. */
     fun isRetryable(code: Int): Boolean = code == -1 || code == 408 || code == 429 || code >= 500

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.SuggestionEdits
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Application
 import android.content.Context
@@ -48,7 +49,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 
 /**
  * The call Debrief: opened from the "call analysed" notification or any call.
@@ -150,14 +150,14 @@ class DebriefViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
-            runCatching { _labels.value = api.getCallLabels() }
-            runCatching { _groups.value = api.getTaskGroups().map { it.name } }
+            runCatching { _labels.value = api.calls.labels() }
+            runCatching { _groups.value = api.tasks.groups().map { it.name } }
         }
     }
 
     suspend fun refresh() {
         try {
-            _detail.value = api.getCallDetail(callId)
+            _detail.value = api.calls.detail(callId)
             _error.value = null
         } catch (e: CancellationException) {
             throw e
@@ -185,14 +185,14 @@ class DebriefViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun accept(s: CallSuggestion, overrides: JSONObject = JSONObject()) = withBusy(s.id) {
-        val r = api.acceptSuggestion(s.id, overrides)
-        _toast.value = if (r.optString("kind") == "event") "Added to your calendar" else "Reminder created"
+    fun accept(s: CallSuggestion, overrides: SuggestionEdits = SuggestionEdits.None) = withBusy(s.id) {
+        val r = api.calls.accept(s.id, overrides)
+        _toast.value = if (r.kind == "event") "Added to your calendar" else "Reminder created"
     }
 
-    fun dismiss(s: CallSuggestion) = withBusy(s.id) { api.dismissSuggestion(s.id) }
+    fun dismiss(s: CallSuggestion) = withBusy(s.id) { api.calls.dismiss(s.id) }
 
-    fun setLabels(ids: List<String>) = withBusy("labels") { api.updateCallLabels(callId, ids) }
+    fun setLabels(ids: List<String>) = withBusy("labels") { api.calls.setLabels(callId, ids) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)

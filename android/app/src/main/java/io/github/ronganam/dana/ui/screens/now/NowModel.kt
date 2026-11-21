@@ -7,8 +7,8 @@ import io.github.ronganam.dana.data.models.NowNotification
 import io.github.ronganam.dana.data.models.NowRef
 import io.github.ronganam.dana.data.models.QuietEntry
 import io.github.ronganam.dana.ui.shell.DaySlot
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 
 /*
  * Pure rules of the Now queue (no Android, no Compose), tested in NowModelTest:
@@ -156,24 +156,19 @@ object NowModel {
      * Args for [action] on [item]: the action's own `args`, and for the
      * primary also every `choices` value (`args[key]`) and `checks` list.
      */
-    fun argsFor(item: NowItem, action: NowAction, draft: ItemDraft?, isPrimary: Boolean): JSONObject {
-        val out = action.argsJson?.let { runCatching { JSONObject(it) }.getOrNull() } ?: JSONObject()
-        if (!isPrimary) return out
+    fun argsFor(item: NowItem, action: NowAction, draft: ItemDraft?, isPrimary: Boolean): JsonObject {
+        if (!isPrimary) return action.args
+        val out = action.args.toMutableMap()
         choiceBlocks(item).forEach { b ->
             val opt = b.options.getOrNull(chosenIndex(b, draft)) ?: return@forEach
-            if (b.key.isNotBlank()) out.put(b.key, readValue(opt.valueJson))
+            if (b.key.isNotBlank()) out[b.key] = opt.value
         }
         checkBlocks(item).forEach { b ->
             if (b.key.isBlank()) return@forEach
-            val arr = JSONArray()
-            checkedIndexes(b, draft).sorted().forEach { i -> arr.put(readValue(b.options[i].valueJson)) }
-            out.put(b.key, arr)
+            out[b.key] = JsonArray(checkedIndexes(b, draft).sorted().map { i -> b.options[i].value })
         }
-        return out
+        return JsonObject(out)
     }
-
-    /** A JSON value from its text form (`{"time": …}`, `"abc"`, `3`, `true`, `null`). */
-    fun readValue(text: String): Any = runCatching { JSONObject("{\"v\":$text}").get("v") }.getOrDefault(JSONObject.NULL)
 
     /** Server slot key for a day-strip cell: the hour ("21"), "home" or "wake". */
     fun slotKey(slot: DaySlot): String = when (slot) {

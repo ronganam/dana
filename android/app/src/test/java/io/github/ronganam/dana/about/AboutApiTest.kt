@@ -1,18 +1,23 @@
 package io.github.ronganam.dana.about
 
-import io.github.ronganam.dana.data.network.AboutJson
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.AboutPageWire
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.ChecksWire
+import io.github.ronganam.dana.data.network.ShortcutsWire
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-class AboutJsonTest {
+class AboutApiTest {
+    private fun page(text: String) = ApiJson.decodeFromString(AboutPageWire.serializer(), text).toModel()
+    private fun shortcuts(text: String) = ApiJson.decodeFromString(ShortcutsWire.serializer(), text).toModel()
+    private fun checks(text: String) = ApiJson.decodeFromString(ChecksWire.serializer(), text).toModel()
 
     @Test
     fun parsesSectionsAndFacts() {
-        val page = AboutJson.page(
-            JSONObject(
+        val page = page(
+            (
                 """
                 {"sections": [
                   {"key": "people", "label": "People", "facts": [
@@ -41,8 +46,8 @@ class AboutJsonTest {
 
     @Test
     fun learnedPhrasesComeFirstThenByUse() {
-        val list = AboutJson.shortcuts(
-            JSONObject(
+        val list = shortcuts(
+            (
                 """
                 {"enabled": true, "learn_after": 3, "shortcuts": [
                   {"id": "s1", "phrase": "open the gate", "does": "Open cover Gate", "active": true, "times_used": 2},
@@ -60,8 +65,8 @@ class AboutJsonTest {
 
     @Test
     fun failedChecksComeFirst() {
-        val checks = AboutJson.checks(
-            JSONObject(
+        val checks = checks(
+            (
                 """
                 {"checks": [
                   {"key": "ha", "label": "Home Assistant", "ok": true, "detail": "connected"},

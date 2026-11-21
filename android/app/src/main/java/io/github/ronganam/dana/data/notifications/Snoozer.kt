@@ -64,7 +64,7 @@ object Snoozer {
     /** Server first (throws when it fails), then the shade and return reminders. */
     suspend fun snooze(context: Context, api: ApiService, targets: List<Target>, untilMillis: Long) {
         if (targets.isEmpty()) return
-        val keys = api.snoozeNotifications(targets.map { it.id }, untilMillis)
+        val keys = api.notifications.snooze(targets.map { it.id }, untilMillis)
         applyOnPhone(context, targets, keys, untilMillis)
     }
 
@@ -89,7 +89,7 @@ object Snoozer {
     /** Wake them now (undo / "Unsnooze"). Ones Android snoozed return to the shade at their time. */
     suspend fun wake(context: Context, api: ApiService, ids: List<String>, keys: List<String> = emptyList()) {
         if (ids.isEmpty()) return
-        api.snoozeNotifications(ids, null)
+        api.notifications.snooze(ids, null)
         ids.forEach { SnoozeReturnWorker.cancel(context, it) }
         DanaNotificationListener.unsnooze(keys)
     }

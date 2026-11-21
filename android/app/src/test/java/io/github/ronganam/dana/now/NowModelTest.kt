@@ -6,7 +6,12 @@ import io.github.ronganam.dana.data.models.OverviewApp
 import io.github.ronganam.dana.data.models.OverviewCounts
 import io.github.ronganam.dana.data.models.PhoneNotification
 import io.github.ronganam.dana.data.models.SearchResult
-import io.github.ronganam.dana.data.network.NowJson
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.NotificationsApi
+import io.github.ronganam.dana.data.network.NowApi
+import io.github.ronganam.dana.data.network.OverviewWire
+import io.github.ronganam.dana.data.network.SearchWire
+import io.github.ronganam.dana.data.network.text
 import io.github.ronganam.dana.ui.screens.common.isolatedParts
 import io.github.ronganam.dana.ui.screens.notifications.summaryPoint
 import io.github.ronganam.dana.ui.screens.now.ItemDraft
@@ -18,8 +23,10 @@ import io.github.ronganam.dana.ui.shell.DaySlot
 import io.github.ronganam.dana.ui.viewmodels.AppRule
 import io.github.ronganam.dana.ui.viewmodels.OverviewMath
 import io.github.ronganam.dana.ui.viewmodels.SearchController
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -84,7 +91,7 @@ class NowModelTest {
     }
     """.trimIndent()
 
-    private val payload = NowJson.payload(JSONObject(payloadJson))
+    private val payload = NowApi.parse(payloadJson)
     private val sug = payload.items[0]
     private val task = payload.items[1]
     private val notif = payload.items[2]
@@ -101,7 +108,7 @@ class NowModelTest {
         assertEquals("19", payload.daySlots.single().key)
         assertTrue(sug.schedulable)
         assertEquals("call", sug.ref?.type)
-        assertEquals("""{"source":"call"}""", sug.primary?.argsJson)
+        assertEquals("""{"source":"call"}""", sug.primary?.args.toString())
         assertTrue(notif.primary!!.client)
         assertEquals("com.whatsapp", notif.notification?.packageName)
         assertEquals("Reply", NowModel.replyButton(notif))
@@ -127,28 +134,28 @@ class NowModelTest {
     fun argsComeFromTheChoicesAndChecks() {
         // Defaults: the selected choice, the checked options, plus the action's own args.
         val a = NowModel.argsFor(sug, sug.primary!!, null, isPrimary = true)
-        assertEquals("call", a.getString("source"))
-        assertEquals("2026-11-15T09:00:00", a.getJSONObject("when").getString("time"))
-        assertEquals(listOf<Any>("g1"), a.getJSONArray("lists").values())
+        assertEquals("call", a.text("source"))
+        assertEquals("2026-11-15T09:00:00", (a["when"] as JsonObject).text("time"))
+        assertEquals(listOf<Any>("g1"), (a["lists"] as JsonArray).values())
 
         // The owner picked "At home" and ticked Work and the number.
         val draft = ItemDraft(choices = mapOf("when" to 1), checks = mapOf("lists" to setOf(1, 2)))
         val b = NowModel.argsFor(sug, sug.primary!!, draft, isPrimary = true)
-        assertEquals("home", b.getJSONObject("when").getString("location"))
-        assertEquals(listOf<Any>("g2", 3), b.getJSONArray("lists").values())
+        assertEquals("home", (b["when"] as JsonObject).text("location"))
+        assertEquals(listOf<Any>("g2", 3), (b["lists"] as JsonArray).values())
         assertEquals("Remind at home", NowModel.primaryLabel(sug, draft))
         assertEquals("Add reminder", NowModel.primaryLabel(sug, null))
 
         // A secondary sends only its own args.
         val snooze = NowModel.argsFor(task, task.secondary[0], draft, isPrimary = false)
-        assertEquals(60, snooze.getInt("minutes"))
-        assertFalse(snooze.has("when"))
+        assertEquals(60, (snooze["minutes"] as JsonPrimitive).intOrNull)
+        assertFalse(snooze.containsKey("when"))
 
         // Out-of-range picks fall back to the server's defaults.
         val stale = ItemDraft(choices = mapOf("when" to 9), checks = mapOf("lists" to setOf(7)))
         val c = NowModel.argsFor(sug, sug.primary!!, stale, isPrimary = true)
-        assertEquals("2026-11-15T09:00:00", c.getJSONObject("when").getString("time"))
-        assertEquals(0, c.getJSONArray("lists").length())
+        assertEquals("2026-11-15T09:00:00", (c["when"] as JsonObject).text("time"))
+        assertEquals(0, (c["lists"] as JsonArray).size)
     }
 
     @Test
@@ -181,14 +188,14 @@ class NowModelTest {
 
     @Test
     fun actResultParsesBothKindsOfDeviceKeys() {
-        val dismissed = NowJson.actResult(JSONObject("""{"message":"Cleared","undo_id":"u1","device_keys":["k1","",null]}"""))
+        val dismissed = NotificationsApi.actResult(obj("""{"message":"Cleared","undo_id":"u1","device_keys":["k1","",null]}"""))
         assertEquals("Cleared", dismissed.message)
         assertEquals("u1", dismissed.undoId)
         assertEquals(listOf("k1"), dismissed.cancelKeys)
-        val snoozed = NowJson.actResult(JSONObject("""{"message":"Snoozed","device_keys":[{"key":"k2","until_ms":1763140000000}]}"""))
+        val snoozed = NotificationsApi.actResult(obj("""{"message":"Snoozed","device_keys":[{"key":"k2","until_ms":1763140000000}]}"""))
         assertEquals(mapOf("k2" to 1763140000000L), snoozed.snoozeKeys)
         assertNull(snoozed.undoId)
-        assertEquals("Done", NowJson.actResult(JSONObject("{}")).message)
+        assertEquals("Done", NotificationsApi.actResult(obj("{}")).message)
     }
 
     @Test
@@ -239,7 +246,7 @@ class NowModelTest {
 
     @Test
     fun overviewParsing() {
-        val o = NowJson.overview(JSONObject("""
+        val o = overview(("""
             {"counts": {"total": 3, "noise": 1, "needs_you": 1, "snoozed": 2},
              "apps": [{"package": "com.google.android.gm", "app": "Gmail", "rule": "alert", "rule_action": "alert",
                        "count": 3, "needs_you": 1, "noise": 1, "summary": ["אחת", "Two"], "summary_source": "ai"}, {"app": "no package"}],
@@ -307,10 +314,10 @@ class NowModelTest {
         val g = SearchController.grouped(r)
         assertEquals(listOf("reminder", "person", "note", "mystery"), g.map { it.first })
         assertEquals(listOf("t1", "t2"), g[0].second.map { it.id })
-        val parsed = NowJson.searchResults(JSONObject("""{"results":[{"kind":"call","id":"c1","title":"Call with Avi"},{"kind":"x"}]}"""))
+        val parsed = searchResults(("""{"results":[{"kind":"call","id":"c1","title":"Call with Avi"},{"kind":"x"}]}"""))
         assertEquals(listOf(SearchResult("call", "c1", "Call with Avi", "")), parsed)
         // Routing extras: a notification opens its app's page, a note its project (null = none).
-        val routed = NowJson.searchResults(JSONObject("""{"results":[
+        val routed = searchResults(("""{"results":[
             {"kind":"notification","id":"n1","title":"Running late","subtitle":"WhatsApp · Gal","package":"com.whatsapp"},
             {"kind":"note","id":"e1","title":"Wi-Fi","subtitle":"Home","project_id":"p9"},
             {"kind":"note","id":"e2","title":"Loose","subtitle":"Note","project_id":null}]}"""))
@@ -339,7 +346,7 @@ class NowModelTest {
         // A call suggestion is a phone, even though it has choices and a time.
         assertEquals(NowVisual.Glyph(NowGlyph.CALL), NowModel.visual(sug))
         assertEquals(NowVisual.Glyph(NowGlyph.REMINDER), NowModel.visual(task))
-        fun item(json: String) = NowJson.payload(JSONObject("""{"items":[$json]}""")).items.single()
+        fun item(json: String) = NowApi.parse("""{"items":[$json]}""").items.single()
         assertEquals(NowVisual.Glyph(NowGlyph.APPROVAL), NowModel.visual(item("""{"id":"approval:main","kind":"approval","title":"x","ref":{"type":"thread","id":"main"}}""")))
         assertEquals(NowVisual.Glyph(NowGlyph.CHECK), NowModel.visual(item("""{"id":"check:wake","kind":"check","title":"x"}""")))
         assertEquals(NowVisual.Glyph(NowGlyph.REVIEW), NowModel.visual(item("""{"id":"review:1","kind":"review","title":"x"}""")))
@@ -359,7 +366,7 @@ class NowModelTest {
         // Unknown kinds still get a tile.
         assertEquals(NowVisual.Glyph(NowGlyph.SUGGESTION), NowModel.visual(item("""{"id":"zzz:1","kind":"zzz","title":"x"}""")))
         // Quieter suggestions come from notifications: the app name when the source has one.
-        val quiet = NowJson.payload(JSONObject("""{"items":[],"quiet":[
+        val quiet = NowApi.parse(("""{"items":[],"quiet":[
             {"id":"sug:7","kind":"suggestion","source":"Gmail · 2 h ago","title":"x","ref":{"type":"notification","id":"n"}},
             {"id":"sug:8","kind":"suggestion","source":"Call · Avi · 18:02","title":"x","ref":{"type":"call","id":"c"}}]}""")).quiet
         assertEquals(NowVisual.App(null, "Gmail", NowGlyph.NOTIFICATION), NowModel.visual(quiet[0]))
@@ -377,6 +384,15 @@ class NowModelTest {
     }
 }
 
-// The test classpath compiles against android.jar's JSONArray (no toList()); the
-// real org.json from testImplementation runs the tests.
-private fun JSONArray.values(): List<Any> = (0 until length()).map { get(it) }
+private fun obj(text: String) = ApiJson.parseToJsonElement(text) as JsonObject
+
+private fun overview(text: String): NotificationsOverview = ApiJson.decodeFromString(OverviewWire.serializer(), text).toModel()
+
+private fun searchResults(text: String): List<SearchResult> =
+    ApiJson.decodeFromString(SearchWire.serializer(), text).results.mapNotNull { it.toModel() }
+
+/** Strings and whole numbers as their Kotlin values. */
+private fun JsonArray.values(): List<Any> = map { v ->
+    val p = v as JsonPrimitive
+    if (p.isString) p.content else p.intOrNull ?: p.content
+}

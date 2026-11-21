@@ -217,7 +217,7 @@ class SuggestionAction : ActionCallback {
         WaitingWidget().updateAll(context)
         runCatching {
             val api = ServerConfig.load(context).api()
-            if (accept) api.acceptSuggestion(id) else api.dismissSuggestion(id)
+            if (accept) api.calls.accept(id) else api.calls.dismiss(id)
         }.onFailure { Log.w("Widgets", "Suggestion action failed", it) }
         WidgetRefreshWorker.refreshNow(context)
     }

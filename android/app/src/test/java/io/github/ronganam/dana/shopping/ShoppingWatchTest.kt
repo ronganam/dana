@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.shopping
 
+import io.github.ronganam.dana.data.network.HttpResult
 import io.github.ronganam.dana.data.shopping.ShoppingOp
 import io.github.ronganam.dana.data.shopping.ShoppingStore
 import io.github.ronganam.dana.data.shopping.ShoppingWatch
@@ -34,8 +35,8 @@ class ShoppingWatchTest {
         dir,
         ShoppingStore.Transport { m, p, b ->
             if (!online) throw IOException("unreachable")
-            sent += Triple(m, p, b)
-            reply(m, p)
+            sent += Triple(m, p, b?.let { JSONObject(it.toString()) })
+            reply(m, p).let { (code, text) -> HttpResult(code, text) }
         },
         me = { Who("d3b2f55f2a70", "Noa Peretz") },
         scheduleRetry = {},

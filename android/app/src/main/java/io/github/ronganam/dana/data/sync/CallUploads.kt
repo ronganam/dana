@@ -226,14 +226,14 @@ class CallUploadWorker(appContext: Context, params: WorkerParameters) : Coroutin
         }
 
         val failure: String = try {
-            val result = ServerConfig.load(ctx).api().uploadCall(
+            val result = ServerConfig.load(ctx).api().calls.upload(
                 file, contact, "Me", timestamp,
                 durationSeconds = duration, direction = direction, phoneNumber = number
             )
             if (result != null) {
                 CallUploadStore.mark(ctx, file.name, CallUploadStore.State.UPLOADED)
-                val callId = result.optString("id")
-                val status = result.optString("status")
+                val callId = result.id.orEmpty()
+                val status = result.status.orEmpty()
                 if (callId.isNotEmpty()) {
                     // Quiet "analysing" line; CallResultWorker replaces it with the result.
                     CallUploads.notify(ctx, file.name, baseNotification(

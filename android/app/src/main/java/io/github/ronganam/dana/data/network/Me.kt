@@ -1,53 +1,60 @@
 package io.github.ronganam.dana.data.network
 
 import android.content.Context
+import io.github.ronganam.dana.data.money.MoneyFormat
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import org.json.JSONObject
 
 /**
- * Who the app's token belongs to (`GET /api/me`): id, name and the
- * integrations they have connected (`kinds`). Kept in `DanaPrefs` (three
- * small values) so places that depend on a kind (Shopping) show the right
- * thing at start and offline. [kinds] follows every save, so a place can
- * appear or go as soon as `/api/me` (or a 403 `not_connected`) says so.
+ * Who the app's token belongs to (`GET /api/me`): id, name, the add-ons
+ * they have connected (`addons`), their languages and their currency (ISO
+ * 4217, which [MoneyFormat] writes amounts in). Kept in `DanaPrefs` so places
+ * that depend on an add-on (Shopping) show the right thing at start and
+ * offline. [addons] follows every save, so a place can appear or go as soon
+ * as `/api/me` (or a 403 `not_connected`) says so.
  */
 object Me {
-    data class Info(val id: String, val name: String, val kinds: Set<String>) {
-        fun has(kind: String): Boolean = kind in kinds
+    data class Info(
+        val id: String,
+        val name: String,
+        val addons: Set<String>,
+        val languages: List<String> = emptyList(),
+        val currency: String? = null
+    ) {
+        fun has(addon: String): Boolean = addon in addons
     }
 
     private const val KEY_ID = "me_id"
     private const val KEY_NAME = "me_name"
-    private const val KEY_KINDS = "me_kinds"
+    private const val KEY_ADDONS = "me_addons"
+    private const val KEY_LANGUAGES = "me_languages"
+    private const val KEY_CURRENCY = "me_currency"
 
     private var live: MutableStateFlow<Set<String>>? = null
 
-    /** The connected kinds as they change (starts from the cached answer). */
+    /** The connected add-ons as they change (starts from the cached answer). */
     @Synchronized
-    fun kinds(context: Context): StateFlow<Set<String>> =
-        (live ?: MutableStateFlow(cached(context)?.kinds ?: emptySet()).also { live = it }).asStateFlow()
+    fun addons(context: Context): StateFlow<Set<String>> =
+        (live ?: MutableStateFlow(cached(context)?.addons ?: emptySet()).also { live = it }).asStateFlow()
 
     fun cached(context: Context): Info? {
         val p = ServerConfig.prefs(context)
         val id = p.getString(KEY_ID, null) ?: return null
-        val kinds = p.getString(KEY_KINDS, "").orEmpty().split(',').filter { it.isNotBlank() }.toSet()
-        return Info(id, p.getString(KEY_NAME, "").orEmpty(), kinds)
+        fun list(key: String) = p.getString(key, "").orEmpty().split(',').filter { it.isNotBlank() }
+        return Info(id, p.getString(KEY_NAME, "").orEmpty(), list(KEY_ADDONS).toSet(), list(KEY_LANGUAGES), p.getString(KEY_CURRENCY, null))
+            .also { MoneyFormat.use(it.currency) }
     }
 
-    fun parse(o: JSONObject): Info? {
-        val id = o.optString("id")
-        if (id.isEmpty()) return null
-        val a = o.optJSONArray("kinds")
-        val kinds = if (a == null) emptySet() else (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() }.toSet()
-        return Info(id, o.optString("name"), kinds)
+    fun parse(answer: MeAnswer): Info? {
+        val id = answer.id ?: return null
+        return Info(id, answer.name, answer.addons.toSet(), answer.languages, answer.currency)
     }
 
     /** Ask the server and remember the answer; null (keep the cached one) when it can't be read. */
     suspend fun fetch(context: Context, api: ApiService): Info? = try {
-        parse(api.getMe())?.also { save(context, it) }
+        parse(api.devices.me())?.also { save(context, it) }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
@@ -59,14 +66,29 @@ object Me {
         ServerConfig.prefs(context).edit()
             .putString(KEY_ID, info.id)
             .putString(KEY_NAME, info.name)
-            .putString(KEY_KINDS, info.kinds.sorted().joinToString(","))
+            .putString(KEY_ADDONS, info.addons.sorted().joinToString(","))
+            .putString(KEY_LANGUAGES, info.languages.joinToString(","))
+            .putString(KEY_CURRENCY, info.currency)
             .apply()
-        live?.value = info.kinds
+        MoneyFormat.use(info.currency)
+        live?.value = info.addons
     }
 
-    /** The server said the user lacks [kind] (403 `not_connected`): forget it until the next `/api/me`. */
-    fun drop(context: Context, kind: String) {
+    /** The server said the user lacks [addon] (403 `not_connected`): forget it until the next `/api/me`. */
+    fun drop(context: Context, addon: String) {
         val info = cached(context) ?: return
-        if (kind in info.kinds) save(context, info.copy(kinds = info.kinds - kind))
+        if (addon in info.addons) save(context, info.copy(addons = info.addons - addon))
+    }
+
+    /**
+     * A 403 answer: when it is `not_connected`, forget the add-on it names
+     * (`addon`, else [fallback]) and say so.
+     */
+    fun dropIfNotConnected(context: Context, result: HttpResult, fallback: String): Boolean {
+        if (result.code != 403) return false
+        val json = result.json()
+        if (json.text("error") != "not_connected") return false
+        drop(context, json.text("addon") ?: fallback)
+        return true
     }
 }

@@ -1,29 +1,24 @@
 package io.github.ronganam.dana.ui.viewmodels
 
-import android.annotation.SuppressLint
 import android.content.Context
 import android.content.SharedPreferences
-import android.media.AudioFormat
-import android.media.AudioRecord
-import io.github.ronganam.dana.data.voice.PcmStream
-import io.github.ronganam.dana.data.voice.VoiceInput
-import android.media.MediaRecorder
 import android.net.Uri
 import android.util.Log
-import io.github.ronganam.dana.data.chat.ChatHistoryCodec
 import io.github.ronganam.dana.data.chat.ChatHistoryStore
 import io.github.ronganam.dana.data.chat.ThreadModel
 import io.github.ronganam.dana.data.chat.UndoItem
 import io.github.ronganam.dana.data.network.ApiException
-import io.github.ronganam.dana.data.network.ApiService
+import io.github.ronganam.dana.data.network.ChatApi
+import io.github.ronganam.dana.data.network.RunAction
+import io.github.ronganam.dana.data.network.RunEvent
+import io.github.ronganam.dana.data.network.SessionItem
+import io.github.ronganam.dana.data.network.SessionState
+import io.github.ronganam.dana.data.network.pretty
 import io.github.ronganam.dana.data.models.ChatMessage
 import io.github.ronganam.dana.data.models.ModelOption
 import io.github.ronganam.dana.data.models.PendingExtension
-import io.github.ronganam.dana.data.models.SelectionOption
 import io.github.ronganam.dana.data.models.SelectionRequest
 import io.github.ronganam.dana.data.models.ToolCallEntry
-import io.github.ronganam.dana.data.network.HttpClients
-import io.github.ronganam.dana.data.network.bearerAuth
 import io.github.ronganam.dana.data.network.Reachability
 import io.github.ronganam.dana.data.network.ServerStatusMonitor
 import io.github.ronganam.dana.data.network.SessionBusyException
@@ -37,27 +32,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import okhttp3.Request
-import okhttp3.Response
-import okhttp3.WebSocket
-import okhttp3.WebSocketListener
-import okio.ByteString.Companion.toByteString
-import org.json.JSONArray
-import org.json.JSONObject
 import java.io.IOException
 import java.util.UUID
-
-data class SessionItem(
-    val id: String,
-    val timestamp: Long,
-    val snippet: String,
-    val status: String = "idle",
-    val title: String = ""
-)
 
 data class PendingApproval(
     val toolName: String,
@@ -66,8 +44,10 @@ data class PendingApproval(
 )
 
 /**
- * The conversation: the live SSE assistant stream, push-to-talk voice over
- * WebSocket, and the local transcript cache.
+ * The conversation: it orchestrates the run stream ([RunStreamClient]),
+ * push-to-talk voice ([VoiceSocket] fed by [MicCapture], or the phone's own
+ * recognizer), the Undo row ([ChatUndos]) and the local transcript cache
+ * ([ChatCache]), and maps every run event onto the messages shown.
  *
  * **Thread mode** (the new main screen, the power-button sheet, kiosk and
  * TV): one conversation shared by every device, `session_id: "main"`
@@ -96,7 +76,13 @@ class ChatController(
     /** A run that used tools, or an Undo, may have changed what other screens show. */
     private val onThingsChanged: () -> Unit = {}
 ) {
-    private val store = ChatHistoryStore(appContext, ctx.scope)
+    private val cache = ChatCache(ChatHistoryStore(appContext, ctx.scope), prefs, ctx.scope, { _chatMessages.value }, { sessionId to inThreadNow() })
+    private val store get() = cache.store
+    private val undoRow = ChatUndos(ctx, onThingsChanged)
+    private val runs = RunStreamClient { ctx.api.chat }
+    private val run: RunTracker get() = runs.run
+    private val mic = MicCapture()
+    private val voice = VoiceSocket(onEvent = ::handleVoiceEvent, onFailure = { t -> ctx.scope.launch { onVoiceFailure(t) } })
 
     var sessionId: String = ""
         private set
@@ -178,9 +164,8 @@ class ChatController(
     /** "New topic" is on its way to the server. */
     val clearing: StateFlow<Boolean> = _clearing.asStateFlow()
 
-    private val _undos = MutableStateFlow<List<UndoItem>>(emptyList())
     /** Undo buttons of the latest run (and the outcome of pressed ones). */
-    val undos: StateFlow<List<UndoItem>> = _undos.asStateFlow()
+    val undos: StateFlow<List<UndoItem>> = undoRow.items
 
     /** What is on screen while the owner asks (set by the main screen; null elsewhere). */
     @Volatile var screenProvider: () -> io.github.ronganam.dana.ui.viewmodels.ScreenRef? = { null }
@@ -212,27 +197,10 @@ class ChatController(
     /** `device` to send: only in thread mode (the old per-session chats never sent one). */
     private fun deviceParam(): String? = device.takeIf { threadMode }
 
-    /**
-     * Bookkeeping for the run being rendered. Events carry `run_id` + `seq`,
-     * so a reattached stream that replays frames we already have is ignored.
-     */
-    private class RunTracker {
-        var runId: String? = null
-        var lastSeq = 0
-        var modelLabel: String? = null
-        var gotState = false
-        /** LLM step (iteration) -> id of the live reply bubble for that step. */
-        val stepBubbles = HashMap<Int, String>()
-    }
-
-    @Volatile private var run = RunTracker()
-
-    private var audioRecord: AudioRecord? = null
-    @Volatile private var pcmStream: PcmStream? = null
     private var recordingJob: Job? = null
     private var voiceGateJob: Job? = null
     private var voiceVerifyJob: Job? = null
-    private var currentWebSocket: WebSocket? = null
+    /** Words were heard in the current utterance (the phone's recognizer; the server path asks [mic]). */
     private var hasSpokenInCurrentSession = false
 
     /** Live on-device transcription for the current utterance, if that path is in use. */
@@ -263,20 +231,11 @@ class ChatController(
 
     fun fetchModels() {
         ctx.scope.launch {
-            val json = ctx.load("Models") { JSONObject(ctx.api.getAssistantModels()) } ?: return@launch
-            val arr = json.optJSONArray("models") ?: return@launch
-            val options = (0 until arr.length()).mapNotNull { i ->
-                val o = arr.optJSONObject(i) ?: return@mapNotNull null
-                ModelOption(
-                    id = o.optString("id"),
-                    label = o.optString("label", o.optString("id")),
-                    description = o.optString("description"),
-                    showsReasoning = o.optBoolean("shows_reasoning", false)
-                )
-            }.filter { it.id.isNotEmpty() }
+            val catalog = ctx.load("Models") { ctx.api.chat.models() } ?: return@launch
+            val options = catalog.models
             _models.value = options
             if (options.none { it.id == _chatModel.value }) {
-                _chatModel.value = json.optString("default").ifEmpty { options.firstOrNull()?.id.orEmpty() }
+                _chatModel.value = catalog.default.ifEmpty { options.firstOrNull()?.id.orEmpty() }
             }
         }
     }
@@ -379,41 +338,11 @@ class ChatController(
         persistMessages(current)
     }
 
-    private fun persistMessages(list: List<ChatMessage>) {
-        // The thread can be long; the cache only needs the recent part.
-        store.save(sessionId, if (inThreadNow()) list.takeLast(THREAD_CACHE_MESSAGES) else list)
-        prefs.edit().putLong(KEY_LAST_ACTIVE, System.currentTimeMillis()).apply()
-    }
+    private fun persistMessages(list: List<ChatMessage>) = cache.save(list)
 
-    private var persistPending = false
-    private var persistJob: Job? = null
+    private fun persistMessagesThrottled() = cache.saveSoon()
 
-    /** Coalesce streaming updates into at most one write per second. */
-    private fun persistMessagesThrottled() {
-        if (persistJob?.isActive == true) {
-            persistPending = true
-            return
-        }
-        persistMessages(_chatMessages.value)
-        persistPending = false
-        persistJob = ctx.scope.launch {
-            while (persistPending) {
-                delay(1000)
-                persistPending = false
-                persistMessages(_chatMessages.value)
-            }
-        }
-    }
-
-    /** Write any coalesced pending state immediately. */
-    private fun flushPendingPersist() {
-        if (persistPending) {
-            persistPending = false
-            persistJob?.cancel()
-            persistJob = null
-            persistMessages(_chatMessages.value)
-        }
-    }
+    private fun flushPendingPersist() = cache.flush()
 
     // --- Sessions ---
 
@@ -421,27 +350,13 @@ class ChatController(
         // The shared thread has no session list.
         if (threadMode) return
         ctx.scope.launch {
-            val fromServer = ctx.load("Sessions") { parseSessions(ctx.api.getSessions()) }
+            val fromServer = ctx.load("Sessions") { ctx.api.chat.sessions() }
             _sessions.value = fromServer ?: withContext(Dispatchers.IO) {
                 // Offline: offer the transcripts cached on this device.
                 store.listSessions().map {
                     SessionItem(it.id, it.lastModified, it.snippet, status = "idle", title = "Offline copy")
                 }
             }
-        }
-    }
-
-    private fun parseSessions(json: String): List<SessionItem> {
-        val arr = JSONArray(json)
-        return (0 until arr.length()).map { i ->
-            val obj = arr.getJSONObject(i)
-            SessionItem(
-                id = obj.optString("session_id"),
-                timestamp = parseServerTimestamp(obj.optString("updated_at")) ?: 0L,
-                snippet = obj.optString("snippet", "Empty chat"),
-                status = obj.optString("status", "idle"),
-                title = obj.optString("title", "New Chat")
-            )
         }
     }
 
@@ -475,12 +390,12 @@ class ChatController(
             _currentSessionId.value = sessionId
             _inThread.value = true
             _chatMessages.value = emptyList()
-            _undos.value = emptyList()
+            undoRow.clear()
             _chatStatusText.value = ""
             _sessionContext.value = null
             _hasOlder.value = false
             viewFloorMs = System.currentTimeMillis() - VIEW_FLOOR_MARGIN_MS
-            prefs.edit().putLong(KEY_LAST_ACTIVE, System.currentTimeMillis()).apply()
+            cache.markActive()
             onSessionChanged()
             return
         }
@@ -489,7 +404,7 @@ class ChatController(
         _currentSessionId.value = sessionId
         prefs.edit()
             .putString(KEY_SESSION_ID, sessionId)
-            .putLong(KEY_LAST_ACTIVE, System.currentTimeMillis())
+            .putLong(ChatCache.KEY_LAST_ACTIVE, System.currentTimeMillis())
             .apply()
         _chatMessages.value = emptyList()
         _chatStatusText.value = ""
@@ -497,7 +412,7 @@ class ChatController(
 
         val newId = sessionId
         ctx.scope.launch {
-            ctx.load("CreateSession") { ctx.api.createSession(newId, "New Chat") }
+            ctx.load("CreateSession") { ctx.api.chat.createSession(newId, "New Chat") }
             fetchSessions()
             onSessionChanged()
         }
@@ -515,7 +430,7 @@ class ChatController(
         _inThread.value = inThreadNow()
         if (!threadMode) prefs.edit().putString(KEY_SESSION_ID, sessionId).apply()
         viewFloorMs = 0L
-        _undos.value = emptyList()
+        undoRow.clear()
         _chatMessages.value = if (inThreadNow()) store.load(ThreadModel.MAIN).orEmpty() else emptyList()
         _sessionContext.value = null
         loadActiveSessionHistory()
@@ -523,8 +438,8 @@ class ChatController(
     }
 
     /** One GET of what is shown: the newest thread page, or the whole session. */
-    private suspend fun fetchShown(id: String): JSONObject =
-        JSONObject(if (threadMode && id == ThreadModel.MAIN) ctx.api.getThread(THREAD_PAGE) else ctx.api.getSession(id))
+    private suspend fun fetchShown(id: String): SessionState =
+        if (threadMode && id == ThreadModel.MAIN) ctx.api.chat.thread(THREAD_PAGE) else ctx.api.chat.session(id)
 
     private fun loadActiveSessionHistory() {
         loadHistoryJob?.cancel()
@@ -545,47 +460,38 @@ class ChatController(
         }
     }
 
-    private fun parseAndSetSessionDetail(json: JSONObject) {
-        val status = json.optString("status", "idle")
-        if (json.has("context")) _sessionContext.value = io.github.ronganam.dana.data.network.CallJson.chatContext(json.optJSONObject("context"))
-        val serverMessages = ChatHistoryCodec.decode(json.optJSONArray("messages") ?: JSONArray())
+    private fun parseAndSetSessionDetail(state: SessionState) {
+        if (state.hasContext) _sessionContext.value = state.context
+        val serverMessages = state.messages
 
         if (inThreadNow()) {
-            applyThreadPage(json, serverMessages)
+            applyThreadPage(state, serverMessages)
         } else if (serverMessages.isNotEmpty() || _chatMessages.value.isEmpty()) {
             // Only replace local messages if the server returned some. POST-style
             // responses carry no messages array and must not wipe the chat.
             _chatMessages.value = serverMessages
         }
-        if (json.has("undos")) reconcileUndos(json)
+        state.undos?.let(::reconcileUndos)
 
-        val pendingObj = json.optJSONObject("pending_approval")
-        _pendingApproval.value = pendingObj?.let {
-            PendingApproval(
-                toolName = it.optString("tool_name"),
-                toolArgs = it.optString("tool_args"),
-                toolCallId = it.optString("tool_call_id")
-            )
-        }
-        pendingObj?.let { p ->
-            val reason = approvalReasonOf(p)
-            val id = p.optString("tool_call_id")
-            if (reason.isNotEmpty() && id.isNotEmpty()) updateToolCall(id) { it.copy(approvalReason = reason) }
+        val pending = state.pendingApproval
+        _pendingApproval.value = pending?.let { PendingApproval(it.toolName.orEmpty(), it.toolArgs.orEmpty(), it.toolCallId) }
+        if (pending != null && pending.reason.isNotEmpty() && pending.toolCallId.isNotEmpty()) {
+            updateToolCall(pending.toolCallId) { it.copy(approvalReason = pending.reason) }
         }
 
-        val selectionObj = json.optJSONObject("selection_request")
-        if (selectionObj != null) {
+        val selection = state.selection
+        if (selection != null) {
             _pendingApproval.value = null
-            _selectionRequest.value = selectionObj.toSelectionRequest()
+            _selectionRequest.value = selection
         } else {
             _selectionRequest.value = null
         }
 
-        val activeRun = json.optJSONObject("active_run")
-        if (status == "running" && activeRun != null) {
+        val activeRun = state.activeRunId
+        if (state.status == "running" && activeRun != null) {
             // A run is in flight but this client isn't attached to its stream
             // (reload, app resumed, session switch): replay it and follow live.
-            if (!_isStreaming.value) attachToRun(activeRun.optString("run_id"))
+            if (!_isStreaming.value) attachToRun(activeRun)
         } else if (!_isStreaming.value) {
             removeThinkingIndicator()
             _chatStatusText.value = ""
@@ -600,14 +506,14 @@ class ChatController(
      * The newest thread page (from a GET or a run's closing `state`) over
      * what is shown: stored messages replace live bubbles, older pages stay.
      */
-    private fun applyThreadPage(json: JSONObject, page: List<ChatMessage>) {
-        applyMemory(json)
-        json.optDouble("gap_minutes").takeIf { !it.isNaN() && it > 0 }?.let { _gapMinutes.value = it }
+    private fun applyThreadPage(state: SessionState, page: List<ChatMessage>) {
+        _memory.value = state.memory
+        state.gapMinutes?.let { _gapMinutes.value = it }
         val floor = viewFloorMs
         val visible = if (floor > 0) page.filter { (it.timestamp ?: Long.MAX_VALUE) >= floor } else page
         val current = _chatMessages.value.filter { !it.isThinking }
         var merged = ThreadModel.mergeNewest(current, visible)
-        if (json.optBoolean("shortcut", false)) {
+        if (state.shortcut) {
             val i = merged.indexOfLast { !it.isUser && it.toolCall == null && it.message.isNotBlank() }
             if (i >= 0 && !merged[i].shortcut) merged = merged.toMutableList().also { it[i] = it[i].copy(shortcut = true) }
         }
@@ -615,17 +521,12 @@ class ChatController(
         if (floor > 0) {
             _hasOlder.value = false
         } else if (visible.isNotEmpty() && merged.firstOrNull()?.id == visible.first().id) {
-            _hasOlder.value = json.optBoolean("has_more", false)
-            olderCursor = json.opt("before")?.takeIf { it != JSONObject.NULL }?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+            _hasOlder.value = state.hasMore
+            olderCursor = state.before
         }
         val thinking = _chatMessages.value.filter { it.isThinking }
         _chatMessages.value = merged + thinking
-        if (merged.isNotEmpty()) store.save(ThreadModel.MAIN, merged.takeLast(THREAD_CACHE_MESSAGES))
-    }
-
-    /** The thread state's memory fields (absent on older servers: nothing is drawn). */
-    private fun applyMemory(json: JSONObject) {
-        _memory.value = ThreadModel.parseMemory(json)
+        if (merged.isNotEmpty()) store.save(ThreadModel.MAIN, merged.takeLast(ChatCache.THREAD_CACHE_MESSAGES))
     }
 
     /**
@@ -643,9 +544,9 @@ class ChatController(
         _clearing.value = true
         ctx.scope.launch {
             try {
-                val json = ctx.api.clearThread(device)
+                val state = ctx.api.chat.clearThread(device)
                 if (!inThreadNow()) return@launch
-                parseAndSetSessionDetail(json)
+                parseAndSetSessionDetail(state)
                 // An older server's payload says nothing: Dana remembers nothing now.
                 if (_memory.value == ThreadModel.Memory.Unknown) _memory.value = ThreadModel.Memory.Known(null, null)
                 report("Dana forgot this conversation")
@@ -661,10 +562,8 @@ class ChatController(
         }
     }
 
-    private fun reconcileUndos(state: JSONObject) {
-        val server = ThreadModel.parseUndos(state.optJSONArray("undos"))
-        val lastUserAt = _chatMessages.value.lastOrNull { it.isUser }?.timestamp
-        _undos.update { ThreadModel.reconcileUndos(it, server, lastUserAt) }
+    private fun reconcileUndos(server: List<io.github.ronganam.dana.data.chat.UndoAction>) {
+        undoRow.reconcile(server, _chatMessages.value.lastOrNull { it.isUser }?.timestamp)
     }
 
     /** Scrolled to the top of the thread: fetch the page before the oldest one shown. */
@@ -674,52 +573,20 @@ class ChatController(
         _loadingOlder.value = true
         ctx.scope.launch {
             try {
-                val json = ctx.load("ThreadOlder") { JSONObject(ctx.api.getThread(THREAD_PAGE, cursor)) } ?: return@launch
+                val page = ctx.load("ThreadOlder") { ctx.api.chat.thread(THREAD_PAGE, cursor) } ?: return@launch
                 if (!inThreadNow()) return@launch
-                val older = ChatHistoryCodec.decode(json.optJSONArray("messages") ?: JSONArray())
+                val older = page.messages
                 _chatMessages.value = ThreadModel.prependOlder(_chatMessages.value, older)
-                _hasOlder.value = json.optBoolean("has_more", false) && older.isNotEmpty()
-                olderCursor = json.opt("before")?.takeIf { it != JSONObject.NULL }?.toString()?.takeIf { it.isNotBlank() && it != "null" }
+                _hasOlder.value = page.hasMore && older.isNotEmpty()
+                olderCursor = page.before
             } finally {
                 _loadingOlder.value = false
             }
         }
     }
 
-    /**
-     * Press an Undo under Dana's reply (`POST /api/undo/{id}`). The button
-     * turns into what happened: "Undone.", too late (404, after 15 min), or
-     * the server's reason when it refused (the thing changed since).
-     */
-    fun undo(id: String) {
-        val item = _undos.value.firstOrNull { it.id == id } ?: return
-        if (item.status != UndoItem.Status.READY && item.status != UndoItem.Status.FAILED) return
-        setUndo(item) { it.copy(status = UndoItem.Status.BUSY, error = null) }
-        ctx.scope.launch {
-            val at = System.currentTimeMillis()
-            try {
-                val outcome = ctx.api.undo(id)
-                setUndo(item) {
-                    it.copy(status = if (outcome == ApiService.UndoOutcome.DONE) UndoItem.Status.DONE else UndoItem.Status.TOO_LATE, at = at)
-                }
-                if (outcome == ApiService.UndoOutcome.DONE) onThingsChanged()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: ApiException) {
-                setUndo(item) { it.copy(status = UndoItem.Status.FAILED, error = e.message?.removePrefix("Undo failed: "), at = at) }
-            } catch (e: Exception) {
-                setUndo(item) { it.copy(status = UndoItem.Status.READY) }
-                ctx.messages.post("Couldn't undo: ${describeError(e)}")
-            }
-        }
-    }
-
-    private fun setUndo(item: UndoItem, transform: (UndoItem) -> UndoItem) {
-        // Several presses can finish at once: update atomically.
-        _undos.update { list ->
-            if (list.any { it.id == item.id }) list.map { if (it.id == item.id) transform(it) else it } else list + transform(item)
-        }
-    }
+    /** Press an Undo under Dana's reply ([ChatUndos.press]). */
+    fun undo(id: String) = undoRow.press(id)
 
     /**
      * Re-read the session after the app comes back to the foreground, so a
@@ -731,8 +598,8 @@ class ChatController(
         val id = sessionId
         if (id.isEmpty()) return
         ctx.scope.launch {
-            val json = ctx.load("ResyncSession") { fetchShown(id) } ?: return@launch
-            if (sessionId == id && !_isStreaming.value) parseAndSetSessionDetail(json)
+            val state = ctx.load("ResyncSession") { fetchShown(id) } ?: return@launch
+            if (sessionId == id && !_isStreaming.value) parseAndSetSessionDetail(state)
         }
         fetchSessions()
     }
@@ -751,10 +618,10 @@ class ChatController(
         resetTracker: Boolean = true,
         /** A new message: on a 409 in the thread its text goes back to the ask bar. */
         sent: SentMessage? = null,
-        block: suspend (onEvent: (JSONObject) -> Unit) -> Unit
+        block: RunRequest
     ) {
         streamJob?.cancel()
-        if (resetTracker) run = RunTracker()
+        if (resetTracker) runs.reset()
         _isStreaming.value = true
         _chatStatusText.value = statusText
         showThinkingIndicator(statusText)
@@ -796,62 +663,37 @@ class ChatController(
     private fun attachToRun(runId: String?, afterSeq: Int = 0, resetTracker: Boolean = true) {
         val id = sessionId
         runAssistantStream("Dana is thinking…", resetTracker) { onEvent ->
-            ctx.api.attachRunStream(id, runId, afterSeq, onEvent)
+            ctx.api.chat.attach(id, runId, afterSeq, onEvent)
         }
     }
 
-    private suspend fun followRun(id: String, sent: SentMessage?, first: suspend (onEvent: (JSONObject) -> Unit) -> Unit) {
-        var request = first
-        val startedAt = System.currentTimeMillis()
-        var reconnects = 0
-        var busyRedirects = 0
-        while (true) {
-            try {
-                request { event -> handleAssistantEvent(event) }
-                if (run.gotState) return
-                throw IOException("Stream ended before the run finished")
-            } catch (e: CancellationException) {
-                Log.d(TAG, "Assistant stream cancelled")
-                removeThinkingIndicator()
-                throw e
-            } catch (e: SessionBusyException) {
-                if (sent != null && inThreadNow()) {
-                    // Another device's (or an earlier) request is still running in the
-                    // thread: nothing was sent. Put the text back and show that run.
-                    refuseBusy(sent)
-                    return
-                }
-                if (busyRedirects++ > 0) {
-                    reportStreamFailure(e)
-                    return
-                }
-                // An earlier run in this chat is still going: follow it.
+    private suspend fun followRun(id: String, sent: SentMessage?, first: RunRequest) =
+        runs.follow(id, first, object : RunStreamClient.Listener {
+            override fun onEvent(event: RunEvent) = handleAssistantEvent(event)
+
+            override fun onBusy(): Boolean {
+                if (sent == null || !inThreadNow()) return false
+                // Another device's (or an earlier) request is still running in the
+                // thread: nothing was sent. Put the text back and show that run.
+                refuseBusy(sent)
+                return true
+            }
+
+            override fun onFollowingBusy() {
                 appendMessage("Assistant", "Still working on your previous request — following it…", false)
-                run = RunTracker()
-                val busyRun = e.runId
-                request = { onEvent -> ctx.api.attachRunStream(id, busyRun, 0, onEvent) }
-            } catch (e: Exception) {
-                Log.w(TAG, "Assistant stream failed: ${describeError(e)}")
-                // A stream that dies mid-read never reaches the interceptor.
-                if (e is IOException) ServerStatusMonitor.checkNow()
-                val runId = run.runId
-                val canReattach = e is IOException && runId != null && sessionId == id &&
-                    System.currentTimeMillis() - startedAt < REATTACH_GIVE_UP_MS
-                if (!canReattach) {
-                    reportStreamFailure(e)
-                    return
-                }
-                // The server keeps the run going without us; reconnect and
-                // resume right after the last event we rendered.
-                reconnects++
+            }
+
+            override fun onReconnecting() {
                 _chatStatusText.value = "Connection lost — reconnecting…"
                 showThinkingIndicator("Reconnecting…")
-                delay(minOf(REATTACH_BASE_DELAY_MS * reconnects, REATTACH_MAX_DELAY_MS))
-                val after = run.lastSeq
-                request = { onEvent -> ctx.api.attachRunStream(id, runId, after, onEvent) }
             }
-        }
-    }
+
+            override fun onFailed(e: Exception) = reportStreamFailure(e)
+
+            override fun onCancelled() = removeThinkingIndicator()
+
+            override fun stillShowing(): Boolean = sessionId == id
+        })
 
     private fun refuseBusy(sent: SentMessage?) {
         removeThinkingIndicator()
@@ -882,7 +724,7 @@ class ChatController(
         streamJob?.cancel()
         closeVoiceSocket("Stopped")
         ctx.scope.launch {
-            ctx.load("CancelAssistant") { ctx.api.cancelAssistant(id) }
+            ctx.load("CancelAssistant") { ctx.api.chat.cancel(id) }
         }
         removeThinkingIndicator()
         settleBubbles()
@@ -940,29 +782,16 @@ class ChatController(
         _chatMessages.value.any { it.toolCall?.let { tc -> tc.isRunning || tc.isPreparing } == true }
 
     /** Map one streamed run event onto the chat state. */
-    private fun handleAssistantEvent(event: JSONObject) {
-        val runId = event.optString("run_id")
-        if (runId.isNotEmpty()) {
-            if (run.runId != null && run.runId != runId) {
-                // We're now following a different run than before (attached
-                // after a newer one started): fresh bookkeeping.
-                run = RunTracker().also { it.modelLabel = run.modelLabel }
-            }
-            run.runId = runId
-        }
-        if (event.has("seq")) {
-            val seq = event.optInt("seq")
-            if (seq <= run.lastSeq) return  // already rendered (replayed on reattach)
-            run.lastSeq = seq
-        }
+    private fun handleAssistantEvent(event: RunEvent) {
+        if (!runs.accept(event)) return  // already rendered (replayed on reattach)
 
-        when (event.optString("type")) {
+        when (event.type) {
             "run_start" -> {
-                run.modelLabel = event.optJSONObject("model")?.optString("label")?.takeIf { it.isNotEmpty() }
+                run.modelLabel = event.model?.label
             }
 
             "transcription" -> {
-                val text = event.optString("text")
+                val text = event.text
                 if (text.isNotEmpty()) {
                     removeThinkingIndicator()
                     newTurn()
@@ -985,61 +814,54 @@ class ChatController(
             }
 
             "step_start" -> {
-                val iteration = event.optInt("iteration", 0)
-                val max = event.optInt("max_iterations", 0)
+                val iteration = event.iteration
+                val max = event.maxIterations
                 val label = if (iteration > 1 && max > 0) "Step $iteration of $max" else "Thinking…"
                 _chatStatusText.value = label
                 showThinkingIndicator(label)
             }
 
             "reasoning_delta" -> {
-                val delta = event.optString("delta")
-                updateStepBubble(event.optInt("iteration", 0)) { it.copy(reasoning = it.reasoning + delta, isStreaming = true) }
+                val delta = event.delta
+                updateStepBubble(event.iteration) { it.copy(reasoning = it.reasoning + delta, isStreaming = true) }
                 _chatStatusText.value = "Thinking…"
             }
 
             "text_delta" -> {
-                val delta = event.optString("delta")
-                updateStepBubble(event.optInt("iteration", 0)) { it.copy(message = it.message + delta, isStreaming = true) }
+                val delta = event.delta
+                updateStepBubble(event.iteration) { it.copy(message = it.message + delta, isStreaming = true) }
                 _chatStatusText.value = "Writing…"
             }
 
             "retry" -> {
-                dropStepBubble(event.optInt("iteration", 0))
+                dropStepBubble(event.iteration)
                 showThinkingIndicator("Connection hiccup — retrying…")
             }
 
             "tool_call" -> {
-                val name = event.optString("name", "Tool Execution")
-                upsertToolCall(event.optString("id"), name) { it.copy(toolName = name, isPreparing = true) }
+                val name = event.name
+                upsertToolCall(event.id, name) { it.copy(toolName = name, isPreparing = true) }
                 _chatStatusText.value = "Preparing $name…"
             }
 
             "tool_start" -> {
-                val name = event.optString("name", "Tool Execution")
-                upsertToolCall(event.optString("id"), name) {
-                    it.copy(
-                        toolName = name,
-                        parameters = prettyJson(event.opt("args")),
-                        isPreparing = false,
-                        isRunning = true
-                    )
+                val name = event.name
+                upsertToolCall(event.id, name) {
+                    it.copy(toolName = name, parameters = event.args.pretty(), isPreparing = false, isRunning = true)
                 }
                 _chatStatusText.value = "Running $name…"
             }
 
             "tool_end" -> {
                 runChanged = true
-                val more = ThreadModel.parseUndos(event.optJSONArray("undos"))
-                if (more.isNotEmpty()) _undos.update { ThreadModel.addUndos(it, more) }
-                val ok = !event.has("ok") || event.optBoolean("ok", true)
-                upsertToolCall(event.optString("id"), event.optString("name", "Tool Execution")) {
+                undoRow.add(event.undos)
+                upsertToolCall(event.id, event.name) {
                     it.copy(
-                        response = prettyJson(event.opt("result")),
+                        response = event.result.pretty(),
                         isPreparing = false,
                         isRunning = false,
-                        succeeded = ok,
-                        durationMs = if (event.has("duration_ms")) event.optLong("duration_ms", 0L) else null
+                        succeeded = event.ok,
+                        durationMs = event.durationMs
                     )
                 }
                 if (!anyToolBusy()) {
@@ -1050,48 +872,43 @@ class ChatController(
 
             "final" -> {
                 removeThinkingIndicator()
-                val content = event.optString("content")
-                val shortcut = event.optBoolean("shortcut", false)
+                val content = event.content
+                val shortcut = event.shortcut
                 val lastStep = run.stepBubbles.keys.maxOrNull()
                 val bubbleId = lastStep?.let { run.stepBubbles[it] }
                 val list = _chatMessages.value
                 val bubbleIdx = list.indexOfFirst { it.id == bubbleId }
                 val toolAfter = bubbleIdx >= 0 && list.drop(bubbleIdx + 1).any { it.toolCall != null }
-                if (bubbleIdx >= 0 && !toolAfter) {
+                if (lastStep != null && bubbleIdx >= 0 && !toolAfter) {
                     // The reply already streamed into this bubble; the final
                     // text is authoritative in case a delta went missing.
-                    updateStepBubble(lastStep!!) { it.copy(message = content.ifEmpty { it.message }, isStreaming = false, shortcut = shortcut) }
+                    updateStepBubble(lastStep) { it.copy(message = content.ifEmpty { it.message }, isStreaming = false, shortcut = shortcut) }
                 } else if (content.isNotEmpty()) {
-                    val list = _chatMessages.value + ChatMessage(sender = "Assistant", message = content, isUser = false, shortcut = shortcut)
-                    _chatMessages.value = list
-                    persistMessages(list)
+                    val updated = _chatMessages.value + ChatMessage(sender = "Assistant", message = content, isUser = false, shortcut = shortcut)
+                    _chatMessages.value = updated
+                    persistMessages(updated)
                 }
                 settleBubbles()
             }
 
             "error" -> {
                 removeThinkingIndicator()
-                appendMessage("Assistant", "Error: ${event.optString("message")}", false)
+                appendMessage("Assistant", "Error: ${event.message}", false)
             }
 
             "approval_required" -> {
-                val id = event.optString("id")
-                val name = event.optString("name", "Tool Execution")
-                _pendingApproval.value = PendingApproval(
-                    toolName = name,
-                    toolArgs = event.opt("args").toString(),
-                    toolCallId = id
-                )
-                val reason = event.optString("reason").takeIf { it != "null" }.orEmpty()
+                val id = event.id
+                val name = event.name
+                _pendingApproval.value = PendingApproval(toolName = name, toolArgs = event.argsText, toolCallId = id)
                 upsertToolCall(id, name) {
                     it.copy(
                         requiresApproval = true,
                         isRunning = false,
                         isPreparing = false,
-                        parameters = it.parameters.ifEmpty { prettyJson(event.opt("args")) },
-                        toolArgs = event.opt("args").toString(),
+                        parameters = it.parameters.ifEmpty { event.args.pretty() },
+                        toolArgs = event.argsText,
                         isCollapsed = false,
-                        approvalReason = reason
+                        approvalReason = event.reason.orEmpty()
                     )
                 }
                 removeThinkingIndicator()
@@ -1100,15 +917,15 @@ class ChatController(
 
             "selection_required" -> {
                 // The selection prompt is shown as its own card, not a tool run.
-                val id = event.optString("id")
+                val id = event.id
                 if (id.isNotEmpty()) _chatMessages.value = _chatMessages.value.filter { it.toolCall?.toolCallId != id }
-                _selectionRequest.value = event.toSelectionRequest()
+                _selectionRequest.value = event.selection
                 removeThinkingIndicator()
                 _chatStatusText.value = "Waiting for your choice"
             }
 
             "iterations_exceeded" -> {
-                _pendingExtension.value = PendingExtension(event.optString("summary"))
+                _pendingExtension.value = PendingExtension(event.summary)
                 removeThinkingIndicator()
                 _chatStatusText.value = "Step limit reached"
             }
@@ -1125,7 +942,7 @@ class ChatController(
 
             "state" -> {
                 run.gotState = true
-                event.optJSONObject("state")?.let { applyTerminalState(it) }
+                event.state?.let { applyTerminalState(it) }
             }
         }
     }
@@ -1135,82 +952,54 @@ class ChatController(
      * already rendered the content, so this only reconciles the prompts the
      * user still has to answer and clears stale ones.
      */
-    private fun applyTerminalState(state: JSONObject) {
-        val status = state.optString("status", "idle")
+    private fun applyTerminalState(state: SessionState) {
+        val status = state.status
         // Refreshed every turn: a suggestion accepted in this chat shows as done.
-        if (state.has("context")) _sessionContext.value = io.github.ronganam.dana.data.network.CallJson.chatContext(state.optJSONObject("context"))
+        if (state.hasContext) _sessionContext.value = state.context
         removeThinkingIndicator()
         _chatStatusText.value = ""
         if (inThreadNow()) {
-            applyMemory(state)
+            _memory.value = state.memory
             // The stored turn (stable ids, times, devices) replaces the live bubbles.
-            val stored = ChatHistoryCodec.decode(state.optJSONArray("messages") ?: JSONArray())
-            if (stored.isNotEmpty()) applyThreadPage(state, stored)
+            if (state.messages.isNotEmpty()) applyThreadPage(state, state.messages)
         }
-        if (state.has("undos")) reconcileUndos(state)
+        state.undos?.let(::reconcileUndos)
 
-        val pendingObj = state.optJSONObject("pending_approval")
+        val pending = state.pendingApproval
         // The server stores "waiting_approval" while an approval is pending
         // (core/session_runner.py), so accept both spellings. Clear only when
         // the state carries no pending approval at all.
-        val awaitingApproval =
-            (status == "pending_approval" || status == "waiting_approval") && pendingObj != null
-        if (awaitingApproval) {
-            val id = pendingObj!!.optString("tool_call_id")
+        if ((status == "pending_approval" || status == "waiting_approval") && pending != null) {
+            val id = pending.toolCallId
             _pendingApproval.value = PendingApproval(
-                toolName = pendingObj.optString("tool_name", "Tool Execution"),
-                toolArgs = pendingObj.opt("tool_args").toString(),
+                toolName = pending.toolName ?: "Tool Execution",
+                toolArgs = pending.toolArgs ?: "null",
                 toolCallId = id
             )
-            val reason = approvalReasonOf(pendingObj)
-            updateToolCall(id) { it.copy(requiresApproval = true, isRunning = false, isCollapsed = false, approvalReason = reason.ifEmpty { it.approvalReason }) }
-        } else if (pendingObj == null && _isStreaming.value) {
+            updateToolCall(id) {
+                it.copy(requiresApproval = true, isRunning = false, isCollapsed = false, approvalReason = pending.reason.ifEmpty { it.approvalReason })
+            }
+        } else if (pending == null && _isStreaming.value) {
             _pendingApproval.value = null
         }
 
-        val selectionObj = state.optJSONObject("selection_request")
-        if (status == "awaiting_selection" && selectionObj != null) {
-            _selectionRequest.value = selectionObj.toSelectionRequest()
+        val selection = state.selection
+        if (status == "awaiting_selection" && selection != null) {
+            _selectionRequest.value = selection
         } else if (_isStreaming.value) {
             _selectionRequest.value = null
         }
 
         if (status == "iterations_exceeded") {
-            _pendingExtension.value = PendingExtension(state.optString("extend_summary"))
+            _pendingExtension.value = PendingExtension(state.extendSummary)
         } else if (_isStreaming.value) {
             _pendingExtension.value = null
         }
 
         // The error event usually said it already; a state frame adds a line only when it has news.
-        val stateError = state.optString("error").takeIf { it.isNotBlank() && it != "null" }
+        val stateError = state.error
         if (status == "error" && stateError != null && _chatMessages.value.lastOrNull()?.message?.contains(stateError) != true) {
             appendMessage("Assistant", "Error: $stateError", false)
-        }
-    }
-
-    /** The pending payload's reason for asking ("device_screen" when only the shared screen made it ask). */
-    private fun approvalReasonOf(pending: JSONObject): String =
-        pending.optString("approval_reason").takeIf { it.isNotBlank() && it != "null" }
-            ?: if (pending.optBoolean("untrusted_content", false)) "device_screen" else ""
-
-    private fun JSONObject.toSelectionRequest(): SelectionRequest {
-        val optionsArr = optJSONArray("options") ?: JSONArray()
-        val options = (0 until optionsArr.length()).mapNotNull { i ->
-            val opt = optionsArr.optJSONObject(i) ?: return@mapNotNull null
-            SelectionOption(label = opt.optString("label"), value = opt.optString("value"))
-        }
-        return SelectionRequest(prompt = optString("prompt"), options = options, multiple = optBoolean("multiple", false))
-    }
-
-    /** Pretty-print a tool argument/result blob, tolerating plain strings. */
-    private fun prettyJson(value: Any?): String {
-        if (value == null || value === JSONObject.NULL) return ""
-        val text = value.toString()
-        if (!text.startsWith("{") && !text.startsWith("[")) return text
-        return try {
-            if (text.startsWith("{")) JSONObject(text).toString(2) else JSONArray(text).toString(2)
-        } catch (e: Exception) {
-            text
         }
     }
 
@@ -1250,9 +1039,9 @@ class ChatController(
                         android.webkit.MimeTypeMap.getFileExtensionFromUrl(imageUri.toString()).lowercase()
                     )
                     ?: "image/jpeg"
-                ctx.api.streamMessageWithImage(message, id, selectedModel(), imageBytes, mimeType, onEvent, dev, screen)
+                ctx.api.chat.sendWithImage(message, id, selectedModel(), imageBytes, mimeType, onEvent, dev, screen)
             } else {
-                ctx.api.streamMessage(message, id, selectedModel(), onEvent, dev, screen)
+                ctx.api.chat.send(message, id, selectedModel(), onEvent, dev, screen)
             }
         }
         return true
@@ -1291,9 +1080,9 @@ class ChatController(
         runAssistantStream("Sending…", sent = SentMessage(message, shownId, screen = outgoing)) { onEvent ->
             val jpeg = outgoing.jpeg
             if (jpeg != null) {
-                ctx.api.streamMessageWithImage(message, id, selectedModel(), jpeg, "image/jpeg", onEvent, dev, screen, outgoing.screen)
+                ctx.api.chat.sendWithImage(message, id, selectedModel(), jpeg, "image/jpeg", onEvent, dev, screen, outgoing.screen)
             } else {
-                ctx.api.streamMessage(message, id, selectedModel(), onEvent, dev, screen, outgoing.screen)
+                ctx.api.chat.send(message, id, selectedModel(), onEvent, dev, screen, outgoing.screen)
             }
         }
     }
@@ -1317,9 +1106,7 @@ class ChatController(
         if (inThreadNow()) runCatching { screenProvider() }.getOrNull() else null
 
     /** A new turn starts: the previous turn's Undo row (and its outcomes) goes. */
-    private fun newTurn() {
-        _undos.value = emptyList()
-    }
+    private fun newTurn() = undoRow.clear()
 
     /**
      * Refuse to start work while the server is known to be unreachable, and
@@ -1378,20 +1165,14 @@ class ChatController(
         _pendingApproval.value = null
         updateToolCallRequiringApproval(approved)
 
-        streamAction(if (approved) "Executing..." else "Cancelling...") {
-            put("action", if (approved) "approve" else "deny")
-            if (pending.toolCallId.isNotEmpty()) put("tool_call_id", pending.toolCallId)
-        }
+        streamAction(if (approved) "Executing..." else "Cancelling...", if (approved) "approve" else "deny", toolCallId = pending.toolCallId.ifEmpty { null })
     }
 
     fun sendSelection(indices: List<Int>) {
         if (_selectionRequest.value == null) return
         if (!ensureCanReachServer("Selection not sent")) return
         _selectionRequest.value = null
-        streamAction(if (indices.isEmpty()) "Cancelling..." else "Submitting selection...") {
-            put("action", "select")
-            put("selection", JSONArray(indices))
-        }
+        streamAction(if (indices.isEmpty()) "Cancelling..." else "Submitting selection...", "select", selection = indices)
     }
 
     fun cancelSelection() = sendSelection(emptyList())
@@ -1401,7 +1182,7 @@ class ChatController(
         if (_pendingExtension.value == null) return
         if (!ensureCanReachServer("Couldn't continue")) return
         _pendingExtension.value = null
-        streamAction("Continuing with more steps...") { put("action", "extend_iterations") }
+        streamAction("Continuing with more steps...", "extend_iterations")
     }
 
     /** Stop an over-budget run and settle the session. */
@@ -1409,16 +1190,12 @@ class ChatController(
         if (_pendingExtension.value == null) return
         if (!ensureCanReachServer("Couldn't stop the run")) return
         _pendingExtension.value = null
-        streamAction("Wrapping up...") { put("action", "decline_iterations") }
+        streamAction("Wrapping up...", "decline_iterations")
     }
 
-    private fun streamAction(statusText: String, fill: JSONObject.() -> Unit) {
-        val payload = JSONObject().apply {
-            put("session_id", sessionId)
-            deviceParam()?.let { put("device", it) }
-            fill()
-        }
-        runAssistantStream(statusText) { onEvent -> ctx.api.streamApproveAction(payload, onEvent) }
+    private fun streamAction(statusText: String, action: String, toolCallId: String? = null, selection: List<Int>? = null) {
+        val payload = RunAction(sessionId, action, deviceParam(), toolCallId, selection)
+        runAssistantStream(statusText) { onEvent -> ctx.api.chat.act(payload, onEvent) }
     }
 
     // --- Voice (push-to-talk over WebSocket) ---
@@ -1459,10 +1236,10 @@ class ChatController(
     }
 
     private fun verifyWhileRecording() {
-        val socketAtStart = currentWebSocket
+        val socketAtStart = voice.current()
         voiceVerifyJob?.cancel()
         voiceVerifyJob = ctx.scope.launch {
-            if (!ServerStatusMonitor.ensureReachable() && currentWebSocket === socketAtStart && _isRecording.value) {
+            if (!ServerStatusMonitor.ensureReachable() && voice.current() === socketAtStart && _isRecording.value) {
                 abortVoice(offlineText())
             }
         }
@@ -1589,7 +1366,7 @@ class ChatController(
         val id = sessionId
         val screen = currentScreen()
         runAssistantStream("Sending…", sent = SentMessage(text, settledId)) { onEvent ->
-            ctx.api.streamMessage(text, id, selectedModel(), onEvent, dev, screen)
+            ctx.api.chat.send(text, id, selectedModel(), onEvent, dev, screen)
         }
     }
 
@@ -1624,47 +1401,18 @@ class ChatController(
 
     // --- Voice: PCM over WebSocket, transcribed by the server ---
 
-    @SuppressLint("MissingPermission")
     private fun beginServerRecording() {
         if (_isRecording.value) return
         _isRecording.value = true
         _chatStatusText.value = "Listening..."
-        hasSpokenInCurrentSession = false
+        mic.reset()
 
-        val model = selectedModel()?.let { "&model=" + java.net.URLEncoder.encode(it, "UTF-8") }.orEmpty()
-        val dev = deviceParam()?.let { "&device=$it" }.orEmpty()
-        val wsUrl = serverUrl().replaceFirst("http", "ws") + "/api/assistant/voice_stream?session_id=$sessionId$model$dev"
-        val request = Request.Builder().url(wsUrl).bearerAuth(apiToken()).build()
-
-        val socket = HttpClients.webSocket.newWebSocket(request, object : WebSocketListener() {
-            override fun onMessage(webSocket: WebSocket, text: String) {
-                // OkHttp delivers frames in order on one thread; handle them
-                // synchronously so the run's events keep that order.
-                handleWebSocketVoiceEvent(webSocket, text)
-            }
-
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
-                Log.e(TAG, "Voice WebSocket failure: ${t::class.simpleName}: ${t.message}", t)
-                ctx.scope.launch {
-                    // Ignore late failures from a socket we already moved on from.
-                    if (currentWebSocket !== webSocket) return@launch
-                    currentWebSocket = null
-                    val runId = run.runId
-                    if (runId != null && !run.gotState) {
-                        // The run started on the server; keep following it over SSE.
-                        attachToRun(runId, run.lastSeq, resetTracker = false)
-                        return@launch
-                    }
-                    val reason = if (t is IOException) describeError(t) else (t.message ?: "connection lost")
-                    abortVoice("Voice failed: $reason")
-                }
-            }
-        })
-        currentWebSocket = socket
+        voice.open(ctx.api.chat.voiceRequest(serverUrl(), apiToken(), sessionId, selectedModel(), deviceParam()))
 
         recordingJob = ctx.scope.launch(Dispatchers.IO) {
             try {
-                captureAudio(socket)
+                val silent = mic.capture(keepGoing = { _isRecording.value }, onChunk = voice::send)
+                if (silent) withContext(Dispatchers.Main) { stopVoiceRecording() }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -1674,93 +1422,16 @@ class ChatController(
         }
     }
 
-    @SuppressLint("MissingPermission")
-    private suspend fun captureAudio(socket: WebSocket) {
-        val stream = VoiceInput.source?.invoke() ?: openAudioRecordStream()
-        pcmStream = stream
-        try {
-            val buffer = ByteArray(2560) // 80 ms at 16 kHz PCM16
-
-            var lastSpokenTime = System.currentTimeMillis()
-            val silenceThreshold = VoiceInput.silenceRms
-            val maxSilenceDuration = VoiceInput.endOfSpeechMs
-            // Speech starts after a run of loud frames, not one: a single loud frame
-            // (a click, the chime's tail, boosted room noise on the TV) sent near-silence
-            // to the server, and the transcriber made up a sentence from it.
-            var loudRun = 0
-
-            while (kotlin.coroutines.coroutineContext.isActive && _isRecording.value) {
-                val read = stream.read(buffer)
-                if (read <= 0) {
-                    if (pcmStream !== stream) break
-                    continue
-                }
-                socket.send(buffer.copyOfRange(0, read).toByteString())
-
-                var sum = 0.0
-                val shortsCount = read / 2
-                for (i in 0 until shortsCount) {
-                    val low = buffer[i * 2].toInt() and 0xFF
-                    val high = buffer[i * 2 + 1].toInt()
-                    val sample = ((high shl 8) or low).toShort()
-                    sum += sample * sample
-                }
-                val rms = if (shortsCount > 0) Math.sqrt(sum / shortsCount) else 0.0
-
-                val now = System.currentTimeMillis()
-                if (now < VoiceInput.speechGateUntil) {
-                    lastSpokenTime = now
-                } else if (rms > silenceThreshold) {
-                    loudRun++
-                    if (hasSpokenInCurrentSession || loudRun >= VoiceInput.speechStartFrames) {
-                        lastSpokenTime = now
-                        hasSpokenInCurrentSession = true
-                    }
-                } else {
-                    loudRun = 0
-                    val limit = if (hasSpokenInCurrentSession) maxSilenceDuration else VoiceInput.noSpeechTimeoutMs
-                    if (now - lastSpokenTime > limit) {
-                        Log.d(TAG, "Silence detected, auto-stopping voice recording.")
-                        withContext(Dispatchers.Main) { stopVoiceRecording() }
-                        break
-                    }
-                }
-            }
-        } finally {
-            // Also covers a stop that raced ahead of `pcmStream = stream`.
-            if (pcmStream === stream) pcmStream = null
-            runCatching { stream.close() }
+    /** The voice socket failed (it is already closed). */
+    private fun onVoiceFailure(t: Throwable) {
+        val runId = run.runId
+        if (runId != null && !run.gotState) {
+            // The run started on the server; keep following it over SSE.
+            attachToRun(runId, run.lastSeq, resetTracker = false)
+            return
         }
-    }
-
-    @SuppressLint("MissingPermission")
-    private fun openAudioRecordStream(): PcmStream {
-        val sampleRate = 16000
-        val channelConfig = AudioFormat.CHANNEL_IN_MONO
-        val audioFormat = AudioFormat.ENCODING_PCM_16BIT
-        val minBufferSize = AudioRecord.getMinBufferSize(sampleRate, channelConfig, audioFormat)
-        val recorder = AudioRecord(MediaRecorder.AudioSource.MIC, sampleRate, channelConfig, audioFormat, maxOf(minBufferSize, 2560))
-        audioRecord = recorder
-        recorder.startRecording()
-        return object : PcmStream {
-            override fun read(buffer: ByteArray): Int = recorder.read(buffer, 0, buffer.size)
-            override fun close() = Unit // released by releaseAudioRecord()
-        }
-    }
-
-    private fun releaseAudioRecord() {
-        pcmStream?.let { stream ->
-            pcmStream = null
-            try { stream.close() } catch (e: Exception) { Log.w(TAG, "Error closing PCM stream", e) }
-        }
-        try {
-            audioRecord?.stop()
-            audioRecord?.release()
-        } catch (e: Exception) {
-            Log.e(TAG, "Error releasing AudioRecord", e)
-        } finally {
-            audioRecord = null
-        }
+        val reason = if (t is IOException) describeError(t) else (t.message ?: "connection lost")
+        abortVoice("Voice failed: $reason")
     }
 
     fun stopVoiceRecording() {
@@ -1780,9 +1451,9 @@ class ChatController(
         _isRecording.value = false
         recordingJob?.cancel()
         voiceVerifyJob?.cancel()
-        releaseAudioRecord()
+        mic.release()
 
-        if (!hasSpokenInCurrentSession) {
+        if (!mic.heardSpeech) {
             Log.d(TAG, "No speech detected; cancelling voice stream.")
             _chatStatusText.value = ""
             removeThinkingIndicator()
@@ -1790,7 +1461,7 @@ class ChatController(
             return
         }
 
-        run = RunTracker()
+        runs.reset()
         runChanged = false
         followBusyRun = false
         _isStreaming.value = true
@@ -1802,14 +1473,7 @@ class ChatController(
         // stays on the phone on this path; the sent message says "text only".
         val outgoing = screenAttachments?.take()?.let { OutgoingScreen(it.screen, null, it.label) }
         voiceScreen = outgoing
-        val stopMsg = JSONObject().apply {
-            put("event", "stop")
-            put("session_id", sessionId)
-            put("sample_rate", 16000)
-            screen?.let { put("screen", JSONObject().put("kind", it.kind).put("id", it.id)) }
-            outgoing?.screen?.let { put("device_screen", it.toJson()) }
-        }
-        currentWebSocket?.send(stopMsg.toString())
+        voice.send(ChatApi.voiceStop(sessionId, MicCapture.SAMPLE_RATE, screen, outgoing?.screen))
     }
 
     /**
@@ -1828,37 +1492,22 @@ class ChatController(
         cancelDeviceRecognition()
         _isRecording.value = false
         recordingJob?.cancel()
-        releaseAudioRecord()
-        currentWebSocket?.cancel()
-        currentWebSocket = null
+        mic.release()
+        voice.cancel()
         removeThinkingIndicator()
         _isStreaming.value = false
         _chatStatusText.value = statusText
     }
 
-    private fun closeVoiceSocket(reason: String) {
-        try {
-            currentWebSocket?.close(1000, reason)
-        } catch (e: Exception) {
-            Log.w(TAG, "Error closing voice socket", e)
-        }
-        currentWebSocket = null
-    }
+    private fun closeVoiceSocket(reason: String) = voice.close(reason)
 
     /**
      * One frame from the voice socket: the same events as the SSE stream
      * (`transcription`, the run's events, then a closing `state`), or
      * `no_speech` when nothing intelligible was said.
      */
-    private fun handleWebSocketVoiceEvent(socket: WebSocket, text: String) {
-        if (currentWebSocket !== socket) return
-        val json = try {
-            JSONObject(text)
-        } catch (e: Exception) {
-            Log.w(TAG, "Ignoring unparseable voice frame", e)
-            return
-        }
-        when (json.optString("type")) {
+    private fun handleVoiceEvent(event: RunEvent) {
+        when (event.type) {
             "no_speech" -> {
                 // Nothing was sent: the screen goes with the next try.
                 voiceScreen?.let { screenAttachments?.putBack(it) }
@@ -1869,19 +1518,19 @@ class ChatController(
                 closeVoiceSocket("No speech")
             }
             "state" -> {
-                handleAssistantEvent(json)
+                handleAssistantEvent(event)
                 _isStreaming.value = false
                 settleBubbles()
                 flushPendingPersist()
                 closeVoiceSocket("Response received")
                 finishRun(sessionId)
             }
-            "error" -> if (json.optString("code") == "session_busy" && inThreadNow()) {
+            "error" -> if (event.code == "session_busy" && inThreadNow()) {
                 voiceScreen?.let { screenAttachments?.putBack(it) }
                 voiceScreen = null
                 refuseBusy(null)
-            } else handleAssistantEvent(json)
-            else -> handleAssistantEvent(json)
+            } else handleAssistantEvent(event)
+            else -> handleAssistantEvent(event)
         }
     }
 
@@ -1892,57 +1541,22 @@ class ChatController(
         recordingJob?.cancel()
         cancelDeviceRecognition()
         _isRecording.value = false
-        releaseAudioRecord()
-        currentWebSocket?.cancel()
-        currentWebSocket = null
+        mic.release()
+        voice.cancel()
         flushPendingPersist()
     }
 
     companion object {
         private const val TAG = "ChatController"
-        private const val REATTACH_BASE_DELAY_MS = 1_000L
         /** After the user taps stop, how long to wait for the recognizer's final words. */
         private const val DEVICE_FINAL_TIMEOUT_MS = 2_500L
-        private const val REATTACH_MAX_DELAY_MS = 10_000L
-        /** Stop trying to reattach to a dropped run after this long. */
-        private const val REATTACH_GIVE_UP_MS = 10 * 60_000L
-
-        /**
-         * Parse a session's `updated_at`. SQLite's CURRENT_TIMESTAMP writes
-         * "YYYY-MM-DD HH:MM:SS" in UTC; Python writes ISO-8601, with or
-         * without fractions and offset. Returns epoch millis, or null.
-         */
-        internal fun parseServerTimestamp(raw: String?): Long? {
-            val text = raw?.trim().orEmpty()
-            if (text.isEmpty() || text == "null") return null
-            text.toLongOrNull()?.let { n -> return if (n < 100_000_000_000L) n * 1000 else n }
-            var t = text.replace(' ', 'T')
-            // Drop fractional seconds; SimpleDateFormat can't take micros.
-            t = t.replace(Regex("""(T\d{2}:\d{2}:\d{2})\.\d+"""), "$1")
-            val hasZone = t.endsWith("Z") || Regex("""[+-]\d{2}:?\d{2}$""").containsMatchIn(t.substringAfter('T', ""))
-            if (!hasZone) t += "Z"
-            t = t.replace(Regex("Z$"), "+0000").replace(Regex("""([+-]\d{2}):(\d{2})$"""), "$1$2")
-            for (pattern in listOf("yyyy-MM-dd'T'HH:mm:ssZ", "yyyy-MM-dd'T'HH:mmZ")) {
-                try {
-                    val fmt = java.text.SimpleDateFormat(pattern, java.util.Locale.US)
-                    fmt.isLenient = false
-                    return fmt.parse(t)?.time
-                } catch (_: java.text.ParseException) {
-                    // Not this format: try the next one.
-                }
-            }
-            return null
-        }
         private const val KEY_SESSION_ID = "chat_session_id"
         private const val DEFAULT_GAP_MINUTES = 20.0
         private const val BUSY_CLEAR = "Dana is still answering — try again when the reply is done."
         /** Thread messages per page (the server's own default for the state frame). */
         private const val THREAD_PAGE = 60
-        /** Newest thread messages kept in the offline cache. */
-        private const val THREAD_CACHE_MESSAGES = 120
         /** A fresh view still shows a message stamped this much before it (clock skew). */
         private const val VIEW_FLOOR_MARGIN_MS = 5_000L
-        private const val KEY_LAST_ACTIVE = "last_active_timestamp"
         private const val KEY_CHAT_MODEL = "chat_model"
         /** A successful check this recent is trusted without re-probing. */
         private const val VOICE_STATUS_FRESH_MS = 30_000L

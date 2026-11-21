@@ -12,7 +12,8 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withTimeoutOrNull
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.HttpResult
+import kotlinx.serialization.json.JsonElement
 import java.io.File
 import java.io.IOException
 import java.time.Instant
@@ -52,7 +53,7 @@ class ShoppingStore(
 ) {
     /** The server, seen as requests. An unreachable server throws [IOException]. */
     fun interface Transport {
-        suspend fun call(method: String, path: String, body: JSONObject?): Pair<Int, String>
+        suspend fun call(method: String, path: String, body: JsonElement?): HttpResult
     }
 
     data class State(
@@ -70,7 +71,7 @@ class ShoppingStore(
         /** Saved; it will be sent when the server answers again. */
         object Queued : Outcome()
         /** The server refused it ([status] and its error body). */
-        data class Rejected(val status: Int, val body: JSONObject?) : Outcome()
+        data class Rejected(val status: Int, val body: ShoppingRefusal?) : Outcome()
     }
 
     /** What Undo of a change did. */
@@ -103,7 +104,7 @@ class ShoppingStore(
         if (_state.value.loaded) return
         synchronized(fileLock) {
             if (_state.value.loaded) return
-            val cached = runCatching { if (cacheFile.exists()) ShoppingJson.screen(JSONObject(cacheFile.readText())) else null }
+            val cached = runCatching { if (cacheFile.exists()) ShoppingJson.screen(cacheFile.readText()) else null }
                 .onFailure { Log.w(TAG, "Couldn't read the shopping cache", it) }.getOrNull()
             val queued = runCatching { if (queueFile.exists()) ShoppingOps.decodeAll(queueFile.readText()) else emptyList() }
                 .onFailure { Log.w(TAG, "Couldn't read the shopping queue", it) }.getOrDefault(emptyList())
@@ -127,18 +128,17 @@ class ShoppingStore(
      * when it is not older than what is held. Returns the HTTP status (-1: unreachable)
      * and the error body for a refusal.
      */
-    suspend fun refresh(): Pair<Int, JSONObject?> {
+    suspend fun refresh(): Pair<Int, ShoppingRefusal?> {
         load()
         val (code, text) = try {
-            transport.call("GET", "/api/shopping", null)
+            transport.call("GET", "/api/shopping", null).let { it.code to it.body }
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
             return -1 to null
         }
-        val json = runCatching { JSONObject(text) }.getOrNull()
-        if (code !in 200..299) return code to json
-        val screen = json?.let { ShoppingJson.screen(it) } ?: return code to json
+        if (code !in 200..299) return code to ShoppingJson.refusal(text)
+        val screen = ShoppingJson.screen(text) ?: return code to ShoppingJson.refusal(text)
         val held = _state.value.server
         // A GET is the truth unless a write's answer newer than it already landed.
         if (ShoppingOps.accepts(held, screen) || !busy) keep(screen, text)
@@ -174,7 +174,7 @@ class ShoppingStore(
             val (code, text) = withTimeoutOrNull(immediateTimeoutMs) { attempt(op) } ?: (-1 to "")
             when {
                 code in 200..299 -> {
-                    val answer = runCatching { ShoppingJson.answer(JSONObject(text)) }.getOrNull()
+                    val answer = ShoppingJson.answer(text)
                     landed(op, answer, text)
                     Outcome.Sent(answer)
                 }
@@ -185,7 +185,7 @@ class ShoppingStore(
                 else -> {
                     _state.update { it.copy(inflight = it.inflight - op) }
                     onChanged()
-                    Outcome.Rejected(code, runCatching { JSONObject(text) }.getOrNull())
+                    Outcome.Rejected(code, ShoppingJson.refusal(text))
                 }
             }
         }
@@ -208,7 +208,7 @@ class ShoppingStore(
 
     private suspend fun attempt(op: ShoppingOp): Pair<Int, String> = try {
         val r = ShoppingOps.request(op)
-        transport.call(r.method, r.path, r.body)
+        transport.call(r.method, r.path, r.body).let { it.code to it.body }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
@@ -239,13 +239,13 @@ class ShoppingStore(
                 val (code, text) = attempt(op)
                 if (ShoppingOps.isRetryable(code)) break
                 if (code in 200..299) {
-                    val answer = runCatching { ShoppingJson.answer(JSONObject(text)) }.getOrNull()
+                    val answer = ShoppingJson.answer(text)
                     answer?.undo?.let { sentUndo[op.id] = it.id }
                     synchronized(fileLock) { writeQueue(_state.value.queued.filter { it.id != op.id }) }
                     landed(op, answer, text)
                 } else {
                     if (code != 404) {
-                        val body = runCatching { JSONObject(text) }.getOrNull()
+                        val body = ShoppingJson.refusal(text)
                         _notices.tryEmit("Couldn't sync “${label(op)}”: ${ShoppingView.errorText(code, body)}")
                     }
                     Log.i(TAG, "Dropping a waiting shopping change (HTTP $code)")

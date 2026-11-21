@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.ui.shell
 
+import io.github.ronganam.dana.data.network.pretty
+import kotlinx.serialization.json.JsonPrimitive
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -264,8 +266,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
     }
 }
 
-private fun prettyArgs(raw: String): String =
-    runCatching { org.json.JSONObject(raw).toString(2) }.getOrDefault(raw)
+private fun prettyArgs(raw: String): String = JsonPrimitive(raw).pretty()
 
 /**
  * "New topic": Dana forgets the conversation so far (the messages stay).

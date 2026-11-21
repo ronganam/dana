@@ -1,8 +1,11 @@
 package io.github.ronganam.dana.data.chat
 
 import io.github.ronganam.dana.data.models.ChatMessage
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.text
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -138,10 +141,11 @@ object ThreadModel {
     }
 
     /** The memory fields of a thread state; [Memory.Unknown] when the server doesn't send them. */
-    fun parseMemory(json: JSONObject): Memory {
-        if (!json.has("context_from_seq")) return Memory.Unknown
-        val from = json.opt("context_from_seq").takeIf { it != JSONObject.NULL }?.toString()?.toDoubleOrNull()?.toInt()
-        val exp = json.opt("context_expires_at").takeIf { it != JSONObject.NULL }?.toString()?.toDoubleOrNull()
+    fun parseMemory(json: JsonObject): Memory {
+        if (!json.containsKey("context_from_seq")) return Memory.Unknown
+        fun number(key: String) = (json[key] as? JsonPrimitive)?.takeIf { it !is JsonNull }?.content?.toDoubleOrNull()
+        val from = number("context_from_seq")?.toInt()
+        val exp = number("context_expires_at")
         return Memory.Known(from, exp?.let { (it * 1000).toLong() })
     }
 
@@ -275,14 +279,12 @@ object ThreadModel {
         else -> ""
     }
 
-    fun parseUndos(arr: JSONArray?): List<UndoAction> {
-        if (arr == null) return emptyList()
-        return (0 until arr.length()).mapNotNull { i ->
-            val o = arr.optJSONObject(i) ?: return@mapNotNull null
-            val id = o.optString("id").takeIf { it.isNotBlank() && it != "null" } ?: return@mapNotNull null
-            UndoAction(id, o.optString("label").takeIf { it.isNotBlank() && it != "null" } ?: "Undo")
+    /** `undos: [{id, label}]`: entries without an id dropped, a missing label reads "Undo", one per id. */
+    fun parseUndos(arr: JsonArray?): List<UndoAction> =
+        arr.orEmpty().filterIsInstance<JsonObject>().mapNotNull { o ->
+            val id = o.text("id")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+            UndoAction(id, o.text("label")?.takeIf { it.isNotBlank() } ?: "Undo")
         }.distinctBy { it.id }
-    }
 
     /**
      * The Undo row under the latest reply after the server named the latest

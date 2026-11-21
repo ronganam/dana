@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.wear
 
+import io.github.ronganam.dana.data.network.TaskSnooze
 import io.github.ronganam.dana.data.network.ServerConfig
 import io.github.ronganam.dana.protocol.ReminderHandled
 import io.github.ronganam.dana.protocol.SnoozeRequest
@@ -9,7 +10,12 @@ import io.github.ronganam.dana.protocol.WearPaths
 import android.content.Context
 import android.util.Log
 import io.github.ronganam.dana.data.network.ApiService
-import io.github.ronganam.dana.data.network.bearerAuth
+import io.github.ronganam.dana.data.network.ChatApi
+import io.github.ronganam.dana.data.network.RunAction
+import io.github.ronganam.dana.data.network.RunEvent
+import io.github.ronganam.dana.data.models.ChatMessage
+import io.github.ronganam.dana.data.models.SelectionOption
+import io.github.ronganam.dana.data.models.SelectionRequest
 import io.github.ronganam.dana.data.sync.SubmitResult
 import io.github.ronganam.dana.data.sync.TaskActionQueue
 import com.google.android.gms.wearable.MessageEvent
@@ -70,21 +76,21 @@ class WearMessageListenerService : WearableListenerService() {
         if (text.length <= maxChars) text else text.take(maxChars - 1) + "…"
 
     /** Bound the selection list so a verbose prompt cannot blow the payload. */
-    private fun clampOptions(options: JSONArray?): JSONArray {
+    private fun clampOptions(options: List<SelectionOption>): JSONArray {
         val out = JSONArray()
-        val src = options ?: return out
-        var i = 0
-        while (i < src.length() && out.length() < MAX_SELECTION_OPTIONS) {
-            val opt = src.optJSONObject(i)
-            if (opt != null) {
-                out.put(JSONObject().apply {
-                    put("label", clamp(opt.optString("label"), MAX_OPTION_CHARS))
-                    put("value", clamp(opt.optString("value"), MAX_OPTION_CHARS))
-                })
-            }
-            i++
+        options.take(MAX_SELECTION_OPTIONS).forEach { opt ->
+            out.put(JSONObject().apply {
+                put("label", clamp(opt.label, MAX_OPTION_CHARS))
+                put("value", clamp(opt.value, MAX_OPTION_CHARS))
+            })
         }
         return out
+    }
+
+    private fun selectionJson(sel: SelectionRequest) = JSONObject().apply {
+        put("prompt", clamp(sel.prompt, MAX_OPTION_CHARS * 2))
+        put("multiple", sel.multiple)
+        put("options", clampOptions(sel.options))
     }
 
     private val job = SupervisorJob()
@@ -115,65 +121,57 @@ class WearMessageListenerService : WearableListenerService() {
         private var selectionRequest: JSONObject? = null
         private var extendSummary: JSONObject? = null
 
-        fun onEvent(event: JSONObject) {
-            when (event.optString("type")) {
-                "transcription" -> transcription = event.optString("text")
+        fun onEvent(event: RunEvent) {
+            when (event.type) {
+                "transcription" -> transcription = event.text
                 // Objects, not bare strings: the watch parses tool_name/name.
                 // Capped so a long run cannot overflow the 4 KB message limit.
                 "tool_start" -> if (toolNames.length() < MAX_WEAR_TOOL_CALLS) {
                     toolNames.put(
                         JSONObject().apply {
-                            put("name", event.optString("name", "tool"))
-                            put("tool_name", event.optString("name", "tool"))
+                            put("name", event.name)
+                            put("tool_name", event.name)
                         }
                     )
                 }
-                "final" -> response = clamp(event.optString("content"), MAX_RESPONSE_CHARS)
+                "final" -> response = clamp(event.content, MAX_RESPONSE_CHARS)
                 "error" -> {
                     status = "error"
-                    response = if (event.optString("code") == "session_busy") BUSY_TEXT
-                        else clamp(event.optString("message"), MAX_RESPONSE_CHARS)
+                    response = if (event.code == "session_busy") BUSY_TEXT
+                        else clamp(event.message, MAX_RESPONSE_CHARS)
                 }
                 "cancelled" -> response = "Stopped."
                 "approval_required" -> {
                     status = "pending_approval"
                     pendingApproval = JSONObject().apply {
-                        put("tool_name", event.optString("name", "Tool Execution"))
-                        put("tool_call_id", event.optString("id"))
+                        put("tool_name", event.name)
+                        put("tool_call_id", event.id)
                     }
                 }
-                "selection_required" -> {
+                "selection_required" -> event.selection?.let {
                     status = "awaiting_selection"
-                    selectionRequest = JSONObject().apply {
-                        put("prompt", clamp(event.optString("prompt"), MAX_OPTION_CHARS * 2))
-                        put("multiple", event.optBoolean("multiple", false))
-                        put("options", clampOptions(event.optJSONArray("options")))
-                    }
+                    selectionRequest = selectionJson(it)
                 }
                 "iterations_exceeded" -> {
                     status = "iterations_exceeded"
-                    extendSummary = JSONObject().put("summary", event.optString("summary"))
+                    extendSummary = JSONObject().put("summary", event.summary)
                 }
-                "state" -> event.optJSONObject("state")?.let { st ->
-                    status = st.optString("status", status)
-                    st.optString("extend_summary").takeIf { it.isNotEmpty() }?.let {
+                "state" -> event.state?.let { st ->
+                    status = st.status
+                    st.extendSummary.takeIf { it.isNotEmpty() }?.let {
                         extendSummary = JSONObject().put("summary", it)
                     }
                     // A prompt we missed on the event stream still reaches the watch.
-                    st.optJSONObject("pending_approval")?.let { pa ->
+                    st.pendingApproval?.let { pa ->
                         status = "pending_approval"
                         pendingApproval = JSONObject().apply {
-                            put("tool_name", pa.optString("tool_name", "Tool Execution"))
-                            put("tool_call_id", pa.optString("tool_call_id"))
+                            put("tool_name", pa.toolName ?: "Tool Execution")
+                            put("tool_call_id", pa.toolCallId)
                         }
                     }
-                    st.optJSONObject("selection_request")?.let { sel ->
+                    st.selection?.let { sel ->
                         status = "awaiting_selection"
-                        selectionRequest = JSONObject().apply {
-                            put("prompt", clamp(sel.optString("prompt"), MAX_OPTION_CHARS * 2))
-                            put("multiple", sel.optBoolean("multiple", false))
-                            put("options", clampOptions(sel.optJSONArray("options")))
-                        }
+                        selectionRequest = selectionJson(sel)
                     }
                 }
             }
@@ -202,9 +200,9 @@ class WearMessageListenerService : WearableListenerService() {
         private var lastSentAt = 0L
         private var sentLength = 0
 
-        fun onEvent(event: JSONObject) {
-            when (event.optString("type")) {
-                "transcription" -> event.optString("text").takeIf { it.isNotEmpty() }?.let {
+        fun onEvent(event: RunEvent) {
+            when (event.type) {
+                "transcription" -> event.text.takeIf { it.isNotEmpty() }?.let {
                     send(JSONObject().put("transcription", it))
                 }
                 // A new LLM step (or a retried one) starts its text over.
@@ -213,7 +211,7 @@ class WearMessageListenerService : WearableListenerService() {
                     sentLength = 0
                 }
                 "text_delta" -> {
-                    text.append(event.optString("delta"))
+                    text.append(event.delta)
                     val now = android.os.SystemClock.uptimeMillis()
                     if (text.length > sentLength && now - lastSentAt >= PARTIAL_INTERVAL_MS) {
                         lastSentAt = now
@@ -230,7 +228,7 @@ class WearMessageListenerService : WearableListenerService() {
     /** Consume an assistant SSE stream on behalf of the watch; one folded reply. */
     private suspend fun runAssistantStream(
         live: WearLiveForwarder? = null,
-        block: suspend (onEvent: (JSONObject) -> Unit) -> Unit
+        block: suspend (onEvent: (RunEvent) -> Unit) -> Unit
     ): JSONObject {
         val folder = WearReplyFolder()
         try {
@@ -292,17 +290,14 @@ class WearMessageListenerService : WearableListenerService() {
      * id, text (clamped), who said it, tool name. Oldest turns go first
      * when it doesn't fit.
      */
-    private fun slimThread(thread: JSONObject): JSONObject {
-        val src = thread.optJSONArray("messages") ?: JSONArray()
-        val slim = ArrayList<JSONObject>(src.length())
-        for (i in 0 until src.length()) {
-            val m = src.optJSONObject(i) ?: continue
-            val tool = m.optJSONObject("toolCall")
+    private fun slimThread(messages: List<ChatMessage>): JSONObject {
+        val slim = ArrayList<JSONObject>(messages.size)
+        for (m in messages) {
             slim += JSONObject().apply {
-                put("id", m.optString("id"))
-                put("isUser", m.optBoolean("isUser"))
-                put("message", clamp(m.optString("message"), MAX_THREAD_MESSAGE_CHARS))
-                if (tool != null) put("toolCall", JSONObject().put("toolName", tool.optString("toolName")))
+                put("id", m.id)
+                put("isUser", m.isUser)
+                put("message", clamp(m.message, MAX_THREAD_MESSAGE_CHARS))
+                m.toolCall?.let { put("toolCall", JSONObject().put("toolName", it.toolName)) }
             }
         }
         fun build() = JSONObject().put("session_id", THREAD).put("messages", JSONArray(slim))
@@ -355,8 +350,8 @@ class WearMessageListenerService : WearableListenerService() {
                         sendReply(nodeId, WearPaths.response(WearPaths.GET_SESSIONS), one.toString().toByteArray())
                     }
                     WearPaths.GET_SESSION_DETAIL -> {
-                        val thread = JSONObject(getApiService().getThread(THREAD_TURNS))
-                        sendReply(nodeId, WearPaths.response(WearPaths.GET_SESSION_DETAIL), slimThread(thread).toString().toByteArray())
+                        val thread = getApiService().chat.thread(THREAD_TURNS)
+                        sendReply(nodeId, WearPaths.response(WearPaths.GET_SESSION_DETAIL), slimThread(thread.messages).toString().toByteArray())
                     }
                     // Older watch builds create a session per conversation; nothing to create now.
                     WearPaths.CREATE_SESSION -> {
@@ -366,19 +361,26 @@ class WearMessageListenerService : WearableListenerService() {
                         val json = JSONObject(String(data))
                         val msg = json.getString("message")
                         val responseJson = runAssistantStream(WearLiveForwarder(nodeId, WearPaths.response(WearPaths.SEND_MESSAGE))) { onEvent ->
-                            getApiService().streamMessage(msg, THREAD, chatModel(), onEvent, device = DEVICE)
+                            getApiService().chat.send(msg, THREAD, chatModel(), onEvent, device = DEVICE)
                         }
                         sendReply(nodeId, WearPaths.response(WearPaths.SEND_MESSAGE), responseJson.toString().toByteArray())
                     }
                     WearPaths.APPROVE_ACTION -> {
-                        val json = JSONObject(String(data)).put("session_id", THREAD).put("device", DEVICE)
+                        val json = JSONObject(String(data))
+                        val action = RunAction(
+                            sessionId = THREAD,
+                            action = json.optString("action"),
+                            device = DEVICE,
+                            toolCallId = json.optString("tool_call_id").takeIf { it.isNotEmpty() },
+                            selection = json.optJSONArray("selection")?.let { a -> List(a.length()) { a.optInt(it) } }
+                        )
                         val responseJson = runAssistantStream(WearLiveForwarder(nodeId, WearPaths.response(WearPaths.APPROVE_ACTION))) { onEvent ->
-                            getApiService().streamApproveAction(json, onEvent)
+                            getApiService().chat.act(action, onEvent)
                         }
                         sendReply(nodeId, WearPaths.response(WearPaths.APPROVE_ACTION), responseJson.toString().toByteArray())
                     }
                     WearPaths.GET_TASKS -> {
-                        val tasks = getApiService().getTasks()
+                        val tasks = getApiService().tasks.tasks()
                         val jsonArray = JSONArray()
                         tasks.forEach { task ->
                             jsonArray.put(JSONObject().apply {
@@ -405,7 +407,7 @@ class WearMessageListenerService : WearableListenerService() {
                         // Any snooze kind the watch offers: time (minutes),
                         // place (location + event), car (action) or wake.
                         val req = SnoozeRequest.fromJson(JSONObject(String(data)))
-                        val result = TaskActionQueue.snooze(applicationContext, req.taskId, req.serverPayload())
+                        val result = TaskActionQueue.snooze(applicationContext, req.taskId, TaskSnooze(req.type, req.minutes, req.location, req.event, req.action))
                         val reply = TaskActionReply(success = result != SubmitResult.REJECTED, queued = result == SubmitResult.QUEUED)
                         sendReply(nodeId, WearPaths.response(WearPaths.SNOOZE_TASK), reply.toJson().toString().toByteArray())
                     }
@@ -414,8 +416,8 @@ class WearMessageListenerService : WearableListenerService() {
                         val json = JSONObject(String(data))
                         val id = json.getString("id")
                         val ok = if (json.optString("action") == "accept") {
-                            getApiService().acceptSuggestion(id); true
-                        } else getApiService().dismissSuggestion(id)
+                            getApiService().calls.accept(id); true
+                        } else getApiService().calls.dismiss(id)
                         sendReply(nodeId, WearPaths.response(WearPaths.SUGGESTION_ACTION), JSONObject().put("success", ok).put("id", id).toString().toByteArray())
                         io.github.ronganam.dana.DanaWidgets.refresh(applicationContext)
                     }
@@ -443,9 +445,7 @@ class WearMessageListenerService : WearableListenerService() {
         activeWebSocket = null
         activeNodeId = nodeId
         val config = ServerConfig.load(this)
-        val model = chatModel()?.let { "&model=" + java.net.URLEncoder.encode(it, "UTF-8") }.orEmpty()
-        val wsUrl = config.url.replaceFirst("http", "ws") + "/api/assistant/voice_stream?session_id=$THREAD&device=$DEVICE$model"
-        val request = Request.Builder().url(wsUrl).bearerAuth(config.token).build()
+        val request = config.api().chat.voiceRequest(config.url, config.token, THREAD, chatModel(), DEVICE)
 
         val client = io.github.ronganam.dana.data.network.HttpClients.wearProxyWebSocket
 
@@ -454,9 +454,9 @@ class WearMessageListenerService : WearableListenerService() {
         var live = WearLiveForwarder(nodeId, WearPaths.RESPONSE_VOICE_STREAM)
         activeWebSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
-                val event = try { JSONObject(text) } catch (e: Exception) { return }
+                val event = ChatApi.parseEvent(text) ?: return
                 live.onEvent(event)
-                when (event.optString("type")) {
+                when (event.type) {
                     "no_speech" -> {
                         val reply = JSONObject().apply {
                             put("status", "completed")
@@ -489,12 +489,7 @@ class WearMessageListenerService : WearableListenerService() {
     private fun stopVoiceWebSocket() {
         val ws = activeWebSocket ?: return
         try {
-            val stopMsg = JSONObject().apply {
-                put("event", "stop")
-                put("session_id", THREAD)
-                put("sample_rate", 16000)
-            }
-            ws.send(stopMsg.toString())
+            ws.send(ChatApi.voiceStop(THREAD, 16000, null, null))
         } catch (e: Exception) {
             Log.e("WearMessageListener", "Error sending stop event to WebSocket", e)
         }

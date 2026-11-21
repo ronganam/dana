@@ -118,7 +118,7 @@ class NotificationAlertActivity : ComponentActivity() {
         val app = applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                ServerConfig.load(app).api().markNotificationsSeen(listOf(a.id))
+                ServerConfig.load(app).api().notifications.markSeen(listOf(a.id))
             } catch (e: Exception) {
                 Log.w("NotificationAlert", "Couldn't mark ${a.id} seen", e)
             }
@@ -166,7 +166,7 @@ class NotificationAlertActivity : ComponentActivity() {
         handled(a)
         lifecycleScope.launch {
             try {
-                val keys = ServerConfig.load(applicationContext).api().setNotificationStatus(listOf(a.id), "dismissed")
+                val keys = ServerConfig.load(applicationContext).api().notifications.setStatus(listOf(a.id), "dismissed")
                 DanaNotificationListener.cancel(keys.ifEmpty { listOfNotNull(a.key) })
             } catch (e: Exception) {
                 Toast.makeText(applicationContext, "Couldn't dismiss: ${e.message ?: "server unreachable"}", Toast.LENGTH_SHORT).show()

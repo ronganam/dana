@@ -181,7 +181,7 @@ class CallResultWorker(appContext: Context, params: WorkerParameters) : Coroutin
         val contact = inputData.getString(KEY_CONTACT) ?: "Unknown"
         val ctx = applicationContext
         val detail = try {
-            ServerConfig.load(ctx).api().getCallDetail(callId)
+            ServerConfig.load(ctx).api().calls.detail(callId)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

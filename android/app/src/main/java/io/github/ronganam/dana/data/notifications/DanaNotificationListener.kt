@@ -110,7 +110,7 @@ class DanaNotificationListener : NotificationListenerService() {
         } ?: return false
         AppIcons.remember(this, sbn)
         sbn.notification?.contentIntent?.let { pi -> synchronized(contentIntents) { contentIntents[sbn.key] = pi } }
-        val fingerprint = "${sbn.key}\u0000${item.optString("title")}\u0000${item.optString("text")}"
+        val fingerprint = "${sbn.key}\u0000${item.title}\u0000${item.text}"
         synchronized(recent) {
             if (recent.containsKey(fingerprint)) return false
             recent[fingerprint] = System.currentTimeMillis()

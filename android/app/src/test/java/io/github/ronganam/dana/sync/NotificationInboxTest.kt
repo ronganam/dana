@@ -1,9 +1,10 @@
 package io.github.ronganam.dana.sync
 
-import io.github.ronganam.dana.data.network.NotificationJson
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.NotificationsApi
+import io.github.ronganam.dana.data.network.PhoneNotificationWire
 import io.github.ronganam.dana.data.notifications.NotificationExtractor
 import io.github.ronganam.dana.data.notifications.Redactor
-import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -36,7 +37,7 @@ class NotificationInboxTest {
 
     @Test
     fun notificationWithSuggestionParses() {
-        val json = JSONObject(
+        val json = (
             """
             {"id":"n1","key":"0|com.whatsapp|1","package":"com.whatsapp","app_name":"WhatsApp",
              "title":"Gal","text":"can you buy milk?","sender":"Gal","conversation":null,"is_group":false,
@@ -48,7 +49,7 @@ class NotificationInboxTest {
                "notification":{"id":"n1","app_name":"WhatsApp","posted_at":"2026-11-10T14:00:00+02:00"}}]}
             """.trimIndent()
         )
-        val n = NotificationJson.notification(json)
+        val n = notification(json)
         assertEquals("needs_you", n.bucket)
         assertEquals("important", n.priority)
         assertEquals(null, n.conversation)
@@ -93,16 +94,16 @@ class NotificationInboxTest {
 
     @Test
     fun snoozeKeysParse() {
-        val keys = NotificationJson.snoozeKeys(org.json.JSONArray(
+        val keys = NotificationsApi.snoozeKeys(ApiJson.parseToJsonElement(
             """[{"key":"0|com.whatsapp|1","until_ms":1794300000000},{"key":"bad","until_ms":0},{"until_ms":5}]"""))
         assertEquals(mapOf("0|com.whatsapp|1" to 1794300000000L), keys)
-        val n = NotificationJson.notification(JSONObject("""{"id":"x","package":"p","snoozed_until":"2026-11-10T20:00:00+02:00"}"""))
+        val n = notification(("""{"id":"x","package":"p","snoozed_until":"2026-11-10T20:00:00+02:00"}"""))
         assertEquals("2026-11-10T20:00:00+02:00", n.snoozedUntil)
     }
 
     @Test
     fun suggestionSourceCarriesTheOriginalText() {
-        val n = NotificationJson.notification(JSONObject("""{"id":"x","package":"p","suggestions":[
+        val n = notification(("""{"id":"x","package":"p","suggestions":[
             {"id":"s","call_id":null,"source_type":"notification","source_id":"x","kind":"task","status":"pending","payload":{},
              "notification":{"id":"x","app_name":"Slack","package":"com.Slack","title":"Alon","text":"Robin can you run the report?",
                "sender":"Alon","posted_at":"2026-11-10T10:00:00+02:00"}},
@@ -117,7 +118,7 @@ class NotificationInboxTest {
 
     @Test
     fun callSuggestionStillParsesFromOldShape() {
-        val n = NotificationJson.notification(JSONObject("""{"id":"x","package":"p","suggestions":[
+        val n = notification(("""{"id":"x","package":"p","suggestions":[
             {"id":"s","call_id":"c1","kind":"task","status":"pending","payload":{},
              "call":{"id":"c1","contact":"אמא","call_timestamp":"2026-11-08T11:41:29"}}]}"""))
         val s = n.suggestions[0]
@@ -127,3 +128,5 @@ class NotificationInboxTest {
         assertEquals("אמא", s.source?.contact)
     }
 }
+
+private fun notification(text: String) = ApiJson.decodeFromString(PhoneNotificationWire.serializer(), text).toModel()

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.shopping
 
+import io.github.ronganam.dana.data.network.HttpResult
 import io.github.ronganam.dana.data.shopping.AddPart
 import io.github.ronganam.dana.data.shopping.ShoppingOp
 import io.github.ronganam.dana.data.shopping.ShoppingStore
@@ -39,8 +40,9 @@ class ShoppingStoreTest {
         }
         val transport = ShoppingStore.Transport { m, p, b ->
             if (!online) throw IOException("unreachable")
-            sent += Triple(m, p, b)
-            answer(m, p, b)
+            val body = b?.let { JSONObject(it.toString()) }
+            sent += Triple(m, p, body)
+            answer(m, p, body).let { (code, text) -> HttpResult(code, text) }
         }
         fun writes() = sent.filter { it.first != "GET" }
     }
@@ -87,7 +89,7 @@ class ShoppingStoreTest {
         val avocado = s.shown()!!.items.first { it.name == "Avocado" }
         val outcome = s.submit(ShoppingOp.Remove("o1", list, avocado.id, "Avocado"))
         assertTrue(outcome is ShoppingStore.Outcome.Rejected)
-        assertEquals("read_only", (outcome as ShoppingStore.Outcome.Rejected).body?.optString("error"))
+        assertEquals("read_only", (outcome as ShoppingStore.Outcome.Rejected).body?.error)
         assertTrue("reverted", s.shown()!!.items.any { it.id == avocado.id })
         assertFalse(File(dir, ShoppingStore.QUEUE).exists())
     }

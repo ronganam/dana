@@ -18,7 +18,15 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import org.json.JSONObject
+import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.text
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.put
 import java.time.OffsetDateTime
 
 /**
@@ -55,15 +63,17 @@ object AgentSessions {
     const val ACTION_HIDE = "io.github.ronganam.dana.AGENT_SESSION_HIDE"
     const val EXTRA_ID = "agent_session_id"
 
+    /** Pushed text the way the server's other clients read it ("" when absent or null). */
+    private fun JsonObject.str(key: String): String = text(key).orEmpty()
+
     /** One of a session's subagents. */
     data class Sub(val id: String, val title: String, val status: String, val activity: String, val summary: String) {
         val finished get() = status == "done" || status == "failed"
 
         companion object {
-            fun from(o: JSONObject): Sub? {
-                val id = o.optString("id").takeIf { it.isNotBlank() } ?: return null
-                return Sub(id, o.optString("title").ifBlank { "Subagent" }, o.optString("status"), o.optString("activity"),
-                    o.optString("summary"))
+            fun from(o: JsonObject): Sub? {
+                val id = o.str("id").takeIf { it.isNotBlank() } ?: return null
+                return Sub(id, o.str("title").ifBlank { "Subagent" }, o.str("status"), o.str("activity"), o.str("summary"))
             }
         }
     }
@@ -81,18 +91,19 @@ object AgentSessions {
             "${subagents.count { it.finished }}/${subagents.size} subagent${if (subagents.size == 1) "" else "s"} done"
 
         companion object {
-            fun from(o: JSONObject): Session? {
-                val id = o.optString("id").takeIf { it.isNotBlank() } ?: return null
+            fun from(o: JsonObject): Session? {
+                val id = o.str("id").takeIf { it.isNotBlank() } ?: return null
                 return Session(
-                    id, o.optString("agent"), o.optString("host"), o.optString("project"), o.optString("title"),
-                    o.optString("status"), o.optString("activity"), o.optString("summary"),
-                    o.optInt("steps_done"), o.optInt("steps_total"), o.optInt("rev"),
-                    millis(o.optString("started_at")), millis(o.optString("updated_at")),
-                    o.optString("open_url").takeIf { it.startsWith("https://") }.orEmpty(),
-                    o.optJSONArray("subagents")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it)?.let(Sub::from) } }
-                        .orEmpty(),
+                    id, o.str("agent"), o.str("host"), o.str("project"), o.str("title"),
+                    o.str("status"), o.str("activity"), o.str("summary"),
+                    o.int("steps_done"), o.int("steps_total"), o.int("rev"),
+                    millis(o.str("started_at")), millis(o.str("updated_at")),
+                    o.str("open_url").takeIf { it.startsWith("https://") }.orEmpty(),
+                    (o["subagents"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(Sub::from) },
                 )
             }
+
+            private fun JsonObject.int(key: String): Int = (this[key] as? JsonPrimitive)?.intOrNull ?: 0
 
             private fun millis(iso: String): Long =
                 runCatching { OffsetDateTime.parse(iso).toInstant().toEpochMilli() }.getOrDefault(System.currentTimeMillis())
@@ -131,9 +142,9 @@ object AgentSessions {
     }
 
     /** Make the shade match the pushed list (`data.sessions`). */
-    fun show(context: Context, data: JSONObject) {
-        val list = data.optJSONArray("sessions") ?: return
-        val sessions = (0 until list.length()).mapNotNull { list.optJSONObject(it)?.let(Session::from) }
+    fun show(context: Context, data: JsonObject) {
+        val list = data["sessions"] as? JsonArray ?: return
+        val sessions = list.mapNotNull { (it as? JsonObject)?.let(Session::from) }
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         channels(nm)
         val prefs = ServerConfig.prefs(context)
@@ -144,18 +155,21 @@ object AgentSessions {
                 is Step.Cancel -> nm.cancel(NOTIFICATION_TAG + step.id, 1)
             }
         }
-        val next = JSONObject()
-        sessions.forEach { next.put(it.id, JSONObject().put("rev", it.rev).put("live", it.live)) }
+        val next = buildJsonObject {
+            sessions.forEach { put(it.id, buildJsonObject { put("rev", it.rev); put("live", it.live) }) }
+        }
         prefs.edit().putString(KEY_SHOWN, next.toString()).apply()
     }
 
     private fun loadShown(raw: String?): Map<String, Shown> {
-        val o = runCatching { JSONObject(raw ?: "{}") }.getOrDefault(JSONObject())
-        return o.keys().asSequence().associateWith { id ->
-            val v = o.optJSONObject(id) ?: JSONObject()
-            Shown(v.optInt("rev"), v.optBoolean("live"))
+        return shownMap(raw).mapValues { (_, v) ->
+            val o = v as? JsonObject
+            Shown((o?.get("rev") as? JsonPrimitive)?.intOrNull ?: 0, (o?.get("live") as? JsonPrimitive)?.booleanOrNull ?: false)
         }
     }
+
+    private fun shownMap(raw: String?): JsonObject =
+        runCatching { ApiJson.parseToJsonElement(raw ?: "{}") as? JsonObject }.getOrNull() ?: JsonObject(emptyMap())
 
     private fun channels(nm: NotificationManager) {
         nm.createNotificationChannel(NotificationChannel(CH_LIVE, "Coding sessions (live)", NotificationManager.IMPORTANCE_DEFAULT).apply {
@@ -281,8 +295,7 @@ object AgentSessions {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.cancel(NOTIFICATION_TAG + id, 1)
         val prefs = ServerConfig.prefs(context)
-        val shown = runCatching { JSONObject(prefs.getString(KEY_SHOWN, "{}") ?: "{}") }.getOrDefault(JSONObject())
-        shown.remove(id)
+        val shown = JsonObject(shownMap(prefs.getString(KEY_SHOWN, "{}")) - id)
         prefs.edit().putString(KEY_SHOWN, shown.toString()).apply()
     }
 }
@@ -296,7 +309,7 @@ class AgentSessionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                ServerConfig.load(context).api().hideAgentSession(id)
+                ServerConfig.load(context).api().devices.hideAgentSession(id)
             } catch (e: Exception) {
                 Log.w("AgentSessions", "Couldn't hide session on the server", e)
             } finally {
