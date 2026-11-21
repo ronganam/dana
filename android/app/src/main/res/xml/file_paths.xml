@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paths exposed via FileProvider: the updates cache dir (downloaded APKs for the
+     package installer) and project files downloaded to open in another app. -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <cache-path
+        name="updates"
+        path="updates/" />
+    <cache-path
+        name="project_files"
+        path="project_files/" />
+</paths>

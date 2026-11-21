@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2b2622">
+    <title>Connect Telegram · Dana</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <style>
+        :root {
+            --canvas: #2b2622;
+            --canvas-soft: #383330;
+            --hairline-strong: #4a443f;
+            --primary: #f7f5f0;
+            --on-primary: #2b2622;
+            --body: #c9c0ad;
+            --mute: #aea69c;
+            --destructive: #ff453a;
+            --ok: #30d158;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 16px;
+            background: var(--canvas);
+            color: var(--primary);
+            font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+        main { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; }
+        h1 { margin: 0; font-size: 20px; font-weight: 600; }
+        p, ol { margin: 0; color: var(--body); font-size: 14px; }
+        ol { padding-left: 20px; }
+        .muted { color: var(--mute); font-size: 13px; }
+        .qr { background: #fff; border-radius: 8px; padding: 12px; width: 260px; height: 260px; align-self: center; }
+        .qr svg { width: 100%; height: 100%; display: block; }
+        input {
+            width: 100%; padding: 10px 12px; border-radius: 6px; border: 1px solid var(--hairline-strong);
+            background: var(--canvas-soft); color: var(--primary); font: inherit;
+        }
+        button, a.btn {
+            padding: 10px 12px; border: 0; border-radius: 6px; background: var(--primary); color: var(--on-primary);
+            font: inherit; font-weight: 600; cursor: pointer; text-align: center; text-decoration: none;
+        }
+        button.secondary, a.secondary { background: transparent; color: var(--primary); border: 1px solid var(--hairline-strong); }
+        .error { color: var(--destructive); font-size: 14px; }
+        .ok { color: var(--ok); font-weight: 600; }
+        [hidden] { display: none !important; }
+    </style>
+</head>
+<body>
+<main>
+    <h1>Connect your Telegram</h1>
+    <p>Dana reads your own chats and channels to list and summarize what's unread. It never sends messages and never marks anything as read.</p>
+
+    <section id="qr-step" hidden>
+        <ol>
+            <li>Open Telegram on your phone.</li>
+            <li>Settings → Devices → <b>Link Desktop Device</b>.</li>
+            <li>Scan this code.</li>
+        </ol>
+        <div class="qr" id="qr" aria-label="Telegram sign-in QR code"></div>
+        <p class="muted" id="qr-note">The code renews by itself until you scan it.</p>
+    </section>
+
+    <form id="password-step" hidden>
+        <p>Your account has two-step verification. Enter its password to finish.</p>
+        <input type="password" id="password" placeholder="Telegram password" autocomplete="current-password" required>
+        <button type="submit">Finish</button>
+    </form>
+
+    <section id="done-step" hidden>
+        <p class="ok" id="done-text">Connected.</p>
+        <p class="muted">To remove access later, disconnect Telegram on the Integrations page and remove "Dana" from Telegram's Devices list.</p>
+    </section>
+
+    <p class="error" id="error" hidden></p>
+    <button id="start" hidden>Show a QR code</button>
+    <a class="btn secondary" href="/#integrations">Back to Integrations</a>
+</main>
+<script>
+    const $ = (id) => document.getElementById(id);
+    let timer = null;
+
+    function show(s) {
+        $("qr-step").hidden = s.status !== "qr";
+        $("password-step").hidden = s.status !== "password";
+        $("done-step").hidden = s.status !== "connected";
+        $("start").hidden = !["none", "expired", "failed"].includes(s.status) || s.configured === false;
+        if (s.status === "qr" && s.qr_svg) $("qr").innerHTML = s.qr_svg;
+        if (s.status === "connected") $("done-text").textContent = s.account ? `Connected as ${s.account}.` : "Connected.";
+        const errors = {
+            expired: "The code expired. Show a new one to try again.",
+            bad_password: "That password is not right.",
+            telegram_not_configured: "The server has no Telegram app yet (TELEGRAM_API_ID / TELEGRAM_API_HASH).",
+        };
+        let error = errors[s.error] || errors[s.status] || (s.status === "failed" ? (s.error || "The sign-in failed.") : "");
+        if (s.configured === false) error = errors.telegram_not_configured;
+        $("error").textContent = error;
+        $("error").hidden = !error;
+        clearTimeout(timer);
+        if (s.status === "qr" || s.status === "starting") timer = setTimeout(poll, 2000);
+    }
+
+    async function call(method, path, body) {
+        const r = await fetch(path, {
+            method, credentials: "same-origin",
+            headers: body ? { "Content-Type": "application/json" } : {},
+            body: body ? JSON.stringify(body) : undefined,
+        });
+        let data = {};
+        try { data = await r.json(); } catch (_) { /* not JSON */ }
+        if (!r.ok && !data.status) data = { status: "failed", error: data.error || data.message || `HTTP ${r.status}` };
+        return data;
+    }
+
+    async function poll() { show(await call("GET", "/api/telegram/login")); }
+    async function start() { show(await call("POST", "/api/telegram/login")); }
+
+    $("start").addEventListener("click", start);
+    $("password-step").addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const s = await call("POST", "/api/telegram/login/password", { password: $("password").value });
+        $("password").value = "";
+        show(s);
+    });
+
+    (async () => {
+        const s = await call("GET", "/api/telegram/login");
+        if (s.status === "none" && s.configured !== false) start(); else show(s);
+    })();
+</script>
+</body>
+</html>

@@ -1,0 +1,5 @@
+# Baseline profile: compile Dana's own code ahead of time when the app is
+# installed or updated (the Compose libraries ship their own rules). Without
+# it the tablet and the TV interpret/JIT the assistant sheet for days.
+HSPLapp/ganam/assistant/**;->**(**)**
+Lapp/ganam/assistant/**;

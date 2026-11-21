@@ -1,0 +1,12 @@
+## Opened from a phone notification
+Robin opened this chat from notification notif-fx. Answer about it directly. To take a pending suggestion use accept_call_suggestion; for a new task use add_task.
+Pending suggestions:
+- (none)
+
+### The notification
+Notification notif-fx from the app WhatsApp at 2026-11-08T10:00:00 in group Family
+Title: Gal
+Sender: Gal
+Text:
+can you buy milk
+Category: personal_message, priority: high

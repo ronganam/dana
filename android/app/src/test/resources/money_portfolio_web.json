@@ -1,0 +1,344 @@
+{
+ "overview": {
+  "body": {
+   "attention": [],
+   "banks": [],
+   "cards": [],
+   "everyday": {
+    "on_track": 0,
+    "total": 0,
+    "typical": null
+   },
+   "fixed_monthly": 0,
+   "forecast": null,
+   "income": {
+    "count": 0,
+    "total": 0
+   },
+   "income_month": 0,
+   "income_typical": null,
+   "investments": [
+    {
+     "cash": 100000,
+     "company": "psagot",
+     "company_name": "Psagot Trade",
+     "day_change": 41230,
+     "id": "3afc51386bf74cd0aa0dc72281977145",
+     "label": "Psagot Trade ••••456",
+     "number": "••••456",
+     "profit": 399706,
+     "profit_pct": 6.98,
+     "value": 3950000,
+     "value_at": "2026-11-18T10:21:45+00:00"
+    }
+   ],
+   "last_sync_at": "2026-11-18T10:21:45+00:00",
+   "meals": [],
+   "month": "2026-11",
+   "net": 0,
+   "one_off": 0,
+   "period": {
+    "end": "2026-11-18",
+    "in_progress": true,
+    "key": "2026-11",
+    "label": "November 2026",
+    "start": "2026-11-01"
+   },
+   "recurring_monthly": 0,
+   "set_aside": 0,
+   "sources": [
+    {
+     "company": "psagot",
+     "company_name": "Psagot Trade",
+     "id": "37bef9b98e2d4e148fcbaaa10c2fda02",
+     "label": null,
+     "last_ok_at": "2026-11-18T10:21:45+00:00",
+     "last_sync_at": "2026-11-18T10:21:45+00:00",
+     "name": "Psagot Trade",
+     "next_sync_at": "2026-11-18T17:03:00+00:00",
+     "state": "ok",
+     "state_reason": null
+    }
+   ],
+   "spent": {
+    "compare": [
+     {
+      "count": 0,
+      "end": "2026-10-18",
+      "label": "at this point last month",
+      "start": "2026-10-01",
+      "total": 0
+     },
+     {
+      "count": 0,
+      "end": "2026-10-31",
+      "label": "all of last month",
+      "start": "2026-10-01",
+      "total": 0
+     }
+    ],
+    "count": 0,
+    "total": 0
+   },
+   "uncategorized": 0,
+   "unusual": [],
+   "yearly_monthly": 0
+  },
+  "status": 200
+ },
+ "portfolio": {
+  "body": {
+   "accounts": [
+    {
+     "cash": 100000,
+     "company": "psagot",
+     "company_name": "Psagot Trade",
+     "day_change": 41230,
+     "history": [
+      {
+       "date": "2026-10-09",
+       "value": 3750000
+      },
+      {
+       "date": "2026-10-19",
+       "value": 3800000
+      },
+      {
+       "date": "2026-11-15",
+       "value": 3935000
+      },
+      {
+       "date": "2026-11-16",
+       "value": 3940000
+      },
+      {
+       "date": "2026-11-17",
+       "value": 3945000
+      },
+      {
+       "date": "2026-11-18",
+       "value": 3950000
+      }
+     ],
+     "holdings": [
+      {
+       "cost": 2580000,
+       "currency": "ILS",
+       "name": "קרן מחקה \"דוגמה\" 500",
+       "price": 250.0,
+       "profit": 420000,
+       "profit_pct": 16.28,
+       "quantity": 120.0,
+       "security": "2001234",
+       "value": 3000000,
+       "weight": 48.99
+      },
+      {
+       "cost": 863750,
+       "currency": "USD",
+       "name": "Example Corp",
+       "price": 150.0,
+       "profit": -31250,
+       "profit_pct": -3.62,
+       "quantity": 15.0,
+       "security": "5551234",
+       "value": 832500,
+       "weight": 13.6
+      }
+     ],
+     "id": "3afc51386bf74cd0aa0dc72281977145",
+     "label": "Psagot Trade ••••456",
+     "number": "••••456",
+     "profit": 399706,
+     "profit_pct": 6.98,
+     "value": 3950000,
+     "value_at": "2026-11-18T10:21:45+00:00"
+    }
+   ],
+   "allocation": [
+    {
+     "name": "קרן מחקה \"דוגמה\" 500",
+     "share": 0.759493670886076,
+     "value": 3000000
+    },
+    {
+     "name": "Example Corp",
+     "share": 0.2107594936708861,
+     "value": 832500
+    },
+    {
+     "name": "Cash",
+     "share": 0.02531645569620253,
+     "value": 100000
+    }
+   ],
+   "flows": [
+    {
+     "amount": 2000000,
+     "date": "2026-10-19"
+    }
+   ],
+   "history": [
+    {
+     "date": "2026-10-09",
+     "value": 3750000
+    },
+    {
+     "date": "2026-10-19",
+     "value": 3800000
+    },
+    {
+     "date": "2026-11-15",
+     "value": 3935000
+    },
+    {
+     "date": "2026-11-16",
+     "value": 3940000
+    },
+    {
+     "date": "2026-11-17",
+     "value": 3945000
+    },
+    {
+     "date": "2026-11-18",
+     "value": 3950000
+    }
+   ],
+   "total": {
+    "as_of": "2026-11-18T10:21:45+00:00",
+    "cash": 100000,
+    "cost": 3443750,
+    "day_change": 41230,
+    "profit": 399706,
+    "value": 3950000
+   },
+   "trades": [
+    {
+     "account_id": "3afc51386bf74cd0aa0dc72281977145",
+     "action": "פעולה חדשה כלשהי",
+     "amount": 0,
+     "commission": null,
+     "currency": null,
+     "date": "2026-11-16",
+     "id": "840d5ece6eba4430a56affe74a9b95d8",
+     "kind": "other",
+     "name": null,
+     "price": null,
+     "quantity": null,
+     "security": null,
+     "tax": null
+    },
+    {
+     "account_id": "3afc51386bf74cd0aa0dc72281977145",
+     "action": "חיוב מס",
+     "amount": -333,
+     "commission": null,
+     "currency": "ILS",
+     "date": "2026-11-09",
+     "id": "94d386d1f92b406ebda1c9d2e408e722",
+     "kind": "tax",
+     "name": null,
+     "price": null,
+     "quantity": null,
+     "security": null,
+     "tax": null
+    },
+    {
+     "account_id": "3afc51386bf74cd0aa0dc72281977145",
+     "action": "דיבידנד",
+     "amount": 1332,
+     "commission": null,
+     "currency": "USD",
+     "date": "2026-11-09",
+     "id": "ae9b888e1a6f40edb8e3804ac4874f48",
+     "kind": "dividend",
+     "name": "Example Corp",
+     "price": 0.24,
+     "quantity": 15.0,
+     "security": "5551234",
+     "tax": 333
+    },
+    {
+     "account_id": "3afc51386bf74cd0aa0dc72281977145",
+     "action": "קניה בבורסה",
+     "amount": -496000,
+     "commission": -750,
+     "currency": "ILS",
+     "date": "2026-10-29",
+     "id": "0f7d6871847c4248bb3601eaeeb08b29",
+     "kind": "buy",
+     "name": "קרן מחקה דוגמה 500",
+     "price": 24800.0,
+     "quantity": 20.0,
+     "security": "2001234",
+     "tax": 0
+    },
+    {
+     "account_id": "3afc51386bf74cd0aa0dc72281977145",
+     "action": "התקבל מח.בסניף",
+     "amount": 2000000,
+     "commission": 0,
+     "currency": "ILS",
+     "date": "2026-10-19",
+     "id": "29bac3ab42f84cb1b5a6a98a376b7b83",
+     "kind": "deposit",
+     "name": null,
+     "price": 0.0,
+     "quantity": 20000.0,
+     "security": null,
+     "tax": 0
+    },
+    {
+     "account_id": "3afc51386bf74cd0aa0dc72281977145",
+     "action": "קניה בבורסה",
+     "amount": -2180000,
+     "commission": -1500,
+     "currency": "ILS",
+     "date": "2026-09-19",
+     "id": "9559956934244c77b8dee46280f7ed68",
+     "kind": "buy",
+     "name": "אג\"ח מדינה לדוגמה [id]",
+     "price": 109.0,
+     "quantity": 20000.0,
+     "security": "1100007",
+     "tax": 0
+    }
+   ]
+  },
+  "status": 200
+ },
+ "sources": {
+  "body": {
+   "sources": [
+    {
+     "accounts": [
+      {
+       "balance": 3950000,
+       "balance_at": "2026-11-18T10:21:45+00:00",
+       "id": "3afc51386bf74cd0aa0dc72281977145",
+       "kind": "investment",
+       "label": null,
+       "next_charge": null,
+       "next_charge_date": null,
+       "number": "••••456"
+      }
+     ],
+     "can_sync": true,
+     "code_request": null,
+     "company": "psagot",
+     "company_name": "Psagot Trade",
+     "credentials_set": true,
+     "error_type": null,
+     "id": "37bef9b98e2d4e148fcbaaa10c2fda02",
+     "label": null,
+     "last_ok_at": "2026-11-18T10:21:45+00:00",
+     "last_sync_at": "2026-11-18T10:21:45+00:00",
+     "next_sync_at": "2026-11-18T17:03:00+00:00",
+     "state": "ok",
+     "state_reason": null
+    }
+   ]
+  },
+  "status": 200
+ }
+}

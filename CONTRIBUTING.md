@@ -1,0 +1,47 @@
+# Contributing to Dana
+
+Thanks for looking. Dana started as one household's assistant, so the bar for a change is: it works for that household, and it makes Dana easier to use or adapt for others.
+
+## Before you start
+
+- For anything bigger than a fix, open an issue first and say what you want to build; it saves you a rewrite.
+- Read the guide of the part you change: [`server/AGENTS.md`](server/AGENTS.md) or [`android/AGENTS.md`](android/AGENTS.md), then the doc for your area (listed at the end of each guide).
+
+## Set up
+
+```bash
+git config core.hooksPath .githooks          # pushing master runs the server tests
+cd server
+python3.14 -m venv .venv && .venv/bin/pip install -r requirements.txt
+cp .env.example .env
+```
+
+Android: JDK 21 and the Android SDK; open `android/` in Android Studio or use `./gradlew`.
+
+## Test
+
+```bash
+cd server
+bin/test --changed      # while working: only what your change touches (seconds)
+bin/test                # before you open a pull request (about 2 minutes)
+bin/test --list         # what each test script covers
+
+cd android
+./gradlew :app:testPhoneDebugUnitTest :wear:testDebugUnitTest
+```
+
+- Server tests are standalone scripts (`test_*.py`, `test_*.mjs`), not pytest. Each starts with `import testenv; testenv.isolate("<name>")`, which gives it a clean environment and a throwaway database. Assert on data, not just status codes; a per-user feature gets checked with two users and one without it.
+- Never put real people, phone numbers, addresses, accounts or money data in tests or fixtures: use made-up ones (`server/testenv.py`).
+- `bin/local-env.sh` runs the real image against stub services for end-to-end checks ([`server/docs/local-testing.md`](server/docs/local-testing.md)).
+
+## Conventions
+
+- Keep the docs current in the same pull request as the code.
+- Schema changes go through a new migration in `server/core/db/migrations/`; never edit a shipped one.
+- A server payload change that a client reads updates that client (and its fixtures) in the same pull request.
+- User-facing text calls the assistant Dana; internal identifiers that start with `ganam` stay as they are ([`AGENTS.md`](AGENTS.md)).
+- No new dependency without a reason in the pull request.
+
+## Pull requests
+
+One topic per pull request, with a description of what changed and how you checked it. CI runs the server suite and the Android unit tests.

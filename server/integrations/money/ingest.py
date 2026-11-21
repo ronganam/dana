@@ -1,0 +1,364 @@
+"""Storing a sync's result: accounts and transactions (docs/money.md, "Ingest"); an investment
+account's portfolio goes to ``portfolio.py``, a meal card's charges to ``meals.py``.
+
+The worker returns ``israeli-bank-scrapers`` accounts (``accountNumber``,
+``balance``, ``txns``). :func:`apply` stores them for one source in one
+transaction: accounts upserted by ``(user, company, number)``, transactions
+by ``(account, ext_key)``, the account's ``pending`` rows not in this pull
+removed. Text is scrubbed before it is stored (ID numbers, card and account
+numbers); amounts become signed agorot; the scrapers' dates (UTC instants of
+local midnight) become local dates. A category comes only from the user's
+rules here; classification runs later, from a hook."""
+
+import datetime
+import hashlib
+import json
+import logging
+import re
+import unicodedata
+import uuid
+from collections import Counter
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
+
+from core import clock
+from core.users import User
+from integrations.money import companies, meals, portfolio, store
+
+logger = logging.getLogger(__name__)
+
+CURRENCIES = {"₪": "ILS", "$": "USD", "€": "EUR"}
+
+# Fields of a stored transaction a later pull may change (never category / merchant / flow / note).
+_SCRAPED = ("status", "occurred_at", "purchase_date", "charge_date", "amount", "orig_amount", "orig_currency",
+            "description", "merchant_key", "memo", "installment_number", "installment_total")
+
+# --- Scrubbing ------------------------------------------------------------------------------
+
+_ACCOUNT = re.compile(r"(?<!\d)\d{2}-\d{3}-\d{4,9}(?!\d)")
+_CARD = re.compile(r"(?<!\d)\d{4}([ -]?)\d{4}\1\d{4}\1\d{4}(?!\d)")
+_NINE = re.compile(r"(?<!\d)\d{9}(?!\d)")
+
+
+def israeli_id_valid(digits: str) -> bool:
+    """Whether 9 digits pass the Israeli ID number checksum."""
+    if len(digits) != 9 or not digits.isdigit():
+        return False
+    total = 0
+    for i, ch in enumerate(digits):
+        n = int(ch) * (1 + i % 2)
+        total += n - 9 if n > 9 else n
+    return total % 10 == 0
+
+
+def _keep_last3(match: "re.Match[str]") -> str:
+    digits = re.sub(r"\D", "", match.group(0))
+    return "••••" + digits[-3:]
+
+
+def scrub(text: str) -> str:
+    """``text`` without ID numbers (→ ``[id]``), card numbers and account
+    numbers (→ ``••••`` + their last 3 digits). Names stay."""
+    if not text:
+        return text
+    text = _ACCOUNT.sub(_keep_last3, text)
+    text = _CARD.sub(_keep_last3, text)
+    return _NINE.sub(lambda m: "[id]" if israeli_id_valid(m.group(0)) else m.group(0), text)
+
+
+def scrub_value(value: Any) -> Any:
+    """:func:`scrub` applied to every string in a JSON value (and to integers
+    that are an ID or a card number)."""
+    if isinstance(value, str):
+        return scrub(value)
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, int):
+        s = str(value)
+        if len(s) == 9 and israeli_id_valid(s):
+            return "[id]"
+        if len(s) == 16:
+            return "••••" + s[-3:]
+        return value
+    if isinstance(value, dict):
+        return {k: scrub_value(v) for k, v in value.items()}
+    if isinstance(value, list):
+        return [scrub_value(v) for v in value]
+    return value
+
+
+# --- Merchant keys --------------------------------------------------------------------------
+
+_QUOTES = re.compile(r"[\"'`׳״]")
+_PUNCT = re.compile(r"[^\w\s]")
+
+
+def merchant_key(text: str) -> str:
+    """A description reduced for matching: lower case, quotes dropped, other
+    punctuation as spaces, number-only tokens (branch numbers) removed,
+    spaces collapsed ("רמי לוי - יבנה 123" → "רמי לוי יבנה")."""
+    s = unicodedata.normalize("NFKC", text or "").casefold()
+    s = _QUOTES.sub("", s)
+    s = _PUNCT.sub(" ", s).replace("_", " ")
+    return " ".join(t for t in s.split() if not t.isdigit())
+
+
+# Hapoalim's note on a transfer the user sent: "לטובת: <payee>. עבור: <purpose>." (the purpose is optional).
+_TRANSFER_NOTE = re.compile(r"^\s*לטובת:\s*(?P<payee>.+?)\s*(?:\.\s*עבור:\s*(?P<purpose>.*?))?\s*\.?\s*$", re.S)
+PAYEE_MAX = 60
+
+
+def transfer_payee(memo: Optional[str]) -> Optional[Tuple[str, str]]:
+    """``(payee, purpose)`` from a bank transfer's note ("לטובת: בית ההשקעות הראשון בע"מ. עבור: השקעה."),
+    None when the note is not one. The user typed both in the bank's app when sending the money."""
+    m = _TRANSFER_NOTE.match(memo or "")
+    if not m:
+        return None
+    payee = " ".join(m.group("payee").split())[:PAYEE_MAX].strip()
+    purpose = " ".join((m.group("purpose") or "").split())[:120].strip()
+    return (payee, purpose) if payee and merchant_key(payee) else None
+
+
+def clean_payee(payee: str) -> str:
+    """A payee as a display name: without the legal suffix ("בית ההשקעות הראשון בע"מ" → "בית ההשקעות הראשון")."""
+    name = re.sub(r"\s*\b(בע(?:[\"'״]?מ)?|בעמ|ltd\.?|inc\.?)\s*$", "", payee or "", flags=re.I).strip(" .,-")
+    return name or (payee or "").strip()
+
+
+# --- Values ---------------------------------------------------------------------------------
+
+def agorot(value: Any) -> Optional[int]:
+    """A shekel amount as integer agorot (rounded half up), None when missing."""
+    if value is None or value == "":
+        return None
+    try:
+        return int((Decimal(str(value)) * 100).to_integral_value(rounding=ROUND_HALF_UP))
+    except (InvalidOperation, ValueError):
+        return None
+
+
+def currency(value: Any) -> Optional[str]:
+    """``₪`` → ILS, ``$`` → USD, ``€`` → EUR; anything else as given."""
+    if value is None:
+        return None
+    text = str(value).strip()
+    return CURRENCIES.get(text, text) or None
+
+
+def _instant(value: Any) -> Optional[datetime.datetime]:
+    """An ISO instant (``…Z``) in the server's zone; a naive value is taken as UTC."""
+    if not value:
+        return None
+    try:
+        dt = datetime.datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=datetime.timezone.utc)
+    return dt.astimezone(clock.get_timezone())
+
+
+def _local_naive(value: Any) -> Optional[datetime.datetime]:
+    """A naive local time (Cal's ``trnPurchaseDate``) in the server's zone."""
+    if not value:
+        return None
+    try:
+        dt = datetime.datetime.fromisoformat(str(value))
+    except ValueError:
+        return None
+    return dt.replace(tzinfo=clock.get_timezone()) if dt.tzinfo is None else dt.astimezone(clock.get_timezone())
+
+
+def _when(dt: datetime.datetime) -> Optional[str]:
+    """The exact time, when there is one (not local midnight)."""
+    return None if dt.time() == datetime.time(0, 0) else dt.isoformat(timespec="seconds")
+
+
+def _int(value: Any) -> Optional[int]:
+    try:
+        return int(value) if value is not None else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _row(company: str, txn: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+    """The stored fields of one scraped transaction (no ext_key yet); None when it has no date or amount."""
+    when = _instant(txn.get("date"))
+    amount = agorot(txn.get("chargedAmount"))
+    if amount is None:
+        amount = agorot(txn.get("originalAmount"))
+    if when is None or amount is None:
+        return None
+    raw = txn.get("rawTransaction") if isinstance(txn.get("rawTransaction"), dict) else {}
+    installments = txn.get("installments") if isinstance(txn.get("installments"), dict) else {}
+    purchase, occurred = when.date(), _when(when)
+    if company == "visaCal" and txn.get("type") == "installments":
+        bought = _local_naive(raw.get("trnPurchaseDate"))
+        if bought is not None:  # the library moves ``date`` to the payment's month
+            purchase, occurred = bought.date(), _when(bought)
+    charged = _instant(txn.get("processedDate"))
+    description = scrub(str(txn.get("description") or "")).strip()
+    memo = scrub(str(txn.get("memo") or "")).strip()
+    # A transfer the user sent is about its payee, not the bank's generic "העב' לאחר-נייד": the payee is
+    # its merchant (memory and "always for this payee" rules then work per payee).
+    payee = transfer_payee(memo) if amount < 0 else None
+    key = merchant_key(payee[0]) if payee else merchant_key(description)
+    return {
+        "status": "pending" if txn.get("status") == "pending" else "completed",
+        "occurred_at": occurred, "purchase_date": purchase.isoformat(),
+        "charge_date": charged.date().isoformat() if charged else None,
+        "amount": amount, "orig_amount": agorot(txn.get("originalAmount")),
+        "orig_currency": currency(txn.get("originalCurrency")),
+        "description": description, "merchant_key": key, "memo": memo or None, "payee": payee[0] if payee else None,
+        "installment_number": _int(installments.get("number")), "installment_total": _int(installments.get("total")),
+        "raw": json.dumps(scrub_value(dict(txn)), ensure_ascii=False, sort_keys=True),
+        "_identifier": txn.get("identifier"),
+    }
+
+
+def _hash(row: Mapping[str, Any]) -> str:
+    """The row's identity for sites without a stable id (scrubbed text: nothing secret is hashed)."""
+    parts = (row["purchase_date"], row["charge_date"] or "", str(row["amount"]), row["description"], row["memo"] or "")
+    return hashlib.sha1("|".join(parts).encode()).hexdigest()[:16]
+
+
+def _assign_keys(company: str, rows: Sequence[Dict[str, Any]]) -> None:
+    """Give each row of one account's pull its ``ext_key`` (unique within the pull)."""
+    occurrences: Counter = Counter()
+    used = set()
+    for row in rows:
+        identifier = row.pop("_identifier", None)
+        if company == "visaCal" and identifier not in (None, ""):
+            key = f"cal:{identifier}:{row['installment_number'] or 0}"
+        else:
+            prefix = "poalim" if company == "hapoalim" else "x"
+            base = f"{prefix}:{_hash(row)}"
+            key = f"{base}:{occurrences[base]}"
+            occurrences[base] += 1
+        if key in used:  # a site repeating an id within one pull: keep both rows
+            n = 1
+            while f"{key}#{n}" in used:
+                n += 1
+            key = f"{key}#{n}"
+        used.add(key)
+        row["ext_key"] = key
+
+
+# --- Storing --------------------------------------------------------------------------------
+
+def _upsert_account(conn, user: User, source_id: str, company: companies.Company, number: str,
+                    balance: Optional[int], next_charge: Optional[int], next_charge_date: Optional[str],
+                    has_balance: bool, now: str) -> str:
+    row = conn.execute("SELECT id FROM money_accounts WHERE user_id = ? AND company = ? AND number = ?",
+                       (user.id, company.id, number)).fetchone()
+    if row is None:
+        account_id = uuid.uuid4().hex
+        conn.execute(
+            "INSERT INTO money_accounts (id, user_id, source_id, company, kind, number, balance, balance_at, "
+            "next_charge, next_charge_date, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (account_id, user.id, source_id, company.id, company.kind, number, balance, now if has_balance else None,
+             next_charge, next_charge_date, now, now))
+        return account_id
+    account_id = row["id"]
+    conn.execute("UPDATE money_accounts SET source_id = ?, kind = ?, updated_at = ? WHERE id = ?",
+                 (source_id, company.kind, now, account_id))
+    if has_balance:
+        conn.execute("UPDATE money_accounts SET balance = ?, balance_at = ?, next_charge = ?, next_charge_date = ? "
+                     "WHERE id = ?", (balance, now, next_charge, next_charge_date, account_id))
+    return account_id
+
+
+def apply(user: User, source: Mapping[str, Any], accounts: Sequence[Mapping[str, Any]]) -> Dict[str, List[str]]:
+    """Store one sync's ``accounts`` for ``source`` (its ``id`` and ``company``), as one transaction.
+
+    Returns:
+        ``{"new": [transaction ids], "changed": [transaction ids], "accounts": [account ids]}``.
+
+    Raises:
+        UnknownCompany: the source's company is not supported.
+    """
+    company = companies.get(str(source["company"]))
+    today = clock.now().date().isoformat()
+    now = store.now_iso()
+    out: Dict[str, List[str]] = {"new": [], "changed": [], "accounts": []}
+    with store.db() as conn:
+        rules = {r["merchant_key"]: dict(r) for r in conn.execute(
+            "SELECT merchant_key, category, merchant, flow FROM money_rules WHERE user_id = ?", (user.id,))}
+        for account in accounts:
+            if company.kind == "investment":
+                account_id = portfolio.store_account(conn, user, str(source["id"]), company, account, now)
+                if account_id:
+                    out["accounts"].append(account_id)
+                continue
+            if company.kind == "meal":
+                account_id = meals.store_account(conn, user, str(source["id"]), company, account, now)
+                if account_id:
+                    out["accounts"].append(account_id)
+                continue
+            number = str(account.get("accountNumber") or "").strip()
+            if not number:
+                logger.warning(f"Money ingest for source {source['id']}: an account without a number was skipped")
+                continue
+            rows = [r for r in (_row(company.id, t) for t in account.get("txns") or []) if r is not None]
+            skipped = len(account.get("txns") or []) - len(rows)
+            if skipped:
+                logger.warning(f"Money ingest for source {source['id']}: {skipped} row(s) without a date or amount")
+            _assign_keys(company.id, rows)
+            raw_balance = agorot(account.get("balance"))
+            has_balance = raw_balance is not None
+            balance = next_charge = None
+            next_charge_date = None
+            if company.kind == "bank":
+                balance = raw_balance
+            elif has_balance:
+                next_charge = abs(raw_balance or 0)
+                upcoming = sorted(r["charge_date"] for r in rows if r["charge_date"] and r["charge_date"] >= today)
+                next_charge_date = upcoming[0] if upcoming else None
+            account_id = _upsert_account(conn, user, str(source["id"]), company, number, balance, next_charge,
+                                         next_charge_date, has_balance, now)
+            out["accounts"].append(account_id)
+            _store_rows(conn, user, account_id, rows, rules, now, out)
+    return out
+
+
+def _store_rows(conn, user: User, account_id: str, rows: Sequence[Dict[str, Any]], rules: Mapping[str, Dict[str, Any]],
+                now: str, out: Dict[str, List[str]]) -> None:
+    pending = [r["ext_key"] for r in rows if r["status"] == "pending"]
+    marks = ",".join("?" * len(pending))
+    conn.execute(f"DELETE FROM money_transactions WHERE account_id = ? AND user_id = ? AND source = 'scrape' "
+                 f"AND status = 'pending'" + (f" AND ext_key NOT IN ({marks})" if pending else ""),
+                 (account_id, user.id, *pending))
+    keys = [r["ext_key"] for r in rows]
+    existing: Dict[str, Dict[str, Any]] = {}
+    for i in range(0, len(keys), 500):
+        chunk = keys[i:i + 500]
+        existing.update((r["ext_key"], dict(r)) for r in conn.execute(
+            f"SELECT * FROM money_transactions WHERE account_id = ? AND user_id = ? "
+            f"AND ext_key IN ({','.join('?' * len(chunk))})", (account_id, user.id, *chunk)))
+    for row in rows:
+        old = existing.get(row["ext_key"])
+        if old is None:
+            txn_id = uuid.uuid4().hex
+            rule = rules.get(row["merchant_key"]) if row["merchant_key"] else None
+            category = rule["category"] if rule and rule.get("category") else None
+            conn.execute(
+                "INSERT INTO money_transactions (id, user_id, account_id, ext_key, source, status, occurred_at, "
+                "purchase_date, charge_date, amount, orig_amount, orig_currency, description, merchant, merchant_key, "
+                "memo, category, category_source, flow, installment_number, installment_total, raw, created_at, "
+                "updated_at) VALUES (?, ?, ?, ?, 'scrape', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (txn_id, user.id, account_id, row["ext_key"], row["status"], row["occurred_at"], row["purchase_date"],
+                 row["charge_date"], row["amount"], row["orig_amount"], row["orig_currency"], row["description"],
+                 (rule or {}).get("merchant") or clean_payee(row.get("payee") or "") or row["description"], row["merchant_key"],
+                 row["memo"], category,
+                 "rule" if category else None, (rule or {}).get("flow"), row["installment_number"],
+                 row["installment_total"], row["raw"], now, now))
+            out["new"].append(txn_id)
+            continue
+        changes = {k: row[k] for k in _SCRAPED if old.get(k) != row[k]}
+        if changes:
+            sets = ", ".join(f"{k} = ?" for k in changes)
+            conn.execute(f"UPDATE money_transactions SET {sets}, raw = ?, updated_at = ? WHERE id = ?",
+                         (*changes.values(), row["raw"], now, old["id"]))
+            out["changed"].append(old["id"])
+        elif old.get("raw") != row["raw"]:
+            conn.execute("UPDATE money_transactions SET raw = ? WHERE id = ?", (row["raw"], old["id"]))

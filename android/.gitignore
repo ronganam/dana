@@ -1,0 +1,35 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/build.sh
+/app/build
+/app/release
+# Module build outputs for the wearable modules were previously tracked
+# (1362 files under wear/build and watchface/build). Ignore every module's
+# build dir so generated dex/jar/intermediates never get committed again.
+**/build/
+*.apk
+*.aab
+*.jks
+*.keystore
+/keystore.properties
+.claude/
+
+# JVM crash logs and stray build output at the repo root
+hs_err_pid*.log
+replay_pid*.log
+/build_error.txt
+
+# Your own setup, never committed (docs/release.md, "Local defaults"):
+# Firebase config, devices / publish token, the TV's first-run defaults, agent notes
+/app/src/phone/google-services.json
+/local.env
+/tv-defaults.json
+AGENTS.local.md

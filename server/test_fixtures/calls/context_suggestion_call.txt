@@ -1,0 +1,16 @@
+## Opened from a call suggestion
+Robin opened this chat from suggestion sug-call-fx (still pending): task “למצוא טכנאי”, due 2026-11-09, priority high, group Home, ⏰ 2026-11-09 09:00, 📍 arrive at home, 🚗 car enter, ☀️ on wake.
+Full suggestion JSON: {"title": "למצוא טכנאי", "due_date": "2026-11-09", "priority": "high", "group": "Home", "triggers": {"time": "2026-11-09 09:00", "location": {"location": "home", "event": "arrive"}, "car": "enter", "wake": true}}
+Help him adjust it. When he asks to create/add it (or approves your proposed version), call accept_call_suggestion with this suggestion_id and only the fields that change (title, due_date, priority, group, time_trigger, location, location_event, car_trigger, wake_trigger, description, start_time, end_time). Use get_ha_zones before setting a location. If he wants it gone, call dismiss_call_suggestion. Don't ask for details you already have; keep replies short.
+
+### Source
+Call call-fx with אמא on 2026-11-08T11:41:29 (incoming)
+Title: תיאום טכנאי
+Labels: 🏠 Home, ❤️ Partner
+Summary:
+- המזגן קופץ
+- רובין יחפש טכנאי
+Key facts:
+  - ביקור טכנאי 250
+Transcript (may be cut):
+אמא: המזגן קופץ. רובין: אני אחפש טכנאי מחר.

@@ -1,0 +1,12 @@
+# DANA_LOCAL_SOURCE=1 (bin/local-env.sh): the app runs the working tree's code instead
+# of the copy baked into the image, so `bin/local-env.sh restart` picks up a change in
+# seconds without a rebuild. Rebuild (`bin/local-env.sh build`) after changing requirements.txt.
+services:
+  app:
+    volumes:
+      - ../../main.py:/app/main.py:ro
+      - ../../VERSION:/app/VERSION:ro
+      - ../../core:/app/core:ro
+      - ../../integrations:/app/integrations:ro
+      - ../../static:/app/static:ro
+      - ../../bin/users.py:/app/bin/users.py:ro

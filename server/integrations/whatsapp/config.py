@@ -1,0 +1,33 @@
+"""WhatsApp configuration of one user, read from their connection: the kind's
+name, WAHA's default session name, the voice-transcript chat setting.
+Nothing here reads env: the first admin's values are imported once by
+``integrations/bootstrap.py``."""
+
+import logging
+from typing import Optional
+
+from integrations.framework import Connection
+
+logger = logging.getLogger(__name__)
+
+KIND = "whatsapp"
+
+# WAHA's own name for a session nobody named.
+DEFAULT_SESSION = "default"
+
+# Setting: the Telegram chat inbound voice-note transcripts go to (None: none).
+VOICE_CHAT = "voice_telegram_chat_id"
+
+
+def voice_chat_id(conn: Connection) -> Optional[int]:
+    """The Telegram chat for ``conn``'s voice-note transcripts: the setting as
+    a chat id; None (logged) when it is unset or not a number. No fallbacks."""
+    raw = conn.settings.get(VOICE_CHAT)
+    if raw is None or isinstance(raw, bool) or (isinstance(raw, str) and not raw.strip()):
+        return None
+    try:
+        return int(str(raw).strip())
+    except ValueError:
+        logger.error(f"The {KIND} setting {VOICE_CHAT} of user {conn.user.id} is not a numeric chat id ({raw!r}): "
+                     "their WhatsApp voice transcripts will NOT be sent to Telegram.")
+        return None

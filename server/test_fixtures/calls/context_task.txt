@@ -1,0 +1,16 @@
+## Opened from a task
+Task {TASK_ID}: “Call the technician” status=needs_action priority=medium due=2026-11-10 triggers={}
+Description: from the call
+Use update_task with this id for changes.
+
+### Source call
+Call call-fx with אמא on 2026-11-08T11:41:29 (incoming)
+Title: תיאום טכנאי
+Labels: 🏠 Home, ❤️ Partner
+Summary:
+- המזגן קופץ
+- רובין יחפש טכנאי
+Key facts:
+  - ביקור טכנאי 250
+Transcript (may be cut):
+אמא: המזגן קופץ. רובין: אני אחפש טכנאי מחר.

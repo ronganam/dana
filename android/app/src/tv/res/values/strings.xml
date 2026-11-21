@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dana TV</string>
+    <string name="key_service_label">Dana TV buttons</string>
+    <string name="key_service_description">Lets remote buttons you bind in Dana TV show the camera picture-in-picture, open Dana or apps, and control Home Assistant. Only bound buttons are used; nothing is read from the screen.</string>
+</resources>

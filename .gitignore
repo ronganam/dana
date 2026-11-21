@@ -1,0 +1,10 @@
+# Maintainer-local notes and settings (AGENTS.md): never committed
+AGENTS.local.md
+CLAUDE.local.md
+
+# Editors, OS, agent tools
+.DS_Store
+.idea/
+.vscode/
+.agents/
+.claude/settings.local.json

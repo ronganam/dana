@@ -1,0 +1,215 @@
+#!/usr/bin/env python3
+"""Run the test scripts side by side and print only what needs attention.
+
+    bin/test                     every script (test_*.py except test_agent.py, test_*.mjs)
+    bin/test shopping users      only scripts whose name contains one of the words
+    bin/test --changed           only scripts touched by, or importing, what changed since HEAD
+    bin/test --changed master    … since another ref (e.g. the branch point)
+    bin/test --quick             leave out the slow import smoke test (test_imports.py)
+    bin/test --list              each script and the first line of its docstring
+    bin/test -v                  print the whole output of failed scripts, not the tail
+    bin/test -j 4                at most 4 at a time (default: one per CPU, fewer when memory is short)
+
+A script that fails is run once more on its own (some checks are timing-based and
+can trip under load); one that then passes is reported as flaky, not failed.
+Logs of every run are kept in a temporary directory printed at the end.
+Exit code: 0 when everything passed (flaky included), 1 otherwise.
+"""
+
+from __future__ import annotations
+
+import argparse
+import ast
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+NEVER = {"test_agent.py"}            # calls the real model
+SLOW = {"test_imports.py"}
+# Changing one of these can break anything: --changed runs everything.
+EVERYTHING = ("testenv.py", "testfakes.py", "requirements.txt", "main.py", "core/db/",
+              "integrations/framework/", "integrations/__init__.py", "core/users.py", "core/auth.py",
+              "core/agent.py", "core/server.py", "test_fixtures/db_8_1_0.sql")
+
+
+MB_PER_JOB = 400                     # a test script with the app imported peaks around 250 MB
+
+
+def default_jobs() -> int:
+    """One job per CPU, but no more than the free memory holds (the machine also runs
+    emulators, Gradle and Docker builds; running out of memory is worse than waiting)."""
+    cpus = os.cpu_count() or 4
+    try:
+        meminfo = Path("/proc/meminfo").read_text()
+        available_mb = int(re.search(r"MemAvailable:\s+(\d+)", meminfo).group(1)) // 1024
+    except (OSError, AttributeError):
+        return cpus
+    return max(2, min(cpus, available_mb // MB_PER_JOB))
+
+
+def python() -> str:
+    venv = ROOT / ".venv" / "bin" / "python"
+    return str(venv) if venv.exists() else sys.executable
+
+
+def all_scripts() -> list[str]:
+    py = sorted(p.name for p in ROOT.glob("test_*.py") if p.name not in NEVER)
+    return py + sorted(p.name for p in ROOT.glob("test_*.mjs"))
+
+
+def describe(name: str) -> str:
+    path = ROOT / name
+    if name.endswith(".py"):
+        doc = ast.get_docstring(ast.parse(path.read_text())) or ""
+    else:
+        m = re.match(r"\s*/\*\*?(.*?)\*/", path.read_text(), re.S) or re.match(r"((?:\s*//.*\n)+)", path.read_text())
+        doc = re.sub(r"^\s*(//|\*)\s?", "", m.group(1), flags=re.M) if m else ""
+    first = " ".join(doc.strip().split("\n\n")[0].split())
+    return re.sub(r"\s*Run: .*$", "", first)
+
+
+def changed_files(ref: str) -> list[str]:
+    # --relative: paths from this folder (the server is a sub-folder of the repository)
+    out = subprocess.run(["git", "diff", "--name-only", "--relative", ref], cwd=ROOT, capture_output=True, text=True,
+                         check=True).stdout
+    new = subprocess.run(["git", "ls-files", "--others", "--exclude-standard"], cwd=ROOT,
+                         capture_output=True, text=True, check=True).stdout
+    return sorted(set(out.split()) | set(new.split()))
+
+
+def module_of(path: str) -> str | None:
+    if not path.endswith(".py") or not path.startswith(("core/", "integrations/")):
+        return None
+    parts = Path(path).with_suffix("").parts
+    return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
+
+
+def select_changed(ref: str, scripts: list[str]) -> tuple[list[str], str]:
+    files = changed_files(ref)
+    if not files:
+        return [], "nothing changed"
+    if any(f.startswith(EVERYTHING) for f in files):
+        return scripts, "a shared foundation changed"
+    picked: set[str] = set()
+    sources = {s: (ROOT / s).read_text() for s in scripts}
+    for f in files:
+        name = Path(f).name
+        if name in sources:                                   # a test script itself
+            picked.add(name)
+        if f.startswith("static/"):
+            picked.update(s for s in scripts if s.startswith("test_web_"))
+        if f.startswith("bank-worker/"):
+            picked.update(s for s in scripts if s.startswith("test_bank_worker"))
+        if f.startswith("test_fixtures/"):
+            stem = Path(f).parts[1] if len(Path(f).parts) > 2 else Path(f).stem
+            picked.update(s for s, src in sources.items() if stem in src)
+        if f.startswith("bin/users.py"):
+            picked.add("test_users_cli.py")
+        if f.startswith("integrations/") and len(Path(f).parts) > 2:
+            kind = Path(f).parts[1]                           # integrations/<kind>/…
+            picked.update(s for s in scripts if kind in s)
+        module = module_of(f)
+        if module:
+            # Scripts naming the module (`import core.now`, `core.now.x` in a patch)
+            # or importing it from its package (`from core import now`).
+            parent, _, leaf = module.rpartition(".")
+            pattern = re.compile(rf"\b{re.escape(module)}\b"
+                                 + (rf"|from\s+{re.escape(parent)}\s+import\s+[^\n]*\b{re.escape(leaf)}\b" if parent else ""))
+            hits = {s for s, src in sources.items() if pattern.search(src)}
+            if not hits:
+                return scripts, f"nothing names {module}: running everything"
+            picked.update(hits)
+        if f.endswith(".py") and f.startswith(("core/", "integrations/")) and f in new_python_files(ref):
+            picked.add("test_imports.py")
+    return sorted(picked), f"{len(files)} changed file(s)"
+
+
+def new_python_files(ref: str) -> set[str]:
+    out = subprocess.run(["git", "diff", "--name-only", "--diff-filter=AR", "--relative", ref], cwd=ROOT,
+                         capture_output=True, text=True).stdout.split()
+    new = subprocess.run(["git", "ls-files", "--others", "--exclude-standard"], cwd=ROOT,
+                         capture_output=True, text=True).stdout.split()
+    return set(out) | set(new)
+
+
+def run(name: str, logdir: Path, suffix: str = "") -> tuple[str, int, float, Path]:
+    cmd = ["node", name] if name.endswith(".mjs") else [python(), name]
+    log = logdir / f"{name}{suffix}.log"
+    start = time.monotonic()
+    with log.open("w") as fh:
+        rc = subprocess.run(cmd, cwd=ROOT, stdout=fh, stderr=subprocess.STDOUT).returncode
+    return name, rc, time.monotonic() - start, log
+
+
+def tail(log: Path, verbose: bool) -> str:
+    lines = log.read_text(errors="replace").splitlines()
+    if verbose:
+        return "\n".join(lines)
+    fails = [ln for ln in lines if re.search(r"\bFAIL|Traceback|Error\b", ln)]
+    shown = fails[:15] if fails else []
+    return "\n".join(shown + ["   …"] + lines[-12:]) if shown else "\n".join(lines[-25:])
+
+
+def main(argv: list[str]) -> int:
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("words", nargs="*", help="run only scripts whose name contains one of these")
+    ap.add_argument("--changed", nargs="?", const="HEAD", metavar="REF")
+    ap.add_argument("--quick", action="store_true")
+    ap.add_argument("--list", action="store_true")
+    ap.add_argument("-v", "--verbose", action="store_true")
+    ap.add_argument("-j", "--jobs", type=int, default=default_jobs())
+    args = ap.parse_args(argv)
+
+    scripts = all_scripts()
+    if args.list:
+        width = max(map(len, scripts))
+        for s in scripts:
+            print(f"{s:<{width}}  {describe(s)}")
+        return 0
+    why = "all scripts"
+    if args.changed:
+        scripts, why = select_changed(args.changed, scripts)
+    if args.words:
+        scripts = [s for s in scripts if any(w in s for w in args.words)]
+        why = f"matching {' '.join(args.words)}"
+    if args.quick:
+        scripts = [s for s in scripts if s not in SLOW]
+    if not scripts:
+        print(f"No test scripts to run ({why}).")
+        return 0
+
+    logdir = Path(tempfile.mkdtemp(prefix="dana-tests-"))
+    print(f"Running {len(scripts)} script(s) ({why}), {args.jobs} at a time …", flush=True)
+    start = time.monotonic()
+    # Slowest first so the long one is not the last to start.
+    order = sorted(scripts, key=lambda s: s not in SLOW)
+    with ThreadPoolExecutor(max_workers=args.jobs) as pool:
+        results = list(pool.map(lambda s: run(s, logdir), order))
+
+    failed = [r for r in results if r[1] != 0]
+    flaky, broken = [], []
+    for name, _, _, log in failed:
+        again = run(name, logdir, ".retry")
+        (flaky if again[1] == 0 else broken).append((name, log, again[3]))
+
+    for name, log, retry_log in broken:
+        print(f"\n✗ {name}  (log: {retry_log})")
+        print(tail(retry_log, args.verbose))
+    wall = time.monotonic() - start
+    slowest = sorted(results, key=lambda r: -r[2])[:3]
+    print(f"\n{len(results) - len(failed)} passed, {len(flaky)} flaky, {len(broken)} failed in {wall:.0f}s"
+          f"  (slowest: {', '.join(f'{n} {d:.0f}s' for n, _, d, _ in slowest)})")
+    for name, log, _ in flaky:
+        print(f"  flaky: {name} failed once in parallel, passed alone (first log: {log})")
+    print(f"  logs: {logdir}")
+    return 1 if broken else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))

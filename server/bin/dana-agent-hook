@@ -1,0 +1,75 @@
+#!/bin/sh
+# Coding-agent hook → Dana: reports a Claude Code / Codex session's progress so
+# the phone shows it live (docs/notifications.md, "Coding-agent sessions").
+#
+#   dana-agent-hook claude|codex     (the hook event JSON on stdin)
+#
+# Config: ~/.config/dana/agent-hook.env (chmod 600) with
+#   DANA_URL=https://dana.example.com
+#   DANA_TOKEN=<a user token: bin/users.py tokens issue USER --label agent-hooks>
+# Never slows the agent: the event is trimmed to the fields the server reads and
+# sent in the background; it always exits 0 and prints nothing.
+agent="${1:-claude}"
+payload=$(cat)
+[ -n "$payload" ] || exit 0
+conf="${DANA_AGENT_HOOK_CONF:-$HOME/.config/dana/agent-hook.env}"
+[ -r "$conf" ] && . "$conf"
+[ -n "$DANA_URL" ] && [ -n "$DANA_TOKEN" ] || exit 0
+command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 || exit 0
+
+# Prints two lines: the query string, then the trimmed event.
+out=$(printf '%s' "$payload" | T3_HOME="${T3CODE_HOME:-$HOME/.t3}" python3 -I -c '
+import json, os, re, sqlite3, sys, urllib.parse
+try:
+    e = json.load(sys.stdin)
+except ValueError:
+    sys.exit(1)
+keep = {k: e[k] for k in ("session_id", "hook_event_name", "cwd", "tool_name", "notification_type", "message",
+                          "error", "error_message", "reason", "agent_id", "agent_type") if k in e}
+if isinstance(e.get("prompt"), str):
+    keep["prompt"] = e["prompt"][:400]
+if isinstance(e.get("last_assistant_message"), str):
+    keep["last_assistant_message"] = e["last_assistant_message"][:600]
+args = e.get("tool_input")
+if isinstance(args, dict):
+    if e.get("tool_name") in ("TodoWrite", "update_plan"):
+        keep["tool_input"] = args
+    else:
+        keep["tool_input"] = {k: (v[:300] if isinstance(v, str) else v) for k, v in args.items()
+                              if k in ("command", "description", "file_path", "notebook_path", "path", "subagent_type")}
+query = {"agent": sys.argv[1], "host": sys.argv[2]}
+# Run by T3 Code: its thread, the root thread when this is a delegated child
+# (the phone shows it inside the parent), the thread title, and the link that
+# opens the root thread in the T3 Code app.
+thread, home = os.environ.get("T3CODE_THREAD_ID", ""), os.environ["T3_HOME"]
+if thread:
+    root, title = thread, ""
+    try:
+        db = sqlite3.connect("file:" + os.path.join(home, "userdata", "statev2.sqlite") + "?mode=ro", uri=True, timeout=0.5)
+        row = db.execute("SELECT title, payload_json FROM orchestration_v2_projection_threads WHERE thread_id = ?",
+                         (thread,)).fetchone()
+        if row:
+            title = row[0] or ""
+            root = (json.loads(row[1]).get("lineage") or {}).get("rootThreadId") or thread
+    except Exception:
+        pass
+    query.update(thread=thread, title=title[:120])
+    if root != thread:
+        query["parent_thread"] = root
+    try:
+        env = open(os.path.join(home, "userdata", "environment-id")).read().strip()
+    except OSError:
+        env = ""
+    if re.fullmatch(r"[A-Za-z0-9-]+", env) and re.fullmatch(r"[A-Za-z0-9-]+", root):
+        query["open_url"] = f"https://app.t3.codes/threads/{env}/{root}"
+print(urllib.parse.urlencode(query))
+print(json.dumps(keep))
+' "$agent" "$(hostname 2>/dev/null || uname -n)") || exit 0
+query=${out%%
+*}
+body=${out#*
+}
+(printf '%s' "$body" | curl -sS -X POST "${DANA_URL%/}/api/agent-sessions/hook?${query}" \
+  --connect-timeout 2 --max-time 5 -H "Authorization: Bearer ${DANA_TOKEN}" \
+  -H "Content-Type: application/json" --data-binary @- >/dev/null 2>&1 &) </dev/null >/dev/null 2>&1
+exit 0

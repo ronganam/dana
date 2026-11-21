@@ -1,0 +1,481 @@
+{
+ "items_owner": {
+  "entries": [
+   {
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-19 16:13:39",
+    "decision": "chosen",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר כולל",
+      "type": "money",
+      "value": 13400
+     },
+     {
+      "name": "טלפון",
+      "type": "phone",
+      "value": "052-0000000"
+     }
+    ],
+    "files": [
+     {
+      "created_at": "2026-11-19 16:13:39",
+      "entry_id": "0a16458a-fbac-4bca-ba9c-c3553b475776",
+      "id": "da87ec5c77bf40f1bd0cecaa7cbd3517",
+      "mime": "application/pdf",
+      "name": "הצעת מחיר.pdf",
+      "note": "הצעת מחיר",
+      "size": 14,
+      "source": "upload",
+      "transcript": null,
+      "url": "/api/entries/0a16458a-fbac-4bca-ba9c-c3553b475776/files/da87ec5c77bf40f1bd0cecaa7cbd3517"
+     }
+    ],
+    "id": "0a16458a-fbac-4bca-ba9c-c3553b475776",
+    "kind": "note",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "section_id": "ec5977f3-cfe7-4059-af7d-56a7d5e0e6fb",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "אורי עשור",
+    "transcript": null,
+    "updated_at": "2026-11-19 16:13:39",
+    "url": null
+   },
+   {
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-19 16:13:39",
+    "decision": "shortlist",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר כולל",
+      "type": "money",
+      "value": 13900
+     },
+     {
+      "name": "טלפון",
+      "type": "phone",
+      "value": "052-0000000"
+     }
+    ],
+    "files": [],
+    "id": "e2bcea68-1854-4fec-96e0-f5582a58e4cb",
+    "kind": "note",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "section_id": "ec5977f3-cfe7-4059-af7d-56a7d5e0e6fb",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "אטדגי",
+    "transcript": null,
+    "updated_at": "2026-11-19 16:13:39",
+    "url": null
+   },
+   {
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-19 16:13:39",
+    "decision": "rejected",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר כולל",
+      "type": "money",
+      "value": "10500-16500"
+     },
+     {
+      "name": "טלפון",
+      "type": "phone",
+      "value": "052-0000000"
+     }
+    ],
+    "files": [],
+    "id": "b95edb21-3c80-45f3-a078-5e1e3b86fe01",
+    "kind": "note",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "section_id": "ec5977f3-cfe7-4059-af7d-56a7d5e0e6fb",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "רובין קובי",
+    "transcript": null,
+    "updated_at": "2026-11-19 16:13:39",
+    "url": null
+   },
+   {
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-19 16:13:39",
+    "decision": "shortlist",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר",
+      "type": "money",
+      "value": 6000
+     }
+    ],
+    "files": [],
+    "id": "7dc797e9-d9c4-4790-9d9d-fa54327c72b1",
+    "kind": "record",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "section_id": "c88e10b3-0980-47db-bd95-fef76927a3b0",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "DJ Noa",
+    "transcript": null,
+    "updated_at": "2026-11-19 16:13:39",
+    "url": null
+   }
+  ],
+  "project": {
+   "budget": 150000.0,
+   "color": "#6366f1",
+   "created_at": "2026-11-19 16:13:38",
+   "description": "",
+   "icon": "💍",
+   "id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+   "status": "active",
+   "tags": [],
+   "target_date": "2027-09-20",
+   "title": "חתונה",
+   "updated_at": "2026-11-19 16:13:38"
+  },
+  "sections": [
+   {
+    "columns": [
+     {
+      "key": "e4e25675",
+      "name": "מחיר כולל",
+      "role": "price",
+      "type": "money"
+     },
+     {
+      "key": "9ebea31c",
+      "name": "טלפון",
+      "type": "phone"
+     },
+     {
+      "key": "dea54325",
+      "name": "וידאו",
+      "type": "checkbox"
+     }
+    ],
+    "created_at": "2026-11-19 16:13:39",
+    "icon": "📸",
+    "id": "ec5977f3-cfe7-4059-af7d-56a7d5e0e6fb",
+    "kind": "options",
+    "position": 0,
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "summary": "## TL;DR\n- אורי: 13,400",
+    "title": "צלמים",
+    "updated_at": "2026-11-19 16:13:39"
+   },
+   {
+    "columns": [],
+    "created_at": "2026-11-19 16:13:39",
+    "icon": "",
+    "id": "85c63448-d369-4e4a-9871-ead686a121d8",
+    "kind": "notes",
+    "position": 1,
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "summary": "",
+    "title": "רעיונות",
+    "updated_at": "2026-11-19 16:13:39"
+   },
+   {
+    "columns": [
+     {
+      "key": "1ea2ce08",
+      "name": "מחיר",
+      "role": "price",
+      "type": "money"
+     }
+    ],
+    "created_at": "2026-11-19 16:13:39",
+    "icon": "",
+    "id": "c88e10b3-0980-47db-bd95-fef76927a3b0",
+    "kind": "options",
+    "position": 2,
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "summary": "",
+    "title": "DJ",
+    "updated_at": "2026-11-19 16:13:39"
+   }
+  ],
+  "tasks": []
+ },
+ "items_read": {
+  "entries": [
+   {
+    "access": "read",
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-19 16:13:39",
+    "decision": "chosen",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר כולל",
+      "type": "money",
+      "value": 13400
+     },
+     {
+      "name": "טלפון",
+      "type": "phone",
+      "value": "052-0000000"
+     }
+    ],
+    "files": [
+     {
+      "created_at": "2026-11-19 16:13:39",
+      "entry_id": "0a16458a-fbac-4bca-ba9c-c3553b475776",
+      "id": "da87ec5c77bf40f1bd0cecaa7cbd3517",
+      "mime": "application/pdf",
+      "name": "הצעת מחיר.pdf",
+      "note": "הצעת מחיר",
+      "size": 14,
+      "source": "upload",
+      "transcript": null,
+      "url": "/api/entries/0a16458a-fbac-4bca-ba9c-c3553b475776/files/da87ec5c77bf40f1bd0cecaa7cbd3517"
+     }
+    ],
+    "id": "0a16458a-fbac-4bca-ba9c-c3553b475776",
+    "kind": "note",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "section_id": "ec5977f3-cfe7-4059-af7d-56a7d5e0e6fb",
+    "shared_by": "Sam Example",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "אורי עשור",
+    "transcript": null,
+    "updated_at": "2026-11-19 16:13:39",
+    "url": null
+   },
+   {
+    "access": "read",
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-19 16:13:39",
+    "decision": "shortlist",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר כולל",
+      "type": "money",
+      "value": 13900
+     },
+     {
+      "name": "טלפון",
+      "type": "phone",
+      "value": "052-0000000"
+     }
+    ],
+    "files": [],
+    "id": "e2bcea68-1854-4fec-96e0-f5582a58e4cb",
+    "kind": "note",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "section_id": "ec5977f3-cfe7-4059-af7d-56a7d5e0e6fb",
+    "shared_by": "Sam Example",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "אטדגי",
+    "transcript": null,
+    "updated_at": "2026-11-19 16:13:39",
+    "url": null
+   },
+   {
+    "access": "read",
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-19 16:13:39",
+    "decision": "rejected",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר כולל",
+      "type": "money",
+      "value": "10500-16500"
+     },
+     {
+      "name": "טלפון",
+      "type": "phone",
+      "value": "052-0000000"
+     }
+    ],
+    "files": [],
+    "id": "b95edb21-3c80-45f3-a078-5e1e3b86fe01",
+    "kind": "note",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "section_id": "ec5977f3-cfe7-4059-af7d-56a7d5e0e6fb",
+    "shared_by": "Sam Example",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "רובין קובי",
+    "transcript": null,
+    "updated_at": "2026-11-19 16:13:39",
+    "url": null
+   },
+   {
+    "access": "read",
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-19 16:13:39",
+    "decision": "shortlist",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר",
+      "type": "money",
+      "value": 6000
+     }
+    ],
+    "files": [],
+    "id": "7dc797e9-d9c4-4790-9d9d-fa54327c72b1",
+    "kind": "record",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "section_id": "c88e10b3-0980-47db-bd95-fef76927a3b0",
+    "shared_by": "Sam Example",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "DJ Noa",
+    "transcript": null,
+    "updated_at": "2026-11-19 16:13:39",
+    "url": null
+   }
+  ],
+  "project": {
+   "access": "read",
+   "budget": 150000.0,
+   "color": "#6366f1",
+   "created_at": "2026-11-19 16:13:38",
+   "description": "",
+   "icon": "💍",
+   "id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+   "shared_by": "Sam Example",
+   "status": "active",
+   "tags": [],
+   "target_date": "2027-09-20",
+   "title": "חתונה",
+   "updated_at": "2026-11-19 16:13:38"
+  },
+  "sections": [
+   {
+    "columns": [
+     {
+      "key": "e4e25675",
+      "name": "מחיר כולל",
+      "role": "price",
+      "type": "money"
+     },
+     {
+      "key": "9ebea31c",
+      "name": "טלפון",
+      "type": "phone"
+     },
+     {
+      "key": "dea54325",
+      "name": "וידאו",
+      "type": "checkbox"
+     }
+    ],
+    "created_at": "2026-11-19 16:13:39",
+    "icon": "📸",
+    "id": "ec5977f3-cfe7-4059-af7d-56a7d5e0e6fb",
+    "kind": "options",
+    "position": 0,
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "summary": "## TL;DR\n- אורי: 13,400",
+    "title": "צלמים",
+    "updated_at": "2026-11-19 16:13:39"
+   },
+   {
+    "columns": [],
+    "created_at": "2026-11-19 16:13:39",
+    "icon": "",
+    "id": "85c63448-d369-4e4a-9871-ead686a121d8",
+    "kind": "notes",
+    "position": 1,
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "summary": "",
+    "title": "רעיונות",
+    "updated_at": "2026-11-19 16:13:39"
+   },
+   {
+    "columns": [
+     {
+      "key": "1ea2ce08",
+      "name": "מחיר",
+      "role": "price",
+      "type": "money"
+     }
+    ],
+    "created_at": "2026-11-19 16:13:39",
+    "icon": "",
+    "id": "c88e10b3-0980-47db-bd95-fef76927a3b0",
+    "kind": "options",
+    "position": 2,
+    "project_id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+    "summary": "",
+    "title": "DJ",
+    "updated_at": "2026-11-19 16:13:39"
+   }
+  ],
+  "tasks": []
+ },
+ "list_owner": [
+  {
+   "budget": 150000.0,
+   "color": "#6366f1",
+   "committed": 13400,
+   "created_at": "2026-11-19 16:13:38",
+   "decided": 1,
+   "decisions": 2,
+   "description": "",
+   "entry_count": 4,
+   "icon": "💍",
+   "id": "515aeb63-a1e2-4701-bf37-7ebc474a5907",
+   "section_count": 3,
+   "status": "active",
+   "tags": [],
+   "target_date": "2027-09-20",
+   "task_count": 0,
+   "title": "חתונה",
+   "updated_at": "2026-11-19 16:13:38"
+  }
+ ]
+}

@@ -1,0 +1,67 @@
+# Local test environment (docs/local-testing.md). Started by bin/local-env.sh, which
+# builds the image, generates .state/app.env and seeds the data volume first.
+#
+# The app and the stubs are only on `internal` (no route out of the machine);
+# `gateway` is the one container also on `edge`, publishing the app and the
+# stubs' control API on 127.0.0.1.
+name: dana-local
+
+x-image: &image
+  image: ${DANA_LOCAL_IMAGE:-dana-local/app:latest}
+  pull_policy: never
+
+services:
+  app:
+    <<: *image
+    env_file: .state/app.env
+    volumes:
+      - data:/app/db
+    networks:
+      internal:
+        aliases:
+          # The production Service's DNS name (INTERNAL_HOSTS in the env file).
+          - ganam-assistant.ganam-assistant
+    depends_on:
+      stubs:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 60
+    restart: "no"
+
+  stubs:
+    <<: *image
+    command: ["python", "/local_env/stubs.py"]
+    environment:
+      PYTHONPATH: /local_env_lib
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ./:/local_env:ro
+      - ../../testfakes.py:/local_env_lib/testfakes.py:ro
+    networks: [internal]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  gateway:
+    <<: *image
+    command: ["python", "/local_env/gateway.py", "8080=app:8080", "9000=stubs:9000"]
+    volumes:
+      - ./:/local_env:ro
+    networks: [internal, edge]
+    ports:
+      - "127.0.0.1:${DANA_LOCAL_PORT:-18080}:8080"
+      - "127.0.0.1:${DANA_LOCAL_CONTROL_PORT:-18090}:9000"
+    depends_on: [stubs]
+
+networks:
+  internal:
+    internal: true
+  edge: {}
+
+volumes:
+  data:

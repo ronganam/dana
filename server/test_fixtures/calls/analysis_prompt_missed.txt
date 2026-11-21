@@ -1,0 +1,59 @@
+You analyse a phone call recorded on Robin Levi's phone. Robin (רובין) owns the phone and is always one of the speakers.
+
+About Robin:
+Robin (רובין) lives in Israel and works in tech. Gal (גל, phone contact 'גל כהן 🚀❤️🔥') is Robin's partner; they are planning their wedding. 'אמא' is Robin's mother. נועה is Robin's sibling. Pepper (פפר) is Robin and Gal's dog.
+Saved contacts / people:
+- (none saved)
+
+The call: with "Sam", a missed call, on unknown (Israel time), duration unknown.
+
+Return JSON matching the schema. Rules:
+- Language: write title, summary, roles, key facts and action items in the transcript's main language (Hebrew transcript → Hebrew). Keep names as spoken.
+- Speakers: one side is Robin, the other is normally "Sam". Do NOT invent names for the speakers; if a name isn't clearly said, use "Robin" / the contact name / "the other side". A business contact name means a representative of that business.
+- title: 3-7 words, specific (what was decided/asked), no quotes.
+- summary: 2-6 short markdown bullet lines starting with "- ". Concrete: decisions, agreements, numbers, dates, addresses. No headings, no fluff.
+- labels: 1-3 ids from this list, most relevant first:
+- family: Family — parents, siblings, relatives
+- partner: Partner — calls with Robin's partner
+- friends: Friends — friends and acquaintances, social plans
+- work: Work — colleagues, customers, outages, work projects
+- wedding: Wedding — a wedding being planned: venues, vendors, guest list
+- home: Home — repairs, technicians, furniture, installations, the apartment
+- purchases: Purchases — buying products, price checks, stores, orders, deliveries
+- travel: Travel & leisure — trips, hotels, flights, spa, restaurants, events
+- car: Car — car repairs, insurance, garage, driving course
+- health: Health — doctors, clinics, tests, medical forms, treatments
+- pets: Pets — pets: vet, vaccines, grooming
+- admin: Admin & money — bills, invoices, banks, insurance policies, registrations, bureaucracy
+- security: Security — hacked accounts, fraud, scams, suspicious calls
+- tech_help: Tech help — Robin helping someone with phones, computers, TV, apps
+- logistics: Quick logistics — short coordination: where are you, parking, on my way
+- automated: Automated — IVR menus, recorded messages, voicemail, no human
+- importance: low for quick logistics, automated messages and trivial chit-chat; high for decisions, money, health, security, deadlines; else normal.
+- is_automated: true for IVR menus, recorded messages, voicemail.
+- participants: the people who speak or are central (name + short role, e.g. "אמא — Robin's mother", "מאיה — sales rep at the venue").
+- key_facts: up to 8 facts worth finding later (dates/times, prices/amounts, addresses, phone numbers, names).
+- action_items: only real commitments and follow-ups that Robin would otherwise forget. Usually 0-2 per call.
+  * Skip things already done during the call ("I'll check right now" and he checks), vague intentions ("we should maybe…"), and several items for one topic — merge them into the single next step.
+  * owner: "me" when Robin has to do it, "both" when shared, "them" when only the other side will act.
+  * kind: "event" for an appointment/meeting Robin attends at a specific date AND time (fill event_start "YYYY-MM-DDTHH:MM", event_end — default 1 hour later — and event_location if known); "task" for to-dos; "info" for things only the other side will do.
+  * Resolve relative dates ("Thursday", "tomorrow", "next week") against the call date above; always write absolute dates.
+  * due_date "YYYY-MM-DD" when there is a deadline or a natural day for it.
+  * Triggers (only when they truly fit the task):
+    - time_trigger "YYYY-MM-DD HH:MM": a reminder at the right moment — the exact time for "call back at 17:00", the morning (09:00) of the due day, or a day before for things that need preparation.
+    - location_zone + location_event: the task should pop up when Robin arrives at / leaves a place. Only zone names from this list: (unavailable — do not set location triggers).
+    - car_trigger: "enter" for things to do on the way when getting into the car (pick up / drop off), "leave" for things to do on arrival by car.
+    - wake_trigger: true for things to do first thing in the morning (only when no other trigger fits).
+    - Usually one trigger: the moment Robin can actually do it.
+  * priority: high only for urgent items, security issues or deadlines within 2 days.
+  * group: one of: .
+  * confidence 0-1: how sure you are Robin wants this tracked as a task. Chit-chat ideas → low.
+  * evidence: a short quote or paraphrase from the call that supports it.
+  * Do not repeat things already on Robin's open task list:
+- (none)
+- project_id: the id of one of Robin's active projects if the call clearly belongs to it, else null:
+- (none)
+- security_alert: one sentence when the call shows fraud, scam, account takeover or social-engineering signs (fake support, requests for codes, unexpected account changes); else null.
+
+Transcript:
+אמא: המזגן קופץ. רובין: אני אחפש טכנאי מחר.

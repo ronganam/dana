@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# Build and deploy one commit from this machine (docs/operations.md, "Deploy").
+#
+#   bin/deploy            deploy HEAD
+#   bin/deploy <commit>   deploy another commit
+#   bin/deploy --wait     … and wait until the pod runs it
+#
+# Reads server/deploy.env (gitignored; copy deploy.env.example, or point
+# DANA_DEPLOY_CONFIG at another file). Builds the Dockerfile's `app` stage from a
+# clean checkout of the commit, tagged "<VERSION>-<short commit>" (the RELEASE build
+# arg writes that into the image's VERSION: /api/health and the dashboard's ?v= show
+# it), and the bank-worker sidecar (bank-worker/Dockerfile) with the same tag when
+# DANA_WORKER_IMAGE is set; copies the plugin kinds of DANA_IMAGE_PLUGINS into the
+# image (docs/plugins.md); pushes the images (and Dana's `latest`). With
+# DANA_GITOPS_REPO set it then writes both tags into DANA_GITOPS_VALUES in that repo
+# and pushes it, for a GitOps tool (ArgoCD, Flux) to roll the pod. That commit is
+# made in a private clone (~/.cache/dana-deploy/gitops), never in your own checkout.
+# It runs no tests: the pre-push hook runs them before it calls this.
+# DANA_DEPLOY_CHECKOUT=<dir>: build from that checkout of the commit (the hook's).
+set -euo pipefail
+server="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$server"
+prefix="$(git rev-parse --show-prefix)"          # "server/" in the monorepo
+
+config="${DANA_DEPLOY_CONFIG:-$server/deploy.env}"
+if [ ! -r "$config" ]; then
+  echo "deploy: no $config (copy deploy.env.example and fill it in)" >&2
+  exit 2
+fi
+# shellcheck disable=SC1090
+. "$config"
+: "${DANA_IMAGE:?deploy: set DANA_IMAGE in $config}"
+DANA_WORKER_IMAGE="${DANA_WORKER_IMAGE:-}"
+DANA_GITOPS_REPO="${DANA_GITOPS_REPO:-}"
+DANA_GITOPS_BRANCH="${DANA_GITOPS_BRANCH:-main}"
+DANA_GITOPS_VALUES="${DANA_GITOPS_VALUES:-}"
+DANA_IMAGE_PLUGINS="${DANA_IMAGE_PLUGINS:-}"
+DANA_K8S_NAMESPACE="${DANA_K8S_NAMESPACE:-dana}"
+DANA_K8S_SELECTOR="${DANA_K8S_SELECTOR:-app=dana}"
+GITOPS=${XDG_CACHE_HOME:-$HOME/.cache}/dana-deploy/gitops
+
+wait_pod=0
+ref=HEAD
+for arg in "$@"; do
+  case "$arg" in
+    --wait) wait_pod=1 ;;
+    -h|--help) sed -n '2,19p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) ref="$arg" ;;
+  esac
+done
+
+sha="$(git rev-parse --verify "$ref^{commit}")"
+release="$(git show "$sha:${prefix}VERSION" | tr -d '[:space:]')-${sha:0:7}"
+
+checkout="${DANA_DEPLOY_CHECKOUT:-}"
+if [ -z "$checkout" ]; then
+  checkout="$(mktemp -d "${TMPDIR:-/tmp}/dana-deploy-XXXXXX")"
+  trap 'git worktree remove --force "$checkout" >/dev/null 2>&1 || rm -rf "$checkout"' EXIT
+  git worktree add --detach -q "$checkout" "$sha"
+fi
+context="$checkout/$prefix"
+
+# Plugin kinds kept outside the repository go into the image's /app/plugins.
+IFS=: read -r -a plugin_dirs <<< "$DANA_IMAGE_PLUGINS"
+for dir in "${plugin_dirs[@]}"; do
+  [ -n "$dir" ] || continue
+  dir="${dir/#\~/$HOME}"
+  [ -d "$dir" ] || { echo "deploy: plugin folder $dir is missing" >&2; exit 1; }
+  for kind in "$dir"/*/; do
+    [ -f "$kind/kind.py" ] || continue
+    echo "deploy: with plugin $(basename "$kind")"
+    rm -rf "$context/plugins/$(basename "$kind")"
+    cp -r "$kind" "$context/plugins/"
+  done
+done
+
+echo "deploy: building $release"
+docker build -q --target app --build-arg "RELEASE=$release" \
+  -t "$DANA_IMAGE:$release" -t "$DANA_IMAGE:latest" "$context" >/dev/null
+if [ -n "$DANA_WORKER_IMAGE" ]; then
+  docker build -q -t "$DANA_WORKER_IMAGE:$release" "$context/bank-worker" >/dev/null
+fi
+echo "deploy: pushing $DANA_IMAGE:$release${DANA_WORKER_IMAGE:+ and $DANA_WORKER_IMAGE:$release}"
+docker push -q "$DANA_IMAGE:$release" >/dev/null
+docker push -q "$DANA_IMAGE:latest" >/dev/null
+[ -z "$DANA_WORKER_IMAGE" ] || docker push -q "$DANA_WORKER_IMAGE:$release" >/dev/null
+
+if [ -z "$DANA_GITOPS_REPO" ]; then
+  echo "deploy: pushed $release (no DANA_GITOPS_REPO: roll it out yourself)"
+else
+  : "${DANA_GITOPS_VALUES:?deploy: set DANA_GITOPS_VALUES in $config}"
+  app="$(basename "$(dirname "$DANA_GITOPS_VALUES")")"
+  # Run from a git hook, git may export these for this repo; the GitOps repo is another one.
+  unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_OBJECT_DIRECTORY GIT_PREFIX
+  if [ ! -d "$GITOPS/.git" ] || [ "$(git -C "$GITOPS" remote get-url origin)" != "$DANA_GITOPS_REPO" ]; then
+    rm -rf "$GITOPS"
+    mkdir -p "$(dirname "$GITOPS")"
+    git clone -q "$DANA_GITOPS_REPO" "$GITOPS"
+  fi
+  for attempt in 1 2 3; do
+    git -C "$GITOPS" fetch -q origin "$DANA_GITOPS_BRANCH"
+    git -C "$GITOPS" checkout -q -B "$DANA_GITOPS_BRANCH" "origin/$DANA_GITOPS_BRANCH"
+    sed -i -E -e "s/^(\s*tag:\s*).*/\1\"$release\"/" "$GITOPS/$DANA_GITOPS_VALUES"
+    [ -z "$DANA_WORKER_IMAGE" ] || \
+      sed -i -E -e "s#(image:\s*\"?$DANA_WORKER_IMAGE:)[^\"[:space:]]*#\1$release#" "$GITOPS/$DANA_GITOPS_VALUES"
+    if git -C "$GITOPS" diff --quiet -- "$DANA_GITOPS_VALUES"; then
+      echo "deploy: $DANA_GITOPS_VALUES already runs $release"
+      break
+    fi
+    git -C "$GITOPS" commit -q -m "chore($app): deploy $release" -- "$DANA_GITOPS_VALUES"
+    if git -C "$GITOPS" push -q origin "$DANA_GITOPS_BRANCH"; then
+      echo "deploy: $DANA_GITOPS_VALUES set to $release; the GitOps tool rolls the pod"
+      break
+    fi
+    [ "$attempt" = 3 ] && { echo "deploy: could not push the GitOps change" >&2; exit 1; }
+  done
+fi
+
+if [ "$wait_pod" = 1 ]; then
+  echo "deploy: waiting for the pod to run $release …"
+  until kubectl -n "$DANA_K8S_NAMESPACE" get pod -l "$DANA_K8S_SELECTOR" \
+      -o jsonpath='{range .items[*]}{.spec.containers[0].image} {.status.containerStatuses[0].ready}{"\n"}{end}' \
+      | grep -q "$release true"; do sleep 10; done
+  echo "deploy: $release is running"
+fi

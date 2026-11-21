@@ -1,0 +1,9 @@
+# Pyrefly Configuration File
+preset = "default"
+
+# Specify the python interpreter from the virtual environment
+python-interpreter = ".venv/bin/python"
+
+# Specify search paths for import resolution
+search-path = ["."]
+

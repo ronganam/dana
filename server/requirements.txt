@@ -1,0 +1,20 @@
+aiogram>=3.0.0
+litellm>=1.108.3
+# litellm>=1.105 eagerly imports its MCP gateway on every tools= call and that
+# import chain needs the `mcp` package (upstream bug BerriAI/litellm#46045).
+# Remove once the upstream fix (BerriAI/litellm#46269) ships.
+mcp>=2.2.0,<3
+pydantic>=2.0.0
+cryptography>=42.0.0
+python-dotenv>=1.0.0
+ddgs>=9.0.0
+google-api-python-client>=2.0.0
+google-auth>=2.0.0
+httpx>=0.25.0
+websockets>=12.0
+yt-dlp>=2024.0.0
+curl_cffi==0.15.0
+mutagen>=1.47
+# The user's own Telegram account (MTProto) and its QR sign-in (integrations/telegram_account).
+telethon>=1.46,<2
+qrcode>=8.0

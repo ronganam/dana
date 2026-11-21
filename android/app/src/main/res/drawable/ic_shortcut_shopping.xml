@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Launcher shortcut "Shopping": a basket on the Ink canvas, vermilion accent. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#13100E" />
+        </shape>
+    </item>
+    <item
+        android:bottom="12dp"
+        android:left="12dp"
+        android:right="12dp"
+        android:top="12dp">
+        <vector
+            android:width="24dp"
+            android:height="24dp"
+            android:viewportWidth="24"
+            android:viewportHeight="24">
+            <path
+                android:fillColor="#00000000"
+                android:pathData="M3,9h18l-1.6,9.2a2,2 0,0 1,-2 1.8H6.6a2,2 0,0 1,-2 -1.8L3,9zM8,9l3,-5M16,9l-3,-5M9,13v3M12,13v3M15,13v3"
+                android:strokeWidth="1.8"
+                android:strokeColor="#FF6A3D"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round" />
+        </vector>
+    </item>
+</layer-list>

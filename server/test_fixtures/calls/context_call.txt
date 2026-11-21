@@ -1,0 +1,19 @@
+## Opened from a phone call
+Robin opened this chat from call call-fx. Answer about it directly. When you create tasks for it, pass call_id='call-fx' to add_task so they're linked; to take a pending suggestion use accept_call_suggestion.
+Pending suggestions:
+- sug-call-fx: task “למצוא טכנאי”, due 2026-11-09, priority high, group Home, ⏰ 2026-11-09 09:00, 📍 arrive at home, 🚗 car enter, ☀️ on wake
+- sug-ev-fx: event “Vet” 2026-11-12T16:15:00 → 2026-11-12T17:15:00 @ Clinic
+Tasks already linked:
+- Call the technician (needs_action)
+
+### The call
+Call call-fx with אמא on 2026-11-08T11:41:29 (incoming)
+Title: תיאום טכנאי
+Labels: 🏠 Home, ❤️ Partner
+Summary:
+- המזגן קופץ
+- רובין יחפש טכנאי
+Key facts:
+  - ביקור טכנאי 250
+Transcript (may be cut):
+אמא: המזגן קופץ. רובין: אני אחפש טכנאי מחר.
