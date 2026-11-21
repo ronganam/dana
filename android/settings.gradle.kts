@@ -22,3 +22,4 @@ dependencyResolutionManagement {
 rootProject.name = "Dana"
 include(":app")
 include(":wear")
+include(":protocol")

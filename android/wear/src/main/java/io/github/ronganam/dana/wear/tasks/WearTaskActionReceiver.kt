@@ -1,5 +1,8 @@
 package io.github.ronganam.dana.wear.tasks
 
+import io.github.ronganam.dana.protocol.SnoozeRequest
+import io.github.ronganam.dana.protocol.TaskStatusRequest
+import io.github.ronganam.dana.protocol.WearPaths
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -14,18 +17,11 @@ class WearTaskActionReceiver : BroadcastReceiver() {
 
         when (action) {
             "complete" -> {
-                sendAction(context, "/update_task_status", JSONObject().apply {
-                    put("task_id", taskId)
-                    put("status", "completed")
-                })
+                sendAction(context, WearPaths.UPDATE_TASK_STATUS, TaskStatusRequest(taskId, "completed").toJson())
             }
             "snooze" -> {
                 val minutes = intent.getIntExtra("snooze_minutes", 60)
-                sendAction(context, "/snooze_task", JSONObject().apply {
-                    put("task_id", taskId)
-                    put("type", "time")
-                    put("minutes", minutes)
-                })
+                sendAction(context, WearPaths.SNOOZE_TASK, SnoozeRequest(taskId, "time", minutes = minutes).toJson())
             }
         }
 

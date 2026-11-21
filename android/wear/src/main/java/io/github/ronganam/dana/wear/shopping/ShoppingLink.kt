@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.wear.shopping
 
+import io.github.ronganam.dana.protocol.WearPaths
 import android.content.Context
 import android.util.Log
 import io.github.ronganam.dana.wear.data.PhoneNode
@@ -14,23 +15,22 @@ fun interface ShoppingLink {
     suspend fun send(context: Context, payload: JSONObject): Boolean
 
     companion object {
-        const val PATH = "/shopping_action"
-        const val PATH_ANSWER = "/response/shopping_action"
+        val PATH_ANSWER = WearPaths.response(WearPaths.SHOPPING_ACTION)
 
         /** The phone over the Wear data layer (a debug build may stand in a fake phone: [DebugPhone]). */
         fun forProcess(context: Context): ShoppingLink = DebugPhone.link(context) ?: Phone
     }
 
-    /** `/shopping_action` to the paired phone; its answer comes back on [PATH_ANSWER]. */
+    /** [WearPaths.SHOPPING_ACTION] to the paired phone; its answer comes back on [PATH_ANSWER]. */
     object Phone : ShoppingLink {
         override suspend fun send(context: Context, payload: JSONObject): Boolean {
             val node = PhoneNode.await(context) ?: return false
             val bytes = payload.toString().toByteArray()
             return suspendCancellableCoroutine { cont ->
-                Wearable.getMessageClient(context.applicationContext).sendMessage(node, PATH, bytes)
+                Wearable.getMessageClient(context.applicationContext).sendMessage(node, WearPaths.SHOPPING_ACTION, bytes)
                     .addOnCompleteListener { task ->
                         if (!task.isSuccessful) {
-                            Log.w("WatchShopping", "Couldn't send $PATH", task.exception)
+                            Log.w("WatchShopping", "Couldn't send ${WearPaths.SHOPPING_ACTION}", task.exception)
                             PhoneNode.invalidate()
                         }
                         if (cont.isActive) cont.resume(task.isSuccessful)

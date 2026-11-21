@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.wear.tasks
 
+import io.github.ronganam.dana.protocol.ReminderHandled
+import io.github.ronganam.dana.protocol.WearPaths
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -13,10 +15,6 @@ import org.json.JSONObject
  * and the phone dismisses ours when it is handled there.
  */
 object WearReminderSync {
-    const val PATH_ALARM = "/wear/reminder_alarm"
-    const val PATH_DISMISS = "/wear/reminder_dismiss"
-    private const val PATH_HANDLED_ON_WATCH = "/reminder_dismiss"
-
     /** Local broadcast that closes [WearReminderActivity]. */
     const val ACTION_CLOSE = "io.github.ronganam.dana.wear.CLOSE_REMINDER"
     const val EXTRA_TASK_ID = "task_id"
@@ -38,7 +36,7 @@ object WearReminderSync {
     fun handledOnWatch(context: Context, taskId: String) {
         if (taskId.isEmpty()) return
         cancelNotification(context, taskId)
-        sendToPhone(context, PATH_HANDLED_ON_WATCH, JSONObject().put("task_id", taskId))
+        sendToPhone(context, WearPaths.REMINDER_HANDLED_ON_WATCH, ReminderHandled(taskId).toJson())
     }
 
     /** The phone handled the alarm: stop ringing here. */

@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.wear.data
 
+import io.github.ronganam.dana.protocol.WearPaths
+import io.github.ronganam.dana.protocol.WearVersion
 import android.content.Context
 import android.util.Log
 import com.google.android.gms.wearable.PutDataMapRequest
@@ -12,7 +14,6 @@ import com.google.android.gms.wearable.Wearable
  */
 object WearVersionPublisher {
     private const val TAG = "WearVersionPublisher"
-    private const val VERSION_PATH = "/dana/version"
 
     fun publish(context: Context) {
         try {
@@ -23,12 +24,9 @@ object WearVersionPublisher {
                 @Suppress("DEPRECATION")
                 info.versionCode
             }
-            val request = PutDataMapRequest.create(VERSION_PATH).apply {
-                dataMap.putInt("version_code", versionCode)
-                dataMap.putString("version_name", info.versionName ?: "")
-                // Data items need a changing value to be re-delivered; include a
-                // coarse timestamp (day granularity is enough for a version ping).
-                dataMap.putLong("day", System.currentTimeMillis() / (24L * 60 * 60 * 1000))
+            val request = PutDataMapRequest.create(WearPaths.VERSION).apply {
+                // Data items need a changing value to be re-delivered; a day is enough for a version ping.
+                WearVersion(versionCode, info.versionName ?: "").writeTo(dataMap, System.currentTimeMillis() / (24L * 60 * 60 * 1000))
             }.asPutDataRequest().setUrgent()
             Wearable.getDataClient(context).putDataItem(request)
                 .addOnSuccessListener {

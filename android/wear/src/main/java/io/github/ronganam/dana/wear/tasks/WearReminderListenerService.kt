@@ -1,5 +1,8 @@
 package io.github.ronganam.dana.wear.tasks
 
+import io.github.ronganam.dana.protocol.ReminderAlarm
+import io.github.ronganam.dana.protocol.ReminderHandled
+import io.github.ronganam.dana.protocol.WearPaths
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -17,21 +20,20 @@ class WearReminderListenerService : com.google.android.gms.wearable.WearableList
 
     override fun onMessageReceived(messageEvent: com.google.android.gms.wearable.MessageEvent) {
         super.onMessageReceived(messageEvent)
-        if (messageEvent.path == WearReminderSync.PATH_DISMISS) {
-            val taskId = JSONObject(String(messageEvent.data)).optString("task_id")
-            WearReminderSync.closeLocally(this, taskId)
+        if (messageEvent.path == WearPaths.REMINDER_HANDLED_ON_PHONE) {
+            WearReminderSync.closeLocally(this, ReminderHandled.fromJson(JSONObject(String(messageEvent.data))).taskId)
             return
         }
-        if (messageEvent.path == WearReminderSync.PATH_ALARM) {
-            val json = JSONObject(String(messageEvent.data))
-            val taskId = json.optString("task_id", "")
-            val taskTitle = json.optString("task_title", "Reminder")
-            val priority = json.optString("priority", "medium")
-            val triggerType = json.optString("trigger_type", "time")
+        if (messageEvent.path == WearPaths.REMINDER_ALARM) {
+            val alarm = ReminderAlarm.fromJson(JSONObject(String(messageEvent.data)))
+            val taskId = alarm.taskId
+            val taskTitle = alarm.title
+            val priority = alarm.priority
+            val triggerType = alarm.triggerType
             // The phone's Home Assistant zones, for the alarm's place snoozes.
-            json.optJSONArray("zones")?.let { zones ->
+            alarm.zones?.let { zones ->
                 getSharedPreferences(WearReminderSync.PREFS, MODE_PRIVATE).edit()
-                    .putString(WearReminderSync.KEY_ZONES, zones.toString()).apply()
+                    .putString(WearReminderSync.KEY_ZONES, org.json.JSONArray(zones).toString()).apply()
             }
 
             // Launch full-screen alarm

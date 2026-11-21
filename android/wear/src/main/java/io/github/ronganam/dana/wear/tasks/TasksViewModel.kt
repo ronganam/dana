@@ -1,5 +1,8 @@
 package io.github.ronganam.dana.wear.tasks
 
+import io.github.ronganam.dana.protocol.SnoozeRequest
+import io.github.ronganam.dana.protocol.TaskStatusRequest
+import io.github.ronganam.dana.protocol.WearPaths
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -44,8 +47,8 @@ class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         _isLoading.value = true
         _statusText.value = "Loading..."
         getPhoneNodeId { phoneId ->
-            Log.d(TAG, "refreshTasks() — sending /get_tasks to $phoneId")
-            Wearable.getMessageClient(appContext).sendMessage(phoneId, "/get_tasks", null)
+            Log.d(TAG, "refreshTasks() — sending ${WearPaths.GET_TASKS} to $phoneId")
+            Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.GET_TASKS, null)
                 .addOnSuccessListener { Log.d(TAG, "refreshTasks() — message sent successfully") }
                 .addOnFailureListener { e ->
                     Log.e(TAG, "refreshTasks() — failed to send message", e)
@@ -57,12 +60,9 @@ class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
 
     fun completeTask(taskId: String) {
         Log.d(TAG, "completeTask($taskId)")
-        val payload = JSONObject().apply {
-            put("task_id", taskId)
-            put("status", "completed")
-        }
+        val payload = TaskStatusRequest(taskId, "completed").toJson()
         getPhoneNodeId { phoneId ->
-            Wearable.getMessageClient(appContext).sendMessage(phoneId, "/update_task_status", payload.toString().toByteArray())
+            Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.UPDATE_TASK_STATUS, payload.toString().toByteArray())
         }
         // Optimistically remove from list, then refresh for server confirmation
         _tasks.value = _tasks.value.filter { it.id != taskId }
@@ -74,13 +74,9 @@ class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
 
     fun snoozeTask(taskId: String, minutes: Int) {
         Log.d(TAG, "snoozeTask($taskId, $minutes min)")
-        val payload = JSONObject().apply {
-            put("task_id", taskId)
-            put("type", "time")
-            put("minutes", minutes)
-        }
+        val payload = SnoozeRequest(taskId, "time", minutes = minutes).toJson()
         getPhoneNodeId { phoneId ->
-            Wearable.getMessageClient(appContext).sendMessage(phoneId, "/snooze_task", payload.toString().toByteArray())
+            Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.SNOOZE_TASK, payload.toString().toByteArray())
         }
         // Optimistically remove, then refresh
         _tasks.value = _tasks.value.filter { it.id != taskId }
@@ -98,7 +94,7 @@ class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         viewModelScope.launch {
             try {
                 when (path) {
-                    "/response/get_tasks" -> {
+                    WearPaths.response(WearPaths.GET_TASKS) -> {
                         val array = JSONArray(jsonString)
                         val list = mutableListOf<WearTask>()
                         for (i in 0 until array.length()) {
@@ -122,10 +118,10 @@ class TasksViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
                         _isLoading.value = false
                         _statusText.value = if (list.isEmpty()) "No tasks" else ""
                     }
-                    "/response/update_task_status", "/response/snooze_task" -> {
+                    WearPaths.response(WearPaths.UPDATE_TASK_STATUS), WearPaths.response(WearPaths.SNOOZE_TASK) -> {
                         refreshTasks()
                     }
-                    "/response/error" -> {
+                    WearPaths.RESPONSE_ERROR -> {
                         val json = JSONObject(jsonString)
                         _statusText.value = "Error: ${json.optString("error", "Failed")}"
                         _isLoading.value = false

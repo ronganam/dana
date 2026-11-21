@@ -1,5 +1,10 @@
 package io.github.ronganam.dana.data.wear
 
+import io.github.ronganam.dana.protocol.ReminderHandled
+import io.github.ronganam.dana.protocol.SnoozeRequest
+import io.github.ronganam.dana.protocol.TaskActionReply
+import io.github.ronganam.dana.protocol.TaskStatusRequest
+import io.github.ronganam.dana.protocol.WearPaths
 import android.content.Context
 import android.util.Log
 import io.github.ronganam.dana.data.network.ApiService
@@ -333,23 +338,23 @@ class WearMessageListenerService : WearableListenerService() {
         // each on the IO pool could reorder audio chunks or run one before
         // the socket exists (it was then dropped). WebSocket calls only queue.
         when (path) {
-            "/voice_start" -> {
+            WearPaths.VOICE_START -> {
                 startVoiceWebSocket(nodeId)
                 Log.d(TAG, "Handled message path: $path from node: $nodeId")
                 return
             }
-            "/voice_chunk" -> {
+            WearPaths.VOICE_CHUNK -> {
                 activeWebSocket?.send(data.toByteString())
                 return
             }
-            "/voice_cancel" -> {
+            WearPaths.VOICE_CANCEL -> {
                 // The watch stopped listening without speech: drop the
                 // stream instead of asking for a reply to silence.
                 activeWebSocket?.close(1000, "Cancelled on watch")
                 activeWebSocket = null
                 return
             }
-            "/voice_stop" -> {
+            WearPaths.VOICE_STOP -> {
                 stopVoiceWebSocket()
                 return
             }
@@ -359,34 +364,34 @@ class WearMessageListenerService : WearableListenerService() {
             try {
                 when (path) {
                     // One conversation: the watch's menu and old builds' session lists see just the thread.
-                    "/get_sessions", "/get_recent_sessions" -> {
+                    WearPaths.GET_SESSIONS, WearPaths.GET_RECENT_SESSIONS -> {
                         val one = JSONArray().put(JSONObject().put("session_id", THREAD).put("title", "Dana"))
-                        sendReply(nodeId, "/response/get_sessions", one.toString().toByteArray())
+                        sendReply(nodeId, WearPaths.response(WearPaths.GET_SESSIONS), one.toString().toByteArray())
                     }
-                    "/get_session_detail" -> {
+                    WearPaths.GET_SESSION_DETAIL -> {
                         val thread = JSONObject(getApiService().getThread(THREAD_TURNS))
-                        sendReply(nodeId, "/response/get_session_detail", slimThread(thread).toString().toByteArray())
+                        sendReply(nodeId, WearPaths.response(WearPaths.GET_SESSION_DETAIL), slimThread(thread).toString().toByteArray())
                     }
                     // Older watch builds create a session per conversation; nothing to create now.
-                    "/create_session" -> {
-                        sendReply(nodeId, "/response/create_session", JSONObject().put("session_id", THREAD).toString().toByteArray())
+                    WearPaths.CREATE_SESSION -> {
+                        sendReply(nodeId, WearPaths.response(WearPaths.CREATE_SESSION), JSONObject().put("session_id", THREAD).toString().toByteArray())
                     }
-                    "/send_message" -> {
+                    WearPaths.SEND_MESSAGE -> {
                         val json = JSONObject(String(data))
                         val msg = json.getString("message")
-                        val responseJson = runAssistantStream(WearLiveForwarder(nodeId, "/response/send_message")) { onEvent ->
+                        val responseJson = runAssistantStream(WearLiveForwarder(nodeId, WearPaths.response(WearPaths.SEND_MESSAGE))) { onEvent ->
                             getApiService().streamMessage(msg, THREAD, chatModel(), onEvent, device = DEVICE)
                         }
-                        sendReply(nodeId, "/response/send_message", responseJson.toString().toByteArray())
+                        sendReply(nodeId, WearPaths.response(WearPaths.SEND_MESSAGE), responseJson.toString().toByteArray())
                     }
-                    "/approve_action" -> {
+                    WearPaths.APPROVE_ACTION -> {
                         val json = JSONObject(String(data)).put("session_id", THREAD).put("device", DEVICE)
-                        val responseJson = runAssistantStream(WearLiveForwarder(nodeId, "/response/approve_action")) { onEvent ->
+                        val responseJson = runAssistantStream(WearLiveForwarder(nodeId, WearPaths.response(WearPaths.APPROVE_ACTION))) { onEvent ->
                             getApiService().streamApproveAction(json, onEvent)
                         }
-                        sendReply(nodeId, "/response/approve_action", responseJson.toString().toByteArray())
+                        sendReply(nodeId, WearPaths.response(WearPaths.APPROVE_ACTION), responseJson.toString().toByteArray())
                     }
-                    "/get_tasks" -> {
+                    WearPaths.GET_TASKS -> {
                         val tasks = getApiService().getTasks()
                         val jsonArray = JSONArray()
                         tasks.forEach { task ->
@@ -401,65 +406,48 @@ class WearMessageListenerService : WearableListenerService() {
                                 put("group_emoji", task.groupEmoji ?: "")
                             })
                         }
-                        sendReply(nodeId, "/response/get_tasks", jsonArray.toString().toByteArray())
+                        sendReply(nodeId, WearPaths.response(WearPaths.GET_TASKS), jsonArray.toString().toByteArray())
                     }
-                    "/update_task_status" -> {
-                        val json = JSONObject(String(data))
-                        val taskId = json.getString("task_id")
-                        val newStatus = json.getString("status")
+                    WearPaths.UPDATE_TASK_STATUS -> {
+                        val req = TaskStatusRequest.fromJson(JSONObject(String(data)))
                         // Queued and retried if the server is unreachable.
-                        val result = TaskActionQueue.setStatus(applicationContext, taskId, newStatus)
-                        val response = JSONObject().apply {
-                            put("success", result != SubmitResult.REJECTED)
-                            put("queued", result == SubmitResult.QUEUED)
-                        }
-                        sendReply(nodeId, "/response/update_task_status", response.toString().toByteArray())
+                        val result = TaskActionQueue.setStatus(applicationContext, req.taskId, req.status)
+                        val reply = TaskActionReply(success = result != SubmitResult.REJECTED, queued = result == SubmitResult.QUEUED)
+                        sendReply(nodeId, WearPaths.response(WearPaths.UPDATE_TASK_STATUS), reply.toJson().toString().toByteArray())
                     }
-                    "/snooze_task" -> {
-                        val json = JSONObject(String(data))
-                        val taskId = json.getString("task_id")
+                    WearPaths.SNOOZE_TASK -> {
                         // Any snooze kind the watch offers: time (minutes),
                         // place (location + event), car (action) or wake.
-                        val payload = JSONObject().apply {
-                            put("type", json.optString("type", "time"))
-                            if (json.has("minutes")) put("minutes", json.getInt("minutes"))
-                            if (json.has("location")) put("location", json.getString("location"))
-                            if (json.has("event")) put("event", json.getString("event"))
-                            if (json.has("action")) put("action", json.getString("action"))
-                        }
-                        val result = TaskActionQueue.snooze(applicationContext, taskId, payload)
-                        val response = JSONObject().apply {
-                            put("success", result != SubmitResult.REJECTED)
-                            put("queued", result == SubmitResult.QUEUED)
-                        }
-                        sendReply(nodeId, "/response/snooze_task", response.toString().toByteArray())
+                        val req = SnoozeRequest.fromJson(JSONObject(String(data)))
+                        val result = TaskActionQueue.snooze(applicationContext, req.taskId, req.serverPayload())
+                        val reply = TaskActionReply(success = result != SubmitResult.REJECTED, queued = result == SubmitResult.QUEUED)
+                        sendReply(nodeId, WearPaths.response(WearPaths.SNOOZE_TASK), reply.toJson().toString().toByteArray())
                     }
-                    WearCards.PATH_SUGGESTION_ACTION -> {
+                    WearPaths.SUGGESTION_ACTION -> {
                         // Accept / Dismiss from the watch's "Waiting on you" tile.
                         val json = JSONObject(String(data))
                         val id = json.getString("id")
                         val ok = if (json.optString("action") == "accept") {
                             getApiService().acceptSuggestion(id); true
                         } else getApiService().dismissSuggestion(id)
-                        sendReply(nodeId, "/response/suggestion_action", JSONObject().put("success", ok).put("id", id).toString().toByteArray())
+                        sendReply(nodeId, WearPaths.response(WearPaths.SUGGESTION_ACTION), JSONObject().put("success", ok).put("id", id).toString().toByteArray())
                         io.github.ronganam.dana.DanaWidgets.refresh(applicationContext)
                     }
-                    WearCards.PATH_SHOPPING_ACTION -> {
+                    WearPaths.SHOPPING_ACTION -> {
                         // Tick / untick / add from the watch: the same path as a tap on the phone.
                         val json = JSONObject(String(data))
                         val outcome = io.github.ronganam.dana.data.shopping.ShoppingWatch.handle(applicationContext, json)
-                        sendReply(nodeId, "/response/shopping_action", outcome.toString().toByteArray())
+                        sendReply(nodeId, WearPaths.response(WearPaths.SHOPPING_ACTION), outcome.toString().toByteArray())
                     }
-                    WearReminderBridge.PATH_DISMISSED_ON_WATCH -> {
-                        val taskId = JSONObject(String(data)).optString("task_id")
-                        WearReminderBridge.dismissOnPhone(applicationContext, taskId)
+                    WearPaths.REMINDER_HANDLED_ON_WATCH -> {
+                        WearReminderBridge.dismissOnPhone(applicationContext, ReminderHandled.fromJson(JSONObject(String(data))).taskId)
                     }
                 }
                 Log.d("WearMessageListener", "Handled message path: $path from node: $nodeId")
             } catch (e: Exception) {
                 Log.e("WearMessageListener", "Error handling message path: $path", e)
                 val errJson = JSONObject().apply { put("error", e.message ?: "Unknown error") }
-                sendReply(nodeId, "/response/error", errJson.toString().toByteArray())
+                sendReply(nodeId, WearPaths.RESPONSE_ERROR, errJson.toString().toByteArray())
             }
         }
     }
@@ -477,7 +465,7 @@ class WearMessageListenerService : WearableListenerService() {
 
         // The socket streams the run's events; the watch gets one folded reply.
         var folder = WearReplyFolder()
-        var live = WearLiveForwarder(nodeId, "/response/voice_stream")
+        var live = WearLiveForwarder(nodeId, WearPaths.RESPONSE_VOICE_STREAM)
         activeWebSocket = client.newWebSocket(request, object : WebSocketListener() {
             override fun onMessage(webSocket: WebSocket, text: String) {
                 val event = try { JSONObject(text) } catch (e: Exception) { return }
@@ -489,13 +477,13 @@ class WearMessageListenerService : WearableListenerService() {
                             put("response", "I couldn't hear anything.")
                             put("transcription", "")
                         }
-                        sendReply(nodeId, "/response/voice_stream", reply.toString().toByteArray())
+                        sendReply(nodeId, WearPaths.RESPONSE_VOICE_STREAM, reply.toString().toByteArray())
                     }
                     "state" -> {
                         folder.onEvent(event)
-                        sendReply(nodeId, "/response/voice_stream", folder.build().toString().toByteArray())
+                        sendReply(nodeId, WearPaths.RESPONSE_VOICE_STREAM, folder.build().toString().toByteArray())
                         folder = WearReplyFolder()
-                        live = WearLiveForwarder(nodeId, "/response/voice_stream")
+                        live = WearLiveForwarder(nodeId, WearPaths.RESPONSE_VOICE_STREAM)
                     }
                     else -> folder.onEvent(event)
                 }
@@ -506,7 +494,7 @@ class WearMessageListenerService : WearableListenerService() {
                 val current = activeWebSocket
                 if (current != null && current !== webSocket) return // a superseded turn's socket
                 val errJson = JSONObject().apply { put("error", "Voice connection failed: " + t.message) }
-                sendReply(nodeId, "/response/voice_stream", errJson.toString().toByteArray())
+                sendReply(nodeId, WearPaths.RESPONSE_VOICE_STREAM, errJson.toString().toByteArray())
                 activeWebSocket = null
             }
         })

@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.wear.data
 
+import io.github.ronganam.dana.protocol.WearConfig
+import io.github.ronganam.dana.protocol.WearPaths
 import android.content.Intent
 import android.util.Log
 import androidx.wear.tiles.TileService
@@ -19,23 +21,23 @@ class WearConfigListenerService : WearableListenerService() {
     override fun onDataChanged(dataEvents: DataEventBuffer) {
         super.onDataChanged(dataEvents)
         for (event in dataEvents) {
-            if (event.type == DataEvent.TYPE_CHANGED && event.dataItem.uri.path == "/dana_config") {
+            if (event.type == DataEvent.TYPE_CHANGED && event.dataItem.uri.path == WearPaths.CONFIG) {
                 try {
-                    val dataMap = DataMapItem.fromDataItem(event.dataItem).dataMap
-                    val serverUrl = dataMap.getString("server_url") ?: ""
-                    val apiToken = dataMap.getString("api_token") ?: ""
-                    val sessionId = dataMap.getString("chat_session_id") ?: ""
+                    val config = WearConfig.from(DataMapItem.fromDataItem(event.dataItem).dataMap)
+                    val serverUrl = config.serverUrl
+                    val apiToken = config.apiToken
+                    val sessionId = config.sessionId
 
                     val wearPrefs = WearPrefs(applicationContext)
                     if (serverUrl.isNotEmpty()) wearPrefs.serverUrl = serverUrl
                     if (apiToken.isNotEmpty()) wearPrefs.apiToken = apiToken
                     if (sessionId.isNotEmpty()) wearPrefs.sessionId = sessionId
 
-                    val phoneVersionCode = dataMap.getInt("phone_version_code", 0)
+                    val phoneVersionCode = config.phoneVersionCode
                     if (phoneVersionCode > 0) wearPrefs.phoneVersionCode = phoneVersionCode
 
-                    val eventsJson = dataMap.getString("calendar_events") ?: "[]"
-                    val tasksJson = dataMap.getString("due_tasks") ?: "[]"
+                    val eventsJson = config.calendarEventsJson
+                    val tasksJson = config.dueTasksJson
                     wearPrefs.cachedEvents = eventsJson
                     wearPrefs.cachedTasks = tasksJson
 

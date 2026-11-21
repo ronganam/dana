@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.wear.ui
 
+import io.github.ronganam.dana.protocol.WearPaths
 import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioFormat
@@ -196,7 +197,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
     }
 
     private fun loadSessionHistory(sessionId: String) {
-        sendToPhone("/get_session_detail", sessionId.toByteArray())
+        sendToPhone(WearPaths.GET_SESSION_DETAIL, sessionId.toByteArray())
     }
 
     /** Show the latest turns of the shared thread (from the phone, any device). */
@@ -253,7 +254,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         val chunks = Channel<ByteArray>(Channel.UNLIMITED)
         @Volatile var stopRequested = false
         @Volatile var heardSpeech = false
-        /** [PATH_VOICE_STOP] (send what was said) or [PATH_VOICE_CANCEL]. */
+        /** [WearPaths.VOICE_STOP] (send what was said) or [WearPaths.VOICE_CANCEL]. */
         @Volatile var endPath: String? = null
     }
 
@@ -374,7 +375,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
             }
         } catch (e: Exception) {
             Log.e("WearViewModel", "Voice recording error", e)
-            turn.endPath = PATH_VOICE_CANCEL
+            turn.endPath = WearPaths.VOICE_CANCEL
             viewModelScope.launch {
                 if (voiceTurn === turn) {
                     _statusText.value = "Mic error"
@@ -404,17 +405,17 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         }
         WearPerf.mark("phone node")
         try {
-            client.sendMessage(phoneId, PATH_VOICE_START, turn.sessionId.toByteArray()).addOnFailureListener { PhoneNode.invalidate() }
+            client.sendMessage(phoneId, WearPaths.VOICE_START, turn.sessionId.toByteArray()).addOnFailureListener { PhoneNode.invalidate() }
             var sentAny = false
             for (chunk in turn.chunks) {
-                if (turn.endPath == PATH_VOICE_CANCEL) continue // drain without sending
-                client.sendMessage(phoneId, PATH_VOICE_CHUNK, chunk)
+                if (turn.endPath == WearPaths.VOICE_CANCEL) continue // drain without sending
+                client.sendMessage(phoneId, WearPaths.VOICE_CHUNK, chunk)
                 if (!sentAny) {
                     sentAny = true
                     WearPerf.mark("first audio sent")
                 }
             }
-            client.sendMessage(phoneId, turn.endPath ?: PATH_VOICE_CANCEL, turn.sessionId.toByteArray())
+            client.sendMessage(phoneId, turn.endPath ?: WearPaths.VOICE_CANCEL, turn.sessionId.toByteArray())
         } catch (e: Exception) {
             Log.e("WearViewModel", "Streaming voice to phone failed", e)
         }
@@ -448,7 +449,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         if (!_isRecording.value) return
         _isRecording.value = false
         voiceTurn?.let {
-            it.endPath = PATH_VOICE_CANCEL
+            it.endPath = WearPaths.VOICE_CANCEL
             it.stopRequested = true
         }
         _statusText.value = status
@@ -461,7 +462,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         awaitingReply = true
         markActivity()
         voiceTurn?.let {
-            it.endPath = PATH_VOICE_STOP
+            it.endPath = WearPaths.VOICE_STOP
             it.stopRequested = true
         }
         _statusText.value = "Processing voice..."
@@ -481,7 +482,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
             put("message", text)
         }
 
-        sendToPhone("/send_message", payload.toString().toByteArray())
+        sendToPhone(WearPaths.SEND_MESSAGE, payload.toString().toByteArray())
     }
 
     fun approveAction(approved: Boolean) {
@@ -495,7 +496,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
             put("action", if (approved) "approve" else "deny")
         }
 
-        sendToPhone("/approve_action", payload.toString().toByteArray())
+        sendToPhone(WearPaths.APPROVE_ACTION, payload.toString().toByteArray())
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -506,11 +507,11 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         viewModelScope.launch {
             try {
                 when (path) {
-                    "/response/get_session_detail" -> {
+                    WearPaths.response(WearPaths.GET_SESSION_DETAIL) -> {
                         parseResponseJson(JSONObject(jsonString))
                         _statusText.value = "Ready"
                     }
-                    "/response/create_session" -> {
+                    WearPaths.response(WearPaths.CREATE_SESSION) -> {
                         // Arrives while listening has often already started;
                         // don't wipe a transcript or the "Listening" status.
                         if (!_isRecording.value && !awaitingReply) {
@@ -518,7 +519,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
                             _statusText.value = "Ready"
                         }
                     }
-                    "/response/send_message", "/response/approve_action", "/response/voice_stream" -> {
+                    WearPaths.response(WearPaths.SEND_MESSAGE), WearPaths.response(WearPaths.APPROVE_ACTION), WearPaths.RESPONSE_VOICE_STREAM -> {
                         val json = JSONObject(jsonString)
                         if (json.has("error")) {
                             awaitingReply = false
@@ -544,7 +545,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
                             _statusText.value = "Ready"
                         }
                     }
-                    "/response/error" -> {
+                    WearPaths.RESPONSE_ERROR -> {
                         awaitingReply = false
                         val json = JSONObject(jsonString)
                         _statusText.value = "Error: " + json.optString("error", "Failed")
@@ -704,7 +705,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
             put("session_id", sessionId)
             put("action", "extend_iterations")
         }
-        sendToPhone("/approve_action", payload.toString().toByteArray())
+        sendToPhone(WearPaths.APPROVE_ACTION, payload.toString().toByteArray())
     }
 
     /** Stop an over-budget run and settle the session. */
@@ -718,7 +719,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
             put("session_id", sessionId)
             put("action", "decline_iterations")
         }
-        sendToPhone("/approve_action", payload.toString().toByteArray())
+        sendToPhone(WearPaths.APPROVE_ACTION, payload.toString().toByteArray())
     }
 
     fun submitSelection(indices: List<Int>) {
@@ -735,7 +736,7 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
             put("action", "select")
             put("selection", selected)
         }
-        sendToPhone("/approve_action", payload.toString().toByteArray())
+        sendToPhone(WearPaths.APPROVE_ACTION, payload.toString().toByteArray())
     }
 
     /** Grows (or starts) the reply bubble while the answer streams in. */
@@ -792,10 +793,6 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         const val FRAME_BYTES = SAMPLE_RATE * 2 / 50
         /** 100 ms per Data Layer message (was one per ~40 ms read). */
         const val BATCH_BYTES = SAMPLE_RATE * 2 / 10
-        const val PATH_VOICE_START = "/voice_start"
-        const val PATH_VOICE_CHUNK = "/voice_chunk"
-        const val PATH_VOICE_STOP = "/voice_stop"
-        const val PATH_VOICE_CANCEL = "/voice_cancel"
         const val STREAMING_ID = "streaming-reply"
         /** Dana's shared thread (server `session_id: "main"`). */
         const val THREAD_ID = "main"
