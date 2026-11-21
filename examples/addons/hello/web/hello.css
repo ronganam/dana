@@ -1,0 +1,3 @@
+/* The hello page; the shell's tokens (static/styles.css: --ink, --canvas, …) are there to build on. */
+.hello-body { padding: 24px; font-size: 18px; color: var(--ink); }
+.hello-body ul { margin-top: 12px; padding-left: 20px; font-size: 15px; color: var(--body); }

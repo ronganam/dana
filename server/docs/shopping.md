@@ -28,7 +28,7 @@ This file is the design of record. The phone, widget and watch screens live in
 | `tools.py`, `addon.py` | Dana's tools, the addon and its prompt words |
 
 The web panel, the addon's page (`web=` in `addon.py`, files in `web/`;
-`writing-an-addon.md`, "A web page"): `web/shopping-core.js` (the pure part:
+`writing-an-addon.md`, "Pages"): `web/shopping-core.js` (the pure part:
 view model, pending changes, requests, words, HTML; tested by
 `tests/test_web_shopping.mjs` against `tests/fixtures/shopping_web.json`),
 `web/shopping.js` (the controller, registered with `Dana.panel`) and

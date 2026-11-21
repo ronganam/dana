@@ -35,8 +35,9 @@ connect_label}``. ``source``: ``official`` / ``site`` / ``image`` /
 (they can turn it on), ``off`` (only an admin can: ``why_not``),
 ``disabled-on-server`` (an admin disabled it, or an addon it needs, for
 everyone) or ``failed`` (a site / installed addon that did not load: only
-admins get its ``error``); ``web`` (only while it is on for the user) =
-``{panel, style, nav: {label, icon, order}}`` with the URLs of its files;
+admins get its ``error``); ``web`` (empty unless it is on for the user) =
+its pages, ``[{id, panel, style, nav: {label, icon, order} | null}]`` with
+the URLs of their files;
 ``worker``: it has a sidecar. Admins also get ``installed`` (``{repo, path,
 commit}``) for an addon installed from git. ``<entry>`` = the catalog entry
 (core/addons/catalog.py) plus ``official`` (its name is an official addon:
@@ -150,15 +151,12 @@ def _rule_fields(rule: store.ChangeRule) -> Dict[str, Any]:
     return {"can_change": rule.can_change, "why_not": rule.why_not, "rule": rule.rule}
 
 
-def _web(addon: Addon) -> Optional[Dict[str, Any]]:
-    """The URLs of ``addon``'s web files and its navigation entry, or None without ``web=``."""
-    if addon.web is None:
-        return None
+def _web(addon: Addon) -> List[Dict[str, Any]]:
+    """``addon``'s pages: each one's id, the URLs of its files and its navigation entry."""
     base = f"/addons/{addon.name}/web/"
-    nav = addon.web.nav
-    return {"panel": base + addon.web.panel if addon.web.panel else None,
-            "style": base + addon.web.style if addon.web.style else None,
-            "nav": {"label": nav.label, "icon": nav.icon, "order": nav.order} if nav is not None else None}
+    return [{"id": p.id, "panel": base + p.panel, "style": base + p.style if p.style else None,
+             "nav": {"label": p.nav.label, "icon": p.nav.icon, "order": p.nav.order} if p.nav is not None else None}
+            for p in addon.web]
 
 
 def _state(user: User, addon: Addon, connected: bool, can_change: bool) -> str:
@@ -206,7 +204,7 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
         "state": _state(user, addon, conn is not None, can_change),
         "needs": list(addon.needs),
         "everyone": addon.everyone,
-        "web": _web(addon) if enabled and conn is not None else None,
+        "web": _web(addon) if enabled and conn is not None else [],
         "worker": addon.worker is not None,
         "connected": conn is not None,
         "requires": addon.requires,
@@ -240,7 +238,7 @@ def failed_payload(failed: loader.Failed, by: User) -> Dict[str, Any]:
     out: Dict[str, Any] = {
         "name": failed.name, "title": failed.name.replace("_", " ").capitalize(), "description": "",
         "version": "", "source": addon_dirs.SITE if failed.source == addon_dirs.EXTRA else failed.source,
-        "state": FAILED, "needs": [], "everyone": False, "web": None, "worker": False, "connected": False,
+        "state": FAILED, "needs": [], "everyone": False, "web": [], "worker": False, "connected": False,
         "requires": None, "can_change": False, "why_not": "It did not load", "credentials": [], "settings": [],
         "account": None, "check": False, "options": False, "connect_url": None, "connect_label": None,
     }

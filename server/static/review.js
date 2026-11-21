@@ -1,9 +1,10 @@
-/* Weekly review + the Today strip on the Reminders screen.
+/* Weekly review + the Today strip (the morning briefing and the weekly-review banner).
  *
  *   GET  /api/review/latest · POST /api/review/generate · POST /api/review/{id}/apply | /dismiss
  *   GET  /api/briefing/today
  *   POST /api/chat/context {kind: "review"}
- * Exposes window.DanaReview = {show, hide} and window.DanaToday = {show}.
+ * Exposes window.DanaReview = {show, hide} and window.DanaToday = {show(el)}. The Today strip is a core
+ * piece: an addon page hosts it with api.piece("today", el) (static/dana.js; the tasks page does).
  */
 (() => {
   "use strict";
@@ -164,7 +165,7 @@
         window.DanaToday?.show();
       }
     });
-    document.getElementById("rv-back")?.addEventListener("click", () => window.danaSwitchTab?.("tasks"));
+    document.getElementById("rv-back")?.addEventListener("click", () => window.danaBack?.());
     document.getElementById("rv-generate")?.addEventListener("click", () => { if (confirm("Make a fresh review now? Unapplied choices are replaced.")) generate(); });
     document.getElementById("rv-ask")?.addEventListener("click", async () => {
       if (!R.review) return;
@@ -176,10 +177,22 @@
 
   window.DanaReview = { show() { R.visible = true; load(); }, hide() { R.visible = false; } };
 
-  // ======================= Today strip (Reminders screen) =======================
-  async function showToday() {
-    const el = document.getElementById("today-strip");
-    if (!el) return;
+  // ======================= Today strip (a core piece an addon page hosts) =======================
+  let todayHost = null;
+
+  /** Draws the strip into `el` (and keeps drawing there); no `el`: draws again where it was. */
+  async function showToday(el) {
+    if (el && el !== todayHost) {
+      todayHost = el;
+      el.classList.add("today-strip");
+      el.addEventListener("click", (ev) => {
+        const h = ev.target.closest("[data-hide-brief]");
+        if (h) { store("today.hidden", h.dataset.hideBrief); showToday(); return; }
+        if (ev.target.closest("[data-open-review]")) window.danaSwitchTab?.("review");
+      });
+    }
+    const host = todayHost;
+    if (!host) return;
     const [b, r] = await Promise.all([api("/api/briefing/today").catch(() => null), api("/api/review/latest").catch(() => null)]);
     const cards = [];
     const brief = b && b.briefing;
@@ -195,23 +208,13 @@
         <div class="pts"><span${rtl(rv.headline)}>${esc(rv.headline)}</span><span>${rv.items.length} items to decide</span></div></div>
         <div class="acts"><button class="btn-primary" data-open-review>Review</button></div></div>`);
     }
-    el.innerHTML = cards.join("");
-    el.classList.toggle("hidden", !cards.length);
+    host.innerHTML = cards.join("");
+    host.classList.toggle("hidden", !cards.length);
     icons();
-  }
-
-  function initToday() {
-    const el = document.getElementById("today-strip");
-    if (!el) return;
-    el.addEventListener("click", (ev) => {
-      const h = ev.target.closest("[data-hide-brief]");
-      if (h) { store("today.hidden", h.dataset.hideBrief); showToday(); return; }
-      if (ev.target.closest("[data-open-review]")) window.danaSwitchTab?.("review");
-    });
   }
 
   window.DanaToday = { show: showToday };
 
-  function init() { initReview(); initToday(); }
+  function init() { initReview(); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
 })();

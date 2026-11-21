@@ -1,37 +1,40 @@
 /* The web app — addons' pages (static/app.js says how the app's scripts fit together).
  *
  * The shell knows no addon by name. At start it asks GET /api/me and GET /api/addons, puts a navigation
- * button for each page the user has (`panelEntries`: addons on for them whose manifest declares
- * `web=Web(panel=…)`), and loads each page's script, which registers itself with Dana.panel
- * (static/dana.js; may start background work such as a badge). Opening a page loads its style the
- * first time, gives it its own <section id="panel-<id>"> and calls its mount; leaving calls unmount.
- * `/<id>` and `#<id>…` open a page when the app loads. The Addons page announces changes with the
- * `dana:addons-changed` event and the navigation is built again.
- * The pure part (`panelEntries`) is tested by tests/test_web_panels.mjs.
+ * button for each page the user has (`panelEntries`: every `Page` in the `web=(…)` of the addons on for
+ * them), and loads each page's script, which registers itself with Dana.panel (static/dana.js; may start
+ * background work such as a badge). Opening a page loads its style the first time, gives it its own
+ * <section id="panel-<id>"> and calls its mount; leaving calls unmount. `/<id>` and `#<id>…` open a page
+ * when the app loads. The Addons page announces changes with the `dana:addons-changed` event and the
+ * navigation is built again.
+ * The pure part (`panelEntries`, `routeOf`, `badgeText`) is tested by tests/test_web_panels.mjs.
  */
 
 // ══════════════════════════════════════════════════════════════════════
 // ADDON PAGES
 // ══════════════════════════════════════════════════════════════════════
 
-/** The pages of a GET /api/addons payload, in navigation order: [{addon, label, icon, order, nav, panel, style}]. */
+/** The pages of a GET /api/addons payload, in navigation order: [{addon, id, label, icon, order, nav, panel, style}]. */
 function panelEntries(payload) {
     const out = [];
     for (const a of (payload && payload.addons) || []) {
-        const web = a && a.state === "on" ? a.web : null;
-        if (!web || !web.panel) continue;
-        const nav = web.nav || null;
-        out.push({
-            addon: a.name,
-            label: (nav && nav.label) || a.title || a.name,
-            icon: (nav && nav.icon) || "puzzle",
-            order: nav && Number.isFinite(nav.order) ? nav.order : 100,
-            nav: Boolean(nav),
-            panel: web.panel,
-            style: web.style || null,
-        });
+        if (!a || a.state !== "on" || !Array.isArray(a.web)) continue;
+        for (const page of a.web) {
+            if (!page || !page.id || !page.panel) continue;
+            const nav = page.nav || null;
+            out.push({
+                addon: a.name,
+                id: page.id,
+                label: (nav && nav.label) || a.title || a.name,
+                icon: (nav && nav.icon) || "puzzle",
+                order: nav && Number.isFinite(nav.order) ? nav.order : 100,
+                nav: Boolean(nav),
+                panel: page.panel,
+                style: page.style || null,
+            });
+        }
     }
-    return out.sort((x, y) => x.order - y.order || x.label.localeCompare(y.label) || x.addon.localeCompare(y.addon));
+    return out.sort((x, y) => x.order - y.order || x.label.localeCompare(y.label) || x.id.localeCompare(y.id));
 }
 
 /** The page a URL asks for: "/weather" → "weather", "#weather/week" → "weather", else null. */
@@ -45,22 +48,21 @@ function routeOf(pathname, hash) {
 const panelHost = {
     me: null,
     entries: [],            // panelEntries of the last /api/addons
-    byId: new Map(),        // page id → addon name (once registered)
-    current: null,          // the addon whose page is on screen
+    current: null,          // the id of the page on screen
     styles: new Map(),      // style URL → Promise
     ready: null,            // every listed page's script has run (or failed)
 };
 
+const pageEntry = (id) => panelHost.entries.find(e => e.id === id) || null;
+
 function panelNavButton(entry, cls) {
     const b = document.createElement("button");
     b.className = cls;
-    b.dataset.addon = entry.addon;
+    b.dataset.tab = entry.id;
     b.title = entry.label;
     b.innerHTML = `<i data-lucide="${escapeHtml(entry.icon)}"></i><span>${escapeHtml(entry.label)}</span>`
-        + `<span class="nav-badge hidden" data-badge="${escapeHtml(entry.addon)}"></span>`;
-    const reg = window.Dana.registered(entry.addon);
-    if (reg) b.dataset.tab = reg.def.id;
-    b.addEventListener("click", () => openAddonPanel(entry.addon));
+        + `<span class="nav-badge hidden" data-badge="${escapeHtml(entry.id)}"></span>`;
+    b.addEventListener("click", () => openPage(entry.id));
     return b;
 }
 
@@ -92,64 +94,55 @@ function loadPanelStyle(url) {
 
 /** Loads the page of `entry` (its script); resolves with the registration, or null when it failed. */
 function loadPanel(entry) {
-    return window.Dana.load(entry.addon, entry.panel).then(reg => {
-        const holder = panelHost.byId.get(reg.def.id);
-        if (CORE_SCREENS.includes(reg.def.id) || (holder && holder !== entry.addon)) {
-            throw new Error(`its page id "${reg.def.id}" is taken by ${holder || "the shell"}`);
-        }
-        panelHost.byId.set(reg.def.id, entry.addon);
-        document.querySelectorAll(`[data-addon="${entry.addon}"]`).forEach(b => { b.dataset.tab = reg.def.id; });
-        return reg;
-    }).catch(err => {
-        console.error(`[dana] the ${entry.addon} page did not load`, err);
+    return window.Dana.load(entry.addon, entry.id, entry.panel).catch(err => {
+        console.error(`[dana] the ${entry.id} page (${entry.addon}) did not load`, err);
         return null;
     });
 }
 
-function panelSection(reg) {
-    const id = `panel-${reg.def.id}`;
+function panelSection(entry) {
+    const id = `panel-${entry.id}`;
     let el = document.getElementById(id);
     if (!el) {
         el = document.createElement("section");
         el.className = "screen-panel";
         el.id = id;
-        el.dataset.addon = reg.addon;
+        el.dataset.addon = entry.addon;
         document.getElementById("main-viewport").appendChild(el);
     }
     return el;
 }
 
-/** Opens `addon`'s page (`arg` reaches its mount). */
-async function openAddonPanel(addon, arg = null) {
-    const entry = panelHost.entries.find(e => e.addon === addon);
+/** Opens the page `id` (`arg` reaches its mount); false when the user has no such page. */
+async function openPage(id, arg = null) {
+    const entry = pageEntry(id);
     if (!entry) return false;
     const reg = await loadPanel(entry);
     if (!reg) { showAppToast(`${entry.label} could not be opened`); return false; }
     await Promise.all([reg.ready, loadPanelStyle(entry.style)]);
-    panelSection(reg);
-    switchTab(reg.def.id, arg);
+    panelSection(entry);
+    switchTab(id, arg);
     return true;
 }
 
 /** Opens the page whose id is `id`, once the pages have loaded; false when there is none. */
 async function openPanelById(id, arg = null) {
     if (panelHost.ready) await panelHost.ready;
-    const addon = panelHost.byId.get(id);
-    return addon && panelHost.entries.some(e => e.addon === addon) ? openAddonPanel(addon, arg) : false;
+    return openPage(id, arg);
 }
 
 /** switchTab's part for pages: unmount the one leaving, mount the one arriving. */
 function switchPanels(tabId, arg) {
-    const arriving = panelHost.byId.get(tabId) || null;
+    const reg = pageEntry(tabId) ? window.Dana.registered(tabId) : null;
+    const arriving = reg ? tabId : null;
     if (panelHost.current && panelHost.current !== arriving) {
         const leaving = window.Dana.registered(panelHost.current);
         try { leaving?.def.unmount?.(); } catch (e) { console.error("[dana] unmount failed", e); }
     }
     panelHost.current = arriving;
-    if (!arriving) return;
-    const reg = window.Dana.registered(arriving);
-    try { reg.def.mount(panelSection(reg), reg.api, arg === undefined ? null : arg); }
-    catch (e) { console.error(`[dana] the ${arriving} page failed to open`, e); }
+    if (!reg) return;
+    try { reg.def.mount(panelSection(pageEntry(tabId)), reg.api, arg === undefined ? null : arg); }
+    catch (e) { console.error(`[dana] the ${tabId} page failed to open`, e); }
 }
 
 /** The text of a navigation badge: "" hides it. */
@@ -158,9 +151,9 @@ function badgeText(value) {
     return typeof value === "number" ? (value > 99 ? "99+" : String(value)) : String(value);
 }
 
-const panelBadges = new Map();   // addon → {text, tone}: kept so a rebuilt navigation shows them again
-function setPanelBadge(addon, value, tone = "") {
-    panelBadges.set(addon, { text: badgeText(value), tone });
+const panelBadges = new Map();   // page id → {text, tone}: kept so a rebuilt navigation shows them again
+function setPanelBadge(page, value, tone = "") {
+    panelBadges.set(page, { text: badgeText(value), tone });
     paintBadges();
 }
 
@@ -203,7 +196,7 @@ function refreshPanels() {
         renderPanelNav();
         await Promise.all(panelHost.entries.map(loadPanel));
         // A page the user no longer has stays registered (scripts cannot be unloaded) but leaves the screen.
-        if (panelHost.current && !panelHost.entries.some(e => e.addon === panelHost.current)) switchTab("chat");
+        if (panelHost.current && !pageEntry(panelHost.current)) switchTab("chat");
     })();
     return panelHost.ready;
 }
@@ -214,7 +207,13 @@ window.Dana.attach({
     open: (id, arg) => openScreen(id, arg),
     openSession: (sid) => window.danaOpenSession(sid),
     badge: setPanelBadge,
-    visible: (addon) => panelHost.current === addon,
+    visible: (page) => panelHost.current === page,
+    piece: (name, el) => {
+        const piece = Object.prototype.hasOwnProperty.call(CORE_PIECES, name) ? CORE_PIECES[name] : null;
+        if (!piece || !el) return false;
+        piece(el);
+        return true;
+    },
 });
 
 document.addEventListener("dana:addons-changed", () => { refreshPanels(); });

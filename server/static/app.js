@@ -4,20 +4,20 @@
  * The shell is classic scripts sharing one global scope, no build step, one area each:
  *   dana.js          the SDK addon pages are written against (Dana.panel; tested by test_web_panels.mjs)
  *   app-core.js      shared state and helpers
- *   app-nav.js       the rail / bottom nav and switchTab
+ *   app-nav.js       the rail / bottom nav, switchTab, the core screens and the core pieces pages host
  *   app-panels.js    addons' pages: the navigation from GET /api/addons, loading, mount / unmount
  *                    (its pure part is tested by test_web_panels.mjs)
  *   app-stream.js    the assistant stream client (its run model is pure, tested by test_web_stream.mjs)
  *   app-thread.js    the shared conversation's memory line (pure, tested by test_web_thread.mjs)
  *   app-chat.js      the Chat screen and its chats sidebar
  *   app-voice.js     the orb, voice messages, realtime calls
- *   app-tasks.js, app-calls.js, app-settings.js, app-debug.js   one screen each
+ *   app-settings.js, app-debug.js   one screen each
  *   app.js           this file, last
  * index.html loads them in this order, `defer`, before the self-contained core screens (review.js,
  * usage.js, addons.js, profile.js): Chat is open and window.danaSwitchTab is set before any of those asks
  * for its own tab (`#review`, `#addons`). While it loads, a script only uses what the scripts before it
  * declared; functions may call any of them later. Addon pages are not listed here: each addon ships its
- * own from its web/ folder (server/docs/writing-an-addon.md, "A web page"). A new shell file goes in
+ * own from its web/ folder (server/docs/writing-an-addon.md, "Pages"). A new shell file goes in
  * index.html and in sw.js's SHELL list.
  */
 

@@ -1,0 +1,7 @@
+# The {{name}} worker: a sidecar next to Dana (docs/operations.md, "Workers"), built by bin/deploy.
+FROM python:3.14-slim
+WORKDIR /app
+COPY server.py .
+ENV PORT=8091
+EXPOSE 8091
+CMD ["python", "server.py"]

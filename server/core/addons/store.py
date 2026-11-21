@@ -2,7 +2,7 @@
 
 One row per (user, addon). Credentials are stored only encrypted
 (:mod:`core.addons.crypto`), settings as plain JSON. Addons declared
-with ``everyone=True`` (``core``) have no row: every user has them.
+with ``everyone=True`` (``essentials``) have no row: every user has them.
 
 Lookups happen on every tool list and tool call, so they read an in-memory
 copy of the table: changes made here refresh it at once, changes made by

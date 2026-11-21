@@ -2,16 +2,25 @@
  *
  * The rail and the bottom nav, switchTab (which screen shows, each core screen's load, the addon pages'
  * mount / unmount through app-panels.js) and the hooks the self-contained core screens call:
- * window.danaSwitchTab (a core screen or an addon page by id), window.danaOpenSession and
- * window.danaOpenCall. Addon pages reach the same through their Dana api (static/dana.js).
+ * window.danaSwitchTab (a core screen or an addon page by id), window.danaBack (the screen before) and
+ * window.danaOpenSession. Addon pages reach the same through their Dana api (static/dana.js).
  */
 
 // ══════════════════════════════════════════════════════════════════════
-// 3. NAVIGATION CONTROLLER (Rail + Bottom Nav)
+// NAVIGATION CONTROLLER (Rail + Bottom Nav)
 // ══════════════════════════════════════════════════════════════════════
 
-// The shell's own screens; every other screen is an addon's page (app-panels.js).
-const CORE_SCREENS = ["chat", "tasks", "calls", "settings", "addons", "usage", "debug", "review"];
+// The shell's own screens (core/addons/hooks.py, CORE_SCREENS: no addon page may take one of these ids);
+// every other screen is an addon's page (app-panels.js).
+const CORE_SCREENS = ["chat", "settings", "addons", "usage", "debug", "review"];
+
+// Core pieces an addon page can host in an element of its own (api.piece(name, el), static/dana.js).
+const CORE_PIECES = {
+    // The morning briefing and the weekly-review banner (static/review.js).
+    today: (el) => window.DanaToday?.show(el),
+};
+
+let previousTab = null;
 
 function highlightNav(tabId) {
     // Addons is a page of Settings: Settings stays the highlighted tab.
@@ -22,6 +31,7 @@ function highlightNav(tabId) {
 }
 
 function switchTab(tabId, arg = null) {
+    if (tabId !== activeTab) previousTab = activeTab;
     activeTab = tabId;
     highlightNav(tabId);
     document.querySelectorAll(".screen-panel").forEach(panel => {
@@ -34,10 +44,7 @@ function switchTab(tabId, arg = null) {
     if (tabId === "review") window.DanaReview?.show(); else window.DanaReview?.hide();
     if (tabId === "usage") window.DanaUsage?.show(); else window.DanaUsage?.hide();
     if (tabId === "addons") window.DanaAddons?.show(); else window.DanaAddons?.hide();
-    if (tabId === "tasks") window.DanaToday?.show();
-    if (tabId === "tasks") loadTasks();
-    else if (tabId === "calls") loadCalls();
-    else if (tabId === "debug") { loadDebugData(); startDebugPolling(); }
+    if (tabId === "debug") { loadDebugData(); startDebugPolling(); }
     else if (tabId === "chat") {
         // Scroll to bottom of chat
         const chatMessagesEl = document.getElementById("chat-messages");
@@ -47,9 +54,8 @@ function switchTab(tabId, arg = null) {
     refreshIcons();
 }
 
-/** Opens a core screen or an addon page by id (`arg`: a call id for calls, a page's own argument). */
+/** Opens a core screen or an addon page by id (`arg` reaches the page's mount). */
 function openScreen(id, arg = null) {
-    if (id === "calls" && arg) return window.danaOpenCall(arg);
     if (CORE_SCREENS.includes(id)) { switchTab(id, arg); return Promise.resolve(true); }
     return openPanelById(id, arg);
 }
@@ -57,15 +63,8 @@ function openScreen(id, arg = null) {
 // A chat about something (a notification, a person, a review) opens here.
 window.danaOpenSession = (sid) => { switchTab("chat"); loadSession(sid); };
 window.danaSwitchTab = openScreen;
-// A call opened from elsewhere (a person's timeline, the Usage screen).
-window.danaOpenCall = async (id) => {
-    switchTab("calls");
-    await loadCalls();
-    selectedCallId = id;
-    renderCallsMasterList();
-    renderCallDetail();
-    return true;
-};
+// Back to the screen shown before this one (the weekly review's back button).
+window.danaBack = () => openScreen(previousTab && previousTab !== activeTab ? previousTab : "chat");
 
 document.querySelectorAll(".rail-btn[data-tab], .bottom-nav-btn[data-tab]").forEach(btn => {
     btn.addEventListener("click", () => switchTab(btn.getAttribute("data-tab")));

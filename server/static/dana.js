@@ -1,12 +1,11 @@
-/* Dana — the web SDK an addon's page is written against (server/docs/writing-an-addon.md, "A web page").
+/* Dana — the web SDK an addon's page is written against (server/docs/writing-an-addon.md, "Pages").
  *
- * An addon declares its page in its manifest (`web=Web(panel="x.js", style="x.css", nav=Nav(...))`); the
- * shell (static/app-panels.js) lists the user's pages from GET /api/addons, loads each page's script,
- * and the script registers itself here:
+ * An addon declares its pages in its manifest (`web=(Page("weather", panel="x.js", style="x.css",
+ * nav=Nav(...)), …)`: the page id names the screen, its element is #panel-<id>, `#<id>` / `/<id>` open it);
+ * the shell (static/app-panels.js) lists the user's pages from GET /api/addons, loads each page's script,
+ * and the script registers itself here (the SDK knows which page a script is from the URL it loaded):
  *
  *   Dana.panel({
- *     id: "weather",                the screen's name: its element is #panel-<id>, `#<id>` / `/<id>` open it
- *     title: "Weather", icon: "cloud-sun",  used where the manifest gives no Nav
  *     scripts: ["weather-core.js"], optional: files of the same web/ folder loaded first, in order
  *     start(api) {},                optional: once, as soon as the page is registered (background work: a badge)
  *     mount(el, api, arg) {},       each time the page is opened (`arg`: what api.open passed, else null);
@@ -14,8 +13,8 @@
  *     unmount() {},                 optional: each time the user leaves it
  *   });
  *
- * `api` is the same object every time: { addon, me, base, fetch, json, call, stream, toast, open,
- * openSession, badge, visible, icons, esc, store } (each described where it is built, `makeApi`).
+ * `api` is the same object every time: { addon, page, me, base, fetch, json, call, stream, toast, open,
+ * openSession, badge, visible, piece, icons, esc, store } (each described where it is built, `makeApi`).
  * Nothing else of the shell is a page's business: no globals, no other page's elements.
  * Works in Node too (no DOM until a page mounts): tests/test_web_panels.mjs.
  */
@@ -23,8 +22,8 @@
   "use strict";
   const root = typeof window !== "undefined" ? window : globalThis;
 
-  const registered = new Map();   // addon name → {addon, def, api, ready: Promise}
-  const owners = new Map();       // a panel script's URL (no query) → addon name
+  const registered = new Map();   // page id → {addon, page, def, api, ready: Promise}
+  const owners = new Map();       // a panel script's URL (no query) → {addon, page}
   let shell = null;               // what the shell lends pages (Dana.attach)
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -66,10 +65,12 @@
     return { status: r.status, body: data };
   }
 
-  function makeApi(addon, panelUrl) {
+  function makeApi(addon, page, panelUrl) {
     return {
       /** The addon this page belongs to. */
       addon,
+      /** This page's id (the manifest's Page id). */
+      page,
       /** Who is signed in (GET /api/me: id, name, access, capabilities, addons, languages, currency). */
       get me() { return shell ? shell.me() : null; },
       /** The URL of the page's web/ folder (ends with "/"). */
@@ -100,16 +101,19 @@
       },
       /** A short message at the bottom of the screen. */
       toast: (text) => shell && shell.toast(text),
-      /** Opens a screen: a core one ("chat", "tasks", "calls", "settings", "addons", "review", "usage")
-       *  or another page by its id; `arg` reaches that page's mount (calls: a call id). */
+      /** Opens a screen: a core one ("chat", "settings", "addons", "review", "usage") or a page by its id
+       *  (its own addon's or another's); `arg` reaches that page's mount. Resolves false when there is none. */
       open: (id, arg) => shell && shell.open(id, arg === undefined ? null : arg),
       /** Opens a chat session in Chat. */
       openSession: (sid) => shell && shell.openSession(sid),
       /** The page's badge in the navigation: a count (0 / null hides it; above 99 shows "99+") or a short
        *  text; tone "quiet" draws a count that is not an alert (the default is the alert colour). */
-      badge: (value, tone) => shell && shell.badge(addon, value, tone || ""),
+      badge: (value, tone) => shell && shell.badge(page, value, tone || ""),
       /** Whether this page is the one on screen. */
-      visible: () => Boolean(shell && shell.visible(addon)),
+      visible: () => Boolean(shell && shell.visible(page)),
+      /** Draws a core piece into an element of the page, which keeps it up to date there: "today" (the
+       *  morning briefing and the weekly-review banner). False for a piece this shell does not have. */
+      piece: (name, el) => Boolean(shell && shell.piece(name, el)),
       /** Draws the icons (`<i data-lucide="name">`) added since. */
       icons() { try { root.lucide?.createIcons(); } catch (_) { /* ignore */ } },
       /** HTML-escapes text for a template. */
@@ -125,44 +129,44 @@
 
   /** Registers a page (see the top of this file). Called by a panel script while it runs. */
   function panel(def) {
-    if (!def || typeof def.id !== "string" || !/^[a-z][a-z0-9_-]*$/.test(def.id)) throw new Error("Dana.panel: an id of lowercase letters, digits, _ or -");
-    if (typeof def.mount !== "function") throw new Error(`Dana.panel(${def.id}): mount(el, api) is required`);
+    if (!def || typeof def.mount !== "function") throw new Error("Dana.panel: mount(el, api, arg) is required");
     const src = (typeof document !== "undefined" && document.currentScript && document.currentScript.src) || "";
-    const addon = owners.get(bare(src));
-    if (!addon) throw new Error(`Dana.panel(${def.id}): not loaded by the shell from an addon's web/ folder`);
-    if (registered.has(addon)) throw new Error(`Dana.panel(${def.id}): ${addon} already has a page`);
-    const api = makeApi(addon, src);
+    const owner = owners.get(bare(src));
+    if (!owner) throw new Error("Dana.panel: not loaded by the shell from an addon's web/ folder");
+    if (registered.has(owner.page)) throw new Error(`Dana.panel: the ${owner.page} page is already registered`);
+    const api = makeApi(owner.addon, owner.page, src);
     const ready = (async () => {
       for (const file of def.scripts || []) await loadScript(sibling(src, file));
       if (typeof def.start === "function") {
-        try { await def.start(api); } catch (e) { console.error(`[dana] ${def.id}: start failed`, e); }
+        try { await def.start(api); } catch (e) { console.error(`[dana] ${owner.page}: start failed`, e); }
       }
     })();
-    const entry = { addon, def, api, ready };
-    registered.set(addon, entry);
+    const entry = { addon: owner.addon, page: owner.page, def, api, ready };
+    registered.set(owner.page, entry);
     return entry;
   }
 
-  /** The shell: loads `addon`'s page from `url`; resolves with its registration ({def, api, ready}). */
-  function load(addon, url) {
-    if (registered.has(addon)) return Promise.resolve(registered.get(addon));
+  /** The shell: loads page `page` of `addon` from `url`; resolves with its registration ({def, api, ready}). */
+  function load(addon, page, url) {
+    if (registered.has(page)) return Promise.resolve(registered.get(page));
     const abs = absolute(url);
-    owners.set(bare(abs), addon);
+    owners.set(bare(abs), { addon, page });
     return loadScript(abs).then(() => {
-      if (!registered.has(addon)) throw new Error(`${url} ran but did not call Dana.panel`);
-      return registered.get(addon);
+      if (!registered.has(page)) throw new Error(`${url} ran but did not call Dana.panel`);
+      return registered.get(page);
     });
   }
 
   root.Dana = {
     panel,
     load,
-    /** The shell lends pages its services: {me(), toast(text), open(id, arg), openSession(sid), badge(addon, value, tone), visible(addon)}. */
+    /** The shell lends pages its services: {me(), toast(text), open(id, arg), openSession(sid),
+     *  badge(page, value, tone), visible(page), piece(name, el)}. */
     attach(services) { shell = services; },
-    /** The registration of `addon`'s page, or null. */
-    registered: (addon) => registered.get(addon) || null,
-    /** A test or the shell names the addon a script URL belongs to before running it. */
-    expect(url, addon) { owners.set(bare(absolute(url)), addon); },
+    /** The registration of the page `page`, or null. */
+    registered: (page) => registered.get(page) || null,
+    /** A test or the shell names the page a script URL belongs to before running it. */
+    expect(url, addon, page) { owners.set(bare(absolute(url)), { addon, page }); },
     sibling,
   };
 })();

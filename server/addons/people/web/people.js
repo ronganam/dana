@@ -394,7 +394,6 @@
   `;
 
   Dana.panel({
-    id: "people", title: "People", icon: "users",
     async mount(el, api, personId) {
       A = api;
       if (!el.firstChild) { el.innerHTML = TEMPLATE; init(); }

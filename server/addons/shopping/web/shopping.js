@@ -731,7 +731,6 @@
   `;
 
   Dana.panel({
-    id: "shopping", title: "Shopping", icon: "shopping-cart",
     scripts: ["shopping-core.js"],
     start(api) {
       A = api;

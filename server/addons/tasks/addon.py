@@ -1,11 +1,12 @@
 """The ``tasks`` addon (Tasks)."""
 
-from core.addons import Addon, PromptPart, LlmJob
+from core.addons import Addon, LlmJob, Nav, Page, PromptPart
 from addons.tasks import groups
 
 # Connecting it gives the user the default task lists.
 addon = Addon(
-    "tasks", order=20, default_on=True, llm_jobs={"task_emoji": LlmJob("fast", "Task emoji"), "task_group": LlmJob("fast", "Task grouping")}, description="Task lists, tasks and their triggers", on_connect=groups.ensure_default_groups,
+    "tasks", order=20, default_on=True,
+    web=(Page("tasks", panel="tasks.js", style="tasks.css", nav=Nav("Tasks", icon="check-square", order=5)),), llm_jobs={"task_emoji": LlmJob("fast", "Task emoji"), "task_group": LlmJob("fast", "Task grouping")}, description="Task lists, tasks and their triggers", on_connect=groups.ensure_default_groups,
     prompt_parts=(
         PromptPart("tools", "task list/todos", rank=30),
         PromptPart("undoable", "adding/completing/editing tasks", rank=10),

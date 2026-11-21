@@ -54,7 +54,7 @@ STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file
 
 def route_modules() -> tuple:
     """Every route module: core's, then each loaded addon's ``api.py``."""
-    return ROUTE_MODULES + loader.route_modules()
+    return ROUTE_MODULES + tuple(module for _, module in loader.apis())
 
 
 @web.middleware

@@ -1,0 +1,14 @@
+/* The {{name}} page (Dana.panel, static/dana.js): the user's greeting, from GET /api/{{name}}. */
+(() => {
+  "use strict";
+  Dana.panel({
+    async mount(el, api) {
+      if (!el.firstChild) {
+        el.innerHTML = `<header class="top-bar"><span class="top-bar-title">{{title}}</span></header>
+          <div class="{{page}}-body" data-greeting></div>`;
+      }
+      const { greeting } = await api.call("/api/{{name}}");
+      el.querySelector("[data-greeting]").textContent = `${greeting}, ${api.me ? api.me.name : "you"}!`;
+    },
+  });
+})();
