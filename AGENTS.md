@@ -21,7 +21,7 @@
 - **Keep deployments on upstream**: anything one deployment needs goes in its site (`site/addons/` for its own addons), or becomes a setting or extension point that every deployment gets. Never a fork of Dana's code (`docs/site.md`). The shipped example addon (`examples/addons/hello/`) is tested; keep it working when the framework changes.
 - **Docs** stay current in the same commit as the code; a new area gets a doc and one line in its part's guide.
 - **Nothing personal in the repository**: no real names, phone numbers, addresses, domains, device serials, account ids or real money data in code, tests, fixtures or docs. Tests use made-up people (`server/tests/testenv.py`: Robin, Gal, Maya…). A deployment's own setup lives in its site (`site/`) and in gitignored secrets: `server/.env`, `android/keystore.properties`, `android/local.properties` (`sdk.dir`).
-- **Old internal identifiers**: the project used to be called `ganam-assistant`; `GanamPrefs` stays on existing devices (the web cookie is `dana_session` and `localStorage` keys migrate from `ganam_*` to `dana_*` on first load). User-facing text says Dana.
+- **Old names**: the project was called `ganam-assistant` before 10.0; nothing is named that any more, except the transition for the app built before the rename (package `app.ganam.assistant`: `kinds` in `/api/me`, notification ingest) and the one-time move of `ganam_*` browser storage keys to `dana_*`.
 
 ## Setup (once per clone)
 

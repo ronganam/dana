@@ -78,7 +78,7 @@ _RANGES = {"today": 1, "7d": 7, "30d": 30, "90d": 90, "1y": 365, "all": None}
 
 # --- Attribution -------------------------------------------------------------
 
-_scope: contextvars.ContextVar[Optional[Dict[str, str]]] = contextvars.ContextVar("ganam_usage_scope", default=None)
+_scope: contextvars.ContextVar[Optional[Dict[str, str]]] = contextvars.ContextVar("dana_usage_scope", default=None)
 
 
 @contextlib.contextmanager

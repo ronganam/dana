@@ -48,7 +48,7 @@ first user's values), tables from migrations `m0002_users` and
   from it (cookie lookups). `last_used_at` is written at most once an hour per
   token.
 - **Web login** uses the cookie `dana_session` = HMAC-SHA256 of the token
-  with the constant `ganam-web-session` (`users.session_cookie_value`).
+  with the constant `dana-web-session` (`users.session_cookie_value`).
   `/login` accepts any valid token; revoking a token also ends the web logins
   made with it.
 - **Requests** (`core/auth.py`): a Bearer token or the session cookie resolves

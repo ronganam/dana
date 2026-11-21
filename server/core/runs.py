@@ -79,7 +79,7 @@ TERMINAL_EVENT_TYPES = frozenset({
 })
 
 _current_run: contextvars.ContextVar[Optional["Run"]] = contextvars.ContextVar(
-    "ganam_current_run", default=None
+    "dana_current_run", default=None
 )
 
 

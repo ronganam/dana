@@ -12,7 +12,7 @@ All triggers send one `notify.send(user, Message(text, kind="reminder", data))` 
 
 ## Home Assistant watcher (location / car)
 
-Dana watches each user's entities itself (`addons/homeassistant/watcher.py`); Home Assistant posts nothing (the old `/webhook` and the custom component `ganam_assistant` are gone).
+Dana watches each user's entities itself (`addons/homeassistant/watcher.py`); Home Assistant needs no component or webhook.
 
 - **Who**: one watcher per user with `homeassistant` connected and their `person` setting, or their `car_sensor` + `car_device` settings, set; over that user's own WebSocket (`subscribe_entities` for exactly those entities); it fires `addons.tasks.triggers.fire(user, …)` as that user. `Watchers` (started with the server, `core/server.py`) checks every `HA_WATCH_RECONCILE_SECONDS` (10) against the connections: a new connection or changed settings / credentials (re)start a watcher, a disconnect stops it.
 - **Location** (as the old component did): the person's state changes old → new: old not `not_home` / `unknown` / `unavailable` → `fire(user, "location", action="leave", target=old)`; new not one of those → `action="arrive", target=new`. The zone is the person's state (the zone's name); the trigger engine strips and lower-cases it, so stored zone targets keep matching. An entity that appears or disappears fires nothing.

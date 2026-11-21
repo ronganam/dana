@@ -19,4 +19,4 @@
 
 ## [Initial Version] - 2025-07-20
 
-- Chat with Ganam and Manage Tasks commands.
+- Chat with Dana and Manage Tasks commands.

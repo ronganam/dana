@@ -4,8 +4,7 @@ location / car triggers (docs/access.md, "Home Assistant triggers").
 One watcher per user who has the addon connected and a person entity or a car
 sensor (with the car's Bluetooth name) set, over that user's own WebSocket
 connection, subscribed only to those entities (``subscribe_entities``). The
-transitions are those of the old Home Assistant component
-(``ganam_assistant``):
+transitions:
 
 - person entity, old state ≠ new state: old not in :data:`IGNORED_STATES` →
   left zone ``old``; new not in them → entered zone ``new`` (the zone is the

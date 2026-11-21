@@ -41,7 +41,7 @@ cd android
 - Keep the docs current in the same pull request as the code.
 - Schema changes go through a new migration in `server/core/db/migrations/`; never edit a shipped one.
 - A server payload change that a client reads updates that client (and its fixtures) in the same pull request.
-- User-facing text calls the assistant Dana; `GanamPrefs` on Android keeps its old name so existing devices keep their settings ([`AGENTS.md`](AGENTS.md)).
+- User-facing text calls the assistant Dana.
 - No new dependency without a reason in the pull request.
 - Something only your own deployment needs belongs in your site (a site addon, a setting), not in Dana's code; a missing extension point is a welcome pull request ([`docs/site.md`](docs/site.md)).
 

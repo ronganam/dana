@@ -50,7 +50,7 @@ TOUCH_INTERVAL_SECONDS = 3600.0
 DEFAULT_FIRST_USER_NAME = user_rows.DEFAULT_FIRST_USER_NAME
 # The web session cookie is an HMAC of the token with this constant; changing
 # it signs everyone out.
-_SESSION_KEY = b"ganam-web-session"
+_SESSION_KEY = b"dana-web-session"
 
 
 @dataclass(frozen=True)
@@ -254,7 +254,7 @@ def list_tokens(user_id: str) -> List[Token]:
 
 # --- The current user ---------------------------------------------------------------
 
-_current_user: contextvars.ContextVar[Optional[User]] = contextvars.ContextVar("ganam_current_user", default=None)
+_current_user: contextvars.ContextVar[Optional[User]] = contextvars.ContextVar("dana_current_user", default=None)
 
 
 def current() -> Optional[User]:
