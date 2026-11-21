@@ -67,7 +67,7 @@ check("valueHtml: empty is a dash", C.valueHtml(money, null).includes("—") && 
 check("valueHtml: phone links to tel:", C.valueHtml(phone, "052-0000000").includes('href="tel:0520000000"'));
 check("valueHtml: checkbox, rating, date, url", C.valueHtml({ type: "checkbox" }, true).includes("Yes")
   && C.valueHtml({ type: "rating" }, 4).includes("★★★★") && C.valueHtml({ type: "date" }, "2027-09-20").includes("20.9.2027")
-  && C.valueHtml({ type: "url" }, "www.ettedgi.com").includes('href="https://www.ettedgi.com"'));
+  && C.valueHtml({ type: "url" }, "www.example-venue.com").includes('href="https://www.example-venue.com"'));
 check("valueHtml: text is escaped", C.valueHtml({ type: "text" }, "<b>x</b>").includes("&lt;b&gt;"));
 check("valueHtml: a javascript: url is not a link", !C.valueHtml({ type: "url" }, "javascript:alert(1)").includes("href"));
 check("phoneLinks: an Israeli number → wa.me digits with 972", eq(C.phoneLinks("052-6000123"), { tel: "0526000123", wa: "972526000123" }));

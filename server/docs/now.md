@@ -52,7 +52,7 @@ Plain DB reads plus cached values; no model call. Calendar events are the caller
 
 ### Notification cards: title, source, why
 
-`core/now.py::notification_parts` (also used for search results and for the source of notification suggestions):
+`addons/phone/notifications/format.py::notification_parts` (also used for search results and for the source of notification suggestions):
 
 - **Chats** (the notification has a sender or a conversation — WhatsApp, Slack, SMS): `title` = the newest message (a "Name: " prefix in groups is dropped), `source` = "App · Sender · age", or "App · Sender in Group · age" for groups.
 - **Everything else** (mail, GitHub, banks, …): `title` = the first meaningful line of the text (for Gmail, the subject) and the notification's title goes to `source` as the sender ("Gmail · Bright Data · 3 min ago"), unless it reads as the message itself (ends in punctuation, ≥ 5 words, or ≥ 3 words and longer than the text's first line: "Your package has arrived" over "Tap to track") — then it is the `title`. The sender is left out when it's the app's name, a count ("3 new messages") or already in the title. The rest of the text is the `text` block, labelled with the sender.

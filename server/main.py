@@ -28,7 +28,7 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
-logger = logging.getLogger("ganam-assistant")
+logger = logging.getLogger("dana")
 
 async def main():
     logger.info("Initializing modular AI assistant...")

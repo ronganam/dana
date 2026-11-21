@@ -18,6 +18,8 @@ jobs:
     outputs:
       server: ${{ steps.filter.outputs.server }}
       android: ${{ steps.filter.outputs.android }}
+      raycast: ${{ steps.filter.outputs.raycast }}
+      docker: ${{ steps.filter.outputs.docker }}
     steps:
       - uses: actions/checkout@v4
       - id: filter
@@ -32,6 +34,14 @@ jobs:
             android:
               - 'android/**'
               - 'server/tests/fixtures/**'
+              - '.github/workflows/ci.yml'
+            raycast:
+              - 'extensions/raycast-assistant/**'
+              - '.github/workflows/ci.yml'
+            docker:
+              - 'server/Dockerfile'
+              - 'server/requirements.*'
+              - 'server/addons/money_il/worker/**'
               - '.github/workflows/ci.yml'
 
   server:
@@ -88,3 +98,42 @@ jobs:
           :app:assemblePhoneDebug :wear:assembleDebug
           :app:lintPhoneDebug :wear:lintDebug
           :app:compileKioskDebugKotlin :app:compileTvDebugKotlin
+
+  raycast:
+    needs: changes
+    if: needs.changes.outputs.raycast == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extensions/raycast-assistant
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extensions/raycast-assistant/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - run: npx eslint src/
+
+  docker:
+    needs: changes
+    if: needs.changes.outputs.docker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: server
+          target: app
+          push: false
+          cache-from: type=gha,scope=server
+          cache-to: type=gha,scope=server,mode=min
+      - uses: docker/build-push-action@v6
+        with:
+          context: server/addons/money_il/worker
+          push: false
+          cache-from: type=gha,scope=money-il-worker
+          cache-to: type=gha,scope=money-il-worker,mode=min

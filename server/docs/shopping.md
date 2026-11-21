@@ -5,7 +5,7 @@ people of a household. Other purchases ("buy a gift for Dan") stay tasks in the
 `Shopping` task group (`docs/tasks-and-triggers.md`); Dana routes by the item.
 
 This file is the design of record. The phone, widget and watch screens live in
-`ganam-assistant-android` (`docs/shopping.md` there); Raycast in
+`android/` (`android/docs/shopping.md`); Raycast in
 `extensions/raycast-assistant/`.
 
 ## Code

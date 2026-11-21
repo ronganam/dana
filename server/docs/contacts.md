@@ -155,7 +155,7 @@ offered and are refused like a made-up tool name.
     unknown id never reaches Google.
 - **Add** refuses a phone number one of the user's contacts already has
   (pointing at that contact), then stores the contact Google returned.
-- **Approval** (`core/approval_text.py`): "Add *name* to Google Contacts" with
+- **Approval** (`@addon.tool(..., describe=...)` in `addons/contacts/tools.py`, rendered by `core/approval_text.py`): "Add *name* to Google Contacts" with
   the phone, email, birthday and organisation; "Change *name* in Google
   Contacts" with each change — the name comes from the user's own copy, never
   from a Google call.

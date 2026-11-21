@@ -65,7 +65,7 @@ async def ha_camera_proxy_api(request: web.Request) -> web.Response:
 async def frigate_camera_proxy_api(request: web.Request) -> web.StreamResponse:
     """GET /api/frigate/{camera_name} — proxy MJPEG stream via HA camera_proxy_stream.
 
-    Frigate is not directly reachable from the ganam-assistant pod, so we route
+    Frigate is not directly reachable from the Dana pod, so we route
     through the caller's HA camera_proxy_stream endpoint which supports MJPEG
     streaming (needs both the homeassistant and the cameras addons).
     Includes a watchdog that drops the stream if no frame arrives in 15s.

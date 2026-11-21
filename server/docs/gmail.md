@@ -2,7 +2,7 @@
 
 Dana searches, reads and writes the user's Gmail in chat. Reading is free; anything that sends mail waits for the user's Approve; archiving, read state, the trash and drafts change at once with Undo. Nothing is stored on Dana's side and nothing runs in the background: every tool call is a request to Gmail with the acting user's own token.
 
-Code: `addons/gmail/` — `addon.py` (the addon, its scope and prompt parts), `config.py` (name and limits), `client.py` (the per-connection Gmail client, the check, the account's address), `content.py` (reading a message: headers, body, attachments, cleaning, framing), `compose.py` (recipients, the message that is sent), `seen.py` (headers of messages the tools showed, for the Approve card), `tools.py`. The Approve card's words: `core/approval_text.py`. Tests: `bin/test test_gmail_users`.
+Code: `addons/gmail/` — `addon.py` (the addon, its scope and prompt parts), `config.py` (name and limits), `client.py` (the per-connection Gmail client, the check, the account's address), `content.py` (reading a message: headers, body, attachments, cleaning, framing), `compose.py` (recipients, the message that is sent), `seen.py` (headers of messages the tools showed, for the Approve card), `tools.py` (including `@addon.tool(..., describe=...)` for the Approve card, rendered by `core/approval_text.py`). Tests: `bin/test test_gmail_users`.
 
 ## The addon
 
