@@ -13,8 +13,8 @@ Tools: ``tools.py``."""
 from typing import Any, Optional
 
 from core.users import User
-from core.addons import Addon, PromptPart
-from addons.money import classify, dashboard, hooks, savings, signals, sources, store, worker
+from core.addons import Addon, PromptPart, LlmJob
+from addons.money import after_sync, classify, dashboard, savings, signals, sources, store, worker
 from addons.money.config import ADDON
 from addons.phone.notifications import observers
 
@@ -61,9 +61,9 @@ async def _check(conn: Any) -> Optional[str]:
 
 
 addon = Addon(
-    ADDON,
+    ADDON, order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories"), "money_market": LlmJob("balanced", "Money price checks")},
     description="Bank and card transactions",
-    check=_check,
+    test=_check,
     on_change=sources.on_change,
     prompt_section=accounts_section,
     prompt_parts=(
@@ -75,7 +75,7 @@ addon = Addon(
     realtime=True,
 )
 
-hooks.on_transactions(signals.reconcile_hook)
-hooks.on_transactions(classify.on_sync)
+after_sync.on_transactions(signals.reconcile_hook)
+after_sync.on_transactions(classify.on_sync)
 observers.register(signals.observe)
 dashboard.on_insights(savings.insight_cards)

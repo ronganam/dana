@@ -84,6 +84,22 @@ async def create_task_record(user: User, fields: Dict[str, Any], call_id: Option
         triggers=json.dumps(triggers, ensure_ascii=False), group_id=group_id, task_links=refs)
 
 
+def undo_created_task(user: User, task_id: str) -> None:
+    """Undo of a task :func:`create_task_record` just made for ``user`` (the
+    Now screen's accept / "remind me"): removed while it is still open and
+    they may still change it.
+
+    Raises:
+        RuntimeError: it was completed meanwhile (it is kept).
+        UndoConflict: they can no longer change it.
+    """
+    task = tasks_service.get_task(user, task_id)
+    if task and task.get("status") != "needs_action":
+        raise RuntimeError("The reminder was already completed, so it was kept.")
+    tasks_service.check_still_writable(user, task_id)
+    tasks_service.remove_task_rows(task_id)
+
+
 async def accept_suggestion(user: User, suggestion_id: str,
                             overrides: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Create the task / calendar event ``user``'s suggestion describes (with edits), for ``user``.

@@ -1,6 +1,6 @@
 """About-you facts per user (docs/about.md, docs/access.md "Addons").
 
-A temporary database that starts as the 8.1.0 fixture (its two facts and the
+A temporary database that starts as the 9.0 fixture (its two facts and the
 learner's state must become the first admin's, and the first admin owns the
 old ``memories``), then users: the first admin Robin (every official addon),
 Bob and Eve (``about``), Carl (no ``about``). Through the agent tools (via
@@ -47,10 +47,14 @@ from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)
 
-# The production database before users existed: its facts and state must become the first admin's.
+# A 9.0 production database (converted at start): its facts and state are the first admin's, Robin, who uses
+# Telegram as 111 (what 9.0 took from the env above when it made them).
 _conn = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as _f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
+_conn.execute("UPDATE users SET name = 'Robin'")
+_conn.execute("INSERT INTO user_telegram (telegram_user_id, user_id, created_at) SELECT 111, id, created_at FROM users")
+_conn.commit()
 _conn.close()
 
 import litellm

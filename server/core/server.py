@@ -1,61 +1,38 @@
 """The aiohttp app: creation, the auth middlewares, the route modules and the
-background loops started with it.
+background work started with it.
 
-Every route lives in the module that owns it (``core/<area>_api.py`` or a
-addon's ``addons/<name>/api.py``), each registering its routes with
-``setup(app)``; :data:`ROUTE_MODULES` is the order they are registered in.
+Every route lives in the module that owns it, each registering its routes
+with ``setup(app)``: core's own (:data:`ROUTE_MODULES`, in this order), then
+every loaded addon's ``api.py`` in the addon order (core/addons/loader.py).
+Background work: core's own loops (usage, the briefing fallback, meeting
+cards, the weekly review, the wake watch) and the addons' jobs and services
+(core/addons/scheduler.py). Nothing here imports an addon.
 """
 import asyncio
-import importlib
-import importlib.util
 import logging
 import os
 
 from aiohttp import web
 
-import addons
-from core import (actions_api, app_updates, assistant_api, briefing, briefing_api, checks, debug_api,
-                  addons_api, now_api, pages_api, sessions_api, sharing_api, usage, usage_api, wake,
-                  weekly_review)
+from core import (actions_api, addons_api, app_updates, assistant_api, briefing, briefing_api, debug_api, now_api,
+                  pages_api, sessions_api, sharing_api, usage, usage_api, wake, weekly_review)
+from core.addons import loader, scheduler
 from core.auth import setup_auth
-from addons.about import api as about_api
-from addons.calendar import api as calendar_api
-from addons.google_account import api as google_api
-from addons.cameras import api as cameras_api
-from addons.contacts import sync as contacts_sync
-from addons.homeassistant import api as homeassistant_api, home_map
-from addons.homeassistant.watcher import Watchers as HAWatchers
-from addons.knowledge import api as knowledge_api
-from addons.money import api as money_api, schedule as money_schedule
-from addons.people import api as people_api, briefs as people_briefs
-from addons.phone import api as phone_api, config as phone_config
-from addons.phone.calls import api as calls_api, processing as calls_processing, retention as calls_retention
-from addons.phone.notifications import api as notifications_api
-from addons.phone.notifications import digest as notification_digest, escalation as notification_escalation
-from addons.phone.notifications import processing as notification_processing
-from addons.phone.notifications import retention as notification_retention
-from addons.shopping import api as shopping_api
-from addons.tasks import api as tasks_api, triggers as task_triggers
-from addons.telegram_account import api as telegram_account_api
-from addons.whatsapp import accounts as whatsapp_accounts, api as whatsapp_api
 
 logger = logging.getLogger(__name__)
 
-# Route modules, in registration order; each one's setup(app) adds its routes
-# (and its startup / cleanup hooks). Imported explicitly above: a module that
-# fails to import fails startup. The static directory is served after them.
+# Core's route modules, in registration order; each one's setup(app) adds its
+# routes (and its startup / cleanup hooks). The addons' come after them, then
+# the static directory.
 ROUTE_MODULES = (
-    pages_api, tasks_api, about_api, knowledge_api, assistant_api, app_updates, debug_api, calls_api, phone_api,
-    notifications_api, sessions_api, whatsapp_api, calendar_api, google_api, homeassistant_api, cameras_api,
-    people_api, briefing_api, actions_api, now_api, usage_api, sharing_api, addons_api, shopping_api,
-    money_api, telegram_account_api,
+    pages_api, assistant_api, app_updates, debug_api, sessions_api, briefing_api, actions_api, now_api,
+    usage_api, sharing_api, addons_api,
 )
 
 
-def site_route_modules() -> tuple:
-    """The ``api`` module (with ``setup(app)``) of each site addon that has one (docs/writing-an-addon.md)."""
-    return tuple(importlib.import_module(f"addons.{name}.api") for name in addons.SITE_ADDONS
-                 if importlib.util.find_spec(f"addons.{name}.api") is not None)
+def route_modules() -> tuple:
+    """Every route module: core's, then each loaded addon's ``api.py``."""
+    return ROUTE_MODULES + loader.route_modules()
 
 
 async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
@@ -82,7 +59,7 @@ async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
     if not os.path.exists(static_dir):
         os.makedirs(static_dir, exist_ok=True)
         
-    for module in ROUTE_MODULES + site_route_modules():
+    for module in route_modules():
         module.setup(app)
 
     # Serve static directory after endpoints
@@ -97,73 +74,19 @@ async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
     
     # Usage and cost tracking: writes the queued records, folds old days (core/usage.py).
     app["usage_task"] = asyncio.create_task(usage.run_loop())
-
-    # The phone's call and notification loops run per user (every user with
-    # ``phone``, each as that user).
-    _start_phone_background(app)
-
-    # Every other loop runs per user (each user with the addons it needs, as
-    # that user, a failing one not stopping the next).
-    _start_background(app)
+    _start_core_background(app)
+    # The addons' jobs (per user, as that user) and services.
+    scheduler.start(app)
+    app.on_cleanup.append(scheduler.stop)
     return runner
 
 
-def _start_phone_background(app: web.Application) -> None:
-    """Calls and notifications, for every user with ``phone`` (each as that
-    user, a failing one not stopping the next): finish call processing and
-    notification triage interrupted by a restart, drop call audio older than
-    CALL_AUDIO_RETENTION_DAYS (transcripts are kept), keep notifications 30
-    days, re-nudge unseen alerts, and send the digest at
-    NOTIFICATION_DIGEST_TIMES."""
-    for user in phone_config.phone_users():
-        try:
-            calls_processing.resume_unfinished(user)  # each call is processed as its owner
-        except Exception as e:
-            logger.error(f"Resuming call processing for user {user.id} failed: {e}", exc_info=True)
-        try:
-            notification_processing.resume_unfinished(user)
-        except Exception as e:
-            logger.error(f"Resuming notification triage for user {user.id} failed: {e}", exc_info=True)
-    app["call_retention_task"] = asyncio.create_task(calls_retention.retention_loop())
-    app["notif_retention_task"] = asyncio.create_task(notification_retention.retention_loop())
-    app["notif_digest_task"] = asyncio.create_task(notification_digest.digest_loop())
-    app["notif_renudge_task"] = asyncio.create_task(notification_escalation.renudge_loop())
-
-
-def _start_background(app: web.Application) -> None:
-    """Start the background loops; each runs for every user it applies to."""
-    # Time-based trigger background checker
-    interval = int(os.getenv("TIME_CHECK_INTERVAL", "30"))
-    app["time_trigger_task"] = asyncio.create_task(task_triggers.time_checker_loop(
-        interval, heartbeat=lambda: checks.mark("time_checker")))  # heartbeat for the self-check
-
-    # People briefs (every user with people), meeting cards (calendar + phone),
-    # the 10:00 briefing fallback (users who get a briefing) and the weekly
-    # review (tasks).
-    app["people_brief_task"] = asyncio.create_task(people_briefs.brief_loop())
+def _start_core_background(app: web.Application) -> None:
+    """Core's own loops, each for every user it applies to: meeting cards
+    (calendar + phone), the 10:00 briefing fallback (users who get a
+    briefing), the weekly review, and the wake fallback (the phone's screen
+    history, in case no unlock signal arrives)."""
     app["meeting_cards_task"] = asyncio.create_task(briefing.meeting_cards_loop())
     app["briefing_fallback_task"] = asyncio.create_task(briefing.fallback_loop())
     app["weekly_review_task"] = asyncio.create_task(weekly_review.schedule_loop())
-    # Wake fallback (phone + Home Assistant): the phone's screen history, in
-    # case no unlock signal arrives.
     app["wake_watch_task"] = asyncio.create_task(wake.wake_watch_loop())
-    # Home Assistant, for every user who has it, each over their own
-    # connection: the entity watchers that fire location / car triggers, and
-    # the home maps for their prompts (fetched in the background; HA being
-    # down only logs a warning).
-    # WhatsApp: learn the account of connections that have none (WAHA being
-    # down only delays it), so inbound events find their user.
-    app["whatsapp_account_task"] = asyncio.create_task(whatsapp_accounts.account_loop())
-    # Google Contacts: every user's copy brought up to date (every
-    # CONTACTS_SYNC_MINUTES), their people filled in from it.
-    app["contacts_sync_task"] = asyncio.create_task(contacts_sync.sync_loop())
-    # Money: every user's bank / card logins synced at their slots (and when
-    # a signal or "Sync now" pulls them earlier).
-    app["money_sync_task"] = asyncio.create_task(money_schedule.loop())
-    app["ha_watchers"] = HAWatchers(task_triggers.fire)
-    app["ha_watch_task"] = asyncio.create_task(app["ha_watchers"].run_forever())
-    try:
-        app["home_map_tasks"] = home_map.warm_all()
-    except Exception as e:
-        logger.warning(f"Home map warm-up skipped: {e}")
-

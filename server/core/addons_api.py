@@ -130,7 +130,7 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
                       "value": values.get(f.name), "type": f.type,
                       **_rule_fields(store.field_rule(addon, user, f.name, by))} for f in addon.settings],
         "account": (conn.account or None) if conn is not None else None,
-        "check": addon.check is not None,
+        "check": addon.test is not None,
         "options": addon.options is not None,
         # The sign-in is the caller's own: not offered to an admin acting for someone else.
         "connect_url": addon.connect_url if by.id == user.id else None,
@@ -331,12 +331,12 @@ async def test_addon_api(request: web.Request) -> web.Response:
     problem = store.stored_value_problem(conn)
     if problem is not None:  # only ever against a stored, valid address (docs/access.md, "Security rules")
         return _invalid(Invalid(problem[0], f"{problem[1]} Set it again before testing."))
-    if addon.check is None:
+    if addon.test is None:
         return web.json_response({"name": addon.name, "checked": False, "ok": None,
                                   "reason": "This addon has no connection check."})
     try:
         with users.acting_as(target):
-            reason = await asyncio.wait_for(addon.check(conn), CHECK_TIMEOUT_SECONDS)
+            reason = await asyncio.wait_for(addon.test(conn), CHECK_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         reason = f"No answer within {CHECK_TIMEOUT_SECONDS:.0f} seconds."
     except Exception as e:

@@ -51,12 +51,3 @@ async def purge_all() -> dict:
     async def job(user: User) -> int:
         return await asyncio.to_thread(purge_old_audio, user)
     return await phone_config.for_each_user("Audio retention", job)
-
-
-async def retention_loop(interval_seconds: int = 6 * 3600) -> None:
-    while True:
-        try:
-            await purge_all()
-        except Exception as e:
-            logger.error(f"Audio retention failed: {e}", exc_info=True)
-        await asyncio.sleep(interval_seconds)

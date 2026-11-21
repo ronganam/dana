@@ -45,7 +45,7 @@ A cold agent costs a few minutes to get oriented, and most of its time goes to w
 5. **Final review**: one independent review of the whole diff against `docs/access.md` (Security rules).
 
 **Keeping parallel branches from colliding**
-- **Migration numbers**: the brief gives each agent its number (`m0021_…` for one, `m0022_…` for the next). Discovery refuses gaps and repeats, so a mistake fails at import, not in production.
+- **Migration numbers**: numbers are per addon (`addons/<name>/migrations/`, core's in `core/db/migrations/`); two agents adding to the same addon get their numbers in the brief (`m0002_…` for one, `m0003_…` for the next). Discovery refuses gaps and repeats, so a mistake fails at start, not in production.
 - **Shared docs** (`AGENTS.md`, `docs/access.md`, `docs/operations.md`): agents change their own area's doc. Changes to a shared doc go in the report as notes, and the orchestrator applies them once per wave.
 - **Tests**: one script per area (`test_<area>.py`). There is no list to update; its docstring is the description.
 - **Fixtures** (`tests/fixtures/parity/`, `golden.sse`, `*_web.json`): only the agent whose task changes them regenerates them, and the brief names who that is.

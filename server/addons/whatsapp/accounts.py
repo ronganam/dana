@@ -5,8 +5,8 @@ The account is the session's own WhatsApp id as WAHA reports it (``me.id``,
 e.g. ``972501234567@c.us``), stored in the ``addons.account`` column.
 It is learned from WAHA itself: right after the addon is connected or
 its credentials change (``on_connect`` / ``on_credentials_change``), by
-:func:`account_loop` for connections that have none yet (at startup, then
-every :data:`REFRESH_SECONDS`), and lazily when an event names an account no
+the ``learn_account`` job (``hooks.py``) for connections that have none yet
+(at startup, then every :data:`REFRESH_SECONDS`), and lazily when an event names an account no
 connection has. Learning never blocks and tolerates WAHA being down (a
 connection is asked again at most every :data:`RETRY_SECONDS`).
 
@@ -96,6 +96,18 @@ def blocked(conn: Connection) -> Optional[str]:
     return TAKEN if conn.account_conflict else None
 
 
+async def refresh_user(user: User) -> Optional[str]:
+    """Learn ``user``'s account when their connection has none (not asked
+    within :data:`RETRY_SECONDS`): the background job, every
+    :data:`REFRESH_SECONDS`."""
+    conn = store.get(user, ADDON)
+    if conn is None or conn.account:
+        return None
+    if time.monotonic() - _last_attempt.get(user.id, -RETRY_SECONDS) < RETRY_SECONDS:
+        return None
+    return await learn(user)
+
+
 async def refresh_missing(*, force: bool = False) -> int:
     """Learn the account of every connection that has none (not one asked
     within :data:`RETRY_SECONDS`, unless ``force``). Returns how many were learned."""
@@ -114,22 +126,11 @@ async def refresh_missing(*, force: bool = False) -> int:
     return learned
 
 
-async def account_loop() -> None:
-    """Learn missing accounts now, then every :data:`REFRESH_SECONDS` (cheap
-    when every connection has one)."""
-    while True:
-        try:
-            await refresh_missing()
-        except Exception as e:
-            logger.error(f"WhatsApp account refresh failed: {e}", exc_info=True)
-        await asyncio.sleep(REFRESH_SECONDS)
-
-
 def _schedule_learn(user: User) -> None:
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
-        return  # no event loop (startup import, a script): account_loop learns it
+        return  # no event loop (startup import, a script): the learn_account job learns it
     task = loop.create_task(learn(user))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)

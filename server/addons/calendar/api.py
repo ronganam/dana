@@ -5,7 +5,8 @@
 - ``GET /api/calendar/events?start_date=&end_date=&calendars=``
 
 403 ``not_connected`` without ``calendar``. The full-screen ``/calendar`` page
-is in core/pages_api.py.
+is in core/pages_api.py. Also registers the Google sign-in routes
+(addons/google_account/api.py).
 """
 
 import asyncio
@@ -14,6 +15,7 @@ import logging
 from aiohttp import web
 
 from core.auth import request_user
+from addons.google_account import api as google_api
 from addons.calendar import client as calendar_client, config as calendar_config, events as calendar_events
 from core.addons import store
 from core.addons.store import NotConnected
@@ -66,7 +68,8 @@ async def get_calendar_events_api(request: web.Request) -> web.Response:
 
 
 def setup(app: web.Application) -> None:
-    """Register the calendar routes."""
+    """Register the calendar routes and the Google sign-in's."""
     app.router.add_get("/api/calendar/calendars", get_calendar_calendars_api)
     app.router.add_post("/api/calendar/selections", save_calendar_selections_api)
     app.router.add_get("/api/calendar/events", get_calendar_events_api)
+    google_api.setup(app)

@@ -1,6 +1,6 @@
 """The ``knowledge`` addon (Knowledge)."""
 
-from core.addons import Addon, PromptPart
+from core.addons import Addon, PromptPart, LlmJob
 
 KNOWLEDGE_GUIDE = (
     "\n\n--- KNOWLEDGE & PROJECTS ---\n"
@@ -39,7 +39,7 @@ KNOWLEDGE_GUIDE = (
     "-----------------------------------\n\n"
 )
 
-addon = Addon("knowledge", description="Projects and saved entries", prompt_parts=(
+addon = Addon("knowledge", order=40, llm_jobs={"media_summary": LlmJob("fast", "Link / media summaries"), "knowledge_file": LlmJob("fast", "Project file transcripts")}, description="Projects and saved entries", prompt_parts=(
     PromptPart("undoable", "notes", rank=40),
     PromptPart("guides", KNOWLEDGE_GUIDE, rank=40),
 ))

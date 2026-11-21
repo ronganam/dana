@@ -84,8 +84,14 @@ async def status_api(request: web.Request) -> web.Response:
                               "addons": rows})
 
 
+APP_KEY = "google_account_routes"
+
+
 def setup(app: web.Application) -> None:
-    """Register the Google sign-in routes."""
+    """Register the Google sign-in routes (once: every Google addon's ``api.py`` calls this)."""
+    if app.get(APP_KEY):
+        return
+    app[APP_KEY] = True
     app.router.add_get(oauth.CONNECT_PATH, connect_api)
     app.router.add_get(oauth.CALLBACK_PATH, callback_api)
     app.router.add_get("/api/google/status", status_api)

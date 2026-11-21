@@ -5,7 +5,7 @@ runs the sync in the background as the user: decrypt the credentials, start
 a worker job (from the last good sync minus :data:`config.OVERLAP_DAYS`, or
 :data:`config.FIRST_SYNC_DAYS` back), follow it with long polls, hand
 ``needs_code`` to ``otp.py``, store the result (``ingest.apply`` in a
-thread), run the hooks and mark the source ``ok``. One sync per source at a
+thread), run the after-sync hooks (``after_sync.py``) and mark the source ``ok``. One sync per source at a
 time: starting another returns the running one's id.
 
 Failures: a login problem (``INVALID_PASSWORD``, ``CHANGE_PASSWORD``,
@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 from core import clock, users
 from core.users import User
 from core.addons import crypto
-from addons.money import companies, config, hooks, ingest, otp, slots, store, worker
+from addons.money import after_sync, companies, config, ingest, otp, slots, store, worker
 
 logger = logging.getLogger(__name__)
 
@@ -236,7 +236,7 @@ async def _follow(user: User, source: Dict[str, Any], run_: _Run) -> None:
             accounts = await asyncio.wait_for(_scrape(user, source, run_),
                                               timeout=config.SYNC_TIMEOUT_MINUTES * 60)
         result = await asyncio.to_thread(ingest.apply, user, source, accounts)
-        await hooks.run(user, source_id, result["new"], result["changed"])
+        await after_sync.run(user, source_id, result["new"], result["changed"])
         _succeeded(user, source, run_, result)
     except asyncio.CancelledError:
         if run_.job_id:

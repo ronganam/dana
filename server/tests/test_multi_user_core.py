@@ -2,10 +2,10 @@
 
 Two users — the first admin and a member, each with a DB token — drive the
 real aiohttp handlers, session runner, agent loop and Telegram adapter on a
-temporary database that starts as the 8.1.0 fixture. Only the LLM (scripted
+temporary database that starts as the 9.0 fixture. Only the LLM (scripted
 LiteLLM stream), phone push and the Telegram network are faked.
 
-Covers: the migration giving 8.1.0 rows to the first admin; own sessions and
+Covers: the converted 9.0 rows stay the first admin's; own sessions and
 own ``main`` thread per user; 404 for another user's session, run, stream,
 debug and undo ids; approvals only for their user (HTTP and the Telegram
 callback); learned phrases per user; usage rows and ``/api/usage`` scoping;
@@ -37,10 +37,14 @@ os.environ.setdefault("GEMINI_API_KEY", "test-key")
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake HA credentials
 sys.path.insert(0, ROOT)
 
-# The production database before users existed: its rows must become the first admin's.
+# A 9.0 production database (converted at start): its rows are the first admin's, who signs in to Telegram
+# as 111 with chat 1111 (what 9.0 took from the env above when it made them).
 _conn = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as _f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
+_conn.execute("UPDATE users SET telegram_chat_id = 1111")
+_conn.execute("INSERT INTO user_telegram (telegram_user_id, user_id, created_at) SELECT 111, id, created_at FROM users")
+_conn.commit()
 _conn.close()
 
 import litellm
@@ -70,6 +74,7 @@ from core.addons.store import Connection
 from addons.homeassistant import watcher as ha_watcher
 from addons.homeassistant.addon import addon as homeassistant_addon
 from core.addons import store
+from addons.phone import push as phone_push
 
 results = []
 
@@ -278,18 +283,17 @@ def owners(table):
 
 
 async def test_migration(client):
-    check("migration: every migration ran on the 8.1.0 database",
-          MIGRATED == [f"{m.VERSION:04d}_{m.NAME}" for m in db.MIGRATIONS],
-          str(MIGRATED))
-    check("migration: the first admin was made from env for the existing rows",
+    check("migration: the 9.0 database was converted (nothing left to apply)",
+          MIGRATED == [] and db.pending_migrations() == [], str(MIGRATED))
+    check("migration: the first admin keeps their Telegram identity and the existing rows",
           ADMIN is not None and ADMIN.level.see_everyone and ADMIN.telegram_chat_id == 1111
           and users.by_telegram_id(111).id == ADMIN.id)
-    check("migration: 8.1.0 sessions, thread, phrases and usage are the first admin's",
+    check("migration: 9.0 sessions, thread, phrases and usage are the first admin's",
           all(owners(t) == {ADMIN.id} for t in ("thread_messages", "shortcuts", "usage_events"))
           and owners("sessions") >= {ADMIN.id} and len(owners("sessions")) == 1,
           str({t: owners(t) for t in ("sessions", "thread_messages", "shortcuts", "usage_events")}))
     status, body = await get(client, ADMIN_TOKEN, "/api/sessions/main")
-    check("migration: the admin's main thread holds the 8.1.0 messages",
+    check("migration: the admin's main thread holds the 9.0 messages",
           status == 200 and [m["message"] for m in body["messages"]][:2] == ["Open the gate", "Opened."], str(body)[:300])
     status, body = await get(client, ADMIN_TOKEN, "/api/sessions/s_web_1")
     check("migration: the admin still opens an old session", status == 200 and body["messages"])
@@ -540,7 +544,7 @@ async def test_usage(client):
     check("/api/usage: the member sees only their own by default",
           status == 200 and body["totals"]["calls"] == n_member == 1, f"{status} {body and body.get('totals')}")
     status, body = await get(client, ADMIN_TOKEN, "/api/usage?range=all")
-    check("/api/usage: the admin sees their own by default (8.1.0 rows included)",
+    check("/api/usage: the admin sees their own by default (9.0 rows included)",
           status == 200 and body["totals"]["calls"] == n_admin and n_admin > 1, f"{body and body.get('totals')} {n_admin}")
     status, body = await get(client, ADMIN_TOKEN, f"/api/usage?range=all&user={MEMBER.id}")
     check("/api/usage: the admin may read one user's", status == 200 and body["totals"]["calls"] == n_member)
@@ -609,7 +613,7 @@ async def test_background_entry():
         await original(item, trigger_type, user, target)
 
     try:
-        with patch.object(task_triggers.phone_push, "send", new=AsyncMock(return_value=True)), \
+        with patch.object(phone_push, "send", new=AsyncMock(return_value=True)), \
                 patch.object(task_triggers, "trigger_reminder", new=watched):
             # The member's Home Assistant watcher sees their phone connect to the car.
             spec = ha_watcher.WatchSpec("http://ha.invalid", "fake", None, "sensor.bt", "Car")

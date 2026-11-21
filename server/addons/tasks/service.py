@@ -11,6 +11,10 @@ task at all (:func:`visible_sql`); HTTP handlers check that first with
 
 Payloads never carry the owner columns; a task seen through a share carries
 ``shared_by`` / ``access`` (:func:`public_task`).
+
+Events (core/events.py) for the user who acted: ``tasks.task.created``
+(``task_id``, ``title``, ``group_id``), ``tasks.task.completed`` and
+``tasks.task.deleted`` (``task_id``, ``title``).
 """
 
 import logging
@@ -18,7 +22,7 @@ import sqlite3
 import uuid
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from core import undoable, users
+from core import events, undoable, users
 from core.db import get_db_connection
 from core.undoable import UndoConflict
 from core.users import User
@@ -244,6 +248,7 @@ def create_task(user: User, *, title: str, description: Optional[str] = None, pr
     finally:
         if conn is None:
             db.close()
+    events.emit("tasks.task.created", user, task_id=task_id, title=title, group_id=gid)
     return task_id
 
 
@@ -315,6 +320,7 @@ def delete_task(user: User, task_id: str) -> Dict[str, Any]:
     """
     task = writable_task(user, task_id)
     remove_task_rows(task_id)
+    events.emit("tasks.task.deleted", user, task_id=task_id, title=task.get("title") or "")
     return task
 
 
@@ -333,7 +339,9 @@ def complete_task(user: User, task_id: str) -> Dict[str, Any]:
     Raises:
         LookupError / ReadOnly: as :func:`writable_task`.
     """
-    return save_task(user, task_id, {"status": "completed"})
+    before = save_task(user, task_id, {"status": "completed"})
+    events.emit("tasks.task.completed", user, task_id=task_id, title=before.get("title") or "")
+    return before
 
 
 def snooze_task(user: User, task_id: str, triggers: str) -> Dict[str, Any]:

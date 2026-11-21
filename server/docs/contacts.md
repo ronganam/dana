@@ -18,7 +18,7 @@ test_contacts_users`.
 | `addon.py` | The declaration: credential `refresh_token`, the scope, the connection hooks, the prompt parts |
 | `client.py` | The People API over the user's connection: `list_changes`, `get`, `create`, `update`, `check` |
 | `store.py` | Each user's copy: writing a sync result, one contact, `search`, `caller_name`, the sync token |
-| `sync.py` | `sync_user`, `sync_all` / `sync_loop`, what happens on connect, on another refresh token and on disconnect |
+| `sync.py` | `sync_user`, `sync_job` (the `hooks.py` job's pass), what happens on connect, on another refresh token and on disconnect |
 | `enrich.py` | `fill_people`: the user's people filled in from the copy |
 | `tools.py` | `search_contacts`, `get_contact`, `update_contact`, `add_contact` |
 
@@ -81,9 +81,9 @@ When it runs:
 - **Another refresh token** (`on_credentials_change`, e.g. signing in to
   Google again): the sync token is forgotten and a full read follows, so the
   copy becomes that account's.
-- **The loop** (`sync_loop`, started in `core/server.py`): 20 s after
+- **The job** (`sync_contacts` in `hooks.py`, an `@addon.job`): 20 s after
   startup, then every `CONTACTS_SYNC_MINUTES` (60), every user with the
-  kind, each as that user (`users.acting_as`), one after another; a user
+  addon, each as that user (`users.acting_as`), one after another; a user
   whose sync fails is logged (the reason only) and the next one still runs.
 - **Disconnect** (`on_change`, once the addon is gone): the user's rows in
   the three tables are deleted, and their people forget which contact they

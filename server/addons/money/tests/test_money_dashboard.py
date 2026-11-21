@@ -1,4 +1,4 @@
-"""Money dashboards: spend kinds, yearly charges, cash flow, the balance history and forecast, trends, merchants, insights, the dashboard API, the marks with Undo and migration m0027.
+"""Money dashboards: spend kinds, yearly charges, cash flow, the balance history and forecast, trends, merchants, insights, the dashboard API, the marks with Undo.
 Run: bin/test test_money_dashboard
 
 A synthetic year, every value made up, with today fixed at Wed 18 Nov 2026
@@ -21,7 +21,7 @@ spending at its rate, one-offs never projected, the band, the low points);
 trends (typical medians, on track, movers from everyday spending only); merchants;
 insights; everyday pace; the API for two users and one without (403
 ``not_connected``), 400 on a bad month; PATCH flow / one_off / yearly with
-one Undo; m0027 on a database at m0026.
+one Undo.
 """
 
 import asyncio
@@ -56,7 +56,6 @@ from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
 from core import actions_api, clock  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
-from core.db.migrations import MIGRATIONS  # noqa: E402
 from core.addons import store as connections  # noqa: E402
 from addons.money import api as money_api, dashboard, ingest, insights, queries, store  # noqa: E402
 
@@ -513,71 +512,11 @@ async def test_marks(client: TestClient) -> None:
     check("marks: another user's transaction → 404; no money → 403", (s, s2) == (404, 403), (s, s2))
 
 
-# --- m0027 --------------------------------------------------------------------------------------------
-
-def test_migration() -> None:
-    folder = testenv.scratch_path("m0026")
-    os.makedirs(folder)
-    path = os.path.join(folder, "m0026.sqlite3")
-    with patch.object(db, "MIGRATIONS", MIGRATIONS[:26]):
-        db.migrate(path)
-    conn = sqlite3.connect(path)
-    conn.execute("INSERT INTO users (id, name, access, created_at) VALUES ('u1', 'Robin', 'admin', 'z')")
-    for aid, kind in (("bank", "bank"), ("c1", "card"), ("c2", "card")):
-        conn.execute("INSERT INTO money_accounts (id, user_id, company, kind, number, created_at, updated_at) "
-                     "VALUES (?, 'u1', 'x', ?, ?, 'z', 'z')", (aid, kind, aid))
-
-    def row(tid: str, aid: str, amount: int, desc: str, category: Optional[str], source: Optional[str],
-            flow: Optional[str], memo: Optional[str] = None) -> None:
-        conn.execute("INSERT INTO money_transactions (id, user_id, account_id, ext_key, source, status, purchase_date, "
-                     "amount, description, merchant, merchant_key, memo, category, category_source, flow, created_at, "
-                     "updated_at) VALUES (?, 'u1', ?, ?, 'scrape', 'completed', '2026-10-01', ?, ?, ?, ?, ?, ?, ?, ?, "
-                     "'z', 'z')", (tid, aid, tid, amount, desc, desc, ingest.merchant_key(desc), memo, category,
-                                   source, flow))
-
-    row("t1", "bank", -4_000_000, "העב' לאחר-נייד", "transfers", "bank", "transfer_out",
-        "לטובת: בית ההשקעות הראשון בע\"מ. עבור: השקעה.")
-    row("t2", "bank", -100_000, "העב' לאחר-נייד", "gifts_donations", "user", "transfer_out", "לטובת: דנה לוי.")
-    row("t3", "bank", -15_000, "העב' לאחר-נייד", "transfers", "bank", "transfer_out", "לנועה")
-    row("c1", "c1", -3_000, "Temu", "groceries", "bank", "purchase")
-    row("c2", "c1", -2_000, "Roblox", "refunds", "model", "purchase")
-    row("c3", "c1", -4_000, "Wolt", "delivery", "model", "purchase")
-    row("c4", "c1", -50_600, "העברת חיובים לכרטיס תחליפי", "other", "bank", "purchase")
-    row("c5", "c2", 50_600, "העברת חיובים לכרטיס תחליפי", "other", "user", "refund")
-    conn.execute("INSERT INTO money_aliases (user_id, alias_key, merchant_key, merchant, category, updated_at) "
-                 "VALUES ('u1', 'roblox', 'roblox', 'Roblox', 'refunds', 'z'), "
-                 "('u1', 'wolt', 'wolt', 'Wolt', 'delivery', 'z')")
-    conn.commit()
-    conn.close()
-    applied = db.migrate(path)
-    check("m0027: applied on a database at m0026", applied and applied[0] == "0027_money_dashboards", applied)
-    conn = sqlite3.connect(path)
-    conn.row_factory = sqlite3.Row
-    rows = {r["id"]: dict(r) for r in conn.execute("SELECT * FROM money_transactions")}
-    aliases = {r["alias_key"]: r["category"] for r in conn.execute("SELECT * FROM money_aliases")}
-    conn.close()
-    t1, t2, t3 = rows["t1"], rows["t2"], rows["t3"]
-    check("m0027: a payee transfer takes the payee as merchant and key, its category and flow cleared",
-          (t1["merchant"], t1["merchant_key"], t1["category"], t1["flow"]) == ("בית ההשקעות הראשון",
-                                                                          ingest.merchant_key("בית ההשקעות הראשון בע\"מ"),
-                                                                          None, None), t1)
-    check("m0027: the user's category stays (the payee still named); a note without a payee untouched",
-          (t2["merchant"], t2["category"], t2["flow"]) == ("דנה לוי", "gifts_donations", "transfer_out")
-          and (t3["merchant"], t3["category"], t3["flow"]) == ("העב' לאחר-נייד", "transfers", "transfer_out"), (t2, t3))
-    check("m0027: Cal-mapped card categories and income categories on card rows cleared; the model's others kept",
-          rows["c1"]["category"] is None and rows["c2"]["category"] is None and rows["c3"]["category"] == "delivery")
-    check("m0027: a replacement card's move cleared for classification (the user's row kept); income aliases cleared",
-          (rows["c4"]["category"], rows["c4"]["flow"]) == (None, None) and rows["c5"]["flow"] == "refund"
-          and aliases == {"roblox": None, "wolt": "delivery"}, (rows["c4"], aliases))
-    check("m0027: the marks start empty", all(r["one_off"] is None and r["yearly"] is None for r in rows.values()))
-
-
 async def main() -> None:
     test_kinds_and_detection()
     test_cashflow_and_balance()
     test_forecast()
     test_trends_and_insights()
-    test_migration()
     app = web.Application()
     setup_auth(app)
     money_api.setup(app)

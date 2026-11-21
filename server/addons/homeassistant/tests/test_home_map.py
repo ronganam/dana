@@ -20,9 +20,11 @@ from litellm.types.utils import Delta, ModelResponseStream, StreamingChoices
 
 from core import db, users
 from core.agent import AgentOrchestrator
-from core.addons import store
+from core.addons import registry, scheduler, store
 from addons.homeassistant.addon import addon as homeassistant_addon
 from addons.homeassistant import client as ha_client, home_map as ha
+
+WARM = registry.job("homeassistant.warm_home_map")
 
 db.migrate()  # the agent reads the About section from the database
 users.bootstrap()
@@ -212,7 +214,7 @@ async def test_no_kind() -> None:
     store.disconnect(ADMIN, "homeassistant")
     try:
         check("no addon: empty map, nothing scheduled, no prompt section",
-              ha.cached_text(ADMIN) == "" and not ha._caches and ha.warm_all() == []
+              ha.cached_text(ADMIN) == "" and not ha._caches and await scheduler.run_once(WARM) == {}
               and ha.prompt_section(ADMIN) == "")
     finally:
         store.connect(ADMIN, "homeassistant", credentials={"host": "http://ha.invalid", "token": "test-token"})
@@ -220,9 +222,8 @@ async def test_no_kind() -> None:
 
 async def test_warm() -> None:
     reset_cache()
-    tasks = ha.warm_all()
-    check("warm: one background task per user with Home Assistant", len(tasks) == 1)
-    await tasks[0]
+    out = await scheduler.run_once(WARM)
+    check("warm: the start job runs once per user with Home Assistant", list(out) == [ADMIN.id], out)
     check("warm: cache filled", "climate.main_ac | Main AC" in ha.get_home_map(CONN))
 
     reset_cache()

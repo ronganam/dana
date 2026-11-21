@@ -3,8 +3,9 @@ suggestion, call, notification, task, person, weekly review, transaction or savi
 on-screen context of one turn (core/session_runner.py).
 
 A composer over the addons: each addon builds its own card and prompt, for the
-chat's user and only from that user's own items; this module dispatches by
-kind, stores the session for that user and rebuilds the prompt on every
+chat's user and only from that user's own items (an addon's own kinds through
+``@addon.context_card`` / ``@addon.context``: the tasks addon's "task"); this
+module dispatches by kind, stores the session for that user and rebuilds the prompt on every
 turn (so it reflects edits and acceptance).
 """
 from __future__ import annotations
@@ -16,11 +17,10 @@ from typing import Any, Dict, Optional
 from core import users, weekly_review
 from core.session import create_new_session_db, get_session_state
 from core.users import User
-from core.addons import store
+from core.addons import ContextRequest, registry, store
 from addons.money import config as money_config, queries as money_queries, savings as money_savings
 from addons.people import detail as people_detail, values as people_values
 from addons.phone.calls import chat as phone_chat
-from addons.tasks import links as task_links, service as tasks_service
 
 logger = logging.getLogger(__name__)
 
@@ -41,19 +41,6 @@ def build_chat_context(user: Optional[User], kind: str, ref_id: str) -> Dict[str
         return phone_chat.call_card(user, ref_id)
     if kind == "notification":
         return phone_chat.notification_card(user, ref_id)
-    if kind == "task":
-        row = tasks_service.get_task(user, ref_id)
-        if not row:
-            raise LookupError("Task not found")
-        links = task_links.links_for_tasks(user, [row["id"]]).get(row["id"], [])
-        call_link = next((l for l in links if l["ref_type"] == "call"), None)
-        return {
-            "kind": "task", "ref_id": row["id"], "call_id": call_link["ref_id"] if call_link else None,
-            "emoji": "✅", "title": row["title"],
-            "subtitle": (f"From call with {call_link['contact']}" if call_link else "Task")
-                        + (f" · due {row['due_date']}" if row["due_date"] else ""),
-            "quick_prompts": ["Change the reminder", "Break it into steps", "Mark it done"],
-        }
     if kind == "person":
         store.require(user, people_values.ADDON)
         return people_detail.chat_context(user, ref_id)
@@ -72,7 +59,22 @@ def build_chat_context(user: Optional[User], kind: str, ref_id: str) -> Dict[str
             raise LookupError("Saving not found")
         store.require(user, money_config.ADDON)
         return money_savings.chat_context(user, ref_id)
-    raise ValueError("kind must be suggestion, call, notification, task, person, review, transaction or saving")
+    hook = registry.hook_for("context_card", kind)
+    if hook is not None:
+        if user is None or not store.is_connected(user, hook.addon):
+            raise LookupError(f"{kind.capitalize()} not found")
+        return hook.func(user, ref_id)
+    kinds = ["suggestion", "call", "notification", "person", "review", "transaction", "saving",
+             *[h.key for h in registry.hooks("context_card")]]
+    raise ValueError(f"kind must be one of {', '.join(kinds)}")
+
+
+def _block(user: Optional[User], kind: str, ref_id: str) -> str:
+    """Another item's description for an addon's context prompt (a task's source call); "" when there is none."""
+    if kind == "call" and ref_id:
+        _, block = phone_chat.call_block(user, ref_id)
+        return block or ""
+    return ""
 
 
 def start_context_session(user: User, kind: str, ref_id: str) -> Dict[str, Any]:
@@ -105,18 +107,6 @@ def context_prompt(user: Optional[User], ctx: Optional[Dict[str, Any]]) -> Optio
             return phone_chat.notification_prompt(user, ref)
         if kind == "call":
             return phone_chat.call_prompt(user, ref)
-        if kind == "task":
-            t = tasks_service.get_task(user, ref)
-            if not t:
-                return None
-            block = (f"## Opened from a task\nTask {t['id']}: “{t['title']}” status={t['status']} priority={t['priority']} "
-                     f"due={t['due_date']} triggers={t['triggers']}\nDescription: {t['description'] or ''}\n"
-                     "Use update_task with this id for changes.")
-            link = next((l for l in task_links.links_for_tasks(user, [ref]).get(ref, []) if l["ref_type"] == "call"), None)
-            if link:
-                _, call_block = phone_chat.call_block(user, link["ref_id"])
-                block += f"\n\n### Source call\n{call_block}"
-            return block
         if kind == "person":
             return people_detail.context_prompt(user, ref)
         if kind == "review":
@@ -129,6 +119,9 @@ def context_prompt(user: Optional[User], ctx: Optional[Dict[str, Any]]) -> Optio
             if user is None or not store.is_connected(user, money_config.ADDON):
                 return None
             return money_savings.context_prompt(user, ref)
+        hook = registry.hook_for("context", str(kind or ""))
+        if hook is not None and user is not None and store.is_connected(user, hook.addon):
+            return hook.func(user, ref, ContextRequest(block=lambda k, rid: _block(user, k, rid)))
     except Exception as e:
         logger.warning(f"context for {(ctx or {}).get('kind')} {(ctx or {}).get('ref_id')} failed: {e}")
     return None

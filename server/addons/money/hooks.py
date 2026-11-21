@@ -1,39 +1,25 @@
-"""Work that runs after every ingest of a sync (docs/money.md, "Sync").
+"""The money addon's background work (docs/money.md, "Schedule"):
 
-Other parts of the money addon register here instead of being imported by
-``sync.py``: classification and reconciliation of provisional rows, the
-unusual-charge check. A hook gets ``(user, source_id, new_ids, changed_ids)``,
-may be sync or async, and runs as that user; a failing hook is logged and the
-next one still runs."""
+- at start: end what a previous process left mid-sync, then classify what is
+  still missing (after a migration cleared categories, or while the model was down);
+- every minute (after 15 s): start every due source of the user (their
+  slots, or earlier when a signal or "Sync now" pulled it).
+"""
 
-import inspect
-import logging
-from typing import Any, Callable, List
+from typing import List
 
+from core.addons import minutes
 from core.users import User
-
-logger = logging.getLogger(__name__)
-
-TransactionsHook = Callable[[User, str, List[str], List[str]], Any]
-
-_hooks: List[TransactionsHook] = []
+from addons.money import classify, schedule, sync
+from addons.money.addon import addon
 
 
-def on_transactions(fn: TransactionsHook) -> TransactionsHook:
-    """Register ``fn(user, source_id, new_ids, changed_ids)`` to run after each
-    ingest (usable as a decorator; registering the same function twice is a no-op)."""
-    if fn not in _hooks:
-        _hooks.append(fn)
-    return fn
+@addon.job(at_start=True)
+async def recover(user: User) -> None:
+    sync.recover(user)
+    await classify.catch_up_user(user)
 
 
-async def run(user: User, source_id: str, new_ids: List[str], changed_ids: List[str]) -> None:
-    """Call every registered hook in order, logging and swallowing errors."""
-    for fn in list(_hooks):
-        try:
-            result = fn(user, source_id, list(new_ids), list(changed_ids))
-            if inspect.isawaitable(result):
-                await result
-        except Exception as e:
-            logger.error(f"Money hook {getattr(fn, '__qualname__', fn)} failed for user {user.id}: {e}",
-                         exc_info=True)
+@addon.job(every=minutes(schedule.INTERVAL_SECONDS / 60), delay=schedule.STARTUP_DELAY_SECONDS)
+async def start_due_syncs(user: User) -> List[str]:
+    return schedule.tick_user(user)

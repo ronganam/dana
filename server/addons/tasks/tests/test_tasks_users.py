@@ -49,11 +49,12 @@ from addons import bootstrap as addons_bootstrap
 addons_bootstrap.bootstrap()
 
 from addons.tasks import api as tasks_api
-from core import clock, sharing_api
+from core import clock, notify as core_notify, sharing_api
 from core.addons import sharing
 from core.auth import setup_auth
 from core.db import get_db_connection
-from core.addons import registry, store
+from core.addons import registry, scheduler, store
+from addons.phone import push as phone_push
 from addons.tasks import groups, links, service, titles, triggers
 
 results: List[Tuple[str, bool]] = []
@@ -208,9 +209,9 @@ def test_triggers_per_user() -> None:
     async def fake_notify(user, text, **kw):
         sent.append((user.id, text))
 
-    with patch.object(triggers, "notify", fake_notify), \
-            patch.object(triggers.phone_push, "send", AsyncMock(return_value=True)):
-        run(triggers.check_all_time_triggers())
+    with patch.object(core_notify, "notify", fake_notify), \
+            patch.object(phone_push, "send", AsyncMock(return_value=True)):
+        run(scheduler.run_once(registry.job("tasks.check_time_triggers")))
     check("time checker: each user's due task fires once, the reminder to its creator",
           sorted(sent) == sorted([(ADMIN.id, "⏰ *Time Reminder*\n\nRemember to: *Admin due*"),
                                   (BOB.id, "⏰ *Time Reminder*\n\nRemember to: *Bob due*")]), str(sent))
@@ -224,12 +225,12 @@ def test_triggers_per_user() -> None:
 
     # Wake, car: only the user's own tasks.
     sent.clear()
-    with patch.object(triggers, "notify", fake_notify), \
-            patch.object(triggers.phone_push, "send", AsyncMock(return_value=True)):
+    with patch.object(core_notify, "notify", fake_notify), \
+            patch.object(phone_push, "send", AsyncMock(return_value=True)):
         n = run(triggers.fire(ADMIN, "wake"))
     check("wake for the first admin does not fire Bob's wake task", n == 0 and not sent, str(sent))
-    with patch.object(triggers, "notify", fake_notify), \
-            patch.object(triggers.phone_push, "send", AsyncMock(return_value=True)):
+    with patch.object(core_notify, "notify", fake_notify), \
+            patch.object(phone_push, "send", AsyncMock(return_value=True)):
         n = run(triggers.fire(BOB, "wake"))
     check("wake for Bob fires his wake task to him", n == 1 and [u for u, _ in sent] == [BOB.id], str(sent))
     service.create_task(BOB, title="Bob car", triggers=json.dumps({"car": "enter"}))
@@ -240,8 +241,8 @@ def test_triggers_per_user() -> None:
         return n
 
     sent.clear()
-    with patch.object(triggers, "notify", fake_notify), \
-            patch.object(triggers.phone_push, "send", AsyncMock(return_value=True)):
+    with patch.object(core_notify, "notify", fake_notify), \
+            patch.object(phone_push, "send", AsyncMock(return_value=True)):
         n_admin = run(fire_and_drain(ADMIN, "car", action="enter"))
         n_bob = run(fire_and_drain(BOB, "car", action="enter"))
     check("car: only the user's own car task fires, to them",
@@ -349,9 +350,9 @@ def test_sharing_read_edit() -> None:
     async def fake_notify(user, text, **kw):
         sent.append((user.id, text))
 
-    with patch.object(triggers, "notify", fake_notify), \
-            patch.object(triggers.phone_push, "send", AsyncMock(return_value=True)):
-        run(triggers.check_all_time_triggers())
+    with patch.object(core_notify, "notify", fake_notify), \
+            patch.object(phone_push, "send", AsyncMock(return_value=True)):
+        run(scheduler.run_once(registry.job("tasks.check_time_triggers")))
     check("a shared-list task's reminder goes to its creator (Bob), not the owner",
           [u for u, t in sent if "Bob in admin home" in t] == [BOB.id], str(sent))
     # Moving a task out to Bob's own list makes it his.

@@ -54,7 +54,7 @@ from core import clock, llm  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import store as connections  # noqa: E402
-from addons.money import api as money_api, classify, hooks, ingest, schedule, signals, sources, store  # noqa: E402
+from addons.money import api as money_api, after_sync, classify, ingest, schedule, signals, sources, store  # noqa: E402
 from addons.phone.notifications import ingest as notification_ingest, observers, processing  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
@@ -338,7 +338,7 @@ async def test_api(client: TestClient) -> None:
 async def run_sync(user, source, accounts) -> Dict[str, List[str]]:
     """What sync.py does after a pull: ingest, then the hooks; then wait for classification."""
     out = await asyncio.to_thread(ingest.apply, user, source, accounts)
-    await hooks.run(user, source["id"], out["new"], out["changed"])
+    await after_sync.run(user, source["id"], out["new"], out["changed"])
     await classify.idle()
     return out
 

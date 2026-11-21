@@ -9,7 +9,7 @@ from addons.homeassistant.config import (BATTERY_SENSOR, CAR_DEVICE, CAR_SENSOR,
 # choice; the first admin's are imported by addons/bootstrap.py), except
 # Home Assistant's own name for the home forecast.
 addon = Addon(
-    ADDON,
+    ADDON, order=80,
     credentials=(
         Field("host", "Home Assistant base URL, e.g. https://home.example.com", type=ADDRESS),
         Field("token", "Long-lived access token"),
@@ -26,7 +26,7 @@ addon = Addon(
     description="Home Assistant",
     prompt_section=home_map.prompt_section,
     on_change=watcher.request_reconcile,
-    check=client.check,
+    test=client.check,
     options=options.entity_options,
     prompt_parts=(
         PromptPart("tools", "HomeAssistant control", rank=20),

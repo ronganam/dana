@@ -9,7 +9,7 @@ import datetime
 from typing import Optional, Dict, Any
 from core.addons import Connection, sharing, store
 from addons.tasks.addon import addon
-from addons.tasks import groups, service
+from addons.tasks import approvals, groups, service
 from addons.tasks import titles as task_titles
 from core import undoable
 from core.users import User
@@ -158,7 +158,7 @@ def _parse_relative_time(text: str) -> Optional[str]:
     return None
 
 
-@addon.tool(is_write=True)
+@addon.tool(is_write=True, describe=approvals.add_task)
 async def add_task(
     conn: Connection,
     title: str,
@@ -268,7 +268,7 @@ async def add_task(
         logger.error(f"Error adding task to SQLite: {e}", exc_info=True)
         return f"Error: Failed to add task to database: {e}"
 
-@addon.tool(is_write=True)
+@addon.tool(is_write=True, describe=approvals.update_task)
 async def update_task(
     conn: Connection,
     item: str,
@@ -402,7 +402,7 @@ async def update_task(
         logger.error(f"Error updating task in SQLite: {e}", exc_info=True)
         return f"Error: Failed to update task: {e}"
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=approvals.delete_task)
 async def delete_task(conn: Connection, item: str) -> str:
     """Delete a task from the Home Assistant todo list.
     
@@ -540,7 +540,7 @@ async def add_task_group(conn: Connection, name: str, emoji: str = "📁", color
         logger.error(f"Error adding task group: {e}", exc_info=True)
         return f"Error: Failed to add task group. It may already exist: {e}"
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=approvals.remove_task_group)
 async def remove_task_group(conn: Connection, name: str) -> str:
     """Remove a task group. Tasks in this group will be reassigned to 'General'.
     

@@ -676,7 +676,7 @@ async def _background(user: User, ids: List[str], ref: str) -> None:
 
 
 def on_sync(user: User, source_id: str, new_ids: List[str], changed_ids: List[str]) -> None:
-    """The ``hooks.on_transactions`` handler: classify in the background (the
+    """The ``after_sync.on_transactions`` handler: classify in the background (the
     sync does not wait; nothing happens without a running loop)."""
     try:
         loop = asyncio.get_running_loop()
@@ -686,6 +686,16 @@ def on_sync(user: User, source_id: str, new_ids: List[str], changed_ids: List[st
         task = loop.create_task(_background(user, list(new_ids) + list(changed_ids), f"money_source:{source_id}"))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
+
+
+async def catch_up_user(user: User, max_rounds: int = 10) -> None:
+    """Classify what is still missing of ``user``'s transactions, :data:`RETRY_LIMIT`
+    rows a round, until a round loaded fewer rows than the limit or the model answered nothing."""
+    for _ in range(max_rounds):
+        counts = await run(user, ref="money_catch_up")
+        logger.info(f"Money catch-up classification for user {user.id}: {counts}")
+        if counts["model_rows"] == 0 or counts["model"] == 0 or counts["rows"] < RETRY_LIMIT:
+            break
 
 
 async def catch_up(max_rounds: int = 10) -> None:
@@ -698,11 +708,7 @@ async def catch_up(max_rounds: int = 10) -> None:
         if user is None:
             continue
         try:
-            for _ in range(max_rounds):
-                counts = await run(user, ref="money_catch_up")
-                logger.info(f"Money catch-up classification for user {user.id}: {counts}")
-                if counts["model_rows"] == 0 or counts["model"] == 0 or counts["rows"] < RETRY_LIMIT:
-                    break
+            await catch_up_user(user, max_rounds)
         except Exception as e:
             logger.error(f"Money catch-up classification for user {uid} failed: {e}", exc_info=True)
 

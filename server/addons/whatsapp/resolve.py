@@ -108,7 +108,7 @@ async def _resolve_name_with_llm(query: str, candidates: list[dict]) -> Optional
     )
 
     try:
-        content = await llm.complete([{"role": "user", "content": prompt}], temperature=0.0,
+        content = await llm.complete([{"role": "user", "content": prompt}], temperature=0.0, job="chat",
                                      purpose="whatsapp_match")
         logger.info(f"LLM name resolution response for query '{query}': {content}")
 

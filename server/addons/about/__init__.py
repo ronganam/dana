@@ -8,6 +8,3 @@ that user's system prompt (docs/about.md, docs/access.md "Addons").
 ``learner`` (per-user background learning from quiet chats and calls),
 ``api`` (``/api/about`` routes, starts the learner), ``tools``.
 """
-
-from addons.about import addon  # noqa: F401 — declares the addon
-from addons.about import tools  # noqa: F401 — registers the about tools

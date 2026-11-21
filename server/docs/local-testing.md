@@ -1,10 +1,11 @@
 # Local test environment
 
 A self-contained copy of the production setup on your machine: the real image
-built from the `Dockerfile` (as `bin/deploy` builds it), started from the 8.1.0 database
-(`tests/fixtures/db_8_1_0.sql`) with an env file shaped like production's before
-the multi-user upgrade, so the first start is the real upgrade (snapshot,
-migrations, first-admin bootstrap, env import into encrypted connections).
+built from the `Dockerfile` (as `bin/deploy` builds it), started from a Dana 9.0
+database (`tests/fixtures/db_9_0.sql`, its first admin named as the env file says)
+with an env file shaped like production's, so the first start is the real
+upgrade (snapshot, conversion to per-addon migrations, env import into
+encrypted connections).
 Every outside service is a stub. Nothing reaches production or the internet.
 
 ```bash
@@ -13,7 +14,7 @@ bin/local-env.sh test    # the end-to-end rehearsal (tests/local_env/e2e.py), PA
 bin/local-env.sh logs    # follow the app's log (`logs --tail 100` etc. pass through)
 bin/local-env.sh ps      # the containers
 bin/local-env.sh down    # remove containers, networks, the data volume and the generated state
-bin/local-env.sh reset   # down + up: a fresh 8.1.0 start
+bin/local-env.sh reset   # down + up: a fresh 9.0 start
 bin/local-env.sh restart # restart the app
 ```
 
@@ -109,7 +110,7 @@ Home Assistant stub, which no admin uses, so a member may connect it) and
 covers: the upgrade (log lines, snapshot, every fixture row with its id through
 the API, `/api/me`, the imported connections, their tests against the stubs,
 the CLI, a restart that imports nothing twice, missing / malformed / wrong
-`CREDENTIALS_KEY` on the migrated database and on a fresh 8.1.0 one); the
+`CREDENTIALS_KEY` on the migrated database and on a fresh 9.0 one); the
 endpoints `static/*.js` load and the fields they read, the pages, the login
 cookie, a streamed chat turn compared with `tests/fixtures/golden.sse`'s event
 types, reattach, approval, undo; a second user made with the CLI (403

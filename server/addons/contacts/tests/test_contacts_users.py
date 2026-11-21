@@ -4,7 +4,7 @@ Run: bin/test test_contacts_users
 Google's client is faked where it is built (``addons.contacts.client.build``):
 each refresh token opens its own fake account with its own contacts, etags,
 change log and sync tokens, and every request is recorded with the account it
-went to and the user it ran as. An 8.1.0 database is migrated first. Robin (the
+went to and the user it ran as. A 9.0 database is converted first. Robin (the
 first admin) and Bob have ``contacts`` and ``people``, each with their own
 account; Eve has ``contacts`` without ``people``; Carl has ``people`` without
 ``contacts``. Checked: the sync (full with paging, incremental with the
@@ -40,9 +40,9 @@ os.environ["OWNER_NAME"] = "Robin"
 os.environ["TIMEZONE"] = "Asia/Jerusalem"
 sys.path.insert(0, ROOT)
 
-# The production database before this addon existed (8.1.0, with a person): migrated below.
+# A 9.0 production database (with a person): converted below.
 _db = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as f:
     _db.executescript(f.read())
 _db.close()
 
@@ -347,7 +347,7 @@ def test_kind() -> None:
           contacts_config.SYNC_MINUTES == 60
           and contacts_config.PERSON_FIELDS == "names,nicknames,phoneNumbers,emailAddresses,birthdays,organizations")
     old = person_row("pe1")
-    check("migration: the 8.1.0 person has no emails and no contact; nobody has a copy",
+    check("migration: the 9.0 person has no emails and no contact; nobody has a copy",
           old["emails"] == "[]" and old["contact_resource"] == "" and old["name"] == "Sam Example"
           and not rows("SELECT 1 FROM google_contacts") and not rows("SELECT 1 FROM google_contacts_sync"))
     check("the env import never connects contacts", not store.is_connected(ADMIN, "contacts"))
@@ -743,7 +743,7 @@ async def test_people() -> None:
           person_row(no_contact)["name"] == "+972509999999" and person_row(no_contact)["hidden"] == 1
           and person_row(hidden_named)["hidden"] == 1 and person_row(hidden_named)["name"] == "Noa Hidden By Robin"
           and person_row(hidden_named)["birthday"] == "07-09" and person_row(hidden_named)["contact_resource"] == "people/r3")
-    check("fill: the 8.1.0 person (no number in the contacts) is untouched",
+    check("fill: the 9.0 person (no number in the contacts) is untouched",
           person_row("pe1")["contact_resource"] == "" and person_row("pe1")["emails"] == "[]")
     check("fill: no person is ever created from a contact",
           {u.id: people_count(u) for u in (ADMIN, BOB, CARL, EVE)} == counts and counts[EVE.id] == 0

@@ -1,0 +1,80 @@
+"""LLM purposes: what each non-chat model call is for (docs/usage.md, docs/configuration.md).
+
+Every ``core.llm`` call names its ``purpose``; usage is filed under it and the
+Usage screen shows its label. Core's own purposes are :data:`CORE`; an addon
+adds its own with ``Addon(llm_jobs={"task_emoji": "fast"})`` (registered by
+the loader, :func:`register`). A purpose has a default model profile
+(``fast`` / ``balanced`` / ``deep``, core/models.py); ``MODEL_<PURPOSE>`` in env
+overrides the model for that purpose alone (core/llm.py). An unknown purpose
+is refused (:class:`UnknownPurpose`), so a typo never files usage under a
+name nobody reads.
+"""
+
+from dataclasses import dataclass
+from typing import Dict, Optional
+
+PROFILES = ("fast", "balanced", "deep")
+
+
+class UnknownPurpose(ValueError):
+    """A purpose neither core nor any loaded addon declares."""
+
+
+@dataclass(frozen=True)
+class Purpose:
+    name: str
+    profile: str
+    label: str
+    addon: str = "core"
+
+
+# Core's own purposes: name → (default profile, label).
+CORE: Dict[str, tuple] = {
+    "chat": ("balanced", "Chat with Dana"),
+    "voice_reply": ("balanced", "Voice chat replies"),
+    "realtime_voice": ("balanced", "Live voice conversation"),
+    "voice_transcript": ("fast", "Voice note transcripts"),
+    "voice_summary": ("fast", "Voice note summaries"),
+    "wake_briefing": ("fast", "Wake briefing"),
+    "weekly_review": ("fast", "Weekly review"),
+    "other": ("fast", "Other (untagged)"),
+}
+
+_purposes: Dict[str, Purpose] = {name: Purpose(name, profile, label) for name, (profile, label) in CORE.items()}
+
+
+def register(name: str, profile: str, label: str = "", *, addon: str) -> Purpose:
+    """Declare ``addon``'s purpose ``name`` with its default ``profile``.
+
+    Raises:
+        ValueError: an unknown profile, or ``name`` already belongs to core or another addon.
+    """
+    if profile not in PROFILES:
+        raise ValueError(f"{addon}: LLM purpose {name!r} has unknown profile {profile!r} (one of {PROFILES})")
+    existing = _purposes.get(name)
+    if existing is not None and existing.addon != addon:
+        raise ValueError(f"{addon}: LLM purpose {name!r} already belongs to {existing.addon}")
+    p = _purposes[name] = Purpose(name, profile, label or name.replace("_", " ").capitalize(), addon)
+    return p
+
+
+def get(name: str) -> Purpose:
+    """The purpose called ``name``.
+
+    Raises:
+        UnknownPurpose: no such purpose.
+    """
+    try:
+        return _purposes[name]
+    except KeyError:
+        raise UnknownPurpose(f"Unknown LLM purpose {name!r}: declare it in the addon's llm_jobs") from None
+
+
+def label(name: str) -> Optional[str]:
+    """How the Usage screen names ``name`` (None for an unknown one)."""
+    p = _purposes.get(name)
+    return p.label if p else None
+
+
+def known(name: str) -> bool:
+    return name in _purposes

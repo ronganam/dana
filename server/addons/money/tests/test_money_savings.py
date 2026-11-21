@@ -63,6 +63,7 @@ from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
 from core import actions_api, clock, context_chats, now as now_screen, session_runner, undo, weekly_review  # noqa: E402
+from core.cards import ActError  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.addons import store as connections  # noqa: E402
 from core.addons import registry  # noqa: E402
@@ -989,7 +990,7 @@ async def test_now(client: TestClient) -> None:
     try:
         await now_screen.act(ROBIN, f"money_save:{BOB_PHONE}", "dismiss")
         ok = False
-    except now_screen.ActError as e:
+    except ActError as e:
         ok = e.status == 404
     check("now: another user's saving → 404", ok)
     try:

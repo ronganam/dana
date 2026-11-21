@@ -300,7 +300,9 @@ def cmd_add(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
                             profile=profile)
     except ValueError as e:
         raise CliError(str(e)) from e
-    print(f"Added {user.name} ({user.id}, {user.access}). They have only the essentials addon until "
+    defaults = store.connect_defaults(user)
+    has = ", ".join(["essentials", *defaults])
+    print(f"Added {user.name} ({user.id}, {user.access}). They have {has} until "
           f"you connect others: bin/users.py addons connect {user.id} <addon>. "
           f"A token for their devices: bin/users.py tokens issue {user.id} --label phone", file=out)
 
@@ -595,7 +597,7 @@ def main(argv: Optional[Sequence[str]] = None, *, stdout: Optional[TextIO] = Non
     err = stderr or sys.stderr
     logging.basicConfig(level=logging.WARNING)
     args = build_parser().parse_args(argv)
-    pending = [m for m in db.MIGRATIONS if m.VERSION not in set(db.applied_migrations())]
+    pending = db.pending_migrations()
     if pending:
         print(f"error: the database at {db.DATABASE_PATH} is not up to date "
               f"({len(pending)} migration(s) pending); start the server once first.", file=err)

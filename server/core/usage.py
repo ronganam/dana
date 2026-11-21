@@ -54,7 +54,7 @@ from typing import Any, Deque, Dict, Iterator, List, Optional
 import litellm
 from litellm.integrations.custom_logger import CustomLogger
 
-from core import clock, runs, users
+from core import clock, purposes, runs, users
 from core.db import get_db_connection
 
 logger = logging.getLogger(__name__)
@@ -68,32 +68,6 @@ KINDS = ("llm", "transcribe", "decision", "realtime")
 KIND_LABELS = {"llm": "Language models", "transcribe": "Transcription", "decision": "Decision models",
                "realtime": "Realtime voice"}
 
-PURPOSE_LABELS = {
-    "chat": "Chat with Dana",
-    "voice_reply": "Voice chat replies",
-    "realtime_voice": "Live voice conversation",
-    "voice_transcript": "Voice note transcripts",
-    "call_transcript": "Call transcription",
-    "call_analysis": "Call analysis",
-    "notification_triage": "Notification sorting",
-    "notification_extract": "Notification → task / event",
-    "notification_summary": "Inbox summaries",
-    "people_brief": "People briefs",
-    "wake_briefing": "Wake briefing",
-    "weekly_review": "Weekly review",
-    "about_learner": "About you learner",
-    "media_summary": "Link / media summaries",
-    "knowledge_file": "Project file transcripts",
-    "voice_summary": "Voice note summaries",
-    "task_emoji": "Task emoji",
-    "task_group": "Task grouping",
-    "whatsapp_match": "WhatsApp name matching",
-    "shopping_category": "Shopping aisles",
-    "money_classify": "Money categories",
-    "money_market": "Money price checks",
-    "telegram_summary": "Telegram summaries",
-    "other": "Other (untagged)",
-}
 
 # Dimensions the summary can be filtered / broken down by (columns shared by
 # usage_events and usage_daily).
@@ -114,8 +88,8 @@ def scope(*, source: Optional[str] = None, ref: Optional[str] = None,
 
     ``source`` is what started the work (``app``, ``telegram``, ``whatsapp``,
     ``phone``, ``background``…), ``ref`` the thing it was for (``call:12``,
-    ``notification:98``, ``session:main``), ``purpose`` what it was (a key of
-    :data:`PURPOSE_LABELS`). Anything not given keeps the outer scope's value.
+    ``notification:98``, ``session:main``), ``purpose`` what it was (a purpose of
+    core/purposes.py). Anything not given keeps the outer scope's value.
     """
     merged = dict(_scope.get() or {})
     merged.update({k: v for k, v in (("source", source), ("ref", ref), ("purpose", purpose)) if v})
@@ -488,7 +462,7 @@ def _label(dimension: str, key: str) -> str:
     if dimension == "kind":
         return KIND_LABELS.get(key, key)
     if dimension == "purpose":
-        return PURPOSE_LABELS.get(key) or key.replace("_", " ").capitalize()
+        return purposes.label(key) or key.replace("_", " ").capitalize()
     return key or "—"
 
 

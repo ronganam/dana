@@ -159,19 +159,3 @@ def prompt_section(user: User) -> str:
 def warm_home_map(conn: Connection) -> Optional["asyncio.Task[str]"]:
     """Fill ``conn``'s cache in the background."""
     return _schedule_refresh(conn)
-
-
-def warm_all() -> List["asyncio.Task[str]"]:
-    """At startup: fill the cache of every user who has Home Assistant, in the background."""
-    tasks: List["asyncio.Task[str]"] = []
-    for uid in store.users_with(ADDON):
-        user = users.get(uid)
-        conn = store.get(user, ADDON) if user is not None else None
-        if conn is None:
-            continue
-        task = warm_home_map(conn)
-        if task is not None:
-            tasks.append(task)
-    if not tasks:
-        logger.info("[HA] Nobody has Home Assistant connected; no home map in any prompt.")
-    return tasks

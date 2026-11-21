@@ -7,7 +7,7 @@ and direct push to the phone (docs/calls.md, docs/notifications.md).
 - ``POST /api/agent-sessions/hook``, ``GET /api/agent-sessions``, ``DELETE /api/agent-sessions/{id}``
 
 Every route answers for the request's user, who must have ``phone``
-(:func:`phone_user`; else 403 ``not_connected`` from the middleware). The
+(``access.phone_user``; else 403 ``not_connected`` from the middleware). The
 calls and notifications routes are in ``calls/api.py`` and ``notifications/api.py``.
 """
 
@@ -17,21 +17,15 @@ from typing import Set
 
 from aiohttp import web
 
-from core.auth import request_user
-from core.users import User
 from core.addons import store
 from core.addons.store import NotConnected
+from addons.phone.access import phone_user
+from addons.phone.calls import api as calls_api
+from addons.phone.notifications import api as notifications_api
 from addons.phone import agent_sessions, config as phone_config, push as phone_push, suggestions as phone_suggestions
 from addons.phone.calls import actions as suggestion_actions
 
 logger = logging.getLogger(__name__)
-
-
-def phone_user(request: web.Request) -> User:
-    """The caller, who must have the ``phone`` addon (NotConnected → 403 not_connected)."""
-    user = request_user(request)
-    store.require(user, phone_config.ADDON)
-    return user
 
 
 async def get_suggestions_api(request: web.Request) -> web.Response:
@@ -192,7 +186,9 @@ async def agent_session_delete_api(request: web.Request) -> web.Response:
 
 
 def setup(app: web.Application) -> None:
-    """Register the suggestion and push routes."""
+    """Register the phone addon's routes: calls (``calls/api.py``), suggestions
+    and push, then notifications (``notifications/api.py``)."""
+    calls_api.setup(app)
     app.router.add_get("/api/suggestions", get_suggestions_api)
     app.router.add_post("/api/suggestions/bulk", bulk_suggestions_api)
     app.router.add_post("/api/phone/register", phone_register_api)
@@ -205,3 +201,4 @@ def setup(app: web.Application) -> None:
     app.router.add_post("/api/agent-sessions/hook", agent_session_hook_api)
     app.router.add_get("/api/agent-sessions", agent_sessions_api)
     app.router.add_delete("/api/agent-sessions/{id}", agent_session_delete_api)
+    notifications_api.setup(app)

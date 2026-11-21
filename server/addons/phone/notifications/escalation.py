@@ -137,13 +137,3 @@ async def renudge_due(user: User, now: Optional[datetime.datetime] = None) -> in
         logger.info(f"Re-nudged {n['id']} (#{done + 1}): {'sent' if ok else 'failed'}")
         sent += int(ok)
     return sent
-
-
-async def renudge_loop(interval_seconds: int = 30) -> None:
-    """Every ``interval_seconds``: :func:`renudge_due` for every user with ``phone``."""
-    while True:
-        try:
-            await for_each_user("Notification re-nudge", renudge_due)
-        except Exception as e:
-            logger.error(f"Notification re-nudge failed: {e}", exc_info=True)
-        await asyncio.sleep(interval_seconds)

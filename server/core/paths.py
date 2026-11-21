@@ -25,6 +25,8 @@ SNAPSHOTS_DIR = DATA_DIR / "snapshots"
 MONEY_DIR = DATA_DIR / "money"
 # Files kept on knowledge entries (quotes, voice notes; addons/knowledge/files.py).
 KNOWLEDGE_FILES_DIR = DATA_DIR / "knowledge"
+# Addons installed from the catalog, one folder each (core/addon_dirs.py).
+ADDONS_DIR = DATA_DIR / "addons"
 
 
 def ensure_data_dirs() -> None:

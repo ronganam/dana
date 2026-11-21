@@ -396,7 +396,7 @@ def reconcile(user: User, source_id: Optional[str] = None) -> Dict[str, int]:
 
 
 async def reconcile_hook(user: User, source_id: str, new_ids: List[str], changed_ids: List[str]) -> None:
-    """The ``hooks.on_transactions`` handler (registered before classification)."""
+    """The ``after_sync.on_transactions`` handler (registered before classification)."""
     await asyncio.to_thread(reconcile, user, source_id)
 
 

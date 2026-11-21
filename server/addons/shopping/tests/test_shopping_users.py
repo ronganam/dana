@@ -2,7 +2,7 @@
 docs/access.md "Sharing"): isolation, sharing, invitations, the stream and
 the phone push across users.
 
-A temporary database that starts as the 8.1.0 fixture (the first admin's
+A temporary database that starts as the 9.0 fixture (the first admin's
 list), then Bob (a member with ``shopping`` and ``phone``), Eve (``shopping``,
 no phone) and Carl (no ``shopping``). Through the real aiohttp handlers
 (shopping, sharing, undo) behind the real auth middleware, the agent tools
@@ -47,7 +47,7 @@ os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)
 
 _conn = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as _f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
 _conn.close()
 

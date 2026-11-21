@@ -1,18 +1,21 @@
-"""The ``hello`` HTTP route: ``GET /api/hello`` → ``{"greeting": ...}`` for the caller.
+"""The ``hello`` HTTP route: ``GET /api/hello`` → ``{"greeting": ..., "pending": [names]}`` for the caller.
 
-A site addon's ``api.py`` is registered after the official routes, behind the same
-authentication; 403 ``not_connected`` for a user without the addon.
+Every addon's ``api.py`` is registered automatically (its ``setup(app)``),
+behind the same authentication; 403 ``not_connected`` for a user without the addon.
 """
 
 from aiohttp import web
 
 from core.auth import request_user
-from core.addons import store
+from core.addons import store as addon_store
+from addons.hello import store
 
 
 async def get_greeting(request: web.Request) -> web.Response:
-    conn = store.require(request_user(request), "hello")  # NotConnected → 403 in the middleware
-    return web.json_response({"greeting": conn.settings.get("greeting") or "Hello"})
+    user = request_user(request)
+    conn = addon_store.require(user, "hello")  # NotConnected → 403 in the middleware
+    return web.json_response({"greeting": conn.settings.get("greeting") or "Hello",
+                              "pending": [g["name"] for g in store.pending(user)]})
 
 
 def setup(app: web.Application) -> None:

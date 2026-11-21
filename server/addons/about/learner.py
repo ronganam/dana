@@ -440,6 +440,20 @@ def learners() -> List[User]:
     return [u for u in (users.get(uid) for uid in store.users_with(facts.ADDON)) if u is not None]
 
 
+async def run_if_due(user: User, now: Optional[float] = None) -> bool:
+    """Run ``user``'s pass when it is due (the background job, every
+    :data:`LOOP_TICK_SECONDS`); their next pass is then due after
+    :func:`next_delay_seconds`. True when it ran."""
+    moment = time.monotonic() if now is None else now
+    if not LEARN_ENABLED or moment < _due.get(user.id, 0.0):
+        return False
+    try:
+        await run_pass(user)
+    finally:
+        _due[user.id] = moment + next_delay_seconds(user)
+    return True
+
+
 async def run_due(now: Optional[float] = None) -> List[str]:
     """Run the pass of every learner whose pass is due (each as that user, one
     after another); a user's next pass is then due after
@@ -458,13 +472,3 @@ async def run_due(now: Optional[float] = None) -> List[str]:
         _due[user.id] = moment + next_delay_seconds(user)
         ran.append(user.id)
     return ran
-
-
-async def learner_loop(initial_delay: float = 120.0) -> None:
-    """Background loop started with the app (addons/about/api.py): after
-    ``initial_delay``, every user with ``about`` gets a pass, then one every
-    interval (backed off per user after failures)."""
-    await asyncio.sleep(initial_delay)
-    while True:
-        await run_due()
-        await asyncio.sleep(LOOP_TICK_SECONDS)

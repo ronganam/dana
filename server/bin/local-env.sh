@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Local test environment: the real image + stub services, started from the 8.1.0
+# Local test environment: the real image + stub services, started from the 9.0
 # database so the first start is the real upgrade (docs/local-testing.md).
 #
 #   bin/local-env.sh up      build the image, generate the env file, seed the data volume, start
@@ -14,7 +14,7 @@
 #   DANA_LOCAL_PORT          web UI / API on 127.0.0.1 (default 18080)
 #   DANA_LOCAL_CONTROL_PORT  the stubs' control API on 127.0.0.1 (default 18090)
 #   DANA_LOCAL_DB            seed from this SQLite file (a copy of a real database) instead of the
-#                            8.1.0 fixture; see docs/local-testing.md before using it
+#                            9.0 fixture; see docs/local-testing.md before using it
 #   DANA_LOCAL_ENV_EXTRA     file of KEY=value lines appended to the generated env (they win)
 #   DANA_LOCAL_EGRESS=1      let the app reach the internet (needed for a real model key)
 #   DANA_LOCAL_SOURCE=1      run the working tree's code (mounted read-only) instead of the image's
@@ -134,12 +134,12 @@ EOF
 }
 
 seed() {
-    local source=/fixtures/db_8_1_0.sql mounts=(-v "$ROOT/tests/fixtures:/fixtures:ro")
+    local source=/fixtures/db_9_0.sql mounts=(-v "$ROOT/tests/fixtures:/fixtures:ro")
     if [[ -n "${DANA_LOCAL_DB:-}" ]]; then
         source=/seed/db.sqlite3
         mounts=(-v "$(cd "$(dirname "$DANA_LOCAL_DB")" && pwd)/$(basename "$DANA_LOCAL_DB"):/seed/db.sqlite3:ro")
     fi
-    echo "==> Seeding the data volume (only when it has no database yet) from ${DANA_LOCAL_DB:-tests/fixtures/db_8_1_0.sql}"
+    echo "==> Seeding the data volume (only when it has no database yet) from ${DANA_LOCAL_DB:-tests/fixtures/db_9_0.sql}"
     compose run --rm --no-deps --user root "${mounts[@]}" --entrypoint python app -c "
 import os, pathlib, shutil, sqlite3, sys
 db = pathlib.Path('/app/db/db.sqlite3')
@@ -147,7 +147,13 @@ src = '$source'
 if db.exists():
     print('    database already there: not seeded')
 elif src.endswith('.sql'):
-    con = sqlite3.connect(db); con.executescript(open(src).read()); con.close()
+    con = sqlite3.connect(db); con.executescript(open(src).read())
+    # The fixture's first admin as 9.0 made them from this env (name, context, Telegram ids).
+    con.execute(\"UPDATE users SET name = 'Robin', other_names = '', telegram_chat_id = 111111111, \"
+                \"context = 'Robin lives in Tel Aviv and works as an architect. Noa is Robin''s sister.'\")
+    con.execute('INSERT OR IGNORE INTO user_telegram (telegram_user_id, user_id, created_at) '
+                'SELECT 111111111, id, created_at FROM users')
+    con.commit(); con.close()
     print('    loaded', src)
 else:
     shutil.copyfile(src, db)

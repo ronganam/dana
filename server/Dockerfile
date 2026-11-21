@@ -42,9 +42,9 @@ COPY VERSION .
 COPY core/ ./core/
 COPY addons/ ./addons/
 COPY static/ ./static/
-# Site addons (docs/writing-an-addon.md): the ones bin/deploy brings from your site.
+# Site addons (docs/writing-an-addon.md): the ones bin/deploy brings from your site; the loader reads
+# /app/addons-site when it exists (core/addon_dirs.py).
 COPY --from=site_addons / ./addons-site/
-ENV DANA_ADDON_DIRS=/app/addons-site
 # The user administration CLI (docs/access.md, "Managing users"): kubectl exec … python bin/users.py
 COPY bin/users.py ./bin/users.py
 # The release name bin/deploy builds ("<VERSION>-<commit>"): /api/health reports it and the

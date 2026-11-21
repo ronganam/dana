@@ -98,7 +98,7 @@ The phone's long-press overlay can share what is on the screen of the app undern
 - **Only tools the user has**: a phrase is learned only for a tool the user has, and matches only while they still have it; when its addon is gone the message goes to the model as if no phrase matched (the model's different answer then clears the phrase, like any different outcome).
 - **Use**: a new text message (no images, `screen` or `device_screen`) whose phrase is active for the sender, in a session with no pending approval/selection, runs the tool without the model. Events: `run_start`, `step_start{shortcut: true}`, `tool_call`, `tool_start`, `tool_end{shortcut: true, undos}`, `text_delta` (the whole reply), `final{content, shortcut: true}`, `run_end`; the state frame has `shortcut: true`. The turn is stored as a normal tool call + the stored reply, so follow-ups make sense. If the tool fails (raises or returns `Error…`), the phrase is deactivated and the model answers in the same run (the failed tool card stays in the stream; the final state has the model's turn).
 - **API**: `GET /api/shortcuts` → `{enabled, learn_after, shortcuts: [{id, phrase, does, tool, args, reply, active, times_used, last_used, seen, learn_after, learned_at}]}` (`does` is in words, e.g. "Open cover Gate"; times are epoch seconds). `DELETE /api/shortcuts/{id}` → `{ok: true}` | 404.
-- **Switch**: `SHORTCUTS=0` turns learning and use off. Table `shortcuts` (phrase unique per user; migrations `m0001_baseline`, `m0003_user_scope`).
+- **Switch**: `SHORTCUTS=0` turns learning and use off. Table `shortcuts` (phrase unique per user; core's `m0001_baseline`).
 
 ## Configuration
 

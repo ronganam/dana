@@ -17,14 +17,14 @@ Failed calls are recorded too (`ok = 0`, error text, no cost). A call whose mode
 
 ## What a call was for
 
-Each record has `purpose` (what: a key of `usage.PURPOSE_LABELS`, e.g. `chat`, `call_analysis`, `notification_triage`, `weekly_review`), `source` (what started it: `app`, a device name, `telegram`, `whatsapp`, `phone`, `background`) and `ref` (the item: `session:<id>`, `call:<id>`, `notification:<id>`, `person:<id>`, `app:<package>`).
+Each record has `purpose` (what: a purpose declared by core, `core/purposes.py`, or by an addon's `llm_jobs=`, e.g. `chat`, `call_analysis`, `notification_triage`, `weekly_review`; the Usage screen shows its label, `purposes.label`), `source` (what started it: `app`, a device name, `telegram`, `whatsapp`, `phone`, `background`) and `ref` (the item: `session:<id>`, `call:<id>`, `notification:<id>`, `person:<id>`, `app:<package>`).
 
-- `llm.complete` / `complete_json` / `transcribe` take optional `purpose=`, `ref=`, `source=`; without a purpose the job name is used, so nothing is untagged.
+- `llm.complete` / `complete_json` / `transcribe` take optional `purpose=`, `ref=`, `source=`; without a purpose the job name is used, so nothing is untagged. A purpose nobody declared raises `purposes.UnknownPurpose`.
 - Agent runs: `purpose` chat, `ref` = the run's session, `source` = the sending device (`usage.bind(device)` at the start of each run task in `core/session_runner.py`).
 - `usage.scope(source=…, ref=…, purpose=…)` attributes everything inside a block (tasks created inside copy it).
 - Context travels in LiteLLM's `litellm_metadata`, which is never sent to a provider.
 - **Whose call**: every record has `user_id`, the current user when the call is made (`users.current_id()`, docs/access.md "The current user": the run's user, the request's, or the user a background loop runs as). Model calls carry it in `litellm_metadata` (`usage.meta`) so the callback sees it on LiteLLM's worker; `usage.record(user_id=…)` may name it (`''` = no user). Calls with no user context are stored with `user_id = ''`.
-- **A new call site**: pass `purpose=` (and `ref=` when there is an item) and add a label to `PURPOSE_LABELS`; an untagged call shows as "Other (untagged)".
+- **A new call site**: pass `purpose=` (and `ref=` when there is an item); a new purpose is declared in the addon's manifest (`llm_jobs={"<purpose>": "fast"}` or `LlmJob("fast", "Label")`), core's own in `purposes.CORE`. An untagged usage row shows as "Other (untagged)".
 
 No prompts or replies are stored, only metadata.
 

@@ -81,7 +81,7 @@ from core import telegram_bot as tb  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import store as connections  # noqa: E402
-from addons.money import api as money_api, config, hooks, otp, schedule, slots, sources, store, sync, worker  # noqa: E402
+from addons.money import after_sync, api as money_api, config, otp, schedule, slots, sources, store, sync, worker  # noqa: E402
 from addons.money.addon import addon as money_addon  # noqa: E402
 from addons.phone import push  # noqa: E402
 from testfakes import FakeBankWorker  # noqa: E402
@@ -176,9 +176,9 @@ def broken_hook(user, source_id: str, new_ids: List[str], changed_ids: List[str]
     raise RuntimeError("a hook that always fails")
 
 
-hooks.on_transactions(broken_hook)
-hooks.on_transactions(sync_hook)
-hooks.on_transactions(async_hook)
+after_sync.on_transactions(broken_hook)
+after_sync.on_transactions(sync_hook)
+after_sync.on_transactions(async_hook)
 
 
 # --- Helpers --------------------------------------------------------------------------------------
@@ -640,10 +640,10 @@ async def test_backoff_and_unreachable() -> None:
               row["state_reason"] == "bank worker not reachable" and syncs_of(sid)[-1]["error"]
               == "bank worker not reachable", row)
         check("kind check: the addons Test says so",
-              await money_addon.check(connections.require(BOB, "money")) == "bank worker not reachable")
+              await money_addon.test(connections.require(BOB, "money")) == "bank worker not reachable")
     finally:
         os.environ["MONEY_WORKER_URL"] = url
-    check("kind check: the worker answers", await money_addon.check(connections.require(BOB, "money")) is None)
+    check("kind check: the worker answers", await money_addon.test(connections.require(BOB, "money")) is None)
     await sync.run(BOB, sid, "schedule")
     row = source_row(sid)
     check("backoff: a good sync resets the failures", row["state"] == "ok" and row["failures"] == 0

@@ -20,9 +20,15 @@ the background jobs, Gemini for transcription since Claude does not take audio):
 
 The web/app chat picks its model from the profile catalog in ``core/models.py``.
 
-Every call here is tracked in ``core/usage.py`` (tokens, price, latency). ``purpose``
-(a key of ``usage.PURPOSE_LABELS``), ``ref`` (``call:12``, ``person:abc``…) and
-``source`` say what the call was for; leave them out and the job name is the purpose.
+Purposes (core/purposes.py): every call names what it is for (``purpose=``,
+core's own or one an addon declares in its ``llm_jobs``; an unknown one raises
+``purposes.UnknownPurpose``); usage is tracked under it in ``core/usage.py``
+(tokens, price, latency) with ``ref`` (``call:12``, ``person:abc``…) and
+``source``. The model of a call: ``MODEL_<PURPOSE>`` from env when set, else
+the ``job``'s chain above when the caller names a job, else the chain of the
+purpose's profile (:data:`_PROFILE_CHAINS`: ``fast`` → ``BACKGROUND_MODEL`` →
+Haiku, ``balanced`` → ``MODEL`` → Sonnet, ``deep`` → ``DEEP_MODEL`` → Opus).
+Leave ``purpose`` out and the job name is the purpose.
 
 ``search`` needs a model with web search through LiteLLM's ``web_search_options``
 (Claude's web search tool, Gemini's Google Search grounding, OpenAI's search models); :func:`search` returns
@@ -49,7 +55,7 @@ from typing import Any, Dict, List, Optional
 
 import litellm
 
-from core import usage
+from core import purposes, usage
 
 logger = logging.getLogger(__name__)
 
@@ -85,6 +91,13 @@ _CHAINS: Dict[str, tuple] = {
     "transcribe": ("TRANSCRIBE_MODEL",),
 }
 
+# profile (core/purposes.py) → env vars tried in order, then its default model
+_PROFILE_CHAINS: Dict[str, tuple] = {
+    "fast": (("BACKGROUND_MODEL",), HAIKU),
+    "balanced": (("MODEL",), SONNET),
+    "deep": (("DEEP_MODEL",), OPUS),
+}
+
 _TRANSCRIBE_PROMPT = (
     "Transcribe the following audio file accurately. "
     "The speaker primarily speaks Hebrew (עברית) or English, or a mix of both (code-switching). "
@@ -105,6 +118,36 @@ def model(job: str) -> str:
         if value:
             return value
     return _DEFAULTS.get(job, HAIKU)
+
+
+def model_for(purpose: str, job: Optional[str] = None) -> str:
+    """The model of a call for ``purpose``: ``MODEL_<PURPOSE>`` from env, else
+    ``job``'s model when given, else the model of the purpose's profile.
+
+    Raises:
+        purposes.UnknownPurpose: neither core nor a loaded addon declares ``purpose``.
+    """
+    p = purposes.get(purpose)
+    value = os.getenv(f"MODEL_{purpose.upper()}", "").strip()
+    if value:
+        return value
+    if job:
+        return model(job)
+    chain, default = _PROFILE_CHAINS[p.profile]
+    for var in chain:
+        value = os.getenv(var, "").strip()
+        if value:
+            return value
+    return default
+
+
+def _call(purpose: str, job: Optional[str]) -> tuple:
+    """(what usage files the call under, its model): a named purpose must be
+    declared (:func:`model_for`); a call that names none is filed under its
+    job (nothing untagged) and gets the job's model."""
+    if purpose:
+        return purpose, model_for(purpose, job)
+    return job or "chat", model(job or "chat")
 
 
 def is_claude(name: str) -> bool:
@@ -173,27 +216,29 @@ def _text(response: Any) -> str:
     return (choice.message.content or "").strip()
 
 
-async def complete(messages: List[Dict[str, Any]], *, job: str = "chat", purpose: str = "", ref: str = "",
+async def complete(messages: List[Dict[str, Any]], *, job: Optional[str] = None, purpose: str = "", ref: str = "",
                    source: str = "", **kwargs: Any) -> str:
-    """One plain completion; returns the reply text. Raises on API failure."""
-    name = model(job)
+    """One plain completion; returns the reply text (model: :func:`model_for`).
+    Raises on API failure and for an unknown purpose."""
+    purpose, name = _call(purpose, job)
     response = await litellm.acompletion(model=name, messages=messages, drop_params=True,
-                                         litellm_metadata=usage.meta(purpose or job, ref, source),
-                                         **claude_kwargs(name, job, kwargs))
+                                         litellm_metadata=usage.meta(purpose, ref, source),
+                                         **claude_kwargs(name, job or "", kwargs))
     return _text(response)
 
 
-async def complete_json(prompt: str, schema: Dict[str, Any], *, job: str, temperature: float = 0.2,
+async def complete_json(prompt: str, schema: Dict[str, Any], *, job: Optional[str] = None, temperature: float = 0.2,
                         timeout: float = 60.0, attempts: int = 3, purpose: str = "", ref: str = "",
                         source: str = "") -> Dict[str, Any]:
     """Run ``prompt`` with structured output constrained to ``schema`` (standard JSON
     Schema) and return the parsed object. Retries network errors, 5xx/429, and empty or
     unparsable replies (a little warmer each time, so a stuck reply doesn't repeat).
-    Raises RuntimeError when every attempt failed."""
-    name = model(job)
+    Raises RuntimeError when every attempt failed, ``purposes.UnknownPurpose``
+    for an unknown purpose (model: :func:`model_for`)."""
+    purpose, name = _call(purpose, job)
     response_format = {"type": "json_schema", "json_schema": {"name": "result", "schema": schema}}
-    tag = usage.meta(purpose or job, ref, source)
-    extra = claude_kwargs(name, job, {})
+    tag = usage.meta(purpose, ref, source)
+    extra = claude_kwargs(name, job or "", {})
     last: Optional[BaseException] = None
     for attempt in range(attempts):
         try:
@@ -217,7 +262,7 @@ async def complete_json(prompt: str, schema: Dict[str, Any], *, job: str, temper
             if not retryable(e):
                 break
             if attempt < attempts - 1:
-                logger.warning(f"{job} ({name}) attempt {attempt + 1} failed: {_error_text(e)}")
+                logger.warning(f"{purpose} ({name}) attempt {attempt + 1} failed: {_error_text(e)}")
                 await asyncio.sleep(1.5 * (attempt + 1))
     raise RuntimeError(f"{name} failed: {_error_text(last) if last else 'unknown'}")
 
@@ -330,7 +375,7 @@ async def search(prompt: str, *, purpose: str, ref: str = "", source: str = "",
     a network error, 5xx or 429 once. Raises :class:`NoSearch` when no source
     came back (the model did not search, or the provider dropped the option),
     RuntimeError when the call failed."""
-    name = model("search")
+    name = model_for(purpose, "search")
     tag = usage.meta(purpose, ref, source)
     response: Any = None
     for attempt in range(2):
@@ -368,7 +413,7 @@ async def transcribe(audio: bytes, mime_type: str, *, timeout: float = 30.0, not
     ``note`` is appended to the prompt (e.g. "This is part 2 of 5 of a longer call").
     Raises on API failure (``status_code`` tells whether a retry can help).
     """
-    name = model("transcribe")
+    name = model_for(purpose, "transcribe")
     prompt = _TRANSCRIBE_PROMPT + (f" {note}" if note else "")
     started = time.perf_counter()
     tag = usage.meta(purpose, ref, source, kind="transcribe")

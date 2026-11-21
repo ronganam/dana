@@ -17,10 +17,10 @@ CONTACTS_GUIDE = (
 # The OAuth client (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) is server-wide env;
 # the refresh token comes from the Google sign-in (addons/google_account).
 addon = Addon(
-    ADDON,
+    ADDON, order=110,
     credentials=(Field("refresh_token", "Google OAuth refresh token"),),
     description="Google Contacts",
-    check=client.check,
+    test=client.check,
     connect_url=oauth.CONNECT_PATH,
     on_connect=sync.on_connect,
     on_credentials_change=sync.on_credentials_change,

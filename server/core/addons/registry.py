@@ -1,4 +1,5 @@
-"""Tools listed and executed for a user (docs/access.md, "Addon" → Rules).
+"""Tools listed and executed for a user (docs/access.md, "Addon" → Rules), and
+the addons' hooks collected for the core (../docs/addons.md, "The manifest").
 
 A user's tools are the tools of the addons they have connected, minus those
 whose ``needs`` are not all connected and those whose availability rule
@@ -6,6 +7,10 @@ whose ``needs`` are not all connected and those whose availability rule
 order the tools are defined in (so the tool block stays cacheable). The same
 check runs again at execution, whoever asks: a tool the user does not have is
 refused exactly like a tool that does not exist.
+
+Hooks (:func:`jobs`, :func:`services`, :func:`handlers`, :func:`channels`,
+:func:`hooks`, :func:`hook_for`) come in the fixed addon order; those asked
+for a user only from the addons that user has.
 """
 
 import inspect
@@ -15,6 +20,7 @@ from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Tuple
 from core.users import User
 from core.addons import store
 from core.addons.addon import Tool, all_tools, find_tool, get_addon, all_addons, version
+from core.addons.hooks import Channel, Handler, Hook, Job, Service
 from core.addons.schema import flatten_for_realtime
 
 logger = logging.getLogger(__name__)
@@ -214,3 +220,51 @@ def needs_confirmation(name: str, arguments: Optional[Dict[str, Any]] = None, *,
             logger.warning(f"confirm rule of {name} failed; asking to be safe", exc_info=True)
             return True
     return bool(rule)
+
+
+# --- Hooks ------------------------------------------------------------------------------
+
+def jobs() -> List[Job]:
+    """Every ``@addon.job`` of every addon."""
+    return [j for a in all_addons() for j in a.jobs]
+
+
+def job(key: str) -> Job:
+    """The job ``<addon>.<name>`` (tests run one pass with ``scheduler.run_once``).
+
+    Raises:
+        KeyError: no such job.
+    """
+    found = next((j for j in jobs() if j.key == key), None)
+    if found is None:
+        raise KeyError(key)
+    return found
+
+
+def services() -> List[Service]:
+    """Every ``@addon.service`` of every addon."""
+    return [s for a in all_addons() for s in a.services]
+
+
+def handlers(event: str, user: User) -> List[Handler]:
+    """The ``@addon.on(event)`` handlers of the addons ``user`` has."""
+    connected = set(store.connected_addons(user))
+    return [h for a in all_addons() if a.name in connected for h in a.handlers if h.event == event]
+
+
+def channels(user: User) -> List[Channel]:
+    """The ``@addon.channel`` channels of the addons ``user`` has."""
+    connected = set(store.connected_addons(user))
+    return [c for a in all_addons() if a.name in connected for c in a.channels]
+
+
+def hooks(kind: str, user: Optional[User] = None) -> List[Hook]:
+    """Every composer hook of ``kind`` (``now_cards``, ``briefing``…): of the
+    addons ``user`` has, or of every addon without a user."""
+    connected = set(store.connected_addons(user)) if user is not None else None
+    return [h for a in all_addons() if connected is None or a.name in connected for h in a.hooks if h.kind == kind]
+
+
+def hook_for(kind: str, key: str) -> Optional[Hook]:
+    """The hook of ``kind`` declared for ``key`` (a card prefix, a context kind, a check key), or None."""
+    return next((h for a in all_addons() for h in a.hooks if h.kind == kind and h.key == key), None)

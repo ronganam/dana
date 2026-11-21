@@ -4,7 +4,7 @@ per-user cache the agent reads it from.
 :func:`section` is the addon's prompt section (``Addon(prompt_section=)``):
 it only reads the cache, so it never touches the database, never blocks and
 never raises. :mod:`addons.about.facts` rebuilds a user's entry after
-every change to their facts and at startup (``facts.load_prompts``).
+every change to their facts and at startup (the ``load_prompt`` job, ``hooks.py``).
 """
 from __future__ import annotations
 

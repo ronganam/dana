@@ -11,8 +11,7 @@ test_web_projects` against `tests/fixtures/projects_web.json`) +
 `static/projects.css`. Tests: `bin/test test_knowledge_users` (per user,
 sharing, media), `bin/test test_knowledge_sections` (sections, decisions,
 columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
-`bin/test test_db` (migrations `m0008_knowledge_per_user`,
-`m0032_knowledge_sections`), `bin/test test_addons`.
+`bin/test test_db` (the addon's baseline migration), `bin/test test_addons`.
 
 | Module | What |
 |---|---|

@@ -2,7 +2,7 @@
 the weekly review, search, the self-checks, context chats and the dashboard's
 endpoints.
 
-The first admin (migrated from the 8.1.0 fixture) has every addon; Bob has
+The first admin (converted from the 9.0 fixture) has every addon; Bob has
 phone, tasks, people, knowledge, Home Assistant and calendar; Carl has tasks
 and calendar and a Telegram chat; Eve has nothing. Each composer answers for
 its user only, from the addons they have connected (a missing addon adds
@@ -40,9 +40,9 @@ from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)
 
-# The production database before users existed: its briefing, review, wake day and hidden card become the first admin's.
+# A 9.0 production database (converted at start): its briefing, review, wake day and hidden card are the first admin's.
 _conn = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as _f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
 _conn.close()
 
@@ -422,7 +422,7 @@ About Robin:
 Now: {clock.describe_now()}
 
 Today's data (JSON):
-{json.dumps({k: v for k, v in d.items() if k != 'calendar_ok'}, ensure_ascii=False, indent=1)}
+{json.dumps({k: v for k, v in d.items() if k not in ('calendar_ok', briefing.SECTIONS)}, ensure_ascii=False, indent=1)}
 {'' if d.get('calendar_ok', True) else '(The calendar could not be read today — say nothing about meetings.)'}
 
 Return:
@@ -433,9 +433,9 @@ Fragments, not sentences; no trailing periods; no emoji; no advice beyond the fa
 
 def old_review_prompt(c: Dict[str, Any], nw: Optional[Dict[str, Any]], today: datetime.date) -> str:
     """core/weekly_review.py's prompt before composers were per user (git 1a98af3)."""
-    OWNER_NAME, OWNER_CONTEXT, ACTIONS = testenv.OWNER_NAME, testenv.OWNER_CONTEXT, weekly_review.ACTIONS
+    OWNER_NAME, OWNER_CONTEXT = testenv.OWNER_NAME, testenv.OWNER_CONTEXT
     listing = [{"ref": i["ref"], "type": i["type"], "title": i["title"], "why": i["why"], "facts": i["facts"],
-                "group": i.get("group"), "allowed": list(ACTIONS[i["type"]])} for i in c["items"]]
+                "group": i.get("group"), "allowed": list(weekly_review.actions_for(i["type"]))} for i in c["items"]]
     return f"""You're helping {OWNER_NAME} with his weekly review (Saturday evening, before the Israeli work week starts Sunday).
 
 About Robin:
@@ -695,7 +695,7 @@ async def test_checks(client: TestClient) -> None:
     a, b, c, e = (await get_checks(client, ADMIN), await get_checks(client, BOB), await get_checks(client, CARL),
                   await get_checks(client, EVE))
     check("checks: the first admin (every addon) sees every check in the usual order",
-          list(a) == list(checks.KEYS), list(a))
+          list(a) == list(checks.all_keys()), list(a))
     check("checks: the payload shape is unchanged",
           all(set(x) == {"key", "label", "ok", "detail", "since", "ignored_until"} for x in a.values()))
     check("checks: Bob sees only the checks of his addons (no server check)",

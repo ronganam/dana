@@ -7,7 +7,8 @@ for restarts and the start-up refusals. The stubs' control API
 (tests/local_env/stubs.py) scripts the model and reads what every stub was
 asked. Prints PASS / FAIL per check and exits non-zero on any failure.
 
-Sections: the upgrade (first start from the 8.1.0 database, the env import, a
+Sections: the upgrade (first start from the 9.0 database, its conversion to per-addon
+migrations, the env import, a
 restart, the CREDENTIALS_KEY refusals); existing clients (the endpoints the
 web UI loads, the login cookie, a streamed chat turn, approval, undo); a
 second user made with the CLI (empty data, the admin's ids 404, 403
@@ -262,11 +263,13 @@ FIXTURE_IDS = {
 
 
 async def upgrade(c: Client) -> Dict[str, Any]:
-    print("\n== 1. Upgrade from 8.1.0")
+    print("\n== 1. Upgrade from 9.0")
     logs = app_logs()
-    check("upgrade: first start logged the snapshot", "Database snapshot before migrating: /app/db/snapshots/db-before-0001.sqlite3" in logs)
-    check("upgrade: migrations 0001..0020 applied", all(f"Applied database migration {n:04d}_" in logs for n in range(1, 21)),
-          [n for n in range(1, 21) if f"migration {n:04d}_" not in logs])
+    snap = "db-before-addons-from-0033.sqlite3"
+    check("upgrade: first start logged the snapshot", f"Database snapshot before migrating: /app/db/snapshots/{snap}" in logs)
+    check("upgrade: the 9.0 database converted to per-addon migrations, nothing else applied",
+          "Database converted to per-addon migrations (from version 33)" in logs
+          and "Applied database migration" not in logs, [l for l in logs.splitlines() if "migrat" in l][:5])
     check("upgrade: env import for the first admin, every addon",
           "Addons imported for Robin: tasks, shopping, knowledge, about, people, phone, homeassistant, "
           "whatsapp, calendar, cameras, ops" in logs)
@@ -274,11 +277,16 @@ async def upgrade(c: Client) -> Dict[str, Any]:
           "CREDENTIALS_KEY" not in logs.split("Webhook & Web UI server listening")[0] and "Traceback" not in logs,
           [l for l in logs.splitlines() if "Traceback" in l or "CREDENTIALS_KEY" in l][:3])
     code, out = dexec("ls", "/app/db/snapshots")
-    check("upgrade: snapshot file exists in the data volume", code == 0 and out.split() == ["db-before-0001.sqlite3"], out)
-    code, out = dexec("python", "-c", "import sqlite3; c=sqlite3.connect('/app/db/snapshots/db-before-0001.sqlite3');"
+    check("upgrade: snapshot file exists in the data volume", code == 0 and out.split() == [snap], out)
+    code, out = dexec("python", "-c", f"import sqlite3; c=sqlite3.connect('/app/db/snapshots/{snap}');"
                       "print(c.execute('SELECT COUNT(*) FROM tasks').fetchone()[0], "
-                      "c.execute(\"SELECT COUNT(*) FROM sqlite_master WHERE name='users'\").fetchone()[0])")
-    check("upgrade: the snapshot is the 8.1.0 database (3 tasks, no users table)", out.split() == ["3", "0"], out)
+                      "c.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0])")
+    check("upgrade: the snapshot is the 9.0 database (3 tasks, old migrations up to 33)", out.split() == ["3", "33"], out)
+    code, out = dexec("python", "-c", "import sqlite3; c=sqlite3.connect('/app/db/db.sqlite3');"
+                      "print(*sorted(r[0] for r in c.execute('SELECT addon FROM schema_migrations')))")
+    check("upgrade: schema_migrations names core's and each official addon's baseline",
+          out.split() == sorted(["core", "about", "contacts", "knowledge", "money", "people", "phone", "shopping",
+                                 "tasks", "whatsapp"]), out)
 
     health = await c.get("/api/health", token=None)
     version = (ROOT / "VERSION").read_text().strip()
@@ -402,13 +410,14 @@ async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
                           == "healthy", timeout=120, every=2)
     check("restart: the container comes back healthy", code == 0 and healthy, out)
     logs = app_logs()
-    check("restart: started twice, migrated once, imported once, one snapshot",
-          logs.count("Initializing modular AI assistant") == 2 and logs.count("Database migrated:") == 1
+    check("restart: started twice, converted once, imported once, one snapshot",
+          logs.count("Initializing modular AI assistant") == 2
+          and logs.count("Database converted to per-addon migrations") == 1
           and logs.count("Addons imported for") == 1 and logs.count("Database snapshot before migrating") == 1,
-          (logs.count("Initializing modular AI assistant"), logs.count("Database migrated:"),
+          (logs.count("Initializing modular AI assistant"), logs.count("Database converted to per-addon migrations"),
            logs.count("Addons imported for")))
     code, out = dexec("ls", "/app/db/snapshots")
-    check("restart: still one snapshot", out.split() == ["db-before-0001.sqlite3"], out)
+    check("restart: still one snapshot", out.split() == ["db-before-addons-from-0033.sqlite3"], out)
     r = await c.get("/api/addons")
     check("restart: addons unchanged", r.text == before["addons"],
           "addons payload differs after restart")
@@ -440,17 +449,17 @@ async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
     check("key: no key value in those messages", not no_secret_in(out) and other.strip() not in out)
 
     # The fixture as production has it today, first start without the key.
-    run(["docker", "cp", str(ROOT / "tests" / "fixtures" / "db_8_1_0.sql"), f"{app_container()}:/tmp/db_8_1_0.sql"])
+    run(["docker", "cp", str(ROOT / "tests" / "fixtures" / "db_9_0.sql"), f"{app_container()}:/tmp/db_9_0.sql"])
     dexec("python", "-c", "import sqlite3, os; os.makedirs('/tmp/f', exist_ok=True);"
-          " c=sqlite3.connect('/tmp/f/db.sqlite3'); c.executescript(open('/tmp/db_8_1_0.sql').read()); c.close()")
+          " c=sqlite3.connect('/tmp/f/db.sqlite3'); c.executescript(open('/tmp/db_9_0.sql').read()); c.close()")
     code, out = start(None, "/tmp/f/db.sqlite3")
-    check("key: 8.1.0 DB + env credentials, no key: refuses to start, says how to generate one",
+    check("key: 9.0 DB + env credentials, no key: refuses to start, says how to generate one",
           code == 1 and "CREDENTIALS_KEY is not set" in out and "Fernet.generate_key()" in out
           and "Addons imported" not in out, (code, out[-500:]))
     code, out = start(ENV["CREDENTIALS_KEY"], "/tmp/f/db.sqlite3")
     check("key: the same DB with the key added: import happens on that start",
           "Addons imported for Robin" in out and "Database migrated" not in out, out[-600:])
-    dexec("rm", "-rf", "/tmp/k", "/tmp/f", "/tmp/db_8_1_0.sql")
+    dexec("rm", "-rf", "/tmp/k", "/tmp/f", "/tmp/db_9_0.sql")
 
 
 # =================================================================================================

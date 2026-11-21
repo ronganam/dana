@@ -9,6 +9,3 @@ write of calls / notifications; whose they are is decided in ``calls_sql`` /
 ``briefs`` (model briefs per user, the loop), ``detail`` (a person in full,
 the call card, the context chat), ``api`` (``/api/people*`` routes), ``tools``.
 """
-
-from addons.people import addon  # noqa: F401 — declares the addon
-from addons.people import tools  # noqa: F401 — registers the people tools
