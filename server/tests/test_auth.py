@@ -82,8 +82,9 @@ async def main() -> None:
 
         r = await client.post("/login", data={"token": "s3cret-token", "next": "/dashboard"}, allow_redirects=False)
         cookie = r.cookies.get(SESSION_COOKIE)
-        check("good login -> redirect + HttpOnly session cookie",
-              r.status == 302 and r.headers["Location"] == "/dashboard"
+        check("good login -> redirect + HttpOnly session cookie named dana_session",
+              r.status == 302 and r.headers["Location"] == "/dashboard" and SESSION_COOKIE == "dana_session"
+              and "dana_session=" in r.headers.get("Set-Cookie", "")
               and cookie is not None and cookie["httponly"] and cookie.value != "s3cret-token")
 
         r = await client.get("/api/tasks")  # client keeps the cookie

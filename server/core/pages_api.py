@@ -1,17 +1,23 @@
 """The web app's pages and the liveness probe.
 
-- ``GET /``, ``GET /shopping`` — the web app (``/shopping`` opens it on the Shopping panel)
-- ``GET /sw.js``, ``GET /manifest.json`` — the service worker and the PWA manifest
+- ``GET /`` — the web app (an addon may serve it at its own path too: ``/shopping``)
+- ``GET /sw.js``, ``GET /manifest.json`` — the service worker (its ``RELEASE``: :func:`web_release`) and the PWA manifest
 - ``GET /calendar`` — the full-screen calendar TV view
 - ``GET /dashboard`` — the bedroom tablet dashboard (docs/dashboard.md), its CSS/JS versioned by the release
 - ``GET /api/health`` — ``{ok, version, time}``; ``version`` is the ``VERSION`` file (CI writes the release name into it)
 """
 
+import functools
+import hashlib
 import logging
 import os
 import time
+from pathlib import Path
+from typing import Any
 
 from aiohttp import web
+
+from core.addons import loader
 
 logger = logging.getLogger(__name__)
 
@@ -45,13 +51,38 @@ async def index_handler(request: web.Request) -> web.StreamResponse:
     return web.FileResponse(index_path)
 
 
+_STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
+
+
+def _digest_files(digest: Any, label: str, folder: Path) -> None:
+    """Feeds every file under ``folder`` (its path under ``label``, then its bytes) to ``digest`` (a hashlib hash)."""
+    for path in sorted(p for p in folder.rglob("*") if p.is_file()):
+        digest.update(f"{label}/{path.relative_to(folder).as_posix()}\0".encode())
+        digest.update(path.read_bytes())
+
+
+@functools.lru_cache(maxsize=1)
+def web_release() -> str:
+    """What the web app's files are in this process: a digest of ``static/`` and of the ``web/`` folder of
+    every loaded addon (they change only with a deploy or a restart). The service worker's cache is named
+    after it, so any change to the shell or to an addon's page installs a new one (static/sw.js)."""
+    digest = hashlib.sha256()
+    _digest_files(digest, "static", _STATIC_DIR)
+    for name in loader.loaded():
+        web_dir = loader.folder(name).path / "web"
+        if web_dir.is_dir():
+            _digest_files(digest, f"addons/{name}", web_dir)
+    return digest.hexdigest()[:16]
+
+
 async def service_worker_handler(request: web.Request) -> web.StreamResponse:
-    """Serve the service worker file."""
-    static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
-    sw_path = os.path.join(static_dir, "sw.js")
-    if not os.path.exists(sw_path):
+    """Serve the service worker, its ``RELEASE`` filled in (never cached: the browser compares it to find a new release)."""
+    sw_path = _STATIC_DIR / "sw.js"
+    if not sw_path.is_file():
         return web.Response(text="Service worker file not found.", status=404)
-    return web.FileResponse(sw_path, headers={"Service-Worker-Allowed": "/"})
+    text = sw_path.read_text(encoding="utf-8").replace("__DANA_RELEASE__", web_release())
+    return web.Response(text=text, content_type="application/javascript",
+                        headers={"Service-Worker-Allowed": "/", "Cache-Control": "no-cache"})
 
 
 async def manifest_handler(request: web.Request) -> web.StreamResponse:
@@ -91,7 +122,6 @@ async def dashboard_fullscreen_handler(request: web.Request) -> web.StreamRespon
 def setup(app: web.Application) -> None:
     """Register the pages and ``/api/health``."""
     app.router.add_get("/", index_handler)
-    app.router.add_get("/shopping", index_handler)  # the app, opened on the Shopping panel (static/shopping.js)
     app.router.add_get("/sw.js", service_worker_handler)
     app.router.add_get("/manifest.json", manifest_handler)
     app.router.add_get("/api/health", health_api)

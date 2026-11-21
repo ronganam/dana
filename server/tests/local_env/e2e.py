@@ -545,12 +545,12 @@ WEB_LOAD = [
 
 # The web app's own scripts, in static/index.html's order (static/app.js says how they fit together).
 APP_SCRIPTS = [f"/static/{name}.js" for name in (
-    "app-core", "app-nav", "app-stream", "app-chat", "app-voice", "app-tasks", "app-memory", "app-projects",
-    "app-projects-table", "app-calls", "app-settings", "app-calendar", "app-debug", "app")]
+    "dana", "app-core", "app-nav", "app-panels", "app-stream", "app-thread", "app-chat", "app-voice", "app-tasks",
+    "app-calls", "app-settings", "app-debug", "app")]
 
-PAGES = ["/", "/dashboard", "/calendar", *APP_SCRIPTS, "/static/styles.css", "/manifest.json", "/sw.js",
-         "/static/addons.js", "/static/addons.css", "/shopping", "/static/shopping.js",
-         "/static/shopping-core.js", "/static/shopping.css"]
+PAGES = ["/", "/dashboard", "/calendar", *APP_SCRIPTS, "/static/styles.css", "/static/kit.css", "/manifest.json",
+         "/sw.js", "/static/addons.js", "/static/addons.css", "/shopping", "/addons/shopping/web/shopping.js",
+         "/addons/shopping/web/shopping-core.js", "/addons/shopping/web/shopping.css"]
 
 
 async def existing_clients(c: Client) -> None:
@@ -563,8 +563,8 @@ async def existing_clients(c: Client) -> None:
         check(f"web: {page} served", r.status == 200, r)
     index, sw = await c.get("/"), await c.get("/sw.js")
     at = [index.text.find(f'"{s}"') for s in APP_SCRIPTS]
-    check("web: the page loads the app's scripts in order, before the panel scripts",
-          0 < max(at) < index.text.find('"/static/inbox.js"') and at == sorted(at), at)
+    check("web: the page loads the app's scripts in order, before the core screens' scripts",
+          0 < max(at) < index.text.find('"/static/review.js"') and at == sorted(at), at)
     check("web: the service worker pre-caches every app script", all(f'"{s}"' in sw.text for s in APP_SCRIPTS), sw.status)
 
     # Login page → cookie → the same user; a bad token goes back to the login page.
@@ -579,9 +579,9 @@ async def existing_clients(c: Client) -> None:
     r = await c.req("POST", "/login", token=None, data={"token": ADMIN_TOKEN, "next": "/"})
     cookie = r.headers.get("Set-Cookie", "")
     check("login: the admin token sets the session cookie (HttpOnly, not the token)",
-          r.status == 302 and "ganam_session=" in cookie and "HttpOnly" in cookie and ADMIN_TOKEN not in cookie, r)
-    value = re.search(r"ganam_session=([^;]+)", cookie)
-    jar = {"ganam_session": value.group(1)} if value else {}
+          r.status == 302 and "dana_session=" in cookie and "HttpOnly" in cookie and ADMIN_TOKEN not in cookie, r)
+    value = re.search(r"dana_session=([^;]+)", cookie)
+    jar = {"dana_session": value.group(1)} if value else {}
     r = await c.get("/api/me", token=None, cookies=jar)
     check("login: the cookie is the admin", r.status == 200 and (r.body or {}).get("name") == ADMIN_NAME, r)
     r = await c.get("/", token=None, cookies=jar)
@@ -1419,9 +1419,9 @@ async def addons_page(c: Client, maya: Dict[str, str]) -> None:
           and "/static/addons.js" in index.text and "/static/addons.css" in index.text, index)
     js = await c.get("/static/addons.js", token=None)
     sw = await c.get("/sw.js", token=None)
-    check("page: its script is public like the other static files and the service worker lets its API through",
+    check("page: its script is public like the other static files and the service worker keeps it",
           js.status == 200 and "DanaAddonsCore" in js.text and sw.status == 200
-          and '"/api/addons"' in sw.text and "ganam-hub-v12" in sw.text, (js.status, sw.status))
+          and '"/static/addons.js"' in sw.text, (js.status, sw.status))
 
     # Every request the page makes, with the fields it reads: the admin, then the member.
     seen: List[str] = []
@@ -1503,28 +1503,33 @@ async def addons_page(c: Client, maya: Dict[str, str]) -> None:
 # =================================================================================================
 
 # =================================================================================================
-# 13. The web Shopping panel (static/shopping.js, static/shopping-core.js)
+# 13. The web Shopping panel (addons/shopping/web/: shopping.js, shopping-core.js, shopping.css)
 # =================================================================================================
 
 async def shopping_page(c: Client, maya: Dict[str, str]) -> None:
     print("\n== 13. The Shopping panel")
     tok, mid = maya["token"], maya["id"]
     page = await c.get("/shopping")
-    check("shopping: /shopping serves the app with the panel, its nav buttons and its assets",
-          page.status == 200 and 'id="panel-shopping"' in page.text and page.text.count("data-shopping-nav") == 2
-          and all(f"/static/{f}" in page.text for f in ("shopping.js", "shopping-core.js", "shopping.css")), page)
+    check("shopping: /shopping serves the app shell, which builds its navigation from /api/addons",
+          page.status == 200 and 'id="rail-addons"' in page.text and "/static/app-panels.js" in page.text
+          and "shopping.js" not in page.text, page)
     r = await c.get("/shopping", token=None)
     check("shopping: signed out → the login page, coming back to /shopping",
           r.status in (302, 303) and r.headers.get("Location", "").endswith("next=/shopping"), (r.status, r.headers.get("Location")))
-    assets = {f: await c.get(f"/static/{f}", token=None) for f in ("shopping.js", "shopping-core.js", "shopping.css")}
-    check("shopping: its assets are public like the other static files",
+    listed = next((a for a in ((await c.get("/api/addons", token=tok)).body or {}).get("addons", []) if a["name"] == "shopping"), {})
+    check("shopping: /api/addons gives its page to a user who has it",
+          (listed.get("web") or {}).get("panel") == "/addons/shopping/web/shopping.js", listed.get("web"))
+    files = ("shopping.js", "shopping-core.js", "shopping.css")
+    assets = {f: await c.get(f"/addons/shopping/web/{f}", token=tok) for f in files}
+    check("shopping: its page files are served signed in",
           all(a.status == 200 for a in assets.values()) and "DanaShoppingCore" in assets["shopping-core.js"].text
-          and "window.DanaShopping" in assets["shopping.js"].text and ".shp-row" in assets["shopping.css"].text,
+          and "Dana.panel(" in assets["shopping.js"].text and ".shp-row" in assets["shopping.css"].text,
           {f: a.status for f, a in assets.items()})
+    signed_out = await c.get("/addons/shopping/web/shopping.js", token=None)
+    check("shopping: its page files need sign-in", signed_out.status in (302, 303, 401), signed_out.status)
     sw = await c.get("/sw.js", token=None)
-    check("shopping: the service worker caches the new files and never the shopping API",
-          '"/static/shopping.js"' in sw.text and '"/static/shopping-core.js"' in sw.text
-          and 'requestUrl.pathname.startsWith("/api/shopping/")' in sw.text, sw.status)
+    check("shopping: the service worker keeps addon pages' files and leaves the API to the network",
+          r"\/addons\/[a-z0-9_]+\/web\/" in sw.text and "__DANA_RELEASE__" not in sw.text, sw.status)
     man = (await c.get("/manifest.json", token=None)).body or {}
     check("shopping: the manifest has a Shopping shortcut to /shopping",
           any(sc.get("url") == "/shopping" for sc in man.get("shortcuts", [])), man.get("shortcuts"))

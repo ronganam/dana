@@ -6,9 +6,8 @@ Trust model
   is the first admin user's; any other token is looked up (hashed) in the DB
   (core/users.py).
 * **Browsers** sign in once at ``/login`` with any valid token; a long-lived
-  HttpOnly cookie holding an HMAC of the token (never the token itself) is
-  set. The cookie format is unchanged, so logins made with ``API_TOKEN``
-  before users existed stay valid.
+  HttpOnly cookie (``dana_session``) holding an HMAC of the token (never the
+  token itself) is set.
 * **Inbound webhooks** (:data:`INBOUND_PATHS`: WAHA) may be called without
   credentials; their handler proves the sender itself (WAHA's HMAC signature
   with ``WAHA_WEBHOOK_SECRET``: addons/whatsapp/api.py) and finds its user
@@ -49,7 +48,7 @@ Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 
 logger = logging.getLogger(__name__)
 
-SESSION_COOKIE = "ganam_session"
+SESSION_COOKIE = "dana_session"
 # Browsers cap cookie lifetime at 400 days.
 SESSION_MAX_AGE = 400 * 24 * 3600
 

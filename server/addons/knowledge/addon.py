@@ -1,6 +1,6 @@
 """The ``knowledge`` addon (Knowledge)."""
 
-from core.addons import Addon, PromptPart, LlmJob
+from core.addons import Addon, PromptPart, LlmJob, Web, Nav
 
 KNOWLEDGE_GUIDE = (
     "\n\n--- KNOWLEDGE & PROJECTS ---\n"
@@ -39,7 +39,7 @@ KNOWLEDGE_GUIDE = (
     "-----------------------------------\n\n"
 )
 
-addon = Addon("knowledge", order=40, default_on=True, llm_jobs={"media_summary": LlmJob("fast", "Link / media summaries"), "knowledge_file": LlmJob("fast", "Project file transcripts")}, description="Projects and saved entries", prompt_parts=(
+addon = Addon("knowledge", web=Web(panel="projects.js", style="projects.css", nav=Nav("Projects", icon="folder", order=50)), order=40, default_on=True, llm_jobs={"media_summary": LlmJob("fast", "Link / media summaries"), "knowledge_file": LlmJob("fast", "Project file transcripts")}, description="Projects and saved entries", prompt_parts=(
     PromptPart("undoable", "notes", rank=40),
     PromptPart("guides", KNOWLEDGE_GUIDE, rank=40),
 ))

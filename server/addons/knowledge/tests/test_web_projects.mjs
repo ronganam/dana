@@ -1,5 +1,5 @@
 /**
- * Contract test for the web Projects panel's pure part (static/projects-core.js, DanaProjectsCore).
+ * Contract test for the web Projects panel's pure part (addons/knowledge/web/projects-core.js, DanaProjectsCore).
  *
  * Loads it without a browser and feeds it the *actual payloads* the API answered, captured in
  * tests/fixtures/projects_web.json by `WRITE_WEB_FIXTURE=1 bin/test test_knowledge_sections`: the owner's
@@ -21,12 +21,12 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = path.join(here, "..", "..", "..");  // the server folder
 const FIXTURE = process.argv[2] || path.join(SERVER, "tests", "fixtures", "projects_web.json");
 const F = JSON.parse(fs.readFileSync(FIXTURE, "utf8"));
-const src = fs.readFileSync(path.join(SERVER, "static/projects-core.js"), "utf8");
+const src = fs.readFileSync(path.join(SERVER, "addons/knowledge/web/projects-core.js"), "utf8");
 
 const sandbox = { console, URL, Set, Map, JSON, Object, Array, String, Number, Boolean, RegExp, Math, Date, Error, Intl };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
-vm.runInContext(src, sandbox, { filename: "static/projects-core.js" });
+vm.runInContext(src, sandbox, { filename: "addons/knowledge/web/projects-core.js" });
 const C = sandbox.DanaProjectsCore;
 
 let pass = 0;

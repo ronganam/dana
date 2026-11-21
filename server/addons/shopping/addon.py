@@ -1,12 +1,12 @@
 """The ``shopping`` addon (Shopping)."""
 
-from core.addons import Field, Addon, PromptPart, LlmJob
+from core.addons import Field, Addon, PromptPart, LlmJob, Web, Nav
 from addons.shopping import lists
 from addons.shopping.values import ACTIVE_SETTING
 
 # Connecting it gives the user their own shopping list.
 addon = Addon(
-    "shopping", order=30, default_on=True, llm_jobs={"shopping_category": LlmJob("fast", "Shopping aisles")},
+    "shopping", web=Web(panel="shopping.js", style="shopping.css", nav=Nav("Shopping", icon="shopping-cart", order=10)), order=30, default_on=True, llm_jobs={"shopping_category": LlmJob("fast", "Shopping aisles")},
     settings=(
         Field(ACTIVE_SETTING, "The list the user's shopping changes go to: their own (None) or the id of a "
                               "list shared with them to edit."),

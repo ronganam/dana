@@ -19,7 +19,7 @@ my_addon/
   tools.py          @addon.tool() functions             imported when present
   hooks.py          jobs, handlers, Now cards…          imported when present
   api.py            setup(app): its HTTP routes         registered automatically
-  web/              its panel / style files             served at /addons/<name>/web/<file> (web=Web(...))
+  web/              its page: script, style             served at /addons/<name>/web/<file> (web=Web(...); "A web page")
   worker/           Dockerfile of a sidecar             built by bin/deploy as <image>-<name> (worker=Worker(...))
   migrations/       m0001_baseline.py, m0002_…          its own tables
   tests/            test_*.py                           run by bin/test
@@ -191,9 +191,56 @@ def setup(app: web.Application) -> None:      # api.py; behind the same auth as 
 
 `store.require` raises `NotConnected` (403 `not_connected` from the middleware) for a user without the addon. While an admin has disabled the addon on the server its routes answer 404 `addon_disabled` before your handler runs.
 
-## Web files and workers
+## A web page
 
-`web=Web(panel="panel.js", style="panel.css", nav=Nav("My addon", icon="star"))` serves the addon's `web/` folder at `/addons/<name>/web/<file>` (signed in, only while the addon is enabled on the server) and puts the URLs in `/api/addons` for users who have it on. `worker=Worker(port=8091, url_env="MY_ADDON_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained: the app image leaves it out); the addon reaches it at the URL in `url_env`. Deploying and running workers: `operations.md`, "Workers"; money's bank worker (`addons/money/worker/`) is the example.
+```python
+web=Web(panel="weather.js", style="weather.css", nav=Nav("Weather", icon="cloud-sun", order=60))
+```
+
+The addon's `web/` folder is served at `/addons/<name>/web/<file>` (signed in, only while the addon is enabled on the server), and `GET /api/addons` gives each user, for the addons on for them, `web: {panel, style, nav}` with those URLs. The web app's shell knows no addon by name: it builds its navigation from that list (a button per `Nav`, in `order`; Lucide icon names), loads each page's script when the app starts, the style the first time the page is opened, and mounts the page in its own `<section id="panel-<id>">`. `/<id>` and `#<id>…` open it when the app loads (an addon that wants a path of its own adds a route serving the app: shopping's `GET /shopping` in its `api.py`).
+
+The script registers the page with the SDK in `static/dana.js`:
+
+```js
+// web/weather.js
+(() => {
+  "use strict";
+  let A = null;
+  Dana.panel({
+    id: "weather", title: "Weather", icon: "cloud-sun",
+    scripts: ["weather-core.js"],          // optional: files beside it, loaded first, in order
+    start(api) { A = api; },               // optional: once, at registration (a badge: api.badge(n))
+    async mount(el, api, arg) {            // each time it is opened; el is empty the first time
+      if (!el.firstChild) el.innerHTML = `<header class="top-bar"><span class="top-bar-title">Weather</span></header><div data-now></div>`;
+      const now = await api.call("/api/weather");
+      el.querySelector("[data-now]").textContent = now.summary;
+    },
+    unmount() {},                          // optional: when the user leaves it
+  });
+})();
+```
+
+`api` (the same object for `start` and every `mount`):
+
+| | |
+|---|---|
+| `api.me` | who is signed in (`GET /api/me`: id, name, access, capabilities, addons, languages, currency) |
+| `api.json(method, path, body)` | a JSON request that never throws: `{status, body}` (status 0: no answer) |
+| `api.call(path, {method, body})` | a JSON request that throws `Error` (the server's `message` / `error`, `.status`, `.body`) unless 2xx |
+| `api.fetch(path, init)` | `fetch`, signed in like the page, never from a cache (uploads) |
+| `api.stream(path, {event: fn(data, ev)})` | Server-Sent Events; returns `{close()}` |
+| `api.open(id, arg)` | another screen: a core one (`chat`, `tasks`, `calls` with a call id, `settings`, `addons`, `review`, `usage`) or another page by its id (`arg` reaches its `mount`) |
+| `api.openSession(sid)` | a chat session in Chat |
+| `api.badge(value, tone)` | the page's navigation badge: a count (0 / null hides it, above 99 shows "99+") or a short text; tone `"quiet"` for a count that is not an alert |
+| `api.toast(text)`, `api.visible()`, `api.icons()`, `api.esc(text)` | a short message; whether the page is on screen; draw `<i data-lucide>` icons; HTML-escape |
+| `api.store.get(key, fallback)` / `.set` / `.remove` | `localStorage` that never throws |
+| `api.addon`, `api.base` | the addon's name; the URL of its `web/` folder |
+
+A page uses only its own elements and these; nothing else of the shell is its business. It builds on the shell's tokens (`static/styles.css`: `--ink`, `--canvas`, `--radius-card`…, `.top-bar`, `.btn-primary`, `.chip`, `.icon-btn`, `.form-control`) and its screen kit (`static/kit.css`: `.ibx` list and detail panes that become one on a phone, `.ibx-toolbar` with view chips and `.ibx-search`, `.ibx-titles` / `.ibx-kicker`, `.ibx-toast`, `.ibx-modal` with `.ibx-modal-card`, `.ibx-field`, `.ibx-row2`, `.ibx-btns`, `.ibx-empty`). The service worker keeps a page's files with the shell's, one cache per release (a digest of the shell's and every addon's web files), so a deploy or an addon update never leaves an old page. Pure parts go in a separate file (`web/<x>-core.js` that sets `globalThis.<Name>`) and get a `tests/test_web_<x>.mjs` run by `bin/test` (the official pages: shopping, knowledge, money). The shell's own part is tested by `tests/test_web_panels.mjs` and `tests/test_web_shell.py`.
+
+## Workers
+
+`worker=Worker(port=8091, url_env="MY_ADDON_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained: the app image leaves it out); the addon reaches it at the URL in `url_env`. Deploying and running workers: `operations.md`, "Workers"; money's bank worker (`addons/money/worker/`) is the example.
 
 ## Rules that save time
 

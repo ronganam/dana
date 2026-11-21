@@ -1,43 +1,6 @@
-/* Inbox — phone notifications managed from the web (static/inbox.js).
-   Uses the app tokens from styles.css. */
-
-.ibx-titles { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.ibx-kicker {
-  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .6px; text-transform: uppercase;
-  color: var(--prio-medium); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.ibx-kicker:empty { display: none; }
-
-.rail-btn, .bottom-nav-btn { position: relative; }
-.ibx-nav-badge {
-  position: absolute; top: 4px; right: 14px; min-width: 17px; height: 17px; padding: 0 5px;
-  border-radius: var(--radius-full); background: var(--destructive); color: #fff;
-  font-size: 10px; font-weight: 600; line-height: 17px; text-align: center; pointer-events: none;
-}
-.bottom-nav-btn .ibx-nav-badge { top: 2px; right: calc(50% - 22px); }
-.ibx-nav-badge.hidden { display: none; }
-
-/* Layout */
-.ibx { flex: 1; display: flex; min-height: 0; }
-.ibx-list-pane {
-  width: 46%; min-width: 360px; max-width: 640px; display: flex; flex-direction: column;
-  border-right: 1px solid var(--hairline); min-height: 0;
-}
-.ibx-detail-pane { flex: 1; min-width: 0; overflow-y: auto; }
-.ibx-scroll { flex: 1; overflow-y: auto; padding-bottom: 40px; outline: none; }
-
-.ibx-toolbar { padding: 12px 16px 10px; display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--hairline); }
-.ibx-views { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
-.ibx-views::-webkit-scrollbar { display: none; }
-.ibx-views .chip .n { color: var(--mute); font-variant-numeric: tabular-nums; }
-.ibx-views .chip.active .n { color: var(--body-strong); }
-.ibx-search {
-  display: flex; align-items: center; gap: 8px; background: var(--canvas); border: 1px solid var(--hairline);
-  border-radius: var(--radius-lg); padding: 0 10px; height: 36px;
-}
-.ibx-search:focus-within { border-color: var(--hairline-strong); }
-.ibx-search i, .ibx-search svg { width: 15px; height: 15px; color: var(--mute); flex-shrink: 0; }
-.ibx-search input { flex: 1; background: none; border: 0; outline: none; color: var(--ink); font-size: 13.5px; min-width: 0; }
+/* Inbox — phone notifications managed from the web (inbox.js), the phone addon's page.
+   Builds on the shell's tokens (static/styles.css) and screen kit (static/kit.css: .ibx panes, toolbar,
+   search, toast, modal, fields). */
 
 #ibx-group-toggle.active { background: rgba(247,245,240,.14); color: var(--ink); border-color: var(--ink); }
 
@@ -55,11 +18,6 @@
   font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .7px; text-transform: uppercase; color: var(--mute);
 }
 .ibx-section .grow { flex: 1; }
-.ibx-link {
-  font-family: var(--font-inter); font-size: 12px; letter-spacing: 0; text-transform: none;
-  color: var(--prio-medium); background: none; padding: 2px 4px; border-radius: var(--radius-sm); cursor: pointer;
-}
-.ibx-link:hover { background: rgba(255,149,0,.12); }
 .ibx-fold { background: none; color: var(--mute); display: inline-flex; align-items: center; gap: 4px; cursor: pointer; font: inherit; letter-spacing: inherit; text-transform: inherit; }
 .ibx-fold svg { width: 13px; height: 13px; }
 
@@ -152,11 +110,6 @@
 .ibx-sugg-ev { font-size: 12px; color: var(--mute); font-style: italic; border-left: 2px solid var(--hairline-strong); padding-left: 8px; margin: 4px 0 6px; }
 .ibx-trigs { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 8px; }
 .ibx-trig { font-family: var(--font-mono); font-size: 11px; color: var(--body); border: 1px solid var(--hairline-strong); border-radius: var(--radius-full); padding: 2px 8px; }
-.ibx-btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.ibx-btns .btn-primary, .ibx-btns .btn-secondary { padding: 5px 12px; font-size: 12.5px; }
-.ibx-btns .btn-primary svg, .ibx-btns .btn-secondary svg { width: 14px; height: 14px; }
-.btn-ghost-danger { background: none; color: var(--destructive); font-size: 12.5px; padding: 5px 10px; border-radius: var(--radius-sm); cursor: pointer; }
-.btn-ghost-danger:hover { background: rgba(255,69,58,.12); }
 
 /* Detail */
 .ibx-detail { max-width: 760px; margin: 0 auto; padding: 22px 28px 60px; }
@@ -164,7 +117,6 @@
 .ibx-detail-head .who { flex: 1; min-width: 0; }
 .ibx-detail-head .app { font-size: 15px; font-weight: 600; color: var(--ink); }
 .ibx-detail-head .sub { font-size: 12px; color: var(--mute); }
-.ibx-close { display: none; }
 .ibx-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 6px; }
 .ibx-tag { font-size: 11.5px; padding: 2px 9px; border-radius: var(--radius-full); background: var(--canvas-soft); border: 1px solid var(--hairline); color: var(--body); }
 .ibx-tag.urgent { color: var(--destructive); border-color: rgba(255,69,58,.4); }
@@ -202,35 +154,11 @@
 .ibx-menu button:hover, .ibx-menu button:focus { background: rgba(247,245,240,.08); color: var(--ink); outline: none; }
 .ibx-menu .hint { color: var(--mute); font-size: 12px; }
 
-.ibx-toast {
-  position: fixed; left: 50%; bottom: 28px; transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: 14px;
-  background: var(--ink); color: var(--on-primary); padding: 10px 14px 10px 16px; border-radius: var(--radius-lg);
-  font-size: 13.5px; box-shadow: 0 10px 30px rgba(0,0,0,.4); max-width: calc(100vw - 32px);
-}
-.ibx-toast.hidden { display: none; }
-.ibx-toast button { background: none; color: #b85c00; font-weight: 600; font-size: 13px; cursor: pointer; }
-
-.ibx-modal { position: fixed; inset: 0; z-index: 70; background: rgba(0,0,0,.5); display: flex; align-items: center; justify-content: center; padding: 16px; }
-.ibx-modal.hidden { display: none; }
-.ibx-modal-card { width: 100%; max-width: 460px; background: var(--canvas-soft); border: 1px solid var(--hairline-strong); border-radius: var(--radius-sheet); padding: 20px; max-height: 90vh; overflow-y: auto; }
-.ibx-modal-card h3 { font-size: 16px; color: var(--ink); margin: 0 0 14px; }
-.ibx-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; font-size: 12px; color: var(--mute); }
-.ibx-field .form-control { width: 100%; }
-.ibx-row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .ibx-keys { display: grid; grid-template-columns: max-content 1fr; gap: 7px 16px; font-size: 13px; color: var(--body-strong); }
 .ibx-keys kbd { font-family: var(--font-mono); font-size: 11.5px; background: var(--canvas); border: 1px solid var(--hairline-strong); border-radius: 4px; padding: 1px 6px; color: var(--ink); }
 
-.ibx-empty { padding: 60px 24px; text-align: center; color: var(--mute); display: flex; flex-direction: column; align-items: center; gap: 8px; }
-.ibx-empty strong { color: var(--body-strong); font-size: 15px; font-weight: 600; }
-.ibx-empty svg { width: 38px; height: 38px; opacity: .4; margin-bottom: 4px; }
-
 /* Small screens: one pane, the detail slides over the list. */
 @media (max-width: 900px) {
-  .ibx-list-pane { width: 100%; max-width: none; min-width: 0; border-right: 0; }
-  .ibx-detail-pane { display: none; position: absolute; inset: 0; z-index: 30; background: var(--canvas); }
-  .ibx.detail-open .ibx-detail-pane { display: block; }
-  .ibx { position: relative; }
-  .ibx-close { display: inline-flex; }
   .ibx-detail { padding: 16px 16px 90px; }
   .ibx-row-actions { display: none !important; }
   .ibx-check { display: inline-flex; }

@@ -18,43 +18,31 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Stylesheet -->
     <link rel="stylesheet" href="/static/styles.css">
-    <link rel="stylesheet" href="/static/inbox.css">
-    <link rel="stylesheet" href="/static/people.css">
+    <link rel="stylesheet" href="/static/kit.css">
+    <link rel="stylesheet" href="/static/review.css">
     <link rel="stylesheet" href="/static/usage.css">
     <link rel="stylesheet" href="/static/addons.css">
-    <link rel="stylesheet" href="/static/shopping.css">
-    <link rel="stylesheet" href="/static/money.css">
-    <link rel="stylesheet" href="/static/projects.css">
     <!-- Third-Party Libraries -->
     <!-- Vendored, exact versions (THIRD_PARTY.md): no script comes from a CDN -->
     <script src="/static/vendor/marked.min.js"></script>
     <script src="/static/vendor/purify.min.js"></script>
     <script src="/static/vendor/lucide.min.js"></script>
+    <script src="/static/dana.js" defer></script>
     <script src="/static/app-core.js" defer></script>
     <script src="/static/app-nav.js" defer></script>
+    <script src="/static/app-panels.js" defer></script>
     <script src="/static/app-stream.js" defer></script>
     <script src="/static/app-thread.js" defer></script>
     <script src="/static/app-chat.js" defer></script>
     <script src="/static/app-voice.js" defer></script>
     <script src="/static/app-tasks.js" defer></script>
-    <script src="/static/app-memory.js" defer></script>
     <script src="/static/app-calls.js" defer></script>
     <script src="/static/app-settings.js" defer></script>
-    <script src="/static/app-calendar.js" defer></script>
     <script src="/static/app-debug.js" defer></script>
     <script src="/static/app.js" defer></script>
-    <script src="/static/inbox.js" defer></script>
-    <script src="/static/people.js" defer></script>
     <script src="/static/review.js" defer></script>
     <script src="/static/usage.js" defer></script>
     <script src="/static/addons.js" defer></script>
-    <script src="/static/shopping-core.js" defer></script>
-    <script src="/static/shopping.js" defer></script>
-    <script src="/static/money-core.js" defer></script>
-    <script src="/static/money-dash.js" defer></script>
-    <script src="/static/money.js" defer></script>
-    <script src="/static/projects-core.js" defer></script>
-    <script src="/static/projects.js" defer></script>
     <script src="/static/profile.js" defer></script>
 </head>
 <body>
@@ -67,36 +55,12 @@
                     <i data-lucide="message-square"></i>
                     <span>Chat</span>
                 </button>
-                <button class="rail-btn" data-tab="inbox" title="Phone notifications">
-                    <i data-lucide="inbox"></i>
-                    <span>Inbox</span>
-                    <span class="ibx-nav-badge hidden" data-inbox-badge></span>
-                </button>
-                <button class="rail-btn" data-tab="people" title="People">
-                    <i data-lucide="users"></i>
-                    <span>People</span>
-                </button>
                 <button class="rail-btn" data-tab="tasks" title="Tasks & Reminders">
                     <i data-lucide="check-square"></i>
                     <span>Tasks</span>
                 </button>
-                <button class="rail-btn hidden" data-tab="shopping" data-shopping-nav title="Shopping list">
-                    <i data-lucide="shopping-cart"></i>
-                    <span>Shopping</span>
-                    <span class="ibx-nav-badge shp-nav-badge hidden" data-shopping-badge></span>
-                </button>
-                <button class="rail-btn hidden" data-tab="money" data-money-nav title="Money">
-                    <i data-lucide="wallet"></i>
-                    <span>Money</span>
-                </button>
-                <button class="rail-btn" data-tab="memory" title="Memory Center">
-                    <i data-lucide="star"></i>
-                    <span>Memory</span>
-                </button>
-                <button class="rail-btn" data-tab="projects" title="Projects & Knowledge">
-                    <i data-lucide="folder"></i>
-                    <span>Projects</span>
-                </button>
+                <!-- The user's addon pages (static/app-panels.js) -->
+                <div class="nav-addons" id="rail-addons"></div>
                 <button class="rail-btn" data-tab="calls" title="Calls & Memos">
                     <i data-lucide="phone"></i>
                     <span>Calls</span>
@@ -108,10 +72,6 @@
             </div>
             <div class="rail-divider"></div>
             <div class="nav-rail-secondary">
-                <button class="rail-btn" data-tab="calendar" title="Calendar Hub">
-                    <i data-lucide="calendar"></i>
-                    <span>Calendar</span>
-                </button>
                 <button class="rail-btn" data-tab="debug" title="Debug & Logs">
                     <i data-lucide="terminal"></i>
                     <span>Debug</span>
@@ -137,28 +97,7 @@
                 <i data-lucide="check-square"></i>
                 <span>Tasks</span>
             </button>
-            <button class="bottom-nav-btn hidden" data-tab="shopping" data-shopping-nav>
-                <i data-lucide="shopping-cart"></i>
-                <span>Shopping</span>
-                <span class="ibx-nav-badge shp-nav-badge hidden" data-shopping-badge></span>
-            </button>
-            <button class="bottom-nav-btn hidden" data-tab="money" data-money-nav>
-                <i data-lucide="wallet"></i>
-                <span>Money</span>
-            </button>
-            <button class="bottom-nav-btn" data-tab="inbox">
-                <i data-lucide="inbox"></i>
-                <span>Inbox</span>
-                <span class="ibx-nav-badge hidden" data-inbox-badge></span>
-            </button>
-            <button class="bottom-nav-btn" data-tab="people">
-                <i data-lucide="users"></i>
-                <span>People</span>
-            </button>
-            <button class="bottom-nav-btn" data-tab="projects">
-                <i data-lucide="folder"></i>
-                <span>Projects</span>
-            </button>
+            <div class="nav-addons" id="bottom-addons"></div>
             <button class="bottom-nav-btn" data-tab="calls">
                 <i data-lucide="phone"></i>
                 <span>Calls</span>
@@ -390,57 +329,6 @@
                 </button>
             </section>
 
-            <!-- ════ SCREEN 3: MEMORY CENTER ════ -->
-            <section class="screen-panel" id="panel-memory">
-                <header class="top-bar">
-                    <span class="top-bar-title">Memory Center</span>
-                    <div class="top-bar-actions">
-                        <button class="btn-primary" id="btn-add-memory-top">
-                            <i data-lucide="plus" style="width:16px;height:16px;"></i>
-                            <span>Add Memory</span>
-                        </button>
-                    </div>
-                </header>
-
-                <div class="two-pane-container" id="memory-two-pane">
-                    <!-- Left: Master List -->
-                    <div class="pane-master">
-                        <div class="pane-master-header">
-                            <input type="text" class="form-control" id="memory-search-input" placeholder="Search memories...">
-                        </div>
-                        <div class="pane-master-list" id="memory-master-list">
-                            <!-- Memory compact rows inserted here -->
-                        </div>
-                    </div>
-                    <!-- Right: Detail / Inline Editor Pane -->
-                    <div class="pane-detail" id="memory-detail-pane">
-                        <div class="pane-empty-state">
-                            <i data-lucide="star" style="width:40px;height:40px;opacity:0.4;"></i>
-                            <span>Select a memory to view or edit</span>
-                        </div>
-                    </div>
-                </div>
-
-                <button class="fab-btn" id="btn-add-memory-fab" title="Add Memory">
-                    <i data-lucide="plus"></i>
-                </button>
-            </section>
-
-            <!-- ════ PROJECTS (static/projects.js, static/projects-core.js; docs/knowledge.md) ════ -->
-            <section class="screen-panel" id="panel-projects" data-level="home">
-                <header class="top-bar prj-top">
-                    <nav class="prj-crumbs" id="prj-crumbs" aria-label="Where you are"><span class="top-bar-title">Projects</span></nav>
-                    <div class="top-bar-actions" id="prj-actions"></div>
-                </header>
-                <div class="prj-body">
-                    <aside class="prj-side" id="prj-side" aria-label="Projects"></aside>
-                    <main class="prj-main" id="prj-main"></main>
-                </div>
-                <div class="prj-sheet-backdrop hidden" id="prj-sheet-backdrop"></div>
-                <aside class="prj-sheet hidden" id="prj-sheet" role="dialog" aria-modal="true" aria-label="Details"></aside>
-                <div class="prj-toast hidden" id="prj-toast" role="status" aria-live="polite"></div>
-            </section>
-
             <!-- ════ SCREEN 5: CALLS (Call Assistant) ════ -->
             <section class="screen-panel" id="panel-calls">
                 <header class="top-bar">
@@ -478,128 +366,6 @@
                 <button class="fab-btn" id="btn-upload-call-fab" title="Upload Audio">
                     <i data-lucide="upload"></i>
                 </button>
-            </section>
-
-            <!-- ════ INBOX: phone notifications (static/inbox.js) ════ -->
-            <section class="screen-panel" id="panel-inbox">
-                <header class="top-bar">
-                    <div class="ibx-titles">
-                        <span class="top-bar-title">Inbox</span>
-                        <span class="ibx-kicker" id="ibx-kicker"></span>
-                    </div>
-                    <div class="top-bar-actions">
-                        <button class="chip" id="ibx-group-toggle" title="Group by app (g)">
-                            <i data-lucide="layers" style="width:14px;height:14px;"></i><span>By app</span>
-                        </button>
-                        <button class="icon-btn" id="ibx-help-btn" title="Keyboard shortcuts (?)"><i data-lucide="keyboard"></i></button>
-                        <button class="icon-btn" id="ibx-refresh" title="Refresh (r)"><i data-lucide="refresh-cw"></i></button>
-                    </div>
-                </header>
-                <div class="ibx" id="ibx-root">
-                    <div class="ibx-list-pane">
-                        <div class="ibx-toolbar">
-                            <div class="ibx-views" id="ibx-views" role="tablist"></div>
-                            <div class="ibx-search">
-                                <i data-lucide="search"></i>
-                                <input type="search" id="ibx-search" placeholder="Search app, person or text   /" autocomplete="off">
-                            </div>
-                        </div>
-                        <div class="ibx-bulkbar hidden" id="ibx-bulkbar"></div>
-                        <div class="ibx-scroll" id="ibx-list" tabindex="-1"></div>
-                    </div>
-                    <div class="ibx-detail-pane" id="ibx-detail"></div>
-                </div>
-                <div class="ibx-toast hidden" id="ibx-toast" role="status" aria-live="polite"></div>
-                <div class="ibx-modal hidden" id="ibx-modal"></div>
-            </section>
-
-            <!-- ════ SHOPPING (static/shopping.js, static/shopping-core.js) — also opened at /shopping ════ -->
-            <section class="screen-panel" id="panel-shopping" data-state="loading">
-                <header class="top-bar shp-top">
-                    <div class="ibx-titles">
-                        <span class="top-bar-title">Shopping</span>
-                        <span class="ibx-kicker" id="shp-sub" aria-live="polite"></span>
-                    </div>
-                    <div class="top-bar-actions">
-                        <div id="shp-people"></div>
-                        <button class="chip hidden" id="shp-share-btn" title="Share this list"><i data-lucide="user-plus"></i><span>Share</span></button>
-                        <div class="shp-menu-wrap">
-                            <button class="icon-btn hidden" id="shp-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-label="List menu" title="More"><i data-lucide="ellipsis-vertical"></i></button>
-                            <div id="shp-menu" class="hidden"></div>
-                        </div>
-                    </div>
-                </header>
-                <div class="shp-scroll" id="shp-scroll">
-                    <div class="shp-inner">
-                        <div id="shp-invites"></div>
-                        <div class="shp-addbar" id="shp-addbar">
-                            <div class="shp-add-field">
-                                <i data-lucide="plus"></i>
-                                <input type="text" id="shp-add" placeholder="Add items…" autocomplete="off" autocapitalize="sentences" enterkeyhint="enter" dir="auto"
-                                       role="combobox" aria-label="Add items: type a name, or several separated by commas" aria-autocomplete="list" aria-expanded="false" aria-controls="shp-sugg">
-                                <kbd class="shp-kbd" aria-hidden="true">/</kbd>
-                            </div>
-                            <ul id="shp-sugg" class="shp-suggs hidden" role="listbox" aria-label="Bought before"></ul>
-                        </div>
-                        <div id="shp-usuals"></div>
-                        <div id="shp-status"></div>
-                        <div id="shp-list" class="shp-list"></div>
-                        <div id="shp-empty"></div>
-                    </div>
-                </div>
-                <div class="shp-snack hidden" id="shp-snack" role="status" aria-live="polite"></div>
-                <div class="shp-pop hidden" id="shp-pop" role="menu"></div>
-                <div class="shp-scrim hidden" id="shp-scrim"></div>
-                <div class="shp-sheet hidden" id="shp-sheet" role="dialog" aria-modal="true"></div>
-            </section>
-
-            <!-- ════ MONEY (static/money.js, static/money-dash.js, static/money-core.js) — also opened at /#money ════ -->
-            <section class="screen-panel" id="panel-money">
-                <header class="top-bar mny-top">
-                    <button class="icon-btn hidden" id="mny-back" title="Back to Money" aria-label="Back to Money"><i data-lucide="arrow-left"></i></button>
-                    <div class="ibx-titles mny-titles">
-                        <span class="top-bar-title" id="mny-title">Money</span>
-                        <span class="mny-status" id="mny-status" aria-live="polite"></span>
-                    </div>
-                    <div class="top-bar-actions">
-                        <div class="mny-month hidden" id="mny-month" role="group" aria-label="Month"></div>
-                        <button class="icon-btn mny-src-btn hidden" id="mny-sources-btn" title="Banks &amp; cards" aria-label="Banks and cards"><i data-lucide="landmark"></i><span class="mny-dot hidden"></span></button>
-                        <button class="chip hidden" id="mny-add-top"><i data-lucide="plus" style="width:14px;height:14px;"></i><span>Add</span></button>
-                        <button class="icon-btn mny-refresh" id="mny-refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
-                    </div>
-                </header>
-                <div class="mny-scroll" id="mny-scroll">
-                    <div class="mny-inner" id="mny-root"></div>
-                </div>
-                <div class="mny-toast hidden" id="mny-toast" role="status" aria-live="polite"></div>
-                <div class="mny-scrim hidden" id="mny-scrim"></div>
-                <div class="mny-sheet hidden" id="mny-sheet" role="dialog" aria-modal="true" aria-label="Money"></div>
-            </section>
-
-            <!-- ════ PEOPLE (static/people.js) ════ -->
-            <section class="screen-panel" id="panel-people">
-                <header class="top-bar">
-                    <span class="top-bar-title">People</span>
-                    <div class="top-bar-actions">
-                        <button class="icon-btn" id="ppl-refresh" title="Refresh"><i data-lucide="refresh-cw"></i></button>
-                        <button class="btn-primary" id="ppl-add"><i data-lucide="user-plus" style="width:16px;height:16px;"></i><span>Add</span></button>
-                    </div>
-                </header>
-                <div class="ibx ppl" id="ppl-root">
-                    <div class="ibx-list-pane">
-                        <div class="ibx-toolbar">
-                            <div class="ibx-views" id="ppl-sorts"></div>
-                            <div class="ibx-search">
-                                <i data-lucide="search"></i>
-                                <input type="search" id="ppl-search" placeholder="Name, relation or number   /" autocomplete="off">
-                            </div>
-                        </div>
-                        <div class="ibx-scroll" id="ppl-list"></div>
-                    </div>
-                    <div class="ibx-detail-pane" id="ppl-detail"></div>
-                </div>
-                <div class="ibx-toast hidden" id="ppl-toast" role="status" aria-live="polite"></div>
-                <div class="ibx-modal hidden" id="ppl-modal"></div>
             </section>
 
             <!-- ════ WEEKLY REVIEW (static/review.js) — opened from the Tasks banner or /#review ════ -->
@@ -722,21 +488,6 @@
                         <div class="usg-card" id="usg-breakdown"></div>
                         <div class="usg-card" id="usg-events"></div>
                     </div>
-                </div>
-            </section>
-
-            <!-- ════ SCREEN 7: CALENDAR HUB ════ -->
-            <section class="screen-panel" id="panel-calendar">
-                <header class="top-bar">
-                    <span class="top-bar-title">Calendar Hub</span>
-                    <div class="top-bar-actions">
-                        <button class="icon-btn" id="btn-refresh-calendar" title="Refresh">
-                            <i data-lucide="refresh-cw"></i>
-                        </button>
-                    </div>
-                </header>
-                <div style="flex:1;overflow-y:auto;padding:24px;" id="calendar-events-container">
-                    <!-- Events list inserted here -->
                 </div>
             </section>
 
@@ -866,40 +617,6 @@
         </div>
     </div>
 
-    <!-- Memory Editor Modal -->
-    <div class="modal-overlay" id="memory-modal">
-        <div class="modal-sheet">
-            <div class="modal-header">
-                <h3 class="modal-title" id="memory-modal-title">New Memory</h3>
-                <button class="icon-btn" id="memory-modal-close"><i data-lucide="x"></i></button>
-            </div>
-            <form id="memory-form" class="modal-body">
-                <input type="hidden" id="memory-original-key">
-                <div class="form-group">
-                    <label class="form-label" for="memory-key">Topic / Key</label>
-                    <input type="text" class="form-control" id="memory-key" required placeholder="e.g. WiFi password">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="memory-value">Content</label>
-                    <textarea class="form-control" id="memory-value" required rows="3" placeholder="What should the assistant remember?"></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Category</label>
-                    <div class="segmented-control" id="memory-cat-control">
-                        <div class="segmented-btn active" data-cat="general">General</div>
-                        <div class="segmented-btn" data-cat="personal">Personal</div>
-                        <div class="segmented-btn" data-cat="work">Work</div>
-                    </div>
-                </div>
-            </form>
-            <div class="modal-footer">
-                <button class="btn-destructive-outline hidden" id="btn-memory-delete">Delete</button>
-                <button class="btn-secondary" id="btn-memory-cancel">Cancel</button>
-                <button class="btn-primary" id="btn-memory-save">Save Memory</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Call Upload Modal -->
     <div class="modal-overlay" id="call-upload-modal">
         <div class="modal-sheet">
@@ -985,5 +702,6 @@
         </div>
     </div>
 
+    <div class="app-toast hidden" id="app-toast" role="status" aria-live="polite"></div>
 </body>
 </html>

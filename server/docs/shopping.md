@@ -27,10 +27,12 @@ This file is the design of record. The phone, widget and watch screens live in
 | `api.py` | The HTTP routes |
 | `tools.py`, `addon.py` | Dana's tools, the addon and its prompt words |
 
-The web panel: `static/shopping-core.js` (the pure part: view model, pending
-changes, requests, words, HTML; tested by `test_web_shopping.mjs` against
-`tests/fixtures/shopping_web.json`), `static/shopping.js` (the controller) and
-`static/shopping.css` (below, "The web panel").
+The web panel, the addon's page (`web=` in `addon.py`, files in `web/`;
+`writing-an-addon.md`, "A web page"): `web/shopping-core.js` (the pure part:
+view model, pending changes, requests, words, HTML; tested by
+`tests/test_web_shopping.mjs` against `tests/fixtures/shopping_web.json`),
+`web/shopping.js` (the controller, registered with `Dana.panel`) and
+`web/shopping.css` (below, "The web panel").
 
 Tables (the addon's `migrations/m0001_baseline.py`): `shopping_lists` (+ `version`),
 `shopping_items`, `shopping_history`, `shopping_aisle_choices` (a list's own
@@ -265,12 +267,13 @@ Sharing itself uses `GET / PUT /api/sharing/shopping_list/{id}`.
 
 ## The web panel
 
-A destination of the web app (`static/index.html`, `panel-shopping`): a
-shopping-cart button in the rail and the bottom bar, with the count to buy,
-shown only to a user with `shopping` (`GET /api/me` → `addons`). `/shopping`
-serves the app opened on the panel (a bookmark, the manifest's "Shopping"
-shortcut); switching to it sets the address to `/shopping`, leaving it sets
-`/`.
+A page of the web app (`panel-shopping`): a shopping-cart button in the rail
+and the bottom bar, with the count to buy as a quiet badge (kept fresh every
+2 minutes while the page is not open), listed by the shell only for a user
+with `shopping` on (`GET /api/addons`). `/shopping` (the addon's route in
+`api.py`) serves the app, which opens the page named by the path (a bookmark,
+the manifest's "Shopping" shortcut); switching to it sets the address to
+`/shopping`, leaving it sets `/`.
 
 Top to bottom: the header (the title, one quiet line: `7 to buy`,
 `7 to buy · Shared with Maya`, `Robin's list · 7 to buy`,

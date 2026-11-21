@@ -1,4 +1,4 @@
-/* Projects panel (static/projects.js). App tokens from styles.css. Layout with logical properties so a
+/* Projects panel (projects.js), the knowledge addon's page. App tokens from styles.css. Layout with logical properties so a
    Hebrew project (dir="rtl" on its content) reads right to left. */
 #panel-projects { position: relative; --prj-soft: rgba(247, 245, 240, .05); --prj-softer: rgba(247, 245, 240, .09);
   --prj-chosen: #34c759; --prj-chosen-bg: rgba(52, 199, 89, .12); --prj-short: #ffb300; --prj-short-bg: rgba(255, 179, 0, .12);

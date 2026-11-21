@@ -65,7 +65,7 @@ chatSessionBadge?.addEventListener("click", () => {
 btnChatNewSession?.addEventListener("click", () => {
     detachChatStream();
     currentSessionId = "web_" + Math.random().toString(36).substring(2, 10);
-    localStorage.setItem("ganam_session_id", currentSessionId);
+    localStorage.setItem("dana_session_id", currentSessionId);
     threadInfo = null;
     updateSessionBadge();
     chatMessages = [];
@@ -144,7 +144,7 @@ chatPreviewRemove?.addEventListener("click", () => {
 
 const chatLlmSelect = document.getElementById("chat-llm-select");
 let selectedLlm = null;
-try { selectedLlm = localStorage.getItem("ganam_chat_model"); } catch (e) {}
+try { selectedLlm = localStorage.getItem("dana_chat_model"); } catch (e) {}
 
 async function loadModelCatalog() {
     if (!chatLlmSelect) return;
@@ -165,7 +165,7 @@ async function loadModelCatalog() {
 }
 chatLlmSelect?.addEventListener("change", () => {
     selectedLlm = chatLlmSelect.value;
-    try { localStorage.setItem("ganam_chat_model", selectedLlm); } catch (e) {}
+    try { localStorage.setItem("dana_chat_model", selectedLlm); } catch (e) {}
 });
 loadModelCatalog();
 
@@ -596,7 +596,7 @@ async function sendSelectionChoice(card, indices) {
 
 // ── Chats sidebar: the shared conversation pinned on top, then recent chats ──
 
-const SIDEBAR_HIDDEN_KEY = "ganam_chat_sidebar_hidden";
+const SIDEBAR_HIDDEN_KEY = "dana_chat_sidebar_hidden";
 const isPhoneWidth = () => window.matchMedia("(max-width: 900px)").matches;
 
 try {
@@ -725,7 +725,7 @@ function mapServerMessages(msgs) {
 async function loadSession(sid) {
     detachChatStream();
     currentSessionId = sid;
-    localStorage.setItem("ganam_session_id", sid);
+    localStorage.setItem("dana_session_id", sid);
     threadInfo = null;
     updateSessionBadge();
     chatMessages = [];
