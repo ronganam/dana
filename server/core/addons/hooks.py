@@ -40,8 +40,8 @@ class Nav:
 @dataclass(frozen=True)
 class Web:
     """A page in the web app: ``panel`` (JavaScript) and ``style`` (CSS) are
-    paths inside the addon's ``web/`` folder; served at ``/addons/<name>/web/``
-    (not built yet: step 2b)."""
+    paths inside the addon's ``web/`` folder, served at ``/addons/<name>/web/``
+    and listed by ``GET /api/addons`` (core/addons_api.py)."""
     panel: str = ""
     style: str = ""
     nav: Optional[Nav] = None
@@ -49,9 +49,11 @@ class Web:
 
 @dataclass(frozen=True)
 class Worker:
-    """A sidecar process built from the addon's ``worker/`` folder: the port it
-    listens on and the env variable that tells Dana its URL (deploy support:
-    step 2b)."""
+    """A sidecar process built from the addon's ``worker/`` folder (a
+    ``Dockerfile``): the port it listens on and the env variable that tells
+    Dana its URL. ``bin/deploy`` builds it as ``<image>-<addon>``;
+    ``compose.yaml`` runs it under a profile named after the addon
+    (docs/operations.md, "Workers")."""
     port: int
     url_env: str
 

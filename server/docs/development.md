@@ -24,7 +24,7 @@ How to iterate on Dana quickly without losing quality. It covers the inner loop,
 ## Shipping small
 
 - Every push to master that changes the app deploys, as `<VERSION>-<commit>`, with no version bump (`docs/operations.md`). The pre-push test gate makes that safe. Several small pushes beat one big release: each is easier to verify, and a problem points at fewer changes. A push of only docs or tests deploys nothing.
-- New work can go live for one user first. An addon is used only by users who have it connected, so a new addon or a new tool can run for the admin for a few days before anyone else gets it (`bin/users.py addons connect`).
+- New work can go live for one user first. An addon is used only by users who have it connected, so a new addon or a new tool can run for the admin for a few days before anyone else gets it (`bin/dana addons connect`).
 - After a deploy, verify with the self-checks (`/api/checks`) and the log, not by reading code (`docs/operations.md`).
 
 ## Before a big change

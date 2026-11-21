@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 from core import clock, users
 from core.users import User
 from core.addons import crypto
-from addons.money import after_sync, companies, config, ingest, otp, slots, store, worker
+from addons.money import after_sync, companies, config, ingest, otp, slots, store, worker_client
 
 logger = logging.getLogger(__name__)
 
@@ -163,12 +163,12 @@ async def _start_job(source: Mapping[str, Any], credentials: Mapping[str, str],
     start = _start_date(source)
     for attempt in range(BUSY_TRIES):
         try:
-            return await worker.start_job(source["company"], source["id"], start, credentials, device)
-        except worker.Busy as e:  # a job left over from before a restart: cancel it, wait for its browser
+            return await worker_client.start_job(source["company"], source["id"], start, credentials, device)
+        except worker_client.Busy as e:  # a job left over from before a restart: cancel it, wait for its browser
             if attempt == BUSY_TRIES - 1:
                 raise
             if e.job:
-                await worker.cancel_job(e.job)
+                await worker_client.cancel_job(e.job)
             await asyncio.sleep(1)
     raise AssertionError("unreachable")
 
@@ -185,7 +185,7 @@ async def _scrape(user: User, source: Dict[str, Any], run_: _Run) -> List[Dict[s
     code_rounds = 0
     code_given = told = False
     while True:
-        job = await worker.get_job(job_id, wait=POLL_SECONDS, seen=seen)
+        job = await worker_client.get_job(job_id, wait=POLL_SECONDS, seen=seen)
         previous, state = seen, str(job.get("state") or "")
         seen = state
         if state == "needs_code" and previous == "needs_code":
@@ -193,17 +193,17 @@ async def _scrape(user: User, source: Dict[str, Any], run_: _Run) -> List[Dict[s
         if state == "needs_code":
             code_rounds += 1
             if code_rounds > MAX_CODE_ROUNDS:
-                await worker.cancel_job(job_id)
+                await worker_client.cancel_job(job_id)
                 raise _Failed("GENERIC", "the bank kept asking for a sign-in code")
             code = await otp.ask(user, source, run_.sync_id)
             if code is None:
-                await worker.cancel_job(job_id)
+                await worker_client.cancel_job(job_id)
                 raise _Failed(CODE_TIMEOUT, "no sign-in code arrived")
             with store.db() as conn:
                 conn.execute("UPDATE money_sources SET state = 'syncing', state_reason = NULL, updated_at = ? "
                              "WHERE id = ? AND user_id = ?", (store.now_iso(), source["id"], user.id))
                 conn.execute("UPDATE money_syncs SET state = 'running' WHERE id = ?", (run_.sync_id,))
-            code_given = await worker.post_code(job_id, code) or code_given
+            code_given = await worker_client.post_code(job_id, code) or code_given
             continue
         if code_given and not told and state in ("scraping", "done"):
             told = True
@@ -240,16 +240,16 @@ async def _follow(user: User, source: Dict[str, Any], run_: _Run) -> None:
         _succeeded(user, source, run_, result)
     except asyncio.CancelledError:
         if run_.job_id:
-            await worker.cancel_job(run_.job_id)
+            await worker_client.cancel_job(run_.job_id)
         _ended(user, source_id, run_.sync_id, "cancelled", None, "cancelled")
         raise
     except asyncio.TimeoutError:
         if run_.job_id:
-            await worker.cancel_job(run_.job_id)
+            await worker_client.cancel_job(run_.job_id)
         _failed(user, source, run_, "TIMEOUT", "the sync took too long")
     except _Failed as e:
         _failed(user, source, run_, e.error_type, str(e))
-    except worker.WorkerError as e:
+    except worker_client.WorkerError as e:
         _failed(user, source, run_, e.error_type if e.error_type else "GENERIC", str(e))
     except crypto.CredentialsKeyError:
         _failed(user, source, run_, "GENERIC", "the saved login details can't be read (CREDENTIALS_KEY)")

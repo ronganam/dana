@@ -10,7 +10,9 @@ refused exactly like a tool that does not exist.
 
 Hooks (:func:`jobs`, :func:`services`, :func:`handlers`, :func:`channels`,
 :func:`hooks`, :func:`hook_for`) come in the fixed addon order; those asked
-for a user only from the addons that user has.
+for a user only from the addons that user has, the others never from an
+addon disabled on the server (core/addons/state.py; the scheduler checks
+jobs and services itself).
 """
 
 import inspect
@@ -18,7 +20,7 @@ import logging
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Tuple
 
 from core.users import User
-from core.addons import store
+from core.addons import state, store
 from core.addons.addon import Tool, all_tools, find_tool, get_addon, all_addons, version
 from core.addons.hooks import Channel, Handler, Hook, Job, Service
 from core.addons.schema import flatten_for_realtime
@@ -260,11 +262,16 @@ def channels(user: User) -> List[Channel]:
 
 def hooks(kind: str, user: Optional[User] = None) -> List[Hook]:
     """Every composer hook of ``kind`` (``now_cards``, ``briefing``…): of the
-    addons ``user`` has, or of every addon without a user."""
+    addons ``user`` has, or of every addon enabled on the server without a user."""
+    off = state.disabled()
     connected = set(store.connected_addons(user)) if user is not None else None
-    return [h for a in all_addons() if connected is None or a.name in connected for h in a.hooks if h.kind == kind]
+    return [h for a in all_addons() if (a.name in connected if connected is not None else a.name not in off)
+            for h in a.hooks if h.kind == kind]
 
 
 def hook_for(kind: str, key: str) -> Optional[Hook]:
-    """The hook of ``kind`` declared for ``key`` (a card prefix, a context kind, a check key), or None."""
-    return next((h for a in all_addons() for h in a.hooks if h.kind == kind and h.key == key), None)
+    """The hook of ``kind`` declared for ``key`` (a card prefix, a context kind,
+    a check key), or None (also when its addon is disabled on the server)."""
+    off = state.disabled()
+    return next((h for a in all_addons() if a.name not in off for h in a.hooks if h.kind == kind and h.key == key),
+                None)

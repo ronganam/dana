@@ -17,6 +17,11 @@ per job and per service of the loaded addons:
   again after a backoff (1 s doubling to 5 min, back to 1 s after it ran for
   10 minutes).
 
+An addon disabled on the server (core/addons/state.py) runs nothing: a job's
+pass does nothing (no heartbeat), a service is not started, and a running one
+is cancelled within :data:`STATE_POLL_SECONDS` and started again once the
+addon is enabled.
+
 Every task is cancelled by :func:`stop` (the app's cleanup).
 """
 
@@ -29,7 +34,7 @@ from typing import Any, Dict, List, Optional
 from core import clock, users
 from core.db import get_db_connection
 from core.users import User
-from core.addons import registry, store
+from core.addons import registry, state, store
 from core.addons.hooks import Job, Service
 
 logger = logging.getLogger(__name__)
@@ -38,6 +43,8 @@ SERVICE_BACKOFF_MIN = 1.0
 SERVICE_BACKOFF_MAX = 300.0
 SERVICE_HEALTHY_SECONDS = 600.0
 DAILY_TICK_SECONDS = 30.0
+# How often a service checks that its addon is still enabled.
+STATE_POLL_SECONDS = 5.0
 APP_KEY = "addon_tasks"
 
 
@@ -81,8 +88,10 @@ def users_for(addon: str) -> List[User]:
 async def run_once(job: Job) -> Dict[str, Any]:
     """One pass of ``job``: ``func(user)`` for every user who has its addon,
     each as that user. Returns user id → result (a user whose run raised is
-    logged and left out)."""
+    logged and left out); nothing while the addon is disabled on the server."""
     out: Dict[str, Any] = {}
+    if not state.is_enabled(job.addon):
+        return out
     failed = 0
     for user in users_for(job.addon):
         try:
@@ -119,12 +128,35 @@ async def _run_job(job: Job) -> None:
         await asyncio.sleep(DAILY_TICK_SECONDS)
 
 
+async def _until_disabled(service: Service, app: Any) -> bool:
+    """Run ``service`` once; True when it was stopped because its addon was disabled."""
+    inner = asyncio.ensure_future(service.func(app))
+    try:
+        while True:
+            done, _ = await asyncio.wait({inner}, timeout=STATE_POLL_SECONDS)
+            if done:
+                inner.result()  # raises what the service raised
+                return False
+            if not state.is_enabled(service.addon):
+                inner.cancel()
+                await asyncio.gather(inner, return_exceptions=True)
+                logger.info(f"Service {service.key} stopped: its addon is disabled on this server")
+                return True
+    except asyncio.CancelledError:
+        inner.cancel()
+        raise
+
+
 async def _run_service(service: Service, app: Any) -> None:
     backoff = SERVICE_BACKOFF_MIN
     while True:
+        if not state.is_enabled(service.addon):
+            await asyncio.sleep(STATE_POLL_SECONDS)
+            continue
         started = time.monotonic()
         try:
-            await service.func(app)
+            if await _until_disabled(service, app):
+                continue
             logger.warning(f"Service {service.key} returned; starting it again in {backoff:.0f}s")
         except asyncio.CancelledError:
             raise

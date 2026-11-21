@@ -7,7 +7,7 @@
 #      or server/requirements.txt also the image's `test` stage (the suite on the exact
 #      image), after bin/test, never at once;
 #   2. when it changes what the images contain (server/core/, addons/, static/,
-#      main.py, requirements.txt, Dockerfile, VERSION, bin/users.py, bank-worker/) and
+#      main.py, requirements.txt, Dockerfile, VERSION, bin/dana, cli/; addon workers are in addons/) and
 #      your site has a deploy.env (site/deploy.env, or $DANA_SITE/deploy.env), deploys it: `server/bin/deploy` builds
 #      "<VERSION>-<commit>", pushes it and sets the GitOps tags.
 # Android changes are not tested here (./gradlew in android/; docs in android/AGENTS.md).
@@ -56,7 +56,7 @@ if printf '%s\n' "$changed" | grep -qE '^(server/Dockerfile|server/requirements\
     || { echo "pre-push: the image's test stage failed (docker build --target test server); nothing pushed."; exit 1; }
 fi
 
-if printf '%s\n' "$changed" | grep -qE '^(server/(core/|addons/|static/|bank-worker/|main\.py$|requirements\.txt$|Dockerfile$|VERSION$|bin/users\.py$)|\(everything\)$)'; then
+if printf '%s\n' "$changed" | grep -qE '^(server/(core/|addons/|static/|cli/|main\.py$|requirements\.txt$|Dockerfile$|VERSION$|bin/dana$)|\(everything\)$)'; then
   if [ ! -r "${DANA_DEPLOY_CONFIG:-${DANA_SITE:-$root/site}/deploy.env}" ]; then
     echo "pre-push: no site/deploy.env: tested, not deploying."
   elif [ -n "${DANA_NO_DEPLOY:-}" ]; then

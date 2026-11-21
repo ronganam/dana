@@ -2,7 +2,7 @@
 Run: bin/test test_money_portfolio
 
 ``testfakes.FakeBankWorker`` plays the bank-worker with a made-up Psagot result
-in the worker's real shape (bank-worker/README.md, "Psagot"): every security,
+in the worker's real shape (addons/money/worker/README.md, "Psagot"): every security,
 amount and name is invented. Robin (the first admin) and Bob have ``money``;
 Carl has not. Checked: the company and its SMS code request (sender and
 pattern the phone reads, the code reaching the job); the device key the job

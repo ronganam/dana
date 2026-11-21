@@ -8,7 +8,7 @@ briefing, the weekly review, context chats) takes these words from
 ``m0016_user_profile``). The first admin's row carries what the prompts said
 about them before it was stored, so their prompts are unchanged; anyone else
 gets their own name and context ("they" until a pronoun is set with
-``bin/users.py update``).
+``bin/dana users update``).
 """
 from __future__ import annotations
 

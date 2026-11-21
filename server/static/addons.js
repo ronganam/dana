@@ -1,12 +1,22 @@
-/* Addons — connect and configure a user's services from Settings.
+/* Addons — turn a user's addons on and configure them; admins also run the server's addons.
  *
  *   GET    /api/me                              who is signed in (name, access level, capabilities)
  *   GET    /api/users                           users an admin can pick (manage_users only)
- *   GET    /api/addons[?user=]            every addon the user may connect, with can_change / why_not
- *   PUT    /api/addons/{addon}[?user=]     connect or change (credentials / settings), 400 names the field
- *   DELETE /api/addons/{addon}[?user=]     disconnect
- *   POST   /api/addons/{addon}/test        the connection check
- *   GET    /api/addons/{addon}/options     setting suggestions from the user's own service
+ *   GET    /api/addons[?user=]                  every addon (source, state, can_change / why_not), restart_needed
+ *   PUT    /api/addons/{addon}[?user=]          connect or change (credentials / settings), 400 names the field
+ *   DELETE /api/addons/{addon}[?user=]          disconnect
+ *   POST   /api/addons/{addon}/test             the connection check
+ *   GET    /api/addons/{addon}/options          setting suggestions from the user's own service
+ *   manage_server only:
+ *   POST   /api/addons/{addon}/disable|enable   for everyone on this server
+ *   GET    /api/addons/catalog                  the catalog merged with what is installed
+ *   POST   /api/addons/install                  {name} or {repo, path, ref}: fetch one commit (restart to load)
+ *   POST   /api/addons/{addon}/remove           delete an installed addon's folder
+ *   POST   /api/server/restart                  the server exits and its supervisor starts it again
+ *
+ * Tabs: Installed (addons added to this server: site, image, from the catalog, and those that failed to
+ * load), Official (shipped with Dana), Catalog (admins: install, update). Installing shows the repository,
+ * folder and commit and says the addon runs with the server's full access; a banner offers the restart.
  *
  * Two parts: DanaAddonsCore (pure: view models, HTML, request bodies, error text; no DOM, exercised
  * by test_web_addons.mjs against payloads captured from the API) and the controller below it
@@ -59,11 +69,16 @@
     expired: { tone: "bad", text: "The Google sign-in took too long or was started elsewhere. Try again." },
     failed: { tone: "bad", text: "Google could not be connected. Try again; the server log says why." },
   };
+  const SOURCES = { official: "Official", site: "Site", image: "Image", installed: "Installed" };
+  const FULL_ACCESS = "An addon runs inside Dana with the server's full access: it can read and change every user's data and reach your network. Install only addons whose code you trust.";
+  const FULL_COMMIT = /^[0-9a-f]{40}$/i;
   const LIST_SETTINGS = new Set(["selected_calendars"]);
   const TELEGRAM_TYPES = new Set(["telegram_chat"]);
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const addonName = (addon) => (ADDONS[addon] && ADDONS[addon].name) || String(addon || "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
+  /** An item's name for people: the page's own words, else the addon's title. */
+  const displayName = (item) => (ADDONS[item.name] && ADDONS[item.name].name) || item.title || addonName(item.name);
   const fieldLabel = (name) => FIELDS[name] || String(name || "").replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
   const fieldsOf = (item) => [...(item.credentials || []).map((f) => ({ ...f, group: "credentials" })),
                               ...(item.settings || []).map((f) => ({ ...f, group: "settings" }))];
@@ -84,8 +99,15 @@
     try { return new URL(address).host; } catch (_) { return String(address || ""); }
   }
 
-  /** {key: connected | off | attention, label, notes: [..]} — only from the server's answer. */
+  /** {key: connected | off | attention | disabled | failed, label, notes: [..]} — only from the server's answer. */
   function rowState(item) {
+    if (item.state === "failed") {
+      return { key: "failed", label: "Didn't load", notes: [item.error ? `It failed to load: ${item.error}` : "It failed to load; an admin can see why in the Addons page."] };
+    }
+    if (item.state === "disabled-on-server") {
+      return { key: "disabled", label: "Disabled on server",
+               notes: [`An admin disabled it for everyone on this server: it does nothing until it's enabled again.${item.connected ? " Saved settings are kept." : ""}`] };
+    }
     if (!item.connected) return { key: "off", label: "Not connected", notes: [] };
     const notes = [];
     if (item.account_conflict) {
@@ -100,6 +122,62 @@
     if (item.account) return accountText(item.account);
     const addr = fieldsOf(item).find((f) => f.type === "address" && f.value);
     return addr && item.connected ? hostOf(addr.value) : "";
+  }
+
+  /** The source badge ("Site", "Installed"…; "" for an official addon, which the Official tab already says). */
+  function sourceLabel(item) {
+    if (!item || item.source === "official") return "";
+    return SOURCES[item.source] || String(item.source || "");
+  }
+
+  /** The tabs the caller gets: Catalog only for those who run the server's addons. */
+  function tabsFor(canManage) {
+    return [["installed", "Installed"], ["official", "Official"], ...(canManage ? [["catalog", "Catalog"]] : [])];
+  }
+
+  /** The items of a tab: Official = shipped with Dana; Installed = everything else (site, image, catalog, failed). */
+  function tabItems(items, tab) {
+    return (items || []).filter((i) => (tab === "official") === (i.source === "official"));
+  }
+
+  /** Admin buttons for an item: [{act, label}] (disable / enable for everyone, remove an installed one). */
+  function serverActions(item, canManage) {
+    if (!canManage || item.everyone) return [];
+    const out = [];
+    if (item.state === "disabled-on-server") out.push({ act: "enable", label: "Enable on server" });
+    else if (item.state !== "failed") out.push({ act: "disable", label: "Disable on server" });
+    if (item.source === "installed") out.push({ act: "remove", label: "Remove" });
+    return out;
+  }
+
+  /** What a catalog entry is here: {key, label, action: install | update | null}. */
+  function catalogState(e) {
+    if (e.official) return { key: "official", label: "Official: ships with Dana", action: null };
+    if (e.present && e.present !== "installed") return { key: "present", label: `Already here (${SOURCES[e.present] || e.present} addon)`, action: null };
+    if (!e.compatible) return { key: "incompatible", label: `Needs Dana ${e.min_dana} or later`, action: null };
+    if (e.installed && e.update_available) return { key: "update", label: "Update available", action: "update" };
+    if (e.installed) return { key: "installed", label: e.installed.loaded ? "Installed" : "Installed: restart to load", action: null };
+    return { key: "available", label: "Not installed", action: "install" };
+  }
+
+  /** The POST /api/addons/install body from typed fields, or {error} saying what to fix. */
+  function installBody(form) {
+    const repo = String((form && form.repo) || "").trim(), path = String((form && form.path) || "").trim().replace(/^\/+|\/+$/g, "");
+    const ref = String((form && form.ref) || "").trim().toLowerCase();
+    if (!repo) return { error: "Give the repository's address (https://… or git@…)." };
+    if (!FULL_COMMIT.test(ref)) return { error: "Give the full 40-character commit hash (a branch or tag can change under you)." };
+    return { repo, path, ref };
+  }
+
+  /** The install / update confirmation: what is fetched and the full-access warning. */
+  function installConfirm(source, name, update) {
+    return {
+      title: `${update ? "Update" : "Install"} ${name || "this addon"}?`,
+      rows: [["Repository", source.repo], ["Folder", source.path || "(the repository's root)"], ["Commit", source.ref]],
+      warning: FULL_ACCESS,
+      after: "Dana fetches exactly this commit; restart the server to load it.",
+      button: update ? "Update" : "Install",
+    };
   }
 
   /** How one field is shown and edited. */
@@ -272,12 +350,21 @@
       ${dl}${rule}${help}${errLine}</div>`;
   }
 
-  function renderDetail(item, ui) {
+  function renderServerActions(item, canManage, busy) {
+    const acts = serverActions(item, canManage);
+    if (!acts.length) return "";
+    const record = item.installed && item.installed.commit
+      ? `<span class="itg-installed" dir="ltr">${esc(item.installed.repo || "")} @ ${esc(String(item.installed.commit).slice(0, 12))}</span>` : "";
+    return `<div class="itg-admin"><span class="itg-admin-label"><i data-lucide="server"></i>On this server</span>${record}
+      ${acts.map((a) => `<button class="chip${a.act === "remove" ? " itg-danger" : ""}" data-act="${a.act}" data-addon="${esc(item.name)}"${busy ? " disabled" : ""}>${esc(a.label)}</button>`).join("")}</div>`;
+  }
+
+  function renderDetail(item, ui, canManage) {
     ui = ui || {};
     const fields = fieldsOf(item);
     const st = rowState(item);
     const notes = st.notes.map((n) => `<div class="itg-note warn"><i data-lucide="triangle-alert"></i><span>${esc(n)}</span></div>`).join("");
-    const locked = !item.can_change
+    const locked = !item.can_change && st.key !== "disabled" && st.key !== "failed"
       ? `<div class="itg-note"><i data-lucide="lock"></i><span>${esc(item.why_not || "Set by an admin")}: only an admin can connect, change or disconnect this.</span></div>` : "";
     let opts = "";
     if (item.options && item.connected && item.can_change) {
@@ -301,7 +388,7 @@
       if (!item.connected) buttons.push(`<button class="${signIn ? "btn-secondary" : "btn-primary"}" data-act="save"${busy ? " disabled" : ""}>${busy === "saving" ? "Connecting…" : "Connect"}</button>`);
       else if (editable) buttons.push(`<button class="btn-primary" data-act="save"${busy ? " disabled" : ""}>${busy === "saving" ? "Saving…" : "Save"}</button>`);
     }
-    if (item.connected && item.check) buttons.push(`<button class="btn-secondary" data-act="test"${busy ? " disabled" : ""}><i data-lucide="activity"></i>${busy === "testing" ? "Testing…" : "Test connection"}</button>`);
+    if (item.connected && item.check && st.key !== "disabled") buttons.push(`<button class="btn-secondary" data-act="test"${busy ? " disabled" : ""}><i data-lucide="activity"></i>${busy === "testing" ? "Testing…" : "Test connection"}</button>`);
     if (item.connected && item.can_change) buttons.push(`<button class="btn-destructive-outline itg-disconnect" data-act="disconnect"${busy ? " disabled" : ""}>${busy === "disconnecting" ? "Disconnecting…" : "Disconnect"}</button>`);
     const status = ui.status ? `<div class="itg-status ${esc(ui.status.tone || "")}" role="status">${esc(ui.status.text)}</div>` : `<div class="itg-status hidden" role="status"></div>`;
     return `<div class="itg-detail" data-detail="${esc(item.name)}">
@@ -309,16 +396,19 @@
       ${fields.length ? `<div class="itg-fields">${fields.map((f) => renderField(item, f, ui)).join("")}</div>` : ""}
       ${opts}
       <div class="itg-actions">${buttons.join("")}</div>
+      ${renderServerActions(item, canManage, busy)}
       ${status}</div>`;
   }
 
-  function renderRow(item, ui, open) {
+  function renderRow(item, ui, open, canManage) {
     const info = ADDONS[item.name] || {};
     const st = rowState(item);
-    const meta = rowMeta(item);
+    const meta = [rowMeta(item), item.version ? `v${item.version}` : ""].filter(Boolean).join(" · ");
     const hasFields = fieldsOf(item).length > 0;
+    const badge = sourceLabel(item) ? `<span class="itg-badge ${esc(item.source)}">${esc(sourceLabel(item))}</span>` : "";
     const chip = `<span class="itg-state ${st.key}"><span class="itg-dot"></span>${esc(st.label)}</span>`;
-    const conflict = item.account_conflict ? `<span class="itg-conflict">Number used by another user</span>` : "";
+    const conflict = item.account_conflict ? `<span class="itg-conflict">Number used by another user</span>`
+      : (st.key === "failed" || st.key === "disabled") && !hasFields ? `<span class="itg-conflict">${esc(st.notes[0])}</span>` : "";
     // Built-in addons without fields: the connect / disconnect control sits on the row itself.
     let control = "";
     if (!hasFields) {
@@ -326,11 +416,12 @@
       control = !item.can_change ? `<span class="itg-lock"><i data-lucide="lock"></i>${esc(item.why_not || "Set by an admin")}</span>`
         : item.connected ? `<button class="chip" data-act="disconnect" data-addon="${esc(item.name)}"${busy ? " disabled" : ""}>${busy === "disconnecting" ? "Disconnecting…" : "Disconnect"}</button>`
         : `<button class="chip itg-connect" data-act="save" data-addon="${esc(item.name)}"${busy ? " disabled" : ""}>${busy === "saving" ? "Connecting…" : "Connect"}</button>`;
+      control += serverActions(item, canManage).map((a) => `<button class="chip itg-admin-chip${a.act === "remove" ? " itg-danger" : ""}" data-act="${a.act}" data-addon="${esc(item.name)}"${busy ? " disabled" : ""}>${esc(a.label)}</button>`).join("");
     }
     const head = `
         <span class="itg-icon"><i data-lucide="${esc(info.icon || "plug")}"></i></span>
         <span class="itg-row-text">
-          <span class="itg-row-name">${esc(addonName(item.name))}</span>
+          <span class="itg-row-name">${esc(displayName(item))}${badge}</span>
           <span class="itg-row-desc">${esc(info.blurb || item.description || "")}</span>
           ${meta || conflict ? `<span class="itg-row-meta">${meta ? `<span dir="auto">${esc(meta)}</span>` : ""}${conflict}</span>` : ""}
         </span>
@@ -342,7 +433,7 @@
     return `<div class="itg-row${open ? " open" : ""}" data-row="${esc(item.name)}">
       <button class="itg-row-head" data-toggle="${esc(item.name)}" aria-expanded="${open ? "true" : "false"}">${head}
         <i data-lucide="chevron-down" class="itg-chev"></i></button>
-      ${open ? renderDetail(item, ui) : ""}</div>`;
+      ${open ? renderDetail(item, ui, canManage) : ""}</div>`;
   }
 
   function renderList(s) {
@@ -351,24 +442,111 @@
         <button class="btn-secondary" data-retry><i data-lucide="refresh-cw"></i>Try again</button></div>`;
     }
     if (!s.items) return `<div class="itg-skel"></div><div class="itg-skel short"></div>`;
-    const services = s.items.filter(isService), builtin = s.items.filter((i) => !isService(i));
+    if (!s.items.length) {
+      return `<div class="itg-card itg-empty"><i data-lucide="package"></i><span>${esc(s.empty || "No addons here.")}</span></div>`;
+    }
+    const loaded = s.items.filter((i) => i.state !== "failed");
+    const services = loaded.filter(isService), builtin = loaded.filter((i) => !isService(i));
+    const failed = s.items.filter((i) => i.state === "failed");
     const section = (title, sub, items) => items.length ? `
       <section class="itg-group"><div class="itg-group-head"><span>${esc(title)}</span><em>${esc(sub)}</em></div>
-        <div class="itg-card itg-rows">${items.map((i) => renderRow(i, (s.ui || {})[i.name], s.open === i.name)).join("")}</div></section>` : "";
+        <div class="itg-card itg-rows">${items.map((i) => renderRow(i, (s.ui || {})[i.name], s.open === i.name, s.canManage)).join("")}</div></section>` : "";
     return section("Services", "Your own accounts: connect each with its address and key", services) +
-           section("Built in", "Parts of Dana you can turn on or off", builtin);
+           section("Built in", "Parts of Dana you can turn on or off", builtin) +
+           section("Didn't load", "Found on this server, but not working: Dana runs without them", failed);
   }
 
-  const core = { ADDONS, FIELDS, esc, addonName, fieldLabel, isService, accountText, rowState, rowMeta, fieldModel, typedValue,
-                 buildChanges, path, errorText, testText, disconnectText, renderHeader, renderField, renderDetail, renderRow,
-                 renderList, KEY_TEXT };
+  function renderTabs(s) {
+    const tabs = tabsFor(s.canManage);
+    const count = (tab) => (tab === "catalog" ? "" : ` <span class="itg-count">${tabItems(s.items, tab).length}</span>`);
+    return `<div class="segmented-control itg-tabs" role="tablist" aria-label="Addons">${tabs.map(([id, label]) =>
+      `<button class="segmented-btn${s.tab === id ? " active" : ""}" role="tab" aria-selected="${s.tab === id}" data-tab="${id}">${esc(label)}${s.items ? count(id) : ""}</button>`).join("")}</div>`;
+  }
+
+  function renderRestartBanner(s) {
+    if (!s.restartNeeded && !s.restarting) return "";
+    if (s.restarting) {
+      return `<div class="itg-banner itg-restart" role="status"><i data-lucide="loader"></i><span>Dana is restarting. This page reloads when it's back.</span></div>`;
+    }
+    const button = s.canManage ? `<button class="btn-primary" data-restart>Restart Dana</button>` : "";
+    return `<div class="itg-banner itg-restart" role="status"><i data-lucide="rotate-cw"></i>
+      <span><strong>Restart needed.</strong> An addon was installed, updated or removed; ${s.canManage ? "restart Dana to load the change (everyone is disconnected for a few seconds)." : "an admin has to restart Dana."}</span>${button}</div>`;
+  }
+
+  function renderCatalogEntry(e, ui) {
+    const st = catalogState(e);
+    const busy = ui && ui.busy;
+    const meta = [e.author ? `by ${e.author}` : "", ...(e.tags || []), e.installed && e.installed.commit ? `installed @ ${String(e.installed.commit).slice(0, 12)}` : ""].filter(Boolean);
+    const action = st.action ? `<button class="chip itg-connect" data-install="${esc(e.name)}"${busy ? " disabled" : ""}>${busy ? (st.action === "update" ? "Updating…" : "Installing…") : (st.action === "update" ? "Update" : "Install")}</button>` : "";
+    const remove = e.installed ? `<button class="chip itg-danger" data-act="remove" data-addon="${esc(e.name)}"${busy ? " disabled" : ""}>Remove</button>` : "";
+    const home = e.homepage && /^https?:\/\//.test(e.homepage) ? `<a class="itg-link" href="${esc(e.homepage)}" target="_blank" rel="noopener noreferrer">Homepage</a>` : "";
+    const status = ui && ui.status ? `<div class="itg-status ${esc(ui.status.tone || "")} itg-row-status" role="status">${esc(ui.status.text)}</div>` : "";
+    return `<div class="itg-row flat" data-entry="${esc(e.name)}"><div class="itg-row-head">
+        <span class="itg-icon"><i data-lucide="package"></i></span>
+        <span class="itg-row-text"><span class="itg-row-name">${esc(e.title || e.name)}</span>
+          <span class="itg-row-desc">${esc(e.description || "")}</span>
+          ${meta.length || home ? `<span class="itg-row-meta">${meta.map((m) => `<span dir="auto">${esc(m)}</span>`).join("")}${home}</span>` : ""}</span>
+        <span class="itg-state ${st.key === "installed" ? "connected" : st.key === "update" ? "attention" : ""}"><span class="itg-dot"></span>${esc(st.label)}</span>
+        ${action}${remove}</div>${status}</div>`;
+  }
+
+  function renderCatalog(s) {
+    if (s.catalogError) {
+      return `<div class="itg-card itg-error"><strong>Couldn't read the catalog</strong><span>${esc(s.catalogError)}</span>
+        <button class="btn-secondary" data-catalog-retry><i data-lucide="refresh-cw"></i>Try again</button></div>`;
+    }
+    if (!s.catalog) return `<div class="itg-skel"></div>`;
+    const c = s.catalog, ui = s.catalogUi || {};
+    const entries = c.entries.length ? `<div class="itg-card itg-rows">${c.entries.map((e) => renderCatalogEntry(e, ui[e.name])).join("")}</div>`
+      : `<div class="itg-card itg-empty"><i data-lucide="package"></i><span>The catalog lists no addons yet.</span></div>`;
+    const problems = (c.problems || []).length ? `<details class="itg-note itg-problems"><summary>${c.problems.length} catalog ${c.problems.length === 1 ? "entry was" : "entries were"} skipped</summary>
+        <ul>${c.problems.map((p) => `<li>${esc(p)}</li>`).join("")}</ul></details>` : "";
+    const form = s.gitForm || {};
+    return `<div class="itg-note warn"><i data-lucide="shield-alert"></i><span>${esc(FULL_ACCESS)}</span></div>
+      <section class="itg-group"><div class="itg-group-head"><span>Catalog</span><em dir="ltr">${esc(c.origin || "")}</em></div>${entries}${problems}</section>
+      <section class="itg-group"><div class="itg-group-head"><span>From a git repository</span><em>Any repository, pinned to one commit</em></div>
+        <div class="itg-card itg-git" data-git>
+          <label class="itg-field"><span class="itg-flabel">Repository</span><input class="settings-input" data-git-field="repo" type="url" inputmode="url" spellcheck="false" autocomplete="off" dir="ltr" placeholder="https://github.com/owner/repo" value="${esc(form.repo || "")}"></label>
+          <label class="itg-field"><span class="itg-flabel">Folder <em>optional</em></span><input class="settings-input" data-git-field="path" type="text" spellcheck="false" autocomplete="off" dir="ltr" placeholder="addons/weather" value="${esc(form.path || "")}"></label>
+          <label class="itg-field"><span class="itg-flabel">Commit</span><input class="settings-input" data-git-field="ref" type="text" spellcheck="false" autocomplete="off" dir="ltr" placeholder="the full 40-character commit hash" value="${esc(form.ref || "")}"></label>
+          <div class="itg-actions"><button class="btn-secondary" data-git-install${s.gitBusy ? " disabled" : ""}>${s.gitBusy ? "Installing…" : "Install…"}</button></div>
+          <div class="itg-status ${s.gitStatus ? esc(s.gitStatus.tone || "") : "hidden"}" role="status">${esc(s.gitStatus ? s.gitStatus.text : "")}</div>
+        </div></section>`;
+  }
+
+  /** Everything under the header: the restart banner, the tabs and the chosen tab. */
+  function renderBody(s) {
+    if (!s.items) return renderList(s);
+    const tab = tabsFor(s.canManage).some(([id]) => id === s.tab) ? s.tab : "official";
+    const content = tab === "catalog" ? renderCatalog(s)
+      : renderList({ ...s, items: tabItems(s.items, tab),
+                     empty: tab === "installed" ? "No addons beyond the official ones. Admins can install some from the Catalog tab, or write one (bin/dana addons new)." : "" });
+    return renderRestartBanner(s) + renderTabs({ ...s, tab }) + `<div class="itg-tab-body">${content}</div>`;
+  }
+
+  /** The confirmation dialog's HTML (installs show the repository, folder, commit and the warning). */
+  function renderConfirm(c) {
+    const rows = (c.rows || []).length ? `<dl class="itg-facts">${c.rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd dir="ltr">${esc(v)}</dd>`).join("")}</dl>` : "";
+    const warning = c.warning ? `<div class="itg-note warn"><i data-lucide="shield-alert"></i><span>${esc(c.warning)}</span></div>` : "";
+    return `<div class="ibx-modal-card itg-confirm" role="dialog" aria-modal="true" aria-labelledby="itg-confirm-title">
+      <h3 id="itg-confirm-title">${esc(c.title)}</h3>${c.body ? `<p>${esc(c.body)}</p>` : ""}${rows}${warning}${c.after ? `<p>${esc(c.after)}</p>` : ""}
+      <div class="itg-actions end"><button class="btn-secondary" data-confirm="no">Cancel</button>
+        <button class="${c.danger ? "btn-destructive-outline" : "btn-primary"}" data-confirm="yes">${esc(c.button || "OK")}</button></div></div>`;
+  }
+
+  const core = { ADDONS, FIELDS, FULL_ACCESS, esc, addonName, displayName, fieldLabel, isService, accountText, rowState, rowMeta,
+                 fieldModel, typedValue, buildChanges, path, errorText, testText, disconnectText, sourceLabel, tabsFor, tabItems,
+                 serverActions, catalogState, installBody, installConfirm, renderHeader, renderField, renderDetail, renderRow,
+                 renderList, renderBody, renderTabs, renderRestartBanner, renderCatalog, renderCatalogEntry, renderConfirm, KEY_TEXT };
   (typeof window !== "undefined" ? window : globalThis).DanaAddonsCore = core;
   if (typeof document === "undefined") return;
 
   // ---------- controller ----------
   const $ = (id) => document.getElementById(id);
   const icons = () => { try { window.lucide?.createIcons(); } catch (_) { /* ignore */ } };
-  const S = { me: null, users: null, target: null, items: null, error: "", open: null, ui: {}, visible: false, confirm: null };
+  const S = { me: null, users: null, target: null, items: null, error: "", open: null, ui: {}, visible: false, confirm: null,
+              tab: "official", canManage: false, restartNeeded: false, restarting: false,
+              catalog: null, catalogError: "", catalogUi: {}, gitForm: {}, gitBusy: false, gitStatus: null };
   const drafts = {};  // addon -> {values, remove}: what was typed since the form was drawn (memory only)
   let seq = 0;
 
@@ -410,6 +588,8 @@
     if (mine !== seq) return;
     if (r.status !== 200) { S.error = errorText(r.status, r.body).message; render(); return; }
     S.items = r.body.addons;
+    S.canManage = Boolean(r.body.can_manage);
+    S.restartNeeded = Boolean(r.body.restart_needed);
     for (const k of Object.keys(drafts)) delete drafts[k];
     S.ui = {};
     render();
@@ -420,8 +600,26 @@
     const kicker = $("itg-kicker");
     if (kicker) kicker.textContent = whose() ? `Editing ${whose()}` : "";
     $("itg-head").innerHTML = renderHeader(S);
-    $("itg-list").innerHTML = renderList(S);
+    $("itg-list").innerHTML = renderBody(S);
     icons();
+  }
+
+  async function loadCatalog(fresh) {
+    S.catalogError = "";
+    if (fresh) S.catalog = null;
+    if (S.tab === "catalog") render();
+    const r = await request("GET", `/api/addons/catalog${fresh ? "?fresh=1" : ""}`);
+    if (r.status === 200) { S.catalog = r.body; S.restartNeeded = S.restartNeeded || Boolean(r.body.restart_needed); }
+    else { S.catalog = null; S.catalogError = errorText(r.status, r.body).message; }
+    if (S.tab === "catalog") render();
+  }
+
+  function setTab(tab) {
+    S.tab = tab;
+    S.open = null;
+    try { localStorage.setItem("dana.addons.tab", tab); } catch (_) { /* ignore */ }
+    if (tab === "catalog" && !S.catalog) loadCatalog(false);
+    render();
   }
 
   // Redraw one row (after a server answer). Its form starts from the new payload: typed values are gone.
@@ -429,7 +627,7 @@
     const el = document.querySelector(`[data-row="${CSS.escape(addon)}"]`);
     const item = itemOf(addon);
     if (!el || !item) return render();
-    el.outerHTML = renderRow(item, S.ui[addon], S.open === addon);
+    el.outerHTML = renderRow(item, S.ui[addon], S.open === addon, S.canManage);
     icons();
   }
 
@@ -443,6 +641,7 @@
     row.querySelectorAll("[data-act]").forEach((b) => {
       b.disabled = Boolean(ui.busy);
       const act = b.dataset.act;
+      if (!["save", "test", "disconnect"].includes(act)) return;
       const label = act === "save" ? (ui.busy === "saving" ? (item.connected ? "Saving…" : "Connecting…") : (item.connected ? "Save" : "Connect"))
         : act === "test" ? (ui.busy === "testing" ? "Testing…" : "Test connection")
         : (ui.busy === "disconnecting" ? "Disconnecting…" : "Disconnect");
@@ -520,22 +719,49 @@
     patch(addon);
   }
 
-  function askDisconnect(addon) {
-    const item = itemOf(addon);
-    const t = disconnectText(item, whose());
-    S.confirm = addon;
-    $("itg-modal").innerHTML = `<div class="ibx-modal-card itg-confirm" role="dialog" aria-modal="true" aria-labelledby="itg-confirm-title">
-      <h3 id="itg-confirm-title">${esc(t.title)}</h3><p>${esc(t.body)}</p>
-      <div class="itg-actions end"><button class="btn-secondary" data-confirm="no">Cancel</button>
-        <button class="btn-destructive-outline" data-confirm="yes">Disconnect</button></div></div>`;
+  // S.confirm = {title, body, rows, warning, after, button, danger, run}: run() on yes.
+  function ask(c) {
+    S.confirm = c;
+    $("itg-modal").innerHTML = renderConfirm(c);
     $("itg-modal").classList.remove("hidden");
+    icons();
     $("itg-modal").querySelector('[data-confirm="no"]').focus();
   }
+
+  function askDisconnect(addon) {
+    const t = disconnectText(itemOf(addon), whose());
+    ask({ ...t, button: "Disconnect", danger: true, run: () => disconnect(addon) });
+  }
+
+  function askServer(act, addon) {
+    const item = itemOf(addon) || { name: addon };
+    const name = displayName(item);
+    if (act === "disable") {
+      ask({ title: `Disable ${name} on this server?`, button: "Disable", danger: true, run: () => setServer(addon, "disable"),
+            body: `It stops for everyone: no tools, prompt lines, jobs or pages, and addons that need it stop too. Connections and data are kept; enable it again any time.` });
+    } else if (act === "enable") {
+      setServer(addon, "enable");
+    } else if (act === "remove") {
+      ask({ title: `Remove ${name}?`, button: "Remove", danger: true, run: () => removeAddon(addon),
+            body: "Its folder is deleted from the server; its tables and rows stay in the database. It's unloaded at the next restart.",
+            rows: item.installed ? [["Repository", item.installed.repo], ["Commit", item.installed.commit]] : [] });
+    }
+  }
+
+  function askInstall(source, name, update) {
+    ask({ ...installConfirm(source, name, update), run: () => doInstall(name && !source.fromForm ? { name } : { repo: source.repo, path: source.path, ref: source.ref }, name) });
+  }
+
+  function askRestart() {
+    ask({ title: "Restart Dana?", button: "Restart", run: restart,
+          body: "The server stops and its supervisor starts it again with the addons now on disk. Everyone is disconnected for a few seconds; running chats pick up where they were." });
+  }
+
+  function confirmed() { const c = S.confirm; closeConfirm(); if (c && c.run) c.run(); }
 
   function closeConfirm() { S.confirm = null; $("itg-modal").classList.add("hidden"); $("itg-modal").innerHTML = ""; }
 
   async function disconnect(addon) {
-    closeConfirm();
     const ui = uiOf(addon);
     ui.busy = "disconnecting"; ui.status = null;
     patch(addon);
@@ -554,12 +780,92 @@
     patch(addon);
   }
 
+  async function setServer(addon, act) {
+    const ui = uiOf(addon);
+    ui.busy = act; ui.status = null;
+    renderOne(addon);
+    const r = await request("POST", `/api/addons/${encodeURIComponent(addon)}/${act}`);
+    ui.busy = "";
+    if (r.status === 200) {
+      ui.status = { tone: "ok", text: act === "disable" ? "Disabled for everyone on this server." : "Enabled again." };
+      await load();  // addons that need it change state too
+      S.ui[addon] = ui;
+      renderOne(addon);
+      return;
+    }
+    ui.status = { tone: "bad", text: errorText(r.status, r.body).message };
+    renderOne(addon);
+  }
+
+  async function removeAddon(addon) {
+    const r = await request("POST", `/api/addons/${encodeURIComponent(addon)}/remove`);
+    if (r.status === 200) {
+      S.restartNeeded = true;
+      if (S.catalog) loadCatalog(true);
+      await load();
+      return;
+    }
+    const where = S.tab === "catalog" ? (S.catalogUi[addon] = { status: null }) : uiOf(addon);
+    where.status = { tone: "bad", text: `Not removed. ${errorText(r.status, r.body).message}` };
+    render();
+  }
+
+  async function doInstall(body, name) {
+    const fromForm = !body.name;
+    if (fromForm) { S.gitBusy = true; S.gitStatus = null; }
+    else S.catalogUi[name] = { busy: true };
+    render();
+    const r = await request("POST", "/api/addons/install", body);
+    if (fromForm) S.gitBusy = false;
+    const done = r.status === 201 || r.status === 200;
+    const text = done ? `${r.body.replaced ? "Updated" : "Installed"} ${r.body.name} at ${String(r.body.commit).slice(0, 12)}. Restart Dana to load it.`
+      : `Not installed. ${errorText(r.status, r.body).message}`;
+    if (fromForm) { S.gitStatus = { tone: done ? "ok" : "bad", text }; if (done) S.gitForm = {}; }
+    else S.catalogUi[name] = { status: { tone: done ? "ok" : "bad", text } };
+    if (done) { S.restartNeeded = true; await loadCatalog(true); }
+    render();
+  }
+
+  async function restart() {
+    S.restarting = true;
+    render();
+    const r = await request("POST", "/api/server/restart");
+    if (r.status !== 202 && r.status !== 0) {
+      S.restarting = false;
+      S.error = `Couldn't restart. ${errorText(r.status, r.body).message}`;
+      render();
+      return;
+    }
+    // Wait for it to go away and come back, then load the page again (new scripts and panels).
+    const started = Date.now();
+    let wentDown = r.status === 0;
+    const poll = async () => {
+      const h = await request("GET", "/api/health");
+      if (h.status !== 200) wentDown = true;
+      if (h.status === 200 && (wentDown || Date.now() - started > 8000)) { location.reload(); return; }
+      if (Date.now() - started > 120000) { S.restarting = false; S.error = "Dana hasn't come back after two minutes: check the server's logs."; render(); return; }
+      setTimeout(poll, 1500);
+    };
+    setTimeout(poll, 1500);
+  }
+
   function wire() {
     const root = $("panel-addons");
     root.addEventListener("click", (ev) => {
       const t = ev.target;
       let n;
       if ((n = t.closest("[data-retry]"))) load();
+      else if ((n = t.closest("[data-tab]"))) setTab(n.dataset.tab);
+      else if (t.closest("[data-restart]")) askRestart();
+      else if (t.closest("[data-catalog-retry]")) loadCatalog(true);
+      else if ((n = t.closest("[data-install]"))) {
+        const e = ((S.catalog || {}).entries || []).find((x) => x.name === n.dataset.install);
+        if (e) askInstall(e.source, e.name, catalogState(e).action === "update");
+      } else if (t.closest("[data-git-install]")) {
+        const b = installBody(S.gitForm);
+        if (b.error) { S.gitStatus = { tone: "bad", text: b.error }; render(); return; }
+        askInstall({ ...b, fromForm: true }, "", false);
+      }
       else if (t.closest("[data-mine]")) { S.target = S.me.id; S.open = null; load(); }
       else if ((n = t.closest("[data-toggle]"))) {
         const addon = n.dataset.toggle;
@@ -573,10 +879,12 @@
         if (n.dataset.act === "save") save(addon);
         else if (n.dataset.act === "test") test(addon);
         else if (n.dataset.act === "disconnect") askDisconnect(addon);
+        else if (["disable", "enable", "remove"].includes(n.dataset.act)) askServer(n.dataset.act, addon);
       }
     });
     root.addEventListener("input", (ev) => {
       const t = ev.target;
+      if (t.dataset && t.dataset.gitField) { S.gitForm[t.dataset.gitField] = t.value; return; }
       if (t.dataset && t.dataset.name && t.dataset.addon) {
         const d = (drafts[t.dataset.addon] = drafts[t.dataset.addon] || { values: {}, remove: [] });
         d.values[t.dataset.name] = t.value;
@@ -601,10 +909,10 @@
     $("itg-modal").addEventListener("click", (ev) => {
       const b = ev.target.closest("[data-confirm]");
       if (ev.target.id === "itg-modal" || (b && b.dataset.confirm === "no")) closeConfirm();
-      else if (b && b.dataset.confirm === "yes" && S.confirm) disconnect(S.confirm);
+      else if (b && b.dataset.confirm === "yes" && S.confirm) confirmed();
     });
     document.addEventListener("keydown", (ev) => { if (ev.key === "Escape" && S.confirm) closeConfirm(); });
-    $("itg-refresh")?.addEventListener("click", () => load());
+    $("itg-refresh")?.addEventListener("click", () => { load(); if (S.tab === "catalog") loadCatalog(true); });
     $("itg-back")?.addEventListener("click", () => window.danaSwitchTab?.("settings"));
   }
 
@@ -613,12 +921,13 @@
     show() {
       if (!wired && $("panel-addons")) { wire(); wired = true; }
       S.visible = true;
+      try { S.tab = localStorage.getItem("dana.addons.tab") || S.tab; } catch (_) { /* ignore */ }
       const result = new URLSearchParams(location.search).get("google");
       if (result) {
         S.notice = GOOGLE_NOTICES[result] || null;
         history.replaceState(null, "", location.pathname + location.hash);
       }
-      load();
+      load().then(() => { if (S.tab === "catalog" && S.canManage) loadCatalog(false); });
     },
     hide() {
       S.visible = false;

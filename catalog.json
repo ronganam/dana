@@ -1,0 +1,19 @@
+{
+ "about": "Dana's addon catalog (docs/addons.md, \"The catalog\"). Each source.ref is a full commit hash: an entry is exactly one version of its addon. Entries that are not valid are skipped by servers, with the reason in their log.",
+ "addons": [
+  {
+   "name": "hello",
+   "title": "Hello",
+   "description": "Example addon: greets people in your words, and reminds you who to greet.",
+   "author": "Dana",
+   "homepage": "https://github.com/ronganam/dana/tree/master/examples/addons/hello",
+   "tags": ["example"],
+   "min_dana": "9.0.0",
+   "source": {
+    "repo": "https://github.com/ronganam/dana",
+    "path": "examples/addons/hello",
+    "ref": "FILL-AT-RELEASE: the full commit hash of the release this entry points to"
+   }
+  }
+ ]
+}

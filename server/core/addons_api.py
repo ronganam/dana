@@ -1,20 +1,52 @@
-"""Who the caller is, and their addons (docs/access.md, "Managing users").
+"""Who the caller is, their addons, and running the addons of the server
+(docs/access.md, "Managing users"; ../docs/addons.md).
 
     GET    /api/me                       → {id, name, access, capabilities: [..], kinds: [..]} (``kinds``: the addons they have)
     GET    /api/users                    → {users: [{id, name, access}]} (``manage_users`` only)
-    GET    /api/addons                   → {user_id, addons: [<addon>, ...]}
+    GET    /api/addons                   → {user_id, addons: [<addon>, ...], restart_needed, can_manage[, pending]}
     GET    /api/addons/{name}            → <addon>
     PUT    /api/addons/{name}            {credentials?: {name: str|null}, settings?: {name: value|null}}
                                          → <addon> (connects it, or updates it)
     DELETE /api/addons/{name}            → <addon> (connected: false) + disconnected: bool
     POST   /api/addons/{name}/test       → {name, checked, ok, reason}
     GET    /api/addons/{name}/options    → {name, settings: {name: [{value, label}]}}
+    GET    /addons/{name}/web/{file}     the addon's web/ files (a loaded addon enabled on the server)
 
-``<addon>`` = ``{name, description, connected, requires, can_change,
-why_not, credentials: [{name, description, required, set, type, secret,
-value?, can_change, why_not, rule}], settings: [{name, description, default,
-value, type, can_change, why_not, rule}], account, check, options, connect_url, connect_label}``:
-credential values are write-only (only whether each is ``set``) except an
+  ``manage_server`` only (running the server's addons):
+
+    POST   /api/addons/{name}/disable    → <addon> (for everyone; ``enable`` turns it back on)
+    POST   /api/addons/{name}/enable     → <addon>
+    GET    /api/addons/catalog[?fresh=1] → {origin, dana_version, entries: [<entry>], problems: [..], restart_needed}
+    POST   /api/addons/install           {name} (a catalog entry) or {repo, ref, path?, name?}
+                                         → 201 {name, repo, path, commit, replaced, restart_needed: true, message}
+    POST   /api/addons/{name}/remove     → {name, removed: true, restart_needed: true}
+    POST   /api/server/restart           → 202 {restarting: true}: the process exits cleanly, the supervisor
+                                           starts it again (core/lifecycle.py)
+
+``<addon>`` = ``{name, title, description, version, source, state, needs,
+everyone, web, worker, connected, requires, can_change, why_not,
+credentials: [{name, description, required, set, type, secret, value?,
+can_change, why_not, rule}], settings: [{name, description, default, value,
+type, can_change, why_not, rule}], account, check, options, connect_url,
+connect_label}``. ``source``: ``official`` / ``site`` / ``image`` /
+``installed``; ``state`` for this user: ``on`` (they have it), ``available``
+(they can turn it on), ``off`` (only an admin can: ``why_not``),
+``disabled-on-server`` (an admin disabled it, or an addon it needs, for
+everyone) or ``failed`` (a site / installed addon that did not load: only
+admins get its ``error``); ``web`` (only while it is on for the user) =
+``{panel, style, nav: {label, icon, order}}`` with the URLs of its files;
+``worker``: it has a sidecar. Admins also get ``installed`` (``{repo, path,
+commit}``) for an addon installed from git. ``<entry>`` = the catalog entry
+(core/addons/catalog.py) plus ``official`` (its name is an official addon:
+not installable), ``present`` (the source of an addon of that name already
+here, else null), ``installed`` (``{commit, loaded}`` for one in
+``<data dir>/addons``), ``update_available`` and ``compatible`` (this Dana
+is at least ``min_dana``). ``restart_needed``: an addon was installed,
+updated or removed since the server started (admins get the changes as
+``pending: [{name, change}]``). Installed addons run with the server's full
+access (the page says so before installing).
+
+Credential values are write-only (only whether each is ``set``) except an
 address (``secret: false``: its ``value`` is returned, to the connection's own
 user and to an admin acting with ``?user=``; ``Field.secret``); ``check`` /
 ``options`` say whether the addon has a connection check / setting
@@ -30,12 +62,14 @@ service reports is held by another user's connection (``whatsapp``),
 while a stored address / name is not valid (saved before the rules),
 ``problem`` = ``{field, message}``.
 
-Every addon the user may connect is listed (not ``essentials``, which everyone has;
-``ops`` only for a level with the ``ops`` capability: anyone else gets 403
-``forbidden`` for it). ``PUT`` merges: credentials given replace the stored
+Every loaded addon the user's level allows is listed (``essentials``, which
+everyone has, with ``everyone: true``; ``ops`` only for a level with the
+``ops`` capability: anyone else gets 403 ``forbidden`` for it), then the
+addons that failed to load. ``PUT`` merges: credentials given replace the stored
 ones of the same name (``null`` removes an optional one), settings given
 replace theirs (``null`` = back to the default); a bad body, an unknown or
-missing field answers 400 ``{"error": "invalid", "field", "message"}``.
+missing field answers 400 ``{"error": "invalid", "field", "message"}``; an
+addon disabled on the server answers 409 ``addon_disabled``.
 Changes take effect at once (the store's cache, the addons' ``on_connect`` /
 ``on_credentials_change`` / ``on_change``).
 
@@ -53,21 +87,27 @@ Loaded by core/server.py (``setup(app)``). The web page: static/addons.js.
 
 import asyncio
 import logging
+import mimetypes
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from aiohttp import web
 
-from core import users
+from core import addon_dirs, lifecycle, users
 from core.access import CAPABILITIES
 from core.auth import request_user, requires
 from core.users import User
-from core.addons import crypto, store
+from core.addons import catalog, crypto, install, loader, state, store
 from core.addons.addon import Addon, InvalidValue, get_addon, all_addons
 
 logger = logging.getLogger(__name__)
 
 CHECK_TIMEOUT_SECONDS = 20.0
 OPTIONS_TIMEOUT_SECONDS = 20.0
+# Who runs the server's addons: disable / enable, the catalog, install, remove, restart.
+MANAGE = "manage_server"
+
+ON, AVAILABLE, OFF, DISABLED, FAILED = "on", "available", "off", "disabled-on-server", "failed"
 
 
 class Invalid(ValueError):
@@ -86,6 +126,12 @@ def _forbidden(capability: str) -> web.Response:
     return web.json_response({"error": "forbidden", "needs": capability}, status=403)
 
 
+def _disabled(name: str) -> web.Response:
+    return web.json_response({"error": "addon_disabled", "addon": name,
+                              "message": f"The {name} addon is disabled on this server; an admin can enable it."},
+                             status=409)
+
+
 def me_payload(user: User) -> Dict[str, Any]:
     return {
         "id": user.id,
@@ -100,6 +146,25 @@ def _rule_fields(rule: store.ChangeRule) -> Dict[str, Any]:
     return {"can_change": rule.can_change, "why_not": rule.why_not, "rule": rule.rule}
 
 
+def _web(addon: Addon) -> Optional[Dict[str, Any]]:
+    """The URLs of ``addon``'s web files and its navigation entry, or None without ``web=``."""
+    if addon.web is None:
+        return None
+    base = f"/addons/{addon.name}/web/"
+    nav = addon.web.nav
+    return {"panel": base + addon.web.panel if addon.web.panel else None,
+            "style": base + addon.web.style if addon.web.style else None,
+            "nav": {"label": nav.label, "icon": nav.icon, "order": nav.order} if nav is not None else None}
+
+
+def _state(user: User, addon: Addon, connected: bool, can_change: bool) -> str:
+    if not state.is_enabled(addon.name):
+        return DISABLED
+    if connected:
+        return ON
+    return AVAILABLE if can_change else OFF
+
+
 def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
     """One addon as ``user``'s, seen by ``by`` (the caller: ``user`` themselves
     or an admin acting for them): never a secret credential's value.
@@ -107,7 +172,7 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
     Raises:
         CredentialsKeyError: the stored credentials cannot be decrypted.
     """
-    conn = store.get(user, addon.name)
+    conn = store.get(user, addon.name, disabled_too=True)
     creds: Mapping[str, str] = conn.credentials if conn is not None else {}
     values: Mapping[str, Any] = conn.settings if conn is not None else addon.setting_defaults()
     credentials: List[Dict[str, Any]] = []
@@ -118,13 +183,31 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
             item["value"] = creds.get(f.name) or None
         credentials.append({**item, **_rule_fields(store.field_rule(addon, user, f.name, by))})
     addon_rule = store.addon_rule(addon, by)
+    can_change, why_not = addon_rule.can_change, addon_rule.why_not
+    enabled = state.is_enabled(addon.name)
+    if addon.everyone:
+        can_change, why_not = False, "Every user has it"
+    elif not enabled:
+        can_change, why_not = False, "Disabled on this server"
+    try:
+        folder: Optional[addon_dirs.AddonFolder] = loader.folder(addon.name)
+    except KeyError:  # declared outside the addon folders (a test's own addon)
+        folder = None
     out = {
         "name": addon.name,
+        "title": addon.title,
         "description": addon.description,
+        "version": addon.version,
+        "source": folder.source.label if folder is not None else addon_dirs.SITE,
+        "state": _state(user, addon, conn is not None, can_change),
+        "needs": list(addon.needs),
+        "everyone": addon.everyone,
+        "web": _web(addon) if enabled and conn is not None else None,
+        "worker": addon.worker is not None,
         "connected": conn is not None,
         "requires": addon.requires,
-        "can_change": addon_rule.can_change,
-        "why_not": addon_rule.why_not,
+        "can_change": can_change,
+        "why_not": why_not,
         "credentials": credentials,
         "settings": [{"name": f.name, "description": f.description, "default": f.default,
                       "value": values.get(f.name), "type": f.type,
@@ -142,6 +225,40 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
     problem = store.stored_value_problem(conn) if conn is not None else None
     if problem is not None:
         out["problem"] = {"field": problem[0], "message": problem[1]}
+    if folder is not None and folder.source.kind == addon_dirs.INSTALLED and by.level.allows(MANAGE):
+        info = addon_dirs.installed_info(folder.path) or {}
+        out["installed"] = {"repo": info.get("repo"), "path": info.get("path"), "commit": info.get("commit")}
+    return out
+
+
+def failed_payload(failed: loader.Failed, by: User) -> Dict[str, Any]:
+    """An addon that was found but did not load (its error only for an admin)."""
+    out: Dict[str, Any] = {
+        "name": failed.name, "title": failed.name.replace("_", " ").capitalize(), "description": "",
+        "version": "", "source": addon_dirs.SITE if failed.source == addon_dirs.EXTRA else failed.source,
+        "state": FAILED, "needs": [], "everyone": False, "web": None, "worker": False, "connected": False,
+        "requires": None, "can_change": False, "why_not": "It did not load", "credentials": [], "settings": [],
+        "account": None, "check": False, "options": False, "connect_url": None, "connect_label": None,
+    }
+    if by.level.allows(MANAGE):
+        out["error"] = failed.error
+    return out
+
+
+def pending_changes() -> List[Dict[str, str]]:
+    """What changed in ``<data dir>/addons`` since this process loaded its addons
+    (installed, updated or removed: a restart loads it)."""
+    found = loader.folders()
+    out: List[Dict[str, str]] = []
+    for name, record in install.installed(addon_dirs.installed_dir()).items():
+        folder = found.get(name)
+        if folder is None:
+            out.append({"name": name, "change": "install"})
+        elif folder.source.kind == addon_dirs.INSTALLED and record.get("commit") != loader.loaded_commit(name):
+            out.append({"name": name, "change": "update"})
+    for name, folder in found.items():
+        if folder.source.kind == addon_dirs.INSTALLED and not (folder.path / "addon.py").is_file():
+            out.append({"name": name, "change": "remove"})
     return out
 
 
@@ -253,14 +370,29 @@ async def list_addons_api(request: web.Request) -> web.Response:
     caller = request_user(request)
     try:
         items: List[Dict[str, Any]] = [addon_payload(target, k, caller) for k in all_addons()
-                                       if not k.everyone and k.allowed_for(target)]
+                                       if k.allowed_for(target)]
     except crypto.CredentialsKeyError as e:
         return _key_error(e, f"Listing the addons of user {target.id}")
-    return web.json_response({"user_id": target.id, "addons": items})
+    items += [failed_payload(f, caller) for f in loader.failed().values()]
+    pending = pending_changes()
+    body: Dict[str, Any] = {"user_id": target.id, "addons": items, "restart_needed": bool(pending),
+                            "can_manage": caller.level.allows(MANAGE)}
+    if caller.level.allows(MANAGE):
+        body["pending"] = pending
+    return web.json_response(body)
 
 
 async def get_addon_api(request: web.Request) -> web.Response:
     """GET /api/addons/{name}"""
+    target = _target(request)
+    if isinstance(target, web.Response):
+        return target
+    try:
+        everyone = get_addon(request.match_info["name"]).everyone
+    except KeyError:
+        everyone = False
+    if everyone:  # listed with the others, though nobody connects it
+        return web.json_response(addon_payload(target, get_addon(request.match_info["name"]), request_user(request)))
     resolved = _resolve(request)
     if isinstance(resolved, web.Response):
         return resolved
@@ -299,6 +431,8 @@ async def put_addon_api(request: web.Request) -> web.Response:
         return _forbidden(e.needs)
     except PermissionError:
         return _forbidden(str(addon.requires))
+    except state.AddonDisabled as e:
+        return _disabled(e.addon)
     except crypto.CredentialsKeyError as e:
         return _key_error(e, f"Saving {addon.name} for user {target.id}")
     logger.info(f"{'Connected' if connecting else 'Updated'} {addon.name} for user {target.id} "
@@ -368,11 +502,190 @@ async def addon_options_api(request: web.Request) -> web.Response:
     return web.json_response({"name": addon.name, "settings": found})
 
 
+# --- Running the server's addons (manage_server) -----------------------------------------------
+
+def _loaded_addon(name: str) -> Union[Addon, web.Response]:
+    try:
+        return get_addon(name)
+    except KeyError:
+        return web.json_response({"error": "unknown_addon", "addon": name}, status=404)
+
+
+async def _set_state(request: web.Request, off: bool) -> web.Response:
+    caller = request_user(request)
+    addon = _loaded_addon(request.match_info["name"])
+    if isinstance(addon, web.Response):
+        return addon
+    try:
+        state.set_disabled(addon.name, off, by=caller)
+    except state.CannotDisable as e:
+        return web.json_response({"error": "cannot_disable", "addon": addon.name, "message": str(e)}, status=400)
+    try:
+        return web.json_response(addon_payload(caller, addon, caller))
+    except crypto.CredentialsKeyError as e:
+        return _key_error(e, f"Reading {addon.name}")
+
+
+@requires(MANAGE)
+async def disable_addon_api(request: web.Request) -> web.Response:
+    """POST /api/addons/{name}/disable: for everyone on this server."""
+    return await _set_state(request, True)
+
+
+@requires(MANAGE)
+async def enable_addon_api(request: web.Request) -> web.Response:
+    """POST /api/addons/{name}/enable"""
+    return await _set_state(request, False)
+
+
+def _present() -> Dict[str, str]:
+    """The source of every addon folder found at start or in ``<data dir>/addons`` now, by name."""
+    out = {name: f.source.label for name, f in loader.folders().items()}
+    for name in install.installed(addon_dirs.installed_dir()):
+        out.setdefault(name, addon_dirs.INSTALLED)
+    return out
+
+
+def catalog_entry_payload(entry: catalog.Entry, present: Mapping[str, str],
+                          installed: Mapping[str, Mapping[str, Any]]) -> Dict[str, Any]:
+    """A catalog entry merged with what this server has."""
+    record = installed.get(entry.name)
+    loaded_names = loader.loaded()
+    version = get_addon(entry.name).version if entry.name in loaded_names else ""
+    commit = record.get("commit") if record is not None else None
+    return {**entry.to_json(),
+            "official": (addon_dirs.OFFICIAL_DIR / entry.name).is_dir(),
+            "present": present.get(entry.name),
+            "installed": {"commit": commit, "loaded": entry.name in loaded_names
+                          and loader.loaded_commit(entry.name) == commit, "version": version}
+            if record is not None else None,
+            "update_available": record is not None and commit != entry.source.ref,
+            "compatible": catalog.compatible(entry)}
+
+
+@requires(MANAGE)
+async def catalog_api(request: web.Request) -> web.Response:
+    """GET /api/addons/catalog: the catalog merged with what is installed."""
+    try:
+        cat = await asyncio.to_thread(catalog.load, fresh=request.query.get("fresh") == "1")
+    except catalog.CatalogError as e:
+        logger.warning(str(e))
+        return web.json_response({"error": "catalog_unavailable", "message": str(e)}, status=502)
+    present = _present()
+    installed = install.installed(addon_dirs.installed_dir())
+    return web.json_response({"origin": cat.origin, "dana_version": catalog.dana_version(),
+                              "entries": [catalog_entry_payload(e, present, installed) for e in cat.entries],
+                              "problems": cat.problems, "restart_needed": bool(pending_changes())})
+
+
+def _install_refused(message: str, status: int = 400, error: str = "install_refused") -> web.Response:
+    return web.json_response({"error": error, "message": message}, status=status)
+
+
+@requires(MANAGE)
+async def install_api(request: web.Request) -> web.Response:
+    """POST /api/addons/install: a catalog entry by ``name``, or any ``{repo, ref, path}`` (admins only)."""
+    caller = request_user(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    if not isinstance(body, dict):
+        return _install_refused("The body must be a JSON object: {name} or {repo, ref, path}.")
+    name = body.get("name") if isinstance(body.get("name"), str) else None
+    if body.get("repo") is not None or body.get("ref") is not None:
+        source = install.Source(str(body.get("repo") or ""), str(body.get("path") or ""), str(body.get("ref") or ""))
+    elif name:
+        try:
+            cat = await asyncio.to_thread(catalog.load)
+        except catalog.CatalogError as e:
+            return _install_refused(str(e), 502, "catalog_unavailable")
+        entry = cat.get(name)
+        if entry is None:
+            return _install_refused(f"The catalog has no addon {name!r}.", 404, "not_in_catalog")
+        if not catalog.compatible(entry):
+            return _install_refused(f"{name} needs Dana {entry.min_dana} or later; this server is "
+                                    f"{catalog.dana_version()}.", 409, "incompatible")
+        source = entry.source
+    else:
+        return _install_refused("Give the name of a catalog entry, or repo and ref (and path).")
+    try:
+        done = await asyncio.to_thread(install.install, source, addon_dirs.installed_dir(), name=name, by=caller.id)
+    except install.InstallError as e:
+        logger.info(f"Install refused for user {caller.id}: {e}")
+        return _install_refused(str(e))
+    logger.warning(f"Addon {done.name} {'updated' if done.replaced else 'installed'} from {done.source.repo} "
+                   f"at {done.source.ref} by user {caller.id}; a restart loads it")
+    return web.json_response({"name": done.name, "repo": done.source.repo, "path": done.source.path,
+                              "commit": done.source.ref, "replaced": done.replaced, "restart_needed": True,
+                              "message": f"{'Updated' if done.replaced else 'Installed'} {done.name} at "
+                                         f"{done.source.ref[:12]}. Restart the server to load it."}, status=201)
+
+
+@requires(MANAGE)
+async def remove_addon_api(request: web.Request) -> web.Response:
+    """POST /api/addons/{name}/remove: delete an installed addon's folder (its tables stay)."""
+    name = request.match_info["name"]
+    if name not in install.installed(addon_dirs.installed_dir()):
+        if (addon_dirs.OFFICIAL_DIR / name).is_dir() or name in loader.folders():
+            return _install_refused(f"{name} was not installed from the catalog; it cannot be removed here.",
+                                    400, "not_installed")
+        return web.json_response({"error": "unknown_addon", "addon": name}, status=404)
+    try:
+        await asyncio.to_thread(install.remove, name, addon_dirs.installed_dir())
+    except install.InstallError as e:
+        return _install_refused(str(e), 400, "not_installed")
+    logger.warning(f"Addon {name} removed by user {request_user(request).id}; a restart unloads it")
+    return web.json_response({"name": name, "removed": True, "restart_needed": True})
+
+
+RESTART_DELAY_SECONDS = 0.5
+
+
+@requires(MANAGE)
+async def restart_api(request: web.Request) -> web.Response:
+    """POST /api/server/restart: answer, then exit cleanly for the supervisor to start the server again."""
+    caller = request_user(request)
+    asyncio.get_running_loop().call_later(RESTART_DELAY_SECONDS, lifecycle.request_restart,
+                                          f"asked by user {caller.id}")
+    return web.json_response({"restarting": True}, status=202)
+
+
+# --- An addon's web files ---------------------------------------------------------------------
+
+async def addon_web_file(request: web.Request) -> web.StreamResponse:
+    """GET /addons/{name}/web/{file}: a file of a loaded addon's ``web/`` folder, while it is enabled on the server."""
+    name = request.match_info["name"]
+    missing = web.json_response({"error": "not_found"}, status=404)
+    if name not in loader.loaded() or not state.is_enabled(name):
+        return missing
+    root = (loader.folder(name).path / "web").resolve()
+    rel = request.match_info["file"]
+    if not rel or "\\" in rel or "\0" in rel or any(part in ("", ".", "..") or part.startswith(".")
+                                                     for part in rel.split("/")):
+        return missing
+    target = (root / rel).resolve()
+    if not target.is_relative_to(root) or not target.is_file():
+        return missing
+    kind, _ = mimetypes.guess_type(target.name)
+    return web.FileResponse(target, headers={"Cache-Control": "no-cache",
+                                             "Content-Type": kind or "application/octet-stream",
+                                             "X-Content-Type-Options": "nosniff"})
+
+
 def setup(app: web.Application) -> None:
     r = app.router
     r.add_get("/api/me", me_api)
     r.add_get("/api/users", users_api)
     r.add_get("/api/addons", list_addons_api)
+    # Before /api/addons/{name}: these names are reserved (core/addons/install.py).
+    r.add_get("/api/addons/catalog", catalog_api)
+    r.add_post("/api/addons/install", install_api)
+    r.add_post("/api/server/restart", restart_api)
+    r.add_post("/api/addons/{name}/disable", disable_addon_api)
+    r.add_post("/api/addons/{name}/enable", enable_addon_api)
+    r.add_post("/api/addons/{name}/remove", remove_addon_api)
+    r.add_get("/addons/{name}/web/{file:.+}", addon_web_file)
     r.add_get("/api/addons/{name}", get_addon_api)
     r.add_put("/api/addons/{name}", put_addon_api)
     r.add_delete("/api/addons/{name}", delete_addon_api)

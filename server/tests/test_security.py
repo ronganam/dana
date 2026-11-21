@@ -28,7 +28,7 @@ localhost (and name lookups that are refused).
 3b. A WhatsApp account belongs to one connection: a second connection whose
    WAHA reports it (a member's own WAHA, the admin's WAHA under another
    hostname) gets no account, is never routed to, its tools refuse; an admin
-   sees the conflict (API, bin/users.py); two claims at once → one holder.
+   sees the conflict (API, bin/dana addons show); two claims at once → one holder.
 4. Telegram chat settings: a member only their own chat (never someone
    else's, never a group); shopping has no Telegram setting.
 5. Shopping: a share never changes a user's active list, the user chooses it
@@ -47,7 +47,6 @@ localhost (and name lookups that are refused).
 
 import asyncio
 import datetime
-import importlib.util
 import io
 import json
 import logging
@@ -96,6 +95,7 @@ import core.addons_api as addons_api  # noqa: E402
 import core.now as now  # noqa: E402
 import core.server as server  # noqa: E402
 from core import debug_api, sessions_api  # noqa: E402
+from cli import main as cli  # noqa: E402
 from addons.cameras import api as cameras_api  # noqa: E402
 from addons.homeassistant import api as homeassistant_api  # noqa: E402
 from addons.knowledge import api as knowledge_api  # noqa: E402
@@ -628,13 +628,6 @@ async def until(cond, seconds: float = 3.0) -> bool:
     return bool(cond())
 
 
-def load_cli():
-    spec = importlib.util.spec_from_file_location("users_cli", testenv.SERVER / "bin" / "users.py")
-    cli = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(cli)
-    return cli
-
-
 async def test_waha_accounts(http: TestClient, waha: FakeWAHA, bobs: FakeWAHA) -> None:
     """Bob's own WAHA (allowed by MEMBER_ALLOWED_ORIGINS) reports the admin's WhatsApp account."""
     store.update(ADMIN, "whatsapp", credentials={"url": waha.url, "api_key": "ADMIN-WAHA-KEY", "session": "default"})
@@ -701,8 +694,8 @@ async def test_waha_accounts(http: TestClient, waha: FakeWAHA, bobs: FakeWAHA) -
     check("accounts: the admin's own payload has no conflict field (unchanged shape)",
           "account_conflict" not in admin_body and admin_body.get("account") == ADMIN_ACCOUNT, admin_body)
     buf = io.StringIO()
-    code = load_cli().main(["addons", "show", BOB.id], stdout=buf, stderr=io.StringIO())
-    check("accounts: bin/users.py addons show names the conflict",
+    code = cli.main(["addons", "show", BOB.id], stdout=buf, stderr=io.StringIO())
+    check("accounts: bin/dana addons show names the conflict",
           code == 0 and "account conflict: " + ADMIN_ACCOUNT in buf.getvalue(), buf.getvalue())
 
     # Bob's WAHA reports another account: the conflict clears and the connection is used.
@@ -800,10 +793,13 @@ async def test_change_rules(http: TestClient) -> None:
             addon = item["name"]
             before = json.dumps(store.list_connections(BOB if query or token == BOB_TOKEN else ADMIN), default=str)
             if not item["can_change"]:
-                locked.append(addon)
+                # An addon every user has (essentials) is listed but has no connection to change: 404.
+                refused = (404,) if item["everyone"] else (403,)
+                if not item["everyone"]:
+                    locked.append(addon)
                 r1 = await http.put(f"/api/addons/{addon}{query}", json={}, headers=h(token))
                 r2 = await http.delete(f"/api/addons/{addon}{query}", headers=h(token))
-                if r1.status != 403 or r2.status != 403:
+                if r1.status not in refused or r2.status not in refused:
                     leaked.append((addon, r1.status, r2.status))
                 continue
             for group in ("credentials", "settings"):

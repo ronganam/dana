@@ -2,7 +2,10 @@
 #
 #   cp .env.example .env            # fill in at least the LLM key and API_TOKEN
 #   docker compose up -d            # http://localhost:8080
-#   docker compose --profile money up -d   # also the bank-worker sidecar (docs/money.md)
+#   docker compose --profile money up -d   # also the money addon's worker: the bank syncs (docs/money.md)
+#
+# An addon's worker (its worker/ folder: docs/operations.md, "Workers") runs as a service under a
+# profile named after the addon.
 #
 # Everything Dana writes (database, recordings, uploads, snapshots) lives in the `data` volume.
 name: dana
@@ -21,20 +24,20 @@ services:
       - data:/app/db
     restart: unless-stopped
 
-  # The money addon's bank syncs: shares the app's network (Dana reaches it on 127.0.0.1:8090)
-  # and only the money/ folder of the data, which money-dir creates first.
+  # The money addon's worker (addons/money/worker/): shares the app's network (Dana reaches it on
+  # 127.0.0.1:8090, MONEY_WORKER_URL) and only the money/ folder of the data, which money-dir creates first.
   money-dir:
     profiles: [money]
-    image: dana-bank-worker
-    build: ./bank-worker
+    image: dana-money
+    build: ./addons/money/worker
     command: ["mkdir", "-p", "/data/money/profiles"]
     volumes:
       - data:/data
     depends_on: [app]   # the app creates the volume first, owned by its user
     restart: "no"
-  bank-worker:
+  money-worker:
     profiles: [money]
-    image: dana-bank-worker
+    image: dana-money
     network_mode: "service:app"
     volumes:
       - type: volume

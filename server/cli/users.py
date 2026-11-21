@@ -1,30 +1,30 @@
-#!/usr/bin/env python3
-"""Manage Dana's users on the server (docs/access.md, "Managing users").
+"""``bin/dana users …`` and the per-user part of ``bin/dana addons …``:
+Dana's users, their tokens, Telegram ids, connections and shares
+(docs/access.md, "Managing users").
 
 Works on the database directly, with the server's own env (``DATABASE_PATH``,
 ``CREDENTIALS_KEY``); the running server notices changes within its cache
 refresh (10 s). In the pod::
 
-    kubectl exec -n ganam-assistant deploy/ganam-assistant -- python bin/users.py list
+    kubectl exec -n <namespace> deploy/<deployment> -- bin/dana users list
 
-Commands (``bin/users.py <command> --help`` for each)::
+Commands (``bin/dana users <command> --help`` for each)::
 
-    list                                    users: access, Telegram ids, tokens, addons
-    add NAME [--access] [--context] [--pronoun] [--telegram-chat]
-    update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
-    remove USER [--delete-data]             without the flag: says what would be deleted, removes nothing
-    tokens issue USER [--label]             prints the token once
-    tokens list [USER]
-    tokens revoke TOKEN_ID
-    telegram add USER TELEGRAM_ID
-    telegram move TELEGRAM_ID USER
-    telegram remove TELEGRAM_ID [--allow-open-bot]
-    addons list                             every addon with its credential and setting fields
+    users list                              users: access, Telegram ids, tokens, addons
+    users add NAME [--access] [--context] [--pronoun] [--telegram-chat]
+    users update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
+    users remove USER [--delete-data]       without the flag: says what would be deleted, removes nothing
+    users tokens issue USER [--label]       prints the token once
+    users tokens list [USER]
+    users tokens revoke TOKEN_ID
+    users telegram add USER TELEGRAM_ID
+    users telegram move TELEGRAM_ID USER
+    users telegram remove TELEGRAM_ID [--allow-open-bot]
+    users sharing [USER]                    who has access to what
     addons show USER                        a user's connections (credential values never shown)
     addons connect USER ADDON [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
     addons update USER ADDON [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
     addons disconnect USER ADDON
-    sharing [USER]                          who has access to what
 
 ``USER`` is a user id or name (full name, or a unique start of one, any case).
 Credentials are read only from a file or stdin, as ``name=value`` lines
@@ -38,22 +38,18 @@ from __future__ import annotations
 
 import argparse
 import json
-import logging
 import sqlite3
-import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, TextIO
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-
-import addons  # noqa: E402,F401 — first: registers every addon (and the sharing item types)
-from core import access, db, user_rows, users  # noqa: E402
-from core.addons import sharing  # noqa: E402
-from core.db import get_db_connection  # noqa: E402
-from core.paths import IMAGES_DIR, RECORDINGS_DIR  # noqa: E402
-from core.users import User  # noqa: E402
-from core.addons import crypto, store  # noqa: E402
-from core.addons.addon import get_addon, all_addons  # noqa: E402
+import addons  # noqa: F401 — first: registers every addon (and the sharing item types)
+from core import access, user_rows, users
+from core.addons import sharing, state
+from core.db import get_db_connection
+from core.paths import IMAGES_DIR, RECORDINGS_DIR
+from core.users import User
+from core.addons import crypto, store
+from core.addons.addon import get_addon
 
 # Rows a removed user keeps: usage is the server's cost history, and
 # connection_imports records that the env import happened (so it never runs
@@ -250,7 +246,7 @@ def _connection_lines(user: User) -> List[str]:
         k = get_addon(info.addon)
         if k.everyone:
             continue
-        conn = store.get(user, info.addon)
+        conn = store.get(user, info.addon, disabled_too=True)
         creds = conn.credentials if conn is not None else {}
         cred_text = ", ".join(f"{f.name} {'set' if creds.get(f.name) else 'not set'}" for f in k.credentials)
         settings = ", ".join(f"{name}={json.dumps(value, ensure_ascii=False)}" for name, value in info.settings.items())
@@ -263,6 +259,8 @@ def _connection_lines(user: User) -> List[str]:
             line += f"  account: {info.account}"
         if info.account_conflict:
             line += f"  account conflict: {info.account_conflict} is already connected by another user (not used)"
+        if not state.is_enabled(info.addon):
+            line += "  (disabled on this server: not used)"
         lines.append(line)
     return lines or ["  (none besides essentials)"]
 
@@ -303,8 +301,8 @@ def cmd_add(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     defaults = store.connect_defaults(user)
     has = ", ".join(["essentials", *defaults])
     print(f"Added {user.name} ({user.id}, {user.access}). They have {has} until "
-          f"you connect others: bin/users.py addons connect {user.id} <addon>. "
-          f"A token for their devices: bin/users.py tokens issue {user.id} --label phone", file=out)
+          f"you connect others: bin/dana addons connect {user.id} <addon>. "
+          f"A token for their devices: bin/dana users tokens issue {user.id} --label phone", file=out)
 
 
 def cmd_update(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
@@ -358,7 +356,7 @@ def cmd_tokens_issue(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> No
     print(f"Token {token.id} for {user.name}{f' ({token.label})' if token.label else ''}:", file=out)
     print(raw, file=out)
     print("It is shown only now; it is stored hashed. Revoke it with: "
-          f"bin/users.py tokens revoke {token.id}", file=out)
+          f"bin/dana users tokens revoke {token.id}", file=out)
 
 
 def cmd_tokens_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
@@ -384,7 +382,7 @@ def cmd_telegram_add(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> No
     try:
         users.add_telegram_id(user.id, args.telegram_id)
     except ValueError as e:
-        raise CliError(f"{e} Use: bin/users.py telegram move {args.telegram_id} {user.id}") from e
+        raise CliError(f"{e} Use: bin/dana users telegram move {args.telegram_id} {user.id}") from e
     print(f"Telegram id {args.telegram_id} is now {user.name}.", file=out)
 
 
@@ -408,20 +406,6 @@ def cmd_telegram_remove(args: argparse.Namespace, out: TextIO, stdin: TextIO) ->
     print(f"Telegram id {args.telegram_id} removed from {owners[0].name}.", file=out)
 
 
-def cmd_addons(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
-    for k in all_addons():
-        if k.everyone:
-            print(f"{k.name}: {k.description} (every user has it)", file=out)
-            continue
-        extra = f" (needs the '{k.requires}' capability: admins only)" if k.requires else ""
-        print(f"{k.name}: {k.description}{extra}", file=out)
-        for f in k.credentials:
-            print(f"  credential {f.name}{'' if f.required else ' (optional)'}: {f.description}", file=out)
-        for f in k.settings:
-            default = f" (default {json.dumps(f.default, ensure_ascii=False)})" if f.default is not None else ""
-            print(f"  setting {f.name}{default}: {f.description}", file=out)
-
-
 def cmd_show(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     user = find_user(args.user)
     print(f"{user.name} ({user.id}):", file=out)
@@ -434,7 +418,7 @@ def _change(args: argparse.Namespace, out: TextIO, stdin: TextIO, *, connecting:
     try:
         get_addon(args.addon)
     except KeyError as e:
-        raise CliError(f"No addon {args.addon!r} (see: bin/users.py addons list).") from e
+        raise CliError(f"No addon {args.addon!r} (see: bin/dana addons list).") from e
     credentials = _read_credentials(args, stdin)
     settings = parse_settings(args.settings)
     try:
@@ -446,7 +430,9 @@ def _change(args: argparse.Namespace, out: TextIO, stdin: TextIO, *, connecting:
     except PermissionError as e:
         raise CliError(str(e)) from e
     except store.NotConnected as e:
-        raise CliError(f"{e} Use: bin/users.py addons connect {user.id} {args.addon}") from e
+        raise CliError(f"{e} Use: bin/dana addons connect {user.id} {args.addon}") from e
+    except state.AddonDisabled as e:
+        raise CliError(f"{e} (bin/dana addons enable {args.addon})") from e
     except crypto.CredentialsKeyError as e:
         raise CliError(str(e)) from e
     except ValueError as e:
@@ -504,11 +490,8 @@ def cmd_sharing(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
 
 # --- Parser -------------------------------------------------------------------------------------
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="bin/users.py", description="Manage Dana's users, their tokens, "
-                                     "Telegram ids, addons and shares (on the server's database).")
-    sub = parser.add_subparsers(dest="command", required=True, metavar="command")
-
+def register(sub: Any) -> None:
+    """Add the ``users`` commands to ``sub`` (the ``bin/dana users`` sub-parsers)."""
     p = sub.add_parser("list", help="every user with access, Telegram ids, tokens and addons")
     p.set_defaults(func=cmd_list)
 
@@ -563,52 +546,26 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-open-bot", action="store_true", help="allow removing the last id (the bot opens)")
     p.set_defaults(func=cmd_telegram_remove)
 
-    ints = sub.add_parser("addons", help="addons and a user's connections").add_subparsers(
-        dest="addons_command", required=True, metavar="action")
-    p = ints.add_parser("list", help="every addon with its credential and setting fields")
-    p.set_defaults(func=cmd_addons)
-    p = ints.add_parser("show", help="a user's connections (credential values are never shown)")
+    p = sub.add_parser("sharing", help="who has access to what")
+    p.add_argument("user", nargs="?")
+    p.set_defaults(func=cmd_sharing)
+
+
+def register_connections(sub: Any) -> None:
+    """Add the per-user addon commands (show, connect, update, disconnect) to the ``bin/dana addons`` sub-parsers."""
+    p = sub.add_parser("show", help="a user's connections (credential values are never shown)")
     p.add_argument("user")
     p.set_defaults(func=cmd_show)
-    for name, func, text in (("connect", cmd_connect, "connect an addon for a user"),
-                             ("update", cmd_connection_update, "change a connected addon's credentials / settings")):
-        p = ints.add_parser(name, help=text)
+    for name, func, text in (("connect", cmd_connect, "turn an addon on for a user"),
+                             ("update", cmd_connection_update, "change a user's addon credentials / settings")):
+        p = sub.add_parser(name, help=text)
         p.add_argument("user")
         p.add_argument("addon")
         p.add_argument("settings", nargs="*", metavar="SETTING=VALUE")
         p.add_argument("--credentials-file", metavar="PATH", help="name=value lines")
         p.add_argument("--credentials-stdin", action="store_true", help="read name=value lines from stdin")
         p.set_defaults(func=func)
-    p = ints.add_parser("disconnect", help="disconnect an addon (its data is kept)")
+    p = sub.add_parser("disconnect", help="turn an addon off for a user (its data is kept)")
     p.add_argument("user")
     p.add_argument("addon")
     p.set_defaults(func=cmd_disconnect)
-
-    p = sub.add_parser("sharing", help="who has access to what")
-    p.add_argument("user", nargs="?")
-    p.set_defaults(func=cmd_sharing)
-    return parser
-
-
-def main(argv: Optional[Sequence[str]] = None, *, stdout: Optional[TextIO] = None,
-         stdin: Optional[TextIO] = None, stderr: Optional[TextIO] = None) -> int:
-    """Run one command; returns the exit status (0 done, 1 refused, 2 bad usage)."""
-    out = stdout or sys.stdout
-    err = stderr or sys.stderr
-    logging.basicConfig(level=logging.WARNING)
-    args = build_parser().parse_args(argv)
-    pending = db.pending_migrations()
-    if pending:
-        print(f"error: the database at {db.DATABASE_PATH} is not up to date "
-              f"({len(pending)} migration(s) pending); start the server once first.", file=err)
-        return 1
-    try:
-        args.func(args, out, stdin or sys.stdin)
-    except CliError as e:
-        print(f"error: {e}", file=err)
-        return 1
-    return 0
-
-
-if __name__ == "__main__":
-    sys.exit(main())

@@ -7,6 +7,11 @@ every loaded addon's ``api.py`` in the addon order (core/addons/loader.py).
 Background work: core's own loops (usage, the briefing fallback, meeting
 cards, the weekly review, the wake watch) and the addons' jobs and services
 (core/addons/scheduler.py). Nothing here imports an addon.
+
+Every route an addon's ``setup(app)`` adds is remembered as that addon's:
+while the addon is disabled on the server (core/addons/state.py) those routes
+answer 404 ``{"error": "addon_disabled", "addon": <name>}``
+(:func:`disabled_addon_middleware`).
 """
 import asyncio
 import logging
@@ -16,8 +21,8 @@ from aiohttp import web
 
 from core import (actions_api, addons_api, app_updates, assistant_api, briefing, briefing_api, debug_api, now_api,
                   pages_api, sessions_api, sharing_api, usage, usage_api, wake, weekly_review)
-from core.addons import loader, scheduler
-from core.auth import setup_auth
+from core.addons import loader, scheduler, state
+from core.auth import Handler, setup_auth
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +35,40 @@ ROUTE_MODULES = (
 )
 
 
+# The addon that added each route resource (filled by setup_routes).
+ROUTE_OWNERS = web.AppKey("route_owners", dict)
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
+
+
 def route_modules() -> tuple:
     """Every route module: core's, then each loaded addon's ``api.py``."""
     return ROUTE_MODULES + loader.route_modules()
+
+
+@web.middleware
+async def disabled_addon_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+    """404 ``addon_disabled`` for a route of an addon disabled on the server."""
+    owner = request.app.get(ROUTE_OWNERS, {}).get(request.match_info.route.resource)
+    if owner is not None and not state.is_enabled(owner):
+        return web.json_response({"error": "addon_disabled", "addon": owner}, status=404)
+    return await handler(request)
+
+
+def setup_routes(app: web.Application) -> None:
+    """Core's routes, every loaded addon's (each remembered as its own), the
+    middleware that closes a disabled addon's routes, and the static folder.
+    Call after :func:`core.auth.setup_auth`."""
+    for module in ROUTE_MODULES:
+        module.setup(app)
+    owners = {}
+    for name, module in loader.apis():
+        before = set(app.router.resources())
+        module.setup(app)
+        owners.update({r: name for r in app.router.resources() if r not in before})
+    app[ROUTE_OWNERS] = owners
+    app.middlewares.append(disabled_addon_middleware)
+    os.makedirs(STATIC_DIR, exist_ok=True)
+    app.router.add_static("/static/", STATIC_DIR, name="static")
 
 
 async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
@@ -53,17 +89,9 @@ async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
     app = web.Application()
     setup_auth(app)
     app["log_handler"] = log_handler
-    
-    # Static files & Root
-    static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
-    if not os.path.exists(static_dir):
-        os.makedirs(static_dir, exist_ok=True)
-        
-    for module in route_modules():
-        module.setup(app)
-
-    # Serve static directory after endpoints
-    app.router.add_static("/static/", static_dir, name="static")
+    setup_routes(app)
+    # Before runner.setup(), which freezes the app's signal lists.
+    app.on_cleanup.append(scheduler.stop)
 
     runner = web.AppRunner(app)
     await runner.setup()
@@ -77,7 +105,6 @@ async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
     _start_core_background(app)
     # The addons' jobs (per user, as that user) and services.
     scheduler.start(app)
-    app.on_cleanup.append(scheduler.stop)
     return runner
 
 

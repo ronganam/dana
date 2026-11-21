@@ -1,10 +1,15 @@
 # Writing an addon
 
-An addon is a folder with an `addon.py`; everything it adds to Dana is declared on the `addon` object there or with `@addon.<hook>` in its other modules. Official addons and yours are written the same way. The design (and what is not built yet) is [`../../docs/addons.md`](../../docs/addons.md). Start from [`examples/addons/hello/`](../../examples/addons/hello/): a tool, a setting, a prompt line, a table, a job, an event handler, a Now card with an action, a route and its test. The `tasks` addon (`addons/tasks/`) uses every hook.
+An addon is a folder with an `addon.py`; everything it adds to Dana is declared on the `addon` object there or with `@addon.<hook>` in its other modules. Official addons and yours are written the same way. The design (and what is not built yet) is [`../../docs/addons.md`](../../docs/addons.md).
+
+## Start from the scaffold
 
 ```bash
-cp -r examples/addons/hello site/addons/my_addon   # rename hello → my_addon inside, restart Dana
+bin/dana addons new my_addon        # from server/: writes site/addons/my_addon (--dir DIR for another folder)
+bin/test my_addon                   # its test passes as written
 ```
+
+It writes a working addon (from `cli/template/`, shaped like the hello example): `addon.py` with a setting and a prompt line, `tools.py` with `my_addon_hello`, `api.py` with `GET /api/my_addon`, `tests/test_my_addon.py` (two users with it, one without) and a `README.md`. Restart Dana to load it and turn it on in Settings → Addons, or `bin/dana addons connect <user> my_addon`. Grow it from there: [`examples/addons/hello/`](../../examples/addons/hello/) adds a table, a job, an event handler and a Now card with an action; the `tasks` addon (`addons/tasks/`) uses every hook. To ship it to others, put it in a git repository and add an entry to `catalog.json` pinned to a full commit (`../../docs/addons.md`, "The catalog").
 
 ## The folder
 
@@ -14,6 +19,8 @@ my_addon/
   tools.py          @addon.tool() functions             imported when present
   hooks.py          jobs, handlers, Now cards…          imported when present
   api.py            setup(app): its HTTP routes         registered automatically
+  web/              its panel / style files             served at /addons/<name>/web/<file> (web=Web(...))
+  worker/           Dockerfile of a sidecar             built by bin/deploy as <image>-<name> (worker=Worker(...))
   migrations/       m0001_baseline.py, m0002_…          its own tables
   tests/            test_*.py                           run by bin/test
 ```
@@ -182,7 +189,11 @@ def setup(app: web.Application) -> None:      # api.py; behind the same auth as 
     app.router.add_get("/api/my", handler)    # handler: store.require(request_user(request), "my_addon")
 ```
 
-`store.require` raises `NotConnected` (403 `not_connected` from the middleware) for a user without the addon.
+`store.require` raises `NotConnected` (403 `not_connected` from the middleware) for a user without the addon. While an admin has disabled the addon on the server its routes answer 404 `addon_disabled` before your handler runs.
+
+## Web files and workers
+
+`web=Web(panel="panel.js", style="panel.css", nav=Nav("My addon", icon="star"))` serves the addon's `web/` folder at `/addons/<name>/web/<file>` (signed in, only while the addon is enabled on the server) and puts the URLs in `/api/addons` for users who have it on. `worker=Worker(port=8091, url_env="MY_ADDON_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained: the app image leaves it out); the addon reaches it at the URL in `url_env`. Deploying and running workers: `operations.md`, "Workers"; money's bank worker (`addons/money/worker/`) is the example.
 
 ## Rules that save time
 
@@ -194,4 +205,4 @@ def setup(app: web.Application) -> None:      # api.py; behind the same auth as 
 
 `bin/test` runs `tests/test_*.py` of every official and site addon. A script starts with `import testenv; testenv.isolate("<name>")`, which sets `DANA_ADDON_DIRS=""`: a site addon's test then sets `DANA_ADDON_DIRS` to its parent folder before importing the app (`examples/addons/hello/tests/test_hello.py`). Cover two users with the addon and one without.
 
-Connect it for a user on the Addons page, with `bin/users.py addons connect <user> <name>`, or `PUT /api/addons/<name>`.
+Connect it for a user on the Addons page, with `bin/dana addons connect <user> <name>`, or `PUT /api/addons/<name>`.

@@ -33,6 +33,20 @@ os.environ["HOMEASSISTANT_TOKEN"] = "env-ha-token"
 os.environ["HA_WATCH_RECONCILE_SECONDS"] = "3600"  # the periodic tick never comes during the test
 os.environ["GOOGLE_CLIENT_ID"] = "test-client"
 os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
+# A site addon that fails to load (listed as failed), and a catalog with one valid and one invalid entry.
+_SITE = os.path.join(testenv.scratch_dir(), "site_addons")
+os.makedirs(os.path.join(_SITE, "broken"))
+with open(os.path.join(_SITE, "broken", "addon.py"), "w", encoding="utf-8") as _f:
+    _f.write("raise ImportError('a missing package')\n")
+os.environ["DANA_ADDON_DIRS"] = _SITE
+_CATALOG = os.path.join(testenv.scratch_dir(), "catalog.json")
+with open(_CATALOG, "w", encoding="utf-8") as _f:
+    json.dump({"addons": [
+        {"name": "weather", "title": "Weather", "description": "The weather where you are", "author": "Someone",
+         "homepage": "https://example.invalid/weather", "tags": ["home"], "min_dana": "9.0.0",
+         "source": {"repo": "https://example.invalid/dana-addons.git", "path": "weather", "ref": "a" * 40}},
+        {"name": "later", "source": {"repo": "https://example.invalid/x.git", "path": "", "ref": "FILL-ME"}}]}, _f)
+os.environ["DANA_CATALOG_FILE"] = _CATALOG
 
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
@@ -206,12 +220,21 @@ async def test_me_and_list(client: TestClient) -> None:
     status, body = await call(client, "GET", "/api/addons", ADMIN_AUTH)
     addons = by_name(body)
     ha = addons.get("homeassistant", {})
-    check("list: every addon but core for the admin, ops included",
-          status == 200 and body["user_id"] == ADMIN.id and "essentials" not in addons and "ops" in addons
-          and list(addons)[:3] == ["tasks", "shopping", "knowledge"], list(addons))
+    check("list: every addon for the admin, essentials (everyone has it) and ops included",
+          status == 200 and body["user_id"] == ADMIN.id and "ops" in addons
+          and list(addons)[:4] == ["essentials", "tasks", "shopping", "knowledge"]
+          and body["restart_needed"] is False and body["can_manage"] is True and body["pending"] == [], list(addons))
+    ess = addons["essentials"]
+    check("list: essentials is on for everyone and cannot be turned off",
+          ess["everyone"] is True and ess["state"] == "on" and ess["connected"] is True
+          and ess["can_change"] is False and ess["why_not"] == "Every user has it", ess)
     check("list: one connection's shape (credentials only as set / not set)",
-          set(ha) == {"name", "description", "connected", "requires", "can_change", "why_not", "credentials",
+          set(ha) == {"name", "title", "description", "version", "source", "state", "needs", "everyone", "web",
+                      "worker", "connected", "requires", "can_change", "why_not", "credentials",
                       "settings", "account", "check", "options", "connect_url", "connect_label"}
+          and isinstance(ha["title"], str) and ha["source"] == "official" and ha["state"] == "on"
+          and ha["needs"] == [] and ha["everyone"] is False and ha["web"] is None and ha["worker"] is False
+          and addons["money"]["worker"] is True
           and ha["connect_url"] is None and addons["calendar"]["connect_url"] == "/api/google/connect"
           and ha["connect_label"] is None and addons["calendar"]["connect_label"] is None
           and addons["telegram_account"]["connect_label"] == "Connect Telegram"
@@ -230,8 +253,10 @@ async def test_me_and_list(client: TestClient) -> None:
     check("list: ops says what it requires", addons["ops"]["requires"] == "ops" and addons["tasks"]["requires"] is None)
     status, body = await call(client, "GET", "/api/addons", BOB_AUTH)
     addons = by_name(body)
-    check("list: a member sees no ops and nothing connected",
-          status == 200 and "ops" not in addons and not any(i["connected"] for i in addons.values())
+    check("list: a member sees no ops and nothing connected but essentials; no admin fields",
+          status == 200 and "ops" not in addons and [n for n, i in addons.items() if i["connected"]] == ["essentials"]
+          and addons["tasks"]["state"] == "available" and addons["cameras"]["state"] == "off"
+          and body["can_manage"] is False and "pending" not in body
           and addons["calendar"]["settings"][0] == {"name": "calendar_id", "description": "Calendar new events go to",
                                                    "default": "primary", "value": "primary", "type": "text",
                                                    "can_change": True, "why_not": None, "rule": None}
@@ -243,8 +268,10 @@ async def test_me_and_list(client: TestClient) -> None:
     check("ops: 403 for a member (connect)", status == 403 and not store.is_connected(BOB, "ops"))
     status, body = await call(client, "GET", "/api/addons/nope", BOB_AUTH)
     check("unknown addon: 404", status == 404 and body["error"] == "unknown_addon")
-    status, _ = await call(client, "GET", "/api/addons/essentials", BOB_AUTH)
-    check("core: not connectable (404)", status == 404)
+    status, body = await call(client, "GET", "/api/addons/essentials", BOB_AUTH)
+    check("essentials: readable, every user has it", status == 200 and body["everyone"] is True and body["state"] == "on")
+    status, _ = await call(client, "PUT", "/api/addons/essentials", BOB_AUTH, {})
+    check("essentials: not connectable (404)", status == 404)
 
 
 # --- 2. Connect, update, validation --------------------------------------------------------------
@@ -470,7 +497,8 @@ async def test_rules_and_users(client: TestClient) -> None:
           host.get("value") == addresses.normalize(HA_A.url) and host["secret"] is False and host["type"] == "address"
           and token["secret"] is True and "value" not in token and token["set"] is True, (host, token))
     check("rules: the admin may change every addon and field of their own",
-          all(k["can_change"] and k["why_not"] is None for k in addons.values())
+          all(k["can_change"] and k["why_not"] is None for k in addons.values()
+              if not k["everyone"] and k["state"] != "failed")
           and all(f["can_change"] for k in addons.values() for f in (*k["credentials"], *k["settings"])),
           [(k["name"], f["name"]) for k in addons.values() for f in (*k["credentials"], *k["settings"])
            if not f["can_change"]])
@@ -625,6 +653,28 @@ async def test_web_fixture(client: TestClient) -> None:
         captured["member_readonly_field"] = {"status": status, "body": payload}
     finally:
         os.environ["MEMBER_ALLOWED_ORIGINS"] = allowed
+    # Running the server's addons: the catalog, a disabled addon, a refused install.
+    for key, method, path, auth, body in [
+        ("catalog_admin", "GET", "/api/addons/catalog", ADMIN_AUTH, None),
+        ("catalog_member", "GET", "/api/addons/catalog", BOB_AUTH, None),
+        ("disable", "POST", "/api/addons/shopping/disable", ADMIN_AUTH, None),
+        ("list_member_disabled", "GET", "/api/addons", BOB_AUTH, None),
+        ("enable", "POST", "/api/addons/shopping/enable", ADMIN_AUTH, None),
+        ("install_refused", "POST", "/api/addons/install", ADMIN_AUTH,
+         {"repo": "https://example.invalid/dana-addons.git", "path": "weather", "ref": "main"}),
+    ]:
+        status, payload = await call(client, method, path, auth, body)
+        captured[key] = {"status": status, "body": payload}
+    check("fixture: the catalog, a disabled addon and a refused install captured",
+          captured["catalog_admin"]["status"] == 200 and captured["catalog_member"]["status"] == 403
+          and [e["name"] for e in captured["catalog_admin"]["body"]["entries"]] == ["weather"]
+          and captured["disable"]["body"]["state"] == "disabled-on-server"
+          and captured["enable"]["body"]["state"] == "on" and captured["install_refused"]["status"] == 400,
+          {k: captured[k]["status"] for k in ("catalog_admin", "disable", "enable", "install_refused")})
+    failed = next((i for i in captured["list_admin"]["body"]["addons"] if i["state"] == "failed"), {})
+    check("fixture: the failed site addon is listed, its error for the admin only",
+          failed.get("name") == "broken" and "a missing package" in failed.get("error", "")
+          and "error" not in next(i for i in captured["list_member"]["body"]["addons"] if i["name"] == "broken"), failed)
     conflict = next(i for i in captured["list_conflict"]["body"]["addons"] if i["name"] == "whatsapp")
     check("fixture: the conflict is in the admin's view of Carl",
           conflict.get("account_conflict") == "972500000002@c.us" and conflict["account"] is None, conflict)

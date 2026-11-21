@@ -77,7 +77,7 @@ When it runs:
 - **On connect** (`on_connect`): in the background; the request that
   connected the addon does not wait. Until it finishes, the tools answer that
   the contacts have not been read yet. A connection made from another
-  process (`bin/users.py`) is read by the loop's next run.
+  process (`bin/dana users`) is read by the loop's next run.
 - **Another refresh token** (`on_credentials_change`, e.g. signing in to
   Google again): the sync token is forgotten and a full read follows, so the
   copy becomes that account's.

@@ -27,6 +27,7 @@ jobs:
             server:
               - 'server/**'
               - 'examples/**'
+              - 'catalog.json'
               - '.github/workflows/ci.yml'
             android:
               - 'android/**'

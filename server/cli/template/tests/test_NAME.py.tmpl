@@ -1,0 +1,74 @@
+"""The {{name}} addon: its tool and setting, its prompt line and its route, for its user only.
+
+Run from server/: bin/test {{name}}. Two users: the first admin turns {{name}} on, Maya does not.
+"""
+
+import asyncio
+import os
+import sys
+from pathlib import Path
+
+import testenv  # first: clean env, temp DB removed at exit, no .env (server/tests/testenv.py)
+testenv.isolate("{{name}}_test")
+os.environ["DANA_ADDON_DIRS"] = str(Path(__file__).resolve().parents[2])  # the folder holding this addon
+os.environ["API_TOKEN"] = "{{name}}-test-env-token"  # a test value: with it set, Bearer tokens decide the user
+
+from aiohttp import web  # noqa: E402
+from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
+
+from core import db, users  # noqa: E402
+
+db.migrate()
+users.bootstrap()
+
+from core.auth import setup_auth  # noqa: E402
+from core.addons import loader, registry, store  # noqa: E402
+from core.addons.registry import ToolNotAvailable  # noqa: E402
+
+failures = 0
+
+
+def check(name: str, cond: object, detail: object = "") -> None:
+    global failures
+    print(f"[{'PASS' if cond else 'FAIL'}] {name}" + (f" — {detail}" if detail and not cond else ""))
+    failures += 0 if cond else 1
+
+
+loader.load()  # every addon, this one included (as a site addon)
+ADMIN = users.first_admin()
+assert ADMIN is not None
+MAYA = users.create("Maya")
+store.connect(ADMIN, "{{name}}")
+
+
+async def main() -> None:
+    check("loaded", "{{name}}" in loader.loaded(), loader.failed())
+    check("tool: the setting's default", await registry.execute(ADMIN, "{{name}}_hello", {"who": "Noa"}) == "Hello, Noa!")
+    store.update(ADMIN, "{{name}}", settings={"greeting": "Shalom"})
+    check("tool: the user's own setting", await registry.execute(ADMIN, "{{name}}_hello", {"who": "Noa"}) == "Shalom, Noa!")
+    try:
+        await registry.execute(MAYA, "{{name}}_hello", {"who": "Noa"})
+        refused = False
+    except ToolNotAvailable:
+        refused = True
+    check("tool: refused for a user without the addon", refused and not registry.has_tool(MAYA, "{{name}}_hello"))
+    check("prompt: its line only for its user",
+          any("{{name}}_hello" in p for p in registry.prompt_parts(ADMIN, "guides"))
+          and not any("{{name}}_hello" in p for p in registry.prompt_parts(MAYA, "guides")))
+
+    app = web.Application()
+    setup_auth(app)
+    for name, module in loader.apis():
+        if name == "{{name}}":
+            module.setup(app)
+    async with TestClient(TestServer(app)) as c:
+        mine = await c.get("/api/{{name}}", headers={"Authorization": "Bearer " + users.issue_token(ADMIN.id, "t")[0]})
+        theirs = await c.get("/api/{{name}}", headers={"Authorization": "Bearer " + users.issue_token(MAYA.id, "t")[0]})
+        check("route: its user gets their greeting", mine.status == 200 and await mine.json() == {"greeting": "Shalom"})
+        check("route: another user is refused (403 not_connected)", theirs.status == 403, theirs.status)
+
+
+asyncio.run(main())
+if failures:
+    sys.exit(f"{failures} check(s) failed")
+print("\nAll {{name}} checks passed")

@@ -6,7 +6,7 @@
 #
 # Config: ~/.config/dana/agent-hook.env (chmod 600) with
 #   DANA_URL=https://dana.example.com
-#   DANA_TOKEN=<a user token: bin/users.py tokens issue USER --label agent-hooks>
+#   DANA_TOKEN=<a user token: bin/dana users tokens issue USER --label agent-hooks>
 # Never slows the agent: the event is trimmed to the fields the server reads and
 # sent in the background; it always exits 0 and prints nothing.
 agent="${1:-claude}"

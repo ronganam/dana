@@ -20,12 +20,15 @@ import testenv  # clean env (no .env, no addon values) + a temp dir removed at e
 testenv.isolate("imports_test")
 
 def _modules() -> list[str]:
-    """Every module under core/ and addons/ (packages included), found on disk."""
+    """Every module under core/, addons/ and cli/ (packages included), found on disk."""
     root = testenv.SERVER
     names = []
-    for top in ("core", "addons"):
+    for top in ("core", "addons", "cli"):
         for path in sorted((root / top).rglob("*.py")):
-            if "tests" in path.relative_to(root).parts:  # test scripts (addons/<name>/tests/), not modules
+            rel = path.relative_to(root).parts
+            if "tests" in rel or "template" in rel:  # test scripts (addons/<name>/tests/), the scaffold's template
+                continue
+            if top == "addons" and len(rel) > 2 and rel[2] == "worker":  # an addon's sidecar (not Python modules)
                 continue
             parts = path.relative_to(root).with_suffix("").parts
             names.append(".".join(parts[:-1] if parts[-1] == "__init__" else parts))

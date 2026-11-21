@@ -1,6 +1,6 @@
 """Investment accounts: storing and reading a portfolio (docs/money.md, "Investment accounts").
 
-The worker returns Psagot's own figures for each account (bank-worker/README.md,
+The worker returns Psagot's own figures for each account (addons/money/worker/README.md,
 "Psagot Trade"): ``summary`` (the balances view without its positions),
 ``holdings`` (one row per security, without names), ``names`` (security number →
 names, from the market table), ``activity`` (trades, deposits, dividends,

@@ -1,0 +1,15 @@
+"""The ``{{name}}`` tools. The schema the model sees comes from the type hints and
+the docstring; ``conn`` (the user's connection) is left out of it."""
+
+from core.addons import Connection
+from addons.{{name}}.addon import addon
+
+
+@addon.tool()
+def {{name}}_hello(conn: Connection, who: str) -> str:
+    """Say hello to someone in the user's chosen words.
+
+    Args:
+        who: Who to greet.
+    """
+    return f"{conn.settings.get('greeting') or 'Hello'}, {who}!"

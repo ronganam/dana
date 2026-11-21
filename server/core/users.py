@@ -5,7 +5,7 @@ what prompts know about them (``context``, ``pronoun``, ``other_names``,
 ``prompt_name``: core/user_profile.py), Telegram user ids and API tokens that
 resolve to them, and the Telegram chat proactive messages go to. The person
 who runs the server is the first user, created at startup with access
-``admin`` (:func:`bootstrap`). ``bin/users.py`` manages users on the server.
+``admin`` (:func:`bootstrap`). ``bin/dana users`` manages users on the server.
 
 Tokens are stored hashed: the SHA-256 of the token (Bearer lookups) and the
 SHA-256 of the web session cookie made from it (cookie lookups). A raw token
@@ -352,7 +352,7 @@ def _admin_count() -> int:
 
 def remove(user_id: str) -> None:
     """Delete a user and, through the database's cascades, everything they
-    own (sessions, addons, tasks, calls, … ; ``bin/users.py remove``
+    own (sessions, addons, tasks, calls, … ; ``bin/dana users remove``
     says what first). Usage rows are kept (server cost history).
 
     Raises:
