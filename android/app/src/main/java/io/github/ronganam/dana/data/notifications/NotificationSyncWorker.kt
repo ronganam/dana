@@ -14,9 +14,7 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import io.github.ronganam.dana.data.network.NotificationJson
 import kotlinx.coroutines.CancellationException
-import org.json.JSONArray
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -44,18 +42,15 @@ class NotificationSyncWorker(appContext: Context, params: WorkerParameters) : Co
                 val batch = NotificationOutbox.peek(ctx)
                 val active = DanaNotificationListener.activeKeys()
                 if (batch.isEmpty && active.isEmpty()) break
-                val res = api.postNotificationBatch(batch.posted, batch.removed, JSONArray(active),
-                    JSONArray(DanaNotificationListener.snoozedKeys()))
+                val res = api.notifications.postBatch(batch.posted, batch.removed, active.toList(),
+                    DanaNotificationListener.snoozedKeys().toList())
                 NotificationOutbox.remove(ctx, batch.ids)
                 if (!batch.isEmpty) changed = true
-                Log.i(TAG, "Synced ${batch.posted.length()} posted / ${batch.removed.length()} removed: " +
-                    "${res.optInt("accepted")} new, ${res.optInt("duplicates")} duplicates")
-                val cancel = res.optJSONArray("cancel_keys")
-                if (cancel != null && cancel.length() > 0) {
-                    DanaNotificationListener.cancel((0 until cancel.length()).map { cancel.getString(it) })
-                }
+                Log.i(TAG, "Synced ${batch.posted.size} posted / ${batch.removed.size} removed: " +
+                    "${res.accepted} new, ${res.duplicates} duplicates")
+                if (res.cancelKeys.isNotEmpty()) DanaNotificationListener.cancel(res.cancelKeys)
                 // Snoozed in Dana elsewhere (web, agent): snooze them in the shade too.
-                val snooze = NotificationJson.snoozeKeys(res.optJSONArray("snooze_keys"))
+                val snooze = res.snoozeKeys
                 if (snooze.isNotEmpty()) DanaNotificationListener.snooze(snooze)
                 rounds++
             } while (!batch.isEmpty && rounds < 20)

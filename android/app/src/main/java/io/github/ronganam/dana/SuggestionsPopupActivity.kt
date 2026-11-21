@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.SuggestionEdits
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Application
 import android.app.NotificationManager
@@ -46,7 +47,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
 /**
  * Pops up when new suggestions come from something that just happened (a call
@@ -145,13 +145,13 @@ class SuggestionsPopupViewModel(app: Application) : AndroidViewModel(app) {
         callId = call ?: callId
         if (heading != null) _heading.value = heading
         viewModelScope.launch { refresh() }
-        viewModelScope.launch { runCatching { _groups.value = api.getTaskGroups().map { it.name } } }
+        viewModelScope.launch { runCatching { _groups.value = api.tasks.groups().map { it.name } } }
     }
 
     private suspend fun refresh() {
         try {
-            val all = if (callId != null && ids.isEmpty()) api.getCallDetail(callId!!).suggestions
-            else api.getSuggestions(status = "all", source = "all").filter { it.id in ids }
+            val all = if (callId != null && ids.isEmpty()) api.calls.detail(callId!!).suggestions
+            else api.calls.suggestions(status = "all", source = "all").filter { it.id in ids }
             // Keep the order they arrived in; resolved ones stay, marked done.
             val byId = all.associateBy { it.id }
             _items.value = if (ids.isEmpty()) all else ids.mapNotNull { byId[it] }
@@ -183,12 +183,12 @@ class SuggestionsPopupViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun accept(s: CallSuggestion, overrides: JSONObject = JSONObject()) = withBusy(s.id) {
-        val r = api.acceptSuggestion(s.id, overrides)
-        _toast.value = if (r.optString("kind") == "event") "Added to your calendar" else "Reminder created"
+    fun accept(s: CallSuggestion, overrides: SuggestionEdits = SuggestionEdits.None) = withBusy(s.id) {
+        val r = api.calls.accept(s.id, overrides)
+        _toast.value = if (r.kind == "event") "Added to your calendar" else "Reminder created"
     }
 
-    fun dismiss(s: CallSuggestion) = withBusy(s.id) { api.dismissSuggestion(s.id) }
+    fun dismiss(s: CallSuggestion) = withBusy(s.id) { api.calls.dismiss(s.id) }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

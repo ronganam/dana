@@ -89,7 +89,7 @@ class UnlockReportWorker(context: Context, params: WorkerParameters) : Coroutine
         // A report delayed over an hour (no network) is no longer a wake signal.
         if (System.currentTimeMillis() - at > 60 * 60 * 1000L) return Result.success()
         return try {
-            val status = ServerConfig.load(applicationContext).api().reportUnlock(at)
+            val status = ServerConfig.load(applicationContext).api().devices.reportUnlock(at)
             Log.i("UnlockWatcher", "Unlock reported: $status")
             if (status == "done") UnlockWatcher.markDone(applicationContext)
             Result.success()

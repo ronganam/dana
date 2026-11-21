@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.content.SharedPreferences
 import io.github.ronganam.dana.data.network.ApiService
+import io.github.ronganam.dana.data.network.ChatApi
 import io.github.ronganam.dana.ui.viewmodels.ChatController
 import io.github.ronganam.dana.ui.viewmodels.ControllerContext
 import io.github.ronganam.dana.ui.viewmodels.UserMessages
@@ -587,15 +588,15 @@ class ChatControllerStreamTest {
     @Test
     fun parsesServerTimestamps() {
         // SQLite CURRENT_TIMESTAMP (UTC, no zone)
-        assertEquals(1_700_000_000_000L, ChatController.parseServerTimestamp("2023-11-14 22:13:20"))
+        assertEquals(1_700_000_000_000L, ChatApi.parseServerTimestamp("2023-11-14 22:13:20"))
         // ISO with micros and offset
-        assertEquals(1_700_000_000_000L, ChatController.parseServerTimestamp("2023-11-15T00:13:20.123456+02:00"))
-        assertEquals(1_700_000_000_000L, ChatController.parseServerTimestamp("2023-11-14T22:13:20Z"))
-        assertEquals(1_700_000_000_000L, ChatController.parseServerTimestamp("1700000000"))
-        assertEquals(null, ChatController.parseServerTimestamp(""))
-        assertEquals(null, ChatController.parseServerTimestamp("null"))
-        assertEquals(null, ChatController.parseServerTimestamp("yesterday"))
-        assertNotNull(ChatController.parseServerTimestamp("2025-01-02T03:04"))
+        assertEquals(1_700_000_000_000L, ChatApi.parseServerTimestamp("2023-11-15T00:13:20.123456+02:00"))
+        assertEquals(1_700_000_000_000L, ChatApi.parseServerTimestamp("2023-11-14T22:13:20Z"))
+        assertEquals(1_700_000_000_000L, ChatApi.parseServerTimestamp("1700000000"))
+        assertEquals(null, ChatApi.parseServerTimestamp(""))
+        assertEquals(null, ChatApi.parseServerTimestamp("null"))
+        assertEquals(null, ChatApi.parseServerTimestamp("yesterday"))
+        assertNotNull(ChatApi.parseServerTimestamp("2025-01-02T03:04"))
     }
 
     // --- Fakes ---------------------------------------------------------------

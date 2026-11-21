@@ -28,7 +28,7 @@ import java.io.File
  */
 object MoneySignals {
     private const val TAG = "MoneySignals"
-    const val KIND = "money"
+    const val ADDON = "money"
     private const val FILE_NAME = "money_signals.json"
     private const val MAX_ITEMS = 500
     private const val BATCH = 100
@@ -38,7 +38,7 @@ object MoneySignals {
 
     /** True when [pkg]'s notifications go to money instead of the Inbox (the user has the kind). */
     fun routes(context: Context, pkg: String?): Boolean =
-        pkg != null && pkg in PACKAGES && Me.cached(context)?.has(KIND) == true
+        pkg != null && pkg in PACKAGES && Me.cached(context)?.has(ADDON) == true
 
     /** The signal for [sbn], or null (ongoing, a group summary, empty …). */
     fun item(context: Context, sbn: StatusBarNotification): JSONObject? {
@@ -89,7 +89,7 @@ object MoneySignals {
             val (ids, batch) = peek(context)
             if (ids.isEmpty()) return true
             val (code, body) = try {
-                api.postMoneySignals(batch)
+                api.money.postSignals(batch)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -103,7 +103,7 @@ object MoneySignals {
                 }
                 code == 403 && body.optString("error") == "not_connected" -> {
                     // Not (or no longer) connected: stop until /api/me says otherwise.
-                    Me.drop(context, KIND)
+                    Me.drop(context, ADDON)
                     synchronized(lock) { write(context, JSONArray()) }
                     Log.i(TAG, "No money integration; dropped the queued signals")
                     return true

@@ -31,7 +31,7 @@ class ReviewController(private val ctx: ControllerContext) {
         ctx.scope.launch {
             _loading.value = true
             try {
-                ctx.load("Review") { ctx.api.getLatestReview() }.let { setReview(it) }
+                ctx.load("Review") { ctx.api.people.latestReview() }.let { setReview(it) }
             } finally {
                 _loading.value = false
             }
@@ -40,7 +40,7 @@ class ReviewController(private val ctx: ControllerContext) {
 
     fun fetchBriefing() {
         ctx.scope.launch {
-            ctx.load("Briefing") { ctx.api.getBriefingToday() }?.let { _briefing.value = it }
+            ctx.load("Briefing") { ctx.api.people.briefingToday() }?.let { _briefing.value = it }
         }
     }
 
@@ -62,7 +62,7 @@ class ReviewController(private val ctx: ControllerContext) {
         ctx.scope.launch {
             _busy.value = true
             try {
-                val r = ctx.load("ReviewGenerate") { ctx.api.generateReview() }
+                val r = ctx.load("ReviewGenerate") { ctx.api.people.generateReview() }
                 if (r == null) ctx.messages.post("Couldn't prepare the review") else setReview(r)
             } finally {
                 _busy.value = false
@@ -75,11 +75,12 @@ class ReviewController(private val ctx: ControllerContext) {
         ctx.scope.launch {
             _busy.value = true
             try {
-                val res = ctx.load("ReviewApply") { ctx.api.applyReview(r.id, _items.value) }
-                if (res == null || res.has("error")) {
-                    ctx.messages.post("Couldn't apply the review" + (res?.optString("error")?.let { ": $it" } ?: ""))
+                val res = ctx.load("ReviewApply") { ctx.api.people.applyReview(r.id, _items.value) }
+                val done = res?.getOrNull()
+                if (done == null) {
+                    ctx.messages.post("Couldn't apply the review" + (res?.exceptionOrNull()?.message?.let { ": $it" } ?: ""))
                 } else {
-                    val applied = res.optInt("applied"); val failed = res.optInt("failed")
+                    val applied = done.applied ?: 0; val failed = done.failed ?: 0
                     ctx.messages.post(if (failed > 0) "Done: $applied changes, $failed failed" else "Done: $applied changes")
                     fetch()
                     onDone()
@@ -93,7 +94,7 @@ class ReviewController(private val ctx: ControllerContext) {
     fun dismiss() {
         val r = _review.value ?: return
         ctx.action("Couldn't skip the review") {
-            ctx.api.dismissReview(r.id).also { if (it) fetch() }
+            ctx.api.people.dismissReview(r.id).also { if (it) fetch() }
         }
     }
 }

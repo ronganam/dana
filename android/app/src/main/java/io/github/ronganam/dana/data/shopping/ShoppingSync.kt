@@ -27,7 +27,7 @@ object ShoppingSync {
             val app = context.applicationContext
             return ShoppingStore(
                 dir = app.filesDir,
-                transport = { method, path, body -> ServerConfig.load(app).api().jsonCall(method, path, body) },
+                transport = { method, path, body -> ServerConfig.load(app).api().shopping.call(method, path, body) },
                 me = { Me.cached(app)?.let { Who(it.id, it.name) } },
                 scheduleRetry = { PendingSyncWorker.schedule(app) },
                 onChanged = { DanaWidgets.shoppingChanged(app) }
@@ -40,12 +40,8 @@ object ShoppingSync {
 
     /** The server's usual items matching [query] on [listId], or null when it can't answer. */
     suspend fun suggestions(context: Context, query: String, listId: String): List<Usual>? {
-        fun enc(v: String) = java.net.URLEncoder.encode(v, "UTF-8").replace("+", "%20")
-        val path = "/api/shopping/suggestions?q=${enc(query)}&list=${enc(listId)}"
-        return runCatching {
-            val (code, body) = ServerConfig.load(context).api().jsonCall("GET", path, null)
-            if (code in 200..299) ShoppingJson.usuals(org.json.JSONObject(body)) else null
-        }.getOrNull()
+        val answer = ServerConfig.load(context).api().shopping.suggestions(query, listId)
+        return answer.value?.takeIf { answer.ok }
     }
 
     /** Make a change; when it had to wait, try the queue again in the background. */

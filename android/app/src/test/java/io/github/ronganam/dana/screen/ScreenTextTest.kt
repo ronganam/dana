@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.screen
 
+import io.github.ronganam.dana.data.network.text
 import io.github.ronganam.dana.data.screen.BlankFrame
 import io.github.ronganam.dana.data.screen.DeviceScreen
 import io.github.ronganam.dana.data.screen.ScreenNode
@@ -160,9 +161,9 @@ class ScreenTextTest {
     @Test
     fun deviceScreenJsonLeavesBlanksOut() {
         val json = DeviceScreen(app = "Chrome", packageName = "com.android.chrome", title = " ", url = null, text = "Hi").toJson()
-        assertEquals(setOf("app", "package", "text"), json.keys().asSequence().toSet())
-        assertEquals("com.android.chrome", json.getString("package"))
+        assertEquals(setOf("app", "package", "text"), json.keys)
+        assertEquals("com.android.chrome", json.text("package"))
         assertFalse(DeviceScreen(app = "X").hasText)
-        assertEquals(0, DeviceScreen().toJson().length())
+        assertEquals(0, DeviceScreen().toJson().size)
     }
 }

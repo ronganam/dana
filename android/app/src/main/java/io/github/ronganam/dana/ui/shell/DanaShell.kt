@@ -52,8 +52,8 @@ fun DanaShell(viewModel: MainViewModel) {
     // The needs-you number (the Notifications screen's, else Now's copy of it); nothing when zero.
     val notificationsBadge = overview?.counts?.needsYou ?: nowPayload?.notifications?.needsYou ?: 0
     val search by viewModel.searchController.state.collectAsState()
-    val kinds by viewModel.kinds.collectAsState()
-    val projectsOn = "knowledge" in kinds
+    val addons by viewModel.addons.collectAsState()
+    val projectsOn = "knowledge" in addons
     val places = remember(projectsOn) { Place.values().filter { it != Place.PROJECTS || projectsOn } }
     // Projects went away (disconnected): back to Now.
     LaunchedEffect(projectsOn, place) { if (!projectsOn && place == Place.PROJECTS) shell.go(Place.NOW) }

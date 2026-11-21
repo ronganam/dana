@@ -1,50 +1,61 @@
 package io.github.ronganam.dana.data.models
 
+import io.github.ronganam.dana.data.network.LenientList
+import io.github.ronganam.dana.data.network.OptString
+import io.github.ronganam.dana.data.network.text
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonObject
 import java.util.UUID
 
+/** A task / reminder (`GET /api/tasks`). */
+@Serializable
 data class Task(
-    val id: String,
-    val title: String,
-    val description: String?,
-    val priority: String,
-    val dueDate: String?,
-    val status: String,
-    val triggers: String?,
-    val createdAt: String?,
-    val updatedAt: String?,
-    val groupId: String? = null,
-    val groupName: String? = null,
-    val groupEmoji: String? = null,
-    val groupColor: String? = null,
+    val id: String = "",
+    val title: String = "",
+    val description: OptString = null,
+    val priority: String = "medium",
+    val dueDate: OptString = null,
+    val status: String = "needs_action",
+    val triggers: Triggers = Triggers(),
+    val createdAt: OptString = null,
+    val updatedAt: OptString = null,
+    val groupId: OptString = null,
+    val groupName: OptString = null,
+    val groupEmoji: OptString = null,
+    val groupColor: OptString = null,
     /** Where the task came from / what it relates to (calls, chats…). */
-    val links: List<TaskLink> = emptyList()
+    val links: LenientList<TaskLink> = emptyList()
 )
 
 /** A task ↔ item relation (`task_links`); call links carry the call's title/contact. */
+@Serializable
 data class TaskLink(
-    val refType: String,
-    val refId: String,
-    val role: String,
-    val title: String? = null,
-    val contact: String? = null,
-    val callTimestamp: String? = null
+    val refType: String = "",
+    val refId: String = "",
+    val role: String = "",
+    val title: OptString = null,
+    val contact: OptString = null,
+    val callTimestamp: OptString = null
 )
 
+@Serializable
 data class TaskGroup(
-    val id: String,
-    val name: String,
-    val emoji: String,
-    val color: String,
-    val description: String?,
-    val sortOrder: Int,
-    val taskCount: Int?
+    val id: String = "",
+    val name: String = "",
+    val emoji: String = "",
+    val color: String = "",
+    val description: OptString = null,
+    val sortOrder: Int = 0,
+    val taskCount: Int? = null
 )
 
+@Serializable
 data class Memory(
-    val key: String,
-    val value: String,
-    val category: String,
-    val updatedAt: String?
+    val key: String = "",
+    val value: String = "",
+    val category: String = "general",
+    val updatedAt: OptString = null
 )
 
 /**
@@ -138,42 +149,50 @@ data class CalendarEvent(
     val location: String? = null
 )
 
+@Serializable
 data class ZoneItem(
-    val name: String,
-    val entityId: String
+    val name: String = "",
+    val entityId: String = ""
 )
 
+/** A call recording (`GET /api/calls`, and the call part of `GET /api/calls/{id}`). */
+@Serializable
 data class PhoneCall(
-    val id: String,
-    val filename: String,
-    val caller: String,
-    val receiver: String,
-    val callTimestamp: String,
-    val transcript: String?,
-    val summary: String?,
-    val title: String?,
+    val id: String = "",
+    val filename: String = "",
+    val caller: String = "Unknown",
+    val receiver: String = "Me",
+    val callTimestamp: String = "",
+    val transcript: OptString = null,
+    val summary: OptString = null,
+    val title: OptString = null,
     val durationSeconds: Int = 0,
     /** processing | ready | failed */
     val status: String = "ready",
-    val labels: List<CallLabel> = emptyList(),
+    @SerialName("label_details") val labels: LenientList<CallLabel> = emptyList(),
     /** low | normal | high — low (logistics, IVR) is hidden by default. */
     val importance: String = "normal",
-    val direction: String? = null,
-    val phoneNumber: String? = null,
+    val direction: OptString = null,
+    val phoneNumber: OptString = null,
     val audioAvailable: Boolean = true,
-    val audioDeleted: Boolean = false,
-    val participants: List<CallParticipant> = emptyList(),
-    val keyFacts: List<CallFact> = emptyList(),
-    val securityAlert: String? = null,
+    val audioDeletedAt: OptString = null,
+    val participants: LenientList<CallParticipant> = emptyList(),
+    val keyFacts: LenientList<CallFact> = emptyList(),
+    val securityAlert: OptString = null,
     val pendingSuggestions: Int = 0,
-    val error: String? = null
-)
+    val error: OptString = null
+) {
+    val audioDeleted: Boolean get() = audioDeletedAt != null
+}
 
-data class CallLabel(val id: String, val emoji: String, val name: String)
+@Serializable
+data class CallLabel(val id: String = "", val emoji: String = "", val name: String = "")
 
-data class CallParticipant(val name: String, val role: String)
+@Serializable
+data class CallParticipant(val name: String = "", val role: String = "")
 
-data class CallFact(val kind: String, val text: String)
+@Serializable
+data class CallFact(val kind: String = "", val text: String = "")
 
 /** The call a suggestion came from (as embedded in `GET /api/suggestions`). */
 data class SuggestionSource(
@@ -203,7 +222,7 @@ data class CallSuggestion(
     val kind: String,
     /** pending | accepted | dismissed */
     val status: String,
-    val payload: org.json.JSONObject,
+    val payload: JsonObject,
     val source: SuggestionSource?,
     val resultRef: String? = null,
     /** call | notification */
@@ -212,17 +231,17 @@ data class CallSuggestion(
     val sourceId: String = callId
 ) {
     val fromNotification: Boolean get() = sourceType == "notification"
-    val title: String get() = payload.optString("title").ifBlank { "Suggestion" }
-    val description: String? get() = payload.optString("description").takeIf { it.isNotBlank() && it != "null" }
-    val dueDate: String? get() = payload.optString("due_date").takeIf { it.isNotBlank() && it != "null" }
-    val priority: String get() = payload.optString("priority").ifBlank { "medium" }
-    val group: String? get() = payload.optString("group").takeIf { it.isNotBlank() && it != "null" }
-    val triggers: org.json.JSONObject get() = payload.optJSONObject("triggers") ?: org.json.JSONObject()
-    val start: String? get() = payload.optString("start").takeIf { it.isNotBlank() && it != "null" }
-    val end: String? get() = payload.optString("end").takeIf { it.isNotBlank() && it != "null" }
-    val location: String? get() = payload.optString("location").takeIf { it.isNotBlank() && it != "null" }
-    val evidence: String? get() = payload.optString("evidence").takeIf { it.isNotBlank() && it != "null" }
-    val alertText: String? get() = payload.optString("text").takeIf { it.isNotBlank() && it != "null" }
+    val title: String get() = payload.text("title")?.takeIf { it.isNotBlank() } ?: "Suggestion"
+    val description: String? get() = payload.text("description")?.takeIf { it.isNotBlank() }
+    val dueDate: String? get() = payload.text("due_date")?.takeIf { it.isNotBlank() }
+    val priority: String get() = payload.text("priority")?.takeIf { it.isNotBlank() } ?: "medium"
+    val group: String? get() = payload.text("group")?.takeIf { it.isNotBlank() }
+    val triggers: Triggers get() = Triggers.of(payload["triggers"])
+    val start: String? get() = payload.text("start")?.takeIf { it.isNotBlank() }
+    val end: String? get() = payload.text("end")?.takeIf { it.isNotBlank() }
+    val location: String? get() = payload.text("location")?.takeIf { it.isNotBlank() }
+    val evidence: String? get() = payload.text("evidence")?.takeIf { it.isNotBlank() }
+    val alertText: String? get() = payload.text("text")?.takeIf { it.isNotBlank() }
 }
 
 /** Full call detail (`GET /api/calls/{id}`): the call plus its suggestions and linked tasks. */
@@ -232,7 +251,8 @@ data class CallDetail(
     val tasks: List<LinkedTask>
 )
 
-data class LinkedTask(val id: String, val title: String, val status: String, val dueDate: String?)
+@Serializable
+data class LinkedTask(val id: String = "", val title: String = "", val status: String = "", val dueDate: OptString = null)
 
 /**
  * What a chat was opened from (a call suggestion, a call or a task). The
@@ -282,6 +302,7 @@ data class PhoneNotification(
     val pendingSuggestions: List<CallSuggestion> get() = suggestions.filter { it.status == "pending" }
 }
 
+@Serializable
 data class NotificationCounts(
     val needsYou: Int = 0,
     val normal: Int = 0,

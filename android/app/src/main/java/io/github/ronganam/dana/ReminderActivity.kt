@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.TaskSnooze
 import android.app.KeyguardManager
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -69,7 +70,6 @@ import io.github.ronganam.dana.ui.components.StatusPill
 import io.github.ronganam.dana.ui.theme.DanaTheme
 import io.github.ronganam.dana.ui.theme.ThemeSettings
 import kotlinx.coroutines.launch
-import org.json.JSONObject
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.floor
@@ -181,18 +181,11 @@ class ReminderActivity : ComponentActivity() {
                     stopAlerts()
                     onHandled()
                     lifecycleScope.launch {
-                        val payload = JSONObject().apply {
-                            put("type", leaf.snoozeType)
-                            if (leaf.snoozeType == "time") {
-                                put("minutes", leaf.minutes)
-                            } else if (leaf.snoozeType == "location") {
-                                put("location", leaf.location)
-                                put("event", leaf.event)
-                            } else if (leaf.snoozeType == "car") {
-                                put("action", leaf.action)
-                            } else if (leaf.snoozeType == "wake") {
-                                // wake trigger has no sub fields
-                            }
+                        val payload = when (leaf.snoozeType) {
+                            "time" -> TaskSnooze("time", minutes = leaf.minutes)
+                            "location" -> TaskSnooze("location", location = leaf.location, event = leaf.event)
+                            "car" -> TaskSnooze("car", action = leaf.action)
+                            else -> TaskSnooze(leaf.snoozeType) // wake: no sub fields
                         }
                         Toast.makeText(this@ReminderActivity, "Snoozing · ${snoozeSentence(leaf)}",Toast.LENGTH_SHORT).show()
                         val message = when (TaskActionQueue.snooze(this@ReminderActivity, taskId, payload)) {

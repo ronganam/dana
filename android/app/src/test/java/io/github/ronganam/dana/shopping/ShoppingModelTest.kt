@@ -48,7 +48,7 @@ class ShoppingModelTest {
 
     @Test
     fun everyScreenPayloadParses() {
-        val screens = ShoppingFixture.keys().filter { ShoppingFixture.body(it).has("list") }
+        val screens = ShoppingFixture.keys().filter { ShoppingFixture.obj(it).containsKey("list") }
         assertTrue(screens.size >= 15)
         for (k in screens) {
             val s = ShoppingJson.screen(ShoppingFixture.body(k))
@@ -186,7 +186,7 @@ class ShoppingModelTest {
 
     @Test
     fun errorsInPlainWords() {
-        fun say(k: String) = ShoppingView.errorText(ShoppingFixture.status(k), ShoppingFixture.body(k))
+        fun say(k: String) = ShoppingView.errorText(ShoppingFixture.status(k), ShoppingJson.refusal(ShoppingFixture.body(k)))
         assertEquals("This list is view only.", say("error_read_only"))
         assertTrue(say("error_not_connected").startsWith("Shopping isn't turned on"))
         assertEquals("At most 30 items at a time.", say("error_too_many"))
@@ -198,7 +198,7 @@ class ShoppingModelTest {
 
     @Test
     fun undoAnswersAndLabels() {
-        fun undo(k: String) = ShoppingView.undoText(ShoppingFixture.status(k), ShoppingFixture.body(k))
+        fun undo(k: String) = ShoppingView.undoText(ShoppingFixture.status(k), ShoppingJson.refusal(ShoppingFixture.body(k)))
         assertEquals(true to "Undone", undo("undo_ok"))
         assertEquals(false to "Couldn't undo: 'Avocado' was changed again since, so it was left as it is.", undo("undo_conflict"))
         assertEquals(false to "This can no longer be undone.", undo("undo_gone"))

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.widgets
 
+import io.github.ronganam.dana.data.network.text
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.util.Log
@@ -91,15 +92,15 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Coroutin
 
         suspend fun build(context: Context) = coroutineScope {
             val api = ServerConfig.load(context).api()
-            val briefing = async { safe { api.getBriefingToday() } }
-            val tasks = async { safe { api.getTasks() } }
-            val sugg = async { safe { api.getSuggestions("pending", "all") } }
-            val people = async { safe { api.getPeople("pinned") } }
-            val inbox = async { safe { api.getNotifications("active", limit = 1).second } }
-            val summaries = async { safe { api.getNotificationSummaries() } }
+            val briefing = async { safe { api.people.briefingToday() } }
+            val tasks = async { safe { api.tasks.tasks() } }
+            val sugg = async { safe { api.calls.suggestions("pending", "all") } }
+            val people = async { safe { api.people.people("pinned") } }
+            val inbox = async { safe { api.notifications.list("active", limit = 1).second } }
+            val summaries = async { safe { api.notifications.summaries() } }
             // The shopping list goes through the same cache and queue as the Shopping screen.
             val shopping = async { safe { io.github.ronganam.dana.data.shopping.ShoppingSync.get(context).refresh() } }
-            val events = async { safe { api.getCalendarEvents() } }
+            val events = async { safe { api.tasks.calendarEvents() } }
 
             val previous = runCatching {
                 JSONObject(ServerConfig.prefs(context).getString("widget_snapshot", "{}") ?: "{}")
@@ -133,7 +134,7 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Coroutin
             sugg.await()?.let { list ->
                 o.put("suggestion_count", list.size)
                 o.put("suggestions", JSONArray(list.take(3).map { s ->
-                    JSONObject().put("id", s.id).put("title", s.payload.optString("title"))
+                    JSONObject().put("id", s.id).put("title", s.payload.text("title").orEmpty())
                         .put("source", if (s.sourceType == "notification") "notification" else "call")
                 }))
             }
@@ -151,9 +152,8 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Coroutin
             io.github.ronganam.dana.data.shopping.ShoppingSnapshot.merge(
                 o, io.github.ronganam.dana.data.shopping.ShoppingSnapshot.fields(io.github.ronganam.dana.data.shopping.ShoppingSync.get(context).shown())
             )
-            events.await()?.let { raw ->
-                val arr = runCatching { JSONArray(raw) }.getOrElse { runCatching { JSONObject(raw).optJSONArray("events") }.getOrNull() ?: JSONArray() }
-                o.put("events", JSONArray(todaysEvents(arr).take(4).map { JSONObject().put("time", it.first).put("title", it.second) }))
+            events.await()?.let { list ->
+                o.put("events", JSONArray(todaysEvents(list).take(4).map { JSONObject().put("time", it.first).put("title", it.second) }))
             }
             o.put("updated_at", System.currentTimeMillis())
             WidgetSnapshot.save(context, o)
@@ -161,21 +161,21 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Coroutin
         }
 
         /** Today's events that haven't ended, as (HH:mm | "all day", title), in the phone's zone. */
-        fun todaysEvents(arr: JSONArray): List<Pair<String, String>> {
+        fun todaysEvents(events: List<io.github.ronganam.dana.data.models.CalendarEvent>): List<Pair<String, String>> {
             val zone = java.time.ZoneId.systemDefault()
             val now = java.time.ZonedDateTime.now(zone)
             val today = now.toLocalDate()
             fun parse(s: String): java.time.ZonedDateTime? = runCatching {
                 java.time.OffsetDateTime.parse(s.replace("Z", "+00:00")).atZoneSameInstant(zone)
             }.getOrNull()
-            return (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.mapNotNull { e ->
-                val start = e.optString("start")
-                val title = e.optString("summary").ifBlank { e.optString("title") }
+            return events.mapNotNull { e ->
+                val start = e.start.orEmpty()
+                val title = e.title
                 if (start.length <= 10) {
                     if (start == today.toString()) "all day" to title else null
                 } else {
                     val s = parse(start) ?: return@mapNotNull null
-                    val end = parse(e.optString("end")) ?: s
+                    val end = parse(e.end.orEmpty()) ?: s
                     if (s.toLocalDate() != today || end.isBefore(now)) null
                     else "%02d:%02d".format(s.hour, s.minute) to title
                 }

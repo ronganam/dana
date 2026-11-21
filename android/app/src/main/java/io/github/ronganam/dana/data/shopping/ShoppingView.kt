@@ -1,6 +1,5 @@
 package io.github.ronganam.dana.data.shopping
 
-import org.json.JSONObject
 
 /**
  * What the Shopping screen, the widget and the watch show, worked out from a
@@ -142,14 +141,14 @@ object ShoppingView {
     }
 
     /** A refused or failed request in plain words. [status] -1: no answer. */
-    fun errorText(status: Int, body: JSONObject?): String {
-        val error = body?.optString("error").orEmpty()
-        val message = body?.optString("message").orEmpty()
+    fun errorText(status: Int, body: ShoppingRefusal?): String {
+        val error = body?.error.orEmpty()
+        val message = body?.message.orEmpty()
         return when {
             status == -1 -> "You're offline — nothing was changed."
             error == "read_only" -> "This list is view only."
             error == "not_connected" -> "Shopping isn't turned on for you. An admin can connect it in Settings → Integrations."
-            error == "too_many" -> "At most ${body?.optInt("max", ShoppingText.MAX_ITEMS) ?: ShoppingText.MAX_ITEMS} items at a time."
+            error == "too_many" -> "At most ${body?.max ?: ShoppingText.MAX_ITEMS} items at a time."
             error == "duplicate" -> message.ifEmpty { "That's already on the list." }.replace(Regex("^'([^']+)'"), "$1")
             status == 404 -> "That's no longer on the list — someone may have changed it."
             error == "owner_only" -> "Only the list's owner can share it."
@@ -161,9 +160,9 @@ object ShoppingView {
     }
 
     /** What an undo answered: done, or why not. */
-    fun undoText(status: Int, body: JSONObject?): Pair<Boolean, String> = when (status) {
+    fun undoText(status: Int, body: ShoppingRefusal?): Pair<Boolean, String> = when (status) {
         in 200..299 -> true to "Undone"
-        409 -> false to "Couldn't undo: ${body?.optString("error").orEmpty().ifEmpty { "it changed since" }.trimEnd('.')}."
+        409 -> false to "Couldn't undo: ${body?.error.orEmpty().ifEmpty { "it changed since" }.trimEnd('.')}."
         404 -> false to "This can no longer be undone."
         else -> false to errorText(status, body)
     }

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.text
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -112,7 +113,7 @@ object NotificationAlertReceiver {
 
         companion object {
             /** From the server's `alert` event. */
-            fun from(json: org.json.JSONObject): Alert? = build { k -> json.optString(k).takeIf { it.isNotBlank() && it != "null" } }
+            fun from(json: kotlinx.serialization.json.JsonObject): Alert? = build { k -> json.text(k)?.takeIf { it.isNotBlank() } }
 
             /** From our own activity intent. */
             fun from(intent: Intent): Alert? = build { k -> intent.getStringExtra(k)?.takeIf { it.isNotBlank() } }

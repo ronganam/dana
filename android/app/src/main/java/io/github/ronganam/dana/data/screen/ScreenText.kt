@@ -1,6 +1,8 @@
 package io.github.ronganam.dana.data.screen
 
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * One node of the app under the assistant sheet, flattened from
@@ -40,7 +42,8 @@ data class DeviceScreen(
 ) {
     val hasText: Boolean get() = !text.isNullOrBlank()
 
-    fun toJson(): JSONObject = JSONObject().apply {
+    /** The `device_screen` payload; blank fields left out. */
+    fun toJson(): JsonObject = buildJsonObject {
         app?.takeIf { it.isNotBlank() }?.let { put("app", it) }
         packageName?.takeIf { it.isNotBlank() }?.let { put("package", it) }
         title?.takeIf { it.isNotBlank() }?.let { put("title", it) }

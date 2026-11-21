@@ -150,7 +150,7 @@ object MoneyCodes {
         if (!rid.matches(ID)) return
         val app = context.applicationContext
         val o = try {
-            ServerConfig.load(app).api().getMoneyCodeRequest(rid)
+            ServerConfig.load(app).api().money.codeRequest(rid)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -230,7 +230,7 @@ object MoneyCodes {
                 var wait = 2_000L
                 while (true) {
                     val status = try {
-                        ServerConfig.load(context).api().postMoneyCode(req.id, code)
+                        ServerConfig.load(context).api().money.postCode(req.id, code)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {

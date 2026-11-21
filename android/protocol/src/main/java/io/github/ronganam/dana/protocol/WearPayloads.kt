@@ -122,9 +122,6 @@ data class SnoozeRequest(
         action?.let { put("action", it) }
     }
 
-    /** What the server's snooze takes (everything but the task id). */
-    fun serverPayload(): JSONObject = toJson().apply { remove("task_id") }
-
     companion object {
         fun fromJson(o: JSONObject) = SnoozeRequest(
             taskId = o.getString("task_id"),

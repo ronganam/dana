@@ -1,12 +1,12 @@
 package io.github.ronganam.dana.ui.viewmodels
 
+import io.github.ronganam.dana.data.network.SuggestionEdits
 import android.content.Context
 import android.net.Uri
 import android.util.Log
 import io.github.ronganam.dana.data.models.CallLabel
 import io.github.ronganam.dana.data.models.CallSuggestion
 import io.github.ronganam.dana.data.models.PhoneCall
-import org.json.JSONObject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -76,13 +76,13 @@ class CallsController(private val ctx: ControllerContext) {
 
     fun fetchSuggestions() {
         ctx.scope.launch {
-            ctx.load("Suggestions") { ctx.api.getSuggestions("pending") }?.let { _suggestions.value = it }
+            ctx.load("Suggestions") { ctx.api.calls.suggestions("pending") }?.let { _suggestions.value = it }
         }
     }
 
     fun fetchLabelCatalog() {
         if (_labelCatalog.value.isNotEmpty()) return
-        ctx.scope.launch { ctx.load("CallLabels") { ctx.api.getCallLabels() }?.let { _labelCatalog.value = it } }
+        ctx.scope.launch { ctx.load("CallLabels") { ctx.api.calls.labels() }?.let { _labelCatalog.value = it } }
     }
 
     private fun setBusy(id: String, busy: Boolean) {
@@ -90,15 +90,15 @@ class CallsController(private val ctx: ControllerContext) {
     }
 
     /** Create the task/event. [onDone] runs after a success (e.g. refresh tasks). */
-    fun acceptSuggestion(suggestion: CallSuggestion, overrides: JSONObject = JSONObject(), onDone: () -> Unit = {}) {
+    fun acceptSuggestion(suggestion: CallSuggestion, overrides: SuggestionEdits = SuggestionEdits.None, onDone: () -> Unit = {}) {
         if (suggestion.id in _busySuggestionIds.value) return
         setBusy(suggestion.id, true)
         ctx.scope.launch {
             try {
-                val result = ctx.api.acceptSuggestion(suggestion.id, overrides)
+                val result = ctx.api.calls.accept(suggestion.id, overrides)
                 _suggestions.value = _suggestions.value.filterNot { it.id == suggestion.id }
                 ctx.messages.post(
-                    when (result.optString("kind")) {
+                    when (result.kind) {
                         "event" -> "Added to your calendar"
                         "task" -> "Reminder created"
                         else -> "Done"
@@ -120,7 +120,7 @@ class CallsController(private val ctx: ControllerContext) {
         val before = _suggestions.value
         _suggestions.value = before.filterNot { it.id == suggestion.id }
         ctx.scope.launch {
-            val ok = ctx.load("DismissSuggestion") { ctx.api.dismissSuggestion(suggestion.id) } ?: false
+            val ok = ctx.load("DismissSuggestion") { ctx.api.calls.dismiss(suggestion.id) } ?: false
             if (!ok) {
                 _suggestions.value = before
                 ctx.messages.post("Couldn't dismiss the suggestion")
@@ -130,7 +130,7 @@ class CallsController(private val ctx: ControllerContext) {
 
     fun updateCallLabels(callId: String, labelIds: List<String>) {
         ctx.action("Couldn't update labels") {
-            ctx.api.updateCallLabels(callId, labelIds).also { if (it) fetchCalls() }
+            ctx.api.calls.setLabels(callId, labelIds).also { if (it) fetchCalls() }
         }
     }
 
@@ -138,7 +138,7 @@ class CallsController(private val ctx: ControllerContext) {
         ctx.scope.launch {
             _isLoadingCalls.value = true
             try {
-                ctx.load("Calls") { ctx.api.getCalls() }?.let { _calls.value = it }
+                ctx.load("Calls") { ctx.api.calls.calls() }?.let { _calls.value = it }
             } finally {
                 _isLoadingCalls.value = false
             }
@@ -147,13 +147,13 @@ class CallsController(private val ctx: ControllerContext) {
 
     fun deleteCall(callId: String) {
         ctx.action("Couldn't delete recording") {
-            ctx.api.deleteCall(callId).also { if (it) fetchCalls() }
+            ctx.api.calls.delete(callId).also { if (it) fetchCalls() }
         }
     }
 
     fun reanalyzeCall(callId: String, customInstructions: String?) {
         ctx.action("Couldn't start re-analysis") {
-            ctx.api.reanalyzeCall(callId, customInstructions).also { if (it) fetchCalls() }
+            ctx.api.calls.reanalyze(callId, customInstructions).also { if (it) fetchCalls() }
         }
     }
 
@@ -267,10 +267,10 @@ class CallsController(private val ctx: ControllerContext) {
                 return@launch
             }
             try {
-                val success = ctx.api.uploadCallRecording(
+                val uploaded = ctx.api.calls.upload(
                     file, state.caller, state.receiver, state.timestamp, state.instructions
                 )
-                if (success) {
+                if (uploaded != null) {
                     _uploadFormState.value = null
                     fetchCalls()
                 } else {
