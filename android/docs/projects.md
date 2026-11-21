@@ -37,4 +37,4 @@ Projects on the phone: a wedding, a trip, a flat hunt — decisions whose option
 
 ## Tests
 
-`app/src/test/java/io/github/ronganam/dana/projects/`: `ProjectsJsonTest` (the fixture's list / owner / read-share payloads, the writers), `ProjectsCoreTest` (numbers, money, best values, order, section lines, countdown, budget, `setField`, phones, values by type, the column payload, helpers), `ProjectMarkdownTest` (tables, lists, checks, code). The fixture is `app/src/test/resources/projects_web.json`, the server's `test_fixtures/projects_web.json` with the sharer's name replaced.
+`app/src/test/java/io/github/ronganam/dana/projects/`: `ProjectsJsonTest` (the fixture's list / owner / read-share payloads, the writers), `ProjectsCoreTest` (numbers, money, best values, order, section lines, countdown, budget, `setField`, phones, values by type, the column payload, helpers), `ProjectMarkdownTest` (tables, lists, checks, code). The fixture is the server's `server/tests/fixtures/projects_web.json`, read from there.
