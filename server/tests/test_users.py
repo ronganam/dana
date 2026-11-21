@@ -107,7 +107,7 @@ def test_tokens():
 
 def test_cookies():
     admin, member, raw = users.first_admin(), STATE["member"], STATE["raw"]
-    legacy = hmac.new(b"env-token", b"dana-web-session", hashlib.sha256).hexdigest()
+    legacy = hmac.new(b"env-token", b"ganam-web-session", hashlib.sha256).hexdigest()
     check("cookie format unchanged (HMAC of the token, same constant)",
           users.session_cookie_value("env-token") == legacy)
     check("existing env-token cookie resolves to the first admin", users.by_session_cookie(legacy) == admin)

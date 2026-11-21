@@ -48,9 +48,10 @@ CACHE_TTL_SECONDS = 10.0
 # last_used_at is written at most this often per token.
 TOUCH_INTERVAL_SECONDS = 3600.0
 DEFAULT_FIRST_USER_NAME = user_rows.DEFAULT_FIRST_USER_NAME
-# The web session cookie is an HMAC of the token with this constant; changing
-# it signs everyone out.
-_SESSION_KEY = b"dana-web-session"
+# The web session cookie is an HMAC of the token with this constant. Every
+# token's stored session_hash was computed with it, so it never changes: a new
+# value would leave no existing token able to sign in on the web.
+_SESSION_KEY = b"ganam-web-session"
 
 
 @dataclass(frozen=True)
