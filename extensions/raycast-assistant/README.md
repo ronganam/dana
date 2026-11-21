@@ -53,8 +53,7 @@ npm run lint     # ray lint: manifest, ESLint, Prettier
 `npm run build` and the ESLint/Prettier steps of `npm run lint` also run on Linux. Testing in Raycast needs macOS or
 Windows.
 
-`npm run lint` checks that `author` in `package.json` is a real Raycast Store handle. `ganam` isn't one, so lint reports
-that until you set your own handle. This only matters for publishing to the Store; `npm run dev` works without it.
+`npm run lint` checks that `author` in `package.json` is a real Raycast Store handle (`ronganam`); to publish your own copy, put yours there. `npm run dev` works without it.
 
 ### Layout
 
