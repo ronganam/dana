@@ -7,18 +7,19 @@ It is one person's daily driver, published as is: opinionated, built around one 
 ## What it does
 
 - **Chat and voice** with an agent that uses tools: a custom ReAct loop over [LiteLLM](https://github.com/BerriAI/litellm) (Claude by default, any provider by env), streamed to every client; realtime voice calls; push-to-talk; "Hey Dana" wake word on the tablet and TV.
-- **Integrations**, each a self-contained kind that owns its tools and is connected per user: tasks and reminders (time, location, car and wake triggers), a shared shopping list, projects with decisions compared side by side, people and their briefs, phone notifications and call recordings turned into suggestions, Home Assistant, WhatsApp (WAHA), Google Calendar / Contacts / Gmail, your own Telegram account (read-only), money (bank and card sync, dashboards, a balance forecast, ways to save), Frigate cameras.
+- **Addons**, each self-contained, owning its tools and is connected per user: tasks and reminders (time, location, car and wake triggers), a shared shopping list, projects with decisions compared side by side, people and their briefs, phone notifications and call recordings turned into suggestions, Home Assistant, WhatsApp (WAHA), Google Calendar / Contacts / Gmail, your own Telegram account (read-only), money (bank and card sync, dashboards, a balance forecast, ways to save), Frigate cameras.
 - **Proactive**: a morning briefing, a weekly review, a "Now" queue of what needs you, urgent-notification escalation, caller cards for incoming calls.
 - **Safe by default**: reversible actions run at once with Undo; sending to other people or destroying something asks first; content written by others (mail, a shared screen) cannot make Dana act outside without asking.
-- **Several users** on one server, each with their own integrations, data and tokens; sharing of lists and projects between them.
+- **Several users** on one server, each with their own addons, data and tokens; sharing of lists and projects between them.
 
 ## Repository
 
 | Path | What |
 |---|---|
-| [`server/`](server/) | The server (Python 3.14, aiohttp, SQLite): agent, integrations, APIs, web UI, Telegram bot, background jobs |
+| [`server/`](server/) | The server (Python 3.14, aiohttp, SQLite): agent, addons, APIs, web UI, Telegram bot, background jobs |
 | [`android/`](android/) | The phone app, the wall-tablet kiosk and the TV home screen (flavors of one app), and the Wear OS watch app (Kotlin, Compose) |
 | [`extensions/raycast-assistant/`](extensions/raycast-assistant/) | A Raycast extension |
+| [`examples/addons/`](examples/addons/) | A working example of an addon you write yourself |
 
 ## Run the server
 
@@ -39,11 +40,11 @@ cp .env.example .env
 .venv/bin/python main.py
 ```
 
-Then connect integrations on the web UI (Settings → Integrations) or with `bin/users.py`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
+Then connect addons on the web UI (Settings → Addons) or with `bin/users.py`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
 
 ## Your own deployment
 
-Run Dana as upstream ships it and keep what is yours in a **site** folder beside it: deploy settings, your own plugins, the apps' server address and TV setup, and notes for you and your coding agents. Start from `site.example/`. Updating is then `git pull`, and your deployment never drifts from Dana: [`docs/site.md`](docs/site.md).
+Run Dana as upstream ships it and keep what is yours in a **site** folder beside it: deploy settings, your own addons, the apps' server address and TV setup, and notes for you and your coding agents. Start from `site.example/`. Updating is then `git pull`, and your deployment never drifts from Dana: [`docs/site.md`](docs/site.md).
 
 ## Build the apps
 
@@ -56,8 +57,8 @@ JDK 21 and the Android SDK are needed. Point the app at your server in its Setti
 
 ## Extend it
 
-- A new integration is a package in `server/integrations/<kind>/`: declare the kind, write its tools as typed Python functions with docstrings (the schema is generated), and it shows up for users who connect it. Start with [`server/docs/access.md`](server/docs/access.md) → Integration.
-- Something only your setup needs can stay out of the repository as a **plugin** in your site's `plugins/`: the same code as a built-in kind ([`server/docs/plugins.md`](server/docs/plugins.md); a working example: [`server/examples/plugins/hello/`](server/examples/plugins/hello/)).
+- A new addon is a package in `server/addons/<name>/`: declare it in `addon.py`, write its tools as typed Python functions with docstrings (the schema is generated), and it shows up for users who connect it. The design: [`docs/addons.md`](docs/addons.md); the reference: [`server/docs/access.md`](server/docs/access.md) → Addon.
+- Something only your setup needs can stay out of the repository as a **site addon** in your site's `addons/`: the same code as an official addon ([`server/docs/writing-an-addon.md`](server/docs/writing-an-addon.md); a working example: [`examples/addons/hello/`](examples/addons/hello/)).
 - Every area has a doc: start from [`server/AGENTS.md`](server/AGENTS.md) and [`android/AGENTS.md`](android/AGENTS.md). They are written for people and coding agents alike.
 
 ## Contributing

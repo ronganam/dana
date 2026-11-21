@@ -1,8 +1,8 @@
 """Who a composer's background work runs for (docs/access.md, "The current user").
 
 Composers (Now, the wake flow, the briefing, meeting cards, the weekly review,
-search, the self-checks) combine several kinds for one user. Their loops run
-once per user who has the kinds the work needs, as that user, one after
+search, the self-checks) combine several addons for one user. Their loops run
+once per user who has the addons the work needs, as that user, one after
 another; one user's failure is logged and the next one still runs.
 """
 from __future__ import annotations
@@ -12,15 +12,15 @@ from typing import Any, Awaitable, Callable, Dict, Iterable, List
 
 from core import users
 from core.users import User
-from integrations.framework import store
+from core.addons import store
 
 logger = logging.getLogger(__name__)
 
 
-def has_all(user: User, kinds: Iterable[str]) -> bool:
-    """Whether ``user`` has every kind in ``kinds`` connected."""
-    mine = store.connected_kinds(user)
-    return all(k in mine for k in kinds)
+def has_all(user: User, addons: Iterable[str]) -> bool:
+    """Whether ``user`` has every addon in ``addons`` connected."""
+    mine = store.connected_addons(user)
+    return all(k in mine for k in addons)
 
 
 def eligible(rule: Callable[[User], bool]) -> List[User]:

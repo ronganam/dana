@@ -39,7 +39,7 @@ services:
       PYTHONDONTWRITEBYTECODE: "1"
     volumes:
       - ./:/local_env:ro
-      - ../../testfakes.py:/local_env_lib/testfakes.py:ro
+      - ../testfakes.py:/local_env_lib/testfakes.py:ro
     networks: [internal]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:9000/health"]

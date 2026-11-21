@@ -3,16 +3,16 @@
 Projects (topics such as a wedding, a trip, a flat hunt), the sections that
 organise them (decisions with their options side by side, notes) and the
 entries saved in them (notes, records, links, options), with files attached.
-Code: `integrations/knowledge/`; the `/api/projects*`, `/api/sections*` and
+Code: `addons/knowledge/`; the `/api/projects*`, `/api/sections*` and
 `/api/entries*` handlers and `GET /media/{name}` live in
-`integrations/knowledge/api.py` and call into the package. Web panel:
-`static/projects.js` + `static/projects-core.js` (pure, tested by `node
-test_web_projects.mjs` against `test_fixtures/projects_web.json`) +
-`static/projects.css`. Tests: `python test_knowledge_users.py` (per user,
-sharing, media), `python test_knowledge_sections.py` (sections, decisions,
+`addons/knowledge/api.py` and call into the package. Web panel:
+`static/projects.js` + `static/projects-core.js` (pure, tested by `bin/test
+test_web_projects` against `tests/fixtures/projects_web.json`) +
+`static/projects.css`. Tests: `bin/test test_knowledge_users` (per user,
+sharing, media), `bin/test test_knowledge_sections` (sections, decisions,
 columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
-`python test_db.py` (migrations `m0008_knowledge_per_user`,
-`m0032_knowledge_sections`), `python test_integrations.py`.
+`bin/test test_db` (migrations `m0008_knowledge_per_user`,
+`m0032_knowledge_sections`), `bin/test test_addons`.
 
 | Module | What |
 |---|---|
@@ -58,7 +58,7 @@ columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
 - **Dana** keeps a decision as an options section: one entry per option
   (title = the vendor's name, values in the columns, the details in the
   body, files attached), the comparison in the section's summary, and sets
-  `decision` only when the user says so (`KNOWLEDGE_GUIDE` in `kind.py`).
+  `decision` only when the user says so (`KNOWLEDGE_GUIDE` in `addon.py`).
   `list_project_entries` prints a project by section with each option's
   values and decision.
 
@@ -81,7 +81,7 @@ types, the budget column) are sheets too.
 
 - **Projects** belong to the user who created them (`projects.user_id`).
   Titles are not unique. A user sees their own projects plus the ones shared
-  with them, and nothing without the `knowledge` integration (HTTP: 403
+  with them, and nothing without the `knowledge` addon (HTTP: 403
   `not_connected`; tools not offered).
 - **Entries** belong to the owner of their project (`entries.user_id`; an
   entry without a project to its creator) and record who created them

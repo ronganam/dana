@@ -352,7 +352,7 @@ def _admin_count() -> int:
 
 def remove(user_id: str) -> None:
     """Delete a user and, through the database's cascades, everything they
-    own (sessions, integrations, tasks, calls, … ; ``bin/users.py remove``
+    own (sessions, addons, tasks, calls, … ; ``bin/users.py remove``
     says what first). Usage rows are kept (server cost history).
 
     Raises:

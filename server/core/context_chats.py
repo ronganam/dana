@@ -2,7 +2,7 @@
 suggestion, call, notification, task, person, weekly review, transaction or saving idea), and the
 on-screen context of one turn (core/session_runner.py).
 
-A composer over the kinds: each kind builds its own card and prompt, for the
+A composer over the addons: each addon builds its own card and prompt, for the
 chat's user and only from that user's own items; this module dispatches by
 kind, stores the session for that user and rebuilds the prompt on every
 turn (so it reflects edits and acceptance).
@@ -16,11 +16,11 @@ from typing import Any, Dict, Optional
 from core import users, weekly_review
 from core.session import create_new_session_db, get_session_state
 from core.users import User
-from integrations.framework import store
-from integrations.money import config as money_config, queries as money_queries, savings as money_savings
-from integrations.people import detail as people_detail, values as people_values
-from integrations.phone.calls import chat as phone_chat
-from integrations.tasks import links as task_links, service as tasks_service
+from core.addons import store
+from addons.money import config as money_config, queries as money_queries, savings as money_savings
+from addons.people import detail as people_detail, values as people_values
+from addons.phone.calls import chat as phone_chat
+from addons.tasks import links as task_links, service as tasks_service
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def build_chat_context(user: Optional[User], kind: str, ref_id: str) -> Dict[str
     Raises:
         LookupError: not one of their items.
         ValueError: an unknown kind.
-        NotConnected: a person without the ``people`` kind, a review without ``tasks``, a
+        NotConnected: a person without the ``people`` addon, a review without ``tasks``, a
             transaction or a saving without ``money``.
     """
     kind = (kind or "").strip().lower()
@@ -55,7 +55,7 @@ def build_chat_context(user: Optional[User], kind: str, ref_id: str) -> Dict[str
             "quick_prompts": ["Change the reminder", "Break it into steps", "Mark it done"],
         }
     if kind == "person":
-        store.require(user, people_values.KIND)
+        store.require(user, people_values.ADDON)
         return people_detail.chat_context(user, ref_id)
     if kind == "review":
         if user is None:
@@ -65,12 +65,12 @@ def build_chat_context(user: Optional[User], kind: str, ref_id: str) -> Dict[str
     if kind == "transaction":
         if user is None:
             raise LookupError("Transaction not found")
-        store.require(user, money_config.KIND)
+        store.require(user, money_config.ADDON)
         return money_queries.chat_context(user, ref_id)
     if kind == "saving":
         if user is None:
             raise LookupError("Saving not found")
-        store.require(user, money_config.KIND)
+        store.require(user, money_config.ADDON)
         return money_savings.chat_context(user, ref_id)
     raise ValueError("kind must be suggestion, call, notification, task, person, review, transaction or saving")
 
@@ -122,11 +122,11 @@ def context_prompt(user: Optional[User], ctx: Optional[Dict[str, Any]]) -> Optio
         if kind == "review":
             return weekly_review.context_prompt(user, ref) if user is not None else None
         if kind == "transaction":
-            if user is None or not store.is_connected(user, money_config.KIND):
+            if user is None or not store.is_connected(user, money_config.ADDON):
                 return None
             return money_queries.context_prompt(user, ref)
         if kind == "saving":
-            if user is None or not store.is_connected(user, money_config.KIND):
+            if user is None or not store.is_connected(user, money_config.ADDON):
                 return None
             return money_savings.context_prompt(user, ref)
     except Exception as e:

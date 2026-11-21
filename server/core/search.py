@@ -1,11 +1,11 @@
 """One search box over what Dana keeps for one user: their open reminders
 (own and on lists shared with them), calls, people, notes (entries and
 projects: own and shared), active notifications and their active shopping
-list. A kind they have not connected adds nothing. Plain SQLite (FTS where it
+list. An addon they have not connected adds nothing. Plain SQLite (FTS where it
 exists, LIKE elsewhere), no model, Hebrew and English.
 
 ``search(user, q, limit)`` → ``[{kind, id, title, subtitle, …}]``, at most
-``limit`` per kind (notifications add ``package``, notes ``project_id``), best
+``limit`` per addon (notifications add ``package``, notes ``project_id``), best
 matches first across kinds (exact title > title prefix > a word of the title
 starts with it > contains > matched only in the body).
 """
@@ -18,16 +18,16 @@ from core import clock
 from core.db import get_db_connection
 from core.now import _loads, notification_parts, trigger_phrase
 from core.users import User
-from integrations.framework import store
-from integrations.knowledge import entries as knowledge_entries, projects as knowledge_projects
-from integrations.people import store as people_store
-from integrations.people.values import ago, norm_name, norm_phone, parse_time
-from integrations.phone.config import KIND as PHONE
-from integrations.phone.notifications import store as notification_store
-from integrations.shopping import items as shopping_items, lists as shopping_lists
-from integrations.tasks import service as tasks_service
+from core.addons import store
+from addons.knowledge import entries as knowledge_entries, projects as knowledge_projects
+from addons.people import store as people_store
+from addons.people.values import ago, norm_name, norm_phone, parse_time
+from addons.phone.config import ADDON as PHONE
+from addons.phone.notifications import store as notification_store
+from addons.shopping import items as shopping_items, lists as shopping_lists
+from addons.tasks import service as tasks_service
 
-KIND_ORDER = ("reminder", "person", "call", "note", "notification", "shopping")
+ADDON_ORDER = ("reminder", "person", "call", "note", "notification", "shopping")
 
 
 def _terms(q: str) -> List[str]:
@@ -178,7 +178,7 @@ def _notifications(user: User, q: str, limit: int) -> List[Dict[str, Any]]:
 
 def _shopping(conn, user: User, q: str, limit: int) -> List[Dict[str, Any]]:
     """Items of ``user``'s active shopping list: theirs or one shared with them to edit (none without ``shopping``)."""
-    if not store.is_connected(user, shopping_lists.KIND):
+    if not store.is_connected(user, shopping_lists.ADDON):
         return []
     rows = shopping_items.search(shopping_lists.active_list(user), _like(q))
     return [{"kind": "shopping", "id": r["id"], "title": r["name"],
@@ -187,7 +187,7 @@ def _shopping(conn, user: User, q: str, limit: int) -> List[Dict[str, Any]]:
 
 
 def search(user: User, q: str, limit: int = 5) -> List[Dict[str, Any]]:
-    """``user``'s items matching ``q`` across their kinds."""
+    """``user``'s items matching ``q`` across their addons."""
     q = (q or "").strip()[:100]
     if not q:
         return []
@@ -203,6 +203,6 @@ def search(user: User, q: str, limit: int = 5) -> List[Dict[str, Any]]:
         results += _notifications(user, q, limit)
     except Exception:
         pass
-    order = {k: i for i, k in enumerate(KIND_ORDER)}
+    order = {k: i for i, k in enumerate(ADDON_ORDER)}
     results.sort(key=lambda r: (-r["_score"], order.get(r["kind"], 9)))
     return [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]

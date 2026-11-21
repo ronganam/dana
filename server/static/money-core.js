@@ -10,7 +10,7 @@
  * cadence, a source's state, badges, the "counts as" choices and errors; for the Save view it sorts the
  * ways to save and spending to watch into sections and words their chips, actions, price checks,
  * targets and outcomes (only formatting: every number is the server's). Tested by test_web_money.mjs
- * against the payloads captured from the real API (test_fixtures/money_web.json, written by
+ * against the payloads captured from the real API (tests/fixtures/money_web.json, written by
  * test_money_page.py; money_portfolio_web.json; money_savings_web.json).
  */
 (() => {
@@ -1355,7 +1355,7 @@
     if (b.error === "needs_attention") return b.reason || "This login needs fixing first.";
     if (b.error === "bad_code") return "That doesn't look like the code: 4 to 8 digits.";
     if (b.error === "not_pending") return "That code request is over. Dana will ask again when it signs in next.";
-    if (b.error === "not_connected") return "Money is turned off for you. Turn it on in Integrations.";
+    if (b.error === "not_connected") return "Money is turned off for you. Turn it on in Addons.";
     if (b.error === "not_found") return "It isn't there any more.";
     if (b.message) return b.message;
     return `Something went wrong (HTTP ${status}).`;

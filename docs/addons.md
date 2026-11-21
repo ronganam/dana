@@ -1,6 +1,6 @@
 # Addons
 
-> **Status: target design (branch `addons`).** Each build step makes part of this true and updates this file to describe what is built. The section "Build plan" at the end is removed once everything is built.
+> **Status: target design (branch `addons`); step 1 (Rename and move) is done.** Each build step makes part of this true and updates this file to describe what is built. The section "Build plan" at the end is removed once everything is built.
 
 Dana is a **small core plus addons**. Everything a user can turn on is an addon: tasks, shopping, Home Assistant, WhatsApp, Gmail, money, the bank scrapers. The addons that ship with Dana are written exactly like the ones you write or install. There is no second, more powerful way reserved for built-in code.
 

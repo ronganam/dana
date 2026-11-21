@@ -9,7 +9,7 @@ refresh (10 s). In the pod::
 
 Commands (``bin/users.py <command> --help`` for each)::
 
-    list                                    users: access, Telegram ids, tokens, integrations
+    list                                    users: access, Telegram ids, tokens, addons
     add NAME [--access] [--context] [--pronoun] [--telegram-chat]
     update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
     remove USER [--delete-data]             without the flag: says what would be deleted, removes nothing
@@ -19,11 +19,11 @@ Commands (``bin/users.py <command> --help`` for each)::
     telegram add USER TELEGRAM_ID
     telegram move TELEGRAM_ID USER
     telegram remove TELEGRAM_ID [--allow-open-bot]
-    integrations kinds                      every kind with its credential and setting fields
-    integrations show USER                  a user's integrations (credential values never shown)
-    integrations connect USER KIND [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
-    integrations update USER KIND [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
-    integrations disconnect USER KIND
+    addons list                             every addon with its credential and setting fields
+    addons show USER                        a user's connections (credential values never shown)
+    addons connect USER ADDON [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
+    addons update USER ADDON [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
+    addons disconnect USER ADDON
     sharing [USER]                          who has access to what
 
 ``USER`` is a user id or name (full name, or a unique start of one, any case).
@@ -46,19 +46,19 @@ from typing import Any, Dict, List, Optional, Sequence, TextIO
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-import integrations  # noqa: E402,F401 — first: registers every kind (and the sharing item types)
+import addons  # noqa: E402,F401 — first: registers every addon (and the sharing item types)
 from core import access, db, user_rows, users  # noqa: E402
-from integrations.framework import sharing  # noqa: E402
+from core.addons import sharing  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.paths import IMAGES_DIR, RECORDINGS_DIR  # noqa: E402
 from core.users import User  # noqa: E402
-from integrations.framework import crypto, store  # noqa: E402
-from integrations.framework.kind import get_kind, kinds  # noqa: E402
+from core.addons import crypto, store  # noqa: E402
+from core.addons.addon import get_addon, all_addons  # noqa: E402
 
 # Rows a removed user keeps: usage is the server's cost history, and
-# integration_imports records that the env import happened (so it never runs
+# connection_imports records that the env import happened (so it never runs
 # again for whoever becomes the first admin).
-KEPT_TABLES = ("usage_events", "usage_daily", "integration_imports")
+KEPT_TABLES = ("usage_events", "usage_daily", "connection_imports")
 
 
 class CliError(Exception):
@@ -244,17 +244,17 @@ def remove_user(user: User) -> List[str]:
     return notes
 
 
-def _integration_lines(user: User) -> List[str]:
+def _connection_lines(user: User) -> List[str]:
     lines = []
-    for info in store.list_integrations(user):
-        k = get_kind(info.kind)
+    for info in store.list_connections(user):
+        k = get_addon(info.addon)
         if k.everyone:
             continue
-        conn = store.get(user, info.kind)
+        conn = store.get(user, info.addon)
         creds = conn.credentials if conn is not None else {}
         cred_text = ", ".join(f"{f.name} {'set' if creds.get(f.name) else 'not set'}" for f in k.credentials)
         settings = ", ".join(f"{name}={json.dumps(value, ensure_ascii=False)}" for name, value in info.settings.items())
-        line = f"  {info.kind}"
+        line = f"  {info.addon}"
         if cred_text:
             line += f"  credentials: {cred_text}"
         if settings:
@@ -264,7 +264,7 @@ def _integration_lines(user: User) -> List[str]:
         if info.account_conflict:
             line += f"  account conflict: {info.account_conflict} is already connected by another user (not used)"
         lines.append(line)
-    return lines or ["  (none besides core)"]
+    return lines or ["  (none besides essentials)"]
 
 
 # --- Commands -----------------------------------------------------------------------------------
@@ -282,8 +282,8 @@ def cmd_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
         print(f"  pronoun: {u.pronoun}   context: {_short(u.context) if u.context else 'none'}", file=out)
         tokens = ", ".join(f"{t.label or '(no label)'} ({t.id})" for t in users.list_tokens(u.id))
         print(f"  tokens: {tokens or 'none'}", file=out)
-        kinds_ = [k for k in store.connected_kinds(u) if not get_kind(k).everyone]
-        print(f"  integrations: {', '.join(kinds_) or 'none'}", file=out)
+        names = [k for k in store.connected_addons(u) if not get_addon(k).everyone]
+        print(f"  addons: {', '.join(names) or 'none'}", file=out)
     if users.telegram_open():
         print("Note: no user has a Telegram id, so the Telegram bot lets anyone in (as the first admin).", file=out)
 
@@ -300,8 +300,8 @@ def cmd_add(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
                             profile=profile)
     except ValueError as e:
         raise CliError(str(e)) from e
-    print(f"Added {user.name} ({user.id}, {user.access}). They have only the core integration until "
-          f"you connect others: bin/users.py integrations connect {user.id} <kind>. "
+    print(f"Added {user.name} ({user.id}, {user.access}). They have only the essentials addon until "
+          f"you connect others: bin/users.py addons connect {user.id} <addon>. "
           f"A token for their devices: bin/users.py tokens issue {user.id} --label phone", file=out)
 
 
@@ -406,13 +406,13 @@ def cmd_telegram_remove(args: argparse.Namespace, out: TextIO, stdin: TextIO) ->
     print(f"Telegram id {args.telegram_id} removed from {owners[0].name}.", file=out)
 
 
-def cmd_kinds(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
-    for k in kinds():
+def cmd_addons(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
+    for k in all_addons():
         if k.everyone:
-            print(f"{k.kind}: {k.description} (every user has it)", file=out)
+            print(f"{k.name}: {k.description} (every user has it)", file=out)
             continue
         extra = f" (needs the '{k.requires}' capability: admins only)" if k.requires else ""
-        print(f"{k.kind}: {k.description}{extra}", file=out)
+        print(f"{k.name}: {k.description}{extra}", file=out)
         for f in k.credentials:
             print(f"  credential {f.name}{'' if f.required else ' (optional)'}: {f.description}", file=out)
         for f in k.settings:
@@ -423,35 +423,35 @@ def cmd_kinds(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
 def cmd_show(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     user = find_user(args.user)
     print(f"{user.name} ({user.id}):", file=out)
-    for line in _integration_lines(user):
+    for line in _connection_lines(user):
         print(line, file=out)
 
 
 def _change(args: argparse.Namespace, out: TextIO, stdin: TextIO, *, connecting: bool) -> None:
     user = find_user(args.user)
     try:
-        get_kind(args.kind)
+        get_addon(args.addon)
     except KeyError as e:
-        raise CliError(f"No integration kind {args.kind!r} (see: bin/users.py integrations kinds).") from e
+        raise CliError(f"No addon {args.addon!r} (see: bin/users.py addons list).") from e
     credentials = _read_credentials(args, stdin)
     settings = parse_settings(args.settings)
     try:
         if connecting:
-            store.connect(user, args.kind, credentials=credentials or None,
+            store.connect(user, args.addon, credentials=credentials or None,
                           settings={k: v for k, v in settings.items() if v is not None})
         else:
-            store.update(user, args.kind, credentials=credentials or None, settings=settings or None)
+            store.update(user, args.addon, credentials=credentials or None, settings=settings or None)
     except PermissionError as e:
         raise CliError(str(e)) from e
     except store.NotConnected as e:
-        raise CliError(f"{e} Use: bin/users.py integrations connect {user.id} {args.kind}") from e
+        raise CliError(f"{e} Use: bin/users.py addons connect {user.id} {args.addon}") from e
     except crypto.CredentialsKeyError as e:
         raise CliError(str(e)) from e
     except ValueError as e:
         raise CliError(str(e)) from e
-    print(f"{'Connected' if connecting else 'Updated'} {args.kind} for {user.name}:", file=out)
-    for line in _integration_lines(user):
-        if line.strip().split(" ")[0] == args.kind:
+    print(f"{'Connected' if connecting else 'Updated'} {args.addon} for {user.name}:", file=out)
+    for line in _connection_lines(user):
+        if line.strip().split(" ")[0] == args.addon:
             print(line, file=out)
 
 
@@ -459,21 +459,21 @@ def cmd_connect(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     _change(args, out, stdin, connecting=True)
 
 
-def cmd_integration_update(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
+def cmd_connection_update(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     _change(args, out, stdin, connecting=False)
 
 
 def cmd_disconnect(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     user = find_user(args.user)
     try:
-        gone = store.disconnect(user, args.kind)
+        gone = store.disconnect(user, args.addon)
     except KeyError as e:
-        raise CliError(f"No integration kind {args.kind!r}.") from e
+        raise CliError(f"No addon {args.addon!r}.") from e
     except ValueError as e:
         raise CliError(str(e)) from e
     if not gone:
-        raise CliError(f"{user.name} does not have the {args.kind} integration.")
-    print(f"Disconnected {args.kind} for {user.name} (their data of that kind is kept; connecting it again "
+        raise CliError(f"{user.name} does not have the {args.addon} addon.")
+    print(f"Disconnected {args.addon} for {user.name} (their data of that addon is kept; connecting it again "
           "brings it back).", file=out)
 
 
@@ -504,10 +504,10 @@ def cmd_sharing(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="bin/users.py", description="Manage Dana's users, their tokens, "
-                                     "Telegram ids, integrations and shares (on the server's database).")
+                                     "Telegram ids, addons and shares (on the server's database).")
     sub = parser.add_subparsers(dest="command", required=True, metavar="command")
 
-    p = sub.add_parser("list", help="every user with access, Telegram ids, tokens and integrations")
+    p = sub.add_parser("list", help="every user with access, Telegram ids, tokens and addons")
     p.set_defaults(func=cmd_list)
 
     p = sub.add_parser("add", help="add a user")
@@ -561,25 +561,25 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--allow-open-bot", action="store_true", help="allow removing the last id (the bot opens)")
     p.set_defaults(func=cmd_telegram_remove)
 
-    ints = sub.add_parser("integrations", help="integration kinds and a user's integrations").add_subparsers(
-        dest="integrations_command", required=True, metavar="action")
-    p = ints.add_parser("kinds", help="every kind with its credential and setting fields")
-    p.set_defaults(func=cmd_kinds)
-    p = ints.add_parser("show", help="a user's integrations (credential values are never shown)")
+    ints = sub.add_parser("addons", help="addons and a user's connections").add_subparsers(
+        dest="addons_command", required=True, metavar="action")
+    p = ints.add_parser("list", help="every addon with its credential and setting fields")
+    p.set_defaults(func=cmd_addons)
+    p = ints.add_parser("show", help="a user's connections (credential values are never shown)")
     p.add_argument("user")
     p.set_defaults(func=cmd_show)
-    for name, func, text in (("connect", cmd_connect, "connect a kind for a user"),
-                             ("update", cmd_integration_update, "change a connected kind's credentials / settings")):
+    for name, func, text in (("connect", cmd_connect, "connect an addon for a user"),
+                             ("update", cmd_connection_update, "change a connected addon's credentials / settings")):
         p = ints.add_parser(name, help=text)
         p.add_argument("user")
-        p.add_argument("kind")
+        p.add_argument("addon")
         p.add_argument("settings", nargs="*", metavar="SETTING=VALUE")
         p.add_argument("--credentials-file", metavar="PATH", help="name=value lines")
         p.add_argument("--credentials-stdin", action="store_true", help="read name=value lines from stdin")
         p.set_defaults(func=func)
-    p = ints.add_parser("disconnect", help="disconnect a kind (its data is kept)")
+    p = ints.add_parser("disconnect", help="disconnect an addon (its data is kept)")
     p.add_argument("user")
-    p.add_argument("kind")
+    p.add_argument("addon")
     p.set_defaults(func=cmd_disconnect)
 
     p = sub.add_parser("sharing", help="who has access to what")

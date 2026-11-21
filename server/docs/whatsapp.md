@@ -1,22 +1,22 @@
 # WhatsApp (WAHA)
 
-Each user connects their own WAHA session: the `whatsapp` integration
-(docs/access.md, "Kinds") holds `url`, `api_key` (optional: no `X-Api-Key`
+Each user connects their own WAHA session: the `whatsapp` addon
+(docs/access.md, "Addons") holds `url`, `api_key` (optional: no `X-Api-Key`
 header without one) and `session` as encrypted credentials, the setting
 `voice_telegram_chat_id`, and the session's own WhatsApp id in
-`integrations.account`. The first admin's values come once from env
-(`integrations/bootstrap.py`; docs/configuration.md); nothing else reads the
+`addons.account`. The first admin's values come once from env
+(`addons/bootstrap.py`; docs/configuration.md); nothing else reads the
 old env names.
 
-## The package (`integrations/whatsapp/`)
+## The package (`addons/whatsapp/`)
 
 | File | What |
 |---|---|
-| `kind.py` | the declaration (`on_connect` / `on_credentials_change` learn the account, `blocked` refuses the tools of a connection in an account conflict) |
+| `addon.py` | the declaration (`on_connect` / `on_credentials_change` learn the account, `blocked` refuses the tools of a connection in an account conflict) |
 | `config.py` | kind name, WAHA's default session name, the `voice_telegram_chat_id` setting and `voice_chat_id(conn)` (strict: an int or None, logged) |
 | `client.py` | per connection: `config(conn)` → (base url, headers, session), `signature(conn)` (cache key), `fetch_me(conn)` / `get_my_identifiers(conn, client)`, the chat-id → name map (5 min, per connection), `get_message_sender_name`, `download_media_bytes(conn, url)` |
 | `resolve.py` | `resolve_chat_id_and_name(conn, name)`: saved contacts → chat id → preferred contacts → WAHA chats / contacts (transliteration, recency, the chat model `purpose="whatsapp_match"`) → number check |
-| `contacts.py` | the user's saved contacts (table `whatsapp_contacts`): `resolve_rows` / `search_rows` (nicknames whose value is a chat id), `preferred(user, name)` (category `preferred`), `known_people(user)` (contact rows for the call-analysis prompt; empty without the kind) |
+| `contacts.py` | the user's saved contacts (table `whatsapp_contacts`): `resolve_rows` / `search_rows` (nicknames whose value is a chat id), `preferred(user, name)` (category `preferred`), `known_people(user)` (contact rows for the call-analysis prompt; empty without the addon) |
 | `accounts.py` | the account of each connection (one connection per account), the routing of inbound events (below), `blocked(conn)` |
 | `events.py` | inbound events: `handle_webhook(data)` → `process_event(conn, data)` |
 | `messages.py` | one message as a line of a read tool's result (below), the messages query |
@@ -29,7 +29,7 @@ connection; caches (name map, "me", dedupe) are keyed by `signature(conn)`.
 rows of the old `memories` table (a value that is a WhatsApp chat id, or a
 contact category / key) to the first admin, plus the preferred contacts
 the resolver had in its code. The rows in `memories` stay for
-the About kind's one-time import; the kind reads only its own table.
+the About addon's one-time import; the addon reads only its own table.
 
 **Reading.** `read_chat_messages` and `get_latest_messages` print every
 message through `messages.format_message`: `[time] **sender**: content (id:
@@ -55,9 +55,9 @@ reported as "no message with id". The approval card shows the recipient,
 a `@lid` chat). `send_whatsapp_file` stays for files at a public URL.
 
 **Saving a file to a project.** `save_whatsapp_file(chat_id, message_id,
-item_id, note)` (needs the knowledge kind; a write with Undo) downloads that
+item_id, note)` (needs the knowledge addon; a write with Undo) downloads that
 message's media through WAHA (`downloadMedia=true`) and attaches it to the
-project entry `item_id` (`integrations/knowledge/files.py`, source
+project entry `item_id` (`addons/knowledge/files.py`, source
 `whatsapp`); the file keeps its name, or gets the chat's name and the
 message's time. A voice note is transcribed onto the file. Docs/knowledge.md
 → Sections, decisions and files.
@@ -102,7 +102,7 @@ dropped; it never reaches the model).
   it; otherwise dropped.
 - **The account** is the `me.id` of the connection's session in WAHA's
   `GET {url}/sessions` (the entry whose `name` is the session). It is learned
-  right after the integration is connected or its credentials change (the old
+  right after the addon is connected or its credentials change (the old
   account is forgotten first), by `accounts.account_loop()` (started with the
   web server: connections without one, now and every minute; WAHA being down
   only delays it), and lazily as above.
@@ -110,16 +110,16 @@ dropped; it never reaches the model).
   `m0019_whatsapp_account_claims`). Storing a learned account is a claim,
   checked and written in one transaction: when another user's connection
   already holds the same account, this connection gets none and the reported
-  account is kept in `integrations.account_conflict` (a warning in the log
+  account is kept in `addons.account_conflict` (a warning in the log
   names both user ids, no message content). Such a connection is never
   routed to and every WhatsApp tool answers "This WhatsApp account is already
   connected by another user, so WhatsApp can't be used here." without a WAHA
-  request (`Integration(blocked=accounts.blocked)`). It is still asked like
+  request (`Addon(blocked=accounts.blocked)`). It is still asked like
   any connection without an account, so the conflict clears by itself when
   its WAHA reports another account (or the holder disconnects); a
   credentials change forgets both and asks again. Admins see it in `GET
-  /api/integrations/whatsapp?user=<id>` (`account_conflict`, present only
-  then) and `bin/users.py integrations show <user>`. This is what stops a
+  /api/addons/whatsapp?user=<id>` (`account_conflict`, present only
+  then) and `bin/users.py addons show <user>`. This is what stops a
   member's own WAHA (allowed by `MEMBER_ALLOWED_ORIGINS`) from claiming the
   admin's number, and the admin's session being used under a second hostname
   of the same WAHA (the session check compares address strings).
@@ -127,7 +127,7 @@ dropped; it never reaches the model).
   incoming 1:1 `audio/*` voice notes (`ptt`) are downloaded from the user's
   WAHA, transcribed with `core/llm.transcribe` (`source="whatsapp"`, usage
   theirs), then delivered to the phone (`events._notify_phone`: the one phone
-  seam; phone push is not per user yet, so only a user with the `phone` kind
+  seam; phone push is not per user yet, so only a user with the `phone` addon
   gets it) and to Telegram (`core.notify.whatsapp_voice(user, chat_id, …)`,
   the chat of their `voice_telegram_chat_id` setting; none set: logged, not
   sent). Groups, outgoing and non-voice messages are ignored; redelivered
@@ -141,11 +141,11 @@ dropped; it never reaches the model).
   their user), so old buttons report "expired" after a restart. At startup
   the adapter logs, per user with WhatsApp, where their transcripts go
   (`report_whatsapp_voice_chats`; a missing / malformed setting is a warning).
-- Tests: `python test_waha_voice.py` (the pipeline, all network calls mocked),
-  `python test_whatsapp_users.py` (two fake WAHA instances: tools, caches,
+- Tests: `bin/test test_waha_voice` (the pipeline, all network calls mocked),
+  `bin/test test_whatsapp_users` (two fake WAHA instances: tools, caches,
   contacts, images, reading with ids and file names, forwarding, accounts,
-  routing, Summarize per user), `python
-  test_security.py` (one connection per account).
+  routing, Summarize per user), `bin/test
+  test_security` (one connection per account).
 
 **To verify against the real WAHA before relying on it** (the fake follows
 WAHA's documentation, not a live instance): that webhook bodies carry the

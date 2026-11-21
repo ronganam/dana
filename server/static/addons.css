@@ -1,0 +1,118 @@
+/* Addons screen (static/addons.js). App tokens from styles.css; state colours reuse the app's
+   own (listening green = connected, medium priority amber = needs attention), always with a text label. */
+#panel-addons { --itg-ok: var(--listening-green); --itg-warn: var(--prio-medium); --itg-bad: var(--prio-high); }
+.itg-scroll { flex: 1; overflow-y: auto; padding: 18px 20px 60px; }
+.itg-inner { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px; }
+
+/* Who is signed in, whose addons */
+#itg-head { display: flex; flex-direction: column; gap: 12px; }
+#itg-head:empty { display: none; }
+.itg-who { display: flex; align-items: center; gap: 12px; }
+.itg-avatar { width: 40px; height: 40px; border-radius: var(--radius-full); background: var(--canvas-raised); border: 1px solid var(--hairline-strong);
+  display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--ink); flex-shrink: 0; }
+.itg-who-text { display: flex; flex-direction: column; min-width: 0; }
+.itg-who-name { font-size: 15px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.itg-who-sub { font-size: 12px; color: var(--mute); }
+.itg-level { font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .5px; font-size: 11px; color: var(--body-strong); }
+.itg-picker { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 500; color: var(--body-strong); }
+.itg-picker select { max-width: 360px; }
+.itg-banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border-radius: var(--radius-card);
+  border: 1px solid var(--itg-warn); background: rgba(255,149,0,.10); color: var(--ink); font-size: 13px; line-height: 1.4; }
+.itg-banner svg { width: 16px; height: 16px; color: var(--itg-warn); flex-shrink: 0; }
+.itg-banner span { flex: 1; min-width: 180px; }
+
+/* Groups and rows */
+#itg-list { display: flex; flex-direction: column; gap: 22px; }
+.itg-group { display: flex; flex-direction: column; gap: 8px; }
+.itg-group-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; font-size: 12px; font-weight: 600; color: var(--body-strong);
+  text-transform: uppercase; letter-spacing: .5px; font-family: var(--font-mono); }
+.itg-group-head em { font-style: normal; font-weight: 400; text-transform: none; letter-spacing: 0; font-family: var(--font-inter); color: var(--mute); }
+.itg-card { border: 1px solid var(--hairline); border-radius: var(--radius-card); background: var(--canvas); }
+.itg-rows { display: flex; flex-direction: column; overflow: hidden; }
+.itg-row { border-bottom: 1px solid var(--hairline); }
+.itg-row:last-child { border-bottom: 0; }
+.itg-row-head { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: none; border: 0; color: var(--ink);
+  text-align: start; font: inherit; }
+button.itg-row-head { cursor: pointer; }
+button.itg-row-head:hover { background: var(--canvas-soft); }
+.itg-row.open > .itg-row-head { background: var(--canvas-soft); }
+.itg-icon { width: 34px; height: 34px; border-radius: var(--radius-lg); background: var(--canvas-soft); border: 1px solid var(--hairline);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0; color: var(--body-strong); }
+.itg-icon svg { width: 17px; height: 17px; }
+.itg-row-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1; }
+.itg-row-name { font-size: 14px; font-weight: 500; }
+.itg-row-desc { font-size: 12px; color: var(--mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.itg-row-meta { display: flex; gap: 8px; flex-wrap: wrap; font-size: 12px; color: var(--body); font-family: var(--font-mono); overflow-wrap: anywhere; }
+.itg-conflict { font-family: var(--font-inter); color: var(--itg-warn); }
+.itg-state { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--mute); white-space: nowrap; flex-shrink: 0; }
+.itg-dot { width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--hairline-strong); }
+.itg-state.connected { color: var(--body-strong); }
+.itg-state.connected .itg-dot { background: var(--itg-ok); }
+.itg-state.attention { color: var(--itg-warn); }
+.itg-state.attention .itg-dot { background: var(--itg-warn); }
+.itg-chev { width: 16px; height: 16px; color: var(--mute); flex-shrink: 0; transition: transform .15s; }
+.itg-row.open .itg-chev { transform: rotate(180deg); }
+.itg-row.flat .itg-row-head .chip { flex-shrink: 0; }
+.itg-connect { color: var(--ink); border-color: var(--hairline-strong); }
+.itg-row-status { margin: -4px 14px 12px 60px; }
+
+/* An addon's detail */
+.itg-detail { display: flex; flex-direction: column; gap: 14px; padding: 4px 14px 16px 60px; background: var(--canvas-soft); }
+.itg-fields { display: flex; flex-direction: column; gap: 14px; }
+.itg-field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.itg-field .settings-input { width: 100%; font-family: var(--font-inter); }
+.itg-field input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+.itg-field input[type="number"]::-webkit-inner-spin-button, .itg-field input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.itg-flabel-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.itg-flabel { font-size: 12px; font-weight: 500; color: var(--body-strong); }
+.itg-flabel em { font-style: normal; font-weight: 400; color: var(--mute); margin-inline-start: 4px; }
+.itg-set { font-size: 11px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .5px; color: var(--mute); }
+.itg-set.on { color: var(--itg-ok); }
+.itg-help { font-size: 12px; color: var(--mute); line-height: 1.4; }
+.itg-rule { font-size: 12px; color: var(--body); line-height: 1.4; }
+.itg-ferr { font-size: 12.5px; color: var(--itg-bad); line-height: 1.4; overflow-wrap: anywhere; }
+.itg-remove { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--body); cursor: pointer; }
+.itg-remove input { accent-color: var(--ink); }
+.itg-ro { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 9px 12px;
+  border: 1px dashed var(--hairline-strong); border-radius: var(--radius-md); }
+.itg-ro-val { font-size: 14px; color: var(--ink); overflow-wrap: anywhere; min-width: 0; }
+.itg-ro-val.none { color: var(--mute); }
+.itg-lock { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--mute); white-space: nowrap; }
+.itg-lock svg { width: 13px; height: 13px; }
+.itg-note { display: flex; gap: 8px; align-items: flex-start; padding: 8px 12px; border-radius: var(--radius-card); background: var(--canvas);
+  border: 1px solid var(--hairline); color: var(--body); font-size: 12.5px; line-height: 1.4; }
+.itg-note.warn { background: rgba(255,149,0,.08); border-color: rgba(255,149,0,.35); color: var(--itg-warn); }
+.itg-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 1px; }
+.itg-opts { font-size: 12px; color: var(--mute); }
+.itg-opts:empty { display: none; }
+.itg-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.itg-actions.end { justify-content: flex-end; }
+.itg-actions:empty { display: none; }
+.itg-actions svg { width: 14px; height: 14px; }
+.itg-actions button[disabled], .itg-row .chip[disabled] { opacity: .55; cursor: default; transform: none; }
+.itg-disconnect { margin-inline-start: auto; }
+.itg-status { font-size: 13px; color: var(--body); line-height: 1.4; overflow-wrap: anywhere; }
+.itg-status.ok { color: var(--itg-ok); }
+.itg-status.bad { color: var(--itg-bad); }
+
+/* States */
+.itg-skel { height: 220px; border-radius: var(--radius-card); background: var(--canvas-soft); animation: itg-pulse 1.2s ease-in-out infinite; }
+.itg-skel.short { height: 120px; }
+@keyframes itg-pulse { 50% { opacity: .5; } }
+.itg-error { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; color: var(--body); font-size: 13.5px; }
+.itg-error strong { color: var(--ink); }
+.itg-confirm p { font-size: 13.5px; color: var(--body); line-height: 1.5; margin: 0 0 16px; }
+
+@media (max-width: 767px) {
+  .itg-scroll { padding: 14px 16px 90px; }
+  .itg-row-head { padding: 12px; gap: 10px; }
+  .itg-detail { padding: 4px 12px 16px; }
+  .itg-row-status { margin: -4px 12px 12px; }
+  .itg-row-desc { white-space: normal; }
+  .itg-state { font-size: 11.5px; }
+  .itg-disconnect { margin-inline-start: 0; }
+  .itg-picker select { max-width: none; }
+}
+@media (prefers-reduced-motion: reduce) { .itg-skel { animation: none; } .itg-chev { transition: none; } }
+/* The Google sign-in is a link styled as a button. */
+.itg-actions a.btn-primary { display: inline-flex; align-items: center; text-decoration: none; }

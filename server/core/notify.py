@@ -9,9 +9,9 @@ The core never imports the Telegram adapter: at startup the adapter
 (core/telegram_bot.py) registers itself with :func:`register_telegram` as a
 :class:`TelegramChannel`. The same channel also renders a user's inbound
 WhatsApp voice transcripts (:func:`whatsapp_voice`, sent to the chat their
-``whatsapp`` integration names in its ``voice_telegram_chat_id`` setting).
+``whatsapp`` addon names in its ``voice_telegram_chat_id`` setting).
 
-Phone push (integrations/phone/push.py, ``push.send(user, ...)``) is separate for
+Phone push (addons/phone/push.py, ``push.send(user, ...)``) is separate for
 now; docs/access.md describes ``notify`` growing to "the user's phone if they
 have one".
 """

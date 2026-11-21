@@ -1,10 +1,10 @@
 """Wake briefing + meeting context cards, per user.
 
 A user's briefing is built once a day when they are confirmed awake (the wake
-signal in core/wake.py), from their own kinds only: today's calendar, tasks
+signal in core/wake.py), from their own addons only: today's calendar, tasks
 due or overdue, pending suggestions, the Inbox briefing (already cached), the
 weather from their Home Assistant and people nudges (birthdays, people they
-usually talk to but haven't lately); a kind they have not connected adds
+usually talk to but haven't lately); an addon they have not connected adds
 nothing. The model turns that into a headline + a few points, written for
 them (``core/user_profile.for_user``); if it fails, a plain version is
 written from the same data. One row per user and local date in
@@ -12,7 +12,7 @@ written from the same data. One row per user and local date in
 widgets / bedroom dashboard from ``GET /api/briefing/today``.
 
 Who gets one (:func:`available`): a user with ``phone``, or with a Telegram
-chat and at least one kind that has something to say. If no wake is seen by
+chat and at least one addon that has something to say. If no wake is seen by
 ``BRIEFING_FALLBACK_TIME`` (10:00) each such user's briefing is made anyway
 (not pushed) so the app and widgets have it.
 
@@ -36,16 +36,16 @@ from core import clock, composers, llm, user_profile, users
 from core.db import get_db_connection
 from core.notify import notify
 from core.users import User
-from integrations.calendar import config as calendar_config, events as calendar_events
-from integrations.framework import store
-from integrations.homeassistant import client as ha_client, config as ha_config
-from integrations.people import cadence as people_cadence, detail as people_detail, store as people_store
-from integrations.people.values import KIND as PEOPLE
-from integrations.phone import push as phone_push
-from integrations.phone.config import KIND as PHONE
-from integrations.phone.notifications import store as notification_store, summary as notification_summary
-from integrations.tasks import service as tasks_service
-from integrations.tasks.service import KIND as TASKS
+from addons.calendar import config as calendar_config, events as calendar_events
+from core.addons import store
+from addons.homeassistant import client as ha_client, config as ha_config
+from addons.people import cadence as people_cadence, detail as people_detail, store as people_store
+from addons.people.values import ADDON as PEOPLE
+from addons.phone import push as phone_push
+from addons.phone.config import ADDON as PHONE
+from addons.phone.notifications import store as notification_store, summary as notification_summary
+from addons.tasks import service as tasks_service
+from addons.tasks.service import ADDON as TASKS
 
 
 logger = logging.getLogger(__name__)
@@ -57,10 +57,10 @@ MEETING_CARD_MINUTES = int(os.getenv("MEETING_CARD_MINUTES", "10"))
 MEETING_CARDS = os.getenv("MEETING_CARDS", "1") != "0"
 MEETING_BACKOFF_SECONDS = 900
 
-# Kinds whose data a briefing is made of (with nothing of these there is nothing to say).
-CONTENT_KINDS = (PHONE, calendar_config.KIND, TASKS, PEOPLE, ha_config.KIND)
+# Addons whose data a briefing is made of (with nothing of these there is nothing to say).
+CONTENT_KINDS = (PHONE, calendar_config.ADDON, TASKS, PEOPLE, ha_config.ADDON)
 # Who meeting cards are for: the event comes from their calendar, the card goes to their phone.
-MEETING_KINDS = (calendar_config.KIND, PHONE)
+MEETING_KINDS = (calendar_config.ADDON, PHONE)
 
 # user id → the lock that keeps one build of their briefing at a time.
 _build_locks: Dict[str, asyncio.Lock] = {}
@@ -72,10 +72,10 @@ _meeting_backoff: Dict[str, float] = {}
 
 def available(user: Optional[User]) -> bool:
     """Whether ``user`` gets a briefing: ``phone`` connected (pushed there), or
-    a Telegram chat to send it to and at least one kind with something to say."""
+    a Telegram chat to send it to and at least one addon with something to say."""
     if user is None:
         return False
-    mine = store.connected_kinds(user)
+    mine = store.connected_addons(user)
     if PHONE in mine:
         return True
     return user.telegram_chat_id is not None and any(k in mine for k in CONTENT_KINDS)
@@ -125,7 +125,7 @@ def _hhmm(iso: Optional[str]) -> str:
 async def _events_today(user: User) -> Optional[List[Dict[str, Any]]]:
     """``user``'s events today (remaining and past); None when their
     calendar isn't reachable or they have none."""
-    conn = store.get(user, calendar_config.KIND)
+    conn = store.get(user, calendar_config.ADDON)
     if conn is None:
         return None
     try:
@@ -145,7 +145,7 @@ async def _events_today(user: User) -> Optional[List[Dict[str, Any]]]:
 
 
 def _tasks(conn, user: User, today: str) -> Dict[str, Any]:
-    # The user's tasks (none without the tasks integration).
+    # The user's tasks (none without the tasks addon).
     where, args = tasks_service.visible_sql(user, "")
     rows = conn.execute(
         "SELECT id, title, priority, due_date, triggers FROM tasks WHERE status = 'needs_action' "
@@ -203,7 +203,7 @@ async def weather(user: User) -> Optional[Dict[str, Any]]:
     """``user``'s weather (their Home Assistant ``weather_entity``):
     condition and temperature, today's high / low / rain chance when the
     forecast answers. None without Home Assistant or when it fails."""
-    conn = store.get(user, ha_config.KIND)
+    conn = store.get(user, ha_config.ADDON)
     entity = ha_config.setting(conn, ha_config.WEATHER) if conn is not None else None
     if conn is None or not entity:
         return None
@@ -243,7 +243,7 @@ def _people(user: User) -> Dict[str, Any]:
 
 
 async def gather(user: User) -> Dict[str, Any]:
-    """What ``user``'s briefing is made of, from their own kinds."""
+    """What ``user``'s briefing is made of, from their own addons."""
     now = clock.now()
     today = now.date().isoformat()
     events, weather_now = await asyncio.gather(_events_today(user), weather(user))
@@ -438,7 +438,7 @@ async def check_meetings(user: User, now: Optional[datetime.datetime] = None) ->
     """Push the card of anyone named in an event of ``user``'s calendar
     starting within MEETING_CARD_MINUTES to their phone (nothing without
     their calendar and phone; no card without their people)."""
-    conn = store.get(user, calendar_config.KIND)
+    conn = store.get(user, calendar_config.ADDON)
     if conn is None or not store.is_connected(user, PHONE):
         return 0
     now = now or clock.now()

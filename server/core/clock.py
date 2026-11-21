@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 _timezone: Optional[zoneinfo.ZoneInfo] = None
 # How to ask a user's Home Assistant for its zone: registered by the
-# homeassistant kind (integrations/homeassistant/client.py) when it is imported.
+# homeassistant addon (addons/homeassistant/client.py) when it is imported.
 _home_assistant_zone: Optional[Callable[[User], Optional[str]]] = None
 
 

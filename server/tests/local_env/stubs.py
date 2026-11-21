@@ -186,7 +186,7 @@ AISLE_WORDS = {
 
 
 def shopping_aisles(prompt: str, schema: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """The shopping aisle lookup (integrations/shopping/aisles.py): every item
+    """The shopping aisle lookup (addons/shopping/aisles.py): every item
     under "Items:" with an aisle picked by a few known words, else ``pantry``.
     None for any other structured request."""
     items = (schema.get("properties") or {}).get("items", {}).get("items", {})

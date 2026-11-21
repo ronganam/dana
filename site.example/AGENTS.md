@@ -14,6 +14,6 @@ Notes about this site for you and for coding agents. The repository's `AGENTS.md
 | Device | Serial / address | How to install |
 |---|---|---|
 
-## Plugins
+## Addons
 
-- `plugins/<kind>`: what it is for.
+- `addons/<name>`: what it is for.

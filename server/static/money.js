@@ -358,8 +358,8 @@
     const root = $("mny-root");
     if (S.enabled === false) {
       root.innerHTML = `<div class="mny-off mny-card"><span class="mny-off-icon">${icon("wallet")}</span><h2>Money is off</h2>
-        <p>Turn on Money in Integrations to bring in your bank and card transactions.</p>
-        <button class="btn-primary" data-act="integrations">${icon("plug")}<span>Open Integrations</span></button></div>`;
+        <p>Turn on Money in Addons to bring in your bank and card transactions.</p>
+        <button class="btn-primary" data-act="addons">${icon("plug")}<span>Open Addons</span></button></div>`;
       icons();
       return;
     }
@@ -1356,7 +1356,7 @@
 
   function act(a, n) {
     switch (a) {
-      case "integrations": window.danaSwitchTab?.("integrations"); break;
+      case "addons": window.danaSwitchTab?.("addons"); break;
       case "retry": S.error = ""; loadAll(); break;
       case "retry-tx": loadTxns(); break;
       case "this-month": setMonth(thisMonth()); break;

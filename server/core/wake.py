@@ -1,5 +1,5 @@
 """The wake flow: one daily "the user is up" event per user → their
-wake-trigger tasks (``integrations.tasks.triggers.fire(user, "wake")``) and
+wake-trigger tasks (``addons.tasks.triggers.fire(user, "wake")``) and
 their morning briefing (docs/people.md, "Wake detection"). A composer: the
 phone's unlock signal plus the phone's screen history from the user's Home
 Assistant (their ``phone_interactive_sensor`` setting). Only for a user with
@@ -19,10 +19,10 @@ from typing import Dict, List, Optional
 from core import briefing, clock, composers, users
 from core.db import get_db_connection
 from core.users import User
-from integrations.framework import store
-from integrations.homeassistant import client as ha_client, config as ha_config
-from integrations.phone import config as phone_config
-from integrations.tasks import triggers
+from core.addons import store
+from addons.homeassistant import client as ha_client, config as ha_config
+from addons.phone import config as phone_config
+from addons.tasks import triggers
 
 logger = logging.getLogger(__name__)
 
@@ -42,9 +42,9 @@ WAKE_WINDOW = (int(os.getenv("WAKE_WINDOW_START_HOUR", "5")), int(os.getenv("WAK
 WAKE_FALLBACK_SECONDS = int(os.getenv("WAKE_FALLBACK_SECONDS", "360"))
 WAKE_FALLBACK_SESSIONS = int(os.getenv("WAKE_FALLBACK_SESSIONS", "3"))
 WAKE_POLL_SECONDS = int(os.getenv("WAKE_POLL_SECONDS", "300"))
-# The kinds the wake flow needs: the phone (unlock signal, briefing push) and
+# The addons the wake flow needs: the phone (unlock signal, briefing push) and
 # Home Assistant (the screen history).
-KINDS = (phone_config.KIND, ha_config.KIND)
+ADDONS = (phone_config.ADDON, ha_config.ADDON)
 SIGNAL_MARK = "wake_signal"
 
 # user id → the local date a confirmation check is running for.
@@ -53,7 +53,7 @@ _pending: Dict[str, str] = {}
 
 def available(user: Optional[User]) -> bool:
     """Whether the wake flow runs for ``user`` (``phone`` and ``homeassistant`` connected)."""
-    return user is not None and composers.has_all(user, KINDS)
+    return user is not None and composers.has_all(user, ADDONS)
 
 
 def done_today(user: User, today: str) -> bool:
@@ -72,7 +72,7 @@ async def _screen_sessions(user: User, since_utc: datetime.datetime,
     """Seconds of each screen-on stretch of ``user``'s phone screen sensor in
     [since, until], from their Home Assistant's history. None when it can't
     be asked (no Home Assistant, no screen sensor set, HA failing)."""
-    conn = store.get(user, ha_config.KIND)
+    conn = store.get(user, ha_config.ADDON)
     entity = ha_config.setting(conn, ha_config.SCREEN_SENSOR) if conn is not None else None
     if conn is None or not entity:
         return None

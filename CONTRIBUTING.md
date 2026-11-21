@@ -31,8 +31,8 @@ cd android
 ./gradlew :app:testPhoneDebugUnitTest :wear:testDebugUnitTest
 ```
 
-- Server tests are standalone scripts (`test_*.py`, `test_*.mjs`), not pytest. Each starts with `import testenv; testenv.isolate("<name>")`, which gives it a clean environment and a throwaway database. Assert on data, not just status codes; a per-user feature gets checked with two users and one without it.
-- Never put real people, phone numbers, addresses, accounts or money data in tests or fixtures: use made-up ones (`server/testenv.py`).
+- Server tests are standalone scripts (`test_*.py`, `test_*.mjs`), not pytest: core tests in `server/tests/`, each addon's in `server/addons/<name>/tests/`. Each starts with `import testenv; testenv.isolate("<name>")`, which gives it a clean environment and a throwaway database. Assert on data, not just status codes; a per-user feature gets checked with two users and one without it.
+- Never put real people, phone numbers, addresses, accounts or money data in tests or fixtures: use made-up ones (`server/tests/testenv.py`).
 - `bin/local-env.sh` runs the real image against stub services for end-to-end checks ([`server/docs/local-testing.md`](server/docs/local-testing.md)).
 
 ## Conventions
@@ -42,7 +42,7 @@ cd android
 - A server payload change that a client reads updates that client (and its fixtures) in the same pull request.
 - User-facing text calls the assistant Dana; internal identifiers that start with `ganam` stay as they are ([`AGENTS.md`](AGENTS.md)).
 - No new dependency without a reason in the pull request.
-- Something only your own deployment needs belongs in your site (a plugin, a setting), not in Dana's code; a missing extension point is a welcome pull request ([`docs/site.md`](docs/site.md)).
+- Something only your own deployment needs belongs in your site (a site addon, a setting), not in Dana's code; a missing extension point is a welcome pull request ([`docs/site.md`](docs/site.md)).
 
 ## Pull requests
 

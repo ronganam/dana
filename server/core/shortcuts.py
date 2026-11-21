@@ -22,7 +22,7 @@ removed, surrounding punctuation and extra whitespace dropped. Nothing else —
 Learned phrases belong to a user: learned from, matched, listed and deleted
 per user (table ``shortcuts``, phrase unique per user). A phrase is learned
 for, and runs, only a tool the user has now (docs/access.md, "Enforcement"):
-when its integration is gone the message goes to the model as if no phrase
+when its addon is gone the message goes to the model as if no phrase
 matched (and the model's answer then counts as a different outcome).
 
 ``SHORTCUTS=0`` turns learning and use off. Routes: core/actions_api.py.
@@ -39,8 +39,8 @@ from typing import Any, Dict, List, Optional, Sequence
 from core import users
 from core.db import get_db_connection
 from core.users import User
-from integrations.framework import registry
-from integrations.homeassistant import home_map
+from core.addons import registry
+from addons.homeassistant import home_map
 
 logger = logging.getLogger(__name__)
 

@@ -26,14 +26,14 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 from core import users
 from core.text import escape_markdown
-from integrations.calendar import today as calendar_today
-from integrations.contacts import store as contacts_store
-from integrations.framework import store as integrations_store
-from integrations.gmail import compose as gmail_compose, content as gmail_content, seen as gmail_seen
-from integrations.gmail.config import KIND as GMAIL
-from integrations.knowledge import entries as knowledge_entries, projects as knowledge_projects
-from integrations.people import store as people_store
-from integrations.tasks import service as tasks_service
+from addons.calendar import today as calendar_today
+from addons.contacts import store as contacts_store
+from core.addons import store as addon_store
+from addons.gmail import compose as gmail_compose, content as gmail_content, seen as gmail_seen
+from addons.gmail.config import ADDON as GMAIL
+from addons.knowledge import entries as knowledge_entries, projects as knowledge_projects
+from addons.people import store as people_store
+from addons.tasks import service as tasks_service
 
 Fact = Tuple[str, str]
 
@@ -182,12 +182,12 @@ def _send_email(a: Dict[str, Any]) -> Dict[str, Any]:
 
 def _reply_to_email(a: Dict[str, Any]) -> Dict[str, Any]:
     """Who the reply goes to, from the headers the user's Gmail tools read
-    (integrations/gmail/seen.py); the message's id when they are not known."""
+    (addons/gmail/seen.py); the message's id when they are not known."""
     everyone = gmail_compose.flag(a.get("reply_all"))
     try:
         user = users.current()
         original = gmail_seen.get(user, a.get("message_id"))
-        conn = integrations_store.get(user, GMAIL) if user is not None and original else None
+        conn = addon_store.get(user, GMAIL) if user is not None and original else None
         reply = gmail_compose.reply(original, (conn.account if conn else "") or "", a.get("body"), everyone) \
             if original else None
     except Exception:

@@ -12,13 +12,13 @@ load_dotenv()
 from core.telegram_bot import TelegramBot
 from core.server import start_webhook_listener
 from core import clock, db, llm, session_runner, users
-from integrations.about import facts as about_facts, legacy as about_legacy
-from integrations.tasks import groups as task_groups
-from integrations.shopping import lists as shopping_lists
+from addons.about import facts as about_facts, legacy as about_legacy
+from addons.tasks import groups as task_groups
+from addons.shopping import lists as shopping_lists
 from core.paths import DATA_DIR, ensure_data_dirs
-from integrations import bootstrap as integrations_bootstrap
-from integrations.framework import registry, store
-from integrations.framework.crypto import CredentialsKeyError
+from addons import bootstrap as addons_bootstrap
+from core.addons import registry, store
+from core.addons.crypto import CredentialsKeyError
 
 # Setup logging
 logging.basicConfig(
@@ -44,10 +44,10 @@ async def main():
     if applied:
         logger.info(f"Database migrated: {', '.join(applied)}")
     users.bootstrap()
-    # Integrations: the credentials key, then the first admin's integrations
-    # from env (once per kind). A missing or wrong key stops the start here.
+    # Addons: the credentials key, then the first admin's addons
+    # from env (once per addon). A missing or wrong key stops the start here.
     try:
-        integrations_bootstrap.bootstrap()
+        addons_bootstrap.bootstrap()
     except CredentialsKeyError as e:
         logger.error(str(e))
         sys.exit(1)
@@ -64,9 +64,9 @@ async def main():
     # never resolved lazily with a blocking call inside the event loop.
     clock.get_timezone()
     
-    # 1. Each user's integrations and the first admin's tools (every kind registered on import)
+    # 1. Each user's addons and the first admin's tools (every addon registered on import)
     for user in users.list_users():
-        logger.info(f"User {user.id} ({user.access}): {', '.join(store.connected_kinds(user))}")
+        logger.info(f"User {user.id} ({user.access}): {', '.join(store.connected_addons(user))}")
     admin = users.first_admin()
     tools = registry.tool_schemas(admin) if admin is not None else []
     logger.info(f"The first admin's tools ({len(tools)}):")

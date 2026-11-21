@@ -1,4 +1,4 @@
-"""HTTP routes for sharing an item (integrations/framework/sharing.py; docs/access.md, "Sharing").
+"""HTTP routes for sharing an item (core/addons/sharing.py; docs/access.md, "Sharing").
 
     GET /api/sharing/{item_type}/{id}  → {item_type, id, title, owner: {id, name},
                                           shared_with: [{user_id, name, level}],
@@ -7,7 +7,7 @@
 
 Owner only. An item the caller cannot see answers 404 like a missing one; an
 item shared with them (not theirs) answers 403 ``owner_only``. The caller
-needs the item type's kind connected (403 ``not_connected``). ``users`` lists
+needs the item type's addon connected (403 ``not_connected``). ``users`` lists
 the other users it can be shared with. Loaded by core/server.py (``setup(app)``).
 """
 
@@ -19,7 +19,7 @@ from aiohttp import web
 from core import users
 from core.auth import request_user
 from core.users import User
-from integrations.framework import sharing, store
+from core.addons import sharing, store
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ def _resolve(request: web.Request) -> Tuple[Optional[Tuple[User, sharing.ItemTyp
         t = sharing.item_type(request.match_info["item_type"])
     except KeyError:
         return None, web.json_response({"error": "Unknown item type"}, status=404)
-    store.require(user, t.kind)
+    store.require(user, t.addon)
     item_id = request.match_info["id"]
     level = sharing.access(user, t.name, item_id)
     if level is None:

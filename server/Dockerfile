@@ -1,3 +1,7 @@
+# The site's own addons (docs/site.md): empty unless bin/deploy passes
+# --build-context site_addons=<folder>, which replaces this stage.
+FROM scratch AS site_addons
+
 # Use an official, lightweight Python base image
 FROM python:3.14-slim AS base
 
@@ -36,11 +40,11 @@ FROM base AS app
 COPY main.py .
 COPY VERSION .
 COPY core/ ./core/
-COPY integrations/ ./integrations/
+COPY addons/ ./addons/
 COPY static/ ./static/
-# Plugin kinds (docs/plugins.md): bin/deploy copies the ones kept outside the repository here.
-COPY plugins/ ./plugins/
-ENV DANA_PLUGIN_DIRS=/app/plugins
+# Site addons (docs/writing-an-addon.md): the ones bin/deploy brings from your site.
+COPY --from=site_addons / ./addons-site/
+ENV DANA_ADDON_DIRS=/app/addons-site
 # The user administration CLI (docs/access.md, "Managing users"): kubectl exec … python bin/users.py
 COPY bin/users.py ./bin/users.py
 # The release name bin/deploy builds ("<VERSION>-<commit>"): /api/health reports it and the

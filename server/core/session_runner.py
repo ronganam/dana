@@ -38,7 +38,7 @@ from core.session import (
     save_session_debug,
 )
 from core.users import User
-from integrations.framework import registry
+from core.addons import registry
 
 logger = logging.getLogger(__name__)
 
@@ -311,7 +311,7 @@ async def resume_agent_background(user: User, session_id: str, action: str, devi
                     tool_result_str = str(tool_result)
                     ok = True
                 except registry.ToolNotAvailable as e:
-                    # Checked again at resume: the integration was disconnected
+                    # Checked again at resume: the addon was disconnected
                     # since the card was shown. The model gets the same refusal
                     # as for a made-up tool and finishes the turn.
                     logger.info(f"Approved '{tool_name}' is no longer available to user {user.id}: {e}")

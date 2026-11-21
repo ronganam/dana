@@ -26,6 +26,7 @@ jobs:
           filters: |
             server:
               - 'server/**'
+              - 'examples/**'
               - '.github/workflows/ci.yml'
             android:
               - 'android/**'

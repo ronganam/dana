@@ -260,7 +260,7 @@ class RunManager:
 
 def _session_status(user_id: str, session_id: str) -> str:
     # Read directly (not through core.session, which sits above runs: it
-    # imports the integrations framework, whose kinds use core.llm → usage → runs).
+    # imports the addons framework, whose addons use core.llm → usage → runs).
     try:
         with get_db_connection() as conn:
             row = conn.execute("SELECT status FROM sessions WHERE user_id = ? AND session_id = ?",

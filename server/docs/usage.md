@@ -2,7 +2,7 @@
 
 What every model and decision-model call costs, where it came from, and what it was for. Web screen **Usage** (rail, or Settings → Usage & Cost on a phone; deep link `/#usage`).
 
-Code: `core/usage.py` (capture, storage, roll-up, reads), `core/usage_api.py` (routes), `static/usage.js` + `usage.css`. Tests: `python test_usage.py`, `python test_multi_user_core.py` (scoping).
+Code: `core/usage.py` (capture, storage, roll-up, reads), `core/usage_api.py` (routes), `static/usage.js` + `usage.css`. Tests: `bin/test test_usage`, `bin/test test_multi_user_core` (scoping).
 
 ## What is tracked
 
@@ -10,7 +10,7 @@ Code: `core/usage.py` (capture, storage, roll-up, reads), `core/usage_api.py` (r
 |---|---|---|---|
 | `llm` | agent chat (every ReAct step), `llm.complete` / `complete_json` jobs | LiteLLM callback | LiteLLM's price table, from the provider's token counts (cached and reasoning tokens included) |
 | `transcribe` | `llm.transcribe` (voice notes, calls, voice chat, media) | LiteLLM callback (`kind` set in the call's metadata, since a chat model hears the audio) | same |
-| `decision` | TypeSafe notification triage (`integrations/phone/notifications/triage.py`, as the notification's user) | `usage.record` in `triage.ask` | Jev bills **input tokens only**, $0.042 per million, output free (docs.typesafe.ai/models). Its API reports no usage, so input tokens are estimated from the request (`usage.estimate_tokens`, ~4 chars/token, ~1.5 for Hebrew); `TYPESAFE_COST_PER_MTOK` overrides the price |
+| `decision` | TypeSafe notification triage (`addons/phone/notifications/triage.py`, as the notification's user) | `usage.record` in `triage.ask` | Jev bills **input tokens only**, $0.042 per million, output free (docs.typesafe.ai/models). Its API reports no usage, so input tokens are estimated from the request (`usage.estimate_tokens`, ~4 chars/token, ~1.5 for Hebrew); `TYPESAFE_COST_PER_MTOK` overrides the price |
 | `realtime` | OpenAI realtime voice (`core/realtime.py`) | `response.done` and input-transcription events → `usage.record_realtime` | LiteLLM's table for the realtime model: text / audio / image tokens, cached input at its own rate; `whisper-1` per second |
 
 Failed calls are recorded too (`ok = 0`, error text, no cost). A call whose model has no price is **unpriced** (`cost` NULL), never counted as free: the screen shows how many there are and leaves them out of the total.

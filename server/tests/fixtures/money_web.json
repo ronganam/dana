@@ -1,0 +1,5849 @@
+{
+ "balance": {
+  "body": {
+   "forecast": {
+    "as_of": "2026-11-18",
+    "balance": 1234567,
+    "end": "2027-02-16",
+    "events": [
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": 17300,
+      "date": "2026-11-20",
+      "estimated": false,
+      "kind": "income",
+      "label": "קצבת ילדים"
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": -450000,
+      "date": "2026-11-20",
+      "estimated": false,
+      "kind": "fixed",
+      "label": "משכנתא לאומי"
+     },
+     {
+      "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+      "amount": -120000,
+      "date": "2026-11-25",
+      "estimated": false,
+      "items": [],
+      "kind": "card_bill",
+      "label": "Shared card",
+      "parts": {
+       "everyday": 0,
+       "fixed": 0,
+       "installments": 0,
+       "known": 120000,
+       "yearly": 0
+      },
+      "range": [
+       -120000,
+       -120000
+      ]
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": 1500000,
+      "date": "2026-12-10",
+      "estimated": false,
+      "kind": "income",
+      "label": "משכורת אופק"
+     },
+     {
+      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "amount": -386601,
+      "date": "2026-12-10",
+      "estimated": true,
+      "items": [
+       {
+        "amount": 4990,
+        "kind": "fixed",
+        "label": "NETFLIX.COM"
+       },
+       {
+        "amount": 6000,
+        "kind": "yearly",
+        "label": "NAMECHEAP"
+       }
+      ],
+      "kind": "card_bill",
+      "label": "Cal 8763",
+      "parts": {
+       "everyday": 30530,
+       "fixed": 4990,
+       "installments": 0,
+       "known": 345081,
+       "yearly": 6000
+      },
+      "range": [
+       -490609,
+       -356071
+      ]
+     },
+     {
+      "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+      "amount": -40000,
+      "date": "2026-12-10",
+      "estimated": false,
+      "items": [
+       {
+        "amount": 40000,
+        "kind": "installment",
+        "label": "KSP מחשבים"
+       }
+      ],
+      "kind": "card_bill",
+      "label": "Shared card",
+      "parts": {
+       "everyday": 0,
+       "fixed": 0,
+       "installments": 40000,
+       "known": 0,
+       "yearly": 0
+      },
+      "range": [
+       -40000,
+       -40000
+      ]
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": 17300,
+      "date": "2026-12-20",
+      "estimated": false,
+      "kind": "income",
+      "label": "קצבת ילדים"
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": -450000,
+      "date": "2026-12-20",
+      "estimated": false,
+      "kind": "fixed",
+      "label": "משכנתא לאומי"
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": 1500000,
+      "date": "2027-01-10",
+      "estimated": false,
+      "kind": "income",
+      "label": "משכורת אופק"
+     },
+     {
+      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "amount": -120958,
+      "date": "2027-01-10",
+      "estimated": true,
+      "items": [
+       {
+        "amount": 70900,
+        "kind": "installment",
+        "label": "ביטוח רכב ישיר"
+       },
+       {
+        "amount": 4990,
+        "kind": "fixed",
+        "label": "NETFLIX.COM"
+       }
+      ],
+      "kind": "card_bill",
+      "label": "Cal 8763",
+      "parts": {
+       "everyday": 45068,
+       "fixed": 4990,
+       "installments": 70900,
+       "known": 0,
+       "yearly": 0
+      },
+      "range": [
+       -274494,
+       -75890
+      ]
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": 17300,
+      "date": "2027-01-20",
+      "estimated": false,
+      "kind": "income",
+      "label": "קצבת ילדים"
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": -450000,
+      "date": "2027-01-20",
+      "estimated": false,
+      "kind": "fixed",
+      "label": "משכנתא לאומי"
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": 1500000,
+      "date": "2027-02-10",
+      "estimated": false,
+      "kind": "income",
+      "label": "משכורת אופק"
+     },
+     {
+      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "amount": -120958,
+      "date": "2027-02-10",
+      "estimated": true,
+      "items": [
+       {
+        "amount": 70900,
+        "kind": "installment",
+        "label": "ביטוח רכב ישיר"
+       },
+       {
+        "amount": 4990,
+        "kind": "fixed",
+        "label": "NETFLIX.COM"
+       }
+      ],
+      "kind": "card_bill",
+      "label": "Cal 8763",
+      "parts": {
+       "everyday": 45068,
+       "fixed": 4990,
+       "installments": 70900,
+       "known": 0,
+       "yearly": 0
+      },
+      "range": [
+       -274494,
+       -75890
+      ]
+     }
+    ],
+    "left_out": [],
+    "left_out_total": 0,
+    "low_point": {
+     "balance": 681867,
+     "date": "2026-11-25"
+    },
+    "plans": [
+     {
+      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "amount": 70900,
+      "dates": [
+       "2027-01-10",
+       "2027-02-10",
+       "2027-03-10"
+      ],
+      "left": 212700,
+      "merchant": "ביטוח רכב ישיר",
+      "number": 1,
+      "of": 4,
+      "total": 283600
+     },
+     {
+      "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+      "amount": 40000,
+      "dates": [
+       "2026-12-10"
+      ],
+      "left": 40000,
+      "merchant": "KSP מחשבים",
+      "number": 2,
+      "of": 3,
+      "total": 120000
+     }
+    ],
+    "rates": {
+     "bank": 0,
+     "card": {
+      "high": 195000,
+      "low": 0,
+      "months": [
+       {
+        "bank": 0,
+        "card": 0,
+        "month": "2026-05"
+       },
+       {
+        "bank": 0,
+        "card": 0,
+        "month": "2026-06"
+       },
+       {
+        "bank": 0,
+        "card": 0,
+        "month": "2026-07"
+       },
+       {
+        "bank": 0,
+        "card": 0,
+        "month": "2026-08"
+       },
+       {
+        "bank": 0,
+        "card": 195000,
+        "month": "2026-09"
+       },
+       {
+        "bank": 0,
+        "card": 177000,
+        "month": "2026-10"
+       }
+      ],
+      "typical": 44250
+     }
+    },
+    "series": [
+     {
+      "balance": 1234567,
+      "date": "2026-11-18",
+      "high": 1234567,
+      "low": 1234567
+     },
+     {
+      "balance": 1234567,
+      "date": "2026-11-19",
+      "high": 1234567,
+      "low": 1234567
+     },
+     {
+      "balance": 801867,
+      "date": "2026-11-20",
+      "high": 801867,
+      "low": 801867
+     },
+     {
+      "balance": 801867,
+      "date": "2026-11-21",
+      "high": 801867,
+      "low": 801867
+     },
+     {
+      "balance": 801867,
+      "date": "2026-11-22",
+      "high": 801867,
+      "low": 801867
+     },
+     {
+      "balance": 801867,
+      "date": "2026-11-23",
+      "high": 801867,
+      "low": 801867
+     },
+     {
+      "balance": 801867,
+      "date": "2026-11-24",
+      "high": 801867,
+      "low": 801867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-11-25",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-11-26",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-11-27",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-11-28",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-11-29",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-11-30",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-12-01",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-12-02",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-12-03",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-12-04",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-12-05",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-12-06",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-12-07",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-12-08",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 681867,
+      "date": "2026-12-09",
+      "high": 681867,
+      "low": 681867
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-10",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-11",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-12",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-13",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-14",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-15",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-16",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-17",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-18",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1755266,
+      "date": "2026-12-19",
+      "high": 1785796,
+      "low": 1651258
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-20",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-21",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-22",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-23",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-24",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-25",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-26",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-27",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-28",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-29",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-30",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2026-12-31",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2027-01-01",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2027-01-02",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2027-01-03",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2027-01-04",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2027-01-05",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2027-01-06",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2027-01-07",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2027-01-08",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 1322566,
+      "date": "2027-01-09",
+      "high": 1353096,
+      "low": 1218558
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-10",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-11",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-12",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-13",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-14",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-15",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-16",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-17",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-18",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2701608,
+      "date": "2027-01-19",
+      "high": 2777206,
+      "low": 2444064
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-20",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-21",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-22",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-23",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-24",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-25",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-26",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-27",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-28",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-29",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-30",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-01-31",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-02-01",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-02-02",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-02-03",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-02-04",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-02-05",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-02-06",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-02-07",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-02-08",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 2268908,
+      "date": "2027-02-09",
+      "high": 2344506,
+      "low": 2011364
+     },
+     {
+      "balance": 3647950,
+      "date": "2027-02-10",
+      "high": 3768616,
+      "low": 3236870
+     },
+     {
+      "balance": 3647950,
+      "date": "2027-02-11",
+      "high": 3768616,
+      "low": 3236870
+     },
+     {
+      "balance": 3647950,
+      "date": "2027-02-12",
+      "high": 3768616,
+      "low": 3236870
+     },
+     {
+      "balance": 3647950,
+      "date": "2027-02-13",
+      "high": 3768616,
+      "low": 3236870
+     },
+     {
+      "balance": 3647950,
+      "date": "2027-02-14",
+      "high": 3768616,
+      "low": 3236870
+     },
+     {
+      "balance": 3647950,
+      "date": "2027-02-15",
+      "high": 3768616,
+      "low": 3236870
+     },
+     {
+      "balance": 3647950,
+      "date": "2027-02-16",
+      "high": 3768616,
+      "low": 3236870
+     }
+    ],
+    "soon_low": {
+     "balance": 681867,
+     "date": "2026-11-25",
+     "days": 45
+    },
+    "yearly": [
+     {
+      "account_kind": "card",
+      "amount": 6000,
+      "category": "subscriptions",
+      "date": "2026-12-01",
+      "last_date": "2025-12-01",
+      "merchant": "NAMECHEAP",
+      "payments": 1
+     }
+    ]
+   },
+   "history": [
+    {
+     "balance": -2666133,
+     "date": "2026-08-09"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-10"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-11"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-12"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-13"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-14"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-15"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-16"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-17"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-18"
+    },
+    {
+     "balance": -1166133,
+     "date": "2026-08-19"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-20"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-21"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-22"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-23"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-24"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-25"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-26"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-27"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-28"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-29"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-30"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-08-31"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-09-01"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-09-02"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-09-03"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-09-04"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-09-05"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-09-06"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-09-07"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-09-08"
+    },
+    {
+     "balance": -1598833,
+     "date": "2026-09-09"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-10"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-11"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-12"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-13"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-14"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-15"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-16"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-17"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-18"
+    },
+    {
+     "balance": -98833,
+     "date": "2026-09-19"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-20"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-21"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-22"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-23"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-24"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-25"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-26"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-27"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-28"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-29"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-09-30"
+    },
+    {
+     "balance": -531533,
+     "date": "2026-10-01"
+    },
+    {
+     "balance": -831533,
+     "date": "2026-10-02"
+    },
+    {
+     "balance": -831533,
+     "date": "2026-10-03"
+    },
+    {
+     "balance": -831533,
+     "date": "2026-10-04"
+    },
+    {
+     "balance": -831533,
+     "date": "2026-10-05"
+    },
+    {
+     "balance": -831533,
+     "date": "2026-10-06"
+    },
+    {
+     "balance": -831533,
+     "date": "2026-10-07"
+    },
+    {
+     "balance": -831533,
+     "date": "2026-10-08"
+    },
+    {
+     "balance": -831533,
+     "date": "2026-10-09"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-10"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-11"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-12"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-13"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-14"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-15"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-16"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-17"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-18"
+    },
+    {
+     "balance": 668467,
+     "date": "2026-10-19"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-20"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-21"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-22"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-23"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-24"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-25"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-26"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-27"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-28"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-29"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-30"
+    },
+    {
+     "balance": 235767,
+     "date": "2026-10-31"
+    },
+    {
+     "balance": 234567,
+     "date": "2026-11-01"
+    },
+    {
+     "balance": -110433,
+     "date": "2026-11-02"
+    },
+    {
+     "balance": -110433,
+     "date": "2026-11-03"
+    },
+    {
+     "balance": -210433,
+     "date": "2026-11-04"
+    },
+    {
+     "balance": -210433,
+     "date": "2026-11-05"
+    },
+    {
+     "balance": -235433,
+     "date": "2026-11-06"
+    },
+    {
+     "balance": -235433,
+     "date": "2026-11-07"
+    },
+    {
+     "balance": -235433,
+     "date": "2026-11-08"
+    },
+    {
+     "balance": -235433,
+     "date": "2026-11-09"
+    },
+    {
+     "balance": 1264567,
+     "date": "2026-11-10"
+    },
+    {
+     "balance": 1234567,
+     "date": "2026-11-11"
+    },
+    {
+     "balance": 1234567,
+     "date": "2026-11-12"
+    },
+    {
+     "balance": 1234567,
+     "date": "2026-11-13"
+    },
+    {
+     "balance": 1234567,
+     "date": "2026-11-14"
+    },
+    {
+     "balance": 1234567,
+     "date": "2026-11-15"
+    },
+    {
+     "balance": 1234567,
+     "date": "2026-11-16"
+    },
+    {
+     "balance": 1234567,
+     "date": "2026-11-17"
+    },
+    {
+     "balance": 1234567,
+     "date": "2026-11-18"
+    }
+   ]
+  },
+  "request": "GET /api/money/balance?days=90",
+  "status": 200
+ },
+ "cashflow": {
+  "body": {
+   "months": [
+    {
+     "complete": true,
+     "everyday": 6000,
+     "fixed": 0,
+     "income": 0,
+     "label": "Dec 2025",
+     "month": "2025-12",
+     "net": -6000,
+     "one_off": 0,
+     "savings_rate": null,
+     "set_aside": 0,
+     "spent": 6000,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 0,
+     "fixed": 0,
+     "income": 0,
+     "label": "Jan 2026",
+     "month": "2026-01",
+     "net": 0,
+     "one_off": 0,
+     "savings_rate": null,
+     "set_aside": 0,
+     "spent": 0,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 0,
+     "fixed": 0,
+     "income": 0,
+     "label": "Feb 2026",
+     "month": "2026-02",
+     "net": 0,
+     "one_off": 0,
+     "savings_rate": null,
+     "set_aside": 0,
+     "spent": 0,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 0,
+     "fixed": 0,
+     "income": 0,
+     "label": "Mar 2026",
+     "month": "2026-03",
+     "net": 0,
+     "one_off": 0,
+     "savings_rate": null,
+     "set_aside": 0,
+     "spent": 0,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 0,
+     "fixed": 0,
+     "income": 0,
+     "label": "Apr 2026",
+     "month": "2026-04",
+     "net": 0,
+     "one_off": 0,
+     "savings_rate": null,
+     "set_aside": 0,
+     "spent": 0,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 0,
+     "fixed": 0,
+     "income": 0,
+     "label": "May 2026",
+     "month": "2026-05",
+     "net": 0,
+     "one_off": 0,
+     "savings_rate": null,
+     "set_aside": 0,
+     "spent": 0,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 0,
+     "fixed": 0,
+     "income": 0,
+     "label": "Jun 2026",
+     "month": "2026-06",
+     "net": 0,
+     "one_off": 0,
+     "savings_rate": null,
+     "set_aside": 0,
+     "spent": 0,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 0,
+     "fixed": 0,
+     "income": 0,
+     "label": "Jul 2026",
+     "month": "2026-07",
+     "net": 0,
+     "one_off": 0,
+     "savings_rate": null,
+     "set_aside": 0,
+     "spent": 0,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 0,
+     "fixed": 453990,
+     "income": 1517300,
+     "label": "Aug 2026",
+     "month": "2026-08",
+     "net": 1063310,
+     "one_off": 0,
+     "savings_rate": 0.701,
+     "set_aside": 0,
+     "spent": 453990,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 155000,
+     "fixed": 453990,
+     "income": 1517300,
+     "label": "Sep 2026",
+     "month": "2026-09",
+     "net": 908310,
+     "one_off": 0,
+     "savings_rate": 0.599,
+     "set_aside": 0,
+     "spent": 608990,
+     "yearly": 0
+    },
+    {
+     "complete": true,
+     "everyday": 177000,
+     "fixed": 453990,
+     "income": 1517300,
+     "label": "Oct 2026",
+     "month": "2026-10",
+     "net": 886310,
+     "one_off": 0,
+     "savings_rate": 0.584,
+     "set_aside": 0,
+     "spent": 630990,
+     "yearly": 0
+    },
+    {
+     "complete": false,
+     "everyday": 401794,
+     "fixed": 4990,
+     "income": 1500000,
+     "label": "Nov 2026",
+     "month": "2026-11",
+     "net": 1022316,
+     "one_off": 0,
+     "savings_rate": 0.682,
+     "set_aside": 0,
+     "spent": 477684,
+     "yearly": 70900
+    }
+   ],
+   "totals": {
+    "income": 6051900,
+    "net": 3874246,
+    "one_off": 0,
+    "set_aside": 0,
+    "spent": 2177654
+   },
+   "typical": {
+    "everyday": 0,
+    "fixed": 0,
+    "income": 0,
+    "net": 0,
+    "spent": 0,
+    "yearly": 0
+   }
+  },
+  "request": "GET /api/money/cashflow?n=12",
+  "status": 200
+ },
+ "categories": {
+  "body": {
+   "compare": [
+    {
+     "count": 5,
+     "end": "2026-10-18",
+     "label": "at this point last month",
+     "start": "2026-10-01",
+     "total": 148990
+    },
+    {
+     "count": 8,
+     "end": "2026-10-31",
+     "label": "all of last month",
+     "start": "2026-10-01",
+     "total": 630990
+    }
+   ],
+   "count": 16,
+   "groups": [
+    {
+     "categories": [
+      {
+       "count": 2,
+       "key": "restaurants",
+       "label": "Restaurants & cafés",
+       "total": 94000
+      },
+      {
+       "count": 3,
+       "key": "groceries",
+       "label": "Groceries",
+       "total": 77000
+      },
+      {
+       "count": 1,
+       "key": "delivery",
+       "label": "Delivery",
+       "total": 4500
+      }
+     ],
+     "count": 6,
+     "key": "food",
+     "label": "Food",
+     "total": 175500
+    },
+    {
+     "categories": [
+      {
+       "count": 1,
+       "key": "health",
+       "label": "Health",
+       "total": 150000
+      }
+     ],
+     "count": 1,
+     "key": "health",
+     "label": "Health",
+     "total": 150000
+    },
+    {
+     "categories": [
+      {
+       "count": 1,
+       "key": "insurance",
+       "label": "Insurance",
+       "total": 70900
+      },
+      {
+       "count": 1,
+       "key": "subscriptions",
+       "label": "Subscriptions & software",
+       "total": 4990
+      }
+     ],
+     "count": 2,
+     "key": "bills",
+     "label": "Bills",
+     "total": 75890
+    },
+    {
+     "categories": [
+      {
+       "count": 2,
+       "key": "fuel",
+       "label": "Fuel",
+       "total": 40000
+      }
+     ],
+     "count": 2,
+     "key": "transport",
+     "label": "Transport",
+     "total": 40000
+    },
+    {
+     "categories": [
+      {
+       "count": 1,
+       "key": "transfers",
+       "label": "Transfers to people",
+       "total": 25000
+      }
+     ],
+     "count": 1,
+     "key": "people",
+     "label": "People",
+     "total": 25000
+    },
+    {
+     "categories": [
+      {
+       "count": 2,
+       "key": "uncategorized",
+       "label": "Uncategorized",
+       "total": 8500
+      }
+     ],
+     "count": 2,
+     "key": "uncategorized",
+     "label": "Uncategorized",
+     "total": 8500
+    },
+    {
+     "categories": [
+      {
+       "count": 1,
+       "key": "education",
+       "label": "Education",
+       "total": 1594
+      }
+     ],
+     "count": 1,
+     "key": "family",
+     "label": "Family",
+     "total": 1594
+    },
+    {
+     "categories": [
+      {
+       "count": 1,
+       "key": "fees",
+       "label": "Fees",
+       "total": 1200
+      }
+     ],
+     "count": 1,
+     "key": "finance",
+     "label": "Finance",
+     "total": 1200
+    }
+   ],
+   "period": {
+    "end": "2026-11-18",
+    "in_progress": true,
+    "key": "this_month",
+    "label": "this month",
+    "start": "2026-11-01"
+   },
+   "taxonomy": {
+    "flows": [
+     "purchase",
+     "refund",
+     "transfer_out",
+     "transfer_in",
+     "income",
+     "card_bill",
+     "own_transfer",
+     "fee",
+     "cash",
+     "loan",
+     "investment",
+     "other"
+    ],
+    "groups": [
+     {
+      "categories": [
+       {
+        "key": "groceries",
+        "label": "Groceries",
+        "label_he": "מכולת וסופר"
+       },
+       {
+        "key": "restaurants",
+        "label": "Restaurants & cafés",
+        "label_he": "מסעדות ובתי קפה"
+       },
+       {
+        "key": "delivery",
+        "label": "Delivery",
+        "label_he": "משלוחי אוכל"
+       }
+      ],
+      "income": false,
+      "key": "food",
+      "label": "Food",
+      "label_he": "אוכל"
+     },
+     {
+      "categories": [
+       {
+        "key": "housing",
+        "label": "Rent & mortgage",
+        "label_he": "שכירות ומשכנתא"
+       },
+       {
+        "key": "utilities",
+        "label": "Utilities & municipality",
+        "label_he": "חשמל, מים, גז וארנונה"
+       },
+       {
+        "key": "home",
+        "label": "Home & furniture",
+        "label_he": "בית וריהוט"
+       }
+      ],
+      "income": false,
+      "key": "housing",
+      "label": "Housing",
+      "label_he": "דיור ובית"
+     },
+     {
+      "categories": [
+       {
+        "key": "fuel",
+        "label": "Fuel",
+        "label_he": "דלק"
+       },
+       {
+        "key": "parking",
+        "label": "Parking & tolls",
+        "label_he": "חניה וכבישי אגרה"
+       },
+       {
+        "key": "public_transport",
+        "label": "Public transport",
+        "label_he": "תחבורה ציבורית"
+       },
+       {
+        "key": "car",
+        "label": "Car",
+        "label_he": "רכב"
+       }
+      ],
+      "income": false,
+      "key": "transport",
+      "label": "Transport",
+      "label_he": "תחבורה"
+     },
+     {
+      "categories": [
+       {
+        "key": "phone_internet",
+        "label": "Phone & internet",
+        "label_he": "טלפון ואינטרנט"
+       },
+       {
+        "key": "subscriptions",
+        "label": "Subscriptions & software",
+        "label_he": "מנויים ותוכנה"
+       },
+       {
+        "key": "insurance",
+        "label": "Insurance",
+        "label_he": "ביטוח"
+       }
+      ],
+      "income": false,
+      "key": "bills",
+      "label": "Bills",
+      "label_he": "חשבונות"
+     },
+     {
+      "categories": [
+       {
+        "key": "health",
+        "label": "Health",
+        "label_he": "בריאות"
+       }
+      ],
+      "income": false,
+      "key": "health",
+      "label": "Health",
+      "label_he": "בריאות"
+     },
+     {
+      "categories": [
+       {
+        "key": "clothing",
+        "label": "Clothing",
+        "label_he": "ביגוד והנעלה"
+       },
+       {
+        "key": "electronics",
+        "label": "Electronics",
+        "label_he": "אלקטרוניקה"
+       },
+       {
+        "key": "shopping",
+        "label": "General shopping",
+        "label_he": "קניות כלליות"
+       }
+      ],
+      "income": false,
+      "key": "shopping",
+      "label": "Shopping",
+      "label_he": "קניות"
+     },
+     {
+      "categories": [
+       {
+        "key": "entertainment",
+        "label": "Entertainment",
+        "label_he": "בילויים"
+       },
+       {
+        "key": "travel",
+        "label": "Travel & hotels",
+        "label_he": "חופשות ונסיעות"
+       }
+      ],
+      "income": false,
+      "key": "leisure",
+      "label": "Leisure",
+      "label_he": "פנאי"
+     },
+     {
+      "categories": [
+       {
+        "key": "education",
+        "label": "Education",
+        "label_he": "חינוך"
+       },
+       {
+        "key": "kids",
+        "label": "Kids",
+        "label_he": "ילדים"
+       },
+       {
+        "key": "pets",
+        "label": "Pets",
+        "label_he": "חיות מחמד"
+       }
+      ],
+      "income": false,
+      "key": "family",
+      "label": "Family",
+      "label_he": "משפחה"
+     },
+     {
+      "categories": [
+       {
+        "key": "transfers",
+        "label": "Transfers to people",
+        "label_he": "העברות לאנשים"
+       },
+       {
+        "key": "gifts_donations",
+        "label": "Gifts & donations",
+        "label_he": "מתנות ותרומות"
+       }
+      ],
+      "income": false,
+      "key": "people",
+      "label": "People",
+      "label_he": "אנשים"
+     },
+     {
+      "categories": [
+       {
+        "key": "fees",
+        "label": "Fees",
+        "label_he": "עמלות"
+       },
+       {
+        "key": "cash",
+        "label": "Cash",
+        "label_he": "מזומן"
+       },
+       {
+        "key": "taxes",
+        "label": "Taxes",
+        "label_he": "מיסים"
+       },
+       {
+        "key": "investments",
+        "label": "Investments & savings",
+        "label_he": "השקעות וחיסכון"
+       }
+      ],
+      "income": false,
+      "key": "finance",
+      "label": "Finance",
+      "label_he": "פיננסים"
+     },
+     {
+      "categories": [
+       {
+        "key": "other",
+        "label": "Other",
+        "label_he": "אחר"
+       }
+      ],
+      "income": false,
+      "key": "other",
+      "label": "Other",
+      "label_he": "אחר"
+     },
+     {
+      "categories": [
+       {
+        "key": "salary",
+        "label": "Salary",
+        "label_he": "משכורת"
+       },
+       {
+        "key": "refunds",
+        "label": "Refunds",
+        "label_he": "החזרים"
+       },
+       {
+        "key": "benefits",
+        "label": "Benefits",
+        "label_he": "קצבאות"
+       },
+       {
+        "key": "interest",
+        "label": "Interest",
+        "label_he": "ריבית"
+       },
+       {
+        "key": "transfers_in",
+        "label": "Transfers in",
+        "label_he": "העברות נכנסות"
+       },
+       {
+        "key": "other_income",
+        "label": "Other income",
+        "label_he": "הכנסה אחרת"
+       }
+      ],
+      "income": true,
+      "key": "income",
+      "label": "Income",
+      "label_he": "הכנסות"
+     }
+    ],
+    "income_flows": [
+     "income",
+     "transfer_in"
+    ],
+    "spending_flows": [
+     "cash",
+     "fee",
+     "loan",
+     "purchase",
+     "refund",
+     "transfer_out"
+    ]
+   },
+   "total": 477684
+  },
+  "request": "GET /api/money/categories?period=this_month",
+  "status": 200
+ },
+ "categories_range": {
+  "body": {
+   "compare": [
+    {
+     "count": 7,
+     "end": "2026-09-30",
+     "label": "the 31 days before",
+     "start": "2026-08-31",
+     "total": 608990
+    }
+   ],
+   "count": 8,
+   "groups": [
+    {
+     "categories": [
+      {
+       "count": 1,
+       "key": "housing",
+       "label": "Rent & mortgage",
+       "total": 450000
+      }
+     ],
+     "count": 1,
+     "key": "housing",
+     "label": "Housing",
+     "total": 450000
+    },
+    {
+     "categories": [
+      {
+       "count": 2,
+       "key": "groceries",
+       "label": "Groceries",
+       "total": 105000
+      },
+      {
+       "count": 2,
+       "key": "restaurants",
+       "label": "Restaurants & cafés",
+       "total": 50000
+      }
+     ],
+     "count": 4,
+     "key": "food",
+     "label": "Food",
+     "total": 155000
+    },
+    {
+     "categories": [
+      {
+       "count": 2,
+       "key": "health",
+       "label": "Health",
+       "total": 22000
+      }
+     ],
+     "count": 2,
+     "key": "health",
+     "label": "Health",
+     "total": 22000
+    },
+    {
+     "categories": [
+      {
+       "count": 1,
+       "key": "subscriptions",
+       "label": "Subscriptions & software",
+       "total": 3990
+      }
+     ],
+     "count": 1,
+     "key": "bills",
+     "label": "Bills",
+     "total": 3990
+    }
+   ],
+   "period": {
+    "end": "2026-10-31",
+    "in_progress": false,
+    "key": "custom",
+    "label": "1–31 Oct 2026",
+    "start": "2026-10-01"
+   },
+   "taxonomy": {
+    "flows": [
+     "purchase",
+     "refund",
+     "transfer_out",
+     "transfer_in",
+     "income",
+     "card_bill",
+     "own_transfer",
+     "fee",
+     "cash",
+     "loan",
+     "investment",
+     "other"
+    ],
+    "groups": [
+     {
+      "categories": [
+       {
+        "key": "groceries",
+        "label": "Groceries",
+        "label_he": "מכולת וסופר"
+       },
+       {
+        "key": "restaurants",
+        "label": "Restaurants & cafés",
+        "label_he": "מסעדות ובתי קפה"
+       },
+       {
+        "key": "delivery",
+        "label": "Delivery",
+        "label_he": "משלוחי אוכל"
+       }
+      ],
+      "income": false,
+      "key": "food",
+      "label": "Food",
+      "label_he": "אוכל"
+     },
+     {
+      "categories": [
+       {
+        "key": "housing",
+        "label": "Rent & mortgage",
+        "label_he": "שכירות ומשכנתא"
+       },
+       {
+        "key": "utilities",
+        "label": "Utilities & municipality",
+        "label_he": "חשמל, מים, גז וארנונה"
+       },
+       {
+        "key": "home",
+        "label": "Home & furniture",
+        "label_he": "בית וריהוט"
+       }
+      ],
+      "income": false,
+      "key": "housing",
+      "label": "Housing",
+      "label_he": "דיור ובית"
+     },
+     {
+      "categories": [
+       {
+        "key": "fuel",
+        "label": "Fuel",
+        "label_he": "דלק"
+       },
+       {
+        "key": "parking",
+        "label": "Parking & tolls",
+        "label_he": "חניה וכבישי אגרה"
+       },
+       {
+        "key": "public_transport",
+        "label": "Public transport",
+        "label_he": "תחבורה ציבורית"
+       },
+       {
+        "key": "car",
+        "label": "Car",
+        "label_he": "רכב"
+       }
+      ],
+      "income": false,
+      "key": "transport",
+      "label": "Transport",
+      "label_he": "תחבורה"
+     },
+     {
+      "categories": [
+       {
+        "key": "phone_internet",
+        "label": "Phone & internet",
+        "label_he": "טלפון ואינטרנט"
+       },
+       {
+        "key": "subscriptions",
+        "label": "Subscriptions & software",
+        "label_he": "מנויים ותוכנה"
+       },
+       {
+        "key": "insurance",
+        "label": "Insurance",
+        "label_he": "ביטוח"
+       }
+      ],
+      "income": false,
+      "key": "bills",
+      "label": "Bills",
+      "label_he": "חשבונות"
+     },
+     {
+      "categories": [
+       {
+        "key": "health",
+        "label": "Health",
+        "label_he": "בריאות"
+       }
+      ],
+      "income": false,
+      "key": "health",
+      "label": "Health",
+      "label_he": "בריאות"
+     },
+     {
+      "categories": [
+       {
+        "key": "clothing",
+        "label": "Clothing",
+        "label_he": "ביגוד והנעלה"
+       },
+       {
+        "key": "electronics",
+        "label": "Electronics",
+        "label_he": "אלקטרוניקה"
+       },
+       {
+        "key": "shopping",
+        "label": "General shopping",
+        "label_he": "קניות כלליות"
+       }
+      ],
+      "income": false,
+      "key": "shopping",
+      "label": "Shopping",
+      "label_he": "קניות"
+     },
+     {
+      "categories": [
+       {
+        "key": "entertainment",
+        "label": "Entertainment",
+        "label_he": "בילויים"
+       },
+       {
+        "key": "travel",
+        "label": "Travel & hotels",
+        "label_he": "חופשות ונסיעות"
+       }
+      ],
+      "income": false,
+      "key": "leisure",
+      "label": "Leisure",
+      "label_he": "פנאי"
+     },
+     {
+      "categories": [
+       {
+        "key": "education",
+        "label": "Education",
+        "label_he": "חינוך"
+       },
+       {
+        "key": "kids",
+        "label": "Kids",
+        "label_he": "ילדים"
+       },
+       {
+        "key": "pets",
+        "label": "Pets",
+        "label_he": "חיות מחמד"
+       }
+      ],
+      "income": false,
+      "key": "family",
+      "label": "Family",
+      "label_he": "משפחה"
+     },
+     {
+      "categories": [
+       {
+        "key": "transfers",
+        "label": "Transfers to people",
+        "label_he": "העברות לאנשים"
+       },
+       {
+        "key": "gifts_donations",
+        "label": "Gifts & donations",
+        "label_he": "מתנות ותרומות"
+       }
+      ],
+      "income": false,
+      "key": "people",
+      "label": "People",
+      "label_he": "אנשים"
+     },
+     {
+      "categories": [
+       {
+        "key": "fees",
+        "label": "Fees",
+        "label_he": "עמלות"
+       },
+       {
+        "key": "cash",
+        "label": "Cash",
+        "label_he": "מזומן"
+       },
+       {
+        "key": "taxes",
+        "label": "Taxes",
+        "label_he": "מיסים"
+       },
+       {
+        "key": "investments",
+        "label": "Investments & savings",
+        "label_he": "השקעות וחיסכון"
+       }
+      ],
+      "income": false,
+      "key": "finance",
+      "label": "Finance",
+      "label_he": "פיננסים"
+     },
+     {
+      "categories": [
+       {
+        "key": "other",
+        "label": "Other",
+        "label_he": "אחר"
+       }
+      ],
+      "income": false,
+      "key": "other",
+      "label": "Other",
+      "label_he": "אחר"
+     },
+     {
+      "categories": [
+       {
+        "key": "salary",
+        "label": "Salary",
+        "label_he": "משכורת"
+       },
+       {
+        "key": "refunds",
+        "label": "Refunds",
+        "label_he": "החזרים"
+       },
+       {
+        "key": "benefits",
+        "label": "Benefits",
+        "label_he": "קצבאות"
+       },
+       {
+        "key": "interest",
+        "label": "Interest",
+        "label_he": "ריבית"
+       },
+       {
+        "key": "transfers_in",
+        "label": "Transfers in",
+        "label_he": "העברות נכנסות"
+       },
+       {
+        "key": "other_income",
+        "label": "Other income",
+        "label_he": "הכנסה אחרת"
+       }
+      ],
+      "income": true,
+      "key": "income",
+      "label": "Income",
+      "label_he": "הכנסות"
+     }
+    ],
+    "income_flows": [
+     "income",
+     "transfer_in"
+    ],
+    "spending_flows": [
+     "cash",
+     "fee",
+     "loan",
+     "purchase",
+     "refund",
+     "transfer_out"
+    ]
+   },
+   "total": 630990
+  },
+  "request": "GET /api/money/categories?start=2026-10-01&end=2026-10-31",
+  "status": 200
+ },
+ "changes": {
+  "body": {
+   "changed": true,
+   "cursor": "907175e1596fefe6"
+  },
+  "request": "GET /api/money/changes",
+  "status": 200
+ },
+ "changes_after_patch": {
+  "body": {
+   "changed": false,
+   "cursor": "907175e1596fefe6"
+  },
+  "request": "GET /api/money/changes?since=907175e1596fefe6",
+  "status": 200
+ },
+ "changes_unchanged": {
+  "body": {
+   "changed": false,
+   "cursor": "907175e1596fefe6"
+  },
+  "request": "GET /api/money/changes?since=907175e1596fefe6",
+  "status": 200
+ },
+ "error_invalid": {
+  "body": {
+   "error": "invalid",
+   "field": "period",
+   "message": "unknown period 'someday': use one of today, yesterday, this_week, last_week, this_month, last_month, last_30_days, this_year, last_year, YYYY-MM, YYYY or start/end dates"
+  },
+  "request": "GET /api/money/categories?period=someday",
+  "status": 400
+ },
+ "error_not_connected": {
+  "body": {
+   "addon": "money",
+   "error": "not_connected"
+  },
+  "request": "GET /api/money/overview",
+  "status": 403
+ },
+ "error_not_found": {
+  "body": {
+   "error": "not_found"
+  },
+  "request": "GET /api/money/transactions/bfc343a9d9d44b319bf291d8ce2927f3",
+  "status": 404
+ },
+ "insights": {
+  "body": {
+   "items": [
+    {
+     "amount": 681867,
+     "detail": "Next: קצבת ילדים ₪173.00 on 20 Nov; משכנתא לאומי ₪4,500.00 on 20 Nov; Shared card ₪1,200.00 on 25 Nov. One-offs left out.",
+     "kind": "low_point",
+     "link": {
+      "view": "cashflow"
+     },
+     "title": "Lowest balance in the next 45 days: ₪6,818.67 on 25 Nov",
+     "tone": "info"
+    },
+    {
+     "amount": 150000,
+     "detail": "Nothing here in a typical month (the median of the months before).",
+     "kind": "mover",
+     "link": {
+      "category": "health",
+      "view": "spending"
+     },
+     "title": "Health: ₪1,500.00, usually nothing",
+     "tone": "info"
+    },
+    {
+     "amount": 12000,
+     "detail": "Start with: NETFLIX.COM went up ₪10 a month.",
+     "kind": "savings",
+     "link": {
+      "view": "save"
+     },
+     "title": "1 way to save ₪120 a year",
+     "tone": "good"
+    },
+    {
+     "amount": 94000,
+     "detail": "Nothing here in a typical month (the median of the months before).",
+     "kind": "mover",
+     "link": {
+      "category": "restaurants",
+      "view": "spending"
+     },
+     "title": "Restaurants & cafés: ₪940.00, usually nothing",
+     "tone": "info"
+    },
+    {
+     "amount": 77000,
+     "detail": "Nothing here in a typical month (the median of the months before).",
+     "kind": "mover",
+     "link": {
+      "category": "groceries",
+      "view": "spending"
+     },
+     "title": "Groceries: ₪770.00, usually nothing",
+     "tone": "info"
+    },
+    {
+     "amount": 1000,
+     "detail": "Was ₪39.90 a month: ₪120.00 a year more.",
+     "kind": "price_change",
+     "link": {
+      "view": "cashflow"
+     },
+     "title": "NETFLIX.COM up to ₪49.90",
+     "tone": "bad"
+    },
+    {
+     "amount": 252700,
+     "detail": "2 running: ביטוח רכב ישיר, KSP מחשבים.",
+     "kind": "installments",
+     "link": {
+      "view": "cashflow"
+     },
+     "title": "₪2,527.00 left on installment plans",
+     "tone": "info"
+    },
+    {
+     "amount": 150000,
+     "detail": "About 14× the usual ₪105.00 there.",
+     "kind": "unusual",
+     "link": {
+      "id": "303ba6dc4ce74abc8de40d5a5bcc4d29",
+      "view": "transactions"
+     },
+     "title": "₪1,500.00 at סופר פארם",
+     "tone": "warn"
+    },
+    {
+     "amount": 20000,
+     "detail": "Charged twice within 4 minutes.",
+     "kind": "unusual",
+     "link": {
+      "id": "f0f1a8e8757a4ea093dd5ed2e602ee13",
+      "view": "transactions"
+     },
+     "title": "₪200.00 at פז דלק",
+     "tone": "warn"
+    }
+   ],
+   "month": "2026-11"
+  },
+  "request": "GET /api/money/insights",
+  "status": 200
+ },
+ "insights_past": {
+  "body": {
+   "items": [
+    {
+     "amount": 886310,
+     "detail": "Earned ₪15,173.00, spent ₪6,309.90. A typical month leaves ₪0.00.",
+     "kind": "net",
+     "link": {
+      "view": "cashflow"
+     },
+     "title": "Saved ₪8,863.10",
+     "tone": "good"
+    },
+    {
+     "amount": 105000,
+     "detail": "Nothing here in a typical month (the median of the months before).",
+     "kind": "mover",
+     "link": {
+      "category": "groceries",
+      "view": "spending"
+     },
+     "title": "Groceries: ₪1,050.00, usually nothing",
+     "tone": "info"
+    },
+    {
+     "amount": 50000,
+     "detail": "Nothing here in a typical month (the median of the months before).",
+     "kind": "mover",
+     "link": {
+      "category": "restaurants",
+      "view": "spending"
+     },
+     "title": "Restaurants & cafés: ₪500.00, usually nothing",
+     "tone": "info"
+    },
+    {
+     "amount": 22000,
+     "detail": "Nothing here in a typical month (the median of the months before).",
+     "kind": "mover",
+     "link": {
+      "category": "health",
+      "view": "spending"
+     },
+     "title": "Health: ₪220.00, usually nothing",
+     "tone": "info"
+    }
+   ],
+   "month": "2026-10"
+  },
+  "request": "GET /api/money/insights?month=2026-10",
+  "status": 200
+ },
+ "merchants": {
+  "body": {
+   "merchants": [
+    {
+     "average": 450000,
+     "category": "housing",
+     "category_label": "Rent & mortgage",
+     "count": 1,
+     "first_date": "2026-08-20",
+     "merchant": "משכנתא לאומי",
+     "merchant_key": "משכנתא לאומי",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      450000,
+      450000,
+      450000,
+      0
+     ],
+     "months_active": 3,
+     "one_off": false,
+     "total": 450000
+    },
+    {
+     "average": 81000,
+     "category": "health",
+     "category_label": "Health",
+     "count": 2,
+     "first_date": "2026-09-05",
+     "merchant": "סופר פארם",
+     "merchant_key": "סופר פארם",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      20000,
+      22000,
+      150000
+     ],
+     "months_active": 3,
+     "one_off": false,
+     "total": 162000
+    },
+    {
+     "average": 51000,
+     "category": "restaurants",
+     "category_label": "Restaurants & cafés",
+     "count": 2,
+     "first_date": "2026-10-12",
+     "merchant": "מסעדת הדג",
+     "merchant_key": "מסעדת הדג",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      50000,
+      82000
+     ],
+     "months_active": 2,
+     "one_off": false,
+     "total": 102000
+    },
+    {
+     "average": 70900,
+     "category": "insurance",
+     "category_label": "Insurance",
+     "count": 1,
+     "first_date": "2026-11-16",
+     "merchant": "ביטוח רכב ישיר",
+     "merchant_key": "ביטוח רכב ישיר",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      70900
+     ],
+     "months_active": 1,
+     "one_off": false,
+     "total": 70900
+    },
+    {
+     "average": 45000,
+     "category": "groceries",
+     "category_label": "Groceries",
+     "count": 1,
+     "first_date": "2026-09-08",
+     "merchant": "שופרסל דיל",
+     "merchant_key": "שופרסל דיל",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      55000,
+      60000,
+      45000
+     ],
+     "months_active": 3,
+     "one_off": false,
+     "total": 45000
+    },
+    {
+     "average": 20000,
+     "category": "fuel",
+     "category_label": "Fuel",
+     "count": 2,
+     "first_date": "2026-11-17",
+     "merchant": "פז דלק",
+     "merchant_key": "פז דלק",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      40000
+     ],
+     "months_active": 1,
+     "one_off": false,
+     "total": 40000
+    },
+    {
+     "average": 32000,
+     "category": "groceries",
+     "category_label": "Groceries",
+     "count": 1,
+     "first_date": "2026-10-15",
+     "merchant": "רמי לוי - יבנה",
+     "merchant_key": "רמי לוי יבנה",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      45000,
+      32000
+     ],
+     "months_active": 2,
+     "one_off": false,
+     "total": 32000
+    },
+    {
+     "average": 25000,
+     "category": "transfers",
+     "category_label": "Transfers to people",
+     "count": 1,
+     "first_date": "2026-11-06",
+     "merchant": "העברה לדני כהן",
+     "merchant_key": "העברה לדני כהן",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      25000
+     ],
+     "months_active": 1,
+     "one_off": false,
+     "total": 25000
+    },
+    {
+     "average": 12000,
+     "category": "restaurants",
+     "category_label": "Restaurants & cafés",
+     "count": 1,
+     "first_date": "2026-11-08",
+     "merchant": "קפה לנדוור",
+     "merchant_key": "קפה לנדוור",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      12000
+     ],
+     "months_active": 1,
+     "one_off": false,
+     "total": 12000
+    },
+    {
+     "average": 6000,
+     "category": null,
+     "category_label": "Uncategorized",
+     "count": 1,
+     "first_date": "2026-11-09",
+     "merchant": "חנות כלבו",
+     "merchant_key": "חנות כלבו",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      6000
+     ],
+     "months_active": 1,
+     "one_off": false,
+     "total": 6000
+    },
+    {
+     "average": 4990,
+     "category": "subscriptions",
+     "category_label": "Subscriptions & software",
+     "count": 1,
+     "first_date": "2026-08-03",
+     "merchant": "NETFLIX.COM",
+     "merchant_key": "netflix com",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      3990,
+      3990,
+      3990,
+      4990
+     ],
+     "months_active": 4,
+     "one_off": false,
+     "total": 4990
+    },
+    {
+     "average": 4500,
+     "category": "delivery",
+     "category_label": "Delivery",
+     "count": 1,
+     "first_date": "2026-11-17",
+     "merchant": "WOLT",
+     "merchant_key": "wolt",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      4500
+     ],
+     "months_active": 1,
+     "one_off": false,
+     "total": 4500
+    },
+    {
+     "average": 2500,
+     "category": null,
+     "category_label": "Uncategorized",
+     "count": 1,
+     "first_date": "2026-11-18",
+     "merchant": "קפה קפה",
+     "merchant_key": "קפה קפה",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      2500
+     ],
+     "months_active": 1,
+     "one_off": false,
+     "total": 2500
+    },
+    {
+     "average": 1594,
+     "category": "education",
+     "category_label": "Education",
+     "count": 1,
+     "first_date": "2026-11-07",
+     "merchant": "ONLINE COURSE CO",
+     "merchant_key": "online course co",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1594
+     ],
+     "months_active": 1,
+     "one_off": false,
+     "total": 1594
+    },
+    {
+     "average": 1200,
+     "category": "fees",
+     "category_label": "Fees",
+     "count": 1,
+     "first_date": "2026-11-01",
+     "merchant": "עמלת פעולה",
+     "merchant_key": "עמלת פעולה",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1200
+     ],
+     "months_active": 1,
+     "one_off": false,
+     "total": 1200
+    }
+   ],
+   "period": {
+    "end": "2026-11-18",
+    "in_progress": true,
+    "key": "last_30_days",
+    "label": "the last 30 days",
+    "start": "2026-10-20"
+   }
+  },
+  "request": "GET /api/money/merchants?period=last_30_days",
+  "status": 200
+ },
+ "months": {
+  "body": {
+   "groups": [
+    {
+     "key": "food",
+     "label": "Food"
+    },
+    {
+     "key": "housing",
+     "label": "Housing"
+    },
+    {
+     "key": "transport",
+     "label": "Transport"
+    },
+    {
+     "key": "bills",
+     "label": "Bills"
+    },
+    {
+     "key": "health",
+     "label": "Health"
+    },
+    {
+     "key": "shopping",
+     "label": "Shopping"
+    },
+    {
+     "key": "family",
+     "label": "Family"
+    },
+    {
+     "key": "people",
+     "label": "People"
+    },
+    {
+     "key": "finance",
+     "label": "Finance"
+    },
+    {
+     "key": "uncategorized",
+     "label": "Uncategorized"
+    }
+   ],
+   "months": [
+    {
+     "count": 1,
+     "groups": {
+      "bills": 6000
+     },
+     "label": "Dec 2025",
+     "month": "2025-12",
+     "total": 6000
+    },
+    {
+     "count": 0,
+     "groups": {},
+     "label": "Jan 2026",
+     "month": "2026-01",
+     "total": 0
+    },
+    {
+     "count": 0,
+     "groups": {},
+     "label": "Feb 2026",
+     "month": "2026-02",
+     "total": 0
+    },
+    {
+     "count": 0,
+     "groups": {},
+     "label": "Mar 2026",
+     "month": "2026-03",
+     "total": 0
+    },
+    {
+     "count": 0,
+     "groups": {},
+     "label": "Apr 2026",
+     "month": "2026-04",
+     "total": 0
+    },
+    {
+     "count": 0,
+     "groups": {},
+     "label": "May 2026",
+     "month": "2026-05",
+     "total": 0
+    },
+    {
+     "count": 0,
+     "groups": {},
+     "label": "Jun 2026",
+     "month": "2026-06",
+     "total": 0
+    },
+    {
+     "count": 0,
+     "groups": {},
+     "label": "Jul 2026",
+     "month": "2026-07",
+     "total": 0
+    },
+    {
+     "count": 2,
+     "groups": {
+      "bills": 3990,
+      "housing": 450000
+     },
+     "label": "Aug 2026",
+     "month": "2026-08",
+     "total": 453990
+    },
+    {
+     "count": 7,
+     "groups": {
+      "bills": 3990,
+      "food": 55000,
+      "health": 20000,
+      "housing": 450000,
+      "shopping": 80000
+     },
+     "label": "Sep 2026",
+     "month": "2026-09",
+     "total": 608990
+    },
+    {
+     "count": 8,
+     "groups": {
+      "bills": 3990,
+      "food": 155000,
+      "health": 22000,
+      "housing": 450000
+     },
+     "label": "Oct 2026",
+     "month": "2026-10",
+     "total": 630990
+    },
+    {
+     "count": 16,
+     "groups": {
+      "bills": 75890,
+      "family": 1594,
+      "finance": 1200,
+      "food": 175500,
+      "health": 150000,
+      "people": 25000,
+      "transport": 40000,
+      "uncategorized": 8500
+     },
+     "label": "Nov 2026",
+     "month": "2026-11",
+     "total": 477684
+    }
+   ]
+  },
+  "request": "GET /api/money/months?n=12",
+  "status": 200
+ },
+ "overview": {
+  "body": {
+   "attention": [
+    {
+     "name": "Cal",
+     "reason": "bank worker not reachable",
+     "source_id": "1058da3d4a564b4ab2eda3cf21a60762",
+     "state": "failing"
+    }
+   ],
+   "banks": [
+    {
+     "balance": 1234567,
+     "balance_at": "2026-11-18T05:01:00+00:00",
+     "company": "hapoalim",
+     "company_name": "Bank Hapoalim",
+     "id": "edba4736cb534f60b1270c0bbccd6c59",
+     "label": "Bank Hapoalim ••••901",
+     "number": "••••901"
+    }
+   ],
+   "cards": [
+    {
+     "billed_from_account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "company": "visaCal",
+     "company_name": "Cal",
+     "id": "c9698863ba3d4361b14f5305ef6fef09",
+     "label": "Shared card",
+     "next_charge": 120000,
+     "next_charge_date": "2026-11-25",
+     "number": "4580"
+    },
+    {
+     "billed_from_account_id": null,
+     "company": "visaCal",
+     "company_name": "Cal",
+     "id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "label": "Cal 8763",
+     "next_charge": 345081,
+     "next_charge_date": "2026-12-10",
+     "number": "8763"
+    }
+   ],
+   "everyday": {
+    "on_track": 401794,
+    "total": 401794,
+    "typical": 0
+   },
+   "fixed_monthly": 478623,
+   "forecast": {
+    "as_of": "2026-11-18",
+    "balance": 1234567,
+    "end": "2027-05-17",
+    "end_balance": 6634592,
+    "low_point": {
+     "balance": 681867,
+     "date": "2026-11-25"
+    },
+    "next": [
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": 17300,
+      "date": "2026-11-20",
+      "estimated": false,
+      "kind": "income",
+      "label": "קצבת ילדים"
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": -450000,
+      "date": "2026-11-20",
+      "estimated": false,
+      "kind": "fixed",
+      "label": "משכנתא לאומי"
+     },
+     {
+      "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+      "amount": -120000,
+      "date": "2026-11-25",
+      "estimated": false,
+      "items": [],
+      "kind": "card_bill",
+      "label": "Shared card",
+      "parts": {
+       "everyday": 0,
+       "fixed": 0,
+       "installments": 0,
+       "known": 120000,
+       "yearly": 0
+      },
+      "range": [
+       -120000,
+       -120000
+      ]
+     },
+     {
+      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "amount": 1500000,
+      "date": "2026-12-10",
+      "estimated": false,
+      "kind": "income",
+      "label": "משכורת אופק"
+     }
+    ],
+    "soon_low": {
+     "balance": 681867,
+     "date": "2026-11-25",
+     "days": 45
+    }
+   },
+   "income": {
+    "count": 1,
+    "total": 1500000
+   },
+   "income_month": 1500000,
+   "income_typical": 0,
+   "investments": [],
+   "last_sync_at": "2026-11-18T05:01:00+00:00",
+   "meals": [],
+   "month": "2026-11",
+   "net": 1022316,
+   "one_off": 0,
+   "period": {
+    "end": "2026-11-18",
+    "in_progress": true,
+    "key": "2026-11",
+    "label": "November 2026",
+    "start": "2026-11-01"
+   },
+   "recurring_monthly": 455490,
+   "set_aside": 0,
+   "sources": [
+    {
+     "company": "hapoalim",
+     "company_name": "Bank Hapoalim",
+     "id": "2edc618f1aa749038283e03e851ea50c",
+     "label": null,
+     "last_ok_at": "2026-11-18T05:01:00+00:00",
+     "last_sync_at": "2026-11-18T05:01:00+00:00",
+     "name": "Bank Hapoalim",
+     "next_sync_at": "2026-11-18T17:00:00+00:00",
+     "state": "ok",
+     "state_reason": null
+    },
+    {
+     "company": "visaCal",
+     "company_name": "Cal",
+     "id": "1058da3d4a564b4ab2eda3cf21a60762",
+     "label": null,
+     "last_ok_at": "2026-11-17T17:00:00+00:00",
+     "last_sync_at": "2026-11-17T17:00:00+00:00",
+     "name": "Cal",
+     "next_sync_at": "2026-11-18T17:00:00+00:00",
+     "state": "failing",
+     "state_reason": "bank worker not reachable"
+    }
+   ],
+   "spent": {
+    "compare": [
+     {
+      "count": 5,
+      "end": "2026-10-18",
+      "label": "at this point last month",
+      "start": "2026-10-01",
+      "total": 148990
+     },
+     {
+      "count": 8,
+      "end": "2026-10-31",
+      "label": "all of last month",
+      "start": "2026-10-01",
+      "total": 630990
+     }
+    ],
+    "count": 16,
+    "total": 477684
+   },
+   "uncategorized": 2,
+   "unusual": [
+    {
+     "reason": "large",
+     "text": "₪1,500.00 at סופר פארם, about 14× the usual ₪105.00 there",
+     "title": "₪1,500.00 at סופר פארם",
+     "transaction": {
+      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_kind": "card",
+      "account_label": "Cal 8763",
+      "amount": -150000,
+      "badges": [],
+      "category": "health",
+      "category_label": "Health",
+      "category_source": "bank",
+      "charge_date": null,
+      "description": "סופר פארם",
+      "flow": "purchase",
+      "group": "health",
+      "group_label": "Health",
+      "id": "303ba6dc4ce74abc8de40d5a5bcc4d29",
+      "memo": null,
+      "merchant": "סופר פארם",
+      "merchant_key": "סופר פארם",
+      "note": null,
+      "occurred_at": "2026-11-17T18:00:00+02:00",
+      "purchase_date": "2026-11-17",
+      "spending": true,
+      "status": "completed"
+     },
+     "typical": 10500,
+     "why": "about 14× the usual ₪105.00 there"
+    },
+    {
+     "duplicate_of": "bd9692611464427fbac689b6212e4986",
+     "reason": "duplicate",
+     "text": "₪200.00 at פז דלק, charged twice within 4 minutes",
+     "title": "₪200.00 at פז דלק",
+     "transaction": {
+      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_kind": "card",
+      "account_label": "Cal 8763",
+      "amount": -20000,
+      "badges": [],
+      "category": "fuel",
+      "category_label": "Fuel",
+      "category_source": "bank",
+      "charge_date": null,
+      "description": "פז דלק",
+      "flow": "purchase",
+      "group": "transport",
+      "group_label": "Transport",
+      "id": "f0f1a8e8757a4ea093dd5ed2e602ee13",
+      "memo": null,
+      "merchant": "פז דלק",
+      "merchant_key": "פז דלק",
+      "note": null,
+      "occurred_at": "2026-11-17T12:04:00+02:00",
+      "purchase_date": "2026-11-17",
+      "spending": true,
+      "status": "completed"
+     },
+     "why": "charged twice within 4 minutes"
+    },
+    {
+     "reason": "first_time",
+     "text": "₪2,836.00 at ביטוח רכב ישיר, the first charge from them",
+     "title": "₪2,836.00 at ביטוח רכב ישיר",
+     "transaction": {
+      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_kind": "card",
+      "account_label": "Cal 8763",
+      "amount": -70900,
+      "badges": [
+       {
+        "number": 1,
+        "total": 4,
+        "type": "installment"
+       }
+      ],
+      "category": "insurance",
+      "category_label": "Insurance",
+      "category_source": "bank",
+      "charge_date": "2026-12-10",
+      "description": "ביטוח רכב ישיר",
+      "flow": "purchase",
+      "group": "bills",
+      "group_label": "Bills",
+      "id": "5fad833899b3422fa2a5515897d80356",
+      "memo": null,
+      "merchant": "ביטוח רכב ישיר",
+      "merchant_key": "ביטוח רכב ישיר",
+      "note": null,
+      "occurred_at": "2026-11-16T15:00:00+02:00",
+      "purchase_date": "2026-11-16",
+      "spending": true,
+      "status": "completed"
+     },
+     "why": "the first charge from them"
+    }
+   ],
+   "yearly_monthly": 23633
+  },
+  "request": "GET /api/money/overview",
+  "status": 200
+ },
+ "overview_past": {
+  "body": {
+   "attention": [
+    {
+     "name": "Cal",
+     "reason": "bank worker not reachable",
+     "source_id": "1058da3d4a564b4ab2eda3cf21a60762",
+     "state": "failing"
+    }
+   ],
+   "banks": [
+    {
+     "balance": 1234567,
+     "balance_at": "2026-11-18T05:01:00+00:00",
+     "company": "hapoalim",
+     "company_name": "Bank Hapoalim",
+     "id": "edba4736cb534f60b1270c0bbccd6c59",
+     "label": "Bank Hapoalim ••••901",
+     "number": "••••901"
+    }
+   ],
+   "cards": [
+    {
+     "billed_from_account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "company": "visaCal",
+     "company_name": "Cal",
+     "id": "c9698863ba3d4361b14f5305ef6fef09",
+     "label": "Shared card",
+     "next_charge": 120000,
+     "next_charge_date": "2026-11-25",
+     "number": "4580"
+    },
+    {
+     "billed_from_account_id": null,
+     "company": "visaCal",
+     "company_name": "Cal",
+     "id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "label": "Cal 8763",
+     "next_charge": 345081,
+     "next_charge_date": "2026-12-10",
+     "number": "8763"
+    }
+   ],
+   "everyday": {
+    "on_track": null,
+    "total": 177000,
+    "typical": 0
+   },
+   "fixed_monthly": 478623,
+   "forecast": null,
+   "income": {
+    "count": 2,
+    "total": 1517300
+   },
+   "income_month": 1517300,
+   "income_typical": 0,
+   "investments": [],
+   "last_sync_at": "2026-11-18T05:01:00+00:00",
+   "meals": [],
+   "month": "2026-10",
+   "net": 886310,
+   "one_off": 0,
+   "period": {
+    "end": "2026-10-31",
+    "in_progress": false,
+    "key": "2026-10",
+    "label": "October 2026",
+    "start": "2026-10-01"
+   },
+   "recurring_monthly": 455490,
+   "set_aside": 0,
+   "sources": [
+    {
+     "company": "hapoalim",
+     "company_name": "Bank Hapoalim",
+     "id": "2edc618f1aa749038283e03e851ea50c",
+     "label": null,
+     "last_ok_at": "2026-11-18T05:01:00+00:00",
+     "last_sync_at": "2026-11-18T05:01:00+00:00",
+     "name": "Bank Hapoalim",
+     "next_sync_at": "2026-11-18T17:00:00+00:00",
+     "state": "ok",
+     "state_reason": null
+    },
+    {
+     "company": "visaCal",
+     "company_name": "Cal",
+     "id": "1058da3d4a564b4ab2eda3cf21a60762",
+     "label": null,
+     "last_ok_at": "2026-11-17T17:00:00+00:00",
+     "last_sync_at": "2026-11-17T17:00:00+00:00",
+     "name": "Cal",
+     "next_sync_at": "2026-11-18T17:00:00+00:00",
+     "state": "failing",
+     "state_reason": "bank worker not reachable"
+    }
+   ],
+   "spent": {
+    "compare": [
+     {
+      "count": 7,
+      "end": "2026-09-30",
+      "label": "September 2026",
+      "start": "2026-09-01",
+      "total": 608990
+     }
+    ],
+    "count": 8,
+    "total": 630990
+   },
+   "uncategorized": 0,
+   "unusual": [],
+   "yearly_monthly": 23633
+  },
+  "request": "GET /api/money/overview?month=2026-10",
+  "status": 200
+ },
+ "pace": {
+  "body": {
+   "days": 30,
+   "high": [
+    0,
+    0,
+    0,
+    0,
+    6750,
+    6750,
+    6750,
+    48000,
+    48000,
+    48000,
+    48000,
+    48000,
+    48000,
+    48000,
+    108000,
+    108000,
+    108000,
+    108000,
+    108000,
+    108750,
+    108750,
+    116250,
+    116250,
+    116250,
+    116250,
+    116250,
+    116250,
+    116250,
+    116250,
+    116250
+   ],
+   "label": "November 2026",
+   "low": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ],
+   "month": "2026-11",
+   "months": 6,
+   "this_month": [
+    1200,
+    1200,
+    1200,
+    1200,
+    33200,
+    58200,
+    59794,
+    71794,
+    77794,
+    127794,
+    127794,
+    209794,
+    209794,
+    204794,
+    204794,
+    204794,
+    399294,
+    401794,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null
+   ],
+   "today": 18,
+   "typical": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  "request": "GET /api/money/pace",
+  "status": 200
+ },
+ "patch_category": {
+  "body": {
+   "changed": 1,
+   "transaction": {
+    "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+    "account_kind": "card",
+    "account_label": "Cal 8763",
+    "amount": -2500,
+    "badges": [
+     {
+      "type": "provisional"
+     }
+    ],
+    "bank_category": null,
+    "category": "restaurants",
+    "category_label": "Restaurants & cafés",
+    "category_source": "user",
+    "charge_date": null,
+    "created_at": "2026-11-01T00:00:00+00:00",
+    "description": "קפה קפה",
+    "flow": "purchase",
+    "foreign": null,
+    "group": "food",
+    "group_label": "Food",
+    "id": "cc1c287dbb0646818cee159984b859b2",
+    "installment": null,
+    "kind": "everyday",
+    "meal_cycle": null,
+    "memo": null,
+    "merchant": "קפה קפה",
+    "merchant_key": "קפה קפה",
+    "note": null,
+    "notification_id": null,
+    "occurred_at": "2026-11-18T08:10:00+02:00",
+    "one_off": null,
+    "purchase_date": "2026-11-18",
+    "same_merchant": {
+     "count": 1,
+     "first_date": "2026-11-18",
+     "total": -2500
+    },
+    "source": "notification",
+    "spending": true,
+    "status": "provisional",
+    "updated_at": "2026-11-21T11:18:38+00:00",
+    "yearly": null
+   },
+   "undo_id": "c72f36430220"
+  },
+  "request": "PATCH /api/money/transactions/cc1c287dbb0646818cee159984b859b2",
+  "request_body": {
+   "category": "restaurants",
+   "for_merchant": true
+  },
+  "status": 200
+ },
+ "patch_flow": {
+  "body": {
+   "changed": 0,
+   "transaction": {
+    "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+    "account_kind": "card",
+    "account_label": "Cal 8763",
+    "amount": -1594,
+    "badges": [
+     {
+      "amount": -500,
+      "currency": "USD",
+      "type": "foreign"
+     }
+    ],
+    "bank_category": "חינוך",
+    "category": "education",
+    "category_label": "Education",
+    "category_source": "user",
+    "charge_date": null,
+    "created_at": "2026-11-01T00:00:00+00:00",
+    "description": "ONLINE COURSE CO",
+    "flow": "investment",
+    "foreign": {
+     "amount": -500,
+     "currency": "USD"
+    },
+    "group": "family",
+    "group_label": "Family",
+    "id": "a557130906824d5c885cbdaecf1cb31a",
+    "installment": null,
+    "kind": null,
+    "meal_cycle": null,
+    "memo": null,
+    "merchant": "ONLINE COURSE CO",
+    "merchant_key": "online course co",
+    "note": null,
+    "notification_id": null,
+    "occurred_at": "2026-11-07T17:07:18+02:00",
+    "one_off": null,
+    "purchase_date": "2026-11-07",
+    "same_merchant": {
+     "count": 1,
+     "first_date": "2026-11-07",
+     "total": -1594
+    },
+    "source": "scrape",
+    "spending": false,
+    "status": "completed",
+    "updated_at": "2026-11-21T11:18:38+00:00",
+    "yearly": null
+   },
+   "undo_id": "f631873f4566"
+  },
+  "request": "PATCH /api/money/transactions/a557130906824d5c885cbdaecf1cb31a",
+  "request_body": {
+   "flow": "investment"
+  },
+  "status": 200
+ },
+ "patch_note": {
+  "body": {
+   "changed": 0,
+   "transaction": {
+    "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+    "account_kind": "card",
+    "account_label": "Cal 8763",
+    "amount": -2500,
+    "badges": [
+     {
+      "type": "provisional"
+     }
+    ],
+    "bank_category": null,
+    "category": null,
+    "category_label": "Uncategorized",
+    "category_source": null,
+    "charge_date": null,
+    "created_at": "2026-11-01T00:00:00+00:00",
+    "description": "קפה קפה",
+    "flow": "purchase",
+    "foreign": null,
+    "group": null,
+    "group_label": null,
+    "id": "cc1c287dbb0646818cee159984b859b2",
+    "installment": null,
+    "kind": "everyday",
+    "meal_cycle": null,
+    "memo": null,
+    "merchant": "קפה קפה",
+    "merchant_key": "קפה קפה",
+    "note": "with Noa",
+    "notification_id": null,
+    "occurred_at": "2026-11-18T08:10:00+02:00",
+    "one_off": null,
+    "purchase_date": "2026-11-18",
+    "same_merchant": {
+     "count": 1,
+     "first_date": "2026-11-18",
+     "total": -2500
+    },
+    "source": "notification",
+    "spending": true,
+    "status": "provisional",
+    "updated_at": "2026-11-21T11:18:38+00:00",
+    "yearly": null
+   },
+   "undo_id": "1609a0f3e8a5"
+  },
+  "request": "PATCH /api/money/transactions/cc1c287dbb0646818cee159984b859b2",
+  "request_body": {
+   "note": "with Noa"
+  },
+  "status": 200
+ },
+ "patch_one_off": {
+  "body": {
+   "changed": 1,
+   "transaction": {
+    "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+    "account_kind": "card",
+    "account_label": "Cal 8763",
+    "amount": -1594,
+    "badges": [
+     {
+      "amount": -500,
+      "currency": "USD",
+      "type": "foreign"
+     }
+    ],
+    "bank_category": "חינוך",
+    "category": "education",
+    "category_label": "Education",
+    "category_source": "bank",
+    "charge_date": null,
+    "created_at": "2026-11-01T00:00:00+00:00",
+    "description": "ONLINE COURSE CO",
+    "flow": "purchase",
+    "foreign": {
+     "amount": -500,
+     "currency": "USD"
+    },
+    "group": "family",
+    "group_label": "Family",
+    "id": "a557130906824d5c885cbdaecf1cb31a",
+    "installment": null,
+    "kind": "one_off",
+    "meal_cycle": null,
+    "memo": null,
+    "merchant": "ONLINE COURSE CO",
+    "merchant_key": "online course co",
+    "note": null,
+    "notification_id": null,
+    "occurred_at": "2026-11-07T17:07:18+02:00",
+    "one_off": true,
+    "purchase_date": "2026-11-07",
+    "same_merchant": {
+     "count": 1,
+     "first_date": "2026-11-07",
+     "total": -1594
+    },
+    "source": "scrape",
+    "spending": true,
+    "status": "completed",
+    "updated_at": "2026-11-21T11:18:38+00:00",
+    "yearly": null
+   },
+   "undo_id": "2483b4fe7b44"
+  },
+  "request": "PATCH /api/money/transactions/a557130906824d5c885cbdaecf1cb31a",
+  "request_body": {
+   "one_off": true
+  },
+  "status": 200
+ },
+ "recurring": {
+  "body": {
+   "income": [
+    {
+     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_kind": "bank",
+     "account_label": "Bank Hapoalim ••••901",
+     "amount": 1500000,
+     "cadence": "monthly",
+     "category": "salary",
+     "category_label": "Salary",
+     "count": 4,
+     "direction": "in",
+     "first_date": "2026-08-10",
+     "flow": "income",
+     "last_date": "2026-11-10",
+     "merchant": "משכורת אופק",
+     "merchant_key": "משכורת אופק",
+     "merchant_keys": [
+      "משכורת אופק"
+     ],
+     "monthly_cost": 1500000,
+     "next_date": "2026-12-10",
+     "price_change": null,
+     "variable": false
+    },
+    {
+     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_kind": "bank",
+     "account_label": "Bank Hapoalim ••••901",
+     "amount": 17300,
+     "cadence": "monthly",
+     "category": "benefits",
+     "category_label": "Benefits",
+     "count": 3,
+     "direction": "in",
+     "first_date": "2026-08-20",
+     "flow": "income",
+     "last_date": "2026-10-20",
+     "merchant": "קצבת ילדים",
+     "merchant_key": "קצבת ילדים",
+     "merchant_keys": [
+      "קצבת ילדים"
+     ],
+     "monthly_cost": 17300,
+     "next_date": "2026-11-20",
+     "price_change": null,
+     "variable": false
+    }
+   ],
+   "items": [
+    {
+     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_kind": "bank",
+     "account_label": "Bank Hapoalim ••••901",
+     "amount": 450000,
+     "cadence": "monthly",
+     "category": "housing",
+     "category_label": "Rent & mortgage",
+     "count": 3,
+     "direction": "out",
+     "first_date": "2026-08-20",
+     "flow": "loan",
+     "last_date": "2026-10-20",
+     "merchant": "משכנתא לאומי",
+     "merchant_key": "משכנתא לאומי",
+     "merchant_keys": [
+      "משכנתא לאומי"
+     ],
+     "monthly_cost": 450000,
+     "next_date": "2026-11-20",
+     "price_change": null,
+     "variable": false
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": 4990,
+     "cadence": "monthly",
+     "category": "subscriptions",
+     "category_label": "Subscriptions & software",
+     "count": 4,
+     "direction": "out",
+     "first_date": "2026-08-03",
+     "flow": "purchase",
+     "last_date": "2026-11-03",
+     "merchant": "NETFLIX.COM",
+     "merchant_key": "netflix com",
+     "merchant_keys": [
+      "netflix com"
+     ],
+     "monthly_cost": 4990,
+     "next_date": "2026-12-03",
+     "price_change": {
+      "from": 3990,
+      "since": "2026-11-03",
+      "to": 4990
+     },
+     "variable": false
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": 6000,
+     "cadence": "yearly",
+     "category": "subscriptions",
+     "category_label": "Subscriptions & software",
+     "count": 2,
+     "direction": "out",
+     "first_date": "2024-12-01",
+     "flow": "purchase",
+     "last_date": "2025-12-01",
+     "merchant": "NAMECHEAP",
+     "merchant_key": "namecheap",
+     "merchant_keys": [
+      "namecheap"
+     ],
+     "monthly_cost": 500,
+     "next_date": "2026-12-01",
+     "price_change": null,
+     "variable": false
+    }
+   ],
+   "monthly_total": 455490,
+   "yearly": [
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "amount": 283600,
+     "category": "insurance",
+     "category_label": "Insurance",
+     "count": 1,
+     "last_date": "2026-11-16",
+     "marked": false,
+     "merchant": "ביטוח רכב ישיר",
+     "merchant_key": "ביטוח רכב ישיר",
+     "monthly_cost": 23633,
+     "next_date": "2027-11-16",
+     "payments": 4,
+     "row_ids": [
+      "5fad833899b3422fa2a5515897d80356"
+     ]
+    }
+   ],
+   "yearly_monthly": 23633
+  },
+  "request": "GET /api/money/recurring",
+  "status": 200
+ },
+ "transaction_foreign": {
+  "body": {
+   "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+   "account_kind": "card",
+   "account_label": "Cal 8763",
+   "amount": -1594,
+   "badges": [
+    {
+     "amount": -500,
+     "currency": "USD",
+     "type": "foreign"
+    }
+   ],
+   "bank_category": "חינוך",
+   "category": "education",
+   "category_label": "Education",
+   "category_source": "bank",
+   "charge_date": null,
+   "created_at": "2026-11-01T00:00:00+00:00",
+   "description": "ONLINE COURSE CO",
+   "flow": "purchase",
+   "foreign": {
+    "amount": -500,
+    "currency": "USD"
+   },
+   "group": "family",
+   "group_label": "Family",
+   "id": "a557130906824d5c885cbdaecf1cb31a",
+   "installment": null,
+   "kind": "everyday",
+   "meal_cycle": null,
+   "memo": null,
+   "merchant": "ONLINE COURSE CO",
+   "merchant_key": "online course co",
+   "note": null,
+   "notification_id": null,
+   "occurred_at": "2026-11-07T17:07:18+02:00",
+   "one_off": null,
+   "purchase_date": "2026-11-07",
+   "same_merchant": {
+    "count": 1,
+    "first_date": "2026-11-07",
+    "total": -1594
+   },
+   "source": "scrape",
+   "spending": true,
+   "status": "completed",
+   "updated_at": "2026-11-01T00:00:00+00:00",
+   "yearly": null
+  },
+  "request": "GET /api/money/transactions/a557130906824d5c885cbdaecf1cb31a",
+  "status": 200
+ },
+ "transaction_installment": {
+  "body": {
+   "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+   "account_kind": "card",
+   "account_label": "Cal 8763",
+   "amount": -70900,
+   "badges": [
+    {
+     "number": 1,
+     "total": 4,
+     "type": "installment"
+    }
+   ],
+   "bank_category": null,
+   "category": "insurance",
+   "category_label": "Insurance",
+   "category_source": "bank",
+   "charge_date": "2026-12-10",
+   "created_at": "2026-11-01T00:00:00+00:00",
+   "description": "ביטוח רכב ישיר",
+   "flow": "purchase",
+   "foreign": null,
+   "group": "bills",
+   "group_label": "Bills",
+   "id": "5fad833899b3422fa2a5515897d80356",
+   "installment": {
+    "number": 1,
+    "purchase_amount": -283600,
+    "total": 4
+   },
+   "kind": "yearly",
+   "meal_cycle": null,
+   "memo": null,
+   "merchant": "ביטוח רכב ישיר",
+   "merchant_key": "ביטוח רכב ישיר",
+   "note": null,
+   "notification_id": null,
+   "occurred_at": "2026-11-16T15:00:00+02:00",
+   "one_off": null,
+   "purchase_date": "2026-11-16",
+   "same_merchant": {
+    "count": 1,
+    "first_date": "2026-11-16",
+    "total": -70900
+   },
+   "source": "scrape",
+   "spending": true,
+   "status": "completed",
+   "updated_at": "2026-11-01T00:00:00+00:00",
+   "yearly": null
+  },
+  "request": "GET /api/money/transactions/5fad833899b3422fa2a5515897d80356",
+  "status": 200
+ },
+ "transaction_provisional": {
+  "body": {
+   "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+   "account_kind": "card",
+   "account_label": "Cal 8763",
+   "amount": -2500,
+   "badges": [
+    {
+     "type": "provisional"
+    }
+   ],
+   "bank_category": null,
+   "category": null,
+   "category_label": "Uncategorized",
+   "category_source": null,
+   "charge_date": null,
+   "created_at": "2026-11-01T00:00:00+00:00",
+   "description": "קפה קפה",
+   "flow": "purchase",
+   "foreign": null,
+   "group": null,
+   "group_label": null,
+   "id": "cc1c287dbb0646818cee159984b859b2",
+   "installment": null,
+   "kind": "everyday",
+   "meal_cycle": null,
+   "memo": null,
+   "merchant": "קפה קפה",
+   "merchant_key": "קפה קפה",
+   "note": null,
+   "notification_id": null,
+   "occurred_at": "2026-11-18T08:10:00+02:00",
+   "one_off": null,
+   "purchase_date": "2026-11-18",
+   "same_merchant": {
+    "count": 1,
+    "first_date": "2026-11-18",
+    "total": -2500
+   },
+   "source": "notification",
+   "spending": true,
+   "status": "provisional",
+   "updated_at": "2026-11-01T00:00:00+00:00",
+   "yearly": null
+  },
+  "request": "GET /api/money/transactions/cc1c287dbb0646818cee159984b859b2",
+  "status": 200
+ },
+ "transactions": {
+  "body": {
+   "next_cursor": "WyIyMDI2LTExLTEwIiwgIiIsICI4ZDI0ZjE4ZTgxY2M0YTIzYjU0MjhjYjJjNjcyMjQzOCJd",
+   "transactions": [
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -2500,
+     "badges": [
+      {
+       "type": "provisional"
+      }
+     ],
+     "category": null,
+     "category_label": "Uncategorized",
+     "category_source": null,
+     "charge_date": null,
+     "description": "קפה קפה",
+     "flow": "purchase",
+     "group": null,
+     "group_label": null,
+     "id": "cc1c287dbb0646818cee159984b859b2",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "קפה קפה",
+     "merchant_key": "קפה קפה",
+     "note": null,
+     "occurred_at": "2026-11-18T08:10:00+02:00",
+     "purchase_date": "2026-11-18",
+     "spending": true,
+     "status": "provisional"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -150000,
+     "badges": [],
+     "category": "health",
+     "category_label": "Health",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "סופר פארם",
+     "flow": "purchase",
+     "group": "health",
+     "group_label": "Health",
+     "id": "303ba6dc4ce74abc8de40d5a5bcc4d29",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "סופר פארם",
+     "merchant_key": "סופר פארם",
+     "note": null,
+     "occurred_at": "2026-11-17T18:00:00+02:00",
+     "purchase_date": "2026-11-17",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -20000,
+     "badges": [],
+     "category": "fuel",
+     "category_label": "Fuel",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "פז דלק",
+     "flow": "purchase",
+     "group": "transport",
+     "group_label": "Transport",
+     "id": "f0f1a8e8757a4ea093dd5ed2e602ee13",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "פז דלק",
+     "merchant_key": "פז דלק",
+     "note": null,
+     "occurred_at": "2026-11-17T12:04:00+02:00",
+     "purchase_date": "2026-11-17",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -20000,
+     "badges": [],
+     "category": "fuel",
+     "category_label": "Fuel",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "פז דלק",
+     "flow": "purchase",
+     "group": "transport",
+     "group_label": "Transport",
+     "id": "bd9692611464427fbac689b6212e4986",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "פז דלק",
+     "merchant_key": "פז דלק",
+     "note": null,
+     "occurred_at": "2026-11-17T12:00:00+02:00",
+     "purchase_date": "2026-11-17",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -4500,
+     "badges": [
+      {
+       "type": "pending"
+      }
+     ],
+     "category": "delivery",
+     "category_label": "Delivery",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "WOLT",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "e54581b2d1a14c9694812a4dcae58c96",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "WOLT",
+     "merchant_key": "wolt",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-17",
+     "spending": true,
+     "status": "pending"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -70900,
+     "badges": [
+      {
+       "number": 1,
+       "total": 4,
+       "type": "installment"
+      }
+     ],
+     "category": "insurance",
+     "category_label": "Insurance",
+     "category_source": "bank",
+     "charge_date": "2026-12-10",
+     "description": "ביטוח רכב ישיר",
+     "flow": "purchase",
+     "group": "bills",
+     "group_label": "Bills",
+     "id": "5fad833899b3422fa2a5515897d80356",
+     "kind": "yearly",
+     "memo": null,
+     "merchant": "ביטוח רכב ישיר",
+     "merchant_key": "ביטוח רכב ישיר",
+     "note": null,
+     "occurred_at": "2026-11-16T15:00:00+02:00",
+     "purchase_date": "2026-11-16",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -9900,
+     "badges": [
+      {
+       "type": "unmatched"
+      }
+     ],
+     "category": "delivery",
+     "category_label": "Delivery",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "WOLT",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "0aa4c0d12d9d44cfa3ee4ecc74fd844a",
+     "kind": null,
+     "memo": null,
+     "merchant": "WOLT",
+     "merchant_key": "wolt",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-15",
+     "spending": true,
+     "status": "unmatched"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": 5000,
+     "badges": [],
+     "category": "groceries",
+     "category_label": "Groceries",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "שופרסל דיל",
+     "flow": "refund",
+     "group": "food",
+     "group_label": "Food",
+     "id": "de02a611ce9d4fbeb3577a670a301634",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "שופרסל דיל",
+     "merchant_key": "שופרסל דיל",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-14",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -82000,
+     "badges": [],
+     "category": "restaurants",
+     "category_label": "Restaurants & cafés",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "מסעדת הדג",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "86d4f4305a3644c69641482c5ebf36ae",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "מסעדת הדג",
+     "merchant_key": "מסעדת הדג",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-12",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_kind": "bank",
+     "account_label": "Bank Hapoalim ••••901",
+     "amount": -30000,
+     "badges": [],
+     "category": null,
+     "category_label": "Uncategorized",
+     "category_source": null,
+     "charge_date": null,
+     "description": "משיכת מזומן",
+     "flow": "other",
+     "group": null,
+     "group_label": null,
+     "id": "4af7c83cb8f04b42aaabaf9a5e21667e",
+     "kind": null,
+     "memo": null,
+     "merchant": "משיכת מזומן",
+     "merchant_key": "משיכת מזומן",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-11",
+     "spending": false,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -50000,
+     "badges": [],
+     "category": "groceries",
+     "category_label": "Groceries",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "שופרסל דיל",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "237c8688b5b64e4bb4a54efd0fde9e83",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "שופרסל דיל",
+     "merchant_key": "שופרסל דיל",
+     "note": null,
+     "occurred_at": "2026-11-10T10:00:00+00:00",
+     "purchase_date": "2026-11-10",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_kind": "bank",
+     "account_label": "Bank Hapoalim ••••901",
+     "amount": 1500000,
+     "badges": [],
+     "category": "salary",
+     "category_label": "Salary",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "משכורת אופק",
+     "flow": "income",
+     "group": "income",
+     "group_label": "Income",
+     "id": "8d24f18e81cc4a23b5428cb2c6722438",
+     "kind": null,
+     "memo": null,
+     "merchant": "משכורת אופק",
+     "merchant_key": "משכורת אופק",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-10",
+     "spending": false,
+     "status": "completed"
+    }
+   ]
+  },
+  "request": "GET /api/money/transactions?period=this_month&limit=12",
+  "status": 200
+ },
+ "transactions_filtered": {
+  "body": {
+   "next_cursor": null,
+   "transactions": [
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -82000,
+     "badges": [],
+     "category": "restaurants",
+     "category_label": "Restaurants & cafés",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "מסעדת הדג",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "86d4f4305a3644c69641482c5ebf36ae",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "מסעדת הדג",
+     "merchant_key": "מסעדת הדג",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-12",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -50000,
+     "badges": [],
+     "category": "groceries",
+     "category_label": "Groceries",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "שופרסל דיל",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "237c8688b5b64e4bb4a54efd0fde9e83",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "שופרסל דיל",
+     "merchant_key": "שופרסל דיל",
+     "note": null,
+     "occurred_at": "2026-11-10T10:00:00+00:00",
+     "purchase_date": "2026-11-10",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -32000,
+     "badges": [],
+     "category": "groceries",
+     "category_label": "Groceries",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "רמי לוי - יבנה",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "a956e6412f604070b9c615abcf0535fe",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "רמי לוי - יבנה",
+     "merchant_key": "רמי לוי יבנה",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-05",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -20000,
+     "badges": [],
+     "category": "restaurants",
+     "category_label": "Restaurants & cafés",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "מסעדת הדג",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "8e9ca3cf4a4341469eb3431918810fe4",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "מסעדת הדג",
+     "merchant_key": "מסעדת הדג",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-10-25",
+     "spending": true,
+     "status": "completed"
+    }
+   ]
+  },
+  "request": "GET /api/money/transactions?period=last_30_days&category=food&account=6ec40bbad482403aa8b4634c71e95e6b&min=100",
+  "status": 200
+ },
+ "transactions_next": {
+  "body": {
+   "next_cursor": null,
+   "transactions": [
+    {
+     "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+     "account_kind": "card",
+     "account_label": "Shared card",
+     "amount": -6000,
+     "badges": [],
+     "category": null,
+     "category_label": "Uncategorized",
+     "category_source": null,
+     "charge_date": null,
+     "description": "חנות כלבו",
+     "flow": "purchase",
+     "group": null,
+     "group_label": null,
+     "id": "b6c46ac9f0ff485baa5e8fcdeec75521",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "חנות כלבו",
+     "merchant_key": "חנות כלבו",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-09",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+     "account_kind": "card",
+     "account_label": "Shared card",
+     "amount": -12000,
+     "badges": [],
+     "category": "restaurants",
+     "category_label": "Restaurants & cafés",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "קפה לנדוור",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "73bb114428c346ac8bb40f1ff640e5f6",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "קפה לנדוור",
+     "merchant_key": "קפה לנדוור",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-08",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -1594,
+     "badges": [
+      {
+       "amount": -500,
+       "currency": "USD",
+       "type": "foreign"
+      }
+     ],
+     "category": "education",
+     "category_label": "Education",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "ONLINE COURSE CO",
+     "flow": "purchase",
+     "group": "family",
+     "group_label": "Family",
+     "id": "a557130906824d5c885cbdaecf1cb31a",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "ONLINE COURSE CO",
+     "merchant_key": "online course co",
+     "note": null,
+     "occurred_at": "2026-11-07T17:07:18+02:00",
+     "purchase_date": "2026-11-07",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_kind": "bank",
+     "account_label": "Bank Hapoalim ••••901",
+     "amount": -25000,
+     "badges": [],
+     "category": "transfers",
+     "category_label": "Transfers to people",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "העברה לדני כהן",
+     "flow": "transfer_out",
+     "group": "people",
+     "group_label": "People",
+     "id": "d1381df082dd4d6f858948d8f82ccaa5",
+     "kind": "everyday",
+     "memo": "עבור כרטיסים להופעה",
+     "merchant": "העברה לדני כהן",
+     "merchant_key": "העברה לדני כהן",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-06",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -32000,
+     "badges": [],
+     "category": "groceries",
+     "category_label": "Groceries",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "רמי לוי - יבנה",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "a956e6412f604070b9c615abcf0535fe",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "רמי לוי - יבנה",
+     "merchant_key": "רמי לוי יבנה",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-05",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_kind": "bank",
+     "account_label": "Bank Hapoalim ••••901",
+     "amount": -100000,
+     "badges": [],
+     "category": null,
+     "category_label": "Uncategorized",
+     "category_source": null,
+     "charge_date": null,
+     "description": "העברה לחיסכון",
+     "flow": "own_transfer",
+     "group": null,
+     "group_label": null,
+     "id": "2559aadd237d400f93957e56ae9c2610",
+     "kind": null,
+     "memo": null,
+     "merchant": "העברה לחיסכון",
+     "merchant_key": "העברה לחיסכון",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-04",
+     "spending": false,
+     "status": "completed"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -4990,
+     "badges": [],
+     "category": "subscriptions",
+     "category_label": "Subscriptions & software",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "NETFLIX.COM",
+     "flow": "purchase",
+     "group": "bills",
+     "group_label": "Bills",
+     "id": "94dc0be643e04e5686cbc8f4a01ddce2",
+     "kind": "fixed",
+     "memo": null,
+     "merchant": "NETFLIX.COM",
+     "merchant_key": "netflix com",
+     "note": null,
+     "occurred_at": "2026-11-03T10:00:00+02:00",
+     "purchase_date": "2026-11-03",
+     "spending": true,
+     "status": "completed"
+    },
+    {
+     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_kind": "bank",
+     "account_label": "Bank Hapoalim ••••901",
+     "amount": -345000,
+     "badges": [],
+     "category": null,
+     "category_label": "Uncategorized",
+     "category_source": null,
+     "charge_date": null,
+     "description": "כאל",
+     "flow": "card_bill",
+     "group": null,
+     "group_label": null,
+     "id": "c5e491214f8542e5aea36554f83203d5",
+     "kind": null,
+     "memo": null,
+     "merchant": "כאל",
+     "merchant_key": "כאל",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-02",
+     "spending": false,
+     "status": "completed"
+    },
+    {
+     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_kind": "bank",
+     "account_label": "Bank Hapoalim ••••901",
+     "amount": -1200,
+     "badges": [],
+     "category": "fees",
+     "category_label": "Fees",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "עמלת פעולה",
+     "flow": "fee",
+     "group": "finance",
+     "group_label": "Finance",
+     "id": "d16f57c3fa3b4b65896b3cd14e314935",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "עמלת פעולה",
+     "merchant_key": "עמלת פעולה",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-01",
+     "spending": true,
+     "status": "completed"
+    }
+   ]
+  },
+  "request": "GET /api/money/transactions?period=this_month&limit=12&cursor=WyIyMDI2LTExLTEwIiwgIiIsICI4ZDI0ZjE4ZTgxY2M0YTIzYjU0MjhjYjJjNjcyMjQzOCJd",
+  "status": 200
+ },
+ "transactions_search": {
+  "body": {
+   "next_cursor": null,
+   "transactions": [
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -4500,
+     "badges": [
+      {
+       "type": "pending"
+      }
+     ],
+     "category": "delivery",
+     "category_label": "Delivery",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "WOLT",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "e54581b2d1a14c9694812a4dcae58c96",
+     "kind": "everyday",
+     "memo": null,
+     "merchant": "WOLT",
+     "merchant_key": "wolt",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-17",
+     "spending": true,
+     "status": "pending"
+    },
+    {
+     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_kind": "card",
+     "account_label": "Cal 8763",
+     "amount": -9900,
+     "badges": [
+      {
+       "type": "unmatched"
+      }
+     ],
+     "category": "delivery",
+     "category_label": "Delivery",
+     "category_source": "bank",
+     "charge_date": null,
+     "description": "WOLT",
+     "flow": "purchase",
+     "group": "food",
+     "group_label": "Food",
+     "id": "0aa4c0d12d9d44cfa3ee4ecc74fd844a",
+     "kind": null,
+     "memo": null,
+     "merchant": "WOLT",
+     "merchant_key": "wolt",
+     "note": null,
+     "occurred_at": null,
+     "purchase_date": "2026-11-15",
+     "spending": true,
+     "status": "unmatched"
+    }
+   ]
+  },
+  "request": "GET /api/money/transactions?q=wolt",
+  "status": 200
+ },
+ "trends": {
+  "body": {
+   "days": 30,
+   "elapsed": 18,
+   "everyday": {
+    "on_track": 401794,
+    "total": 401794,
+    "typical": 0
+   },
+   "groups": [
+    {
+     "categories": [
+      {
+       "delta": 225000,
+       "key": "housing",
+       "label": "Rent & mortgage",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        450000,
+        450000,
+        450000,
+        0
+       ],
+       "on_track": 450000,
+       "total": 0,
+       "typical": 225000
+      }
+     ],
+     "delta": 225000,
+     "key": "housing",
+     "label": "Housing",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      450000,
+      450000,
+      450000,
+      0
+     ],
+     "on_track": 450000,
+     "total": 0,
+     "typical": 225000
+    },
+    {
+     "categories": [
+      {
+       "delta": 94000,
+       "key": "restaurants",
+       "label": "Restaurants & cafés",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        50000,
+        94000
+       ],
+       "on_track": 94000,
+       "total": 94000,
+       "typical": 0
+      },
+      {
+       "delta": 77000,
+       "key": "groceries",
+       "label": "Groceries",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        55000,
+        105000,
+        77000
+       ],
+       "on_track": 77000,
+       "total": 77000,
+       "typical": 0
+      },
+      {
+       "delta": 4500,
+       "key": "delivery",
+       "label": "Delivery",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        4500
+       ],
+       "on_track": 4500,
+       "total": 4500,
+       "typical": 0
+      }
+     ],
+     "delta": 175500,
+     "key": "food",
+     "label": "Food",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      55000,
+      155000,
+      175500
+     ],
+     "on_track": 175500,
+     "total": 175500,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 150000,
+       "key": "health",
+       "label": "Health",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20000,
+        22000,
+        150000
+       ],
+       "on_track": 150000,
+       "total": 150000,
+       "typical": 0
+      }
+     ],
+     "delta": 150000,
+     "key": "health",
+     "label": "Health",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      20000,
+      22000,
+      150000
+     ],
+     "on_track": 150000,
+     "total": 150000,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 70900,
+       "key": "insurance",
+       "label": "Insurance",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        70900
+       ],
+       "on_track": 70900,
+       "total": 70900,
+       "typical": 0
+      },
+      {
+       "delta": 2995,
+       "key": "subscriptions",
+       "label": "Subscriptions & software",
+       "months": [
+        6000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3990,
+        3990,
+        3990,
+        4990
+       ],
+       "on_track": 4990,
+       "total": 4990,
+       "typical": 1995
+      }
+     ],
+     "delta": 73895,
+     "key": "bills",
+     "label": "Bills",
+     "months": [
+      6000,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      3990,
+      3990,
+      3990,
+      75890
+     ],
+     "on_track": 75890,
+     "total": 75890,
+     "typical": 1995
+    },
+    {
+     "categories": [
+      {
+       "delta": 40000,
+       "key": "fuel",
+       "label": "Fuel",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        40000
+       ],
+       "on_track": 40000,
+       "total": 40000,
+       "typical": 0
+      }
+     ],
+     "delta": 40000,
+     "key": "transport",
+     "label": "Transport",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      40000
+     ],
+     "on_track": 40000,
+     "total": 40000,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 25000,
+       "key": "transfers",
+       "label": "Transfers to people",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        25000
+       ],
+       "on_track": 25000,
+       "total": 25000,
+       "typical": 0
+      }
+     ],
+     "delta": 25000,
+     "key": "people",
+     "label": "People",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      25000
+     ],
+     "on_track": 25000,
+     "total": 25000,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 8500,
+       "key": "uncategorized",
+       "label": "Uncategorized",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        8500
+       ],
+       "on_track": 8500,
+       "total": 8500,
+       "typical": 0
+      }
+     ],
+     "delta": 8500,
+     "key": "uncategorized",
+     "label": "Uncategorized",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      8500
+     ],
+     "on_track": 8500,
+     "total": 8500,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 1594,
+       "key": "education",
+       "label": "Education",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1594
+       ],
+       "on_track": 1594,
+       "total": 1594,
+       "typical": 0
+      }
+     ],
+     "delta": 1594,
+     "key": "family",
+     "label": "Family",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1594
+     ],
+     "on_track": 1594,
+     "total": 1594,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 1200,
+       "key": "fees",
+       "label": "Fees",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1200
+       ],
+       "on_track": 1200,
+       "total": 1200,
+       "typical": 0
+      }
+     ],
+     "delta": 1200,
+     "key": "finance",
+     "label": "Finance",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      1200
+     ],
+     "on_track": 1200,
+     "total": 1200,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 0,
+       "key": "electronics",
+       "label": "Electronics",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        80000,
+        0,
+        0
+       ],
+       "on_track": 0,
+       "total": 0,
+       "typical": 0
+      }
+     ],
+     "delta": 0,
+     "key": "shopping",
+     "label": "Shopping",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      80000,
+      0,
+      0
+     ],
+     "on_track": 0,
+     "total": 0,
+     "typical": 0
+    }
+   ],
+   "in_progress": true,
+   "label": "November 2026",
+   "month": "2026-11",
+   "months": [
+    "Dec 2025",
+    "Jan 2026",
+    "Feb 2026",
+    "Mar 2026",
+    "Apr 2026",
+    "May 2026",
+    "Jun 2026",
+    "Jul 2026",
+    "Aug 2026",
+    "Sep 2026",
+    "Oct 2026",
+    "Nov 2026"
+   ],
+   "movers": [
+    {
+     "delta": 150000,
+     "direction": "new",
+     "group": "health",
+     "key": "health",
+     "label": "Health",
+     "typical": 0,
+     "value": 150000
+    },
+    {
+     "delta": 94000,
+     "direction": "new",
+     "group": "food",
+     "key": "restaurants",
+     "label": "Restaurants & cafés",
+     "typical": 0,
+     "value": 94000
+    },
+    {
+     "delta": 77000,
+     "direction": "new",
+     "group": "food",
+     "key": "groceries",
+     "label": "Groceries",
+     "typical": 0,
+     "value": 77000
+    },
+    {
+     "delta": 40000,
+     "direction": "new",
+     "group": "transport",
+     "key": "fuel",
+     "label": "Fuel",
+     "typical": 0,
+     "value": 40000
+    },
+    {
+     "delta": 25000,
+     "direction": "new",
+     "group": "people",
+     "key": "transfers",
+     "label": "Transfers to people",
+     "typical": 0,
+     "value": 25000
+    }
+   ],
+   "one_offs": []
+  },
+  "request": "GET /api/money/trends",
+  "status": 200
+ },
+ "trends_past": {
+  "body": {
+   "days": 31,
+   "elapsed": 31,
+   "everyday": {
+    "on_track": null,
+    "total": 177000,
+    "typical": 0
+   },
+   "groups": [
+    {
+     "categories": [
+      {
+       "delta": 450000,
+       "key": "housing",
+       "label": "Rent & mortgage",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        450000,
+        450000,
+        450000
+       ],
+       "on_track": null,
+       "total": 450000,
+       "typical": 0
+      }
+     ],
+     "delta": 450000,
+     "key": "housing",
+     "label": "Housing",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      450000,
+      450000,
+      450000
+     ],
+     "on_track": null,
+     "total": 450000,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 105000,
+       "key": "groceries",
+       "label": "Groceries",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        55000,
+        105000
+       ],
+       "on_track": null,
+       "total": 105000,
+       "typical": 0
+      },
+      {
+       "delta": 50000,
+       "key": "restaurants",
+       "label": "Restaurants & cafés",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        50000
+       ],
+       "on_track": null,
+       "total": 50000,
+       "typical": 0
+      }
+     ],
+     "delta": 155000,
+     "key": "food",
+     "label": "Food",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      55000,
+      155000
+     ],
+     "on_track": null,
+     "total": 155000,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 22000,
+       "key": "health",
+       "label": "Health",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        20000,
+        22000
+       ],
+       "on_track": null,
+       "total": 22000,
+       "typical": 0
+      }
+     ],
+     "delta": 22000,
+     "key": "health",
+     "label": "Health",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      20000,
+      22000
+     ],
+     "on_track": null,
+     "total": 22000,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 3990,
+       "key": "subscriptions",
+       "label": "Subscriptions & software",
+       "months": [
+        0,
+        6000,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        3990,
+        3990,
+        3990
+       ],
+       "on_track": null,
+       "total": 3990,
+       "typical": 0
+      }
+     ],
+     "delta": 3990,
+     "key": "bills",
+     "label": "Bills",
+     "months": [
+      0,
+      6000,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      3990,
+      3990,
+      3990
+     ],
+     "on_track": null,
+     "total": 3990,
+     "typical": 0
+    },
+    {
+     "categories": [
+      {
+       "delta": 0,
+       "key": "electronics",
+       "label": "Electronics",
+       "months": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        80000,
+        0
+       ],
+       "on_track": null,
+       "total": 0,
+       "typical": 0
+      }
+     ],
+     "delta": 0,
+     "key": "shopping",
+     "label": "Shopping",
+     "months": [
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      0,
+      80000,
+      0
+     ],
+     "on_track": null,
+     "total": 0,
+     "typical": 0
+    }
+   ],
+   "in_progress": false,
+   "label": "October 2026",
+   "month": "2026-10",
+   "months": [
+    "Nov 2025",
+    "Dec 2025",
+    "Jan 2026",
+    "Feb 2026",
+    "Mar 2026",
+    "Apr 2026",
+    "May 2026",
+    "Jun 2026",
+    "Jul 2026",
+    "Aug 2026",
+    "Sep 2026",
+    "Oct 2026"
+   ],
+   "movers": [
+    {
+     "delta": 105000,
+     "direction": "new",
+     "group": "food",
+     "key": "groceries",
+     "label": "Groceries",
+     "typical": 0,
+     "value": 105000
+    },
+    {
+     "delta": 50000,
+     "direction": "new",
+     "group": "food",
+     "key": "restaurants",
+     "label": "Restaurants & cafés",
+     "typical": 0,
+     "value": 50000
+    },
+    {
+     "delta": 22000,
+     "direction": "new",
+     "group": "health",
+     "key": "health",
+     "label": "Health",
+     "typical": 0,
+     "value": 22000
+    }
+   ],
+   "one_offs": []
+  },
+  "request": "GET /api/money/trends?month=2026-10",
+  "status": 200
+ },
+ "undo": {
+  "body": {
+   "label": "Set קפה קפה and its merchant to Restaurants & cafés",
+   "ok": true
+  },
+  "request": "POST /api/undo/c72f36430220",
+  "status": 200
+ },
+ "undo_flow": {
+  "body": {
+   "label": "Counted ONLINE COURSE CO as money set aside",
+   "ok": true
+  },
+  "request": "POST /api/undo/f631873f4566",
+  "status": 200
+ },
+ "undo_one_off": {
+  "body": {
+   "label": "Marked ONLINE COURSE CO a one-off",
+   "ok": true
+  },
+  "request": "POST /api/undo/2483b4fe7b44",
+  "status": 200
+ }
+}

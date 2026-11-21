@@ -1,10 +1,10 @@
 """Access levels (docs/access.md, "Access level").
 
-A level covers only what integrations cannot express. Every level is one row
+A level covers only what addons cannot express. Every level is one row
 of :data:`LEVELS`; adding a level is adding a row, adding a capability is a
 field of :class:`AccessLevel` (named in :data:`CAPABILITIES`) set on every row.
 Code asks a level with :meth:`AccessLevel.allows` (web endpoints:
-``core.auth.requires``; integrations: ``Integration(requires=...)``) or, for
+``core.auth.requires``; addons: ``Addon(requires=...)``) or, for
 chat model profiles, :meth:`AccessLevel.may_use_profile`.
 """
 
@@ -15,9 +15,9 @@ from typing import Dict, Optional, Tuple
 @dataclass(frozen=True)
 class AccessLevel:
     name: str
-    # May connect the ``ops`` integration (kubectl, Python).
+    # May connect the ``ops`` addon (kubectl, Python).
     ops: bool
-    # May manage users and other users' integrations.
+    # May manage users and other users' addons.
     manage_users: bool
     # Sees everyone's usage and the system self-checks (otherwise only their own).
     see_everyone: bool

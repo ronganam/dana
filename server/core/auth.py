@@ -26,10 +26,10 @@ request is the first admin user, and a warning is logged at startup.
 
 Access (docs/access.md, "Enforcement"): endpoints about the whole server are
 wrapped in :func:`requires` (403 ``{"error": "forbidden", "needs": <capability>}``
-for a level without it), and :func:`integration_middleware` answers a handler
-that needed an integration the user has not connected
-(``integrations.framework.store.NotConnected``) with 403
-``{"error": "not_connected", "integration": <kind>}``.
+for a level without it), and :func:`addon_middleware` answers a handler
+that needed an addon the user has not connected
+(``core.addons.store.NotConnected``) with 403
+``{"error": "not_connected", "addon": <name>}``.
 """
 
 import functools
@@ -44,7 +44,7 @@ from yarl import URL
 from core import users
 from core.access import CAPABILITIES
 from core.users import User
-from integrations.framework.store import NotConnected
+from core.addons.store import NotConnected
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 
@@ -144,12 +144,12 @@ def requires(capability: str) -> Callable[[Handler], Handler]:
 
 
 def not_connected_response(error: NotConnected) -> web.Response:
-    """The answer to a request that needed an integration the user has not connected."""
-    return web.json_response({"error": "not_connected", "integration": error.kind}, status=403)
+    """The answer to a request that needed an addon the user has not connected."""
+    return web.json_response({"error": "not_connected", "addon": error.addon}, status=403)
 
 
 @web.middleware
-async def integration_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+async def addon_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
     """Turn a :class:`NotConnected` raised by a handler (a direct call of a
     tool function with ``store.require``) into :func:`not_connected_response`.
     Handlers with a catch-all ``except`` re-raise it so it gets here."""
@@ -215,10 +215,10 @@ async def login_submit(request: web.Request) -> web.StreamResponse:
 
 
 def setup_auth(app: web.Application) -> None:
-    """Install the auth middleware (then the integration middleware, inside
+    """Install the auth middleware (then the addon middleware, inside
     it) and the login routes on ``app``."""
     app.middlewares.append(auth_middleware)
-    app.middlewares.append(integration_middleware)
+    app.middlewares.append(addon_middleware)
     app.router.add_get("/login", login_page)
     app.router.add_post("/login", login_submit)
     if users.env_token():

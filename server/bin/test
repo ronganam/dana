@@ -2,13 +2,19 @@
 """Run the test scripts side by side and print only what needs attention.
 
     bin/test                     every script (test_*.py except test_agent.py, test_*.mjs)
-    bin/test shopping users      only scripts whose name contains one of the words
+    bin/test shopping users      only scripts whose path contains one of the words
     bin/test --changed           only scripts touched by, or importing, what changed since HEAD
     bin/test --changed master    … since another ref (e.g. the branch point)
     bin/test --quick             leave out the slow import smoke test (test_imports.py)
     bin/test --list              each script and the first line of its docstring
     bin/test -v                  print the whole output of failed scripts, not the tail
     bin/test -j 4                at most 4 at a time (default: one per CPU, fewer when memory is short)
+
+Scripts live in tests/ (core), addons/<name>/tests/ (each addon), bank-worker/test/
+(the bank worker's .mjs) and the tests/ folder of each site addon (the folders
+DANA_ADDON_DIRS names, else the site's addons/: docs/site.md). Each runs from this
+folder with it and tests/ on PYTHONPATH (so `import testenv` and the app's modules
+resolve); a script is named by its path from here (addons/tasks/tests/test_tasks_users.py).
 
 A script that fails is run once more on its own (some checks are timing-based and
 can trip under load); one that then passes is reported as flaky, not failed.
@@ -33,9 +39,9 @@ ROOT = Path(__file__).resolve().parent.parent
 NEVER = {"test_agent.py"}            # calls the real model
 SLOW = {"test_imports.py"}
 # Changing one of these can break anything: --changed runs everything.
-EVERYTHING = ("testenv.py", "testfakes.py", "requirements.txt", "main.py", "core/db/",
-              "integrations/framework/", "integrations/__init__.py", "core/users.py", "core/auth.py",
-              "core/agent.py", "core/server.py", "test_fixtures/db_8_1_0.sql")
+EVERYTHING = ("tests/testenv.py", "tests/testfakes.py", "requirements.txt", "main.py", "core/db/",
+              "core/addons/", "addons/__init__.py", "core/users.py", "core/auth.py",
+              "core/agent.py", "core/server.py", "tests/fixtures/db_8_1_0.sql", "bin/test")
 
 
 MB_PER_JOB = 400                     # a test script with the app imported peaks around 250 MB
@@ -58,9 +64,39 @@ def python() -> str:
     return str(venv) if venv.exists() else sys.executable
 
 
+def site_addon_dirs() -> list[Path]:
+    """The site addon folders, as the server finds them (addons/__init__.py: ``DANA_ADDON_DIRS``,
+    else ``$DANA_SITE/addons``, else ``site/addons`` at the repository root)."""
+    raw = os.environ.get("DANA_ADDON_DIRS")
+    if raw is None:
+        site = os.environ.get("DANA_SITE", "").strip()
+        raw = str((Path(site).expanduser() if site else ROOT.parent / "site") / "addons")
+    return [Path(d).expanduser().resolve() for d in raw.split(os.pathsep) if d.strip()]
+
+
+def script_paths() -> list[Path]:
+    """Every test script: core's, each official addon's, the bank worker's, each site addon's."""
+    found = [*ROOT.glob("tests/test_*"), *ROOT.glob("addons/*/tests/test_*"), *ROOT.glob("bank-worker/test/test_*")]
+    for folder in site_addon_dirs():
+        found += folder.glob("*/tests/test_*") if folder.is_dir() else []
+    return [p for p in found if p.suffix in (".py", ".mjs") and p.is_file() and p.name not in NEVER]
+
+
+def label(path: Path) -> str:
+    """How a script is named: its path from the server folder (absolute when outside it)."""
+    path = path.resolve()
+    return str(path.relative_to(ROOT)) if path.is_relative_to(ROOT) else str(path)
+
+
 def all_scripts() -> list[str]:
-    py = sorted(p.name for p in ROOT.glob("test_*.py") if p.name not in NEVER)
-    return py + sorted(p.name for p in ROOT.glob("test_*.mjs"))
+    scripts = [label(p) for p in script_paths()]
+    return sorted(s for s in scripts if s.endswith(".py")) + sorted(s for s in scripts if s.endswith(".mjs"))
+
+
+def env() -> dict[str, str]:
+    """The scripts' environment: the server folder and tests/ on the import path."""
+    paths = [str(ROOT), str(ROOT / "tests")] + [p for p in os.environ.get("PYTHONPATH", "").split(os.pathsep) if p]
+    return dict(os.environ, PYTHONPATH=os.pathsep.join(paths))
 
 
 def describe(name: str) -> str:
@@ -80,11 +116,14 @@ def changed_files(ref: str) -> list[str]:
                          check=True).stdout
     new = subprocess.run(["git", "ls-files", "--others", "--exclude-standard"], cwd=ROOT,
                          capture_output=True, text=True, check=True).stdout
-    return sorted(set(out.split()) | set(new.split()))
+    # The shipped example addon lives beside the server, in the repository's examples/
+    examples = subprocess.run(["git", "diff", "--name-only", ref, "--", "../examples"], cwd=ROOT,
+                              capture_output=True, text=True).stdout
+    return sorted(set(out.split()) | set(new.split()) | {"../" + f for f in examples.split()})
 
 
 def module_of(path: str) -> str | None:
-    if not path.endswith(".py") or not path.startswith(("core/", "integrations/")):
+    if not path.endswith(".py") or not path.startswith(("core/", "addons/")) or "/tests/" in path:
         return None
     parts = Path(path).with_suffix("").parts
     return ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
@@ -99,21 +138,22 @@ def select_changed(ref: str, scripts: list[str]) -> tuple[list[str], str]:
     picked: set[str] = set()
     sources = {s: (ROOT / s).read_text() for s in scripts}
     for f in files:
-        name = Path(f).name
-        if name in sources:                                   # a test script itself
-            picked.add(name)
+        if f in sources:                                      # a test script itself
+            picked.add(f)
         if f.startswith("static/"):
-            picked.update(s for s in scripts if s.startswith("test_web_"))
+            picked.update(s for s in scripts if Path(s).name.startswith("test_web_"))
         if f.startswith("bank-worker/"):
-            picked.update(s for s in scripts if s.startswith("test_bank_worker"))
-        if f.startswith("test_fixtures/"):
-            stem = Path(f).parts[1] if len(Path(f).parts) > 2 else Path(f).stem
+            picked.update(s for s in scripts if s.startswith("bank-worker/"))
+        if f.startswith("tests/fixtures/"):
+            stem = Path(f).parts[2] if len(Path(f).parts) > 3 else Path(f).stem
             picked.update(s for s, src in sources.items() if stem in src)
+        if f.startswith("../examples/"):
+            picked.add("tests/test_addon_loading.py")
         if f.startswith("bin/users.py"):
-            picked.add("test_users_cli.py")
-        if f.startswith("integrations/") and len(Path(f).parts) > 2:
-            kind = Path(f).parts[1]                           # integrations/<kind>/…
-            picked.update(s for s in scripts if kind in s)
+            picked.add("tests/test_users_cli.py")
+        if f.startswith("addons/") and len(Path(f).parts) > 2:
+            name = Path(f).parts[1]                           # addons/<name>/…: its tests, and scripts named after it
+            picked.update(s for s in scripts if s.startswith(f"addons/{name}/") or name in Path(s).name)
         module = module_of(f)
         if module:
             # Scripts naming the module (`import core.now`, `core.now.x` in a patch)
@@ -125,8 +165,8 @@ def select_changed(ref: str, scripts: list[str]) -> tuple[list[str], str]:
             if not hits:
                 return scripts, f"nothing names {module}: running everything"
             picked.update(hits)
-        if f.endswith(".py") and f.startswith(("core/", "integrations/")) and f in new_python_files(ref):
-            picked.add("test_imports.py")
+        if module and f in new_python_files(ref):
+            picked.add("tests/test_imports.py")
     return sorted(picked), f"{len(files)} changed file(s)"
 
 
@@ -140,10 +180,10 @@ def new_python_files(ref: str) -> set[str]:
 
 def run(name: str, logdir: Path, suffix: str = "") -> tuple[str, int, float, Path]:
     cmd = ["node", name] if name.endswith(".mjs") else [python(), name]
-    log = logdir / f"{name}{suffix}.log"
+    log = logdir / f"{name.strip('/').replace('/', '__')}{suffix}.log"
     start = time.monotonic()
     with log.open("w") as fh:
-        rc = subprocess.run(cmd, cwd=ROOT, stdout=fh, stderr=subprocess.STDOUT).returncode
+        rc = subprocess.run(cmd, cwd=ROOT, env=env(), stdout=fh, stderr=subprocess.STDOUT).returncode
     return name, rc, time.monotonic() - start, log
 
 
@@ -179,7 +219,7 @@ def main(argv: list[str]) -> int:
         scripts = [s for s in scripts if any(w in s for w in args.words)]
         why = f"matching {' '.join(args.words)}"
     if args.quick:
-        scripts = [s for s in scripts if s not in SLOW]
+        scripts = [s for s in scripts if Path(s).name not in SLOW]
     if not scripts:
         print(f"No test scripts to run ({why}).")
         return 0
@@ -188,7 +228,7 @@ def main(argv: list[str]) -> int:
     print(f"Running {len(scripts)} script(s) ({why}), {args.jobs} at a time …", flush=True)
     start = time.monotonic()
     # Slowest first so the long one is not the last to start.
-    order = sorted(scripts, key=lambda s: s not in SLOW)
+    order = sorted(scripts, key=lambda s: Path(s).name not in SLOW)
     with ThreadPoolExecutor(max_workers=args.jobs) as pool:
         results = list(pool.map(lambda s: run(s, logdir), order))
 

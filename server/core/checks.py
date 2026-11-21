@@ -6,30 +6,30 @@ network calls) and says whether the signal still arrives:
 
 - ``push``: a phone of the user is registered for direct push, FCM accepts
   pings to it and it keeps fetching events (marked per user by
-  integrations/phone/push.py).
+  addons/phone/push.py).
 - ``notification_sync``: the user's phone sends notification batches.
 - ``location`` / ``car``: the user's Home Assistant watcher still sees their
   person entity / car sensor change.
 - ``ha_entities`` / ``ha_watcher``: the entities selected in the user's Home
   Assistant settings exist, and the watcher is connected
-  (integrations/homeassistant/watcher.py, marks in its ``status`` module).
+  (addons/homeassistant/watcher.py, marks in its ``status`` module).
 - ``wake``: the user's wake was confirmed within ``CHECK_WAKE_DAYS`` (3).
 - ``reminders``: the time-trigger loop is alive (the server's own: only for
   users with ``see_everyone``).
 - ``triage``: TypeSafe answers (the user's notifications aren't all failing to sort).
 - ``calls``: the user's recordings arrive and get processed.
 - ``calendar``: the user's Google Calendar can be read (marked per user by
-  integrations/calendar/today.py, the Now screen's cache).
+  addons/calendar/today.py, the Now screen's cache).
 - ``briefing``: the user's briefing of today exists by late morning.
 - ``money``: each of the user's bank / card logins syncs: none waits for an
   SMS code or needs its login fixed, and each had a good sync within
-  24 hours (integrations/money, table ``money_sources``).
+  24 hours (addons/money, table ``money_sources``).
 
-Per user: :func:`for_user` gives the checks of the kinds the user has
+Per user: :func:`for_user` gives the checks of the addons the user has
 connected (:data:`APPLIES`) plus, for users with ``see_everyone``, the
 server's own (:data:`SERVER_CHECKS`); ignoring one hides it only for them
 (core/now_hidden.py). :func:`compute` answers every check for one user, a
-kind they lack as ok "not connected".
+addon they lack as ok "not connected".
 
 Signals without a timestamp elsewhere are recorded with :func:`mark` (table
 ``system_marks``); confirmed wakes are in ``wake_log`` (one row per user and
@@ -48,14 +48,14 @@ from typing import Any, Callable, Dict, List, Optional, Tuple
 from core import briefing, clock, now_hidden, undo, users, wake
 from core.db import get_db_connection
 from core.users import User
-from integrations.calendar import config as calendar_config, today as calendar_today
-from integrations.framework import store
-from integrations.homeassistant import config as ha_config, status as ha_status, watcher as ha_watcher
-from integrations.money import companies as money_companies, config as money_config
-from integrations.people.values import ago as people_ago
-from integrations.phone import push as phone_push
-from integrations.phone.config import KIND as PHONE, mark_key as phone_mark_key
-from integrations.tasks import triggers as task_triggers
+from addons.calendar import config as calendar_config, today as calendar_today
+from core.addons import store
+from addons.homeassistant import config as ha_config, status as ha_status, watcher as ha_watcher
+from addons.money import companies as money_companies, config as money_config
+from addons.people.values import ago as people_ago
+from addons.phone import push as phone_push
+from addons.phone.config import ADDON as PHONE, mark_key as phone_mark_key
+from addons.tasks import triggers as task_triggers
 
 logger = logging.getLogger(__name__)
 
@@ -91,24 +91,24 @@ SERVER_CHECKS = ("reminders",)
 SERVER_CAPABILITY = "see_everyone"
 
 
-def _kind(kind: str) -> Callable[[User], bool]:
-    return lambda user: store.is_connected(user, kind)
+def _addon(name: str) -> Callable[[User], bool]:
+    return lambda user: store.is_connected(user, name)
 
 
-# Which user a check is for: the kinds it reads (a user without them does not see it).
+# Which user a check is for: the addons it reads (a user without them does not see it).
 APPLIES: Dict[str, Callable[[User], bool]] = {
-    "push": _kind(PHONE),
-    "notification_sync": _kind(PHONE),
-    "location": _kind(ha_config.KIND),
-    "car": _kind(ha_config.KIND),
-    "ha_entities": _kind(ha_config.KIND),
-    "ha_watcher": _kind(ha_config.KIND),
+    "push": _addon(PHONE),
+    "notification_sync": _addon(PHONE),
+    "location": _addon(ha_config.ADDON),
+    "car": _addon(ha_config.ADDON),
+    "ha_entities": _addon(ha_config.ADDON),
+    "ha_watcher": _addon(ha_config.ADDON),
     "wake": wake.available,
-    "triage": _kind(PHONE),
-    "calls": _kind(PHONE),
-    "calendar": _kind(calendar_config.KIND),
+    "triage": _addon(PHONE),
+    "calls": _addon(PHONE),
+    "calendar": _addon(calendar_config.ADDON),
     "briefing": briefing.available,
-    "money": _kind(money_config.KIND),
+    "money": _addon(money_config.ADDON),
 }
 
 
@@ -270,13 +270,13 @@ def _check_trigger_feed(conn, now: datetime.datetime, user: Optional[User], key:
                        title=f"No {what} updates for {span(quiet)}", why=why,
                        blocks=[{"type": "text", "label": "Where it comes from",
                                 "text": f"Dana watches the entity in the {setting} setting of your Home Assistant "
-                                        "integration. After a phone change, set the new phone's entity there."}])
+                                        "addon. After a phone change, set the new phone's entity there."}])
     return _result(key, True, f"last {ago(last, now)}", last)
 
 
 def _ha_watch(user: Optional[User]) -> Tuple[Any, Optional[ha_watcher.WatchSpec]]:
     """The user's Home Assistant connection and what its watcher watches."""
-    conn = store.get(user, ha_config.KIND) if user is not None else None
+    conn = store.get(user, ha_config.ADDON) if user is not None else None
     return conn, ha_watcher.spec_for(conn)
 
 
@@ -295,7 +295,7 @@ def _check_ha_entities(conn, now: datetime.datetime, user: Optional[User]) -> Di
         return _result("ha_entities", False, f"{names} not found", None,
                        title=f"Home Assistant has no {names}",
                        why="Location and car reminders need the entities selected in your Home Assistant "
-                           "integration settings. Pick the right ones there.",
+                           "addon settings. Pick the right ones there.",
                        blocks=[{"type": "facts", "label": "Not found",
                                 "items": [f"{role}: {eid}" for role, eid in missing]}])
     checked = all(seen[role] is not None and seen[role].entity_id == eid for role, eid in spec.entities.items())
@@ -443,7 +443,7 @@ def _check_calls(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str
 
 
 def _check_calendar(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
-    if user is None or not store.is_connected(user, calendar_config.KIND):
+    if user is None or not store.is_connected(user, calendar_config.ADDON):
         return _result("calendar", True, "not connected", None)
     m = dict(conn.execute("SELECT * FROM system_marks WHERE key = ?",
                           (calendar_today.mark_key(user.id),)).fetchone() or {})
@@ -474,7 +474,7 @@ def _check_briefing(conn, now: datetime.datetime, user: Optional[User]) -> Dict[
 
 
 def _check_money(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
-    if user is None or not store.is_connected(user, money_config.KIND):
+    if user is None or not store.is_connected(user, money_config.ADDON):
         return _result("money", True, "not connected", None)
     rows = [dict(r) for r in conn.execute(
         "SELECT company, label, state, state_reason, last_ok_at, created_at FROM money_sources WHERE user_id = ? "
@@ -536,7 +536,7 @@ _CHECKS = {
 def compute(now: Optional[datetime.datetime] = None, user: Optional[User] = None,
             keys: Optional[Tuple[str, ...]] = None) -> List[Dict[str, Any]]:
     """Every check (or only ``keys``) for ``user`` (default: the current user),
-    with ``ignored_until`` when they chose to ignore it; a check of a kind
+    with ``ignored_until`` when they chose to ignore it; a check of an addon
     they lack is ok "not connected". Internal fields (``title``, ``why``,
     ``blocks``) feed the Now card."""
     now = now or clock.now()
@@ -557,7 +557,7 @@ def compute(now: Optional[datetime.datetime] = None, user: Optional[User] = None
 
 
 def keys_for(user: User) -> Tuple[str, ...]:
-    """The checks ``user`` sees: those of the kinds they have connected, and
+    """The checks ``user`` sees: those of the addons they have connected, and
     the server's own when they may see everyone (in :data:`KEYS` order)."""
     out = []
     for key in KEYS:
