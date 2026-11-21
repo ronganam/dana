@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.sync
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -21,7 +22,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import io.github.ronganam.dana.data.network.ApiException
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.ui.viewmodels.describeError
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
@@ -226,7 +226,7 @@ class CallUploadWorker(appContext: Context, params: WorkerParameters) : Coroutin
         }
 
         val failure: String = try {
-            val result = ApiService.fromPrefs(ctx).uploadCall(
+            val result = ServerConfig.load(ctx).api().uploadCall(
                 file, contact, "Me", timestamp,
                 durationSeconds = duration, direction = direction, phoneNumber = number
             )

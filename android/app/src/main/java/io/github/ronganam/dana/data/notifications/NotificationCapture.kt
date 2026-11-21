@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.notifications
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Notification
 import android.content.Context
 import android.content.Intent
@@ -23,7 +24,6 @@ import java.io.File
  *   and Dana's own, are ignored.
  */
 object NotificationSettings {
-    private const val PREFS = "DanaPrefs"
     private const val KEY_ENABLED = "notif_capture_enabled"
     private const val KEY_DENIED = "notif_denied_packages"
     private const val KEY_SKIP_SENSITIVE = "notif_skip_sensitive"
@@ -66,7 +66,7 @@ object NotificationSettings {
         }
     }
 
-    private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(context: Context) = ServerConfig.prefs(context)
 }
 
 /** Hides one-time codes (the server does the same as a safety net). */

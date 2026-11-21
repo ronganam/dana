@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.widgets
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -208,7 +209,7 @@ object ShoppingWidgetSync {
     /** Put the current shopping fields into the widget snapshot; returns the whole snapshot. */
     @Synchronized
     fun writeFields(context: Context): JSONObject {
-        val prefs = context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         val o = runCatching { JSONObject(prefs.getString("widget_snapshot", "{}") ?: "{}") }.getOrDefault(JSONObject())
         ShoppingSnapshot.merge(o, ShoppingSnapshot.fields(ShoppingSync.get(context).shown()))
         prefs.edit().putString("widget_snapshot", o.toString()).apply()

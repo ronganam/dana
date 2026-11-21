@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.viewmodels
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
@@ -7,7 +8,6 @@ import android.net.Uri
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.ronganam.dana.BuildConfig
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.network.ServerStatus
 import io.github.ronganam.dana.data.network.Reachability
 import io.github.ronganam.dana.data.network.ServerStatusMonitor
@@ -41,11 +41,12 @@ import java.util.TimeZone
 class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     private val appContext: Context = application.applicationContext
-    private val prefs: SharedPreferences = appContext.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
+    private val prefs: SharedPreferences = ServerConfig.prefs(appContext)
 
-    private var serverUrl = prefs.getString("server_url", "https://") ?: "https://"
-    private var apiToken = prefs.getString("api_token", "") ?: ""
-    private var apiService = ApiService(serverUrl, apiToken)
+    /** The server and token every controller talks to (Settings changes it: [updateServerConfig]). */
+    var serverConfig: ServerConfig = ServerConfig.load(appContext)
+        private set
+    private var apiService = serverConfig.api()
 
     private val userMessages = UserMessages()
     private val ctx = ControllerContext(viewModelScope, userMessages) { apiService }
@@ -107,8 +108,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val callController: RealtimeCallController by lazy {
         RealtimeCallController(
             ctx, appContext, prefs,
-            serverUrl = { serverUrl },
-            apiToken = { apiToken },
+            serverUrl = { serverConfig.url },
+            apiToken = { serverConfig.token },
             sessionId = { chatController.sessionId },
             onTranscript = { sender, text, isUser -> chatController.appendMessage(sender, text, isUser) },
             onStatusText = { chatController.setStatusText(it) }
@@ -117,8 +118,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     val chatController: ChatController = ChatController(
         ctx, appContext, prefs,
-        serverUrl = { serverUrl },
-        apiToken = { apiToken },
+        serverUrl = { serverConfig.url },
+        apiToken = { serverConfig.token },
         onSessionChanged = { syncToWear() },
         endRealtimeCall = { callController.endCall() },
         device = when {
@@ -211,7 +212,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun initialize(@Suppress("UNUSED_PARAMETER") context: Context) {
-        ServerStatusMonitor.configure(appContext, serverUrl)
+        ServerStatusMonitor.configure(appContext, serverConfig.url)
         if (!initialized) {
             initialized = true
             chatController.initialize()
@@ -237,26 +238,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     /** Kiosk: only the assistant chat — no tasks, calls, wear sync or update checks. */
     fun initializeChatOnly() {
-        ServerStatusMonitor.configure(appContext, serverUrl)
+        ServerStatusMonitor.configure(appContext, serverConfig.url)
         if (!initialized) {
             initialized = true
             chatController.initialize()
         }
     }
 
-    fun getServerUrl(): String = serverUrl
-
-    fun getApiToken(): String = apiToken
-
+    /** Save a new server / token (normalized) and point every controller at it. */
     fun updateServerConfig(newServerUrl: String, newApiToken: String) {
-        serverUrl = newServerUrl
-        apiToken = newApiToken
-        apiService = ApiService(serverUrl, apiToken)
-        prefs.edit()
-            .putString("server_url", serverUrl)
-            .putString("api_token", apiToken)
-            .apply()
-        ServerStatusMonitor.configure(appContext, serverUrl)
+        serverConfig = ServerConfig.save(appContext, newServerUrl, newApiToken)
+        apiService = serverConfig.api()
+        ServerStatusMonitor.configure(appContext, serverConfig.url)
         shoppingController.accountChanged()
         moneyController.forget()
         projectsController.forget()
@@ -286,9 +279,9 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun checkForAppUpdate() {
         viewModelScope.launch {
             try {
-                val info = UpdateManager.checkForUpdate(serverUrl, "phone")
+                val info = UpdateManager.checkForUpdate(serverConfig.url, "phone")
                 _appUpdateInfo.value = info?.takeIf { UpdateManager.isNewer(it, BuildConfig.VERSION_CODE) }
-                _wearUpdateInfo.value = UpdateManager.checkForUpdate(serverUrl, "wear")
+                _wearUpdateInfo.value = UpdateManager.checkForUpdate(serverConfig.url, "wear")
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.w("MainViewModel", "Update check failed: ${describeError(e)}")
@@ -312,7 +305,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val eventsJson = ctx.load("WearSync") { filterEventsForWatch(apiService.getCalendarEvents()) } ?: "[]"
             val tasksJson = ctx.load("WearSync") { apiService.getTasksDueSoon() } ?: "[]"
-            WearSyncManager.syncConfigToWear(appContext, serverUrl, apiToken, sessionId, eventsJson, tasksJson)
+            WearSyncManager.syncConfigToWear(appContext, serverConfig.url, serverConfig.token, sessionId, eventsJson, tasksJson)
         }
     }
 

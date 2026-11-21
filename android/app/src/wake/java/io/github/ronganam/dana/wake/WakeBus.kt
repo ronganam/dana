@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.wake
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.SharedPreferences
 import android.media.MediaRecorder
@@ -43,11 +44,10 @@ object WakeBus {
     fun setListening(v: Boolean) { _listening.value = v }
 }
 
-/** Wake-word settings, in the app's usual `DanaPrefs` file (server_url / api_token are shared with ApiService). */
+/** Wake-word settings, in the app's prefs file (the server and token are [io.github.ronganam.dana.data.network.ServerConfig]). */
 object WakePrefs {
     const val MODEL_ASSET = "wakeword/hey_dana.onnx"
     const val DEFAULT_THRESHOLD = 0.5f
-    val DEFAULT_SERVER: String = io.github.ronganam.dana.BuildConfig.DEFAULT_SERVER_URL
 
     // Keys predate the TV build (kiosk_*); kept so existing tablets keep their settings.
     private const val KEY_THRESHOLD = "kiosk_wake_threshold"
@@ -64,12 +64,7 @@ object WakePrefs {
     )
 
     fun prefs(context: Context): SharedPreferences =
-        context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
-
-    fun serverUrl(context: Context): String =
-        prefs(context).getString("server_url", "").orEmpty().trim().trimEnd('/').ifEmpty { DEFAULT_SERVER }
-
-    fun apiToken(context: Context): String = prefs(context).getString("api_token", "").orEmpty()
+        ServerConfig.prefs(context)
 
     fun threshold(context: Context): Float = prefs(context).getFloat(KEY_THRESHOLD, DEFAULT_THRESHOLD)
 
@@ -83,13 +78,6 @@ object WakePrefs {
 
     /** Platform acoustic echo canceller on the mic session (removes the device's own speaker output). */
     fun echoCancel(context: Context): Boolean = prefs(context).getBoolean(KEY_AEC, false)
-
-    fun saveServer(context: Context, serverUrl: String, apiToken: String) {
-        prefs(context).edit()
-            .putString("server_url", serverUrl.trim().trimEnd('/'))
-            .putString("api_token", apiToken.trim())
-            .apply()
-    }
 
     fun saveVoice(
         context: Context,

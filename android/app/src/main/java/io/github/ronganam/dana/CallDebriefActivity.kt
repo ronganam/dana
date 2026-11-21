@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Application
 import android.content.Context
 import android.content.Intent
@@ -33,7 +34,6 @@ import androidx.lifecycle.viewModelScope
 import io.github.ronganam.dana.data.models.CallDetail
 import io.github.ronganam.dana.data.models.CallLabel
 import io.github.ronganam.dana.data.models.CallSuggestion
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.ui.components.*
 import io.github.ronganam.dana.ui.screens.calls.RtlSupportingText
 import io.github.ronganam.dana.ui.screens.calls.formatDuration
@@ -120,7 +120,7 @@ class CallDebriefActivity : ComponentActivity() {
 }
 
 class DebriefViewModel(app: Application) : AndroidViewModel(app) {
-    private val api get() = ApiService.fromPrefs(getApplication())
+    private val api get() = ServerConfig.load(getApplication()).api()
 
     private val _detail = MutableStateFlow<CallDetail?>(null)
     val detail = _detail.asStateFlow()

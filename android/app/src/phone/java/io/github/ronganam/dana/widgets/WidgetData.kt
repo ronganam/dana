@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.widgets
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.util.Log
 import androidx.work.CoroutineWorker
@@ -13,7 +14,6 @@ import androidx.work.WorkerParameters
 import androidx.work.Constraints
 import androidx.glance.appwidget.updateAll
 import io.github.ronganam.dana.DanaCards
-import io.github.ronganam.dana.data.network.ApiService
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
@@ -46,7 +46,7 @@ data class WidgetSnapshot(
         private const val KEY = "widget_snapshot"
 
         fun load(context: Context): WidgetSnapshot {
-            val raw = context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE).getString(KEY, null)
+            val raw = ServerConfig.prefs(context).getString(KEY, null)
             val o = runCatching { JSONObject(raw ?: "{}") }.getOrDefault(JSONObject())
             fun arr(k: String) = o.optJSONArray(k) ?: JSONArray()
             fun strs(a: JSONArray) = (0 until a.length()).map { a.optString(it) }
@@ -69,7 +69,7 @@ data class WidgetSnapshot(
         }
 
         fun save(context: Context, o: JSONObject) {
-            context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE).edit().putString(KEY, o.toString()).apply()
+            ServerConfig.prefs(context).edit().putString(KEY, o.toString()).apply()
         }
     }
 }
@@ -90,7 +90,7 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Coroutin
         private suspend fun <T> safe(block: suspend () -> T): T? = withTimeoutOrNull(12_000) { runCatching { block() }.getOrNull() }
 
         suspend fun build(context: Context) = coroutineScope {
-            val api = ApiService.fromPrefs(context)
+            val api = ServerConfig.load(context).api()
             val briefing = async { safe { api.getBriefingToday() } }
             val tasks = async { safe { api.getTasks() } }
             val sugg = async { safe { api.getSuggestions("pending", "all") } }
@@ -102,7 +102,7 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Coroutin
             val events = async { safe { api.getCalendarEvents() } }
 
             val previous = runCatching {
-                JSONObject(context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE).getString("widget_snapshot", "{}") ?: "{}")
+                JSONObject(ServerConfig.prefs(context).getString("widget_snapshot", "{}") ?: "{}")
             }.getOrDefault(JSONObject())
             val o = JSONObject(previous.toString())
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())

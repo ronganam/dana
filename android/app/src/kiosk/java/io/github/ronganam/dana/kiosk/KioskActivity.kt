@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.kiosk
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -153,7 +154,7 @@ class KioskActivity : ComponentActivity() {
             WakeBus.wake.collect { frame -> openAssistant(frame) }
         }
 
-        if (WakePrefs.apiToken(this).isEmpty()) settingsVisible = true
+        if (ServerConfig.load(this).token.isEmpty()) settingsVisible = true
         ensureMic()
         handleIntent(intent)
     }
@@ -271,8 +272,7 @@ class KioskActivity : ComponentActivity() {
 
     private fun applySettings() {
         settingsVisible = false
-        vm.updateServerConfig(WakePrefs.serverUrl(this), WakePrefs.apiToken(this))
-        ServerStatusMonitor.configure(applicationContext, WakePrefs.serverUrl(this))
+        ServerConfig.load(this).let { vm.updateServerConfig(it.url, it.token) }
         webView?.let { loadDashboard(it, forceLogin = true) }
     }
 
@@ -369,9 +369,8 @@ class KioskActivity : ComponentActivity() {
     }
 
     private fun loadDashboard(view: WebView, forceLogin: Boolean = false) {
-        val server = WakePrefs.serverUrl(this)
+        val (server, token) = ServerConfig.load(this)
         val path = KioskPrefs.dashboardPath(this)
-        val token = WakePrefs.apiToken(this)
         val hasSession = CookieManager.getInstance().getCookie(server)?.contains("ganam_session=") == true
         if (token.isNotEmpty() && (forceLogin || !hasSession)) {
             // Exchange the API token for the dashboard's long-lived session cookie.

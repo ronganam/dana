@@ -19,7 +19,6 @@ object Me {
         fun has(kind: String): Boolean = kind in kinds
     }
 
-    private const val PREFS = "DanaPrefs"
     private const val KEY_ID = "me_id"
     private const val KEY_NAME = "me_name"
     private const val KEY_KINDS = "me_kinds"
@@ -32,7 +31,7 @@ object Me {
         (live ?: MutableStateFlow(cached(context)?.kinds ?: emptySet()).also { live = it }).asStateFlow()
 
     fun cached(context: Context): Info? {
-        val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val p = ServerConfig.prefs(context)
         val id = p.getString(KEY_ID, null) ?: return null
         val kinds = p.getString(KEY_KINDS, "").orEmpty().split(',').filter { it.isNotBlank() }.toSet()
         return Info(id, p.getString(KEY_NAME, "").orEmpty(), kinds)
@@ -57,7 +56,7 @@ object Me {
     }
 
     fun save(context: Context, info: Info) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+        ServerConfig.prefs(context).edit()
             .putString(KEY_ID, info.id)
             .putString(KEY_NAME, info.name)
             .putString(KEY_KINDS, info.kinds.sorted().joinToString(","))

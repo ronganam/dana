@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.wake
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -13,7 +14,6 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
-import io.github.ronganam.dana.data.network.ApiService
 import java.time.LocalDate
 import java.time.LocalTime
 
@@ -31,7 +31,6 @@ import java.time.LocalTime
  */
 object UnlockWatcher {
     private const val TAG = "UnlockWatcher"
-    private const val PREFS = "DanaPrefs"
     private const val KEY_DONE = "wake_done_date"
     private const val KEY_LAST = "wake_last_report"
     private const val MIN_GAP_MS = 2 * 60 * 1000L
@@ -66,7 +65,7 @@ object UnlockWatcher {
         val hour = LocalTime.now().hour
         Log.i(TAG, "Unlock seen at ${LocalTime.now().withNano(0)}")
         if (hour < 5 || hour >= 12) return
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         if (prefs.getString(KEY_DONE, null) == LocalDate.now().toString()) return
         if (now - prefs.getLong(KEY_LAST, 0) < MIN_GAP_MS) return
         prefs.edit().putLong(KEY_LAST, now).apply()
@@ -80,7 +79,7 @@ object UnlockWatcher {
     }
 
     internal fun markDone(context: Context) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_DONE, LocalDate.now().toString()).apply()
+        ServerConfig.prefs(context).edit().putString(KEY_DONE, LocalDate.now().toString()).apply()
     }
 }
 
@@ -90,7 +89,7 @@ class UnlockReportWorker(context: Context, params: WorkerParameters) : Coroutine
         // A report delayed over an hour (no network) is no longer a wake signal.
         if (System.currentTimeMillis() - at > 60 * 60 * 1000L) return Result.success()
         return try {
-            val status = ApiService.fromPrefs(applicationContext).reportUnlock(at)
+            val status = ServerConfig.load(applicationContext).api().reportUnlock(at)
             Log.i("UnlockWatcher", "Unlock reported: $status")
             if (status == "done") UnlockWatcher.markDone(applicationContext)
             Result.success()

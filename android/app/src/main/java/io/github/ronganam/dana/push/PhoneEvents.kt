@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.push
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -11,7 +12,6 @@ import io.github.ronganam.dana.NotificationActionReceiver
 import io.github.ronganam.dana.NotificationAlertReceiver
 import io.github.ronganam.dana.ReminderReceiver
 import io.github.ronganam.dana.SuggestionsReceiver
-import io.github.ronganam.dana.data.network.ApiService
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import org.json.JSONObject
@@ -30,7 +30,6 @@ import java.util.UUID
  */
 object PhoneEvents {
     private const val TAG = "PhoneEvents"
-    private const val PREFS = "DanaPrefs"
     private const val KEY_SEQ = "push_last_seq"
     private const val KEY_DEVICE = "push_device_id"
     private const val KEY_TOKEN = "push_token"
@@ -42,21 +41,17 @@ object PhoneEvents {
     private val REFRESHING = setOf("alert", "suggestions", "reminder", "reminder_clear", "briefing", "weekly_review", "context_card")
 
     fun deviceId(context: Context): String {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         return prefs.getString(KEY_DEVICE, null) ?: UUID.randomUUID().toString().also {
             prefs.edit().putString(KEY_DEVICE, it).apply()
         }
     }
 
-    private fun configured(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        return prefs.getString("server_url", "").orEmpty().trim().trimEnd('/').length > "https://".length &&
-            prefs.getString("api_token", "").orEmpty().isNotBlank()
-    }
+    private fun configured(context: Context): Boolean = ServerConfig.load(context).isConfigured
 
     /** Registered within the last week (else the sync registers again). */
     fun isRegistered(context: Context): Boolean {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         return prefs.contains(KEY_TOKEN) &&
             System.currentTimeMillis() - prefs.getLong(KEY_REGISTERED_AT, 0) < REFRESH_MS
     }
@@ -64,10 +59,10 @@ object PhoneEvents {
     /** Send the FCM token to the server (on start and when Firebase rotates it). */
     suspend fun register(context: Context, token: String) {
         if (!configured(context)) return
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         try {
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-            val res = ApiService.fromPrefs(context).registerPush(deviceId(context), token, Build.MODEL, version)
+            val res = ServerConfig.load(context).api().registerPush(deviceId(context), token, Build.MODEL, version)
             prefs.edit().putString(KEY_TOKEN, token).putLong(KEY_REGISTERED_AT, System.currentTimeMillis()).apply()
             // A fresh install starts from now instead of replaying old events.
             if (!prefs.contains(KEY_SEQ)) prefs.edit().putLong(KEY_SEQ, res.optLong("latest_seq")).apply()
@@ -81,10 +76,10 @@ object PhoneEvents {
     /** Fetch and show everything newer than the last handled event. */
     suspend fun catchUp(context: Context) {
         if (!configured(context)) return
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         if (!prefs.contains(KEY_SEQ)) return  // not registered yet
         lock.withLock {
-            val api = ApiService.fromPrefs(context)
+            val api = ServerConfig.load(context).api()
             repeat(5) {  // at most 5 pages of 50
                 val after = prefs.getLong(KEY_SEQ, 0)
                 val res = try {

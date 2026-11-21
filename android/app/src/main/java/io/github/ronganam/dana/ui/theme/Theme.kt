@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.theme
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Activity
 import android.content.Context
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -24,13 +25,13 @@ object ThemeSettings {
         private set
 
     fun load(context: Context) {
-        val raw = context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE).getString(KEY, null)
+        val raw = ServerConfig.prefs(context).getString(KEY, null)
         mode = ThemeMode.values().firstOrNull { it.name == raw } ?: ThemeMode.SYSTEM
     }
 
     fun set(context: Context, value: ThemeMode) {
         mode = value
-        context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE).edit().putString(KEY, value.name).apply()
+        ServerConfig.prefs(context).edit().putString(KEY, value.name).apply()
     }
 }
 

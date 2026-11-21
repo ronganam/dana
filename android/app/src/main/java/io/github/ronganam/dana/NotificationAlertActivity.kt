@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.util.Log
 import android.app.KeyguardManager
 import android.app.NotificationManager
@@ -38,7 +39,6 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.notifications.AppIcons
 import io.github.ronganam.dana.data.notifications.DanaNotificationListener
 import io.github.ronganam.dana.data.notifications.Snoozer
@@ -118,7 +118,7 @@ class NotificationAlertActivity : ComponentActivity() {
         val app = applicationContext
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                ApiService.fromPrefs(app).markNotificationsSeen(listOf(a.id))
+                ServerConfig.load(app).api().markNotificationsSeen(listOf(a.id))
             } catch (e: Exception) {
                 Log.w("NotificationAlert", "Couldn't mark ${a.id} seen", e)
             }
@@ -151,7 +151,7 @@ class NotificationAlertActivity : ComponentActivity() {
         handled(a)
         lifecycleScope.launch {
             val msg = try {
-                Snoozer.snooze(applicationContext, ApiService.fromPrefs(applicationContext),
+                Snoozer.snooze(applicationContext, ServerConfig.load(applicationContext).api(),
                     listOf(Snoozer.Target(a.id, a.key, a.app, a.title)), opt.untilMillis)
                 "Snoozed ${Snoozer.untilLabel(opt.untilMillis)}"
             } catch (e: Exception) {
@@ -166,7 +166,7 @@ class NotificationAlertActivity : ComponentActivity() {
         handled(a)
         lifecycleScope.launch {
             try {
-                val keys = ApiService.fromPrefs(applicationContext).setNotificationStatus(listOf(a.id), "dismissed")
+                val keys = ServerConfig.load(applicationContext).api().setNotificationStatus(listOf(a.id), "dismissed")
                 DanaNotificationListener.cancel(keys.ifEmpty { listOfNotNull(a.key) })
             } catch (e: Exception) {
                 Toast.makeText(applicationContext, "Couldn't dismiss: ${e.message ?: "server unreachable"}", Toast.LENGTH_SHORT).show()

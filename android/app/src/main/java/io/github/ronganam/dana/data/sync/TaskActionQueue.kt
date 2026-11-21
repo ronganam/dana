@@ -1,8 +1,8 @@
 package io.github.ronganam.dana.data.sync
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.util.Log
-import io.github.ronganam.dana.data.network.ApiService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -133,7 +133,7 @@ object TaskActionQueue {
 
     /** HTTP status of one attempt, or -1 when the server couldn't be reached. */
     private suspend fun attempt(context: Context, action: Action): Int = try {
-        val api = ApiService.fromPrefs(context)
+        val api = ServerConfig.load(context).api()
         when (action.kind) {
             KIND_STATUS -> api.updateTaskStatusCode(action.taskId, action.payload.optString("status", "completed"))
             KIND_SNOOZE -> api.snoozeTaskCode(action.taskId, action.payload)

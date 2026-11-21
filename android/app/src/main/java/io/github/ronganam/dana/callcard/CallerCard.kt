@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.callcard
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.annotation.SuppressLint
 import androidx.compose.ui.graphics.toArgb
 import io.github.ronganam.dana.ui.theme.AccentDark
@@ -45,7 +46,6 @@ import android.widget.TextView
 import io.github.ronganam.dana.EXTRA_OPEN_PERSON_ID
 import io.github.ronganam.dana.MainActivity
 import io.github.ronganam.dana.data.models.PersonCard
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.wear.WearCards
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -90,7 +90,6 @@ class CallerCardReceiver : BroadcastReceiver() {
 object CallerCards {
     const val TAG = "CallerCard"
     const val KEY_ENABLED = "caller_card_enabled"
-    private const val PREFS = "DanaPrefs"
     private const val CACHE = "caller_card_cache"
     private const val CACHE_MAX = 60
     private const val KEY_Y = "caller_card_y"
@@ -100,10 +99,10 @@ object CallerCards {
     private var shownNumber: String? = null
 
     fun enabled(context: Context): Boolean =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean(KEY_ENABLED, true)
+        ServerConfig.prefs(context).getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(context: Context, on: Boolean) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putBoolean(KEY_ENABLED, on).apply()
+        ServerConfig.prefs(context).edit().putBoolean(KEY_ENABLED, on).apply()
         if (!on) CallerCardOverlay.hide()
     }
 
@@ -145,7 +144,7 @@ object CallerCards {
         cached(context, number)?.let { CallerCardOverlay.show(context, it, incoming) }
         val card = withTimeoutOrNull(4000) {
             withContext(Dispatchers.IO) {
-                runCatching { ApiService.fromPrefs(context).lookupCaller(number) }
+                runCatching { ServerConfig.load(context).api().lookupCaller(number) }
                     .onFailure { Log.d(TAG, "Lookup failed: ${it.message}") }
                     .getOrElse { return@withContext cached(context, number) }
             }
@@ -161,12 +160,12 @@ object CallerCards {
     }
 
     private fun cached(context: Context, number: String): PersonCard? {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(CACHE, null) ?: return null
+        val raw = ServerConfig.prefs(context).getString(CACHE, null) ?: return null
         return runCatching { JSONObject(raw).optJSONObject(key(number))?.let { PersonCard.from(it) } }.getOrNull()
     }
 
     private fun remember(context: Context, number: String, card: PersonCard) {
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         val all = runCatching { JSONObject(prefs.getString(CACHE, "{}") ?: "{}") }.getOrDefault(JSONObject())
         all.put(key(number), card.toJson().put("_t", System.currentTimeMillis()))
         if (all.length() > CACHE_MAX) {  // drop the oldest
@@ -179,10 +178,10 @@ object CallerCards {
     private fun key(number: String) = number.filter { it.isDigit() }.takeLast(9)
 
     internal fun savedY(context: Context): Int =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getInt(KEY_Y, -1)
+        ServerConfig.prefs(context).getInt(KEY_Y, -1)
 
     internal fun saveY(context: Context, y: Int) =
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putInt(KEY_Y, y).apply()
+        ServerConfig.prefs(context).edit().putInt(KEY_Y, y).apply()
 }
 
 /**

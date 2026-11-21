@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.kiosk
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
@@ -52,8 +53,8 @@ fun KioskSettingsDialog(
     onTestWake: () -> Unit
 ) {
     val context = LocalContext.current
-    var server by remember { mutableStateOf(WakePrefs.serverUrl(context)) }
-    var token by remember { mutableStateOf(WakePrefs.apiToken(context)) }
+    var server by remember { mutableStateOf(ServerConfig.load(context).url) }
+    var token by remember { mutableStateOf(ServerConfig.load(context).token) }
     var path by remember { mutableStateOf(KioskPrefs.dashboardPath(context)) }
     var threshold by remember { mutableFloatStateOf(WakePrefs.threshold(context)) }
     var speak by remember { mutableStateOf(WakePrefs.speakReplies(context)) }

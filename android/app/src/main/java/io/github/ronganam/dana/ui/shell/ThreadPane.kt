@@ -206,8 +206,8 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                                 msg = msg,
                                 tts = tts,
                                 wide = wide,
-                                serverUrl = viewModel.getServerUrl(),
-                                apiToken = viewModel.getApiToken()
+                                serverUrl = viewModel.serverConfig.url,
+                                apiToken = viewModel.serverConfig.token
                             )
                             if (msg.shortcut && !msg.isUser) {
                                 MonoLabel("learned phrase · no model", modifier = Modifier.padding(start = 12.dp, top = 2.dp))

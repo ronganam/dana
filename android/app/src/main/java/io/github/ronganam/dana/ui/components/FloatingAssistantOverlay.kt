@@ -494,8 +494,8 @@ fun FloatingAssistantOverlay(
                                                         context = context,
                                                         clipboard = clipboardManager,
                                                         tapToSpeech = tapToSpeech,
-                                                        serverUrl = viewModel.getServerUrl(),
-                                                        apiToken = viewModel.getApiToken(),
+                                                        serverUrl = viewModel.serverConfig.url,
+                                                        apiToken = viewModel.serverConfig.token,
                                                         modifier = Modifier.animateItemPlacement().then(faded)
                                                     )
                                                 }

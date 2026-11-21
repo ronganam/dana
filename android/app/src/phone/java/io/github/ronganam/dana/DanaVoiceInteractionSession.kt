@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -64,7 +65,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
     private lateinit var mainViewModel: MainViewModel
     /** The "Screen" control: what the system captured of the app underneath, for this opening only. */
     private lateinit var screenShare: ScreenShareController
-    private val prefs = context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
+    private val prefs = ServerConfig.prefs(context)
     private var tts: TextToSpeech? = null
 
     /**

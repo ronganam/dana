@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.tv
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -87,8 +88,9 @@ object HaClient {
     private val json = "application/json".toMediaType()
 
     private fun request(context: Context, path: String): Request.Builder {
-        val b = Request.Builder().url(WakePrefs.serverUrl(context) + path)
-        WakePrefs.apiToken(context).takeIf { it.isNotEmpty() }?.let { b.header("Authorization", "Bearer $it") }
+        val server = ServerConfig.load(context)
+        val b = Request.Builder().url(server.url + path)
+        server.token.takeIf { it.isNotEmpty() }?.let { b.header("Authorization", "Bearer $it") }
         return b
     }
 
