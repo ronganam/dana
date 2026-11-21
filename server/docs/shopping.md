@@ -32,7 +32,7 @@ changes, requests, words, HTML; tested by `test_web_shopping.mjs` against
 `tests/fixtures/shopping_web.json`), `static/shopping.js` (the controller) and
 `static/shopping.css` (below, "The web panel").
 
-Tables (migration `m0020_shopping_remake`): `shopping_lists` (+ `version`),
+Tables (the addon's `migrations/m0001_baseline.py`): `shopping_lists` (+ `version`),
 `shopping_items`, `shopping_history`, `shopping_aisle_choices` (a list's own
 choices), `shopping_aisles` (the shared name → aisle table),
 `shopping_invite_answers` (an invitation used or dismissed).

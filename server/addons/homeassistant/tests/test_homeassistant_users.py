@@ -59,10 +59,10 @@ ensure_default_groups_for_everyone()
 from addons.cameras import api as cameras_api  # noqa: E402
 from addons.homeassistant import api as homeassistant_api  # noqa: E402
 from addons.whatsapp import api as whatsapp_api  # noqa: E402
-from core import briefing, checks, clock, now as now_mod, wake  # noqa: E402
+from core import briefing, checks, clock, notify as core_notify, now as now_mod, wake  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
-from core.addons import registry, store  # noqa: E402
+from core.addons import registry, scheduler, store  # noqa: E402
 from addons.homeassistant import client as ha_client, home_map, status as ha_status  # noqa: E402
 from addons.homeassistant import watcher as ha_watcher  # noqa: E402
 from addons.tasks import service as tasks_service, tools as tasks_tools, triggers  # noqa: E402
@@ -213,10 +213,9 @@ async def test_reads() -> None:
 
     # Home map per connection, in the right prompt only.
     home_map._caches.clear()
-    tasks = home_map.warm_all()
-    await asyncio.gather(*tasks)
+    out = await scheduler.run_once(registry.job("homeassistant.warm_home_map"))
     sec_a, sec_b = registry.prompt_section(ADMIN, "homeassistant"), registry.prompt_section(BOB, "homeassistant")
-    check("home map: one warm-up per user with the addon", len(tasks) == 2)
+    check("home map: one warm-up per user with the addon", sorted(out) == sorted([ADMIN.id, BOB.id]), out)
     check("home map: each user's prompt has their own map only",
           "light.a_kitchen | A Kitchen" in sec_a and "light.b_den" not in sec_a
           and "light.b_den | B Den" in sec_b and "light.a_kitchen" not in sec_b, (sec_a, sec_b))
@@ -374,13 +373,14 @@ async def test_watcher() -> None:
     t_bob_work = task(BOB, "Bob at work", {"location": {"location": "work", "event": "arrive"}})
     t_bob_car = task(BOB, "Bob in the car", {"car": "enter"})
     t_bob_car_out = task(BOB, "Bob out of the car", {"car": "leave"})
-    push = AsyncMock(return_value=True)
+    push = AsyncMock(return_value={"telegram": True})  # core.notify.send: what each reminder sends
 
     def pushed(task_id: str) -> int:
-        return sum(1 for c in push.await_args_list if c.args[1] == "reminder" and c.args[2]["task_id"] == task_id)
+        return sum(1 for c in push.await_args_list
+                   if c.args[1].kind == "reminder" and c.args[1].data["task_id"] == task_id)
 
     watchers = ha_watcher.Watchers(spy_fire)
-    with patch.object(triggers.phone_push, "send", push), patch.object(triggers, "notify", AsyncMock()):
+    with patch.object(core_notify, "send", push):
         with users.acting_as(None):
             watchers.reconcile()
         check("watchers: one per user with entities set, none for Carl",

@@ -487,7 +487,6 @@ async def test_http():
     app.router.add_post("/api/memories", about_api.create_memory_api)
     app.router.add_delete("/api/memories/{key}", about_api.delete_memory_api)
     async with TestClient(TestServer(app)) as client:
-        check("learner task started with the app", "about_learner_task" in app and not app["about_learner_task"].done())
         r = await client.get("/api/about")
         body = await r.json()
         check("GET /api/about: all sections in order, empty", r.status == 200
@@ -562,7 +561,6 @@ async def test_http():
         check("DELETE /api/memories unknown → 404", r.status == 404)
         r = await client.post("/api/memories", json={"key": "", "value": ""})
         check("POST /api/memories without key/value → 400", r.status == 400)
-    check("learner task cancelled on cleanup", app["about_learner_task"].cancelled() or app["about_learner_task"].done())
 
 
 async def main():

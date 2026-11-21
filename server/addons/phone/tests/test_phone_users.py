@@ -1,6 +1,6 @@
 """The phone addon per user: devices, direct push and the notifications Inbox.
 
-Two users with the ``phone`` addon (the first admin, migrated from the 8.1.0
+Two users with the ``phone`` addon (the first admin, converted from the 9.0
 fixture, and Bob) and one without it (Carl), on the real handlers: devices
 register with their own token and fetch only their own events (catch-up,
 expiry, dead tokens, the first admin's seq continuing across the migration);
@@ -45,9 +45,9 @@ from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)
 
-# The production database before users existed: its devices, events and notifications become the first admin's.
+# A 9.0 production database (converted at start): its devices, events and notifications are the first admin's.
 _conn = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as _f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
 _conn.close()
 
@@ -67,7 +67,7 @@ addons_bootstrap.bootstrap()
 from core import sessions_api
 from addons.phone import api as phone_api
 from addons.phone.notifications import api as notifications_api
-from core import briefing, checks, clock, now as now_mod, search, usage, user_profile, user_rows
+from core import briefing, checks, clock, notify as core_notify, now as now_mod, search, usage, user_profile, user_rows
 from core.auth import setup_auth
 from core.db import get_db_connection
 from core.addons import Connection, registry, store
@@ -746,13 +746,13 @@ async def test_loops() -> None:
 
 async def test_callers() -> None:
     n = len(SEEN["pings"])
-    with patch.object(task_triggers, "notify", AsyncMock()):
+    with patch.object(core_notify, "notify", AsyncMock()):
         await task_triggers.trigger_reminder({"id": "t-r1", "title": "Water the plants"}, "car", BOB)
     got = pings_since(n)
     check("task reminder: pushed only to its user's phone", [p["token"] for p in got] == ["tok-b"]
           and got[0]["type"] == "reminder", got)
     n = len(SEEN["pings"])
-    with patch.object(task_triggers, "notify", AsyncMock()):
+    with patch.object(core_notify, "notify", AsyncMock()):
         await task_triggers.trigger_reminder({"id": "t-r2", "title": "Carl's thing"}, "car", CARL)
     check("task reminder: nothing for a user without the addon", pings_since(n) == [] and events_of(CARL.id) == [])
     n = len(SEEN["pings"])

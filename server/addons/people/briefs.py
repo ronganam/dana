@@ -205,14 +205,3 @@ async def run_briefs() -> Dict[str, int]:
         except Exception:
             logger.exception(f"People briefs for user {uid} failed")
     return out
-
-
-async def brief_loop(interval_seconds: int = BRIEF_INTERVAL) -> None:
-    """Background loop started with the app (core/server.py)."""
-    await asyncio.sleep(30)
-    while True:
-        try:
-            await run_briefs()
-        except Exception as e:
-            logger.error(f"People brief loop error: {e}", exc_info=True)
-        await asyncio.sleep(interval_seconds)

@@ -63,7 +63,7 @@ from core import images, notify, usage  # noqa: E402
 from addons.phone.calls import context as call_context  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
-from core.addons import registry, store  # noqa: E402
+from core.addons import registry, scheduler, store  # noqa: E402
 from addons.whatsapp import accounts, client as wa_client, events, messages as messages_fmt  # noqa: E402
 from testfakes import FakeWAHA  # noqa: E402
 
@@ -165,19 +165,17 @@ async def test_connect() -> None:
     check("account: asked with each one's own key", {c[2] for c in WA_A.calls()} == {"key-a"}
           and {c[2] for c in WA_B.calls()} == {"key-b"})
 
-    # The startup loop: WAHA down does not block it and is retried.
+    # The job: WAHA down only delays it; learned on a later pass.
     store.update(BOB, "whatsapp", account="")
     WA_B.down = True
-    with patch.object(accounts, "REFRESH_SECONDS", 0.05), patch.object(accounts, "RETRY_SECONDS", 0.0):
-        loop = asyncio.create_task(accounts.account_loop())
-        await asyncio.sleep(0.2)
-        check("startup loop: WAHA down → no account yet, the loop keeps going",
-              store.require(BOB, "whatsapp").account == "" and not loop.done() and WA_B.requests)
+    job = registry.job("whatsapp.learn_account")
+    with patch.object(accounts, "RETRY_SECONDS", 0.0):
+        await scheduler.run_once(job)
+        check("account job: WAHA down → no account yet", store.require(BOB, "whatsapp").account == "" and WA_B.requests)
         WA_B.down = False
-        check("startup loop: learned once WAHA is back", await until(
-            lambda: store.require(BOB, "whatsapp").account == B_ACCOUNT))
-        loop.cancel()
-    check("startup loop: a connection that has its account is not asked again",
+        out = await scheduler.run_once(job)
+        check("account job: learned once WAHA is back", store.require(BOB, "whatsapp").account == B_ACCOUNT, out)
+    check("account job: a connection that has its account is not asked again",
           not [c for c in WA_A.calls() if c[1] == "/api/sessions"])
     WA_B.calls()
 

@@ -12,9 +12,6 @@ load_dotenv()
 from core.telegram_bot import TelegramBot
 from core.server import start_webhook_listener
 from core import clock, db, llm, session_runner, users
-from addons.about import facts as about_facts, legacy as about_legacy
-from addons.tasks import groups as task_groups
-from addons.shopping import lists as shopping_lists
 from core.paths import DATA_DIR, ensure_data_dirs
 from addons import bootstrap as addons_bootstrap
 from core.addons import registry, store
@@ -51,20 +48,13 @@ async def main():
     except CredentialsKeyError as e:
         logger.error(str(e))
         sys.exit(1)
-    task_groups.ensure_default_groups_for_everyone()
-    shopping_lists.ensure_lists_for_everyone()
-    # About you: the old memories copied into their owner's facts (once per
-    # key), then every user's prompt block.
-    try:
-        about_legacy.migrate_legacy()
-    except Exception as e:
-        logger.error(f"About: migration of old memories failed: {e}", exc_info=True)
-    about_facts.load_prompts()
+    # What each addon prepares for its users at start (default lists, prompt
+    # blocks…) runs as its at_start jobs once the web server listens.
     # Resolve the user's timezone up front (may query Home Assistant) so it is
     # never resolved lazily with a blocking call inside the event loop.
     clock.get_timezone()
     
-    # 1. Each user's addons and the first admin's tools (every addon registered on import)
+    # 1. Each user's addons and the first admin's tools (every addon loaded on import: core/addons/loader.py)
     for user in users.list_users():
         logger.info(f"User {user.id} ({user.access}): {', '.join(store.connected_addons(user))}")
     admin = users.first_admin()
@@ -86,7 +76,7 @@ async def main():
     # 4. The Telegram channel adapter (also core.notify's sender), when configured
     bot = TelegramBot(token=telegram_token) if telegram_token else None
     
-    # 5. The web server (and the background loops), then Telegram long polling
+    # 5. The web server (with the background loops and the addons' jobs), then Telegram long polling
     webhook_port = int(os.getenv("PORT", "8080"))
     
     runner = None

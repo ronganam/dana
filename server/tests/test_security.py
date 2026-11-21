@@ -1146,16 +1146,16 @@ async def test_devices(http: TestClient) -> None:
 
 # --- 8. Route modules -----------------------------------------------------------------------------
 
-ROUTE_MODULES = tuple(module.__name__ for module in server.ROUTE_MODULES)
+ROUTE_MODULES = tuple(module.__name__ for module in server.route_modules())
 
 
 def test_route_modules() -> None:
-    """A route module that cannot be imported makes the server's startup import fail (it is never
-    skipped silently): each one blocked in a fresh interpreter; the unblocked import as the control."""
+    """A route module (core's or an official addon's api.py) that cannot be imported makes the server's
+    startup fail (it is never skipped silently): each one blocked in a fresh interpreter; the unblocked import as the control."""
     def boot(blocked: str) -> subprocess.Popen:
         code = ("import sys, testenv; testenv.isolate('routes_boot'); "
                 + (f"sys.modules[{blocked!r}] = None; " if blocked else "")
-                + "import core.server; print('BOOTED')")
+                + "import core.server; core.server.route_modules(); print('BOOTED')")
         return subprocess.Popen([sys.executable, "-c", code], cwd=str(testenv.SERVER),
                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     procs = {m: boot(m) for m in ("", *ROUTE_MODULES)}

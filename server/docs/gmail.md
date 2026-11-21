@@ -6,7 +6,7 @@ Code: `addons/gmail/` — `addon.py` (the addon, its scope and prompt parts), `c
 
 ## The addon
 
-- `gmail`, described as "Gmail", after `calendar` in `ADDON_ORDER`. One credential, `refresh_token`, no settings, no table, no HTTP endpoint of its own.
+- `gmail`, described as "Gmail", after `calendar` in the addon order (`order=` in its manifest). One credential, `refresh_token`, no settings, no table, no HTTP endpoint of its own.
 - A Google addon (docs/access.md, "Google account"): `oauth.register("gmail", (gmail.modify, gmail.settings.basic))`, connected by the Google sign-in (`connect_url`), its client built with `oauth.credentials(conn)` per call (`client.service`). `gmail.modify` allows reading, sending, labels, drafts and the trash; `gmail.settings.basic` allows filters (no Dana tool uses it yet: it is there for organizing the mailbox with the user's token). Neither allows permanent deletion, forwarding or delegation. A connection signed in before `settings.basic` was asked keeps working; the next sign-in grants it.
 - **Account**: the connection's `account` is the mailbox's address. The sign-in gives it; a connection that came without one (a token typed by hand) asks Gmail (`users.getProfile`) in the background, and after a credential change the stored address is checked against Gmail and corrected. The tools use it to leave the user's own address out of a reply-all (they ask Gmail when it is not stored).
 - **Check** (`POST /api/addons/gmail/test`): `users.getProfile`, one cheap request; a failure is a short reason from `oauth.failure_reason(e, "Gmail")`, never a token.

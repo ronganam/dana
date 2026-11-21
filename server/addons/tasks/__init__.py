@@ -9,6 +9,3 @@
 - :mod:`.triggers` — the trigger engine (time checker, location / car / wake);
 - :mod:`.tools` — the tools.
 """
-
-from addons.tasks import addon  # noqa: F401 — declares the addon
-from addons.tasks import tools  # noqa: F401 — registers the tasks tools

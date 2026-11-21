@@ -6,7 +6,7 @@ Code: the package `addons/about/` — `values.py` (sections, limits, the text ru
 
 ## Facts
 
-Table `about_facts` (baseline schema; owner from migration `m0009_about_per_user`):
+Table `about_facts` (the addon's `migrations/m0001_baseline.py`):
 
 | column | |
 |---|---|
@@ -39,16 +39,16 @@ Home:
 -----------------------------------
 ```
 
-The name is the user's `name` (`core/users.py`; the first admin's comes from `OWNER_NAME` when it is created, default `Owner`; change it with `bin/users.py update`). The cache holds one block per user: built at startup for every user with `about` (`facts.load_prompts()`, `main.py`), when the addon is connected (`on_connect`) and after every change to that user's facts; `prompt.section(user)` never touches the DB, never blocks and never raises. No facts → `""`. Hard cap `ABOUT_MAX_CHARS + 800` characters (whole lines only).
+The name is the user's `name` (`core/users.py`; the first admin's comes from `OWNER_NAME` when it is created, default `Owner`; change it with `bin/users.py update`). The cache holds one block per user: built at startup for every user with `about` (the `load_prompt` job, `hooks.py`), when the addon is connected (`on_connect`) and after every change to that user's facts; `prompt.section(user)` never touches the DB, never blocks and never raises. No facts → `""`. Hard cap `ABOUT_MAX_CHARS + 800` characters (whole lines only).
 
 ## Migration from `memories`
 
-`memories` is not per user, and other code still keeps its own rows there (below). Its real memories belong to one user: the one marked by the `about_state` row `legacy_memories`, which migration `m0009_about_per_user` gives to the first admin of a database that existed before it (a database created later has no such user; it never had real memories). Only that user gets the copy, the "older notes" in `recall_info`, old keys in the Telegram `/memory` pickers and the deletion of an old key (`forget_info`, `DELETE /api/memories/{key}`); everyone else gets nothing from `memories` (`addons/about/legacy.py`).
+`memories` is not per user, and other code still keeps its own rows there (below). Its real memories belong to one user: the one marked by the `about_state` row `legacy_memories`, which Dana 9.0 gave to the first admin of a database that existed before users (a database created later has no such user; it never had real memories). Only that user gets the copy, the "older notes" in `recall_info`, old keys in the Telegram `/memory` pickers and the deletion of an old key (`forget_info`, `DELETE /api/memories/{key}`); everyone else gets nothing from `memories` (`addons/about/legacy.py`).
 
-On every start (`legacy.migrate_legacy()`, `main.py`), `memories` rows that are real memories become that user's `imported` facts, once per key (`legacy_key` is unique, so a fact the owner removed is not re-imported). The `memories` rows themselves are left untouched. Not copied:
+On every start (`legacy.migrate_legacy()`, the `load_prompt` job in `hooks.py`), `memories` rows that are real memories become that user's `imported` facts, once per key (`legacy_key` is unique, so a fact the owner removed is not re-imported). The `memories` rows themselves are left untouched. Not copied:
 
-- `category = 'system'` rows: wake state that `core/wake.py` and `core/checks.py` read and write (the notification digest's old `notif_digest_*` rows were moved to `notification_digest_state` by migration `m0013_phone_per_user`);
-- `selected_calendars` (app state for the calendar picker; migration `m0012_calendar_per_user` moves it into the first admin's `calendar` addon and removes the row);
+- `category = 'system'` rows: wake state that `core/wake.py` and `core/checks.py` read and write (the notification digest's old `notif_digest_*` rows were moved to `notification_digest_state` by Dana 9.0);
+- `selected_calendars` (the calendar picker's old state; Dana 9.0 moved it into the first admin's `calendar` addon and removed the row);
 - credential-looking rows (key or category mentions password / token / secret / api key / credential / pin / otp, or the value looks sensitive). These stay answerable by `recall_info` as "older notes".
 
 Text: `Key words: value` (e.g. `wife_phone` → "Wife phone: 0501234567"), or just the value when it already contains the key words. Section from the old category (contact(s)/family → people, preference(s) → habits, otherwise guessed from the text).
@@ -68,7 +68,7 @@ The old `key` / `value` / `category` arguments are still accepted (Telegram `/me
 
 ## Learner
 
-`learner.learner_loop()` is started on app startup by `addons/about/api.py::setup` (an `on_startup` hook). It runs **per user**: every user with `about` connected (`learner.learners()`) gets a pass 2 min after start, then one every `ABOUT_LEARN_INTERVAL_MINUTES` (the loop looks every minute for users whose pass is due, `learner.run_due()`); each pass runs as its user (`users.acting_as`: the model call's usage row is theirs), one user after another, and one user's failure never stops the others. Each pass:
+The `learn` job (`addons/about/hooks.py`, an `@addon.job`) runs **per user**: every user with `about` connected gets a pass 2 min after start, then one every `ABOUT_LEARN_INTERVAL_MINUTES` (the job looks every minute whether the user's pass is due, `learner.run_if_due(user)`); each pass runs as its user (`users.acting_as`: the model call's usage row is theirs), one user after another, and one user's failure never stops the others. Each pass:
 
 1. **Collects** what finished since that user's bookmark (`about_state` row `(user, 'learner')`):
    - the user's own conversations (`sessions` of that user, `main` included) quiet for `ABOUT_LEARN_QUIET_MINUTES` and not running / waiting for approval. Only the messages after the last one it read (stored as a hash per session, so the 40-message Telegram window works) — user and assistant text, tool results left out;

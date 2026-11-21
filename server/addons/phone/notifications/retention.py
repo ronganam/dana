@@ -38,12 +38,3 @@ async def purge_all() -> dict:
     async def one(user: User) -> int:
         return await asyncio.to_thread(purge_old, user)
     return await for_each_user("Notification retention", one)
-
-
-async def retention_loop(interval_seconds: int = 6 * 3600) -> None:
-    while True:
-        try:
-            await purge_all()
-        except Exception as e:
-            logger.error(f"Notification retention failed: {e}", exc_info=True)
-        await asyncio.sleep(interval_seconds)

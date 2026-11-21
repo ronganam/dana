@@ -10,12 +10,12 @@ SCOPES = ("https://www.googleapis.com/auth/calendar",)
 # The OAuth client (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) is server-wide env;
 # the refresh token comes from the Google sign-in (addons/google_account).
 addon = Addon(
-    ADDON,
+    ADDON, order=100,
     credentials=(Field("refresh_token", "Google OAuth refresh token"),),
     settings=(Field(DEFAULT_CALENDAR, "Calendar new events go to", "primary"),
               Field(SELECTED, "Calendars shown and searched (ids); none chosen: the default calendar")),
     description="Google Calendar",
-    check=client.check,
+    test=client.check,
     connect_url=oauth.CONNECT_PATH,
     prompt_parts=(
         PromptPart("tools", "calendar management", rank=10),

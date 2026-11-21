@@ -3,12 +3,12 @@
 ## Trigger system (tasks)
 
 Tasks support triggers stored as JSON in `tasks.triggers`:
-- `time`: ISO datetime — checked every 30s, per user (`addons/tasks/triggers.py::time_checker_loop`)
-- `location`: `{"location": "zone_name", "event": "arrive|leave"}` — fired by the user's Home Assistant watcher (below) from their person entity
-- `car`: `"enter"|"leave"` — fired by the same watcher from their car Bluetooth sensor
+- `time`: ISO datetime — checked every 30s, per user (the `check_time_triggers` job in `addons/tasks/hooks.py`)
+- `location`: `{"location": "zone_name", "event": "arrive|leave"}` — fired by the user's Home Assistant watcher (below) from their person entity (the event `homeassistant.location.changed`, handled in `addons/tasks/hooks.py`)
+- `car`: `"enter"|"leave"` — fired by the same watcher from their car Bluetooth sensor (`homeassistant.car.changed`)
 - `wake`: `true` — fired once a day per user when they are up (their phone unlock confirmed by the screen history from their Home Assistant, or a fallback screen-history poll; only for users with `phone` and `homeassistant`; `docs/people.md` → Wake detection); the same moment sends their morning briefing
 
-All triggers push a `reminder` event to the phone (direct push, see below) + a Telegram message to the chat of the task's creator (`notify(user, …)`, `core/notify.py`). Completing a task from the reminder (app, Now) pushes `reminder_clear`.
+All triggers send one `notify.send(user, Message(text, kind="reminder", data))` (`core/notify.py`): the text to the Telegram chat of the task's creator, the `reminder` event to their phone through the phone addon's push channel (direct push, see below). Completing a task from the reminder (app, Now) sends `reminder_clear` the same way. The `wake` trigger fires on core's `core.user.woke` event.
 
 ## Home Assistant watcher (location / car)
 

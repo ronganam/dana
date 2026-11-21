@@ -65,7 +65,7 @@ def python() -> str:
 
 
 def site_addon_dirs() -> list[Path]:
-    """The site addon folders, as the server finds them (addons/__init__.py: ``DANA_ADDON_DIRS``,
+    """The site addon folders, as the server finds them (core/addon_dirs.py: ``DANA_ADDON_DIRS``,
     else ``$DANA_SITE/addons``, else ``site/addons`` at the repository root)."""
     raw = os.environ.get("DANA_ADDON_DIRS")
     if raw is None:

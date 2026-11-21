@@ -28,10 +28,10 @@ EMAIL_GUIDE = (
 # realtime=False: a voice call has no Approve card and no rule for untrusted
 # content, so mail is neither read nor sent there.
 addon = Addon(
-    ADDON,
+    ADDON, order=120,
     credentials=(Field("refresh_token", "Google OAuth refresh token"),),
     description="Gmail",
-    check=client.check,
+    test=client.check,
     connect_url=oauth.CONNECT_PATH,
     on_connect=client.on_connect,
     on_credentials_change=client.on_credentials_change,

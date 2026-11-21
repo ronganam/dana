@@ -103,11 +103,10 @@ dropped; it never reaches the model).
 - **The account** is the `me.id` of the connection's session in WAHA's
   `GET {url}/sessions` (the entry whose `name` is the session). It is learned
   right after the addon is connected or its credentials change (the old
-  account is forgotten first), by `accounts.account_loop()` (started with the
-  web server: connections without one, now and every minute; WAHA being down
-  only delays it), and lazily as above.
-- **One connection per account** (`store.claim_account`, migration
-  `m0019_whatsapp_account_claims`). Storing a learned account is a claim,
+  account is forgotten first), by the `learn_account` job (`hooks.py`:
+  connections without one, at start and every minute; WAHA being down only
+  delays it), and lazily as above.
+- **One connection per account** (`store.claim_account`). Storing a learned account is a claim,
   checked and written in one transaction: when another user's connection
   already holds the same account, this connection gets none and the reported
   account is kept in `addons.account_conflict` (a warning in the log

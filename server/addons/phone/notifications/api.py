@@ -16,7 +16,7 @@ from aiohttp import web
 from core import clock, undo
 from core.db import get_db_connection
 from addons.phone import config as phone_config, suggestions as phone_suggestions
-from addons.phone.api import phone_user
+from addons.phone.access import phone_user
 from addons.phone.calls import actions as suggestion_actions
 from addons.phone.notifications import (
     actions as notification_actions,

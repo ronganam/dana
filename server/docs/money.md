@@ -51,7 +51,7 @@ Migration `m0025_money.py` (its docstring describes each column). All tables are
 
 1. Decrypt the credentials; start a job from the last good sync minus 10 days (the first sync: one year back). At most 2 jobs run at once (the worker's browser limit); one sync gives up after 15 minutes.
 2. Follow the job with long polls. `needs_code` → the code broker (below); the code goes to the worker, and once the job moves on the phone gets a quiet "Signed in to Bank Hapoalim" notice.
-3. `done` → `ingest.apply` in a thread → every hook (`hooks.on_transactions`) → the source is `ok`, `failures = 0`, `last_ok_at`, `next_sync_at` = its next slot (or a sooner time a signal set while it ran).
+3. `done` → `ingest.apply` in a thread → every hook (`after_sync.on_transactions`) → the source is `ok`, `failures = 0`, `last_ok_at`, `next_sync_at` = its next slot (or a sooner time a signal set while it ran).
 4. `failed`:
    - `INVALID_PASSWORD`, `CHANGE_PASSWORD`, `ACCOUNT_BLOCKED`, `CODE_REJECTED` (the bank refused the code), `LOGIN_UNKNOWN` (the password went out and the site neither let the worker in nor said why: an error page the worker does not know, a stall, a crash mid-login — it may have been a refused password) → `needs_attention` with what to do ("Cal wants a new password: change it on Cal's site, then update it here"), `next_sync_at` empty: Dana never signs in again on its own (not the loop, a payment signal or the agent), because a repeated wrong password is what locks a login. New credentials restart it; after `CODE_REJECTED` and `LOGIN_UNKNOWN` the user's own "Sync now" (trigger `manual`) also signs in once more (`store.HAND_RETRY_ERRORS`; the source payload's `can_sync`).
    - No code in time (`CODE_TIMEOUT`) → `failing`, "no sign-in code arrived", next sync at the next regular slot (no quick retry, so no stream of SMS codes); "Sync now" is allowed. A second one in a row → `needs_attention` (each try sends the user an SMS) until the user's "Sync now".
@@ -59,7 +59,7 @@ Migration `m0025_money.py` (its docstring describes each column). All tables are
 
    The worker's error text can quote the site, so it is scrubbed (`ingest.scrub`: ID, card and account numbers) before it is stored as `state_reason` or the run's `error`; the worker itself drops URL query strings and masks the credentials.
 
-Each finished sync writes the health mark `money_sync:<user id>`. After a restart, `schedule.recover_all` ends what the previous process left mid-sync ("interrupted by a restart": the run failed, the code request cancelled, the source `failing`); the interruption counts as a failure and is retried like one (30 minutes, 2 hours, then the slots), so a restart loop cannot sign in over and over.
+Each finished sync writes the health mark `money_sync:<user id>`. After a restart, the `recover` job (`hooks.py`) ends what the previous process left mid-sync ("interrupted by a restart": the run failed, the code request cancelled, the source `failing`); the interruption counts as a failure and is retried like one (30 minutes, 2 hours, then the slots), so a restart loop cannot sign in over and over.
 
 ## Sign-in codes
 
@@ -93,7 +93,7 @@ Pluxee (`consumers.pluxee.co.il`, formerly Cibus: an Angular app over Cibus's JS
 
 ## Schedule
 
-`schedule.py`: a loop started with the app (`core/server.py`) looks every minute at every user with `money`, as that user, and starts each source whose `next_sync_at` has come, unless it is `syncing`, `needs_code` or `needs_attention`.
+`schedule.py` + the job `start_due_syncs` (`hooks.py`, every minute) look at every user with `money`, as that user, and starts each source whose `next_sync_at` has come, unless it is `syncing`, `needs_code` or `needs_attention`.
 
 - Regular slots: `MONEY_SYNC_TIMES` (default `07:00,19:00`, local time) moved by a stable per-source jitter within ±20 minutes (`slots.py`).
 - `request_soon(user, source_id, minutes=30, reason="signal")` pulls `next_sync_at` earlier (an earlier time already set is kept): at most 4 times per source per local day, never in 00:00–06:00 (moved to 06:00 + the jitter), never for a `failing` or `needs_attention` source. The loop then starts it as a `signal` sync.
@@ -115,7 +115,7 @@ Every sync is a full sign-in: the library keeps no session between runs. The sav
 - **Scrub** (description, memo and every string in `raw`, plus integers in `raw`): 9-digit numbers that pass the Israeli ID checksum → `[id]` (a salary memo carries the user's ID), 16-digit card numbers and `NN-NNN-NNNN…` account numbers → `••••` + their last 3 digits. Names stay.
 - **Category**: none from the bank here (Cal's own category text stays in `raw` for classification); a `money_rules` row for the merchant key sets `category` (`category_source = 'rule'`) and, when it has them, the display name and flow.
 
-`hooks.on_transactions(fn)` registers `fn(user, source_id, new_ids, changed_ids)` (sync or async); `sync.py` calls every hook after each ingest, as the user, logging and swallowing errors.
+`after_sync.on_transactions(fn)` (`after_sync.py`) registers `fn(user, source_id, new_ids, changed_ids)` (sync or async); `sync.py` calls every hook after each ingest, as the user, logging and swallowing errors.
 
 ## Categories
 
@@ -198,7 +198,7 @@ A run takes the sync's new and changed scraped rows plus up to 200 rows (newest 
 5. **The model**, for rows still missing a category, a display name or (bank) a flow: `llm.complete_json(job="money", purpose="money_classify")` (`MONEY_MODEL` → `BACKGROUND_MODEL`), 40 questions a call. A card merchant is asked once per merchant key, a bank line once per key + memo + sign, and the answer applies to every row of the group. Each question is `{id: "r1"…, account, date, amount (shekels), description, memo, bank_category}`; each answer `{id, merchant, category, flow}` is validated (an unknown id ignored, a category not in the list → `other`, a bank flow not in `FLOWS` → `other`, a card row's flow ignored) → `category_source = 'model'`. Writes are checked again when made, so a category the user set meanwhile stays. Display names are for card merchants only: a name (one line, at most 40 characters, `classify.NAME_MAX`) is set on every card row of that key still showing its description and, when it named rows (in the same write, so a run that ends after Money was turned off leaves nothing), becomes the key's remembered name (an alias of the key to itself); it is never asked again. A bank line keeps the bank's own description as its name: its memo carries the other side's transfer note, and a name the model drew from it would be a stranger's words in every tool result. Descriptions and memos are written by others: the prompt calls them data, the schema allows only those four fields, and nothing from the answer is run. Without a key for the job (`llm.configured("money")`) the step is skipped; a failing call is logged and what is left waits for the next run.
 6. **Card ↔ bank**: a card without `billed_from_account_id` gets the bank account whose `card_bill` lines equal the card's completed total per charge date (within 3 days); when no single card matches, all the source's cards together. Two bank accounts matching equally leave it unset.
 
-**Catch-up** (`classify.catch_up()`, started by the schedule loop when the app starts): for each user with `money`, classification runs in rounds of 200 until a round loads fewer rows, the model classifies nothing or ten rounds have run — so rows a migration cleared (m0027 cleared bank transfers with a payee, card rows whose category came from Cal's or was an income one, and the card moves) are redone within minutes of a deploy.
+**Catch-up** (`classify.catch_up_user()`, the `recover` job of `hooks.py` when the app starts, after `sync.recover`): for each user with `money`, classification runs in rounds of 200 until a round loads fewer rows, the model classifies nothing or ten rounds have run — so rows a migration cleared (m0027 cleared bank transfers with a payee, card rows whose category came from Cal's or was an income one, and the card moves) are redone within minutes of a deploy.
 
 What callers can rely on: once a run has ended with a model configured, every scraped row has a `flow`, `category` is NULL only on `card_bill` and `own_transfer` rows, and `merchant` is a display name (the description on those two flows and when the description is empty). Between the ingest and the end of the run (seconds), and for good without a model key, rows the deterministic steps did not settle have `category` NULL, bank lines may have `flow` NULL and `merchant` equals the description; they are retried at every run.
 

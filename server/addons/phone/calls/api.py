@@ -18,7 +18,7 @@ from aiohttp import web
 from core import paths
 from addons.knowledge import projects as knowledge_projects
 from addons.phone import suggestions as phone_suggestions
-from addons.phone.api import phone_user
+from addons.phone.access import phone_user
 from addons.phone.calls import (
     labels as calls_labels,
     processing as calls_processing,

@@ -112,15 +112,3 @@ async def digest_due(user: User, now: Optional[datetime.datetime] = None) -> int
         fired += 1
         await send_digest(user, since)
     return fired
-
-
-async def digest_loop(interval_seconds: int = 60) -> None:
-    """Every ``interval_seconds``: :func:`digest_due` for every user with ``phone``, as that user."""
-    if not _digest_slots():
-        return
-    while True:
-        try:
-            await for_each_user("Notification digest", digest_due)
-        except Exception as e:
-            logger.error(f"Notification digest failed: {e}", exc_info=True)
-        await asyncio.sleep(interval_seconds)

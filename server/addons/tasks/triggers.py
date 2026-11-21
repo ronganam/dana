@@ -9,13 +9,15 @@ see the task; the reminder goes to them.
 
 Entry points:
 
-- :func:`fire` — "fire the triggers of type T (and target) for user U": the
-  Home Assistant entity watcher (location / car,
-  ``addons/homeassistant/watcher.py``, given this function by the
-  server) and the wake flow (``wake``, ``core/wake.py``) call it;
-- :func:`time_checker_loop` — every ``check_interval_seconds``, each user with
-  ``tasks`` connected gets their due time triggers fired, as that user; one
-  user's failure does not stop the others.
+- :func:`fire` — "fire the triggers of type T (and target) for user U": called
+  by the addon's event handlers (hooks.py) for the Home Assistant watcher's
+  ``homeassistant.location.changed`` / ``homeassistant.car.changed`` and the
+  wake flow's ``core.user.woke``;
+- :func:`check_time_triggers` — one user's due time triggers, run for every
+  user with ``tasks`` by the addon's job (hooks.py).
+
+A reminder goes out with ``core.notify.send``: the text to Telegram, the
+``reminder`` event to every channel the user has (the phone's push).
 
 Refire / flap / cooldown marks are per user (table ``task_trigger_marks``).
 """
@@ -25,16 +27,12 @@ import datetime
 import json
 import logging
 import os
-import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
-from core import clock, users
+from core import clock, notify
 from core.db import get_db_connection
-from core.notify import notify
 from core.text import escape_markdown
 from core.users import User
-from core.addons import store
-from addons.phone import push as phone_push
 from addons.tasks import service
 
 logger = logging.getLogger(__name__)
@@ -225,8 +223,8 @@ def parse_trigger_time(time_str: str) -> Optional[datetime.datetime]:
 # --- Firing ------------------------------------------------------------------------------
 
 async def trigger_reminder(item: Dict[str, Any], trigger_type: str, user: User, target: str = "") -> None:
-    """Fire one task's reminder for ``user`` (the task's creator): push it to
-    the phone, tell them on Telegram and clean up a time trigger."""
+    """Fire one task's reminder for ``user`` (the task's creator): send it
+    (Telegram and the phone, ``core.notify.send``) and clean up a time trigger."""
     summary = item.get("title") or item.get("summary", "Untitled Task")
     uid = item.get("id") or item.get("uid")
 
@@ -238,21 +236,19 @@ async def trigger_reminder(item: Dict[str, Any], trigger_type: str, user: User, 
 
     emoji, title = _TRIGGER_STYLE.get(trigger_type, ("🔔", "Reminder"))
     priority = (item.get("priority") or "medium").lower()
-
-    # Full-screen reminder in the user's phone app (direct push, addons/phone/push.py).
-    # Once queued it counts as sent: a phone that missed the ping fetches it on
-    # its next sync (retrying here would queue duplicates).
-    logger.info(f"Sending reminder push for '{summary}'...")
-    if not await phone_push.send(user, "reminder", {"task_id": str(uid or ""), "task_title": summary,
-                                                    "priority": priority, "trigger_type": trigger_type}):
-        logger.warning(f"Reminder push for '{summary}' wasn't delivered now (queued for the phone's next sync, "
-                       f"or no phone)")
+    data = {"task_id": str(uid or ""), "task_title": summary, "priority": priority, "trigger_type": trigger_type}
+    # The text to Telegram (only for a task with an id), the full-screen
+    # reminder to the phone app (the push channel: once queued it counts as
+    # sent, a phone that missed the ping fetches it on its next sync).
+    text = f"{emoji} *{title}*\n\nRemember to: *{escape_markdown(summary)}*" if uid else ""
+    logger.info(f"Sending reminder for '{summary}'...")
+    sent = await notify.send(user, notify.Message(text, parse_mode="Markdown", kind="reminder", data=data))
+    if not any(sent.values()):
+        logger.warning(f"Reminder for '{summary}' wasn't delivered now (queued for the phone's next sync, "
+                       f"or no phone / chat)")
 
     if uid:
         _mark_set_now(user, _fire_key(trigger_type, str(uid)))
-
-        msg_text = f"{emoji} *{title}*\n\nRemember to: *{escape_markdown(summary)}*"
-        await notify(user, msg_text, parse_mode="Markdown")
 
         # Strip the time trigger so it doesn't fire again (only time triggers).
         if trigger_type == "time":
@@ -350,36 +346,3 @@ async def check_time_triggers(user: User) -> int:
             await trigger_reminder(item, "time", user)
             fired += 1
     return fired
-
-
-async def check_all_time_triggers() -> None:
-    """One pass of the time checker: every user with ``tasks``, as that user."""
-    for uid in store.users_with(service.ADDON):
-        user = users.get(uid)
-        if user is None:
-            continue
-        try:
-            with users.acting_as(user):
-                await check_time_triggers(user)
-        except Exception as e:
-            logger.error(f"Time trigger check failed for user {uid}: {e}", exc_info=True)
-
-
-async def time_checker_loop(check_interval_seconds: int = 30,
-                            heartbeat: Optional[Callable[[], None]] = None) -> None:
-    """Check every user's time triggers every ``check_interval_seconds``;
-    ``heartbeat`` (the self-check's mark) is called at most every 2 minutes."""
-    logger.info(f"Starting time trigger checker background loop (every {check_interval_seconds}s)...")
-    last_mark = 0.0
-    while True:
-        if heartbeat is not None and time.monotonic() - last_mark >= 120:
-            try:
-                heartbeat()
-            except Exception as e:
-                logger.warning(f"Time checker heartbeat failed: {e}")
-            last_mark = time.monotonic()
-        try:
-            await check_all_time_triggers()
-        except Exception as e:
-            logger.error(f"Error in time trigger checker loop: {e}", exc_info=True)
-        await asyncio.sleep(check_interval_seconds)

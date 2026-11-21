@@ -405,6 +405,18 @@ def _encrypt(credentials: Mapping[str, Any]) -> Optional[str]:
     return crypto.encrypt(values) if values else None
 
 
+def connect_defaults(user: User) -> List[str]:
+    """Turn on, for a new ``user``, every ``default_on`` addon they may have
+    and lack (no credentials, its default settings). Returns the names turned on."""
+    done = []
+    for addon in all_addons():
+        if not addon.default_on or addon.everyone or not addon.allowed_for(user) or is_connected(user, addon.name):
+            continue
+        connect(user, addon.name)
+        done.append(addon.name)
+    return done
+
+
 def connect(user: User, name: str, *, credentials: Optional[Mapping[str, Any]] = None,
             settings: Optional[Mapping[str, Any]] = None, account: Optional[str] = None,
             by: Optional[User] = None) -> Connection:

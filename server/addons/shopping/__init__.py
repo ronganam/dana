@@ -11,6 +11,3 @@
 - :mod:`.invites` — answering an invitation;
 - :mod:`.screen` — the screen payload; :mod:`.api` — the routes; :mod:`.tools` — Dana's tools.
 """
-
-from addons.shopping import addon  # noqa: F401 — declares the addon
-from addons.shopping import tools  # noqa: F401 — registers the shopping tools

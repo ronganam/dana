@@ -31,7 +31,7 @@ ensure_default_groups_for_everyone()
 
 import addons
 from addons import bootstrap as addons_bootstrap
-from core.addons import Addon, crypto, registry, store
+from core.addons import Addon, crypto, loader, registry, store
 from core.addons.crypto import CredentialsKeyError
 from core.addons.addon import all_tools, find_tool, get_addon, all_addons
 
@@ -92,7 +92,7 @@ EXPECTED_ORDER = ["essentials", "tasks", "shopping", "knowledge", "about", "peop
 def test_discovery():
     check("discovery: every addon registered, in the fixed order", [k.name for k in all_addons()] == EXPECTED_ORDER,
           str([k.name for k in all_addons()]))
-    check("discovery: ADDON_ORDER is the order", list(addons.ADDON_ORDER) == EXPECTED_ORDER)
+    check("discovery: the loader's order is the order", list(loader.loaded()) == EXPECTED_ORDER)
     tools = all_tools()
     check("discovery: 99 tools", len(tools) == 99, str(len(tools)))
     check("discovery: tool names unique", len({t.name for t in tools}) == len(tools))

@@ -120,6 +120,15 @@ def due_sources(user: User, now: Optional[datetime.datetime] = None) -> List[Dic
     return [dict(r) for r in rows if not sync.running(r["id"])]
 
 
+def tick_user(user: User, now: Optional[datetime.datetime] = None) -> List[str]:
+    """Start ``user``'s due sources; returns the started sync ids."""
+    started = []
+    for source in due_sources(user, now):
+        trigger = "signal" if _signal_due.pop(source["id"], None) == source["next_sync_at"] else "schedule"
+        started.append(sync.start(user, source["id"], trigger))
+    return started
+
+
 def tick(now: Optional[datetime.datetime] = None) -> Dict[str, List[str]]:
     """Start every due source of every user with ``money`` (each as that user;
     one user's failure does not stop the next). Returns user id → started sync ids."""
@@ -130,9 +139,9 @@ def tick(now: Optional[datetime.datetime] = None) -> Dict[str, List[str]]:
             continue
         try:
             with users.acting_as(user):
-                for source in due_sources(user, now):
-                    trigger = "signal" if _signal_due.pop(source["id"], None) == source["next_sync_at"] else "schedule"
-                    out.setdefault(user.id, []).append(sync.start(user, source["id"], trigger))
+                started = tick_user(user, now)
+            if started:
+                out[user.id] = started
         except Exception as e:
             logger.error(f"Money schedule for user {uid} failed: {e}", exc_info=True)
     return out
@@ -149,16 +158,3 @@ def recover_all() -> None:
                 sync.recover(user)
         except Exception as e:
             logger.error(f"Money recovery for user {uid} failed: {e}", exc_info=True)
-
-
-async def loop(interval_seconds: float = INTERVAL_SECONDS) -> None:
-    """Background loop started with the app (core/server.py)."""
-    await asyncio.sleep(STARTUP_DELAY_SECONDS)
-    recover_all()
-    _catch_up = asyncio.get_running_loop().create_task(classify.catch_up())
-    while True:
-        try:
-            tick()
-        except Exception as e:
-            logger.error(f"Money schedule loop error: {e}", exc_info=True)
-        await asyncio.sleep(interval_seconds)

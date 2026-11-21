@@ -1,8 +1,9 @@
 """Wake briefing + meeting context cards, per user.
 
 A user's briefing is built once a day when they are confirmed awake (the wake
-signal in core/wake.py), from their own addons only: today's calendar, tasks
-due or overdue, pending suggestions, the Inbox briefing (already cached), the
+signal in core/wake.py), from their own addons only: today's calendar, each addon's
+``@addon.briefing`` section (the tasks addon: due or overdue, high priority,
+today's reminders), pending suggestions, the Inbox briefing (already cached), the
 weather from their Home Assistant and people nudges (birthdays, people they
 usually talk to but haven't lately); an addon they have not connected adds
 nothing. The model turns that into a headline + a few points, written for
@@ -37,15 +38,14 @@ from core.db import get_db_connection
 from core.notify import notify
 from core.users import User
 from addons.calendar import config as calendar_config, events as calendar_events
-from core.addons import store
+from core.addons import BriefingContext, Section, registry, store
+from core.addons.hooks import BRIEFING
 from addons.homeassistant import client as ha_client, config as ha_config
 from addons.people import cadence as people_cadence, detail as people_detail, store as people_store
 from addons.people.values import ADDON as PEOPLE
 from addons.phone import push as phone_push
 from addons.phone.config import ADDON as PHONE
 from addons.phone.notifications import store as notification_store, summary as notification_summary
-from addons.tasks import service as tasks_service
-from addons.tasks.service import ADDON as TASKS
 
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,11 @@ MEETING_CARDS = os.getenv("MEETING_CARDS", "1") != "0"
 MEETING_BACKOFF_SECONDS = 900
 
 # Addons whose data a briefing is made of (with nothing of these there is nothing to say).
-CONTENT_KINDS = (PHONE, calendar_config.ADDON, TASKS, PEOPLE, ha_config.ADDON)
+# The addons whose content a briefing has, besides every addon with an ``@addon.briefing`` hook.
+CONTENT_KINDS = (PHONE, calendar_config.ADDON, PEOPLE, ha_config.ADDON)
+# Where gather() keeps the addons' sections (their plain points, headline and
+# counts) until the briefing is written; never stored or shown to the model.
+SECTIONS = "_sections"
 # Who meeting cards are for: the event comes from their calendar, the card goes to their phone.
 MEETING_KINDS = (calendar_config.ADDON, PHONE)
 
@@ -78,7 +82,8 @@ def available(user: Optional[User]) -> bool:
     mine = store.connected_addons(user)
     if PHONE in mine:
         return True
-    return user.telegram_chat_id is not None and any(k in mine for k in CONTENT_KINDS)
+    return user.telegram_chat_id is not None and (any(k in mine for k in CONTENT_KINDS)
+                                                  or bool(registry.hooks("briefing", user)))
 
 
 def require(user: User) -> None:
@@ -144,30 +149,21 @@ async def _events_today(user: User) -> Optional[List[Dict[str, Any]]]:
     return out
 
 
-def _tasks(conn, user: User, today: str) -> Dict[str, Any]:
-    # The user's tasks (none without the tasks addon).
-    where, args = tasks_service.visible_sql(user, "")
-    rows = conn.execute(
-        "SELECT id, title, priority, due_date, triggers FROM tasks WHERE status = 'needs_action' "
-        f"AND due_date IS NOT NULL AND due_date != '' AND substr(due_date, 1, 10) <= ? AND {where} "
-        "ORDER BY due_date, CASE priority WHEN 'high' THEN 0 WHEN 'medium' THEN 1 ELSE 2 END LIMIT 12",
-        (today, *args)).fetchall()
-    due = [{"id": r["id"], "title": r["title"], "priority": r["priority"], "due_date": r["due_date"][:10],
-            "overdue": r["due_date"][:10] < today} for r in rows]
-    high = conn.execute(
-        "SELECT id, title FROM tasks WHERE status = 'needs_action' AND priority = 'high' "
-        f"AND (due_date IS NULL OR due_date = '') AND {where} ORDER BY updated_at DESC LIMIT 3", args).fetchall()
-    timed = []
-    for r in conn.execute("SELECT id, title, triggers FROM tasks WHERE status = 'needs_action' "
-                          f"AND triggers LIKE '%\"time\"%' AND {where}", args).fetchall():
+def sections(user: User, kind: str, now: datetime.datetime) -> List[Section]:
+    """The parts of ``user``'s briefing (``kind`` :data:`BRIEFING`) or weekly review
+    (:data:`WEEKLY_REVIEW`) from every ``@addon.briefing`` of an addon they have
+    (one failing is logged and left out)."""
+    out: List[Section] = []
+    ctx = BriefingContext(kind=kind, now=now)
+    for hook in registry.hooks("briefing", user):
         try:
-            t = json.loads(r["triggers"] or "{}").get("time")
-        except Exception:
-            t = None
-        if t and str(t)[:10] == today:
-            timed.append({"id": r["id"], "title": r["title"], "time": _hhmm(t) or str(t)[11:16]})
-    timed.sort(key=lambda x: x["time"])
-    return {"due": due, "high_priority": [{"id": r["id"], "title": r["title"]} for r in high], "reminders_today": timed[:6]}
+            section = hook.func(user, ctx)
+        except Exception as e:
+            logger.warning(f"Briefing section of {hook.addon} failed for user {user.id}: {e}", exc_info=True)
+            continue
+        if section is not None:
+            out.append(section)
+    return out
 
 
 def _suggestions(conn, user: User) -> Dict[str, Any]:
@@ -247,12 +243,12 @@ async def gather(user: User) -> Dict[str, Any]:
     now = clock.now()
     today = now.date().isoformat()
     events, weather_now = await asyncio.gather(_events_today(user), weather(user))
+    parts = await asyncio.to_thread(sections, user, BRIEFING, now)
     with get_db_connection() as conn:
-        tasks = _tasks(conn, user, today)
         sugg = _suggestions(conn, user)
     return {"date": today, "weekday": now.strftime("%A"), "events": events or [],
-            "calendar_ok": events is not None, "tasks": tasks, "suggestions": sugg, "inbox": _inbox(user),
-            "weather": weather_now, "people": _people(user)}
+            "calendar_ok": events is not None, **{p.key: p.data for p in parts}, "suggestions": sugg,
+            "inbox": _inbox(user), "weather": weather_now, "people": _people(user), SECTIONS: parts}
 
 
 # ---------------------------------------------------------------------------
@@ -267,13 +263,9 @@ def plain_briefing(d: Dict[str, Any]) -> Dict[str, Any]:
         first = evs[0]
         more = f" + {len(evs) - 1} more" if len(evs) > 1 else ""
         pts.append(f"{first['time']} {first['title']}{more}")
-    t = d["tasks"]
-    overdue = [x for x in t["due"] if x["overdue"]]
-    today_due = [x for x in t["due"] if not x["overdue"]]
-    if today_due:
-        pts.append("Due today: " + ", ".join(x["title"] for x in today_due[:3]))
-    if overdue:
-        pts.append(f"{len(overdue)} overdue: " + ", ".join(x["title"] for x in overdue[:2]))
+    parts: List[Section] = d.get(SECTIONS) or []
+    for p in parts:
+        pts += p.points
     if d["inbox"]["needs_you"]:
         pts.append(f"{d['inbox']['needs_you']} notification(s) need you")
     if d["suggestions"]["count"]:
@@ -288,8 +280,7 @@ def plain_briefing(d: Dict[str, Any]) -> Dict[str, Any]:
         pts.insert(0, f"{w['condition'].capitalize()}, {w['temperature']}°{hi}")
     n = len(evs)
     headline = f"{d['weekday']}: " + (f"{n} event{'s' if n != 1 else ''}" if n else "a clear calendar")
-    if today_due:
-        headline += f", {len(today_due)} due"
+    headline += "".join(p.headline for p in parts)
     return {"headline": headline, "points": pts[:6] or ["Nothing scheduled — enjoy the day"]}
 
 
@@ -302,7 +293,7 @@ def briefing_prompt(d: Dict[str, Any], user: Optional[User]) -> str:
 {who.about()}Now: {clock.describe_now()}
 
 Today's data (JSON):
-{json.dumps({k: v for k, v in d.items() if k != 'calendar_ok'}, ensure_ascii=False, indent=1)}
+{json.dumps({k: v for k, v in d.items() if k not in ('calendar_ok', SECTIONS)}, ensure_ascii=False, indent=1)}
 {'' if d.get('calendar_ok', True) else '(The calendar could not be read today — say nothing about meetings.)'}
 
 Return:
@@ -337,6 +328,7 @@ async def build_and_store(user: User, trigger: str) -> Dict[str, Any]:
     async with _build_locks.setdefault(user.id, asyncio.Lock()):
         d = await gather(user)
         text = await compose(d, user)
+        d.pop(SECTIONS, None)
         d["model"] = text.pop("model", False)
         with get_db_connection() as conn:
             prev = conn.execute("SELECT delivered_at FROM briefings WHERE user_id = ? AND date = ?",
@@ -356,18 +348,29 @@ async def ensure_today(user: User, trigger: str) -> Dict[str, Any]:
     return get_today(user) or await build_and_store(user, trigger)
 
 
-def push_payload(b: Dict[str, Any]) -> Dict[str, Any]:
+def push_payload(b: Dict[str, Any], counts: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
+    """The phone's ``briefing`` event: the stored briefing ``b`` plus the
+    addons' ``counts`` (the tasks addon's ``due``: due today, not overdue)."""
     d = b.get("data") or {}
     evs = d.get("events") or []
     return {"date": b["date"], "headline": b["headline"], "points": b["points"],
             "next_event": (f"{evs[0]['time']} {evs[0]['title']}" if evs else None),
-            "due": len([t for t in (d.get("tasks") or {}).get("due", []) if not t.get("overdue")]),
+            "due": (counts or {}).get("due", 0),
             "needs_you": (d.get("inbox") or {}).get("needs_you", 0)}
+
+
+def counts(user: User) -> Dict[str, int]:
+    """The addons' counts for the briefing's push (their sections' ``counts``, now)."""
+    out: Dict[str, int] = {}
+    for p in sections(user, BRIEFING, clock.now()):
+        for k, v in p.counts.items():
+            out[k] = out.get(k, 0) + v
+    return out
 
 
 async def deliver(b: Dict[str, Any], user: User) -> bool:
     """Push the briefing to ``user``'s phone and, with ``BRIEFING_TELEGRAM``, to them on Telegram."""
-    ok = await phone_push.send(user, "briefing", push_payload(b))
+    ok = await phone_push.send(user, "briefing", push_payload(b, await asyncio.to_thread(counts, user)))
     with get_db_connection() as conn:
         conn.execute("UPDATE briefings SET delivered_at = ? WHERE user_id = ? AND date = ?",
                      (_now_iso(), user.id, b["date"]))

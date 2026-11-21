@@ -1,8 +1,10 @@
 """Weekly review: every Saturday evening, each user tidies their task list in one go.
 
 1. Plain queries find what needs a decision among the user's own data:
-   overdue tasks, tasks untouched for ``REVIEW_STALE_DAYS`` (21), tasks
-   snoozed 3+ times, suggestions pending over a week (with ``phone``), and
+   each addon's part (``@addon.briefing`` for the weekly review, acted on by
+   its ``@addon.review_action``; the tasks addon: overdue tasks, tasks
+   untouched for ``REVIEW_STALE_DAYS`` (21), tasks snoozed 3+ times),
+   suggestions pending over a week (with ``phone``), and
    people they usually talk to but haven't lately (with ``people``). With
    ``money``, a Money section: spent this week vs a usual week, the top
    groups, new recurring charges and price changes (``addons/money/queries.py::week``)
@@ -14,7 +16,7 @@
 3. They review the list (phone, web), untick what they disagree with and
    apply it with one call: ``POST /api/review/{id}/apply``.
 
-For every user with ``tasks`` (:data:`ADDONS`); reviews belong to their user
+For every user with an addon the review is about (``tasks``); reviews belong to their user
 (``weekly_reviews.user_id``). Schedule: ``WEEKLY_REVIEW_AT`` ("sat 20:00"); a
 review missed by a restart is still made until noon the next day. One review
 per user and ISO week.
@@ -30,19 +32,19 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional
 
-from core import clock, composers, llm, user_profile, users
+from core import briefing, clock, composers, llm, user_profile, users
 from core.db import get_db_connection
 from core.notify import notify
 from core.users import User
 from addons.calendar import config as calendar_config, events as calendar_events
 from addons.money import config as money_config, queries as money_queries, savings as money_savings
-from core.addons import store
+from core.addons import registry, store
+from core.addons.hooks import WEEKLY_REVIEW
 from addons.people import cadence as people_cadence
 from addons.people.values import ADDON as PEOPLE
 from addons.phone import push as phone_push, suggestions as phone_suggestions
 from addons.phone.calls import actions as suggestion_actions
 from addons.phone.config import ADDON as PHONE
-from addons.tasks import groups as task_groups, service as tasks_service, triggers as task_triggers
 
 logger = logging.getLogger(__name__)
 
@@ -53,26 +55,38 @@ SUGGESTION_DAYS = int(os.getenv("REVIEW_SUGGESTION_DAYS", "7"))
 MAX_ITEMS = int(os.getenv("REVIEW_MAX_ITEMS", "25"))
 REVIEW_TELEGRAM = os.getenv("REVIEW_TELEGRAM", "1") != "0"
 _DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
+# Core's own item types and what may be proposed for each; an addon adds its
+# own with ``@addon.review_action(type, actions)`` (the tasks addon: "task").
 ACTIONS = {
-    "task": ("complete", "reschedule", "delete", "move_group", "keep"),
     "suggestion": ("accept", "dismiss", "keep"),
     "person": ("reach_out", "keep"),
 }
-# The weekly review is about a user's tasks.
-ADDONS = (tasks_service.ADDON,)
 # user id → the lock that keeps one generation of their review at a time.
 _locks: Dict[str, asyncio.Lock] = {}
 
 
+def _review_addons() -> List[str]:
+    """The addons a review is about: those with an ``@addon.review_action`` (the tasks addon), in addon order."""
+    return list(dict.fromkeys(h.addon for h in registry.hooks("review_action")))
+
+
+def actions_for(item_type: str) -> tuple:
+    """What may be proposed for an item of ``item_type`` (() for an unknown type)."""
+    if item_type in ACTIONS:
+        return ACTIONS[item_type]
+    hook = registry.hook_for("review_action", item_type)
+    return tuple(hook.option("actions", ())) if hook else ()
+
+
 def available(user: Optional[User]) -> bool:
-    """Whether ``user`` gets a weekly review (``tasks`` connected)."""
-    return user is not None and composers.has_all(user, ADDONS)
+    """Whether ``user`` gets a weekly review (an addon it is about connected: ``tasks``)."""
+    return user is not None and any(store.is_connected(user, a) for a in _review_addons())
 
 
 def require(user: User) -> None:
     """Raise ``NotConnected`` (403 ``not_connected``, ``tasks``) when ``user`` gets no review."""
     if not available(user):
-        raise store.NotConnected(user, tasks_service.ADDON)
+        raise store.NotConnected(user, (_review_addons() or ["tasks"])[0])
 
 
 def _now_iso() -> str:
@@ -110,14 +124,6 @@ def _loads(raw, default):
 # Finding what needs a decision
 # ---------------------------------------------------------------------------
 
-def _future_time_trigger(triggers: Dict[str, Any], now: datetime.datetime) -> bool:
-    t = triggers.get("time")
-    if not t:
-        return False
-    dt = task_triggers.parse_trigger_time(str(t))
-    return bool(dt and dt > now)
-
-
 def _age_days(ts: Optional[str], now: datetime.datetime) -> Optional[int]:
     if not ts:
         return None
@@ -131,52 +137,24 @@ def _age_days(ts: Optional[str], now: datetime.datetime) -> Optional[int]:
 
 
 def candidates(user: User, now: Optional[datetime.datetime] = None) -> Dict[str, Any]:
-    """What needs a decision among ``user``'s own tasks, suggestions and people."""
+    """What needs a decision among ``user``'s own items: each addon's section
+    (``@addon.briefing`` for the weekly review: the tasks addon's overdue,
+    snoozed-often and stale tasks, the week's numbers and the groups), old
+    suggestions and people."""
     now = now or clock.now()
-    today = now.date().isoformat()
-    items: List[Dict[str, Any]] = []
-    seen = set()
-    where, args = tasks_service.visible_sql(user, "")
-    groups = {g["id"]: g["name"] for g in task_groups.list_groups(user)} if tasks_service.has_tasks(user) else {}
+    parts = briefing.sections(user, WEEKLY_REVIEW, now)
+    items: List[Dict[str, Any]] = [i for p in parts for i in p.items]
+    data: Dict[str, Any] = {}
+    for p in parts:
+        data.update(p.data or {})
+    groups = list(data.get("groups") or [])
     with get_db_connection() as conn:
-        tasks = [dict(r) for r in conn.execute(f"SELECT * FROM tasks WHERE status = 'needs_action' AND {where}", args)]
-        done = [dict(r) for r in conn.execute(
-            f"SELECT title, updated_at FROM tasks WHERE status = 'completed' AND updated_at >= ? AND {where} "
-            "ORDER BY updated_at DESC",
-            ((now - datetime.timedelta(days=7)).astimezone(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
-             *args))]
-        created = conn.execute(f"SELECT COUNT(*) FROM tasks WHERE created_at >= ? AND {where}",
-                               ((now - datetime.timedelta(days=7)).astimezone(datetime.timezone.utc)
-                                .strftime("%Y-%m-%d %H:%M:%S"), *args)).fetchone()[0]
         # Only the user's own suggestions (they come from the phone: none without it).
         vis, vis_args = phone_suggestions.visible_sql(user)
         suggestions = conn.execute(
             f"SELECT s.id, s.kind, s.payload, s.created_at FROM call_suggestions s WHERE s.status = 'pending' AND {vis} "
             "ORDER BY s.created_at", vis_args).fetchall() if store.is_connected(user, PHONE) else []
 
-    def task_item(t, why: str, facts: List[str]):
-        if t["id"] in seen:
-            return
-        seen.add(t["id"])
-        items.append({"ref": t["id"], "type": "task", "title": t["title"], "why": why,
-                      "facts": [f for f in facts if f], "group": groups.get(t["group_id"] or "", ""),
-                      "due_date": (t["due_date"] or "")[:10] or None, "priority": t["priority"]})
-
-    for t in sorted(tasks, key=lambda t: t["due_date"] or "9999"):
-        due = (t["due_date"] or "")[:10]
-        if due and due < today:
-            days = (now.date() - datetime.date.fromisoformat(due)).days if re.fullmatch(r"\d{4}-\d{2}-\d{2}", due) else None
-            task_item(t, "overdue", [f"due {due}" + (f" ({days} days ago)" if days else ""),
-                                     f"snoozed {t['snooze_count']}×" if t.get("snooze_count") else ""])
-    for t in tasks:
-        if (t.get("snooze_count") or 0) >= SNOOZE_MIN:
-            task_item(t, "snoozed_often", [f"snoozed {t['snooze_count']}×"])
-    for t in sorted(tasks, key=lambda t: t["updated_at"] or ""):
-        age = _age_days(t["updated_at"], now)
-        trig = _loads(t["triggers"], {})
-        if age is not None and age >= STALE_DAYS and not _future_time_trigger(trig, now):
-            waiting = [k for k in ("location", "car", "wake") if trig.get(k)]
-            task_item(t, "stale", [f"untouched {age} days", f"waits for a {'/'.join(waiting)} trigger" if waiting else ""])
     for s in suggestions:
         age = _age_days(s["created_at"], now)
         if age is not None and age >= SUGGESTION_DAYS:
@@ -196,10 +174,9 @@ def candidates(user: User, now: Optional[datetime.datetime] = None) -> Dict[str,
 
     order = {"overdue": 0, "snoozed_often": 1, "stale": 2, "old_suggestion": 3, "drifting": 4}
     items.sort(key=lambda i: order.get(i["why"], 9))
-    stats = {"done": len(done), "done_titles": [d["title"] for d in done[:8]], "created": created,
-             "open": len(tasks), "overdue": sum(1 for i in items if i["why"] == "overdue")}
-    return {"items": items[:MAX_ITEMS], "stats": stats, "groups": sorted(set(groups.values())),
-            "money": money_week(user, now)}
+    stats = {"done": 0, "done_titles": [], "created": 0, "open": 0, **(data.get("stats") or {}),
+             "overdue": sum(1 for i in items if i["why"] == "overdue")}
+    return {"items": items[:MAX_ITEMS], "stats": stats, "groups": groups, "money": money_week(user, now)}
 
 
 def money_week(user: User, now: datetime.datetime) -> Optional[Dict[str, Any]]:
@@ -249,19 +226,19 @@ async def next_week(user: User, now: Optional[datetime.datetime] = None) -> Opti
 # Proposals
 # ---------------------------------------------------------------------------
 
-def _next_weekday(base: datetime.date, weekday: int) -> datetime.date:
+def next_weekday(base: datetime.date, weekday: int) -> datetime.date:
     return base + datetime.timedelta(days=(weekday - base.weekday()) % 7 or 7)
 
 
 def default_action(item: Dict[str, Any], today: datetime.date) -> Dict[str, Any]:
     """The no-model proposal: reschedule overdue to Sunday, keep the rest unticked."""
-    if item["type"] == "task" and item["why"] == "overdue":
-        return {"action": "reschedule", "due_date": _next_weekday(today, 6).isoformat(),
+    if item["why"] == "overdue" and "reschedule" in actions_for(item["type"]):
+        return {"action": "reschedule", "due_date": next_weekday(today, 6).isoformat(),
                 "reason": "Overdue — give it a fresh date"}
     if item["type"] == "suggestion":
         return {"action": "dismiss", "reason": "Pending for over a week"}
     if item["type"] == "person":
-        return {"action": "reach_out", "due_date": _next_weekday(today, 6).isoformat(),
+        return {"action": "reach_out", "due_date": next_weekday(today, 6).isoformat(),
                 "reason": "It's been longer than usual"}
     return {"action": "keep", "reason": ""}
 
@@ -272,7 +249,7 @@ def review_prompt(c: Dict[str, Any], nw: Optional[Dict[str, Any]], today: dateti
     who = user_profile.for_user(user)
     his = who.possessive
     listing = [{"ref": i["ref"], "type": i["type"], "title": i["title"], "why": i["why"], "facts": i["facts"],
-                "group": i.get("group"), "allowed": list(ACTIONS[i["type"]])} for i in c["items"]]
+                "group": i.get("group"), "allowed": list(actions_for(i["type"]))} for i in c["items"]]
     money = f"Money this week: {'; '.join(money_queries.week_lines(c['money']))}\n" if c.get("money") else ""
     return f"""You're helping {who.name} with {his} weekly review (Saturday evening, before the Israeli work week starts Sunday).
 
@@ -303,7 +280,7 @@ _SCHEMA = {"type": "object", "properties": {
     "required": ["headline", "summary", "items"]}
 
 
-def _valid_future_date(v: Any, today: datetime.date) -> Optional[str]:
+def valid_future_date(v: Any, today: datetime.date) -> Optional[str]:
     try:
         d = datetime.date.fromisoformat(str(v or "")[:10])
         return d.isoformat() if d > today else None
@@ -318,11 +295,11 @@ def merge_proposals(c: Dict[str, Any], raw: Optional[Dict[str, Any]], today: dat
     for item in c["items"]:
         p = by_ref.get(item["ref"]) or {}
         action = str(p.get("action") or "").strip().lower()
-        proposal = default_action(item, today) if action not in ACTIONS[item["type"]] else {
+        proposal = default_action(item, today) if action not in actions_for(item["type"]) else {
             "action": action, "reason": re.sub(r"\s+", " ", str(p.get("reason") or "")).strip()[:120]}
         if proposal["action"] in ("reschedule", "reach_out"):
-            proposal["due_date"] = _valid_future_date(p.get("due_date") or proposal.get("due_date"), today) \
-                or _next_weekday(today, 6).isoformat()
+            proposal["due_date"] = valid_future_date(p.get("due_date") or proposal.get("due_date"), today) \
+                or next_weekday(today, 6).isoformat()
         if proposal["action"] == "move_group":
             g = groups_lower.get(str(p.get("group") or "").strip().lower())
             if not g or g == item.get("group"):
@@ -455,7 +432,7 @@ async def apply(user: User, rid: str, decisions: Optional[List[Dict[str, Any]]] 
         if not d.get("enabled") or d.get("action") == "keep":
             continue
         action = str(d.get("action") or "")
-        if action not in ACTIONS[item["type"]]:
+        if action not in actions_for(item["type"]):
             results.append({"ref": item["ref"], "ok": False, "error": f"'{action}' isn't allowed here"})
             continue
         try:
@@ -475,28 +452,9 @@ async def apply(user: User, rid: str, decisions: Optional[List[Dict[str, Any]]] 
 
 async def _apply_one(item, action, d, today, user: User) -> str:
     ref = item["ref"]
-    if item["type"] == "task":
-        try:
-            tasks_service.writable_task(user, ref)
-        except LookupError:
-            raise LookupError("task no longer exists")
-        if action == "complete":
-            tasks_service.complete_task(user, ref)
-        elif action == "delete":
-            tasks_service.delete_task(user, ref)
-        elif action == "reschedule":
-            due = _valid_future_date(d.get("due_date"), today) or _next_weekday(today, 6).isoformat()
-            tasks_service.save_task(user, ref, {"due_date": due, "snooze_count": 0})
-            return f"due {due}"
-        elif action == "move_group":
-            g = task_groups.find_group(user, str(d.get("group") or ""))
-            if not g:
-                raise ValueError(f"no group '{d.get('group')}'")
-            tasks_service.save_task(user, ref, {"group_id": g["id"]})
-            return f"moved to {g['name']}"
-        if action in ("complete", "delete"):
-            await phone_push.send(user, "reminder_clear", {"task_id": ref})
-        return action
+    hook = registry.hook_for("review_action", item["type"])
+    if hook is not None:
+        return str(await hook.func(user, item, action, d, today))
     if item["type"] == "suggestion":
         if action == "accept":
             res = await suggestion_actions.accept_suggestion(user, ref)
@@ -505,7 +463,7 @@ async def _apply_one(item, action, d, today, user: User) -> str:
             raise LookupError("suggestion is no longer pending")
         return "dismissed"
     # person → reach_out
-    due = _valid_future_date(d.get("due_date"), today) or _next_weekday(today, 6).isoformat()
+    due = valid_future_date(d.get("due_date"), today) or next_weekday(today, 6).isoformat()
     tid = await suggestion_actions.create_task_record(
         user, {"title": f"📞 Reach out to {item['title']}", "due_date": due, "group": "Personal", "priority": "low"},
         link=("person", ref))

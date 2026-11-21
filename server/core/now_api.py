@@ -17,7 +17,7 @@ import logging
 
 from aiohttp import web
 
-from core import checks, now, search
+from core import cards, checks, now, search
 from core.auth import request_user
 from core.addons.store import NotConnected
 
@@ -41,7 +41,7 @@ async def now_act_api(request: web.Request) -> web.Response:
     try:
         result = await now.act(request_user(request), str(data.get("id") or ""), str(data.get("action") or ""),
                                data.get("args") or {})
-    except now.ActError as e:
+    except cards.ActError as e:
         return web.json_response({"ok": False, "error": str(e)}, status=e.status)
     except NotConnected:
         raise  # answered by core.auth.addon_middleware

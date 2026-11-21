@@ -52,7 +52,7 @@ users.bootstrap()
 import addons  # noqa: E402,F401 — registers every addon
 from core import agent as agent_mod, approval_text, undo  # noqa: E402
 from core.undoable import UndoConflict  # noqa: E402
-from core.addons import NotConnected, registry, store  # noqa: E402
+from core.addons import NotConnected, loader, registry, store  # noqa: E402
 from core.addons.addon import find_tool, get_addon  # noqa: E402
 from addons.gmail import client as gmail_client, compose, config, content, seen  # noqa: E402
 from addons.google_account import oauth  # noqa: E402
@@ -440,7 +440,7 @@ def text_of(message) -> str:
 
 def test_kind() -> None:
     kind = get_addon("gmail")
-    order = list(addons.ADDON_ORDER)
+    order = list(loader.loaded())
     check("kind: gmail, described as Gmail, after calendar in the addon order",
           kind.description == "Gmail" and order.index("gmail") > order.index("calendar")
           and order.index("gmail") < order.index("cameras"), order)

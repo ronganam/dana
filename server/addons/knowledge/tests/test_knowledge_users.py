@@ -1,6 +1,6 @@
 """Projects and entries per user, and project sharing (docs/access.md, "Sharing").
 
-A temporary database that starts as the 8.1.0 fixture (its project and two
+A temporary database that starts as the 9.0 fixture (its project and two
 entries must become the first admin's, ids and FTS index kept), then users:
 the first admin, Bob (knowledge + tasks), Eve (knowledge) and Carl (without
 knowledge). Through the agent tools (via the registry, as the model would
@@ -40,9 +40,9 @@ from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)
 
-# The production database before users existed: its project and entries must become the first admin's.
+# A 9.0 production database (converted at start): its project and entries are the first admin's.
 _conn = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as _f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
 _conn.close()
 

@@ -13,8 +13,10 @@ One description per pending call, rendered by two clients:
      "facts": [("When", "tomorrow 19:00"), …],        # other details, "label: value"
      "question": "Send this WhatsApp message?"}
 
-Tools without a description of their own get a generic one: the tool name as
-the action and every argument as "Label: value". Names are looked up where
+A tool declared with ``@addon.tool(describe=fn)`` is described by its addon
+(``fn(args)`` → ``core.addons.Approval``, the same shape); the others named
+here are described below. Tools without a description of their own get a
+generic one: the tool name as the action and every argument as "Label: value". Names are looked up where
 that is a plain DB read (a reminder's title by its id, a WhatsApp number in
 People); nothing here calls the network.
 """
@@ -29,11 +31,11 @@ from core.text import escape_markdown
 from addons.calendar import today as calendar_today
 from addons.contacts import store as contacts_store
 from core.addons import store as addon_store
+from core.addons.addon import find_tool
 from addons.gmail import compose as gmail_compose, content as gmail_content, seen as gmail_seen
 from addons.gmail.config import ADDON as GMAIL
 from addons.knowledge import entries as knowledge_entries, projects as knowledge_projects
 from addons.people import store as people_store
-from addons.tasks import service as tasks_service
 
 Fact = Tuple[str, str]
 
@@ -108,15 +110,6 @@ def _whatsapp_source(message_id: Any) -> str:
     if len(parts) < 3 or "@" not in parts[1] or parts[1].endswith("@lid"):
         return ""  # a LID is no phone number to show
     return whatsapp_who(parts[1])
-
-
-def _task_title(item: Any) -> str:
-    raw = _s(item, 200)
-    m = re.search(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", raw, re.I)
-    if not m:
-        return raw
-    task = tasks_service.get_task(users.current(), m.group(0))  # only a task the current user can see
-    return (task.get("title") or "") if task else ""
 
 
 def _event_title(event_id: Any) -> str:
@@ -206,6 +199,9 @@ def describe(tool_name: str, tool_args: Optional[Dict[str, Any]]) -> Dict[str, A
     """The pending call in words (see the module docstring for the shape)."""
     a = tool_args if isinstance(tool_args, dict) else {}
     t = tool_name or ""
+    tool = find_tool(t)
+    if tool is not None and tool.describe is not None:
+        return tool.describe(a).to_json()  # the addon's own words (@addon.tool(describe=...))
     if t == "send_whatsapp_message":
         who = whatsapp_who(a.get("chat_id"))
         return _d(f"Send a WhatsApp message to {who}", "WhatsApp message", "💬", "Send this WhatsApp message?",
@@ -266,13 +262,6 @@ def describe(tool_name: str, tool_args: Optional[Dict[str, Any]]) -> Dict[str, A
                          ("Add email", a.get("add_email")), ("Remove email", a.get("remove_email")),
                          ("Birthday", "remove" if a.get("birthday") == "" else a.get("birthday")),
                          ("Organisation", "remove" if a.get("organisation") == "" else a.get("organisation"))])
-    if t == "delete_task":
-        name = _task_title(a.get("item"))
-        return _d(f"Delete the reminder {_quote(name)}" if name else "Delete a reminder", "Delete reminder", "❌",
-                  "Delete this reminder?")
-    if t == "remove_task_group":
-        return _d(f"Remove the group {_quote(a.get('name'))}", "Remove group", "❌", "Remove this group?",
-                  facts=[("Its reminders", "move to General")])
     if t == "delete_project":
         project = knowledge_projects.get_project(users.current(), _s(a.get("project_id"), 200))
         name = (project.get("title") or "") if project else ""  # only a project the current user can see
@@ -283,20 +272,6 @@ def describe(tool_name: str, tool_args: Optional[Dict[str, Any]]) -> Dict[str, A
         name = (entry.get("title") or "") if entry else ""  # only an entry the current user can see
         return _d(f"Delete the note {_quote(name)}" if name else "Delete a note", "Delete note", "❌",
                   "Delete this note?")
-    if t == "add_task":
-        loc = a.get("location")
-        return _d(f"Add the reminder {_quote(a.get('title') or 'Untitled')}", "New reminder", "📋",
-                  "Add this reminder?", body_label="Note", body=a.get("description"),
-                  facts=[("Due", a.get("due_date")), ("Remind", _when(a.get("time_trigger"))),
-                         ("Place", f"{loc} ({a.get('location_event') or 'arrive'})" if loc else ""),
-                         ("Car", a.get("car_trigger")), ("On waking", "yes" if a.get("wake_trigger") else ""),
-                         ("Priority", a.get("priority"))])
-    if t == "update_task":
-        name = _task_title(a.get("item"))
-        return _d(f"Change the reminder {_quote(name)}" if name else "Change a reminder", "Change reminder", "🔄",
-                  "Make this change?", body_label="Note", body=a.get("description"),
-                  facts=[("New title", a.get("summary") or a.get("title")), ("Status", a.get("status")),
-                         ("Place", a.get("location"))])
     if t == "share_item":
         what = str(a.get("item_type") or "item").replace("_", " ")
         level = str(a.get("level") or "").strip().lower()

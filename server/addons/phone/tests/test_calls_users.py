@@ -1,8 +1,8 @@
 """Phone calls per user: uploads, processing, suggestions, context chats.
 
-Two users with the ``phone`` addon (the first admin, migrated from the 8.1.0
+Two users with the ``phone`` addon (the first admin, converted from the 9.0
 fixture, and Bob), one with ``phone`` but no ``tasks`` (Dee) and one without
-``phone`` (Carl), on the real handlers: the 8.1.0 call / suggestions / FTS rows
+``phone`` (Carl), on the real handlers: the 9.0 call / suggestions / FTS rows
 become the first admin's and the recording is still served to them; uploads
 belong to the uploader (dedupe per user) and are transcribed and analysed as
 their owner (usage rows theirs; the analysis prompt built only from the
@@ -45,9 +45,9 @@ from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)
 
-# The production database before users existed: its call, suggestions and FTS rows become the first admin's.
+# A 9.0 production database (converted at start): its call, suggestions and FTS rows are the first admin's.
 _conn = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as _f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
 _conn.close()
 
@@ -63,7 +63,6 @@ from addons import bootstrap as addons_bootstrap
 
 addons_bootstrap.bootstrap()
 
-import core.server as server
 from core import sessions_api
 from addons.phone import api as phone_api
 from addons.phone.calls import api as calls_api
@@ -73,7 +72,7 @@ from core.auth import setup_auth
 from core.db import get_db_connection
 from addons.about import learner
 from addons.calendar import tools as calendar_tools
-from core.addons import registry, store
+from core.addons import registry, scheduler, store
 from core.addons.registry import ToolNotAvailable
 from addons.homeassistant import client as ha_client
 from addons.knowledge import projects as knowledge_projects
@@ -107,7 +106,7 @@ def test_migration() -> None:
         calls = {r[0]: r[1] for r in conn.execute("SELECT id, user_id FROM phone_calls")}
         sugg = {r[0]: r[1] for r in conn.execute("SELECT id, user_id FROM call_suggestions")}
         fts = [r[0] for r in conn.execute("SELECT id FROM phone_calls_fts WHERE phone_calls_fts MATCH '\"ladder\"*'")]
-    check("migration: the 8.1.0 call is the first admin's", calls == {"c1": ADMIN.id}, calls)
+    check("migration: the 9.0 call is the first admin's", calls == {"c1": ADMIN.id}, calls)
     check("migration: both suggestions (call and notification) are the first admin's",
           sugg == {"cs1": ADMIN.id, "cs2": ADMIN.id}, sugg)
     check("migration: the FTS index still has the call", fts == ["c1"], fts)
@@ -604,13 +603,10 @@ async def test_loops(client: TestClient) -> None:
         return real_resume(user)
 
     processing.resume_unfinished = resume
-    app: Dict[str, Any] = {}
     try:
-        server._start_phone_background(app)
+        await scheduler.run_once(registry.job("phone.resume_unfinished"))
     finally:
         processing.schedule_processing, processing.resume_unfinished = real_schedule, real_resume
-        for t in app.values():
-            t.cancel()
     check("resume: per user, the first admin's failure doesn't stop Bob's", scheduled == [b["id"]], scheduled)
     scheduled.clear()
     processing.schedule_processing = lambda cid, custom_instructions=None: scheduled.append(cid) or True

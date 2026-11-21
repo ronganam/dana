@@ -51,6 +51,7 @@ OWNER = users.first_admin()
 ensure_default_groups_for_everyone()
 from core.addons import store  # noqa: E402
 from addons.shopping import lists as shopping_lists  # noqa: E402
+from addons.homeassistant import status as ha_status  # noqa: E402
 # The first admin has Home Assistant (location triggers need it); its client is mocked.
 store.connect(OWNER, "homeassistant", credentials={"host": "http://ha.invalid", "token": "test-ha"})
 store.connect(OWNER, "money")  # every check applies to them (no bank added: the money check is ok)
@@ -317,11 +318,10 @@ def seed():
                      "VALUES (?, 'main', '[]', ?, 'waiting_approval', 'Dana', CURRENT_TIMESTAMP)",
                      (OWNER.id, json.dumps({"status": "pending_approval", "tool_name": "send_whatsapp_message",
                                   "tool_args": {"chat_id": "Gal", "text": "on my way"}, "user_text": "tell Gal I'm late"}),))
-        # Signals for the checks.
-        for key, at in (("last_event_v2_location_home", NOW - datetime.timedelta(hours=1)),
-                        ("last_event_v2_car_-", NOW - datetime.timedelta(days=1))):
-            conn.execute("INSERT OR REPLACE INTO task_trigger_marks (user_id, key, at) VALUES (?, ?, ?)",
-                         (OWNER.id, key, at.astimezone(UTC).isoformat()))
+        # Signals for the checks: the watched person entity and car sensor changed (as the watcher marks it).
+        for role, at in (("person", NOW - datetime.timedelta(hours=1)), ("car", NOW - datetime.timedelta(days=1))):
+            conn.execute("INSERT OR REPLACE INTO system_marks (key, last_at, ok, detail) VALUES (?, ?, 1, '')",
+                         (f"ha_event:{OWNER.id}:{role}", at.astimezone(UTC).isoformat()))
         # The last confirmed wake: 4 days ago.
         conn.execute("INSERT INTO wake_log (user_id, date, at, why) VALUES (?, ?, ?, 'unlock')",
                      (OWNER.id, (NOW.date() - datetime.timedelta(days=4)).isoformat(),
@@ -991,7 +991,7 @@ async def main():
         r = await client.get("/api/checks")
         cs = {c["key"]: c for c in (await r.json())["checks"]}
         check("checks: every key with label/ok/detail/since",
-              set(cs) == set(checks.KEYS) and all({"label", "ok", "detail", "since"} <= set(c) for c in cs.values()), cs)
+              set(cs) == set(checks.all_keys()) and all({"label", "ok", "detail", "since"} <= set(c) for c in cs.values()), cs)
         check("checks: push ok after pings", cs["push"]["ok"] and cs["push"]["detail"].startswith("Last check-in"), cs["push"])
         check("checks: notification sync ok after a batch", cs["notification_sync"]["ok"], cs["notification_sync"])
         check("checks: location + car ok", cs["location"]["ok"] and cs["car"]["ok"], (cs["location"], cs["car"]))
@@ -999,8 +999,8 @@ async def main():
               cs["wake"])
         check("checks: calendar read ok", cs["calendar"]["ok"], cs["calendar"])
         with get_db_connection() as conn:
-            conn.execute("UPDATE task_trigger_marks SET at = ? WHERE key = 'last_event_v2_location_home'",
-                         ((NOW - datetime.timedelta(days=5)).astimezone(UTC).isoformat(),))
+            conn.execute("UPDATE system_marks SET last_at = ? WHERE key = ?",
+                         ((NOW - datetime.timedelta(days=5)).astimezone(UTC).isoformat(), f"ha_event:{OWNER.id}:person"))
             conn.execute("INSERT INTO wake_log (user_id, date, at, why) VALUES (?, ?, ?, 'unlock')",
                          (OWNER.id, NOW.date().isoformat(), NOW.isoformat(timespec="seconds")))
             conn.commit()
@@ -1033,6 +1033,7 @@ async def main():
                                                    "AND key LIKE 'last_event_v2_location%work'", (OWNER.id,))}
         check("watcher: the transition is stored under the key the refire check reads",
               keys == {"last_event_v2_location_work", "last_event_v2_location_leave_work"}, keys)
+        ha_status.mark_event(OWNER.id, "person", "person.robin")  # what the watcher records with the transition
         cs = {c["key"]: c for c in checks.compute()}
         check("checks: a fresh location transition → location ok again", cs["location"]["ok"], cs["location"])
 

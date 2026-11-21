@@ -189,12 +189,12 @@ The `suggestions` push (full-screen review on the phone) is sent for calls that 
 |---|---|---|
 | `push` | FCM configured, a phone of the caller registered, the last ping attempt to it didn't fail (or the phone fetched since), it checked in within `CHECK_PUSH_FETCH_HOURS` (24) (ok "not connected" without the `phone` addon) | their `phone_devices.last_fetch_at`, `system_marks['push:<user>']` (every `push.send` to them) |
 | `notification_sync` | a batch from the caller's phone within `CHECK_NOTIFICATION_SYNC_HOURS` (12) (ok "not connected" without the addon) | `system_marks['notification_sync:<user>']` (every batch), else their newest notification |
-| `location` | the caller's person entity changed, or a zone transition fired, within `CHECK_LOCATION_DAYS` (3) | their `task_trigger_marks` `last_event_v2_location*` and `system_marks['ha_event:<user>:person']` (the Home Assistant watcher) |
-| `car` | the caller's car connection changed within `CHECK_CAR_DAYS` (7) | their `task_trigger_marks` `last_event_v2_car*` and `system_marks['ha_event:<user>:car']` |
+| `location` | the caller's person entity changed, or a zone transition fired, within `CHECK_LOCATION_DAYS` (3) | `system_marks['ha_event:<user>:person']` (the Home Assistant watcher) |
+| `car` | the caller's car connection changed within `CHECK_CAR_DAYS` (7) | `system_marks['ha_event:<user>:car']` |
 | `ha_entities` | every entity the caller's watcher watches (person, car sensor) exists in their Home Assistant (ok "not connected" / "nothing selected" without one) | `system_marks['ha_entity:<user>:<role>']` (written at each subscribe and when an entity is added / removed) |
 | `ha_watcher` | the caller's watcher is connected, or reconnecting for less than `CHECK_HA_WATCHER_MINUTES` (10) | `system_marks['ha_watcher:<user>']` (written when it connects / disconnects, with the last error) |
 | `wake` | a wake of the caller confirmed less than `CHECK_WAKE_DAYS` (3) days ago (shown with `phone` + `homeassistant`) | their newest `wake_log` row; week view from their `wake_log` + wake briefings (a date moved from the old memory without a time shows ✓); their last raw signal in `system_marks['wake_signal:<user>']` |
-| `reminders` | the time-trigger loop ran in the last 5 min (a server check: only with `see_everyone`) | `system_marks['time_checker']` (every 2 min) |
+| `reminders` | the tasks addon's time-trigger job ran in the last 5 min (a server check: only with `see_everyone`; declared by `@addon.selfcheck` in `addons/tasks/hooks.py`) | the job's heartbeat `system_marks['job:tasks.check_time_triggers']` (every pass, `scheduler.last_run`) |
 | `triage` | fewer than 3, or under half, of the caller's last 24 h's TypeSafe triages failed (ok "not connected" without the addon) | their `notifications.triage_status` |
 | `calls` | no recording failed to process in 3 days (silent ones excluded) and one was uploaded within `CHECK_CALLS_DAYS` (7) | `phone_calls` |
 | `calendar` | the last read of the caller's calendar (Now's cache) worked (ok "not connected" without the addon) | `system_marks['calendar:<user>']` (written by `addons/calendar/today.py`) |

@@ -269,12 +269,12 @@ def test_sharing_and_remove() -> None:
 
 
 def test_not_migrated() -> None:
-    real = cli.db.applied_migrations
-    cli.db.applied_migrations = lambda *a, **k: [1, 2]
+    real = cli.db.pending_migrations
+    cli.db.pending_migrations = lambda *a, **k: ["tasks:0002_x"]
     try:
         rc, _, err = run("list")
     finally:
-        cli.db.applied_migrations = real
+        cli.db.pending_migrations = real
     check("a database that is not up to date is refused", rc == 1 and "start the server once first" in err)
 
 

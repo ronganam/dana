@@ -19,6 +19,8 @@ Every model is a LiteLLM id (`provider/model`: `anthropic/claude-haiku-5-5`, `ge
 | `SEARCH_MODEL` | web-grounded answers through LiteLLM's `web_search_options`: the money price checks (→ `MODEL`; needs a model with web search: Claude's web search tool, Gemini's Google Search grounding…; without one the price checks are unavailable, `docs/money.md` → Price checks) |
 | `TRANSCRIBE_MODEL` | all audio → text (voice notes, call recordings, voice chat, media). Must hear audio: a chat model with audio input (Gemini) or a speech-to-text model (`openai/gpt-4o-transcribe`, `deepgram/nova-3`…). Claude has no audio input |
 | `ASSISTANT_MODELS` / `ASSISTANT_DEFAULT_MODEL` | chat profiles for the web/app/Raycast picker (below) |
+| `DEEP_MODEL` | the `deep` profile's model for LLM purposes that default to it (→ `anthropic/claude-opus-5-5`); `fast` purposes use `BACKGROUND_MODEL`, `balanced` ones `MODEL` |
+| `MODEL_<PURPOSE>` | the model of one LLM purpose alone (`MODEL_TASK_EMOJI`, `MODEL_PEOPLE_BRIEF`…), above every variable here. Purposes: core's in `core/purposes.py`, each addon's in its manifest (`llm_jobs=`); an unknown purpose is an error, not a fallback |
 
 Chat profiles (`core/models.py`): `fast` Claude Haiku 5.5 at low effort (thinking hidden), `balanced` Claude Sonnet 5.5 and `deep` Claude Opus 5.5, both at high effort with their thinking summary streamed (LiteLLM turns `reasoning_effort` into adaptive thinking, a summarized display and `output_config.effort`; Sonnet at medium often answers without thinking, so nothing would show). Telegram / trigger runs on a Claude `MODEL` think at medium.
 
@@ -61,7 +63,7 @@ No kind reads these env values for its own configuration: each reads only its co
 | `DB_BUSY_TIMEOUT_MS` | how long a connection waits for a locked database (default 30000) |
 | `PORT` | web server (default 8080) |
 | `DANA_SITE` | your deployment's site folder (`../docs/site.md`); default `site/` at the repository root |
-| `DANA_ADDON_DIRS` | folders of site addons, separated by `:` (`docs/writing-an-addon.md`); unset: the site's `addons/`; empty: none (the tests); the image sets `/app/addons-site` |
+| `DANA_ADDON_DIRS` | folders of non-official addons, separated by `:` (`docs/writing-an-addon.md`), replacing the default sources; unset: the site's `addons/`, the image's `/app/addons-site` and `<data dir>/addons/` (each when it exists); empty: none (the tests) |
 | `TIMEZONE` | the server's timezone (one for every user), e.g. `Asia/Jerusalem` (falls back to the first admin's Home Assistant → `TZ` → UTC) |
 | `API_TOKEN` | always a valid token of the first (admin) user for the web server/API; other users' tokens live hashed in the DB (`docs/access.md`); unset = auth disabled, every request is the first user (local dev only) |
 | `INTERNAL_HOSTS` | comma-separated `Host` values (the in-cluster Service names) allowed to post to the inbound webhook `/webhook/waha` (WAHA) without a token; every other path needs a token from any host. With a token, only a user with `manage_server` may post to it (anyone else 403) |

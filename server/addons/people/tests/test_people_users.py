@@ -1,6 +1,6 @@
 """People per user (docs/people.md, docs/access.md "Addons").
 
-A temporary database that starts as the 8.1.0 fixture (its person, number and
+A temporary database that starts as the 9.0 fixture (its person, number and
 the person links of its call / notification must become the first admin's),
 then users: the first admin Robin (every official addon), Bob and Eve (``people``
 + ``tasks``), Carl (``tasks``, no ``people``). Through the agent tools (via the
@@ -42,10 +42,12 @@ from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)
 
-# The production database before users existed: its person and number must become the first admin's.
+# A 9.0 production database (converted at start): its person and number are the first admin's, Robin.
 _conn = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as _f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
+_conn.execute("UPDATE users SET name = 'Robin'")
+_conn.commit()
 _conn.close()
 
 import litellm

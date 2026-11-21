@@ -4,10 +4,10 @@
 later ones only what changed (deleted contacts included); a sync token Google
 no longer accepts starts over with one full read. A user is synced right
 after the addon is connected for them (in the background), again from scratch
-when their refresh token changes (it may be another account), and by
-:func:`sync_loop` every :data:`~addons.contacts.config.SYNC_MINUTES`:
-every user with the addon, each as that user, one user's failure not stopping
-the next. After each sync the user's people are filled in
+when their refresh token changes (it may be another account), and by the
+``sync_contacts`` job (``hooks.py``) every
+:data:`~addons.contacts.config.SYNC_MINUTES`: every user with the addon, each
+as that user, one user's failure not stopping the next. After each sync the user's people are filled in
 (``addons/contacts/enrich.py``). Disconnecting deletes the copy.
 """
 
@@ -82,6 +82,16 @@ def _log_failure(user: User, error: Exception) -> None:
                  exc_info=None if getattr(error, "resp", None) is not None else error)
 
 
+async def sync_job(user: User) -> Optional[Dict[str, int]]:
+    """The background sync of one user (``@addon.job``): its failure is logged
+    here, without Google's message (it carries the request URL)."""
+    try:
+        return await sync_user(user)
+    except Exception as e:
+        _log_failure(user, e)
+        return None
+
+
 async def sync_all() -> Dict[str, Optional[Dict[str, int]]]:
     """Sync every user who has ``contacts``, each as that user, one after
     another. Returns user id → result (a user whose sync failed is left out
@@ -99,17 +109,6 @@ async def sync_all() -> Dict[str, Optional[Dict[str, int]]]:
     return out
 
 
-async def sync_loop(interval_minutes: int = SYNC_MINUTES) -> None:
-    """Background loop started with the app (core/server.py)."""
-    await asyncio.sleep(STARTUP_DELAY_SECONDS)
-    while True:
-        try:
-            await sync_all()
-        except Exception as e:
-            logger.error(f"Contacts sync loop error: {e}", exc_info=True)
-        await asyncio.sleep(interval_minutes * 60)
-
-
 async def _sync_in_background(user: User) -> None:
     try:
         with users.acting_as(user):
@@ -120,7 +119,7 @@ async def _sync_in_background(user: User) -> None:
 
 def schedule(user: User) -> None:
     """Sync ``user`` soon without waiting for it (nothing without a running
-    event loop — a script, startup: :func:`sync_loop` gets to them)."""
+    event loop — a script, startup: the ``sync_contacts`` job gets to them)."""
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:

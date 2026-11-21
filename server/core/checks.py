@@ -14,8 +14,9 @@ network calls) and says whether the signal still arrives:
   Assistant settings exist, and the watcher is connected
   (addons/homeassistant/watcher.py, marks in its ``status`` module).
 - ``wake``: the user's wake was confirmed within ``CHECK_WAKE_DAYS`` (3).
-- ``reminders``: the time-trigger loop is alive (the server's own: only for
-  users with ``see_everyone``).
+- each addon's ``@addon.selfcheck`` (the tasks addon's ``reminders``: the
+  time-trigger job is alive, a check of the server's own: only for users
+  with ``see_everyone``).
 - ``triage``: TypeSafe answers (the user's notifications aren't all failing to sort).
 - ``calls``: the user's recordings arrive and get processed.
 - ``calendar``: the user's Google Calendar can be read (marked per user by
@@ -26,8 +27,9 @@ network calls) and says whether the signal still arrives:
   24 hours (addons/money, table ``money_sources``).
 
 Per user: :func:`for_user` gives the checks of the addons the user has
-connected (:data:`APPLIES`) plus, for users with ``see_everyone``, the
-server's own (:data:`SERVER_CHECKS`); ignoring one hides it only for them
+connected (:data:`APPLIES`, and the addons' checks of the addons they have)
+plus, for users with ``see_everyone``, the server's own (an addon check
+declared ``server=True``); ignoring one hides it only for them
 (core/now_hidden.py). :func:`compute` answers every check for one user, a
 addon they lack as ok "not connected".
 
@@ -49,13 +51,13 @@ from core import briefing, clock, now_hidden, undo, users, wake
 from core.db import get_db_connection
 from core.users import User
 from addons.calendar import config as calendar_config, today as calendar_today
-from core.addons import store
+from core.addons import registry, store
+from core.addons.hooks import Check, Hook
 from addons.homeassistant import config as ha_config, status as ha_status, watcher as ha_watcher
 from addons.money import companies as money_companies, config as money_config
 from addons.people.values import ago as people_ago
 from addons.phone import push as phone_push
 from addons.phone.config import ADDON as PHONE, mark_key as phone_mark_key
-from addons.tasks import triggers as task_triggers
 
 logger = logging.getLogger(__name__)
 
@@ -66,10 +68,8 @@ CAR_DAYS = float(os.getenv("CHECK_CAR_DAYS", "7"))
 WAKE_DAYS = int(os.getenv("CHECK_WAKE_DAYS", "3"))
 CALLS_DAYS = float(os.getenv("CHECK_CALLS_DAYS", "7"))
 HA_WATCHER_MINUTES = float(os.getenv("CHECK_HA_WATCHER_MINUTES", "10"))
-TIME_CHECKER_MINUTES = 5
 
 _STARTED = time.monotonic()
-
 LABELS: Dict[str, str] = {
     "push": "Push to the phone",
     "notification_sync": "Notification sync",
@@ -78,16 +78,14 @@ LABELS: Dict[str, str] = {
     "ha_entities": "Home Assistant entities",
     "ha_watcher": "Home Assistant connection",
     "wake": "Wake signal",
-    "reminders": "Reminder checks",
     "triage": "Notification sorting",
     "calls": "Call recordings",
     "calendar": "Calendar",
     "briefing": "Morning briefing",
     "money": "Bank and card syncs",
 }
-KEYS = tuple(LABELS)
-# The checks about the server itself: shown only to users who may see everyone.
-SERVER_CHECKS = ("reminders",)
+# The addons' checks (``@addon.selfcheck``) come in where they ask (``after``).
+# A check about the server itself (``server=True``) is shown only to users who may see everyone.
 SERVER_CAPABILITY = "see_everyone"
 
 
@@ -103,11 +101,12 @@ APPLIES: Dict[str, Callable[[User], bool]] = {
     "car": _addon(ha_config.ADDON),
     "ha_entities": _addon(ha_config.ADDON),
     "ha_watcher": _addon(ha_config.ADDON),
-    "wake": wake.available,
+    # Looked up when called: this module may be imported while those two are still loading.
+    "wake": lambda user: wake.available(user),
     "triage": _addon(PHONE),
     "calls": _addon(PHONE),
     "calendar": _addon(calendar_config.ADDON),
-    "briefing": briefing.available,
+    "briefing": lambda user: briefing.available(user),
     "money": _addon(money_config.ADDON),
 }
 
@@ -195,7 +194,7 @@ def _latest(*values: Optional[datetime.datetime]) -> Optional[datetime.datetime]
 
 def _result(key: str, ok: bool, detail: str, since: Optional[datetime.datetime], *,
             title: str = "", why: str = "", blocks: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
-    return {"key": key, "label": LABELS[key], "ok": ok, "detail": detail, "since": _iso(since),
+    return {"key": key, "label": label_of(key), "ok": ok, "detail": detail, "since": _iso(since),
             "title": title, "why": why, "blocks": blocks or []}
 
 
@@ -257,11 +256,8 @@ def _check_notification_sync(conn, now: datetime.datetime, user: Optional[User])
 
 def _check_trigger_feed(conn, now: datetime.datetime, user: Optional[User], key: str, prefix: str, role: str,
                         setting: str, days: float, what: str, why: str) -> Dict[str, Any]:
-    # The user's feed: their latest transition (fired by their Home Assistant
-    # watcher) or the latest change of the watched entity; anyone's without a user.
-    last = task_triggers.last_transition(prefix, user)
-    if user is not None:
-        last = _latest(last, parse(ha_status.read(user.id).last_event.get(role)))
+    # The user's feed: the latest change of the entity their Home Assistant watcher watches.
+    last = parse(ha_status.read(user.id).last_event.get(role)) if user is not None else None
     if not last:
         return _result(key, False, "never received", None, title=f"No {what} updates received yet", why=why)
     quiet = (now - last).total_seconds()
@@ -382,21 +378,6 @@ def _check_wake(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str,
                    ("confirmed yesterday" if days == 1 else f"confirmed {days} days ago"), since, blocks=blocks)
 
 
-def _check_reminders(conn, now: datetime.datetime) -> Dict[str, Any]:
-    m = dict(conn.execute("SELECT * FROM system_marks WHERE key = 'time_checker'").fetchone() or {})
-    last = parse(m.get("last_at"))
-    why = "Time reminders won't fire until the server restarts."
-    if not last:
-        if time.monotonic() - _STARTED < TIME_CHECKER_MINUTES * 60:
-            return _result("reminders", True, "starting", None)
-        return _result("reminders", False, "never ran", None, title="Reminder checks aren't running", why=why)
-    quiet = (now - last).total_seconds()
-    if quiet > TIME_CHECKER_MINUTES * 60:
-        return _result("reminders", False, f"stopped {ago(last, now)}", last,
-                       title="Reminder checks stopped", why=why)
-    return _result("reminders", True, f"last {ago(last, now)}", last)
-
-
 def _check_triage(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
     if user is None or not store.is_connected(user, PHONE):
         return _result("triage", True, "not connected", None)
@@ -507,11 +488,6 @@ def _check_money(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str
     return _result("money", True, f"synced {ago(latest, now)}", latest)
 
 
-def _server(fn):
-    """A check of the server's own feeds (the same for every user who may see it)."""
-    return lambda conn, now, user: fn(conn, now)
-
-
 _CHECKS = {
     "push": _check_push,
     "notification_sync": _check_notification_sync,
@@ -524,13 +500,38 @@ _CHECKS = {
     "ha_entities": _check_ha_entities,
     "ha_watcher": _check_ha_watcher,
     "wake": _check_wake,
-    "reminders": _server(_check_reminders),
     "triage": _check_triage,
     "calls": _check_calls,
     "calendar": _check_calendar,
     "briefing": _check_briefing,
     "money": _check_money,
 }
+
+
+def _hooks() -> List[Hook]:
+    return registry.hooks("selfcheck")
+
+
+def all_keys() -> Tuple[str, ...]:
+    """Every check: core's, with each addon's placed after the one it names (else at the end)."""
+    out = list(LABELS)
+    for hook in _hooks():
+        after = hook.option("after", "")
+        out.insert(out.index(after) + 1 if after in out else len(out), hook.key)
+    return tuple(out)
+
+
+def label_of(key: str) -> str:
+    """How the check ``key`` is named."""
+    if key in LABELS:
+        return LABELS[key]
+    hook = registry.hook_for("selfcheck", key)
+    return str(hook.option("label", key)) if hook else key
+
+
+def _hook_check(hook: Hook, conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
+    c: Check = hook.func(user, now)
+    return c.to_json(hook.key, label_of(hook.key))
 
 
 def compute(now: Optional[datetime.datetime] = None, user: Optional[User] = None,
@@ -541,13 +542,14 @@ def compute(now: Optional[datetime.datetime] = None, user: Optional[User] = None
     ``blocks``) feed the Now card."""
     now = now or clock.now()
     user = user or users.current()
+    hooks = {h.key: h for h in _hooks()}
     out = []
     with get_db_connection() as conn:
-        for key, fn in _CHECKS.items():
+        for key in all_keys():
             if keys is not None and key not in keys:
                 continue
             try:
-                c = fn(conn, now, user)
+                c = _hook_check(hooks[key], conn, now, user) if key in hooks else _CHECKS[key](conn, now, user)
             except Exception as e:
                 logger.warning(f"Check {key} failed: {e}", exc_info=True)
                 c = _result(key, True, "couldn't check", None)
@@ -556,17 +558,22 @@ def compute(now: Optional[datetime.datetime] = None, user: Optional[User] = None
     return out
 
 
+def _applies(key: str, user: User) -> bool:
+    hook = registry.hook_for("selfcheck", key)
+    if hook is None:
+        return APPLIES[key](user)
+    if hook.option("server", False):
+        return user.level.allows(SERVER_CAPABILITY)
+    return store.is_connected(user, hook.addon)
+
+
 def keys_for(user: User) -> Tuple[str, ...]:
     """The checks ``user`` sees: those of the addons they have connected, and
-    the server's own when they may see everyone (in :data:`KEYS` order)."""
+    the server's own when they may see everyone (in :func:`all_keys` order)."""
     out = []
-    for key in KEYS:
-        if key in SERVER_CHECKS:
-            if user.level.allows(SERVER_CAPABILITY):
-                out.append(key)
-            continue
+    for key in all_keys():
         try:
-            if APPLIES[key](user):
+            if _applies(key, user):
                 out.append(key)
         except Exception as e:
             logger.warning(f"Check {key}: who it applies to failed for user {user.id}: {e}")
@@ -596,10 +603,10 @@ def ignore(user: User, key: str, days: float = 7) -> Dict[str, Any]:
     if days and days > 0:
         until = clock.now() + datetime.timedelta(days=float(days))
         now_hidden.hide(user, item, until, "ignore")
-        label = f"Ignored “{LABELS[key]}” for {int(days) if float(days).is_integer() else days} days"
+        label = f"Ignored “{label_of(key)}” for {int(days) if float(days).is_integer() else days} days"
     else:
         now_hidden.unhide(user, item)
         until = None
-        label = f"Watching “{LABELS[key]}” again"
+        label = f"Watching “{label_of(key)}” again"
     uid = undo.record(label, lambda: now_hidden.restore(user, item, before), source="checks.ignore")
     return {"ok": True, "message": label, "until": _iso(until), "undo_id": uid}

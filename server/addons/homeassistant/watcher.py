@@ -26,8 +26,11 @@ process (the addon's ``on_change`` → :func:`request_reconcile`), else within
 :data:`RECONCILE_SECONDS` (a change made by ``bin/users.py``). What the
 self-checks need is written by :mod:`.status`.
 
-The addon never imports the tasks addon: whoever starts :class:`Watchers` gives
-it the trigger entry point (``addons.tasks.triggers.fire``).
+The addon never imports the tasks addon: whoever starts :class:`Watchers`
+gives it what to do with a transition; the addon's service (``hooks.py``)
+emits it as the event ``homeassistant.location.changed`` /
+``homeassistant.car.changed`` (data: ``action``, ``target``), which the
+``tasks`` addon handles.
 """
 
 import asyncio
@@ -54,7 +57,7 @@ RETRY_MIN_SECONDS = 1.0
 RETRY_MAX_SECONDS = float(os.getenv("HA_WATCH_RETRY_MAX_SECONDS", "300"))
 RECONCILE_SECONDS = float(os.getenv("HA_WATCH_RECONCILE_SECONDS", "10"))
 
-# fire(user, trigger_type, *, action=, target=): addons.tasks.triggers.fire
+# fire(user, trigger_type, *, action=, target=): hooks.emit_transition (an event)
 FireFn = Callable[..., Awaitable[Any]]
 
 

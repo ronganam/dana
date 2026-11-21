@@ -52,4 +52,4 @@ async def summarize_text(text: str) -> str:
     return await llm.complete([
         {"role": "system", "content": _SUMMARY_PROMPT},
         {"role": "user", "content": text},
-    ], purpose="voice_summary")
+    ], job="chat", purpose="voice_summary")

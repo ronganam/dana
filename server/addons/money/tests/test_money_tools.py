@@ -43,6 +43,7 @@ from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
 
 from core import agent, clock, context_chats, now as now_mod, session_runner, undo, weekly_review  # noqa: E402
+from core.cards import ActError  # noqa: E402
 from core.addons import registry, store as connections  # noqa: E402
 from addons.money import ingest, queries, store, sync  # noqa: E402
 
@@ -368,7 +369,7 @@ async def test_now() -> None:
     for who, item in ((BOB, f"money:{T['pharm']}"), (CARL, f"money:{T['pharm']}")):
         try:
             await now_mod.act(who, item, "dismiss")
-        except now_mod.ActError as e:
+        except ActError as e:
             errors.append(e.status)
         except connections.NotConnected:
             errors.append(403)

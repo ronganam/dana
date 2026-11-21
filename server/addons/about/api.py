@@ -1,4 +1,4 @@
-"""HTTP routes for "About you" and the learner's startup.
+"""HTTP routes for "About you" (the learner runs as a job: hooks.py).
 
     GET    /api/about                 → {sections: [{key, label, facts: [...]}], used_chars, max_chars}
     POST   /api/about/facts           {text, section?}   → 201 {ok, fact, undo_id}
@@ -8,15 +8,14 @@
 Every route answers for the request's user, who must have ``about``
 connected (else 403 ``not_connected`` from the addon middleware);
 another user's fact id is 404 like an unknown one. Undo ids go to
-``POST /api/undo/{id}`` (core/undo.py). Shapes: docs/about.md. Loaded by
-core/server.py (``setup(app)``). The old ``/api/memories`` routes (old
+``POST /api/undo/{id}`` (core/undo.py). Shapes: docs/about.md. Registered with
+the app by the addon loader (``setup(app)``). The old ``/api/memories`` routes (old
 clients, the old shape) are here too:
 
     GET    /api/memories              → [{key: "fact_<id>", value, category, updated_at}]
     POST   /api/memories              {key, value, category?} → {status, key}
     DELETE /api/memories/{key}                            → {status, key, undo_id?}
 """
-import asyncio
 import logging
 from typing import Any, Dict, Optional
 
@@ -25,7 +24,7 @@ from aiohttp import web
 from core import undo
 from core.auth import request_user
 from core.users import User
-from addons.about import facts, learner, legacy
+from addons.about import facts, legacy
 from addons.about.values import SECTION_KEYS
 from core.addons import store
 
@@ -189,27 +188,6 @@ async def delete_memory_api(request: web.Request) -> web.Response:
         return web.json_response({"error": str(e)}, status=500)
 
 
-# --- Learner -----------------------------------------------------------------------
-
-async def _start_learner(app: web.Application) -> None:
-    if not learner.LEARN_ENABLED:
-        logger.info("About learner off (ABOUT_LEARN=0)")
-        return
-    app["about_learner_task"] = asyncio.create_task(learner.learner_loop())
-    logger.info(f"About learner on: every {learner.LEARN_INTERVAL_MINUTES} min per user with About you, "
-                f"conversations quiet for {learner.LEARN_QUIET_MINUTES} min")
-
-
-async def _stop_learner(app: web.Application) -> None:
-    task = app.get("about_learner_task")
-    if task:
-        task.cancel()
-        try:
-            await task
-        except (asyncio.CancelledError, Exception):
-            pass
-
-
 def setup(app: web.Application) -> None:
     app.router.add_get("/api/about", get_about_api)
     app.router.add_post("/api/about/facts", add_fact_api)
@@ -218,7 +196,3 @@ def setup(app: web.Application) -> None:
     app.router.add_get("/api/memories", get_memories_api)
     app.router.add_post("/api/memories", create_memory_api)
     app.router.add_delete("/api/memories/{key}", delete_memory_api)
-    # Started with the app (runner.setup() in core/server.py fires on_startup),
-    # next to the other background loops.
-    app.on_startup.append(_start_learner)
-    app.on_cleanup.append(_stop_learner)

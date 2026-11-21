@@ -1,7 +1,7 @@
 """The ``about`` addon (About you)."""
 
 from addons.about import facts, prompt
-from core.addons import Addon, PromptPart
+from core.addons import Addon, PromptPart, LlmJob
 
 # ``{user}``: what the agent's instructions call the user (core/agent.py).
 MEMORY_GUIDE = (
@@ -17,7 +17,7 @@ CONTACTS_GUIDE = (
 
 # Connecting it builds the user's prompt block; the block is the addon's
 # section of their system prompt (core/agent.py asks for it every turn).
-addon = Addon(facts.ADDON, description="About-you facts and their learner",
+addon = Addon(facts.ADDON, order=50, llm_jobs={"about_learner": LlmJob("fast", "About you learner")}, description="About-you facts and their learner",
                     on_connect=facts.refresh_prompt, prompt_section=prompt.section,
                     prompt_parts=(
                         PromptPart("tools", "persistent memory", rank=70),

@@ -1,7 +1,14 @@
-"""Proactive messages to a user: the one way core code reaches someone on Telegram.
+"""Proactive messages to a user (../docs/addons.md, "The manifest": ``@addon.channel``).
 
-``await notify(user, text)`` sends ``text`` to the user's Telegram chat
-(``users.telegram_chat_id``, core/users.py). It is a no-op returning False when
+``await send(user, Message(...))`` delivers one message on every channel the
+user has: Telegram (core's own: the message's ``text`` to their chat,
+``users.telegram_chat_id``) and each ``@addon.channel`` of an addon they have
+(the phone addon's ``push``: the message's ``kind`` and ``data`` as a push
+event). Each channel takes what it can use from the message and says whether
+it delivered it; one failing is logged and never stops the others.
+
+``await notify(user, text)`` is the Telegram channel alone (the text to the
+user's chat). It is a no-op returning False when
 the user has no chat, when no Telegram channel is registered (tests, a server
 without the bot) or when sending fails (logged).
 
@@ -11,17 +18,31 @@ The core never imports the Telegram adapter: at startup the adapter
 WhatsApp voice transcripts (:func:`whatsapp_voice`, sent to the chat their
 ``whatsapp`` addon names in its ``voice_telegram_chat_id`` setting).
 
-Phone push (addons/phone/push.py, ``push.send(user, ...)``) is separate for
-now; docs/access.md describes ``notify`` growing to "the user's phone if they
-have one".
 """
 
 import logging
-from typing import Optional, Protocol
+from dataclasses import dataclass, field
+from typing import Any, Dict, Optional, Protocol
 
 from core.users import User
+from core.addons import registry
 
 logger = logging.getLogger(__name__)
+
+TELEGRAM = "telegram"
+
+
+@dataclass(frozen=True)
+class Message:
+    """One proactive message. ``text`` is what a person reads (Telegram;
+    ``parse_mode`` "Markdown" for Telegram's legacy Markdown, values escaped
+    with ``core.text.escape_markdown``); ``kind`` and ``data`` are the
+    structured event a device gets (the phone's push: ``kind`` "reminder",
+    ``data`` its payload). A channel skips a message without what it needs."""
+    text: str = ""
+    parse_mode: Optional[str] = None
+    kind: str = ""
+    data: Dict[str, Any] = field(default_factory=dict)
 
 
 class TelegramChannel(Protocol):
@@ -56,6 +77,22 @@ async def notify(user: User, text: str, *, parse_mode: Optional[str] = None) -> 
         logger.error(f"Telegram message to {user.name} failed: {e}")
         return False
     return True
+
+
+async def send(user: User, message: Message) -> Dict[str, bool]:
+    """Deliver ``message`` to ``user`` on Telegram (when it has text) and on
+    every channel of the addons they have, in addon order. Returns channel
+    name → whether it delivered."""
+    out: Dict[str, bool] = {}
+    if message.text:
+        out[TELEGRAM] = await notify(user, message.text, parse_mode=message.parse_mode)
+    for ch in registry.channels(user):
+        try:
+            out[ch.name] = bool(await ch.func(user, message))
+        except Exception as e:
+            logger.error(f"Channel {ch.name} ({ch.addon}) failed for user {user.id}: {e}", exc_info=True)
+            out[ch.name] = False
+    return out
 
 
 async def whatsapp_voice(user: User, chat_id: Optional[int], sender: str, transcript: str, message_id: str) -> bool:

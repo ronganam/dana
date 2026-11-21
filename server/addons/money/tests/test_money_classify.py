@@ -45,7 +45,7 @@ addons_bootstrap.bootstrap()
 from core import llm  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import store as connections  # noqa: E402
-from addons.money import classify, hooks, ingest, rules, sources  # noqa: E402
+from addons.money import after_sync, classify, ingest, rules, sources  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
 
@@ -329,7 +329,7 @@ async def test_reuse_and_hook() -> None:
         cal("70000000030", "2026-11-12", "2026-12-15", -310.0, "תחנת דלק אורן", "אנרגיה")]}]
     with patch.object(llm, "configured", return_value=True), patch.object(llm, "complete_json", model):
         out = ingest.apply(ADMIN, CAL, pull)
-        await hooks.run(ADMIN, CAL["id"], out["new"], out["changed"])
+        await after_sync.run(ADMIN, CAL["id"], out["new"], out["changed"])
         before = one(ADMIN, "תחנת דלק אורן", -31000)
         check("hook: the sync's hooks return before classification ran (it runs in the background)",
               before["category"] is None, before)

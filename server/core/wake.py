@@ -1,5 +1,5 @@
-"""The wake flow: one daily "the user is up" event per user → their
-wake-trigger tasks (``addons.tasks.triggers.fire(user, "wake")``) and
+"""The wake flow: one daily "the user is up" event per user → the event
+``core.user.woke`` (``why``; the tasks addon fires the wake-trigger tasks) and
 their morning briefing (docs/people.md, "Wake detection"). A composer: the
 phone's unlock signal plus the phone's screen history from the user's Home
 Assistant (their ``phone_interactive_sensor`` setting). Only for a user with
@@ -16,13 +16,12 @@ import logging
 import os
 from typing import Dict, List, Optional
 
-from core import briefing, clock, composers, users
+from core import briefing, clock, composers, events, users
 from core.db import get_db_connection
 from core.users import User
 from core.addons import store
 from addons.homeassistant import client as ha_client, config as ha_config
 from addons.phone import config as phone_config
-from addons.tasks import triggers
 
 logger = logging.getLogger(__name__)
 
@@ -186,6 +185,6 @@ async def _fire_wake(user: User, today: str, why: str) -> None:
         conn.commit()
     if not cur.rowcount:
         return  # already confirmed today
-    logger.info(f"User {user.id} is up ({why}): firing wake tasks and the briefing.")
-    await triggers.fire(user, "wake")
+    logger.info(f"User {user.id} is up ({why}): core.user.woke and the briefing.")
+    events.emit("core.user.woke", user, why=why)
     await briefing.on_wake(user)

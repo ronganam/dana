@@ -1,6 +1,6 @@
 """The shopping list for one user (docs/shopping.md): every rule of one list.
 
-A temporary database that starts as the 8.1.0 fixture (its two items must
+A temporary database that starts as the 9.0 fixture (its two items must
 become the first admin's list), the first admin with ``shopping`` and Carl
 without it. Through the real aiohttp handlers (shopping, undo) behind the
 real auth middleware, the agent tools (via the registry, as the model calls
@@ -45,7 +45,7 @@ os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)
 
 _conn = sqlite3.connect(DB_PATH)
-with open(os.path.join(testenv.FIXTURES, "db_8_1_0.sql"), encoding="utf-8") as _f:
+with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
 _conn.close()
 
