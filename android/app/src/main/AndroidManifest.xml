@@ -26,8 +26,6 @@
 
     <!-- Live push-to-talk transcription binds the system speech recognizer. -->
     <queries>
-        <!-- Coding-session notifications open their thread in the T3 Code app -->
-        <package android:name="com.t3tools.t3code" />
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>

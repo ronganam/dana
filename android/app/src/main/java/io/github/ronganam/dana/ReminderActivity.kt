@@ -330,8 +330,8 @@ fun ReminderScreen(
         zones = try {
             apiService.getZones().map { it.name }
         } catch (e: Exception) {
-            Log.e("ReminderActivity", "Failed to fetch zones dynamically, using fallbacks", e)
-            listOf("Home", "Work", "Parent's home")
+            Log.e("ReminderActivity", "Couldn't fetch zones, using the last known ones", e)
+            io.github.ronganam.dana.data.wear.WearReminderBridge.cachedZones(context)
         }
     }
 
