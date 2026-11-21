@@ -21,7 +21,7 @@ jobs:
       raycast: ${{ steps.filter.outputs.raycast }}
       docker: ${{ steps.filter.outputs.docker }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: filter
         uses: dorny/paths-filter@v3
         with:
@@ -52,7 +52,7 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.14"
@@ -73,7 +73,7 @@ jobs:
       run:
         working-directory: android
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -107,7 +107,7 @@ jobs:
       run:
         working-directory: extensions/raycast-assistant
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -122,7 +122,7 @@ jobs:
     if: needs.changes.outputs.docker == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v3
       - uses: docker/build-push-action@v6
         with:
