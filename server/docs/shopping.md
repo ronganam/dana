@@ -267,7 +267,7 @@ Sharing itself uses `GET / PUT /api/sharing/shopping_list/{id}`.
 
 A destination of the web app (`static/index.html`, `panel-shopping`): a
 shopping-cart button in the rail and the bottom bar, with the count to buy,
-shown only to a user with `shopping` (`GET /api/me` → `kinds`). `/shopping`
+shown only to a user with `shopping` (`GET /api/me` → `addons`). `/shopping`
 serves the app opened on the panel (a bookmark, the manifest's "Shopping"
 shortcut); switching to it sets the address to `/shopping`, leaving it sets
 `/`.
