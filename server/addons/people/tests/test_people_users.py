@@ -356,12 +356,12 @@ def test_composers() -> None:
           and people_store.mentioned_in(ADMIN, "Lunch with Galit Bob and Gal Robin") == [P["robin_gal"]]
           and people_store.mentioned_in(CARL, "Lunch with Gal Robin") == [])
     with users.acting_as(BOB):
-        bob_people = briefing._people(BOB)
+        bob_people = briefing.sections(BOB, clock.now())["people"].data
         bob_review = [i for i in weekly_review.candidates(BOB)["items"] if i["type"] == "person"]
     with users.acting_as(ADMIN):
         robin_review = [i["title"] for i in weekly_review.candidates(ADMIN)["items"] if i["type"] == "person"]
     with users.acting_as(CARL):
-        carl_people = briefing._people(CARL)
+        carl_people = asyncio.run(briefing.gather(CARL))["people"]
     check("briefing: people part from the caller's people only (birthdays), none without the addon",
           all(b["id"] in (P["bob_only"], P["bob_gal"], P["bob_zehava"]) for b in bob_people["birthdays"])
           and carl_people == {"birthdays": [], "reach_out": []}, f"{bob_people} / {carl_people}")

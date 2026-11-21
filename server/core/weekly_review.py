@@ -1,24 +1,17 @@
 """Weekly review: every Saturday evening, each user tidies their task list in one go.
 
-1. Plain queries find what needs a decision among the user's own data:
-   each addon's part (``@addon.briefing`` for the weekly review, acted on by
-   its ``@addon.review_action``; the tasks addon: overdue tasks, tasks
-   untouched for ``REVIEW_STALE_DAYS`` (21), tasks snoozed 3+ times),
-   suggestions pending over a week (with ``phone``), and
-   people they usually talk to but haven't lately (with ``people``). With
-   ``money``, a Money section: spent this week vs a usual week, the top
-   groups, new recurring charges and price changes (``addons/money/queries.py::week``)
-   and a savings line (``addons/money/savings.py::week_line``).
-2. The model proposes one action per item (complete / reschedule / delete /
-   move to a group / keep; accept or dismiss a suggestion; a "reach out"
-   task for a person) plus a few lines about the week, written for them
-   (``core/user_profile.for_user``).
+1. Plain queries find what needs a decision among the user's own data via each
+   active addon's ``@addon.review`` hook (tasks: overdue / snoozed / stale;
+   phone: old pending suggestions; people: drifting contacts; money: week
+   spending & savings summary).
+2. The model proposes one action per item from each type's ``@addon.review_action``
+   plus a few lines about the week, written for them (``core/user_profile.for_user``).
 3. They review the list (phone, web), untick what they disagree with and
    apply it with one call: ``POST /api/review/{id}/apply``.
 
-For every user with an addon the review is about (``tasks``); reviews belong to their user
-(``weekly_reviews.user_id``). Schedule: ``WEEKLY_REVIEW_AT`` ("sat 20:00"); a
-review missed by a restart is still made until noon the next day. One review
+For every user with a primary review addon (``tasks``); reviews belong to their
+user (``weekly_reviews.user_id``). Schedule: ``WEEKLY_REVIEW_AT`` ("sat 20:00");
+a review missed by a restart is still made until noon the next day. One review
 per user and ISO week.
 """
 from __future__ import annotations
@@ -32,54 +25,36 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional
 
-from core import briefing, clock, composers, llm, user_profile, users
+from core import briefing, clock, composers, llm, notify as notify_mod, user_profile, users
+from core.addons import BriefingContext, registry, store
+from core.addons.helpers import next_weekday, valid_future_date
 from core.db import get_db_connection
 from core.notify import notify
 from core.users import User
-from addons.calendar import config as calendar_config, events as calendar_events
-from addons.money import config as money_config, queries as money_queries, savings as money_savings
-from core.addons import registry, store
-from core.addons.helpers import age_days, next_weekday, valid_future_date
-from addons.people import cadence as people_cadence
-from addons.people.values import ADDON as PEOPLE
-from addons.phone import push as phone_push, suggestions as phone_suggestions
-from addons.phone.calls import actions as suggestion_actions
-from addons.phone.config import ADDON as PHONE
 
 logger = logging.getLogger(__name__)
 
 REVIEW_AT = os.getenv("WEEKLY_REVIEW_AT", "sat 20:00")
-STALE_DAYS = int(os.getenv("REVIEW_STALE_DAYS", "21"))
-SNOOZE_MIN = int(os.getenv("REVIEW_SNOOZE_MIN", "3"))
-SUGGESTION_DAYS = int(os.getenv("REVIEW_SUGGESTION_DAYS", "7"))
 MAX_ITEMS = int(os.getenv("REVIEW_MAX_ITEMS", "25"))
 REVIEW_TELEGRAM = os.getenv("REVIEW_TELEGRAM", "1") != "0"
 _DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
-# Core's own item types and what may be proposed for each; an addon adds its
-# own with ``@addon.review_action(type, actions)`` (the tasks addon: "task").
-ACTIONS = {
-    "suggestion": ("accept", "dismiss", "keep"),
-    "person": ("reach_out", "keep"),
-}
 # user id → the lock that keeps one generation of their review at a time.
 _locks: Dict[str, asyncio.Lock] = {}
 
 
 def _review_addons() -> List[str]:
-    """The addons a review is about: those with an ``@addon.review_action`` (the tasks addon), in addon order."""
-    return list(dict.fromkeys(h.addon for h in registry.hooks("review_action", None)))
+    """The primary addons a review is about (``@addon.review_action(..., primary=True)``), in addon order."""
+    return list(dict.fromkeys(h.addon for h in registry.hooks("review_action", None) if h.option("primary", True)))
 
 
 def actions_for(item_type: str) -> tuple:
-    """What may be proposed for an item of ``item_type`` (() for an unknown type; core's types first)."""
-    if item_type in ACTIONS:
-        return ACTIONS[item_type]
+    """What may be proposed for an item of ``item_type`` (() for an unknown type)."""
     hook = registry.hook_for("review_action", item_type, None)
     return tuple(hook.option("actions", ())) if hook else ()
 
 
 def available(user: Optional[User]) -> bool:
-    """Whether ``user`` gets a weekly review (an addon it is about connected: ``tasks``)."""
+    """Whether ``user`` gets a weekly review (a primary review addon connected: ``tasks``)."""
     return user is not None and any(store.is_connected(user, a) for a in _review_addons())
 
 
@@ -120,14 +95,26 @@ def _loads(raw, default):
         return default
 
 
+def money_lines(week: Optional[Dict[str, Any]]) -> List[str]:
+    """Short lines describing the money section of a review (empty when none or provider absent)."""
+    if not week:
+        return []
+    hook = registry.provider("money_week_lines", None)
+    if hook is None:
+        return []
+    try:
+        return list(hook.func(week) or [])
+    except Exception:
+        return []
+
+
 # ---------------------------------------------------------------------------
 # Finding what needs a decision
 # ---------------------------------------------------------------------------
 
 def candidates(user: User, now: Optional[datetime.datetime] = None) -> Dict[str, Any]:
-    """What needs a decision among ``user``'s own items: each addon's section
-    (``@addon.review``: the tasks addon's overdue, snoozed-often and stale
-    tasks, the week's numbers and the groups), old suggestions and people."""
+    """What needs a decision among ``user``'s own items: each active addon's
+    ``@addon.review`` section."""
     now = now or clock.now()
     parts = list(briefing.collect("review", user, now).values())
     items: List[Dict[str, Any]] = [i for p in parts for i in p.items]
@@ -135,68 +122,37 @@ def candidates(user: User, now: Optional[datetime.datetime] = None) -> Dict[str,
     for p in parts:
         data.update(p.data or {})
     groups = list(data.get("groups") or [])
-    with get_db_connection() as conn:
-        # Only the user's own suggestions (they come from the phone: none without it).
-        vis, vis_args = phone_suggestions.visible_sql(user)
-        suggestions = conn.execute(
-            f"SELECT s.id, s.kind, s.payload, s.created_at FROM call_suggestions s WHERE s.status = 'pending' AND {vis} "
-            "ORDER BY s.created_at", vis_args).fetchall() if store.is_connected(user, PHONE) else []
-
-    for s in suggestions:
-        age = age_days(s["created_at"], now)
-        if age is not None and age >= SUGGESTION_DAYS:
-            p = _loads(s["payload"], {})
-            items.append({"ref": s["id"], "type": "suggestion", "title": p.get("title") or "Suggestion",
-                          "why": "old_suggestion", "facts": [f"pending {age} days", f"a {s['kind']}"],
-                          "due_date": p.get("due_date")})
-    try:
-        drifting = people_cadence.list_people(user, sort="drifting")[:3] if store.is_connected(user, PEOPLE) else []
-        for p in drifting:
-            st = p["stats"]
-            items.append({"ref": p["id"], "type": "person", "title": p["name"], "why": "drifting",
-                          "facts": [f"last contact {st['days_since']} days ago",
-                                    f"usually every ~{st['typical_gap_days']} days", p.get("relation") or ""]})
-    except Exception as e:
-        logger.debug(f"Review people failed: {e}")
 
     order = {"overdue": 0, "snoozed_often": 1, "stale": 2, "old_suggestion": 3, "drifting": 4}
     items.sort(key=lambda i: order.get(i["why"], 9))
     stats = {"done": 0, "done_titles": [], "created": 0, "open": 0, **(data.get("stats") or {}),
              "overdue": sum(1 for i in items if i["why"] == "overdue")}
-    return {"items": items[:MAX_ITEMS], "stats": stats, "groups": groups, "money": money_week(user, now)}
+    return {"items": items[:MAX_ITEMS], "stats": stats, "groups": groups, "money": data.get("money")}
 
 
 def money_week(user: User, now: datetime.datetime) -> Optional[Dict[str, Any]]:
-    """``user``'s money this week (``addons/money/queries.py::week``) with its savings line
-    (``savings`` — saved so far, ideas open, targets: ``addons/money/savings.py::week_line``);
-    None without ``money`` or with nothing to say (no spending this week or before, no recurring
-    news, no savings line)."""
-    if not store.is_connected(user, money_config.ADDON):
-        return None
+    """``user``'s money section for the weekly review (None when unavailable or empty)."""
     try:
-        week = money_queries.week(user, now.date())
-    except Exception as e:
-        logger.warning(f"Review money section for user {user.id} failed: {e}")
+        hook = registry.hook_for("review", "money", user)
+    except store.NotConnected:
         return None
-    try:
-        week["savings"] = money_savings.week_line(user, now.date())
-    except Exception as e:
-        logger.warning(f"Review savings line for user {user.id} failed: {e}")
-        week["savings"] = None
-    if not (week["spent"] or week["usual"] or week["new_recurring"] or week["price_changes"] or week["savings"]):
+    if hook is None:
         return None
-    return week
+    section = hook.func(user, BriefingContext(now=now))
+    return (section.data or {}).get("money") if section is not None else None
 
 
 async def next_week(user: User, now: Optional[datetime.datetime] = None) -> Optional[Dict[str, Any]]:
     """Events per day of ``user``'s calendar for the coming 7 days (from tomorrow); None without it."""
     now = now or clock.now()
-    conn = store.get(user, calendar_config.ADDON)
-    if conn is None:
+    hook = registry.provider("events_between", user)
+    if hook is None:
         return None
     try:
         start = (now + datetime.timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-        evs = await asyncio.to_thread(calendar_events.list_events, conn, start, start + datetime.timedelta(days=7), 100)
+        evs = await hook.func(user, start, start + datetime.timedelta(days=7), 100)
+        if evs is None:
+            return None
     except Exception as e:
         logger.info(f"Review: calendar unavailable ({e})")
         return None
@@ -233,7 +189,8 @@ def review_prompt(c: Dict[str, Any], nw: Optional[Dict[str, Any]], today: dateti
     his = who.possessive
     listing = [{"ref": i["ref"], "type": i["type"], "title": i["title"], "why": i["why"], "facts": i["facts"],
                 "group": i.get("group"), "allowed": list(actions_for(i["type"]))} for i in c["items"]]
-    money = f"Money this week: {'; '.join(money_queries.week_lines(c['money']))}\n" if c.get("money") else ""
+    mlines = money_lines(c.get("money"))
+    money = f"Money this week: {'; '.join(mlines)}\n" if mlines else ""
     return f"""You're helping {who.name} with {his} weekly review (Saturday evening, before the Israeli work week starts Sunday).
 
 {who.about()}Today: {clock.describe_now()}
@@ -291,7 +248,7 @@ async def generate(user: User, now: Optional[datetime.datetime] = None,
     async with _locks.setdefault(user.id, asyncio.Lock()):
         now = now or clock.now()
         today = now.date()
-        c = await asyncio.to_thread(candidates, user, now)  # money's savings read the database and the BoI
+        c = await asyncio.to_thread(candidates, user, now)
         nw = await next_week(user, now)
         raw = None
         if c["items"] and llm.configured("briefs"):
@@ -310,13 +267,13 @@ async def generate(user: User, now: Optional[datetime.datetime] = None,
             summary = [f"{c['stats']['done']} tasks done, {c['stats']['created']} new"]
             if nw and nw.get("busiest") and nw["busiest"]["count"] >= 3:
                 summary.append(f"Busiest day ahead: {nw['busiest']['weekday']} ({nw['busiest']['count']} events)")
-            if c.get("money"):
-                summary.append(money_queries.week_lines(c["money"])[0])
+            mlines = money_lines(c.get("money"))
+            if mlines:
+                summary.append(mlines[0])
         rid = str(uuid.uuid4())
         data = {"week": week or week_id(today), "stats": c["stats"], "next_week": nw, "summary": summary,
                 "groups": c["groups"], "items": items, "model": bool(raw), "money": c.get("money")}
         with get_db_connection() as conn:
-            # A newer review replaces the user's unapplied one for the same week.
             conn.execute("UPDATE weekly_reviews SET status = 'superseded', resolved_at = ? "
                          "WHERE user_id = ? AND week = ? AND status = 'pending'", (_now_iso(), user.id, data["week"]))
             conn.execute("INSERT INTO weekly_reviews (id, user_id, week, status, headline, data, created_at) "
@@ -332,9 +289,16 @@ async def generate(user: User, now: Optional[datetime.datetime] = None,
 # Reading / delivering / applying
 # ---------------------------------------------------------------------------
 
+def _has_money_review(user: User) -> bool:
+    try:
+        return registry.hook_for("review", "money", user) is not None
+    except store.NotConnected:
+        return False
+
+
 def _to_api(user: User, r) -> Dict[str, Any]:
     d = _loads(r["data"], {})
-    money = d.get("money") if d.get("money") and store.is_connected(user, money_config.ADDON) else None
+    money = d.get("money") if d.get("money") and _has_money_review(user) else None
     return {"id": r["id"], "week": r["week"], "status": r["status"], "headline": r["headline"],
             "summary": d.get("summary") or [], "stats": d.get("stats") or {}, "next_week": d.get("next_week"),
             "groups": d.get("groups") or [], "items": d.get("items") or [], "money": money,
@@ -377,11 +341,14 @@ def restore_pending(user: User, rid: str) -> bool:
 
 
 async def deliver(r: Dict[str, Any], user: User) -> bool:
-    """Push the review to ``user``'s phone and, unless ``REVIEW_TELEGRAM=0``, to them on Telegram."""
+    """Push the review to ``user``'s channels and, unless ``REVIEW_TELEGRAM=0``, to them on Telegram."""
     n = sum(1 for i in r["items"] if i.get("enabled"))
-    ok = await phone_push.send(user, "weekly_review", {"id": r["id"], "headline": r["headline"],
-                                                       "items": len(r["items"]), "proposed": n,
-                                                       "summary": r["summary"]})
+    res = await notify_mod.send(user, notify_mod.Message(
+        kind="weekly_review",
+        data={"id": r["id"], "headline": r["headline"], "items": len(r["items"]), "proposed": n,
+              "summary": r["summary"]},
+    ))
+    ok = any(res.values())
     if REVIEW_TELEGRAM:
         lines = [f"🗓️ Weekly review — {r['headline']}", ""] + [f"• {s}" for s in r["summary"]]
         if r["items"]:
@@ -426,25 +393,10 @@ async def apply(user: User, rid: str, decisions: Optional[List[Dict[str, Any]]] 
 
 
 async def _apply_one(item, action, d, today, user: User) -> str:
-    ref = item["ref"]
-    if item["type"] not in ACTIONS:
-        hook = registry.hook_for("review_action", item["type"], user)  # NotConnected: no longer theirs
-        if hook is None:
-            raise LookupError(f"no addon acts on '{item['type']}' items")
-        return str(await hook.func(user, item, action, d, today))
-    if item["type"] == "suggestion":
-        if action == "accept":
-            res = await suggestion_actions.accept_suggestion(user, ref)
-            return str(res.get("result_ref") or "accepted")
-        if not suggestion_actions.dismiss_suggestion(user, ref):
-            raise LookupError("suggestion is no longer pending")
-        return "dismissed"
-    # person → reach_out
-    due = valid_future_date(d.get("due_date"), today) or next_weekday(today, 6).isoformat()
-    tid = await suggestion_actions.create_task_record(
-        user, {"title": f"📞 Reach out to {item['title']}", "due_date": due, "group": "Personal", "priority": "low"},
-        link=("person", ref))
-    return tid
+    hook = registry.hook_for("review_action", item["type"], user)  # NotConnected: no longer theirs
+    if hook is None:
+        raise LookupError(f"no addon acts on '{item['type']}' items")
+    return str(await hook.func(user, item, action, d, today))
 
 
 # ---------------------------------------------------------------------------
@@ -469,7 +421,8 @@ def context_prompt(user: User, rid: str) -> Optional[str]:
     lines = [f"- [{i['type']} {i['ref']}] {i['title']} — {i['why']} ({'; '.join(i.get('facts') or [])}) → proposed "
              f"{i.get('action')}{' ' + str(i.get('due_date')) if i.get('due_date') and i.get('action') in ('reschedule', 'reach_out') else ''}"
              f"{' ' + str(i.get('group')) if i.get('action') == 'move_group' else ''}" for i in r["items"]]
-    money = f"Money this week: {'; '.join(money_queries.week_lines(r['money']))}.\n" if r.get("money") else ""
+    mlines = money_lines(r.get("money"))
+    money = f"Money this week: {'; '.join(mlines)}.\n" if mlines else ""
     return (f"## Opened from the weekly review {r['week']} (status {r['status']})\n"
             f"{r['headline']}. {' '.join(r['summary'])}\n{money}"
             "Items and the proposed actions:\n" + ("\n".join(lines) or "- none") +
@@ -495,8 +448,7 @@ async def _scheduled_for(user: User, now: datetime.datetime, week: str) -> bool:
 
 async def schedule_once(now: Optional[datetime.datetime] = None) -> Dict[str, bool]:
     """When the review is due: make and deliver this week's review of every
-    user with ``tasks`` who has none yet (each as that user, a failing one
-    not stopping the next). user id → whether one was made."""
+    user with a primary review addon who has none yet."""
     now = now or clock.now()
     if not is_due(now):
         return {}

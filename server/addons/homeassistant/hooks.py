@@ -1,29 +1,39 @@
-"""The Home Assistant addon's background work and self-checks (../docs/addons.md, "The manifest").
+"""The Home Assistant addon's background work, self-checks and composer hooks
+(../docs/addons.md, "The manifest").
 
 - the entity watchers (a service): one per user with a person entity or a
   car sensor set, over their own connection; each transition is emitted as
   the event ``homeassistant.location.changed`` or ``homeassistant.car.changed``;
 - at start: every user's home map fetched in the background for their prompt;
-- self-checks: ``location``, ``car``, ``ha_entities``, ``ha_watcher``.
+- self-checks: ``location``, ``car``, ``ha_entities``, ``ha_watcher``;
+- morning briefing: ``weather``;
+- providers: ``weather``, ``home_zone``, ``resolve_home_zone``, ``screen_sessions``.
 """
 
+import asyncio
 import datetime
+import logging
 import os
 import time
-from typing import Any, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from core import events
-from core.addons import Check, helpers, store
+from core.addons import BriefingContext, Check, Section, helpers, store
 from core.users import User
-from addons.homeassistant import config, home_map, status as ha_status, watcher as ha_watcher
+from addons.homeassistant import client as ha_client, config, home_map, status as ha_status, watcher as ha_watcher
 from addons.homeassistant.addon import addon
 from addons.homeassistant.config import ADDON
 from addons.homeassistant.watcher import Watchers
+
+logger = logging.getLogger(__name__)
 
 LOCATION_DAYS = float(os.getenv("CHECK_LOCATION_DAYS", "3"))
 CAR_DAYS = float(os.getenv("CHECK_CAR_DAYS", "7"))
 HA_WATCHER_MINUTES = float(os.getenv("CHECK_HA_WATCHER_MINUTES", "10"))
 _STARTED = time.monotonic()
+
+# Per user: cached friendly name of zone.home (lower case).
+_home_zones: Dict[str, Dict[str, Any]] = {}
 
 
 async def emit_transition(user: User, trigger_type: str, *, action: str = "", target: str = "") -> None:
@@ -43,6 +53,99 @@ async def warm_home_map(user: User) -> None:
     task = home_map.warm_home_map(conn) if conn is not None else None
     if task is not None:
         await task
+
+
+# --- Providers & briefing -------------------------------------------------------------------
+
+@addon.provide("weather")
+async def fetch_weather(user: User) -> Optional[Dict[str, Any]]:
+    """``user``'s weather (their Home Assistant ``weather_entity``):
+    condition and temperature, today's high / low / rain chance when the
+    forecast answers. None without Home Assistant or when it fails."""
+    conn = store.get(user, ADDON)
+    entity = config.setting(conn, config.WEATHER) if conn is not None else None
+    if conn is None or not entity:
+        return None
+    try:
+        s = await ha_client.entity_state(conn, entity)
+        if s is None:
+            return None
+        out = {"condition": str(s.get("state") or "").replace("-", " "),
+               "temperature": (s.get("attributes") or {}).get("temperature"),
+               "unit": (s.get("attributes") or {}).get("temperature_unit") or "°C"}
+        d = await ha_client.forecast(conn, entity)
+        if d:
+            out.update({"high": d.get("temperature"), "low": d.get("templow"),
+                        "rain_chance": d.get("precipitation_probability")})
+        return out
+    except Exception as e:
+        logger.debug(f"Briefing weather failed: {e}")
+        return None
+
+
+@addon.briefing("weather", default=None, rank=10)
+async def briefing_weather(user: User, ctx: BriefingContext) -> Section:
+    w = await fetch_weather(user)
+    points = []
+    if w and w.get("temperature") is not None:
+        hi = f", high {w['high']}°" if w.get("high") is not None else ""
+        points.append(f"{w['condition'].capitalize()}, {w['temperature']}°{hi}")
+    return Section(w, points=points)
+
+
+@addon.provide("home_zone")
+def cached_home_zone(user: Optional[User]) -> str:
+    return _home_zones.setdefault(user.id if user else "", {"name": "home", "at": 0.0})["name"]
+
+
+@addon.provide("resolve_home_zone")
+async def resolve_home_zone(user: User) -> str:
+    cache = _home_zones.setdefault(user.id, {"name": "home", "at": 0.0})
+    if time.monotonic() - cache["at"] < 600:
+        return cache["name"]
+    conn = store.get(user, ADDON)
+    if conn is None:
+        return cache["name"]
+    try:
+        zones = await asyncio.wait_for(ha_client.get_ha_zones_list(conn), timeout=5)
+        for z in zones or []:
+            if z.get("entity_id") == "zone.home" and z.get("name"):
+                cache["name"] = z["name"].lower()
+                break
+        cache["at"] = time.monotonic()
+    except Exception as e:
+        logger.debug(f"Home zone lookup failed: {e}")
+    return cache["name"]
+
+
+@addon.provide("screen_sessions")
+async def screen_sessions(user: User, since_utc: datetime.datetime,
+                          until_utc: datetime.datetime) -> Optional[List[float]]:
+    """Seconds of each screen-on stretch of ``user``'s phone screen sensor in
+    [since, until], from their Home Assistant's history."""
+    conn = store.get(user, ADDON)
+    entity = config.setting(conn, config.SCREEN_SENSOR) if conn is not None else None
+    if conn is None or not entity:
+        return None
+    rows = await ha_client.history(conn, entity, since_utc, until_utc)
+    if rows is None:
+        return None
+    points = []
+    for x in rows:
+        try:
+            t = datetime.datetime.fromisoformat(str(x.get("last_changed")).replace("Z", "+00:00"))
+        except ValueError:
+            continue
+        points.append((t, x.get("state")))
+    out: List[float] = []
+    for i, (t, state) in enumerate(points):
+        if state != "on":
+            continue
+        t_end = points[i + 1][0] if i + 1 < len(points) else until_utc
+        a, b = max(t, since_utc), min(t_end, until_utc)
+        if b > a:
+            out.append((b - a).total_seconds())
+    return out
 
 
 # --- Self-checks ----------------------------------------------------------------------------

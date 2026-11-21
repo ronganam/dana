@@ -554,19 +554,20 @@ async def test_composers() -> None:
 
     requests()
     with users.acting_as(BOB):
-        brief_bob = await briefing._events_today(BOB)
+        brief_bob = await briefing.gather(BOB)
         week_bob = await weekly_review.next_week(BOB)
     hit = requests()
     with users.acting_as(CARL):
-        brief_carl = await briefing._events_today(CARL)
+        brief_carl = await briefing.gather(CARL)
         week_carl = await weekly_review.next_week(CARL)
     check("briefing / weekly review: Bob's own calendar only",
-          [e["title"] for e in brief_bob or []] == ["Bob dentist"] and week_bob is not None
-          and hit and all(r[0] == "bob" for r in hit), (brief_bob, hit))
+          [e["title"] for e in brief_bob["events"]] == ["Bob dentist"] and brief_bob["calendar_ok"]
+          and week_bob is not None and hit and all(r[0] == "bob" for r in hit), (brief_bob, hit))
     check("briefing / weekly review: skipped without a calendar (no Google call)",
-          brief_carl is None and week_carl is None and not requests())
+          not brief_carl["calendar_ok"] and brief_carl["events"] == [] and week_carl is None and not requests())
 
-    with patch.object(briefing.phone_push, "send", AsyncMock()):
+    from addons.phone import push as phone_push
+    with patch.object(phone_push, "send", AsyncMock()):
         with users.acting_as(BOB):
             await briefing.check_meetings(BOB)
         hit = requests()

@@ -574,7 +574,8 @@ async def main():
                     "promotional": 0.05, "owner_wrote_it": 0.05, "addressed_to_owner": 0.9, "record_only": 0.1}
             base.update(kw)
             return json.dumps(base)
-        W = now_mod.notification_why
+        from addons.phone.notifications import format as notif_format
+        W = notif_format.notification_why
         wa = {"package": "com.whatsapp", "app_name": "WhatsApp", "sender": "Gal", "title": "Gal", "text": "מתי?",
               "category": "personal_message"}
         check("why: a person asking → '<name> is waiting for an answer'",
@@ -616,7 +617,8 @@ async def main():
               and W({**wa, "triage": '{"error": "boom"}'}, None) is None)
 
         # --- card titles per app shape ----------------------------------------------------
-        P = now_mod.notification_parts
+        from addons.phone.notifications import format as notif_format
+        P = notif_format.notification_parts
         shapes = {
             "gmail": ({"app_name": "Gmail", "title": "Bright Data", "sub_text": "robin@example.com",
                        "text": "Your invoice for October is ready\nHi Robin, your monthly invoice is attached."},

@@ -15,21 +15,27 @@
 
 import asyncio
 import datetime
+import json
+import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from core import clock
-from core.addons import Check, ContextRequest, Hit, helpers, hours, minutes
+from core import cards, clock
+from core.addons import BriefingContext, Check, ContextRequest, Hit, Section, helpers, hours, minutes
 from core.db import get_db_connection
 from core.notify import Message
 from core.users import User
-from addons.phone import push
+from addons.phone import now_cards as _now_cards, push, suggestions as phone_suggestions  # noqa: F401
 from addons.phone.addon import addon
-from addons.phone.calls import chat as phone_chat, processing as calls_processing, retention as calls_retention
+from addons.phone.calls import (actions as suggestion_actions, chat as phone_chat,
+                                processing as calls_processing, retention as calls_retention)
 from addons.phone.config import mark_key
 from addons.phone.notifications import (digest, escalation, format as notif_format,
                                         processing as notification_processing, retention as notification_retention,
-                                        store as notification_store)
+                                        store as notification_store, summary as notification_summary)
+
+logger = logging.getLogger(__name__)
+SUGGESTION_DAYS = int(os.getenv("REVIEW_SUGGESTION_DAYS", "7"))
 
 PUSH_FETCH_HOURS = float(os.getenv("CHECK_PUSH_FETCH_HOURS", "24"))
 NOTIFICATION_SYNC_HOURS = float(os.getenv("CHECK_NOTIFICATION_SYNC_HOURS", "12"))
@@ -71,6 +77,68 @@ async def push_channel(user: User, message: Message) -> bool:
     if not message.kind:
         return False
     return await push.send(user, message.kind, dict(message.data))
+
+
+# --- Briefing & weekly review ---------------------------------------------------------------
+
+@addon.briefing("inbox", counts=("needs_you",), default={"needs_you": 0, "active": 0, "points": []}, rank=40)
+def briefing_inbox(user: User, ctx: BriefingContext) -> Section:
+    try:
+        c = notification_store.counts(user)
+        s = notification_summary.get_summaries(user, refresh=False)
+        overall = (s.get("overall") or {}).get("points") or []
+        data = {"needs_you": c.get("needs_you", 0), "active": c.get("active", 0), "points": overall[:3]}
+    except Exception as e:
+        logger.debug(f"Briefing inbox failed: {e}")
+        data = {"needs_you": 0, "active": 0, "points": []}
+    pts = [f"{data['needs_you']} notification(s) need you"] if data["needs_you"] else []
+    return Section(data, points=pts, counts={"needs_you": data["needs_you"]})
+
+
+@addon.briefing("suggestions", default={"count": 0, "top": []}, rank=45)
+def briefing_suggestions(user: User, ctx: BriefingContext) -> Section:
+    with get_db_connection() as conn:
+        rows = conn.execute("SELECT payload FROM call_suggestions WHERE status = 'pending' AND user_id = ? "
+                            "ORDER BY created_at DESC", (user.id,)).fetchall()
+    titles = []
+    for r in rows[:3]:
+        try:
+            titles.append(json.loads(r["payload"] or "{}").get("title") or "")
+        except Exception:
+            pass
+    data = {"count": len(rows), "top": [t for t in titles if t]}
+    pts = [f"{data['count']} suggestion(s) waiting"] if data["count"] else []
+    return Section(data, points=pts)
+
+
+@addon.review("phone")
+def review_suggestions(user: User, ctx: BriefingContext) -> Section:
+    vis, vis_args = phone_suggestions.visible_sql(user)
+    with get_db_connection() as conn:
+        rows = conn.execute(
+            f"SELECT s.id, s.kind, s.payload, s.created_at FROM call_suggestions s WHERE s.status = 'pending' AND {vis} "
+            "ORDER BY s.created_at", vis_args).fetchall()
+    items = []
+    for s in rows:
+        age = helpers.age_days(s["created_at"], ctx.now)
+        if age is not None and age >= SUGGESTION_DAYS:
+            p = cards.loads(s["payload"], {})
+            items.append({"ref": s["id"], "type": "suggestion", "title": p.get("title") or "Suggestion",
+                          "why": "old_suggestion", "facts": [f"pending {age} days", f"a {s['kind']}"],
+                          "due_date": p.get("due_date")})
+    return Section(items=items)
+
+
+@addon.review_action("suggestion", ("accept", "dismiss", "keep"), primary=False)
+async def apply_review_suggestion(user: User, item: Dict[str, Any], action: str, decision: Dict[str, Any],
+                                  today: datetime.date) -> str:
+    ref = item["ref"]
+    if action == "accept":
+        res = await suggestion_actions.accept_suggestion(user, ref)
+        return str(res.get("result_ref") or "accepted")
+    if not suggestion_actions.dismiss_suggestion(user, ref):
+        raise LookupError("suggestion is no longer pending")
+    return "dismissed"
 
 
 # --- Context chats --------------------------------------------------------------------------

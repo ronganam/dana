@@ -305,3 +305,12 @@ def hook_for(kind: str, key: str, user: Optional[User]) -> Optional[Hook]:
     if owner.addon not in active_addons(user):
         raise store.NotConnected(user, owner.addon)
     return owner
+
+
+def provider(key: str, user: Optional[User]) -> Optional[Hook]:
+    """The ``@addon.provide(key)`` hook when active for ``user`` (None when no
+    enabled addon declares it or it is not active for ``user``)."""
+    try:
+        return hook_for("provide", key, user)
+    except store.NotConnected:
+        return None
