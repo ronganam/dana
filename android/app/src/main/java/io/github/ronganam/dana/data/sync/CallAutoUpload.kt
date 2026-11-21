@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.sync
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.Manifest
 import android.app.PendingIntent
 import io.github.ronganam.dana.SuggestionsPopupActivity
@@ -18,7 +19,6 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import io.github.ronganam.dana.CallDebriefActivity
-import io.github.ronganam.dana.data.network.ApiService
 import kotlinx.coroutines.CancellationException
 import java.io.File
 import java.time.LocalDateTime
@@ -28,13 +28,12 @@ import kotlin.math.abs
 
 /** User settings for automatic call uploads (DanaPrefs). */
 object CallUploadSettings {
-    private const val PREFS = "DanaPrefs"
     private const val KEY_AUTO = "call_auto_upload"
     private const val KEY_THRESHOLD = "call_auto_threshold_seconds"
     private const val KEY_WIFI = "call_upload_wifi_only"
     private const val KEY_SKIP = "call_skip_contacts"
 
-    private fun prefs(c: Context) = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+    private fun prefs(c: Context) = ServerConfig.prefs(c)
 
     fun autoUpload(c: Context): Boolean = prefs(c).getBoolean(KEY_AUTO, true)
     fun setAutoUpload(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_AUTO, v).apply()
@@ -162,7 +161,7 @@ class CallResultWorker(appContext: Context, params: WorkerParameters) : Coroutin
         val contact = inputData.getString(KEY_CONTACT) ?: "Unknown"
         val ctx = applicationContext
         val detail = try {
-            ApiService.fromPrefs(ctx).getCallDetail(callId)
+            ServerConfig.load(ctx).api().getCallDetail(callId)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

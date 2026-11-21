@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.tv
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.background
@@ -149,8 +150,8 @@ private fun <T> List<T>.moved(index: Int, by: Int): List<T> {
 private fun ConnectionSection(model: HomeModel) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var server by remember { mutableStateOf(WakePrefs.serverUrl(context)) }
-    var token by remember { mutableStateOf(WakePrefs.apiToken(context)) }
+    var server by remember { mutableStateOf(ServerConfig.load(context).url) }
+    var token by remember { mutableStateOf(ServerConfig.load(context).token) }
     var result by remember { mutableStateOf<String?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Heading("Connection", "The assistant server. Home Assistant is reached through it, so no HA token lives on the TV.")
@@ -160,7 +161,7 @@ private fun ConnectionSection(model: HomeModel) {
             visualTransformation = PasswordVisualTransformation())
         ChipRow {
             TvChip("Save & test") {
-                WakePrefs.saveServer(context, server, token)
+                ServerConfig.save(context, server, token)
                 result = "Testing…"
                 scope.launch {
                     result = runCatching { HaClient.states(context, listOf("sun.sun")) }

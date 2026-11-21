@@ -59,7 +59,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.sync.SubmitResult
 import io.github.ronganam.dana.data.sync.TaskActionQueue
 import io.github.ronganam.dana.data.wear.WearReminderBridge
@@ -316,24 +315,9 @@ fun ReminderScreen(
     onInteractionStateChanged: (Boolean) -> Unit
 ) {
     val context = LocalContext.current
-    val apiService = remember {
-        val prefs = context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
-        val serverUrl = prefs.getString("server_url", "https://") ?: "https://"
-        val apiToken = prefs.getString("api_token", "") ?: ""
-        ApiService(serverUrl, apiToken)
-    }
-
-    var zones by remember { mutableStateOf<List<String>>(emptyList()) }
-
-    // Fetch dynamic location zones
-    LaunchedEffect(Unit) {
-        zones = try {
-            apiService.getZones().map { it.name }
-        } catch (e: Exception) {
-            Log.e("ReminderActivity", "Couldn't fetch zones, using the last known ones", e)
-            io.github.ronganam.dana.data.wear.WearReminderBridge.cachedZones(context)
-        }
-    }
+    // Place snoozes: the server's zones, else the last known ones.
+    var zones by remember { mutableStateOf(io.github.ronganam.dana.data.network.Zones.cached(context)) }
+    LaunchedEffect(Unit) { zones = io.github.ronganam.dana.data.network.Zones.fetch(context) }
 
     val menuTree = remember(zones) { buildSnoozeTree(zones) }
 

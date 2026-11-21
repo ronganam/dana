@@ -60,9 +60,9 @@ fun ProjectsStage(viewModel: MainViewModel, cover: Boolean) {
                         Box(
                             Modifier.width(paneW).fillMaxHeight()
                                 .background(MaterialTheme.colorScheme.surfaceContainerLow).edgeRule(start = true)
-                        ) { EntryPane(c, its, e, viewModel.getServerUrl(), viewModel.getApiToken()) }
+                        ) { EntryPane(c, its, e, viewModel.serverConfig.url, viewModel.serverConfig.token) }
                     }
-                    else -> EntryPane(c, its, e, viewModel.getServerUrl(), viewModel.getApiToken())
+                    else -> EntryPane(c, its, e, viewModel.serverConfig.url, viewModel.serverConfig.token)
                 }
             }
         }

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.push
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,7 +14,6 @@ import android.os.Build
 import android.util.Log
 import io.github.ronganam.dana.MainActivity
 import io.github.ronganam.dana.R
-import io.github.ronganam.dana.data.network.ApiService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -47,7 +47,6 @@ import java.time.OffsetDateTime
  */
 object AgentSessions {
     private const val TAG = "AgentSessions"
-    private const val PREFS = "DanaPrefs"
     private const val KEY_SHOWN = "agent_sessions_shown"
     private const val CH_LIVE = "agent_sessions_live"
     private const val CH_ALERT = "agent_sessions_alert"
@@ -137,7 +136,7 @@ object AgentSessions {
         val sessions = (0 until list.length()).mapNotNull { list.optJSONObject(it)?.let(Session::from) }
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         channels(nm)
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         for (step in plan(loadShown(prefs.getString(KEY_SHOWN, null)), sessions)) {
             when (step) {
                 is Step.Live -> post(nm, step.session, live(context, step.session, step.alert))
@@ -281,7 +280,7 @@ object AgentSessions {
     internal fun hideNow(context: Context, id: String) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.cancel(NOTIFICATION_TAG + id, 1)
-        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         val shown = runCatching { JSONObject(prefs.getString(KEY_SHOWN, "{}") ?: "{}") }.getOrDefault(JSONObject())
         shown.remove(id)
         prefs.edit().putString(KEY_SHOWN, shown.toString()).apply()
@@ -297,7 +296,7 @@ class AgentSessionReceiver : BroadcastReceiver() {
         val pending = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                ApiService.fromPrefs(context).hideAgentSession(id)
+                ServerConfig.load(context).api().hideAgentSession(id)
             } catch (e: Exception) {
                 Log.w("AgentSessions", "Couldn't hide session on the server", e)
             } finally {

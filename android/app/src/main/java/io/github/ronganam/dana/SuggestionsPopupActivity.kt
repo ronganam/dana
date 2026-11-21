@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Application
 import android.app.NotificationManager
 import android.content.Context
@@ -33,7 +34,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.ronganam.dana.data.models.CallSuggestion
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.notifications.AppIcons
 import io.github.ronganam.dana.ui.components.*
 import io.github.ronganam.dana.ui.theme.DanaTheme
@@ -121,7 +121,7 @@ class SuggestionsPopupActivity : ComponentActivity() {
 }
 
 class SuggestionsPopupViewModel(app: Application) : AndroidViewModel(app) {
-    private val api get() = ApiService.fromPrefs(getApplication())
+    private val api get() = ServerConfig.load(getApplication()).api()
 
     private val _items = MutableStateFlow<List<CallSuggestion>?>(null)
     val items = _items.asStateFlow()

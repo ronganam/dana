@@ -43,18 +43,8 @@ class ApiException(val code: Int, message: String) : Exception(message)
  */
 class SessionBusyException(val runId: String?) : Exception("This chat is still working on the previous request")
 
+/** Calls to the Dana server at [serverUrl] (normalized, see [ServerConfig]); get one from [ServerConfig.api]. */
 class ApiService(private val serverUrl: String, private val apiToken: String) {
-
-    companion object {
-        /** For services and workers that run without the ViewModel. */
-        fun fromPrefs(context: android.content.Context): ApiService {
-            val prefs = context.getSharedPreferences("DanaPrefs", android.content.Context.MODE_PRIVATE)
-            return ApiService(
-                prefs.getString("server_url", "").orEmpty().trim().trimEnd('/'),
-                prefs.getString("api_token", "").orEmpty()
-            )
-        }
-    }
 
     private val client = HttpClients.base
     private val streamingClient = HttpClients.streaming

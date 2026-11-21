@@ -1,11 +1,11 @@
 package io.github.ronganam.dana.data.money
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Notification
 import android.content.Context
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.notifications.DanaNotificationListener
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -150,7 +150,7 @@ object MoneyCodes {
         if (!rid.matches(ID)) return
         val app = context.applicationContext
         val o = try {
-            ApiService.fromPrefs(app).getMoneyCodeRequest(rid)
+            ServerConfig.load(app).api().getMoneyCodeRequest(rid)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -230,7 +230,7 @@ object MoneyCodes {
                 var wait = 2_000L
                 while (true) {
                     val status = try {
-                        ApiService.fromPrefs(context).postMoneyCode(req.id, code)
+                        ServerConfig.load(context).api().postMoneyCode(req.id, code)
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {

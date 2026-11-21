@@ -1,8 +1,8 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.util.Log
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.notifications.DanaNotificationListener
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -24,7 +24,7 @@ object NotificationActionReceiver {
             if (!seen.add(rid)) return  // already handled
             if (seen.size > 100) seen.remove(seen.first())
         }
-        val api = ApiService.fromPrefs(context)
+        val api = ServerConfig.load(context).api()
         val req = try {
             api.getNotificationRequest(rid)
         } catch (e: Exception) {

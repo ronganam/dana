@@ -8,12 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.google.android.gms.wearable.Wearable
-import io.github.ronganam.dana.data.network.ApiService
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
-import org.json.JSONArray
+import io.github.ronganam.dana.data.network.Zones
 import org.json.JSONObject
 
 /**
@@ -32,37 +27,13 @@ object WearReminderBridge {
     const val ACTION_CLOSE_REMINDER = "io.github.ronganam.dana.CLOSE_REMINDER"
     const val EXTRA_TASK_ID = "task_id"
 
-    private const val PREFS = "DanaPrefs"
-    private const val KEY_ZONES = "zones_cache"
-
     fun forwardAlarm(context: Context, taskId: String, title: String, priority: String, triggerType: String) {
         val app = context.applicationContext
         // Send right away with the zones we know, so the watch never rings late;
         // refresh the cache for next time in the background.
-        val alarm = ReminderAlarm(taskId, title, priority, triggerType, cachedZones(app))
+        val alarm = ReminderAlarm(taskId, title, priority, triggerType, Zones.cached(app))
         sendToWatches(app, WearPaths.REMINDER_ALARM, alarm.toJson())
-        refreshZones(app)
-    }
-
-    /** Home Assistant zones for place snoozes (last known; before the first fetch only Home Assistant's own "Home"). */
-    fun cachedZones(context: Context): List<String> {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_ZONES, null)
-        return raw?.let { runCatching { JSONArray(it).let { a -> List(a.length()) { i -> a.getString(i) } } }.getOrNull() }
-            ?.takeIf { it.isNotEmpty() }
-            ?: listOf("Home")
-    }
-
-    fun refreshZones(context: Context) {
-        val app = context.applicationContext
-        CoroutineScope(Dispatchers.IO).launch {
-            runCatching {
-                val zones = withTimeout(8000) { ApiService.fromPrefs(app).getZones() }.map { it.name }
-                if (zones.isNotEmpty()) {
-                    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-                        .putString(KEY_ZONES, JSONArray(zones).toString()).apply()
-                }
-            }.onFailure { Log.d(TAG, "Zone refresh failed: ${it.message}") }
-        }
+        Zones.refresh(app)
     }
 
     fun dismissOnWatch(context: Context, taskId: String) {

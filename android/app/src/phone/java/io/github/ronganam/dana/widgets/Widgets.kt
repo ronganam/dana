@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.widgets
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -44,7 +45,6 @@ import io.github.ronganam.dana.AskDanaActivity
 import io.github.ronganam.dana.EXTRA_OPEN_PERSON_ID
 import io.github.ronganam.dana.EXTRA_OPEN_SCREEN
 import io.github.ronganam.dana.MainActivity
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.sync.TaskActionQueue
 import org.json.JSONArray
 import org.json.JSONObject
@@ -216,7 +216,7 @@ class SuggestionAction : ActionCallback {
         Snapshot.removeFrom(context, "suggestions", id, countKey = "suggestion_count")
         WaitingWidget().updateAll(context)
         runCatching {
-            val api = ApiService.fromPrefs(context)
+            val api = ServerConfig.load(context).api()
             if (accept) api.acceptSuggestion(id) else api.dismissSuggestion(id)
         }.onFailure { Log.w("Widgets", "Suggestion action failed", it) }
         WidgetRefreshWorker.refreshNow(context)
@@ -289,7 +289,7 @@ class InboxWidget : GlanceAppWidget() {
 private object Snapshot {
     @Synchronized
     fun removeFrom(context: Context, key: String, id: String, countKey: String? = null) {
-        val prefs = context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
+        val prefs = ServerConfig.prefs(context)
         val o = runCatching { JSONObject(prefs.getString("widget_snapshot", "{}") ?: "{}") }.getOrDefault(JSONObject())
         val arr = o.optJSONArray(key) ?: JSONArray()
         val kept = JSONArray()

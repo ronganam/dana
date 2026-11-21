@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -28,7 +29,6 @@ const val EXTRA_OPEN_SCREEN = "io.github.ronganam.dana.OPEN_SCREEN"
  */
 object DanaCards {
     private const val TAG = "DanaCards"
-    private const val PREFS = "DanaPrefs"
     const val KEY_BRIEFING = "briefing_cache"
 
     private const val CH_BRIEFING = "dana_briefing"
@@ -58,7 +58,7 @@ object DanaCards {
     // --- Briefing ---
 
     fun cachedBriefing(context: Context): Briefing? {
-        val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_BRIEFING, null) ?: return null
+        val raw = ServerConfig.prefs(context).getString(KEY_BRIEFING, null) ?: return null
         return runCatching { Briefing.from(JSONObject(raw)) }.getOrNull()
     }
 
@@ -69,7 +69,7 @@ object DanaCards {
 
     /** Store without asking the widgets to refresh (used by the widget refresh itself). */
     fun storeBriefingQuietly(context: Context, b: Briefing) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY_BRIEFING, b.toJson().toString()).apply()
+        ServerConfig.prefs(context).edit().putString(KEY_BRIEFING, b.toJson().toString()).apply()
     }
 
     fun showBriefing(context: Context, d: JSONObject) {

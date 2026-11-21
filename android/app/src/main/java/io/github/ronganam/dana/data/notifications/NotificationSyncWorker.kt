@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.notifications
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.util.Log
 import androidx.work.BackoffPolicy
@@ -13,7 +14,6 @@ import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.network.NotificationJson
 import kotlinx.coroutines.CancellationException
 import org.json.JSONArray
@@ -34,7 +34,7 @@ class NotificationSyncWorker(appContext: Context, params: WorkerParameters) : Co
         // Also a safety net for direct push: anything a lost ping didn't bring.
         io.github.ronganam.dana.push.PushSetup.ensureRegistered(ctx)
         io.github.ronganam.dana.push.PhoneEvents.catchUp(ctx)
-        val api = ApiService.fromPrefs(ctx)
+        val api = ServerConfig.load(ctx).api()
         // Bank / card app notifications for the money kind: their own queue and endpoint.
         val moneyDone = io.github.ronganam.dana.data.money.MoneySignals.drain(ctx, api)
         return try {

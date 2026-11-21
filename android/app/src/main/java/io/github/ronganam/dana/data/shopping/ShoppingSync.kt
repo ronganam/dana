@@ -1,8 +1,8 @@
 package io.github.ronganam.dana.data.shopping
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import io.github.ronganam.dana.DanaWidgets
-import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.network.Me
 import io.github.ronganam.dana.data.sync.PendingSyncWorker
 import kotlinx.coroutines.CoroutineScope
@@ -13,7 +13,7 @@ import kotlinx.coroutines.launch
 /**
  * The one [ShoppingStore] of this process (files under `filesDir`), shared by
  * the Shopping screen, the home-screen widget, pushes and the watch bridge.
- * Requests go through `ApiService.fromPrefs`, so a changed server or token
+ * Requests go through `ServerConfig.load(…).api()`, so a changed server or token
  * applies to the next request.
  */
 object ShoppingSync {
@@ -27,7 +27,7 @@ object ShoppingSync {
             val app = context.applicationContext
             return ShoppingStore(
                 dir = app.filesDir,
-                transport = { method, path, body -> ApiService.fromPrefs(app).jsonCall(method, path, body) },
+                transport = { method, path, body -> ServerConfig.load(app).api().jsonCall(method, path, body) },
                 me = { Me.cached(app)?.let { Who(it.id, it.name) } },
                 scheduleRetry = { PendingSyncWorker.schedule(app) },
                 onChanged = { DanaWidgets.shoppingChanged(app) }
@@ -36,6 +36,16 @@ object ShoppingSync {
                 scope.launch { it.load() }
             }
         }
+    }
+
+    /** The server's usual items matching [query] on [listId], or null when it can't answer. */
+    suspend fun suggestions(context: Context, query: String, listId: String): List<Usual>? {
+        fun enc(v: String) = java.net.URLEncoder.encode(v, "UTF-8").replace("+", "%20")
+        val path = "/api/shopping/suggestions?q=${enc(query)}&list=${enc(listId)}"
+        return runCatching {
+            val (code, body) = ServerConfig.load(context).api().jsonCall("GET", path, null)
+            if (code in 200..299) ShoppingJson.usuals(org.json.JSONObject(body)) else null
+        }.getOrNull()
     }
 
     /** Make a change; when it had to wait, try the queue again in the background. */

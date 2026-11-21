@@ -22,8 +22,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import io.github.ronganam.dana.data.network.ApiService
-import io.github.ronganam.dana.data.shopping.ShoppingJson
 import io.github.ronganam.dana.data.shopping.ShoppingOp
 import io.github.ronganam.dana.data.shopping.ShoppingOps
 import io.github.ronganam.dana.data.shopping.ShoppingStore
@@ -44,8 +42,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.URLEncoder
 
 /**
  * The Shopping widget's `+`: a small sheet over the home screen with the
@@ -90,11 +86,7 @@ private fun QuickAddSheet(onClose: () -> Unit) {
         if (q.isEmpty() || listId.isEmpty()) { suggestions = emptyList(); return@LaunchedEffect }
         delay(180)
         suggestions = withContext(Dispatchers.IO) {
-            val path = "/api/shopping/suggestions?q=${enc(q)}&list=${enc(listId)}"
-            runCatching {
-                val (code, body) = ApiService.fromPrefs(context).jsonCall("GET", path, null)
-                if (code in 200..299) ShoppingJson.usuals(JSONObject(body)) else null
-            }.getOrNull() ?: run {
+            ShoppingSync.suggestions(context, q, listId) ?: run {
                 val key = ShoppingText.nameKey(q)
                 screen?.usuals.orEmpty().filter { ShoppingText.nameKey(it.name).contains(key) }
             }
@@ -199,4 +191,3 @@ private fun QuickAddSheet(onClose: () -> Unit) {
     }
 }
 
-private fun enc(s: String) = URLEncoder.encode(s, "UTF-8").replace("+", "%20")

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -41,10 +42,10 @@ import kotlinx.coroutines.withContext
 @Composable
 fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
-    val prefs = context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
+    val prefs = ServerConfig.prefs(context)
 
-    var serverUrl by remember { mutableStateOf(prefs.getString("server_url", "https://") ?: "") }
-    var apiToken by remember { mutableStateOf(prefs.getString("api_token", "") ?: "") }
+    var serverUrl by remember { mutableStateOf(viewModel.serverConfig.url.ifEmpty { "https://" }) }
+    var apiToken by remember { mutableStateOf(viewModel.serverConfig.token) }
     var liveTranscription by remember { mutableStateOf(prefs.getBoolean(DeviceSpeech.PREF_KEY, true)) }
 
     val appUpdateInfo by viewModel.appUpdateInfo.collectAsState()
@@ -118,11 +119,8 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                     )
                     Button(
                         onClick = {
-                            prefs.edit()
-                                .putString("server_url", serverUrl)
-                                .putString("api_token", apiToken)
-                                .apply()
                             viewModel.updateServerConfig(serverUrl, apiToken)
+                            serverUrl = viewModel.serverConfig.url
                             Toast.makeText(context, "Settings Saved", Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
@@ -232,7 +230,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                             } else {
                                 Button(
                                     onClick = {
-                                        val savedServerUrl = prefs.getString("server_url", serverUrl) ?: serverUrl
+                                        val savedServerUrl = viewModel.serverConfig.url
                                         scope.launch {
                                             downloadProgress = 0
                                             val file = UpdateManager.downloadUpdate(

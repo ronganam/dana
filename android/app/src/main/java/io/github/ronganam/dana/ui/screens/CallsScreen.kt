@@ -55,10 +55,8 @@ fun CallsScreen(viewModel: MainViewModel) {
     var deleteTargetId by rememberSaveable { mutableStateOf<String?>(null) }
     var showUploadOptions by rememberSaveable { mutableStateOf(false) }
 
-    val prefs = remember { context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE) }
-    val serverUrl = remember { prefs.getString("server_url", "") ?: "" }
-    val apiToken = remember { prefs.getString("api_token", "") ?: "" }
-    val audioPlayer = remember(serverUrl, apiToken) { CallAudioPlayer(context, serverUrl, apiToken) }
+    val server = viewModel.serverConfig
+    val audioPlayer = remember(server) { CallAudioPlayer(context, server.url, server.token) }
     DisposableEffect(audioPlayer) { onDispose { audioPlayer.stop() } }
 
     LaunchedEffect(Unit) { viewModel.fetchCalls() }

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.components
 
+import io.github.ronganam.dana.data.network.Zones
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,8 +47,6 @@ import java.util.Locale
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import androidx.compose.ui.platform.LocalContext
-import io.github.ronganam.dana.data.network.ApiService
-import io.github.ronganam.dana.data.wear.WearReminderBridge
 
 // ---------------------------------------------------------------------------
 // Formatting helpers
@@ -562,11 +561,8 @@ fun SuggestionEditSheet(
     var wakeOn by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.triggers.optBoolean("wake")) }
     val context = LocalContext.current
     // Zones (Home, Work, …) come from Home Assistant; fall back to the last cached list.
-    var zones by remember { mutableStateOf(WearReminderBridge.cachedZones(context)) }
-    LaunchedEffect(Unit) {
-        runCatching { ApiService.fromPrefs(context.applicationContext).getZones().map { it.name } }
-            .getOrNull()?.takeIf { it.isNotEmpty() }?.let { zones = it }
-    }
+    var zones by remember { mutableStateOf(Zones.cached(context)) }
+    LaunchedEffect(Unit) { zones = Zones.fetch(context.applicationContext) }
     // Events: shown as "YYYY-MM-DD HH:MM", sent back as "YYYY-MM-DDTHH:MM:00".
     val toField = { iso: String? -> iso?.replace('T', ' ')?.take(16).orEmpty() }
     var start by rememberSaveable(suggestion.id) { mutableStateOf(toField(suggestion.start)) }

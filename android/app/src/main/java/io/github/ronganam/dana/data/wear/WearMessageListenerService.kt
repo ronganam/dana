@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.wear
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import io.github.ronganam.dana.protocol.ReminderHandled
 import io.github.ronganam.dana.protocol.SnoozeRequest
 import io.github.ronganam.dana.protocol.TaskActionReply
@@ -92,22 +93,7 @@ class WearMessageListenerService : WearableListenerService() {
     @Volatile private var activeWebSocket: WebSocket? = null
     private var activeNodeId: String? = null
 
-    private fun getApiService(): ApiService {
-        val prefs = getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
-        val serverUrl = prefs.getString("server_url", "https://") ?: "https://"
-        val apiToken = prefs.getString("api_token", "") ?: ""
-        return ApiService(serverUrl, apiToken)
-    }
-
-    private fun getServerUrl(): String {
-        val prefs = getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
-        return prefs.getString("server_url", "https://") ?: "https://"
-    }
-
-    private fun getApiToken(): String {
-        val prefs = getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE)
-        return prefs.getString("api_token", "") ?: ""
-    }
+    private fun getApiService(): ApiService = ServerConfig.load(this).api()
 
     /**
      * Folds a run's event stream into the compact JSON reply the watch shows.
@@ -270,7 +256,7 @@ class WearMessageListenerService : WearableListenerService() {
 
     /** The chat model picked on the phone, so watch requests use it too. */
     private fun chatModel(): String? =
-        getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE).getString("chat_model", null)?.ifEmpty { null }
+        ServerConfig.prefs(this).getString("chat_model", null)?.ifEmpty { null }
 
     /**
      * Guarantee the reply fits the data-layer envelope. Tool history is the most
@@ -456,10 +442,10 @@ class WearMessageListenerService : WearableListenerService() {
         activeWebSocket?.close(1000, "Superseded by a new voice turn")
         activeWebSocket = null
         activeNodeId = nodeId
-        val serverUrl = getServerUrl()
+        val config = ServerConfig.load(this)
         val model = chatModel()?.let { "&model=" + java.net.URLEncoder.encode(it, "UTF-8") }.orEmpty()
-        val wsUrl = serverUrl.replaceFirst("http", "ws") + "/api/assistant/voice_stream?session_id=$THREAD&device=$DEVICE$model"
-        val request = Request.Builder().url(wsUrl).bearerAuth(getApiToken()).build()
+        val wsUrl = config.url.replaceFirst("http", "ws") + "/api/assistant/voice_stream?session_id=$THREAD&device=$DEVICE$model"
+        val request = Request.Builder().url(wsUrl).bearerAuth(config.token).build()
 
         val client = io.github.ronganam.dana.data.network.HttpClients.wearProxyWebSocket
 

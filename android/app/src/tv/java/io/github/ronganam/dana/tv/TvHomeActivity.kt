@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.tv
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -171,7 +172,7 @@ class TvHomeActivity : ComponentActivity() {
         val server = intent.getStringExtra("server")
         val token = intent.getStringExtra("token")
         if (server != null || token != null) {
-            WakePrefs.saveServer(this, server ?: WakePrefs.serverUrl(this), token ?: WakePrefs.apiToken(this))
+            ServerConfig.load(this).let { ServerConfig.save(this, server ?: it.url, token ?: it.token) }
             Log.i(TAG, "Server config set from intent")
         }
         if (intent.getBooleanExtra("settings", false)) screen = Screen.SETTINGS

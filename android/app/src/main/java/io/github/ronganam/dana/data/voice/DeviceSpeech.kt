@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.voice
 
+import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -154,7 +155,7 @@ class DeviceSpeech(
         /** The kiosk and TV always stream to the server: Gemini handles Hebrew + English far-field speech. */
         fun isEnabled(context: Context): Boolean =
             !io.github.ronganam.dana.BuildConfig.KIOSK && !io.github.ronganam.dana.BuildConfig.TV &&
-                context.getSharedPreferences("DanaPrefs", Context.MODE_PRIVATE).getBoolean(PREF_KEY, true)
+                ServerConfig.prefs(context).getBoolean(PREF_KEY, true)
 
         fun isAvailable(context: Context): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
 
