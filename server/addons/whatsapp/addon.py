@@ -4,8 +4,8 @@ from core.addons import ADDRESS, NAME, TELEGRAM_CHAT, Field, Addon, PromptPart, 
 from addons.whatsapp import accounts, client
 from addons.whatsapp.config import ADDON, VOICE_CHAT
 
-# No owner-specific defaults here: the first admin's address, key and session
-# are imported by addons/bootstrap.py. The account (the session's own
+# No owner-specific defaults here: the address, key and session are set on the
+# Addons page or with bin/users.py. The account (the session's own
 # WhatsApp id, routing inbound events) is learned from WAHA (accounts.py).
 addon = Addon(
     ADDON, order=90, modules=('latest',), llm_jobs={"whatsapp_match": LlmJob("fast", "WhatsApp name matching")},

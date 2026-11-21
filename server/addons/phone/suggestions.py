@@ -81,6 +81,7 @@ def suggestion_to_api(user: Optional[User], row) -> Dict[str, Any]:
     return out
 
 
+# scoped: every use appends visible_sql (s.user_id = ?)
 _SUGGESTION_SELECT = """
     SELECT s.*, c.title AS call_title, c.caller AS call_caller, c.receiver AS call_receiver, c.summary AS call_summary,
            c.call_timestamp AS call_timestamp, c.labels AS call_labels,

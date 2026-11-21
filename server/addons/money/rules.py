@@ -59,6 +59,7 @@ def set_category(user: User, txn_id: str, category: str, for_merchant: bool = Tr
                 "AND id != ? AND COALESCE(category_source, '') != 'user'", (user.id, key, txn_id)).fetchall()
             before += [(r["id"], r["category"], r["category_source"]) for r in others]
             if old_rule:
+                # scoped: the user's rule (query above)
                 conn.execute("UPDATE money_rules SET category = ? WHERE id = ?", (category, old_rule["id"]))
             else:
                 conn.execute("INSERT INTO money_rules (id, user_id, merchant_key, category, created_at) "
@@ -143,6 +144,7 @@ def set_flow(user: User, txn_id: str, flow: str) -> Dict[str, Any]:
         raise ValueError(f"unknown flow {flow!r}")
     with store.db() as conn:
         txn = _txn(conn, user, txn_id)
+        # scoped: _txn(conn, user, txn_id) checked above
         before = conn.execute("SELECT flow FROM money_transactions WHERE id = ?", (txn_id,)).fetchone()["flow"]
         source = txn["category_source"] if txn["category_source"] in ("user", "rule") else "user"
         conn.execute("UPDATE money_transactions SET flow = ?, category_source = ?, updated_at = ? "

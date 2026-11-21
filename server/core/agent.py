@@ -396,6 +396,8 @@ class AgentOrchestrator:
                 return built.choices[0].message
             except asyncio.CancelledError:
                 raise
+            except litellm.AuthenticationError:
+                raise  # no key, or a refused one: retrying cannot help
             except Exception as e:
                 if attempt >= LLM_STREAM_ATTEMPTS:
                     raise
@@ -528,6 +530,13 @@ class AgentOrchestrator:
                     response_message = await self._stream_completion(messages, profile, iteration)
                 except asyncio.CancelledError:
                     raise
+                except litellm.AuthenticationError as e:
+                    logger.error(f"LLM authentication failed for {profile.model}: {e}")
+                    self.last_error = str(e)
+                    error_msg = llm.missing_key_message(profile.model)
+                    new_entries.append({"role": "assistant", "content": error_msg})
+                    emit({"type": "error", "message": error_msg})
+                    return error_msg, new_entries
                 except Exception as e:
                     logger.error(f"LiteLLM call failed: {e}", exc_info=True)
                     self.last_error = traceback.format_exc()

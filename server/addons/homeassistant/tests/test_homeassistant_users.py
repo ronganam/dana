@@ -4,7 +4,7 @@ Run: bin/test test_homeassistant_users
 Two in-process fake Home Assistants (aiohttp: REST states / services /
 history / config / camera, and the WebSocket auth, entity registry and
 ``subscribe_entities`` messages), each with its own token and entities. The
-first admin's addon comes from the env import (the car entities set
+first admin's addon is connected by the operator (the car entities set
 after it) and is then pointed at instance A; Bob has instance B; Carl has no
 Home Assistant. Checked: tools, proxies, zones, the home map, the clock's
 zone, weather and wake reads hit only the user's own instance with their own
@@ -15,8 +15,8 @@ old webhook produced them), ignores ``not_home`` / ``unknown`` /
 fires a missed transition once after a reconnect (a duplicate does not
 refire), re-subscribes on a settings change, stops on disconnect, keeps going
 for one user while the other's Home Assistant is down; the self-check items;
-``/webhook`` is gone while ``/webhook/waha`` still accepts an internal host;
-nothing outside the env import reads the old env names. Phone push / Telegram
+``/webhook`` is gone while ``/webhook/waha`` takes only signed events (an
+internal Host header proves nothing); nothing reads the old env names. Phone push / Telegram
 are mocked; no network beyond localhost.
 """
 
@@ -33,16 +33,12 @@ from unittest.mock import AsyncMock, patch
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("homeassistant_users_test")
 os.environ["API_TOKEN"] = "ha-users-test-env-token"  # a test value: with it set, DB tokens are honoured
-os.environ["INTERNAL_HOSTS"] = "ganam-assistant.ganam-assistant"
+os.environ["WAHA_WEBHOOK_SECRET"] = "ha-users-test-waha-secret"  # a test value: WAHA's HMAC key
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
 # The first admin's env values, as production has them (fake).
-os.environ["HOMEASSISTANT_TOKEN"] = "env-token"
-os.environ["HOMEASSISTANT_HOST"] = "http://env-ha.invalid"
+os.environ["HOMEASSISTANT_TOKEN"] = "env-token"  # the old env import's names: read by nothing now
 os.environ["PRIMARY_PERSON"] = "person.robin"
-os.environ["PHONE_INTERACTIVE_SENSOR"] = "binary_sensor.pixel_8_interactive"
-os.environ["PHONE_BATTERY_SENSOR"] = "sensor.pixel_8_battery_level"
-os.environ["PHONE_NOTIFY_SERVICE"] = "mobile_app_pixel_8"
 
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
@@ -54,6 +50,10 @@ db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
+testenv.connect_admin("homeassistant", credentials={"host": "http://admin-ha.invalid", "token": "admin-token"},
+                      settings={"person": "person.robin", "phone_interactive_sensor": "binary_sensor.pixel_8_interactive",
+                                "phone_battery_sensor": "sensor.pixel_8_battery_level",
+                                "phone_notify_service": "mobile_app_pixel_8"})
 ensure_default_groups_for_everyone()
 
 from addons.cameras import api as cameras_api  # noqa: E402
@@ -126,13 +126,13 @@ async def tool(user, name: str, **args) -> Any:
         return await registry.execute(user, name, args)
 
 
-# --- 1. The env import and the old env names ---------------------------------------------------
+# --- 1. No env import: the old env names -------------------------------------------------------
 
 def test_import() -> None:
     ha = store.require(ADMIN, "homeassistant")
-    check("import: host / token from env", dict(ha.credentials) == {"host": "http://env-ha.invalid", "token": "env-token"},
-          dict(ha.credentials))
-    check("import: person and phone entities from env, no car entities (no env names)",
+    check("connection: the operator's host / token (env values ignored)",
+          dict(ha.credentials) == {"host": "http://admin-ha.invalid", "token": "admin-token"}, dict(ha.credentials))
+    check("connection: person and phone entities as connected, no car entities, the default weather entity",
           ha.settings["person"] == "person.robin"
           and ha.settings["car_sensor"] is None
           and ha.settings["car_device"] is None
@@ -145,11 +145,9 @@ def test_import() -> None:
     root = testenv.SERVER
     readers = []
     for path in list((root / "core").rglob("*.py")) + [p for p in (root / "addons").rglob("*.py") if "tests" not in p.parts] + [root / "main.py"]:
-        if path.name == "bootstrap.py" and path.parent.name == "addons":
-            continue
         text = path.read_text(encoding="utf-8")
         readers += [f"{path.relative_to(root)}: {n}" for n in old_names if re.search(rf'["\']{n}["\']', text)]
-    check("old env names: read only by the env import", not readers, readers)
+    check("old env names: read by nothing", not readers, readers)
     check("no owner-specific defaults in the addon (entity settings default to nothing)",
           all(f.default is None for f in store.get_addon("homeassistant").settings if f.name != "weather_entity"))
     routes = "".join(p.read_text(encoding="utf-8") for p in
@@ -326,16 +324,22 @@ async def test_http() -> None:
                               json={"domain": "light", "service": "turn_on", "entity_id": "light.b_den"})
         check("no addon: POST /api/ha/service → 403, nothing called", r.status == 403 and not HA_B.service_calls[1:])
 
-        # The old Home Assistant webhook is gone; WAHA's stays open to internal hosts.
-        internal = {"Host": "ganam-assistant.ganam-assistant"}
+        # The old Home Assistant webhook is gone; WAHA's takes signed events only.
+        internal = {"Host": "dana.dana"}
         r = await client.post("/webhook", headers=internal, json={"event": "zone_entered", "zone": "work"})
         check("/webhook from an internal host → 401 (not inbound any more)", r.status == 401)
         r = await client.post("/webhook", headers=ADMIN_AUTH, json={"event": "zone_entered", "zone": "work"})
         check("/webhook with a token → 404 (no such route)", r.status == 404)
+        event = json.dumps({"event": "message"}).encode()
+        signed = {"X-Webhook-Hmac": whatsapp_api.signature("ha-users-test-waha-secret", event),
+                  "X-Webhook-Hmac-Algorithm": "sha512", "Content-Type": "application/json"}
         with patch.object(whatsapp_api.whatsapp_events, "handle_webhook", AsyncMock()) as waha:
-            r = await client.post("/webhook/waha", headers=internal, json={"event": "message"})
+            r = await client.post("/webhook/waha", headers=internal, data=event)
+            check("/webhook/waha from an internal host, unsigned → 403, not handled",
+                  r.status == 403 and waha.await_count == 0, r.status)
+            r = await client.post("/webhook/waha", headers=signed, data=event)
             await asyncio.sleep(0.05)
-        check("/webhook/waha from an internal host still accepted", r.status == 200 and waha.await_count == 1)
+        check("/webhook/waha signed with the secret → accepted", r.status == 200 and waha.await_count == 1)
 
 
 # --- 5. The watcher ----------------------------------------------------------------------------

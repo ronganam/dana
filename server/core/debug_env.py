@@ -11,9 +11,6 @@ For an admin, a value is shown as ``******`` when any of these holds:
 - its name contains ``key``, ``token``, ``password``, ``secret``, ``auth``,
   ``credential``, ``private``, ``cookie``, ``passwd``, ``session`` or
   ``service_account``, or ends in ``_json``;
-- its name is one the one-time addon import stores as a credential
-  (:data:`addons.bootstrap.CREDENTIAL_ENV`: the Home Assistant host,
-  the WAHA URL and session, …);
 - its value holds a PEM block (``-----BEGIN``), parses as JSON with a
   secret-looking key (``private_key``, ``client_secret``, ``token``, …) at any
   depth, or is a URL carrying a user name / password.
@@ -25,7 +22,6 @@ import re
 from typing import Any, Dict
 
 from core.users import User
-from addons.bootstrap import CREDENTIAL_ENV
 
 MASK = "******"
 _NAME_MARKERS = ("key", "token", "password", "passwd", "secret", "auth", "credential", "private", "cookie",
@@ -44,7 +40,7 @@ def _secret_json(value: Any) -> bool:
 def masked(name: str, value: str) -> bool:
     """Whether the admin's export hides this env value."""
     lower = name.lower()
-    if any(m in lower for m in _NAME_MARKERS) or lower.endswith("_json") or name in CREDENTIAL_ENV:
+    if any(m in lower for m in _NAME_MARKERS) or lower.endswith("_json"):
         return True
     if "-----BEGIN" in value or _URL_WITH_USERINFO.search(value):
         return True

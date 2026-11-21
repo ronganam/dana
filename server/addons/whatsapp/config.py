@@ -1,7 +1,7 @@
 """WhatsApp configuration of one user, read from their connection: the addon's
 name, WAHA's default session name, the voice-transcript chat setting.
-Nothing here reads env: the first admin's values are imported once by
-``addons/bootstrap.py``."""
+Nothing here reads env: the values are set on the Addons page or with
+bin/users.py."""
 
 import logging
 from typing import Optional

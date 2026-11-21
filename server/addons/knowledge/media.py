@@ -176,6 +176,7 @@ async def download_and_process_media(url: str, restricted: bool) -> dict:
 def apply_media_result(entry_id: str, result: Dict[str, Any]) -> None:
     """Store the output of the media/download pipeline on an entry."""
     with get_db_connection() as conn:
+        # scoped: the media pipeline's own entry, processed as its owner (process_knowledge_media)
         row = conn.execute("SELECT title, tags FROM entries WHERE id = ?", (entry_id,)).fetchone()
         if row is None:
             return
@@ -186,6 +187,7 @@ def apply_media_result(entry_id: str, result: Dict[str, Any]) -> None:
         merged_tags = list(dict.fromkeys(merged_tags))  # de-dupe, preserve order
 
         conn.execute(
+            # scoped: the media pipeline's own entry, processed as its owner (process_knowledge_media)
             """
             UPDATE entries
             SET media_path = ?, transcript = ?, summary = ?, tags = ?, comments = ?,
@@ -204,6 +206,7 @@ def apply_media_result(entry_id: str, result: Dict[str, Any]) -> None:
         )
         # Only adopt the real media title when the entry has none yet.
         if clean_str(row["title"]) == "" and result.get("title"):
+            # scoped: the media pipeline's own entry, processed as its owner (process_knowledge_media)
             conn.execute("UPDATE entries SET title = ? WHERE id = ?", (result["title"], entry_id))
         conn.commit()
 
@@ -218,6 +221,7 @@ def _link_of_entry(entry_id: str) -> Optional[Tuple[Optional[str], Optional[User
     """``(url, who last set it)`` of an entry (None: no such entry; the user
     None: unknown, e.g. removed since)."""
     with get_db_connection() as conn:
+        # scoped: the pipeline reads its entry's link before acting as the entry's owner
         row = conn.execute("SELECT url, url_set_by FROM entries WHERE id = ?", (entry_id,)).fetchone()
     if row is None:
         return None
@@ -272,6 +276,7 @@ def file_for(visible_where: str, args: list, name: str) -> Optional[Path]:
     if not name or name != os.path.basename(name) or name.startswith("."):
         return None
     with get_db_connection() as conn:
+        # scoped: visible_where is the caller's entries.visible_sql clause
         row = conn.execute(f"SELECT 1 FROM entries WHERE media_path = ? AND {visible_where} LIMIT 1",
                            (URL_PREFIX + name, *args)).fetchone()
     if row is None:

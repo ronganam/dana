@@ -1,7 +1,6 @@
 """Google Calendar configuration of one user: the addon's name and its setting
 names (docs/access.md, "Addons"). The refresh token is the connection's
-credential; nothing here reads env (the first admin's values are imported
-once by ``addons/bootstrap.py``)."""
+credential; nothing here reads env (the Google sign-in sets them)."""
 
 ADDON = "calendar"
 

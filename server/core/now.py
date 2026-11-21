@@ -1105,11 +1105,13 @@ async def _act_approval(user, ref, action, args, now):
 
 def _restore_suggestion(sid: str, payload: Dict[str, Any], expect: str) -> None:
     with get_db_connection() as conn:
+        # scoped: undo of the user's own accept / dismiss; sid came from get_suggestion(user)
         row = conn.execute("SELECT status FROM call_suggestions WHERE id = ?", (sid,)).fetchone()
         if not row:
             raise RuntimeError("The suggestion no longer exists.")
         if row["status"] != expect:
             raise RuntimeError("The suggestion changed since, so it was left as it is.")
+        # scoped: undo of the user's own accept / dismiss; sid came from get_suggestion(user)
         conn.execute("UPDATE call_suggestions SET status = 'pending', result_ref = NULL, resolved_at = NULL, "
                      "payload = ? WHERE id = ?", (json.dumps(payload, ensure_ascii=False), sid))
         conn.commit()

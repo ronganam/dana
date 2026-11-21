@@ -2729,7 +2729,7 @@
     "type": "function",
     "function": {
       "name": "run_python",
-      "description": "Execute Python code in a sandboxed subprocess and return its output. Use this for calculations, data processing, JSON manipulation, text parsing, format conversion, or file generation. Only use when no other specialized tool fits the task — prefer using dedicated tools for Home Assistant (call_ha_service), WhatsApp (send_whatsapp_message), Calendar (search_calendar), etc. instead of reimplementing their logic in Python. IMPORTANT: The provided code MUST use print() to produce any output that should be visible — only printed text is captured and returned. Do not use input() or interactive functions.",
+      "description": "Run Python code on the server (asks the user first) and return its output. Use this for calculations, data processing, JSON manipulation, text parsing, format conversion, or file generation. Only use when no other specialized tool fits the task — prefer using dedicated tools for Home Assistant (call_ha_service), WhatsApp (send_whatsapp_message), Calendar (search_calendar), etc. instead of reimplementing their logic in Python. IMPORTANT: The provided code MUST use print() to produce any output that should be visible — only printed text is captured and returned. Do not use input() or interactive functions.",
       "parameters": {
         "type": "object",
         "properties": {

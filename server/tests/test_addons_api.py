@@ -28,8 +28,6 @@ testenv.isolate("addons_api_test")
 os.environ["API_TOKEN"] = "addons-api-env-token"  # a test value: with it set, DB tokens are honoured
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
-os.environ["HOMEASSISTANT_HOST"] = "http://127.0.0.1:9"  # the first admin's HA from the env import (fake; replaced below)
-os.environ["HOMEASSISTANT_TOKEN"] = "env-ha-token"
 os.environ["HA_WATCH_RECONCILE_SECONDS"] = "3600"  # the periodic tick never comes during the test
 os.environ["GOOGLE_CLIENT_ID"] = "test-client"
 os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
@@ -43,6 +41,7 @@ db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
+testenv.connect_admin("homeassistant", credentials={"host": "http://127.0.0.1:9", "token": "admin-ha-token"})  # replaced below
 
 from addons.tasks import api as tasks_api  # noqa: E402
 from core import agent, addons_api  # noqa: E402
@@ -196,7 +195,7 @@ async def test_me_and_list(client: TestClient) -> None:
     status, me = await call(client, "GET", "/api/me", ADMIN_AUTH)
     check("me: the first admin", status == 200 and me["id"] == ADMIN.id and me["access"] == "admin"
           and me["capabilities"] == ["ops", "manage_users", "see_everyone", "manage_server"]
-          and me["kinds"][0] == "essentials" and "homeassistant" in me["kinds"] and "ops" in me["kinds"], me)
+          and me["kinds"][0] == "essentials" and "homeassistant" in me["kinds"] and "ops" not in me["kinds"], me)
     status, me = await call(client, "GET", "/api/me", BOB_AUTH)
     check("me: a member with nothing connected", status == 200 and me == {
         "id": BOB.id, "name": "Bob Builder", "access": "member", "capabilities": [], "kinds": ["essentials"]}, me)

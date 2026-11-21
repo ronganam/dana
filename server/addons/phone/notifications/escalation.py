@@ -121,9 +121,11 @@ async def renudge_due(user: User, now: Optional[datetime.datetime] = None) -> in
         with get_db_connection() as conn:
             target = _unseen_latest(conn, user, n)
             if target is None:
+                # scoped: ids from the user's notifications (query above)
                 conn.execute("UPDATE notifications SET nudges = ? WHERE id = ?", (len(RENUDGE_MINUTES), n["id"]))
                 conn.commit()
                 continue
+            # scoped: ids from the user's notifications (query above)
             conn.execute("UPDATE notifications SET nudges = ? WHERE id = ?", (done + 1, n["id"]))
             conn.commit()
         target = {**target, "id": n["id"] if target["id"] == n["id"] else target["id"],

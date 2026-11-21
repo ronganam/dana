@@ -9,20 +9,19 @@ Trust model
   HttpOnly cookie holding an HMAC of the token (never the token itself) is
   set. The cookie format is unchanged, so logins made with ``API_TOKEN``
   before users existed stay valid.
-* **In-cluster callers** reach the pod through its ClusterIP Service, so their
-  ``Host`` header is the Service DNS name. Hosts listed in ``INTERNAL_HOSTS``
-  may call the inbound webhook paths (:data:`INBOUND_PATHS`) without
-  credentials; those handlers find their user from the payload, so auth sets
-  no user. Every other path needs credentials, from any host. Clients outside
-  the cluster can only get in through the gateway, which only routes the
-  public hostname, so they cannot present an internal ``Host``.
+* **Inbound webhooks** (:data:`INBOUND_PATHS`: WAHA) may be called without
+  credentials; their handler proves the sender itself (WAHA's HMAC signature
+  with ``WAHA_WEBHOOK_SECRET``: addons/whatsapp/api.py) and finds its user
+  from the payload, so auth sets no user. Every other path needs credentials.
 
 An authenticated request carries its :class:`core.users.User` in
 ``request["user"]`` (handlers read it with :func:`request_user`), and the
 handler runs with that user current (:func:`core.users.acting_as`), so undo
 entries, usage records and tools inside the request know whose they are. If
-``API_TOKEN`` is unset, authentication is disabled (local development): every
-request is the first admin user, and a warning is logged at startup.
+``API_TOKEN`` is unset, the server does not start (main.py) unless
+``DANA_INSECURE_DEV=1`` (local development: it then listens on 127.0.0.1 only
+and every request is the first admin user); without that flag the middleware
+refuses every request too (fail closed).
 
 Access (docs/access.md, "Enforcement"): endpoints about the whole server are
 wrapped in :func:`requires` (403 ``{"error": "forbidden", "needs": <capability>}``
@@ -69,26 +68,39 @@ _PUBLIC_PATHS = frozenset({
 })
 _PUBLIC_PREFIXES = ("/static/", "/api/app/download/")
 
-# Inbound webhooks that in-cluster callers (INTERNAL_HOSTS) may post to
-# without credentials (WAHA; Home Assistant posts nothing: Dana watches it).
+# Inbound webhooks reachable without credentials: the handler verifies the
+# sender's signature (WAHA; Home Assistant posts nothing: Dana watches it).
 INBOUND_PATHS = frozenset({"/webhook/waha"})
+
+INSECURE_DEV_ENV = "DANA_INSECURE_DEV"
 
 # Paths answered with 401 rather than a redirect to the login page.
 _API_PREFIXES = ("/api/", "/webhook", "/media/")
 
 
-def _internal_hosts() -> frozenset[str]:
-    raw = os.getenv("INTERNAL_HOSTS", "")
-    return frozenset(h.strip().lower() for h in raw.split(",") if h.strip())
+def insecure_dev() -> bool:
+    """``DANA_INSECURE_DEV=1``: no ``API_TOKEN`` is allowed (local development only)."""
+    return os.getenv(INSECURE_DEV_ENV, "").strip() == "1"
+
+
+def startup_problem() -> Optional[str]:
+    """Why the server must not start with this environment (None: it may):
+    no ``API_TOKEN`` without ``DANA_INSECURE_DEV=1``."""
+    if users.env_token() or insecure_dev():
+        return None
+    return ("API_TOKEN is not set, so anyone who reaches the server would be its admin. Set API_TOKEN "
+            "(e.g. `openssl rand -hex 32`) in server/.env, or for local development only set "
+            f"{INSECURE_DEV_ENV}=1 (the server then listens on 127.0.0.1 without authentication).")
+
+
+def bind_host() -> str:
+    """Where the web server listens: 127.0.0.1 without ``API_TOKEN`` (insecure
+    development), every interface otherwise."""
+    return "0.0.0.0" if users.env_token() else "127.0.0.1"
 
 
 def _is_public(path: str) -> bool:
     return path in _PUBLIC_PATHS or path.startswith(_PUBLIC_PREFIXES)
-
-
-def _is_internal(request: web.Request) -> bool:
-    host = (request.host or "").rsplit(":", 1)[0].lower()
-    return host in _internal_hosts()
 
 
 def _request_user(request: web.Request) -> Optional[User]:
@@ -171,6 +183,8 @@ async def auth_middleware(request: web.Request, handler):
     if _is_public(request.path):
         return await handler(request)
     if not users.env_token():
+        if not insecure_dev():
+            return web.json_response({"error": "Unauthorized", "detail": "the server has no API_TOKEN"}, status=401)
         user = users.first_admin()
         if user:
             return await _as(user, request, handler)
@@ -178,7 +192,7 @@ async def auth_middleware(request: web.Request, handler):
     user = _request_user(request)
     if user:
         return await _as(user, request, handler)
-    if request.path in INBOUND_PATHS and _is_internal(request):
+    if request.path in INBOUND_PATHS:
         return await handler(request)
 
     if request.method == "GET" and not request.path.startswith(_API_PREFIXES):
@@ -222,7 +236,9 @@ def setup_auth(app: web.Application) -> None:
     app.router.add_get("/login", login_page)
     app.router.add_post("/login", login_submit)
     if users.env_token():
-        hosts = ", ".join(sorted(_internal_hosts())) or "none"
-        logger.info(f"API authentication enabled (internal hosts allowed on {', '.join(sorted(INBOUND_PATHS))}: {hosts})")
+        logger.info("API authentication enabled")
+    elif insecure_dev():
+        logger.warning("!!! API_TOKEN is not set and DANA_INSECURE_DEV=1: every request is the first admin, "
+                       "without authentication. Local development only (listening on 127.0.0.1). !!!")
     else:
-        logger.warning("API_TOKEN is not set — the web server accepts unauthenticated requests")
+        logger.error("API_TOKEN is not set: every request is refused")

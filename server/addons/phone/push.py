@@ -160,6 +160,7 @@ def devices(user: User) -> List[Dict[str, Any]]:
 
 def _drop_token(token: str) -> None:
     with get_db_connection() as conn:
+        # scoped: a token FCM reported dead: the device row holding it goes, whoever's
         conn.execute("DELETE FROM phone_devices WHERE token = ?", (token,))
         conn.commit()
 
@@ -206,8 +207,10 @@ def _store(user: User, type_: str, data: Dict[str, Any], replace: bool = False) 
                            "VALUES (?, ?, ?, ?, ?)",
                            (user.id, type_, json.dumps(data, ensure_ascii=False), _utc(now), _utc(expires)))
         # Keep the numbering (AUTOINCREMENT), drop old rows and long-silent devices.
+        # scoped: server-wide retention of old push events (KEEP_EVENTS_DAYS)
         conn.execute("DELETE FROM phone_events WHERE created_at < ?",
                      (_utc(now - datetime.timedelta(days=KEEP_EVENTS_DAYS)),))
+        # scoped: server-wide cleanup of devices silent for STALE_DEVICE_DAYS
         conn.execute("DELETE FROM phone_devices WHERE COALESCE(last_fetch_at, updated_at) < ?",
                      (_utc(now - datetime.timedelta(days=STALE_DEVICE_DAYS)),))
         conn.commit()

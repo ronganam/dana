@@ -205,7 +205,7 @@ def users_with(name: str) -> List[str]:
 
 def admin_change(by: Optional[User]) -> bool:
     """``by`` may set any address / chat: None (the server itself, an operator
-    with shell access: bin/users.py, the env import) or a user with
+    with shell access: bin/users.py) or a user with
     :data:`ADMIN_CAPABILITY`."""
     return by is None or by.level.allows(ADMIN_CAPABILITY)
 
@@ -609,52 +609,28 @@ def disconnect(user: User, name: str, *, by: Optional[User] = None) -> bool:
 def stored_credentials() -> int:
     """How many connections hold encrypted credentials."""
     with get_db_connection() as db:
+        # scoped: server-wide startup check of the credentials key over every connection
         return db.execute("SELECT COUNT(*) FROM connections WHERE credentials IS NOT NULL").fetchone()[0]
 
 
-def verify_key(*, pending: bool) -> None:
-    """Startup check of ``CREDENTIALS_KEY``: needed when credentials are
-    stored or ``pending`` (about to be stored); then it must be well formed
-    and decrypt every stored credential. A key that is set must be well
+def verify_key() -> None:
+    """Startup check of the credentials key (``CREDENTIALS_KEY``, else the key
+    file: core/addons/crypto.py): when credentials are stored it must be well
+    formed and decrypt every one of them; a key that is set must be well
     formed even when nothing needs it yet.
 
     Raises:
         CredentialsKeyError: what is wrong and what to do.
     """
     with get_db_connection() as db:
+        # scoped: server-wide startup check of the credentials key over every connection
         tokens = [r[0] for r in db.execute("SELECT credentials FROM connections WHERE credentials IS NOT NULL")]
-    if not tokens and not pending:
+    if not tokens:
         if crypto.key_configured():
             crypto.check_key()
         return
     if not crypto.key_configured():
-        why = (f"{len(tokens)} connection(s) have stored credentials" if tokens
-               else "addon credentials are waiting to be imported from the environment")
-        raise crypto.CredentialsKeyError(f"{crypto.KEY_ENV} is not set but {why}. " + crypto.GENERATE_HINT)
+        raise crypto.CredentialsKeyError(f"{crypto.KEY_ENV} is not set (and there is no key file) but {len(tokens)} "
+                                         "connection(s) have stored credentials. " + crypto.GENERATE_HINT)
     for token in tokens:
         crypto.decrypt(token)
-
-
-def imported_addons() -> Tuple[str, ...]:
-    """Addons the startup env import has already handled (``connection_imports``)."""
-    with get_db_connection() as db:
-        return tuple(r[0] for r in db.execute("SELECT addon FROM connection_imports ORDER BY addon"))
-
-
-def import_settings(name: str) -> Dict[str, Any]:
-    """Settings waiting for the env import of ``name`` (``connection_import_settings``:
-    values a migration moved out of older storage before the addon existed for
-    the first admin)."""
-    with get_db_connection() as db:
-        return {r["name"]: json.loads(r["value"])
-                for r in db.execute("SELECT name, value FROM connection_import_settings WHERE addon = ? ORDER BY name",
-                                    (name,))}
-
-
-def mark_imported(user: User, name: str) -> None:
-    """Record ``name`` as imported for ``user`` (its waiting settings are consumed)."""
-    with get_db_connection() as db:
-        db.execute("INSERT OR IGNORE INTO connection_imports (addon, user_id, imported_at) VALUES (?, ?, ?)",
-                   (name, user.id, user_rows.now_iso()))
-        db.execute("DELETE FROM connection_import_settings WHERE addon = ?", (name,))
-        db.commit()

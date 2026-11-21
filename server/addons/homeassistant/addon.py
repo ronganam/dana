@@ -6,7 +6,7 @@ from addons.homeassistant.config import (BATTERY_SENSOR, CAR_DEVICE, CAR_SENSOR,
                                                NOTIFY_SERVICE, PERSON, SCREEN_SENSOR, WEATHER)
 
 # Entity settings have no default (whose entities they are is the user's
-# choice; the first admin's are imported by addons/bootstrap.py), except
+# choice, set on the Addons page), except
 # Home Assistant's own name for the home forecast.
 addon = Addon(
     ADDON, order=80,

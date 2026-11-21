@@ -17,10 +17,10 @@ from cryptography.fernet import Fernet
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("notifications_test")
-os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: the startup import encrypts env credentials
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 os.environ["TYPESAFE_API_KEY"] = "test-typesafe"
-os.environ["HOMEASSISTANT_TOKEN"] = "test-ha"
 os.environ["FCM_SERVICE_ACCOUNT_JSON"] = '{"project_id": "dana-test"}'
 
 import httpx
@@ -34,7 +34,8 @@ from addons.tasks.groups import ensure_default_groups_for_everyone
 
 db.migrate()
 users.bootstrap()
-addons_bootstrap.bootstrap()  # the first admin's addons (built-ins + env)
+addons_bootstrap.bootstrap()  # the first admin's default addons
+testenv.connect_admin("homeassistant", credentials={"host": "http://homeassistant.local:8123", "token": "test-ha"})
 OWNER = users.first_admin()
 ensure_default_groups_for_everyone()
 from core import sessions_api

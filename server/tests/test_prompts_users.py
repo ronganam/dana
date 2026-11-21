@@ -35,11 +35,6 @@ os.environ["OWNER_NAME"] = "Robin Levi"
 os.environ["OWNER_CONTEXT"] = "Robin lives in Tel Aviv with Gal and the dog Pepper; he works in tech."
 os.environ["TIMEZONE"] = "Asia/Jerusalem"
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway test key
-os.environ["HOMEASSISTANT_HOST"] = "http://127.0.0.1:9"  # fake values: the startup import connects these
-os.environ["HOMEASSISTANT_TOKEN"] = "prompts-ha-token"
-os.environ["WAHA_URL"] = "http://127.0.0.1:9/api"
-os.environ["WAHA_API_KEY"] = "prompts-waha-key"
-os.environ["GOOGLE_REFRESH_TOKEN"] = "prompts-refresh-token"
 
 import litellm  # noqa: E402
 from litellm.types.utils import Delta, ModelResponseStream, StreamingChoices  # noqa: E402
@@ -50,6 +45,11 @@ db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
+testenv.connect_admin("homeassistant", credentials={"host": "http://127.0.0.1:9", "token": "prompts-ha-token"})
+testenv.connect_admin("whatsapp", credentials={"url": "http://127.0.0.1:9/api", "api_key": "prompts-waha-key",
+                                               "session": "default"})
+testenv.connect_admin("calendar", credentials={"refresh_token": "prompts-refresh-token"})
+testenv.connect_admin("ops")  # opt-in: the admin's prompt then mentions the cluster
 
 from core import briefing, device_screen, session_runner, user_profile, weekly_review  # noqa: E402
 from core.agent import AgentOrchestrator, instructions  # noqa: E402

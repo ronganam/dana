@@ -24,6 +24,7 @@ def screen(user: User, lst: ShoppingList) -> Dict[str, Any]:
     """Everything the Shopping screen shows for ``user`` looking at ``lst``."""
     items.expire(lst.id)
     with get_db_connection() as conn:
+        # scoped: lst is a list the user can see (passed in)
         row = conn.execute("SELECT version FROM shopping_lists WHERE id = ?", (lst.id,)).fetchone()
         found = items.rows(conn, lst.id)
     to_buy = sum(1 for r in found if not r["checked"])

@@ -3,10 +3,10 @@ Run: bin/test test_whatsapp_users
 
 Two in-process fake WAHA instances (aiohttp: sessions with their ``me``,
 contacts, chats, messages, files, send / forward / edit / delete), each with its own API
-key, session and WhatsApp account. The first admin's addon comes from
-the env import and is then pointed at instance A; Bob has instance B; Carl has
-no WhatsApp. Checked: the import and that nothing else reads the old env
-names; every tool hits only the user's own WAHA with their own key and
+key, session and WhatsApp account. The first admin's addon is connected by
+the operator and is then pointed at instance A; Bob has instance B; Carl has
+no WhatsApp. Checked: nothing reads the old env names; inbound events only
+when WAHA signed them; every tool hits only the user's own WAHA with their own key and
 session; name maps / "me" caches / dedupe are per connection; Carl has no
 tools; saved contacts and the call pipeline's known people per user; an image
 a tool saved is served only to its user; the account is learned at connect,
@@ -23,6 +23,7 @@ localhost.
 """
 
 import asyncio
+import json
 import logging
 import os
 import pathlib
@@ -36,13 +37,11 @@ from unittest.mock import AsyncMock, patch
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("whatsapp_users_test")
 os.environ["API_TOKEN"] = "wa-users-test-env-token"  # a test value: with it set, DB tokens are honoured
-os.environ["INTERNAL_HOSTS"] = "ganam-assistant.ganam-assistant"
+os.environ["WAHA_WEBHOOK_SECRET"] = "wa-users-test-waha-secret"  # a test value: WAHA's HMAC key
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
 # The first admin's env values, as production has them (fake).
-os.environ["WAHA_URL"] = "http://env-waha.invalid/api/"
-os.environ["WAHA_API_KEY"] = "env-key"
-os.environ["WAHA_SESSION"] = "default"
+os.environ["WAHA_URL"] = "http://env-waha.invalid/api/"  # the old env import's names: read by nothing now
 os.environ["WHATSAPP_VOICE_TELEGRAM_CHAT_ID"] = "1001"
 
 import litellm
@@ -55,6 +54,9 @@ db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
+testenv.connect_admin("whatsapp", credentials={"url": "http://admin-waha.invalid/api/", "api_key": "admin-key",
+                                               "session": "default"},
+                      settings={"voice_telegram_chat_id": 1001})
 
 from core import assistant_api  # noqa: E402
 from addons.whatsapp import api as whatsapp_api  # noqa: E402
@@ -117,26 +119,30 @@ CARL_TOKEN, _ = users.issue_token(CARL.id, "test")
 ADMIN_AUTH = {"Authorization": f"Bearer {os.environ['API_TOKEN']}"}
 BOB_AUTH = {"Authorization": f"Bearer {BOB_TOKEN}"}
 CARL_AUTH = {"Authorization": f"Bearer {CARL_TOKEN}"}
-INTERNAL = {"Host": "ganam-assistant.ganam-assistant"}
+SECRET = os.environ["WAHA_WEBHOOK_SECRET"]
 
 
-# --- 1. The env import and the old env names ----------------------------------------------------
+def signed(body: bytes) -> Dict[str, str]:
+    """WAHA's headers for ``body`` signed with the shared secret."""
+    return {"X-Webhook-Hmac": whatsapp_api.signature(SECRET, body), "X-Webhook-Hmac-Algorithm": "sha512",
+            "Content-Type": "application/json"}
+
+
+# --- 1. No env import: the old env names --------------------------------------------------------
 
 def test_import() -> None:
     wa = store.require(ADMIN, "whatsapp")
     # the address is stored normalised (no trailing slash)
-    check("import: url / key / session from env, the voice chat setting",
-          dict(wa.credentials) == {"url": "http://env-waha.invalid/api", "api_key": "env-key", "session": "default"}
+    check("connection: url / key / session as connected, the voice chat setting",
+          dict(wa.credentials) == {"url": "http://admin-waha.invalid/api", "api_key": "admin-key", "session": "default"}
           and wa.settings["voice_telegram_chat_id"] == 1001, (dict(wa.credentials), dict(wa.settings)))
     old_names = ("WAHA_URL", "WAHA_API_KEY", "WAHA_TOKEN", "WAHA_SESSION", "WHATSAPP_VOICE_TELEGRAM_CHAT_ID")
     root = testenv.SERVER
     readers = []
     for path in list((root / "core").rglob("*.py")) + [p for p in (root / "addons").rglob("*.py") if "tests" not in p.parts] + [root / "main.py"]:
-        if path.name == "bootstrap.py" and path.parent.name == "addons":
-            continue
         text = path.read_text(encoding="utf-8")
         readers += [f"{path.relative_to(root)}: {n}" for n in old_names if re.search(rf'["\']{n}["\']', text)]
-    check("old env names: read only by the env import", not readers, readers)
+    check("old env names: read by nothing", not readers, readers)
     check("no owner-specific defaults in the addon (no default address, no voice chat)",
           all(f.default is None for f in store.get_addon("whatsapp").credentials + store.get_addon("whatsapp").settings)
           and not re.search(r"https?://waha\.", "".join(p.read_text(encoding="utf-8")
@@ -379,7 +385,8 @@ async def test_inbound() -> None:
             phone_patch.start()
             async def post(body) -> int:
                 n = len(bot.bot.send_message.await_args_list)
-                r = await http.post("/webhook/waha", headers=INTERNAL, json=body)
+                raw = json.dumps(body).encode()
+                r = await http.post("/webhook/waha", headers=signed(raw), data=raw)
                 assert r.status == 200
                 await until(lambda: len(bot.bot.send_message.await_args_list) > n, timeout=1.5)
                 await asyncio.sleep(0.05)

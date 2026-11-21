@@ -70,13 +70,25 @@ dropped; it never reaches the model).
 
 ## Inbound events (`/webhook/waha`)
 
-- WAHA forwards `message` events to `POST /webhook/waha` (configured globally in the
-  waha deployment via `WHATSAPP_HOOK_URL` / `WHATSAPP_HOOK_EVENTS`, ClusterIP
-  `http://ganam-assistant.ganam-assistant.svc.cluster.local/webhook/waha`).
-  The path takes no token from an `INTERNAL_HOSTS` Host (docs/access.md); with
-  a token only a user with `manage_server` may post (anyone else 403), so a
-  user cannot forge an event for another user's account. The handler answers
-  at once and processes in the background.
+- WAHA forwards `message` events to `POST /webhook/waha`, **signed**. On the
+  WAHA side (its environment, for every session):
+
+  ```
+  WHATSAPP_HOOK_URL=http://<dana's address>/webhook/waha   # e.g. the in-cluster Service
+  WHATSAPP_HOOK_EVENTS=message
+  WHATSAPP_HOOK_HMAC_KEY=<the same value as Dana's WAHA_WEBHOOK_SECRET>
+  ```
+
+  (or per session: `config.webhooks[].hmac.key` in WAHA's session API). WAHA
+  then sends `X-Webhook-Hmac` (hex HMAC-SHA512 of the raw body) and
+  `X-Webhook-Hmac-Algorithm: sha512`; Dana recomputes it with
+  `WAHA_WEBHOOK_SECRET` (`addons/whatsapp/api.py`, constant-time compare)
+  and refuses anything else with 403 — an unsigned event, a changed body, a
+  forged `Host`. Without the secret every unsigned event is refused (the
+  start logs it). With a token only a user with `manage_server` may post
+  (testing; anyone else 403), so a user cannot forge an event for another
+  user's account. The handler answers at once and processes in the
+  background.
 - **Media** named by an event is always fetched from the connection's own
   WAHA: its scheme and host, with only the path and query of the event's URL
   (`client.media_url_on_connection`), so the API key never goes to another

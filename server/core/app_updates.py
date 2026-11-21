@@ -26,6 +26,7 @@ import logging
 import os
 import re
 import datetime
+from typing import Optional
 from pathlib import Path
 
 from aiohttp import web
@@ -77,15 +78,31 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
-def _check_publish_token(request: web.Request) -> bool:
-    """Bearer-token check for the publish endpoint.
+# Publishing is refused unless APP_PUBLISH_TOKEN is at least this long and not
+# the example's placeholder (anyone who has it can ship an APK to every phone).
+PUBLISH_TOKEN_MIN_LENGTH = 24
+PUBLISH_TOKEN_PLACEHOLDERS = frozenset({"choose_a_random_publish_token"})
 
-    The rest of the server has no auth (edge-network trust); publishing APKs is
-    the first mutating, security-sensitive operation, so it gets a token.
-    """
-    expected = os.getenv("APP_PUBLISH_TOKEN", "")
-    if not expected:
-        logger.warning("APP_PUBLISH_TOKEN not set — rejecting app upload")
+
+def publish_token_problem(token: str) -> Optional[str]:
+    """Why ``token`` cannot guard publishing (None: it can)."""
+    token = token.strip()
+    if not token:
+        return "APP_PUBLISH_TOKEN is not set"
+    if token in PUBLISH_TOKEN_PLACEHOLDERS:
+        return "APP_PUBLISH_TOKEN is the example's placeholder"
+    if len(token) < PUBLISH_TOKEN_MIN_LENGTH:
+        return f"APP_PUBLISH_TOKEN is shorter than {PUBLISH_TOKEN_MIN_LENGTH} characters"
+    return None
+
+
+def _check_publish_token(request: web.Request) -> bool:
+    """Bearer-token check for the publish endpoint (a public path: the token
+    is not a user's). Refused while :func:`publish_token_problem` finds one."""
+    expected = os.getenv("APP_PUBLISH_TOKEN", "").strip()
+    problem = publish_token_problem(expected)
+    if problem:
+        logger.warning(f"{problem}: app publishing is disabled, upload refused")
         return False
     auth = request.headers.get("Authorization", "")
     return hmac.compare_digest(auth, f"Bearer {expected}")
@@ -234,3 +251,6 @@ def setup(app: web.Application) -> None:
     app.router.add_get("/api/app/version", get_app_version_api)
     app.router.add_get("/api/app/download/{filename}", download_app_apk_api)
     app.router.add_post("/api/app/upload", upload_app_apk_api)
+    problem = publish_token_problem(os.getenv("APP_PUBLISH_TOKEN", ""))
+    if problem:
+        logger.info(f"{problem}: Android app publishing (POST /api/app/upload) is disabled")

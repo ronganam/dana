@@ -41,7 +41,7 @@
     people: { name: "People", icon: "users", blurb: "People you talk to and their briefs", stops: "people and their briefs" },
     phone: { name: "Phone", icon: "smartphone", blurb: "Notifications Inbox, calls and suggestions, push",
              stops: "the phone's notifications Inbox, calls, suggestions and push" },
-    ops: { name: "Ops", icon: "terminal", blurb: "kubectl and sandboxed Python (admins)", stops: "kubectl and sandboxed Python" },
+    ops: { name: "Ops", icon: "terminal", blurb: "Read-only kubectl and Python on the server, asks first (admins; not a sandbox)", stops: "kubectl and Python on the server" },
   };
   const FIELDS = {
     host: "Address", url: "Address", token: "Access token", api_key: "API key", session: "Session name",

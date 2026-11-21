@@ -226,11 +226,13 @@ def _restore(user: User, task_id: str, before: Dict[str, Any], expect: Dict[str,
     cols = ("status", "triggers", "snooze_count", "updated_at")
     service.check_still_writable(user, task_id)
     with get_db_connection() as conn:
+        # scoped: service.check_still_writable(user, task_id) above
         cur = conn.execute("SELECT status, triggers FROM tasks WHERE id = ?", (task_id,)).fetchone()
         if not cur:
             raise RuntimeError("The reminder was deleted in the meantime.")
         if any(expect.get(k) is not None and cur[k] != expect[k] for k in ("status", "triggers")):
             raise RuntimeError("The reminder was changed again since, so it was left as it is.")
+        # scoped: service.check_still_writable(user, task_id) above
         conn.execute(f"UPDATE tasks SET {', '.join(c + ' = ?' for c in cols)} WHERE id = ?",
                      (*[before.get(c) for c in cols], task_id))
         conn.commit()

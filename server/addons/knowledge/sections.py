@@ -114,6 +114,7 @@ def _rename_fields(conn: Any, section_id: str, renames: Dict[str, str]) -> None:
     """Carry a column rename into the fields of the section's entries."""
     if not renames:
         return
+    # scoped: the section was checked writable by update_section (writable_section)
     for row in conn.execute("SELECT id, fields FROM entries WHERE section_id = ?", (section_id,)).fetchall():
         fields = loads_json(row["fields"], [])
         changed = False
@@ -122,6 +123,7 @@ def _rename_fields(conn: Any, section_id: str, renames: Dict[str, str]) -> None:
                 field["name"] = renames[field["name"]]
                 changed = True
         if changed:
+            # scoped: the section was checked writable by update_section (writable_section)
             conn.execute("UPDATE entries SET fields = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                          (json.dumps(fields, ensure_ascii=False), row["id"]))
 
@@ -185,10 +187,13 @@ def delete_section(user: User, section_id: str, *, with_entries: bool = False) -
         return False
     with get_db_connection() as conn:
         if with_entries:
+            # scoped: writable_section(user, section_id) checked above
             ids = [r["id"] for r in conn.execute("SELECT id FROM entries WHERE section_id = ?", (section_id,))]
             files.forget_entries(conn, ids)
+            # scoped: writable_section(user, section_id) checked above
             conn.execute("DELETE FROM entries WHERE section_id = ?", (section_id,))
         else:
+            # scoped: writable_section(user, section_id) checked above
             conn.execute("UPDATE entries SET section_id = NULL WHERE section_id = ?", (section_id,))
         rows = conn.execute("DELETE FROM project_sections WHERE id = ?", (section_id,)).rowcount
         conn.commit()

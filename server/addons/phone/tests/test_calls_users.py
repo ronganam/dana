@@ -40,7 +40,6 @@ DB_PATH = testenv.isolate("calls_users_test")
 ROOT = str(testenv.SERVER)
 os.environ["API_TOKEN"] = "calls-users-test-env-token"  # a test value: with it set, DB tokens are honoured
 os.environ["GEMINI_API_KEY"] = "test-key"  # a test value: LiteLLM only ever runs its offline mock here
-os.environ["GOOGLE_REFRESH_TOKEN"] = "test-refresh-token"  # the first admin's calendar (add_event is faked)
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)
@@ -62,6 +61,7 @@ users.bootstrap()
 from addons import bootstrap as addons_bootstrap
 
 addons_bootstrap.bootstrap()
+testenv.connect_admin("calendar", credentials={"refresh_token": "test-refresh-token"})  # add_event is faked
 
 from core import sessions_api
 from addons.phone import api as phone_api

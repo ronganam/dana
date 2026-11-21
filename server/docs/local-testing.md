@@ -4,12 +4,14 @@ A self-contained copy of the production setup on your machine: the real image
 built from the `Dockerfile` (as `bin/deploy` builds it), started from a Dana 9.0
 database (`tests/fixtures/db_9_0.sql`, its first admin named as the env file says)
 with an env file shaped like production's, so the first start is the real
-upgrade (snapshot, conversion to per-addon migrations, env import into
-encrypted connections).
+upgrade (snapshot, conversion to per-addon migrations, core's later
+migrations, the first admin's default addons); `up` then connects the
+admin's addons to the stubs with `bin/users.py addons connect`, as an
+operator does (encrypted connections).
 Every outside service is a stub. Nothing reaches production or the internet.
 
 ```bash
-bin/local-env.sh up      # build the image, generate the env file, seed the data volume, start
+bin/local-env.sh up      # build the image, generate the env file, seed the data volume, start, connect the stubs
 bin/local-env.sh test    # the end-to-end rehearsal (tests/local_env/e2e.py), PASS / FAIL per check
 bin/local-env.sh logs    # follow the app's log (`logs --tail 100` etc. pass through)
 bin/local-env.sh ps      # the containers
@@ -23,7 +25,7 @@ bin/local-env.sh restart # restart the app
 over the image's copy, `tests/local_env/compose.source.yaml`). `up` then builds the
 image only when it is missing, `restart` (about 8 s) picks up a Python change, and a
 static file change is live on the next browser reload. Rebuild with
-`bin/local-env.sh build` after changing `requirements.txt` or the `Dockerfile`.
+`bin/local-env.sh build` after changing `requirements.lock` or the `Dockerfile`.
 Without it, the environment runs exactly what `bin/deploy` would build.
 
 ```bash
@@ -71,15 +73,16 @@ web search, kubectl.
 ## The env file
 
 `bin/local-env.sh up` writes `tests/local_env/.state/app.env` (gitignored, mode
-600) once: a generated `CREDENTIALS_KEY`, `API_TOKEN` and bot token, and
-fake values for every env name the one-time import reads (`OWNER_NAME=Robin`,
-`OWNER_CONTEXT`, `ALLOWED_TELEGRAM_USER_IDS=111111111`, `TELEGRAM_CHAT_ID`,
-`HOMEASSISTANT_*`, `PRIMARY_PERSON`, the phone sensors, `WAHA_*`,
-`WHATSAPP_VOICE_TELEGRAM_CHAT_ID`, `GOOGLE_*`, `FRIGATE_URL`), pointing at the stubs, plus `INTERNAL_HOSTS`
-(`ganam-assistant.ganam-assistant`, also the app's alias on the network),
-`MEMBER_ALLOWED_ORIGINS=homeassistant=http://stubs:8124` (the second user's
-Home Assistant stub, which no admin uses, so a member may connect it) and
-`TIMEZONE`. The models are `openai/dana-local-*` on the stub. `down` deletes it.
+600) once: a generated `CREDENTIALS_KEY`, `API_TOKEN`, bot token,
+`APP_PUBLISH_TOKEN` and `WAHA_WEBHOOK_SECRET` (the rehearsal signs its
+webhook posts with it), the first user's profile (`OWNER_NAME=Robin`,
+`OWNER_CONTEXT`, `ALLOWED_TELEGRAM_USER_IDS=111111111`, `TELEGRAM_CHAT_ID`),
+the Google OAuth client, `MEMBER_ALLOWED_ORIGINS=homeassistant=http://stubs:8124`
+(the second user's Home Assistant stub, which no admin uses, so a member may
+connect it) and `TIMEZONE`. The models are `openai/dana-local-*` on the stub.
+`down` deletes it. The admin's Home Assistant, WhatsApp, calendar, cameras and
+`ops` are not in it: `up` connects them to the stubs after the start
+(`connect_addons` in `bin/local-env.sh`; skipped for one already connected).
 
 ## Opening it
 
@@ -108,9 +111,10 @@ Home Assistant stub, which no admin uses, so a member may connect it) and
 `tests/local_env/e2e.py` drives the running container over HTTP only, plus
 `docker exec … bin/users.py` and `docker` (restart, start-up refusals). It
 covers: the upgrade (log lines, snapshot, every fixture row with its id through
-the API, `/api/me`, the imported connections, their tests against the stubs,
-the CLI, a restart that imports nothing twice, missing / malformed / wrong
-`CREDENTIALS_KEY` on the migrated database and on a fresh 9.0 one); the
+the API, `/api/me`, the default addons and the connections `up` made, their
+tests against the stubs, the CLI, a restart that gives nothing twice, missing /
+malformed / wrong `CREDENTIALS_KEY` on the migrated database, the key file
+generated for a fresh 9.0 one); the
 endpoints `static/*.js` load and the fields they read, the pages, the login
 cookie, a streamed chat turn compared with `tests/fixtures/golden.sse`'s event
 types, reattach, approval, undo; a second user made with the CLI (403
@@ -162,8 +166,8 @@ Possible, and not done by the script for you. Read all of this first.
    credentials: the start refuses without the production `CREDENTIALS_KEY`.
    Put it, and anything else you want to override, in a file of `KEY=value`
    lines and pass `DANA_LOCAL_ENV_EXTRA=/path/to/extra.env` (appended to the
-   generated env, so it wins). A pre-upgrade copy needs no key of yours: it is
-   imported from the generated env (the stubs).
+   generated env, so it wins). A pre-upgrade copy needs no key of yours: `up`
+   connects the stubs.
 4. A real model: in the same extra file set `MODEL`, `BACKGROUND_MODEL`,
    `TRANSCRIBE_MODEL`, `ASSISTANT_MODELS` (or empty it for the built-in
    catalog), the provider key, and `OPENAI_API_BASE=` (empty) when the

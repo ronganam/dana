@@ -60,7 +60,7 @@ def list_calendars(conn: Connection) -> str:
         return f"Error listing calendars: {e}"
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 def search_calendar(
     conn: Connection,
     query: Optional[str] = None,

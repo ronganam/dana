@@ -34,7 +34,9 @@ def _record_project_created(user: User, project_id: str, title: str) -> None:
 
     def _undo():
         with get_db_connection() as conn:
+            # scoped: undo of the project this user just created: anything saved into it since keeps it
             busy = (conn.execute("SELECT 1 FROM entries WHERE project_id = ?", (project_id,)).fetchone()
+                    # scoped: undo of the project this user just created: anything saved into it since keeps it
                     or conn.execute("SELECT 1 FROM tasks WHERE project_id = ?", (project_id,)).fetchone())
         if busy:
             raise undoable.UndoConflict("Things were saved into the project since, so it was kept.")
@@ -238,7 +240,7 @@ async def list_project_entries(conn: Connection, project_id: str, kind: Optional
         return f"Error listing project entries: {e}"
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def get_knowledge_item(conn: Connection, item_id: str) -> str:
     """Read one saved entry in full — its complete Markdown body, structured fields, summary,
     transcript, tags and comments.
@@ -574,6 +576,7 @@ async def create_section(conn: Connection, project_id: str, title: str, kind: st
 
         def _undo():
             with get_db_connection() as db:
+                # scoped: undo of the section this user just created: anything saved into it since keeps it
                 busy = db.execute("SELECT 1 FROM entries WHERE section_id = ?", (section_id,)).fetchone()
             if busy:
                 raise undoable.UndoConflict("Things were saved into the section since, so it was kept.")
