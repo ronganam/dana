@@ -34,6 +34,7 @@ import io.github.ronganam.dana.ui.screens.MarkdownText
 import io.github.ronganam.dana.ui.screens.TypingIndicator
 import coil.compose.AsyncImage
 import java.util.Locale
+import io.github.ronganam.dana.R
 
 /** A TextToSpeech for "tap a reply to hear it", shut down with the composable. */
 @Composable
@@ -104,7 +105,7 @@ fun ChatBubble(
                             onLongPress = {
                                 if (!msg.isThinking) {
                                     copy(msg.message)
-                                    Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                                    Toast.makeText(context, R.string.toast_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                                 }
                             }
                         )

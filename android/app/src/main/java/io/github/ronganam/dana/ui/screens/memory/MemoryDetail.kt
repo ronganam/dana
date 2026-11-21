@@ -27,6 +27,7 @@ import io.github.ronganam.dana.ui.components.MonoLabel
 import io.github.ronganam.dana.ui.screens.common.DotLabel
 import io.github.ronganam.dana.ui.screens.common.auto
 import io.github.ronganam.dana.ui.theme.Danger
+import io.github.ronganam.dana.R
 
 /** Read-first view of one memory: serif topic, generous selectable body, quiet actions. */
 @Composable
@@ -73,7 +74,7 @@ internal fun MemoryDetailPane(
             FilledTonalButton(
                 onClick = {
                     copy(memory.value)
-                    android.widget.Toast.makeText(context, "Copied", android.widget.Toast.LENGTH_SHORT).show()
+                    android.widget.Toast.makeText(context, R.string.toast_copied, android.widget.Toast.LENGTH_SHORT).show()
                 },
                 modifier = Modifier.heightIn(min = 48.dp)
             ) { Text("Copy") }

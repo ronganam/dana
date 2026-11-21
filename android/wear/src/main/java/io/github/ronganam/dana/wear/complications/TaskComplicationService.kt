@@ -9,6 +9,7 @@ import androidx.wear.watchface.complications.data.ShortTextComplicationData
 import androidx.wear.watchface.complications.datasource.ComplicationRequest
 import androidx.wear.watchface.complications.datasource.SuspendingComplicationDataSourceService
 import io.github.ronganam.dana.wear.data.WearPrefs
+import io.github.ronganam.dana.wear.R
 
 class TaskComplicationService : SuspendingComplicationDataSourceService() {
     override suspend fun onComplicationRequest(request: ComplicationRequest): ComplicationData {
@@ -30,9 +31,9 @@ class TaskComplicationService : SuspendingComplicationDataSourceService() {
         }
     }
     override fun getPreviewData(type: ComplicationType) = ShortTextComplicationData.Builder(
-        text = PlainComplicationText.Builder("Groceries \uD83D\uDCCB").build(),
-        contentDescription = PlainComplicationText.Builder("Groceries").build()
-    ).setTitle(PlainComplicationText.Builder("Groceries").build()).build()
+        text = PlainComplicationText.Builder(getString(R.string.preview_task_groceries) + " \uD83D\uDCCB").build(),
+        contentDescription = PlainComplicationText.Builder(getString(R.string.preview_task_groceries)).build()
+    ).setTitle(PlainComplicationText.Builder(getString(R.string.preview_task_groceries)).build()).build()
 
     private fun extractLeadingEmoji(text: String): Pair<String?, String> {
         if (text.isEmpty()) return Pair(null, text)

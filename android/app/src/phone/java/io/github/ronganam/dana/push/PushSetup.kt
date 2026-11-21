@@ -68,6 +68,7 @@ object PushSetup {
         }
     }
 
+    @Suppress("DEPRECATION") // getToken(): see DanaMessagingService.onNewToken
     private suspend fun token(): String? = suspendCancellableCoroutine { cont ->
         FirebaseMessaging.getInstance().token
             .addOnSuccessListener { cont.resume(it) }

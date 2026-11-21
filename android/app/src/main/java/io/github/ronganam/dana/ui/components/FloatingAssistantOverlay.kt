@@ -102,6 +102,7 @@ import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import io.github.ronganam.dana.R
 
 enum class AssistantOverlayState {
     EXPANDED,
@@ -428,7 +429,7 @@ fun FloatingAssistantOverlay(
                                             onCopySession = {
                                                 if (currentSessionId.isNotEmpty()) {
                                                     copy(currentSessionId)
-                                                    Toast.makeText(context, "Session ID copied!", Toast.LENGTH_SHORT).show()
+                                                    Toast.makeText(context, R.string.toast_session_id_copied, Toast.LENGTH_SHORT).show()
                                                 }
                                             }
                                         )

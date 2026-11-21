@@ -41,6 +41,8 @@ import androidx.wear.compose.material.*
 import io.github.ronganam.dana.wear.ui.WearViewModel
 import io.github.ronganam.dana.wear.ui.components.WearMarkdownText
 import io.github.ronganam.dana.wear.perf.WearPerf
+import io.github.ronganam.dana.wear.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalWearFoundationApi::class)
 @Composable
@@ -89,6 +91,8 @@ fun AssistantScreen(
             PositionIndicator(scalingLazyListState = listState)
         }
     ) {
+        val ready = stringResource(R.string.status_ready)
+        val busy = setOf(stringResource(R.string.status_processing_voice), stringResource(R.string.status_thinking))
         Box(modifier = Modifier.fillMaxSize()) {
             ScalingLazyColumn(
                 state = listState,
@@ -98,10 +102,10 @@ fun AssistantScreen(
                 contentPadding = PaddingValues(top = 28.dp, bottom = 72.dp, start = 12.dp, end = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                if (status != "Ready") {
+                if (status != ready) {
                     item {
                         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                            if (status == "Processing voice..." || status == "Thinking...") {
+                            if (status in busy) {
                                 CircularProgressIndicator(modifier = Modifier.size(16.dp), strokeWidth = 2.dp)
                                 Spacer(modifier = Modifier.width(4.dp))
                             }
@@ -150,7 +154,7 @@ fun AssistantScreen(
                             } else if (isTool) {
                                 Column { // Use Column for tool name and args
                                     Text(
-                                        text = msg.toolName ?: "Tool", // Display tool name
+                                        text = msg.toolName ?: stringResource(R.string.tool), // Display tool name
                                         style = MaterialTheme.typography.caption1.copy(fontWeight = FontWeight.Bold), // Smaller bold font
                                         color = Color.White,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis
@@ -198,7 +202,7 @@ fun AssistantScreen(
                             modifier = Modifier.padding(2.dp)
                         ) {
                             Text(
-                                text = "Approve Tool?",
+                                text = stringResource(R.string.approve_tool),
                                 style = MaterialTheme.typography.caption2,
                                 color = DanaWear.Warning,
                                 fontWeight = FontWeight.Bold
@@ -217,14 +221,14 @@ fun AssistantScreen(
                                     colors = ButtonDefaults.buttonColors(backgroundColor = DanaWear.Danger),
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Deny", tint = Color.White)
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.deny), tint = Color.White)
                                 }
                                 Button(
                                     onClick = { viewModel.approveAction(true) },
                                     colors = ButtonDefaults.buttonColors(backgroundColor = DanaWear.Success),
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(Icons.Default.Check, contentDescription = "Approve", tint = Color.White)
+                                    Icon(Icons.Default.Check, contentDescription = stringResource(R.string.approve), tint = Color.White)
                                 }
                             }
                         }
@@ -248,7 +252,7 @@ fun AssistantScreen(
                             modifier = Modifier.padding(4.dp)
                         ) {
                             Text(
-                                text = selection.prompt.ifBlank { "Choose an option" },
+                                text = selection.prompt.ifBlank { stringResource(R.string.choose_an_option) },
                                 style = MaterialTheme.typography.caption2,
                                 color = DanaWear.Warning,
                                 fontWeight = FontWeight.Bold,
@@ -299,7 +303,7 @@ fun AssistantScreen(
                             modifier = Modifier.padding(4.dp)
                         ) {
                             Text(
-                                text = "Step limit reached",
+                                text = stringResource(R.string.step_limit_reached),
                                 style = MaterialTheme.typography.caption2,
                                 color = DanaWear.Warning,
                                 fontWeight = FontWeight.Bold
@@ -323,7 +327,7 @@ fun AssistantScreen(
                                     colors = ButtonDefaults.buttonColors(backgroundColor = DanaWear.Danger),
                                     modifier = Modifier.size(32.dp)
                                 ) {
-                                    Icon(Icons.Default.Close, contentDescription = "Stop here", tint = Color.White)
+                                    Icon(Icons.Default.Close, contentDescription = stringResource(R.string.stop_here), tint = Color.White)
                                 }
                                 Button(
                                     onClick = { viewModel.extendIterations() },
@@ -332,7 +336,7 @@ fun AssistantScreen(
                                 ) {
                                     Icon(
                                         Icons.Default.Add,
-                                        contentDescription = "Give more steps",
+                                        contentDescription = stringResource(R.string.give_more_steps),
                                         tint = Color.White
                                     )
                                 }
@@ -358,7 +362,7 @@ fun AssistantScreen(
                 ) {
                     Icon(
                         imageVector = if (isRecording) Icons.Default.Stop else Icons.Default.Mic,
-                        contentDescription = if (isRecording) "Stop" else "Speak",
+                        contentDescription = stringResource(if (isRecording) R.string.stop else R.string.speak),
                         tint = Color.White,
                         modifier = Modifier.size(26.dp)
                     )

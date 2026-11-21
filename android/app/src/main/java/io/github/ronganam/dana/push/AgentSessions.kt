@@ -147,7 +147,7 @@ object AgentSessions {
         val list = data["sessions"] as? JsonArray ?: return
         val sessions = list.mapNotNull { (it as? JsonObject)?.let(Session::from) }
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        channels(nm)
+        channels(context, nm)
         val prefs = ServerConfig.prefs(context)
         for (step in plan(loadShown(prefs.getString(KEY_SHOWN, null)), sessions)) {
             when (step) {
@@ -172,15 +172,15 @@ object AgentSessions {
     private fun shownMap(raw: String?): JsonObject =
         runCatching { ApiJson.parseToJsonElement(raw ?: "{}") as? JsonObject }.getOrNull() ?: JsonObject(emptyMap())
 
-    private fun channels(nm: NotificationManager) {
-        nm.createNotificationChannel(NotificationChannel(CH_LIVE, "Coding sessions (live)", NotificationManager.IMPORTANCE_DEFAULT).apply {
-            description = "Claude Code and Codex sessions while they run"
+    private fun channels(context: Context, nm: NotificationManager) {
+        nm.createNotificationChannel(NotificationChannel(CH_LIVE, context.getString(R.string.channel_sessions_live), NotificationManager.IMPORTANCE_DEFAULT).apply {
+            description = context.getString(R.string.channel_sessions_live_description)
             setSound(null, null)
             enableVibration(false)
             setShowBadge(false)
         })
-        nm.createNotificationChannel(NotificationChannel(CH_ALERT, "Coding sessions (finished / needs you)", NotificationManager.IMPORTANCE_HIGH).apply {
-            description = "A coding session finished, failed or is waiting for you"
+        nm.createNotificationChannel(NotificationChannel(CH_ALERT, context.getString(R.string.channel_sessions_alert), NotificationManager.IMPORTANCE_HIGH).apply {
+            description = context.getString(R.string.channel_sessions_alert_description)
         })
     }
 

@@ -71,6 +71,8 @@ import org.json.JSONObject
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
+import io.github.ronganam.dana.wear.R
+import androidx.compose.ui.res.stringResource
 
 class WearReminderActivity : ComponentActivity() {
 
@@ -102,7 +104,7 @@ class WearReminderActivity : ComponentActivity() {
         }
 
         val taskId = intent.getStringExtra("task_id") ?: ""
-        val taskTitle = intent.getStringExtra("task_title") ?: "Reminder"
+        val taskTitle = intent.getStringExtra("task_title") ?: getString(R.string.reminder)
         val priority = intent.getStringExtra("priority") ?: "medium"
         val triggerType = intent.getStringExtra("trigger_type") ?: "time"
 
@@ -114,7 +116,7 @@ class WearReminderActivity : ComponentActivity() {
         )
 
         startVibration()
-        val options = wearSnoozeOptions(WearReminderSync.zones(this))
+        val options = wearSnoozeOptions(this, WearReminderSync.zones(this))
 
         setContent {
             DanaWearTheme {
@@ -203,16 +205,18 @@ data class WearSnooze(
 }
 
 /** Same choices as the phone's dial: time, waking up, the car, then each place (arrive / leave). */
-fun wearSnoozeOptions(zones: List<String>): List<WearSnooze> = buildList {
-    listOf("15 min" to 15, "1 hour" to 60, "3 hours" to 180, "1 day" to 1440).forEach { (l, m) ->
-        add(WearSnooze("Time", l, null, "In $l", "time", minutes = m))
+fun wearSnoozeOptions(context: Context, zones: List<String>): List<WearSnooze> = buildList {
+    fun s(id: Int): String = context.getString(id)
+    listOf(R.string.reminder_snooze_15_min to 15, R.string.snooze_1_hour to 60, R.string.snooze_3_hours to 180, R.string.snooze_1_day to 1440).forEach { (id, m) ->
+        val l = s(id)
+        add(WearSnooze(s(R.string.snooze_group_time), l, null, context.getString(R.string.snooze_in, l), "time", minutes = m))
     }
-    add(WearSnooze("Wake up", "Wake up", null, "When I wake up", "wake"))
-    add(WearSnooze("Car", "Get in", "the car", "When I get in the car", "car", action = "enter"))
-    add(WearSnooze("Car", "Get out", "of the car", "When I get out of the car", "car", action = "leave"))
+    add(WearSnooze(s(R.string.snooze_wake_up), s(R.string.snooze_wake_up), null, s(R.string.snooze_wake_sentence), "wake"))
+    add(WearSnooze(s(R.string.snooze_group_car), s(R.string.snooze_get_in), s(R.string.snooze_the_car), s(R.string.snooze_get_in_sentence), "car", action = "enter"))
+    add(WearSnooze(s(R.string.snooze_group_car), s(R.string.snooze_get_out), s(R.string.snooze_of_the_car), s(R.string.snooze_get_out_sentence), "car", action = "leave"))
     zones.forEach { z ->
-        add(WearSnooze("Place", "Arrive", "at $z", "When I arrive at $z", "location", location = z, event = "arrive"))
-        add(WearSnooze("Place", "Leave", z, "When I leave $z", "location", location = z, event = "leave"))
+        add(WearSnooze(s(R.string.snooze_group_place), s(R.string.snooze_arrive), context.getString(R.string.snooze_at, z), context.getString(R.string.snooze_arrive_sentence, z), "location", location = z, event = "arrive"))
+        add(WearSnooze(s(R.string.snooze_group_place), s(R.string.snooze_leave), z, context.getString(R.string.snooze_leave_sentence, z), "location", location = z, event = "leave"))
     }
 }
 
@@ -288,7 +292,10 @@ fun WearReminderAlarmScreen(
         ) { isPicking ->
             if (!isPicking) {
                 AlarmFace(
-                    kicker = "Reminder · ${"%02d:%02d".format(now.hour, now.minute)}${triggerSuffix(triggerType)}",
+                    kicker = triggerName(triggerType).let { t ->
+                        val time = "%02d:%02d".format(now.hour, now.minute)
+                        if (t == null) stringResource(R.string.reminder_kicker, time) else stringResource(R.string.reminder_kicker_trigger, time, stringResource(t))
+                    },
                     priority = priority,
                     emoji = emoji,
                     title = cleanTitle,
@@ -371,13 +378,13 @@ private fun AlarmFace(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                RoundAction(Icons.Outlined.Snooze, "Snooze", size = 42.dp, filled = false, onClick = onSnooze)
-                RoundAction(Icons.Filled.Check, "Done", size = 52.dp, filled = true, onClick = onComplete)
-                RoundAction(Icons.Filled.Close, "Dismiss", size = 42.dp, filled = false, onClick = onDismiss)
+                RoundAction(Icons.Outlined.Snooze, stringResource(R.string.snooze), size = 42.dp, filled = false, onClick = onSnooze)
+                RoundAction(Icons.Filled.Check, stringResource(R.string.done), size = 52.dp, filled = true, onClick = onComplete)
+                RoundAction(Icons.Filled.Close, stringResource(R.string.dismiss), size = 42.dp, filled = false, onClick = onDismiss)
             }
             Spacer(Modifier.height(4.dp))
             Text(
-                "TURN CROWN TO SNOOZE",
+                stringResource(R.string.turn_crown_to_snooze),
                 fontFamily = DanaWear.Mono, fontSize = 8.sp, color = DanaWear.Mute
             )
         }
@@ -449,9 +456,10 @@ private fun SnoozePicker(
                 }
             }
         }
+        val groupLine = stringResource(R.string.snooze_group, opt.group.uppercase())
         CurvedLayout(anchor = 90f, modifier = Modifier.padding(bottom = 16.dp)) {
             curvedText(
-                text = "SNOOZE · ${opt.group.uppercase()}",
+                text = groupLine,
                 fontSize = 10.sp, color = DanaWear.Accent, fontFamily = DanaWear.Mono,
                 angularDirection = androidx.wear.compose.foundation.CurvedDirection.Angular.CounterClockwise
             )
@@ -460,7 +468,7 @@ private fun SnoozePicker(
             Modifier.fillMaxSize().padding(horizontal = 30.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StepArrow(Icons.AutoMirrored.Filled.KeyboardArrowLeft, "Previous", enabled = index > 0) { onStep(-1) }
+            StepArrow(Icons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(R.string.previous), enabled = index > 0) { onStep(-1) }
             Column(
                 Modifier
                     .weight(1f)
@@ -488,10 +496,10 @@ private fun SnoozePicker(
                         .background(DanaWear.Accent)
                         .padding(horizontal = 16.dp, vertical = 6.dp)
                 ) {
-                    Text("Snooze", fontSize = 13.sp, color = DanaWear.OnAccent)
+                    Text(stringResource(R.string.snooze), fontSize = 13.sp, color = DanaWear.OnAccent)
                 }
             }
-            StepArrow(Icons.AutoMirrored.Filled.KeyboardArrowRight, "Next", enabled = index < options.lastIndex) { onStep(1) }
+            StepArrow(Icons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(R.string.next), enabled = index < options.lastIndex) { onStep(1) }
         }
     }
 }
@@ -513,7 +521,13 @@ private fun StepArrow(icon: ImageVector, label: String, enabled: Boolean, onClic
 @Composable
 private fun SnoozeMarker(o: WearSnooze, tint: Color, size: Dp) {
     if (o.type == "time") {
-        val short = when (o.minutes) { 15 -> "15m"; 60 -> "1h"; 180 -> "3h"; 1440 -> "1d"; else -> "${o.minutes}m" }
+        val short = when (o.minutes) {
+            15 -> stringResource(R.string.snooze_short_15)
+            60 -> stringResource(R.string.snooze_short_60)
+            180 -> stringResource(R.string.snooze_short_180)
+            1440 -> stringResource(R.string.snooze_short_1440)
+            else -> stringResource(R.string.snooze_short_minutes, o.minutes)
+        }
         Text(short, fontFamily = DanaWear.Mono, fontSize = (size.value * 0.42f).sp, color = tint, maxLines = 1)
         return
     }
@@ -552,11 +566,11 @@ private fun zoneIcon(zone: String): ImageVector {
     }
 }
 
-private fun triggerSuffix(type: String) = when (type.lowercase()) {
-    "location" -> " · Place"
-    "car" -> " · Car"
-    "wake" -> " · Wake"
-    else -> ""
+private fun triggerName(type: String): Int? = when (type.lowercase()) {
+    "location" -> R.string.trigger_place
+    "car" -> R.string.trigger_car
+    "wake" -> R.string.trigger_wake
+    else -> null
 }
 
 private fun extractLeadingEmoji(text: String): Pair<String?, String> {

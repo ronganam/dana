@@ -19,6 +19,8 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.compose.ui.focus.focusRequester
 import androidx.wear.compose.material.*
+import io.github.ronganam.dana.wear.R
+import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalWearFoundationApi::class)
 @Composable
@@ -45,7 +47,7 @@ fun SnoozeScreen(
         ) {
             item {
                 Text(
-                    text = "Snooze",
+                    text = stringResource(R.string.snooze),
                     style = MaterialTheme.typography.caption1,
                     color = MaterialTheme.colors.secondary
                 )
@@ -63,17 +65,17 @@ fun SnoozeScreen(
             }
 
             val options = listOf(
-                Pair("15 minutes", 15),
-                Pair("1 hour", 60),
-                Pair("3 hours", 180),
-                Pair("1 day", 1440)
+                Pair(R.string.snooze_15_minutes, 15),
+                Pair(R.string.snooze_1_hour, 60),
+                Pair(R.string.snooze_3_hours, 180),
+                Pair(R.string.snooze_1_day, 1440)
             )
 
             items(options.size) { index ->
                 val (label, minutes) = options[index]
                 CompactChip(
                     onClick = { onSnoozeSelected(minutes) },
-                    label = { Text(label) },
+                    label = { Text(stringResource(label)) },
                     icon = { Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(18.dp)) },
                     colors = ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth()
@@ -87,7 +89,7 @@ fun SnoozeScreen(
             item {
                 CompactChip(
                     onClick = onDismiss,
-                    label = { Text("Cancel") },
+                    label = { Text(stringResource(R.string.cancel)) },
                     colors = ChipDefaults.secondaryChipColors(),
                     modifier = Modifier.fillMaxWidth()
                 )

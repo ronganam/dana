@@ -20,6 +20,9 @@ class DanaMessagingService : FirebaseMessagingService() {
             ?: Log.w(TAG, "Catch-up timed out")
     }
 
+    // firebase-messaging 26 deprecates the token callbacks for register() / onRegistered();
+    // moving there changes how the server learns the token, so it waits for a test on a device.
+    @Deprecated("Firebase's token API; see the note above")
     override fun onNewToken(token: String) {
         runBlocking { withTimeoutOrNull(9_000) { PhoneEvents.register(applicationContext, token) } }
     }

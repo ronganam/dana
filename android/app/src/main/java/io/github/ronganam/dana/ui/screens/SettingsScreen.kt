@@ -15,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.BuildConfig
@@ -40,6 +41,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import androidx.core.content.edit
 import androidx.core.net.toUri
+import io.github.ronganam.dana.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -124,7 +126,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                         onClick = {
                             viewModel.updateServerConfig(serverUrl, apiToken)
                             serverUrl = viewModel.serverConfig.url
-                            Toast.makeText(context, "Settings Saved", Toast.LENGTH_SHORT).show()
+                            Toast.makeText(context, R.string.toast_settings_saved, Toast.LENGTH_SHORT).show()
                         },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                     ) { Text("Save") }
@@ -146,7 +148,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                             try {
                                 context.startActivity(Intent(Settings.ACTION_VOICE_INPUT_SETTINGS))
                             } catch (e: Exception) {
-                                Toast.makeText(context, "Could not open settings", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_couldnt_open_settings, Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
@@ -242,10 +244,10 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                                             downloadProgress = -1
                                             if (file != null) {
                                                 if (!UpdateManager.installApk(context, file)) {
-                                                    Toast.makeText(context, "Could not launch installer", Toast.LENGTH_LONG).show()
+                                                    Toast.makeText(context, R.string.toast_couldnt_launch_installer, Toast.LENGTH_LONG).show()
                                                 }
                                             } else {
-                                                Toast.makeText(context, "Download failed — try again", Toast.LENGTH_LONG).show()
+                                                Toast.makeText(context, R.string.toast_download_failed, Toast.LENGTH_LONG).show()
                                             }
                                         }
                                     },
@@ -293,6 +295,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
 @Composable
 private fun CallRecordingSettings() {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(CallUploadSettings.enabled(context)) }
     var auto by remember { mutableStateOf(CallUploadSettings.autoUpload(context)) }
@@ -308,7 +311,7 @@ private fun CallRecordingSettings() {
     val enableLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
         callLogGranted = result[android.Manifest.permission.READ_CALL_LOG] ?: callLogGranted
         if (result[CallUploadSettings.storagePermission] == false) {
-            Toast.makeText(context, "Dana needs access to audio files to see call recordings", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, R.string.toast_needs_audio_access, Toast.LENGTH_LONG).show()
         }
         CallRecordingObserverService.start(context)
     }
@@ -403,7 +406,8 @@ private fun CallRecordingSettings() {
                         backlogBusy = false
                         Toast.makeText(
                             context,
-                            if (n == 0) "Nothing new to upload" else "Uploading $n recordings in the background",
+                            if (n == 0) resources.getString(R.string.toast_nothing_new_to_upload)
+                            else resources.getQuantityString(R.plurals.toast_uploading_recordings, n, n),
                             Toast.LENGTH_LONG
                         ).show()
                     }

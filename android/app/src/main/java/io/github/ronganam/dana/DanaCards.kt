@@ -1,5 +1,6 @@
 package io.github.ronganam.dana
 
+import androidx.annotation.StringRes
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -13,6 +14,7 @@ import io.github.ronganam.dana.data.models.PersonCard
 import io.github.ronganam.dana.data.wear.WearCards
 import io.github.ronganam.dana.data.network.PeopleApi
 import androidx.core.content.edit
+import io.github.ronganam.dana.R
 
 /** Opens the person's page (People screen) from a card, widget or notification. */
 const val EXTRA_OPEN_PERSON_ID = "io.github.ronganam.dana.OPEN_PERSON_ID"
@@ -35,8 +37,8 @@ object DanaCards {
     private const val CH_PEOPLE = "dana_people"
     private const val CH_REVIEW = "dana_review"
 
-    private fun channel(nm: NotificationManager, id: String, name: String, importance: Int) {
-        nm.createNotificationChannel(NotificationChannel(id, name, importance))
+    private fun channel(context: Context, nm: NotificationManager, id: String, @StringRes name: Int, importance: Int) {
+        nm.createNotificationChannel(NotificationChannel(id, context.getString(name), importance))
     }
 
     private fun openApp(context: Context, code: Int, extras: Intent.() -> Unit): PendingIntent =
@@ -76,7 +78,7 @@ object DanaCards {
         if (b.headline.isBlank()) return
         storeBriefing(context, b)
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        channel(nm, CH_BRIEFING, "Morning briefing", NotificationManager.IMPORTANCE_DEFAULT)
+        channel(context, nm, CH_BRIEFING, R.string.channel_briefing, NotificationManager.IMPORTANCE_DEFAULT)
         val style = NotificationCompat.InboxStyle().setBigContentTitle("☀️ ${b.headline}")
         b.points.forEach { style.addLine(it) }
         post(context, "briefing", 1, NotificationCompat.Builder(context, CH_BRIEFING)
@@ -95,7 +97,7 @@ object DanaCards {
     /** The `context_card` push: [c] before a meeting called [event], [mins] from now. */
     fun showMeetingCard(context: Context, c: PersonCard, event: String, mins: Int) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        channel(nm, CH_PEOPLE, "Before you meet someone", NotificationManager.IMPORTANCE_HIGH)
+        channel(context, nm, CH_PEOPLE, R.string.channel_people, NotificationManager.IMPORTANCE_HIGH)
         val title = "${c.name} · $event"
         val lines = listOf(c.headline) + c.summaryLines()
         val style = NotificationCompat.InboxStyle().setBigContentTitle(title)
@@ -116,7 +118,7 @@ object DanaCards {
     /** The `weekly_review` push: [items] things to decide, [summaryLines] the review's summary. */
     fun showReviewReady(context: Context, headline: String, items: Int, summaryLines: List<String>) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        channel(nm, CH_REVIEW, "Weekly review", NotificationManager.IMPORTANCE_DEFAULT)
+        channel(context, nm, CH_REVIEW, R.string.channel_review, NotificationManager.IMPORTANCE_DEFAULT)
         val summary = summaryLines.joinToString(" · ")
         post(context, "weekly_review", 3, NotificationCompat.Builder(context, CH_REVIEW)
             .setSmallIcon(android.R.drawable.ic_menu_agenda)

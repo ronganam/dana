@@ -30,6 +30,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.Text
+import io.github.ronganam.dana.wear.R
+import androidx.compose.ui.res.stringResource
 
 class MainActivity : ComponentActivity() {
 
@@ -48,7 +50,7 @@ class MainActivity : ComponentActivity() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "This is the Dana watch app.\nPlease install it on your watch.",
+                            text = stringResource(R.string.not_a_phone_app),
                             textAlign = TextAlign.Center,
                             modifier = Modifier.padding(16.dp)
                         )

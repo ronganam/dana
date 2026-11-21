@@ -16,6 +16,7 @@ import io.github.ronganam.dana.data.sync.CallUploads
 import io.github.ronganam.dana.data.sync.CallUploadSettings
 import io.github.ronganam.dana.data.sync.RecordingInspector
 import java.io.File
+import io.github.ronganam.dana.R
 
 class CallRecordingObserverService : Service() {
 
@@ -324,10 +325,10 @@ class CallRecordingObserverService : Service() {
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
-            "Call recordings",
+            getString(R.string.channel_call_recordings),
             NotificationManager.IMPORTANCE_DEFAULT
         ).apply {
-            description = "Handles call recording detection and upload progress"
+            description = getString(R.string.channel_call_recordings_description)
         }
         val manager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(channel)

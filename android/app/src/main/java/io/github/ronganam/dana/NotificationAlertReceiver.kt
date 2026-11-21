@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.github.ronganam.dana.R
 
 /**
  * The server's `alert` push event (see [io.github.ronganam.dana.push.PhoneEvents])
@@ -35,8 +36,8 @@ object NotificationAlertReceiver {
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Urgent notifications", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Phone notifications Dana thinks you shouldn't miss"
+            NotificationChannel(CHANNEL, context.getString(R.string.channel_urgent), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = context.getString(R.string.channel_urgent_description)
                 enableVibration(true)
                 vibrationPattern = longArrayOf(0, 600, 150, 600, 150, 600, 900, 600, 150, 600)
             }
@@ -53,8 +54,8 @@ object NotificationAlertReceiver {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_QUIET, "Urgent notifications (screen open)", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Kept while the alert screen is showing (the screen rings itself)"
+            NotificationChannel(CHANNEL_QUIET, context.getString(R.string.channel_urgent_quiet), NotificationManager.IMPORTANCE_LOW).apply {
+                description = context.getString(R.string.channel_urgent_quiet_description)
             }
         )
         // The alert screen opens by itself and rings + vibrates on its own, so

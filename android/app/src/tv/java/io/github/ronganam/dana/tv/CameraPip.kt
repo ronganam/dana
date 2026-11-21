@@ -78,7 +78,7 @@ object CameraPip {
             service != null -> service to WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
             Settings.canDrawOverlays(context) -> context.applicationContext to WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
             else -> {
-                Toast.makeText(context, "Enable the Dana TV button service to show cameras", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, R.string.toast_enable_tv_button_service, Toast.LENGTH_LONG).show()
                 return
             }
         }
