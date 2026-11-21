@@ -16,7 +16,8 @@ from core import clock
 from core.db import get_db_connection
 from core.users import User
 from addons.people import activity, linking, person_tasks, store
-from addons.people.values import DRIFT_MIN_DAYS, ago, norm_name, norm_phone, upcoming_birthday
+from core.addons.helpers import ago
+from addons.people.values import DRIFT_MIN_DAYS, norm_name, norm_phone, upcoming_birthday
 
 
 def cadence(dates: List[datetime.date], today: Optional[datetime.date] = None) -> Dict[str, Any]:

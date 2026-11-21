@@ -11,7 +11,12 @@ shipped. A migration that rebuilds a table other tables reference sets
 ``FOREIGN_KEYS_OFF = True``: the runner turns foreign keys off around it.
 
 Addon migrations are read from the addon folders (core/addon_dirs.py) by
-file path, without importing the addon (the runner runs before the addons load).
+file path, without importing the addon. Order: core's first, then each addon's
+after the addons its manifest ``needs`` (read from ``addon.py`` without running
+it: :func:`core.addon_dirs.read_manifest`); among addons free to go, the folder
+order (official first, then by name). A site / installed addon whose ``needs``
+are missing or form a cycle is left out (:func:`plan` says why); an official one
+stops the start.
 """
 
 import importlib.util
@@ -19,9 +24,10 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
-from typing import Dict, List, Tuple
+from typing import Dict, List, Set, Tuple
 
 from core import addon_dirs
+from core.addon_dirs import AddonFolder
 
 CORE = "core"
 _FILE = re.compile(r"^m(\d{4})_\w+$")
@@ -78,15 +84,73 @@ def discover(addon: str, folder: Path) -> Tuple[Migration, ...]:
     return tuple(out)
 
 
-def all_migrations() -> List[Tuple[str, Tuple[Migration, ...]]]:
-    """Core's migrations, then each addon folder's (official first, then site /
-    image / installed; by name within a source), as (addon, migrations)."""
-    out = [(CORE, discover(CORE, Path(__file__).parent))]
-    for folder in addon_dirs.addon_folders():
+@dataclass(frozen=True)
+class Plan:
+    """Every addon's migrations in the order they run (core's first), the
+    site / installed addons left out because their ``needs`` cannot be met
+    (name → why), and which addons are official."""
+    order: List[Tuple[str, Tuple[Migration, ...]]]
+    failed: Dict[str, str]
+    official: Set[str]
+
+
+def ordered_folders() -> Tuple[List[AddonFolder], Dict[str, str]]:
+    """Every addon folder after the addons its manifest ``needs`` (a name seen
+    twice keeps its first folder: the loader refuses that start), and the
+    site / installed ones that cannot be placed, with why.
+
+    Raises:
+        RuntimeError: an official addon's ``needs`` are missing or form a cycle.
+    """
+    folders: Dict[str, AddonFolder] = {}
+    for f in addon_dirs.addon_folders():
+        folders.setdefault(f.name, f)
+    needs = {name: f.needs for name, f in folders.items()}
+    placed: List[AddonFolder] = []
+    done: Set[str] = set()
+    waiting = list(folders.values())
+    while True:
+        free = next((f for f in waiting if all(d in done for d in needs[f.name])), None)
+        if free is None:
+            break
+        placed.append(free)
+        done.add(free.name)
+        waiting.remove(free)
+    failed: Dict[str, str] = {}
+    for f in waiting:
+        missing = [d for d in needs[f.name] if d not in folders]
+        if missing:
+            failed[f.name] = f"needs {', '.join(missing)}, which is not there"
+    changed = True
+    while changed:
+        changed = False
+        for f in waiting:
+            lost = [d for d in needs[f.name] if d in failed]
+            if f.name not in failed and lost:
+                failed[f.name] = f"needs {', '.join(lost)}, which cannot load"
+                changed = True
+    for f in waiting:
+        failed.setdefault(f.name, f"its needs ({', '.join(needs[f.name])}) form a cycle")
+    for f in waiting:
+        if f.source.official:
+            raise RuntimeError(f"The official addon {f.name!r} cannot be migrated: {failed[f.name]}")
+    return placed, failed
+
+
+def plan() -> Plan:
+    """What :func:`core.db.migrate` runs, in order (see the module docstring)."""
+    placed, failed = ordered_folders()
+    order = [(CORE, discover(CORE, Path(__file__).parent))]
+    for folder in placed:
         found = discover(folder.name, folder.migrations)
         if found:
-            out.append((folder.name, found))
-    return out
+            order.append((folder.name, found))
+    return Plan(order, failed, {f.name for f in placed if f.source.official})
+
+
+def all_migrations() -> List[Tuple[str, Tuple[Migration, ...]]]:
+    """Core's migrations, then each addon's in :func:`plan` order, as (addon, migrations)."""
+    return plan().order
 
 
 def official_with_migrations() -> List[str]:

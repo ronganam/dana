@@ -17,7 +17,8 @@ from core.db import get_db_connection
 from core.users import User
 from addons.contacts import store as contacts
 from addons.people import activity, briefs, cadence, linking, person_tasks, store
-from addons.people.values import ago, initials, loads, parse_time, upcoming_birthday
+from core.addons.helpers import ago
+from addons.people.values import initials, loads, parse_time, upcoming_birthday
 
 
 def get_person(user: User, person_id: str, *, schedule_brief: bool = True) -> Optional[Dict[str, Any]]:

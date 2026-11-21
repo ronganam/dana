@@ -12,6 +12,15 @@ applied. A database made by Dana 9.0 (one sequence of migrations, at 33 or
 with :class:`SchemaError` (start Dana 9.0.0 on it once). Before migrations are
 applied to an existing database, a consistent copy is written to
 ``snapshots/db-before-<addon>-<version>.sqlite3`` (core/db_snapshot.py).
+
+Order and failures: core's migrations first, then each addon's after the
+addons it ``needs`` (core/db/migrations, :func:`~core.db.migrations.plan`).
+Each addon's pending migrations run in one transaction of their own. When one
+of core's or an official addon's fails, everything of that addon is rolled
+back and the error stops the start (it is a bug). When a site / installed
+addon's fails, only that addon is rolled back; it is recorded in the result's
+``failed`` (and so is every addon that needs it), the others go on, and the
+loader does not load it (:func:`core.addons.loader.migrate`).
 """
 
 import datetime
@@ -19,11 +28,11 @@ import logging
 import os
 import sqlite3
 from pathlib import Path
-from typing import List, Optional, Set, Tuple, Union
+from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple, Union
 
-from core import db_snapshot
+from core import addon_dirs, db_snapshot
 from core.db import convert
-from core.db.migrations import CORE, Migration, all_migrations, official_with_migrations
+from core.db.migrations import CORE, Migration, all_migrations, official_with_migrations, plan
 from core.paths import DATABASE_PATH
 
 logger = logging.getLogger(__name__)
@@ -38,6 +47,16 @@ PathLike = Union[str, Path]
 
 class SchemaError(RuntimeError):
     """The database cannot be migrated (older than Dana 9.0, or newer than this code)."""
+
+
+class Migrated(List[str]):
+    """What :func:`migrate` applied: the labels (``"core:0001_baseline"``), in
+    order, and ``failed``: the site / installed addons whose migrations were
+    not applied this time, name → why (rolled back, or they need one that was)."""
+
+    def __init__(self, labels: Iterable[str] = (), failed: Optional[Dict[str, str]] = None) -> None:
+        super().__init__(labels)
+        self.failed: Dict[str, str] = dict(failed or {})
 
 
 def get_db_connection(path: Optional[PathLike] = None) -> sqlite3.Connection:
@@ -95,7 +114,8 @@ def _convert_old(conn: sqlite3.Connection, db_path: Path) -> None:
     """Convert a Dana 9.0 database (old single-numbered migrations) in place, after a snapshot.
 
     Raises:
-        SchemaError: it is older than 9.0 (before migration 33) or newer than 34.
+        SchemaError: it is older than 9.0 (before migration 33), newer than 34,
+            or one of the old migrations 1..33 is not recorded.
     """
     versions = convert.old_versions(conn)
     top = max(versions, default=0)
@@ -105,6 +125,12 @@ def _convert_old(conn: sqlite3.Connection, db_path: Path) -> None:
     if top not in convert.CONVERTIBLE:
         raise SchemaError(f"The database at {db_path} is older than Dana 9.0 (migration {top}): upgrade with "
                           "Dana 9.0.0 first (start it once on this database), then this version.")
+    gaps = convert.missing(conn)
+    if gaps:
+        raise SchemaError(f"The database at {db_path} is at migration {top} but has not recorded migration(s) "
+                          f"{', '.join(map(str, gaps))} of Dana 9.0, so its schema is not the one this version "
+                          "converts. Restore it from a backup made by Dana 9.0, or start Dana 9.0.0 on it once "
+                          "so it applies them, then this version.")
     _snapshot(db_path, f"addons-from-{top:04d}")
     conn.execute("BEGIN IMMEDIATE")
     try:
@@ -116,15 +142,53 @@ def _convert_old(conn: sqlite3.Connection, db_path: Path) -> None:
     logger.info(f"Database converted to per-addon migrations (from version {top})")
 
 
-def migrate(path: Optional[PathLike] = None) -> List[str]:
+def _apply(conn: sqlite3.Connection, ms: List[Migration]) -> None:
+    """Apply ``ms`` (one addon's pending migrations) in one transaction; rolled back as a whole when one raises.
+
+    A migration that rebuilds a table other tables reference (SQLite cannot
+    change a constraint in place) sets ``FOREIGN_KEYS_OFF``: the whole
+    transaction then runs with foreign keys off, as SQLite's table-rebuild
+    procedure requires (the pragma only takes effect outside a transaction).
+    """
+    fk_off = any(getattr(m.module, "FOREIGN_KEYS_OFF", False) for m in ms)
+    if fk_off:
+        conn.execute("PRAGMA foreign_keys = OFF")
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        conn.execute(convert.CREATE_TABLE.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS", 1))
+        for m in ms:
+            m.module.up(conn)
+            conn.execute("INSERT INTO schema_migrations (addon, version, name, applied_at) VALUES (?, ?, ?, ?)",
+                         (m.addon, m.version, m.name, _now()))
+        conn.execute("COMMIT")
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    finally:
+        if fk_off:
+            conn.execute("PRAGMA foreign_keys = ON")
+
+
+def _error(e: BaseException) -> str:
+    return f"{type(e).__name__}: {e}"
+
+
+def migrate(path: Optional[PathLike] = None, *, skip: Collection[str] = ()) -> Migrated:
     """Bring the database up to date. Returns the labels of the migrations
-    applied (``"core:0001_baseline"``, ``"tasks:0002_…"``), empty when it already was.
+    applied (``"core:0001_baseline"``, ``"tasks:0002_…"``), empty when it
+    already was, with the site / installed addons that failed (``.failed``;
+    see the module docstring). ``skip``: addons whose migrations are not run
+    this time (the loader's failed addons: they do not load).
 
     Raises:
         SchemaError: the database predates Dana 9.0, or it has migrations of
-            core or of a present addon that this code does not know.
+            core or of an official addon that this code does not know.
+        Exception: a migration of core or of an official addon failed (rolled back).
     """
     db_path = Path(path or DATABASE_PATH)
+    the_plan = plan()
+    failed: Dict[str, str] = dict(the_plan.failed)
+    trusted = {CORE, *the_plan.official}
     conn = get_db_connection(db_path)
     conn.isolation_level = None  # explicit transactions below
     try:
@@ -137,41 +201,44 @@ def migrate(path: Optional[PathLike] = None) -> List[str]:
         done: Set[Tuple[str, int]] = set()
         if "schema_migrations" in _user_tables(conn):
             done = {(r[0], r[1]) for r in conn.execute("SELECT addon, version FROM schema_migrations")}
-        everything = all_migrations()
-        for addon, ms in everything:
+        for addon, ms in the_plan.order:
             unknown = sorted(v for a, v in done if a == addon and v not in {m.version for m in ms})
-            if unknown:
-                raise SchemaError(f"The database at {db_path} has migrations of {addon} this code does not know "
-                                  f"({unknown}); it was made by a newer version.")
-        pending = [m for _, ms in everything for m in ms if (m.addon, m.version) not in done]
+            if not unknown:
+                continue
+            why = f"the database has migrations of {addon} this code does not know ({unknown})"
+            if addon in trusted:
+                raise SchemaError(f"The database at {db_path}: {why}; it was made by a newer version.")
+            failed[addon] = f"{why}: the addon's folder is older than the database"
+        pending = [(addon, [m for m in ms if (m.addon, m.version) not in done])
+                   for addon, ms in the_plan.order]
+        pending = [(addon, ms) for addon, ms in pending if ms]
         if not pending:
-            return []
+            return Migrated((), failed)
         if tables:
-            _snapshot(db_path, f"{pending[0].addon}-{pending[0].version:04d}")
+            first = pending[0][1][0]
+            _snapshot(db_path, f"{first.addon}-{first.version:04d}")
+        needs = {f.name: f.needs for f in addon_dirs.addon_folders()}
         applied: List[str] = []
-        for m in pending:
-            # A migration that rebuilds a table other tables reference (SQLite
-            # cannot change a constraint in place) runs with foreign keys off,
-            # as SQLite's table-rebuild procedure requires; the pragma only
-            # takes effect outside a transaction.
-            fk_off = bool(getattr(m.module, "FOREIGN_KEYS_OFF", False))
-            if fk_off:
-                conn.execute("PRAGMA foreign_keys = OFF")
-            conn.execute("BEGIN IMMEDIATE")
+        for addon, ms in pending:
+            lost = [d for d in needs.get(addon, ()) if d in failed or d in skip]
+            if addon in skip or addon in failed or lost:
+                if lost and addon not in failed and addon not in skip:
+                    failed[addon] = f"needs {', '.join(lost)}, which failed to load"
+                continue
             try:
-                conn.execute(convert.CREATE_TABLE.replace("CREATE TABLE", "CREATE TABLE IF NOT EXISTS", 1))
-                m.module.up(conn)
-                conn.execute("INSERT INTO schema_migrations (addon, version, name, applied_at) VALUES (?, ?, ?, ?)",
-                             (m.addon, m.version, m.name, _now()))
-                conn.execute("COMMIT")
-            except BaseException:
-                conn.execute("ROLLBACK")
+                _apply(conn, ms)
+            except (KeyboardInterrupt, SystemExit):
                 raise
-            finally:
-                if fk_off:
-                    conn.execute("PRAGMA foreign_keys = ON")
-            logger.info(f"Applied database migration {m.label}")
-            applied.append(m.label)
-        return applied
+            except BaseException as e:
+                if addon in trusted:
+                    raise
+                logger.error(f"Database migrations of the addon {addon} failed and were rolled back; "
+                             f"it will not load: {_error(e)}")
+                failed[addon] = f"its database migration failed and was rolled back: {_error(e)}"
+                continue
+            for m in ms:
+                logger.info(f"Applied database migration {m.label}")
+                applied.append(m.label)
+        return Migrated(applied, failed)
     finally:
         conn.close()

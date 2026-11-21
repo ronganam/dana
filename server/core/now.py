@@ -52,10 +52,10 @@ from core.db import get_db_connection
 from core.users import User
 from addons.calendar import config as calendar_config, today as calendar_today_cache, tools as calendar_tools
 from core.addons import DayItem, NowContext, registry, store
+from core.addons.helpers import ago, fmt_date, parse_time, when_phrase
 from addons.homeassistant import client as ha_client, config as ha_config
 from addons.money import config as money_config, insights as money_insights, queries as money_queries
 from addons.money import savings as money_savings, store as money_store
-from addons.people.values import ago as people_ago
 from addons.phone import push as phone_push, suggestions as phone_suggestions
 from addons.phone.calls import actions as suggestion_actions
 from addons.phone.calls.store import parse_call_time
@@ -107,29 +107,6 @@ def _utc(dt: Optional[datetime.datetime] = None) -> str:
 # ---------------------------------------------------------------------------
 # Formatting
 # ---------------------------------------------------------------------------
-
-def _parse(value: Any) -> Optional[datetime.datetime]:
-    return checks.parse(value)
-
-
-def ago(dt: Optional[datetime.datetime], now: Optional[datetime.datetime] = None) -> str:
-    return people_ago(dt, now or clock.now()) if dt else ""
-
-
-def when_phrase(dt: datetime.datetime, now: Optional[datetime.datetime] = None) -> str:
-    """'19:40' (today) / 'tonight 20:00' / 'tomorrow 09:00' / 'Thu 18:00' / '3 Dec 10:00'."""
-    now = now or clock.now()
-    dt = dt.astimezone(now.tzinfo)
-    hm = dt.strftime("%H:%M")
-    days = (dt.date() - now.date()).days
-    if days == 0:
-        return f"tonight {hm}" if dt.hour >= 18 and now.hour < 18 else hm
-    if days == 1:
-        return f"tomorrow {hm}"
-    if 1 < days < 7:
-        return f"{dt.strftime('%a')} {hm}"
-    return f"{dt.day} {dt.strftime('%b')} {hm}"
-
 
 def _home_cache() -> Dict[str, Any]:
     """The current user's home-zone cache (Now's formatting helpers run as the user they compose for)."""
@@ -215,21 +192,6 @@ def _set_message(triggers: Dict[str, Any], now: Optional[datetime.datetime] = No
     return f"Reminder set · {phrase}" if phrase else "Added to reminders"
 
 
-def fmt_date(d: Optional[str]) -> str:
-    try:
-        x = datetime.date.fromisoformat(str(d)[:10])
-    except ValueError:
-        return str(d or "")
-    today = clock.now().date()
-    if x == today:
-        return "today"
-    if x == today + datetime.timedelta(days=1):
-        return "tomorrow"
-    if 0 < (x - today).days < 7:
-        return x.strftime("%a")
-    return f"{x.day} {x.strftime('%b')}"
-
-
 # ---------------------------------------------------------------------------
 # Cached outside data: calendar + weather (never block the request for long)
 # ---------------------------------------------------------------------------
@@ -292,7 +254,7 @@ def _approval_items(now: datetime.datetime, user_id: str) -> List[Dict[str, Any]
     except Exception:
         return []
     for r in rows:
-        at = _parse(r["updated_at"])
+        at = parse_time(r["updated_at"])
         if at and (now - at).total_seconds() > APPROVAL_MAX_HOURS * 3600:
             continue
         p = cards.loads(r["pending_approval"], {})
@@ -1090,10 +1052,9 @@ async def act(user: User, item_id: str, action: str, args: Optional[Dict[str, An
                    "money_save": _act_money_save, "money_target": _act_money_target}.get(kind)
         if handler:
             return await handler(user, ref, action, args, clock.now())
-        hook = registry.hook_for("now_action", kind)
+        hook = registry.hook_for("now_action", kind, user)  # NotConnected → 403 not_connected
         if hook is None:
             raise cards.ActError(f"unknown kind '{kind}'")
-        store.require(user, hook.addon)  # NotConnected → 403 not_connected
         return await hook.func(user, ref, action, args, clock.now())
 
 

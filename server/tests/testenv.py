@@ -16,7 +16,8 @@ WAHA / Google values it finds into the database. A test must never pick up,
 store or use the developer's real credentials, so this:
 
 - stops LiteLLM from loading ``.env`` (``LITELLM_MODE=PRODUCTION``; that is all
-  the flag changes);
+  the flag changes) and Dana from loading one in a subprocess such as
+  ``bin/dana`` (``DANA_ENV_FILE=""``, core/env_file.py);
 - removes every env name the startup import or the identity bootstrap reads
   (whatever the shell exported or something loaded before), so the code
   sees exactly what an unset value gives in production: its defaults;
@@ -90,6 +91,7 @@ def isolate(name: str) -> str:
     """Clean the environment for a test process and point ``DATABASE_PATH``
     at ``<scratch dir>/<name>.sqlite3``. Returns that path."""
     os.environ["LITELLM_MODE"] = "PRODUCTION"
+    os.environ["DANA_ENV_FILE"] = ""  # a subprocess (bin/dana) never reads a real server/.env
     for env in ADDON_ENV + IDENTITY_ENV:
         os.environ.pop(env, None)
     os.environ.update(OWNER_ENV)

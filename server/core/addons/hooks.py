@@ -11,7 +11,7 @@ composers have always produced:
 
 - :class:`Card` — a card on the Now screen (``@addon.now_cards``);
 - :class:`DayItem` — an item in the Now screen's day strip (``@addon.day_items``);
-- :class:`Section` — a part of the morning briefing or the weekly review (``@addon.briefing``);
+- :class:`Section` — a part of the morning briefing (``@addon.briefing``) or the weekly review (``@addon.review``);
 - :class:`Hit` — a result of the global search (``@addon.search``);
 - :class:`Check` — a line of the self-checks (``@addon.selfcheck``);
 - :class:`Approval` — the Approve card of a tool call (``@addon.tool(describe=)``).
@@ -92,6 +92,8 @@ class Job:
     at_start: bool = False
     # Seconds to wait after the server starts before the first pass.
     delay: float = 0.0
+    # Seconds one user's run may take before it is cancelled (logged as failed for that user).
+    timeout: float = 600.0
 
     @property
     def key(self) -> str:
@@ -129,9 +131,10 @@ class Channel:
 @dataclass(frozen=True)
 class Hook:
     """A composer hook (``now_cards``, ``day_items``, ``now_action``, ``briefing``,
-    ``review_action``, ``search``, ``selfcheck``, ``context``, ``context_card``):
-    ``key`` names what it is for when the hook has one (the card kind it acts on,
-    the context kind, the check key), ``options`` its decorator's other values."""
+    ``review``, ``review_action``, ``search``, ``selfcheck``, ``context``,
+    ``context_card``): ``key`` names what it is for when the hook has one (the
+    card prefix it acts on, the section key, the item type, the context kind,
+    the check key; unique across addons), ``options`` its decorator's other values."""
     addon: str
     kind: str
     func: Callable[..., Any]
@@ -197,15 +200,10 @@ class NowContext:
 
 # --- Briefing / weekly review ---------------------------------------------------------
 
-BRIEFING = "briefing"
-WEEKLY_REVIEW = "weekly_review"
-
 
 @dataclass(frozen=True)
 class BriefingContext:
-    """What ``@addon.briefing`` gets: ``kind`` (:data:`BRIEFING` or
-    :data:`WEEKLY_REVIEW`) and the moment."""
-    kind: str
+    """What ``@addon.briefing`` and ``@addon.review`` get besides the user: the moment."""
     now: datetime.datetime
 
     @property
@@ -215,16 +213,16 @@ class BriefingContext:
 
 @dataclass
 class Section:
-    """An addon's part of a briefing or weekly review.
+    """An addon's part of a briefing (``@addon.briefing``) or weekly review
+    (``@addon.review``), stored under the key its decorator declares.
 
-    ``key``: where ``data`` goes in the stored briefing / review data (and the
-    model's prompt). Briefing: ``points`` are the plain lines used when the
-    model is not, ``headline`` is added to the plain headline, ``counts`` go to
-    the phone push. Weekly review: ``items`` are things to decide (each with
-    ``ref``, ``type``, ``title``, ``why``, ``facts``), acted on by the addon's
-    ``@addon.review_action(type)``.
+    ``data``: what goes in the stored briefing / review data (and the model's
+    prompt). Briefing: ``points`` are the plain lines used when the model is
+    not, ``headline`` is added to the plain headline, ``counts`` go to the
+    phone push (only the keys the decorator declares). Weekly review:
+    ``items`` are things to decide (each with ``ref``, ``type``, ``title``,
+    ``why``, ``facts``), acted on by the addon's ``@addon.review_action(type)``.
     """
-    key: str
     data: Any = None
     points: List[str] = field(default_factory=list)
     headline: str = ""

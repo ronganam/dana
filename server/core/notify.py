@@ -1,11 +1,12 @@
 """Proactive messages to a user (../docs/addons.md, "The manifest": ``@addon.channel``).
 
 ``await send(user, Message(...))`` delivers one message on every channel the
-user has: Telegram (core's own: the message's ``text`` to their chat,
-``users.telegram_chat_id``) and each ``@addon.channel`` of an addon they have
-(the phone addon's ``push``: the message's ``kind`` and ``data`` as a push
-event). Each channel takes what it can use from the message and says whether
-it delivered it; one failing is logged and never stops the others.
+user has, all at once (``asyncio.gather``): Telegram (core's own: the
+message's ``text`` to their chat, ``users.telegram_chat_id``) and each
+``@addon.channel`` of an addon active for them (the phone addon's ``push``:
+the message's ``kind`` and ``data`` as a push event). Each channel takes what
+it can use from the message and says whether it delivered it; one failing
+(or raising) is logged, counts as not delivered and never stops the others.
 
 ``await notify(user, text)`` is the Telegram channel alone (the text to the
 user's chat). It is a no-op returning False when
@@ -20,9 +21,10 @@ WhatsApp voice transcripts (:func:`whatsapp_voice`, sent to the chat their
 
 """
 
+import asyncio
 import logging
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional, Protocol
+from typing import Any, Awaitable, Dict, List, Optional, Protocol
 
 from core.users import User
 from core.addons import registry
@@ -79,19 +81,32 @@ async def notify(user: User, text: str, *, parse_mode: Optional[str] = None) -> 
     return True
 
 
+async def _deliver(user: User, ch: Any, message: Message) -> bool:
+    try:
+        return bool(await ch.func(user, message))
+    except Exception as e:
+        logger.error(f"Channel {ch.name} ({ch.addon}) failed for user {user.id}: {e}", exc_info=True)
+        return False
+
+
 async def send(user: User, message: Message) -> Dict[str, bool]:
     """Deliver ``message`` to ``user`` on Telegram (when it has text) and on
-    every channel of the addons they have, in addon order. Returns channel
-    name → whether it delivered."""
-    out: Dict[str, bool] = {}
+    every channel of the addons active for them, concurrently. Returns
+    channel name → whether it delivered (Telegram first, then addon order)."""
+    names: List[str] = []
+    sends: List[Awaitable[bool]] = []
     if message.text:
-        out[TELEGRAM] = await notify(user, message.text, parse_mode=message.parse_mode)
+        names.append(TELEGRAM)
+        sends.append(notify(user, message.text, parse_mode=message.parse_mode))
     for ch in registry.channels(user):
-        try:
-            out[ch.name] = bool(await ch.func(user, message))
-        except Exception as e:
-            logger.error(f"Channel {ch.name} ({ch.addon}) failed for user {user.id}: {e}", exc_info=True)
-            out[ch.name] = False
+        names.append(ch.name)
+        sends.append(_deliver(user, ch, message))
+    results = await asyncio.gather(*sends, return_exceptions=True)
+    out: Dict[str, bool] = {}
+    for name, result in zip(names, results):
+        if isinstance(result, BaseException):
+            logger.error(f"Channel {name} failed for user {user.id}: {result}")
+        out[name] = result is True
     return out
 
 

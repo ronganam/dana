@@ -63,7 +63,7 @@ from addons.tasks.groups import ensure_default_groups_for_everyone
 ensure_default_groups_for_everyone()
 
 from addons.knowledge import api as knowledge_api
-from core import approval_text, search, sharing_api, undo
+from core import approval_text, events, search, sharing_api, undo
 from core.addons import sharing
 from addons.phone.calls import context as call_context
 from core.auth import setup_auth
@@ -115,10 +115,11 @@ def run(coro):
 
 
 def settle() -> None:
-    """Let background media processing started by the last call finish."""
+    """Let background media processing and the event handlers started by the last call finish."""
     pending = list(media._tasks)
     if pending:
         run(asyncio.gather(*pending))
+    run(events.drain())
 
 
 def tool(who, tool_name: str, **args) -> Any:

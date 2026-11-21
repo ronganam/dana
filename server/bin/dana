@@ -6,6 +6,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+# Dana's own .env, and LiteLLM kept from loading any, before anything else of Dana (core/env_file.py).
+from core import env_file  # noqa: E402
+env_file.load()
+
 from cli.main import main  # noqa: E402
 
 if __name__ == "__main__":

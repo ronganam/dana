@@ -58,6 +58,12 @@ def register(name: str, profile: str, label: str = "", *, addon: str) -> Purpose
     return p
 
 
+def forget_addon(addon: str) -> None:
+    """Remove every purpose of ``addon`` (the loader, for an addon that did not load after all)."""
+    for name in [n for n, p in _purposes.items() if p.addon == addon]:
+        del _purposes[name]
+
+
 def get(name: str) -> Purpose:
     """The purpose called ``name``.
 

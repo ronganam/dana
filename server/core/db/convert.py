@@ -14,16 +14,21 @@ of that scheme is converted in place by :func:`convert` (after a snapshot):
    addon applied.
 
 An older database (version < 33, or one made before migrations existed) is
-refused by the runner: start Dana 9.0.0 on it once first.
+refused by the runner: start Dana 9.0.0 on it once first. So is one that
+skipped an old migration (:func:`missing`: any of 1..33 not recorded): the
+baselines describe the schema all of them leave, so converting it would mark
+a schema it does not have.
 """
 
 import datetime
 import sqlite3
-from typing import Iterable, Set
+from typing import Iterable, List, Set
 
 # The versions an old-scheme database must be at to be converted.
 CONVERTIBLE = (33, 34)
 LAST = 34
+# The old migrations every convertible database has recorded (1..33: the 9.0 release).
+REQUIRED = range(1, 34)
 
 # Old migration 34 ("connections"), applied to a database still at 33.
 M0034 = [
@@ -48,6 +53,12 @@ M0034 = [
 def old_versions(conn: sqlite3.Connection) -> Set[int]:
     """The versions an old-scheme ``schema_migrations`` records."""
     return {r[0] for r in conn.execute("SELECT version FROM schema_migrations")}
+
+
+def missing(conn: sqlite3.Connection) -> List[int]:
+    """The old migrations of :data:`REQUIRED` an old-scheme database has not recorded, in order."""
+    have = old_versions(conn)
+    return [v for v in REQUIRED if v not in have]
 
 
 def is_old(conn: sqlite3.Connection) -> bool:

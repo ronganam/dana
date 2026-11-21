@@ -1,21 +1,24 @@
-import asyncio
-import logging
-import os
-import sys
-from dotenv import load_dotenv
+# Dana's own .env, and LiteLLM kept from loading any, before anything else is
+# imported: several modules (e.g. core.paths) read their configuration at import
+# time, and LiteLLM reads LITELLM_MODE when it is first imported (core/env_file.py).
+from core import env_file
+env_file.load()
 
-# Load environment configuration before importing our packages: several modules
-# (e.g. core.paths) resolve configuration at import time.
-load_dotenv()
+import asyncio  # noqa: E402
+import logging  # noqa: E402
+import os  # noqa: E402
+import sys  # noqa: E402
 
-# Import our packages
-from core.telegram_bot import TelegramBot
-from core.server import start_webhook_listener
-from core import auth, clock, db, lifecycle, llm, session_runner, users
-from core.paths import DATA_DIR, ensure_data_dirs
-from addons import bootstrap as addons_bootstrap
-from core.addons import registry, store
-from core.addons.crypto import CredentialsKeyError
+# The addons first (importing the package loads them all: core/addons/loader.py),
+# then the rest of the app.
+import addons  # noqa: E402,F401
+from core.telegram_bot import TelegramBot  # noqa: E402
+from core.server import start_webhook_listener  # noqa: E402
+from core import auth, clock, db, lifecycle, llm, session_runner, users  # noqa: E402
+from core.paths import DATA_DIR, ensure_data_dirs  # noqa: E402
+from addons import bootstrap as addons_bootstrap  # noqa: E402
+from core.addons import loader, registry, store  # noqa: E402
+from core.addons.crypto import CredentialsKeyError  # noqa: E402
 
 # Setup logging
 logging.basicConfig(
@@ -36,15 +39,19 @@ async def main():
         sys.exit(1)
     ensure_data_dirs()
     logger.info(f"Data directory: {DATA_DIR}")
-    # The schema, then the data every part relies on, before anything reads
-    # the database. A database older than 8.1.0 stops the start here.
+    # The schema (core's, then each loaded addon's), then the data every part
+    # relies on, before anything reads the database. A database older than
+    # Dana 9.0 stops the start here; a site addon whose migrations fail is
+    # taken out and the start goes on (core/addons/loader.py).
     try:
-        applied = db.migrate()
+        applied = loader.migrate()
     except db.SchemaError as e:
         logger.error(str(e))
         sys.exit(1)
     if applied:
         logger.info(f"Database migrated: {', '.join(applied)}")
+    for name, why in applied.failed.items():
+        logger.error(f"Addon {name} not loaded: {why}")
     users.bootstrap()
     # Addons: the credentials key (generated into the data directory when
     # CREDENTIALS_KEY is unset), then the first admin's default addons (once).

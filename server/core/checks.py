@@ -51,11 +51,11 @@ from core import briefing, clock, now_hidden, undo, users, wake
 from core.db import get_db_connection
 from core.users import User
 from addons.calendar import config as calendar_config, today as calendar_today
-from core.addons import registry, store
+from core.addons import helpers, registry, store
+from core.addons.helpers import parse_time
 from core.addons.hooks import Check, Hook
 from addons.homeassistant import config as ha_config, status as ha_status, watcher as ha_watcher
 from addons.money import companies as money_companies, config as money_config
-from addons.people.values import ago as people_ago
 from addons.phone import push as phone_push
 from addons.phone.config import ADDON as PHONE, mark_key as phone_mark_key
 
@@ -146,23 +146,6 @@ def get_mark(key: str) -> Dict[str, Any]:
 # Time helpers
 # ---------------------------------------------------------------------------
 
-def parse(value: Any) -> Optional[datetime.datetime]:
-    """ISO with or without zone, or SQLite's CURRENT_TIMESTAMP (naive = UTC) → local aware."""
-    if not value:
-        return None
-    s = str(value).strip().replace("Z", "+00:00")
-    try:
-        dt = datetime.datetime.fromisoformat(s)
-    except ValueError:
-        try:
-            dt = datetime.datetime.fromisoformat(s[:19])
-        except ValueError:
-            return None
-    if dt.tzinfo is None:
-        dt = dt.replace(tzinfo=datetime.timezone.utc)
-    return dt.astimezone(clock.get_timezone())
-
-
 def span(seconds: float) -> str:
     """'4 min' / '14 h' / '3 days'."""
     seconds = max(0.0, seconds)
@@ -174,9 +157,8 @@ def span(seconds: float) -> str:
 
 
 def ago(dt: Optional[datetime.datetime], now: Optional[datetime.datetime] = None) -> str:
-    if not dt:
-        return "never"
-    return people_ago(dt, now or clock.now())
+    """:func:`core.addons.helpers.ago`, but "never" without a time."""
+    return helpers.ago(dt, now) if dt else "never"
 
 
 def _iso(dt: Optional[datetime.datetime]) -> Optional[str]:
@@ -206,13 +188,13 @@ def _check_push(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str,
         (user.id,)).fetchall()]
     m = dict(conn.execute("SELECT * FROM system_marks WHERE key = ?",
                           (phone_mark_key("push", user.id),)).fetchone() or {})
-    last_ok, last_fail = parse(m.get("last_ok_at")), parse(m.get("last_fail_at"))
-    fetch = _latest(*(parse(d.get("last_fetch_at")) for d in devs))
-    seen = _latest(fetch, *(parse(d.get("updated_at")) for d in devs))
+    last_ok, last_fail = parse_time(m.get("last_ok_at")), parse_time(m.get("last_fail_at"))
+    fetch = _latest(*(parse_time(d.get("last_fetch_at")) for d in devs))
+    seen = _latest(fetch, *(parse_time(d.get("updated_at")) for d in devs))
     facts = []
     for d in devs[:3]:
         facts.append(f"{d.get('name') or 'Phone'}" + (f" · app {d['app_version']}" if d.get("app_version") else "")
-                     + f" · last check-in {ago(parse(d.get('last_fetch_at')) or parse(d.get('updated_at')), now)}")
+                     + f" · last check-in {ago(parse_time(d.get('last_fetch_at')) or parse_time(d.get('updated_at')), now)}")
     if last_ok:
         facts.append(f"Last push accepted {ago(last_ok, now)}")
     if last_fail:
@@ -241,7 +223,7 @@ def _check_notification_sync(conn, now: datetime.datetime, user: Optional[User])
     m = dict(conn.execute("SELECT * FROM system_marks WHERE key = ?",
                           (phone_mark_key("notification_sync", user.id),)).fetchone() or {})
     row = conn.execute("SELECT MAX(created_at) AS t FROM notifications WHERE user_id = ?", (user.id,)).fetchone()
-    last = _latest(parse(m.get("last_at")), parse(row["t"] if row else None))
+    last = _latest(parse_time(m.get("last_at")), parse_time(row["t"] if row else None))
     why = "Dana can't see what needs you. Check notification access for the Dana app."
     if not last:
         return _result("notification_sync", False, "No batch received yet", None,
@@ -257,7 +239,7 @@ def _check_notification_sync(conn, now: datetime.datetime, user: Optional[User])
 def _check_trigger_feed(conn, now: datetime.datetime, user: Optional[User], key: str, prefix: str, role: str,
                         setting: str, days: float, what: str, why: str) -> Dict[str, Any]:
     # The user's feed: the latest change of the entity their Home Assistant watcher watches.
-    last = parse(ha_status.read(user.id).last_event.get(role)) if user is not None else None
+    last = parse_time(ha_status.read(user.id).last_event.get(role)) if user is not None else None
     if not last:
         return _result(key, False, "never received", None, title=f"No {what} updates received yet", why=why)
     quiet = (now - last).total_seconds()
@@ -305,7 +287,7 @@ def _check_ha_watcher(conn, now: datetime.datetime, user: Optional[User]) -> Dic
     if spec is None:
         return _result("ha_watcher", True, "nothing to watch", None)
     st = ha_status.read(user.id)
-    since = parse(st.since)
+    since = parse_time(st.since)
     why = "Location and car reminders won't fire while Dana can't watch your Home Assistant."
     blocks = [{"type": "text", "label": "Error", "text": st.detail}] if st.detail else []
     if st.connected:
@@ -328,11 +310,11 @@ def wake_week(conn, now: datetime.datetime, user: User) -> List[Dict[str, Any]]:
     start = (now.date() - datetime.timedelta(days=6)).isoformat()
     for r in conn.execute("SELECT date, created_at FROM briefings WHERE user_id = ? AND trigger = 'wake' AND date >= ?",
                           (user.id, start)).fetchall():
-        t = parse(r["created_at"])
+        t = parse_time(r["created_at"])
         if t:
             times[r["date"]] = t.strftime("%H:%M")
     for r in conn.execute("SELECT date, at FROM wake_log WHERE user_id = ? AND date >= ?", (user.id, start)).fetchall():
-        t = parse(r["at"])
+        t = parse_time(r["at"])
         if t:
             times[r["date"]] = t.strftime("%H:%M")
         elif r["date"] not in times:
@@ -358,7 +340,7 @@ def _check_wake(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str,
             last_date = None
     signal = dict(conn.execute("SELECT * FROM system_marks WHERE key = ?",
                                (phone_mark_key(wake.SIGNAL_MARK, user.id),)).fetchone() or {})
-    sig_at = parse(signal.get("last_at"))
+    sig_at = parse_time(signal.get("last_at"))
     blocks: List[Dict[str, Any]] = [{"type": "week", "label": "Last 7 mornings", "cells": wake_week(conn, now, user)}]
     facts = []
     if sig_at:
@@ -390,7 +372,7 @@ def _check_triage(conn, now: datetime.datetime, user: Optional[User]) -> Dict[st
     if failed >= 3 and failed >= 0.5 * total:
         last = conn.execute("SELECT MAX(updated_at) AS t FROM notifications WHERE user_id = ? "
                             "AND triage_status = 'failed'", (user.id,)).fetchone()
-        return _result("triage", False, f"{failed} of {total} failed in the last 24 h", parse(last["t"]),
+        return _result("triage", False, f"{failed} of {total} failed in the last 24 h", parse_time(last["t"]),
                        title="Notification sorting is failing",
                        why="TypeSafe calls fail, so nothing is marked as needing you or as noise.")
     return _result("triage", True, f"{done} sorted in the last 24 h" if total else "nothing to sort", None)
@@ -399,7 +381,7 @@ def _check_triage(conn, now: datetime.datetime, user: Optional[User]) -> Dict[st
 def _check_calls(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
     if user is None or not store.is_connected(user, PHONE):
         return _result("calls", True, "not connected", None)
-    last = parse((conn.execute("SELECT MAX(created_at) AS t FROM phone_calls WHERE user_id = ?",
+    last = parse_time((conn.execute("SELECT MAX(created_at) AS t FROM phone_calls WHERE user_id = ?",
                                (user.id,)).fetchone() or {"t": None})["t"])
     since = (now - datetime.timedelta(days=3)).astimezone(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     failed = [dict(r) for r in conn.execute(
@@ -409,7 +391,7 @@ def _check_calls(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str
     if failed:
         facts = [f"{f.get('title') or 'Call'}: {(f.get('error') or 'failed')[:120]}" for f in failed[:4]]
         n = len(failed)
-        return _result("calls", False, f"{n} failed in the last 3 days", parse(failed[0]["created_at"]),
+        return _result("calls", False, f"{n} failed in the last 3 days", parse_time(failed[0]["created_at"]),
                        title=f"{n} call recording{'s' if n != 1 else ''} failed to process",
                        why="Their summaries and suggestions are missing. Reanalyze them from the call screen.",
                        blocks=[{"type": "facts", "label": "Failed", "items": facts}])
@@ -428,7 +410,7 @@ def _check_calendar(conn, now: datetime.datetime, user: Optional[User]) -> Dict[
         return _result("calendar", True, "not connected", None)
     m = dict(conn.execute("SELECT * FROM system_marks WHERE key = ?",
                           (calendar_today.mark_key(user.id),)).fetchone() or {})
-    ok_at, fail_at = parse(m.get("last_ok_at")), parse(m.get("last_fail_at"))
+    ok_at, fail_at = parse_time(m.get("last_ok_at")), parse_time(m.get("last_fail_at"))
     if not ok_at and not fail_at:
         return _result("calendar", True, "not checked yet", None)
     if m.get("ok") == 0:
@@ -445,11 +427,11 @@ def _check_briefing(conn, now: datetime.datetime, user: Optional[User]) -> Dict[
     r = conn.execute("SELECT created_at, trigger FROM briefings WHERE user_id = ? AND date = ?",
                      (user.id, now.date().isoformat())).fetchone()
     if r:
-        return _result("briefing", True, f"made {ago(parse(r['created_at']), now)} ({r['trigger']})",
-                       parse(r["created_at"]))
+        return _result("briefing", True, f"made {ago(parse_time(r['created_at']), now)} ({r['trigger']})",
+                       parse_time(r["created_at"]))
     if now.hour >= 11:
         last = conn.execute("SELECT MAX(created_at) AS t FROM briefings WHERE user_id = ?", (user.id,)).fetchone()
-        return _result("briefing", False, "not made today", parse(last["t"] if last else None),
+        return _result("briefing", False, "not made today", parse_time(last["t"] if last else None),
                        title="No briefing today", why="The 10:00 fallback didn't run; the server may be stuck.")
     return _result("briefing", True, "not due yet", None)
 
@@ -465,21 +447,21 @@ def _check_money(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str
     problems: List[Tuple[str, str]] = []  # (title, fact)
     for r in rows:
         name = (r.get("label") or "").strip() or money_companies.name_of(r["company"])
-        last_ok = parse(r.get("last_ok_at"))
+        last_ok = parse_time(r.get("last_ok_at"))
         if r["state"] == "needs_code":
             problems.append((f"{name} is waiting for a sign-in code",
                              f"{name}: waiting for the SMS sign-in code (enter it on the Money page or in Telegram)"))
         elif r["state"] == "needs_attention":
             problems.append((f"{name} needs its login fixed", f"{name}: {r.get('state_reason') or 'the login failed'}"))
         else:
-            since = last_ok or parse(r.get("created_at"))
+            since = last_ok or parse_time(r.get("created_at"))
             if since and (now - since).total_seconds() > money_config.STALE_HOURS * 3600:
                 quiet = span((now - since).total_seconds())
                 why = f" ({r['state_reason']})" if r.get("state_reason") else ""
                 problems.append((f"{name} hasn't synced for {quiet}",
                                  f"{name}: no successful sync for {quiet}{why}" if last_ok
                                  else f"{name}: never synced{why}"))
-    latest = _latest(*(parse(r.get("last_ok_at")) for r in rows))
+    latest = _latest(*(parse_time(r.get("last_ok_at")) for r in rows))
     if problems:
         detail = problems[0][1] + (f" (+{len(problems) - 1} more)" if len(problems) > 1 else "")
         return _result("money", False, detail, latest, title=problems[0][0],
@@ -509,7 +491,18 @@ _CHECKS = {
 
 
 def _hooks() -> List[Hook]:
-    return registry.hooks("selfcheck")
+    """The addons' checks (every addon enabled on the server), but one under a key of core's own checks."""
+    out = []
+    for h in registry.hooks("selfcheck", None):
+        if h.key in LABELS:
+            logger.warning(f"The check {h.key!r} of {h.addon} is one of core's own; left out")
+            continue
+        out.append(h)
+    return out
+
+
+def _hook(key: str) -> Optional[Hook]:
+    return None if key in LABELS else registry.hook_for("selfcheck", key, None)
 
 
 def all_keys() -> Tuple[str, ...]:
@@ -525,7 +518,7 @@ def label_of(key: str) -> str:
     """How the check ``key`` is named."""
     if key in LABELS:
         return LABELS[key]
-    hook = registry.hook_for("selfcheck", key)
+    hook = _hook(key)
     return str(hook.option("label", key)) if hook else key
 
 
@@ -559,12 +552,12 @@ def compute(now: Optional[datetime.datetime] = None, user: Optional[User] = None
 
 
 def _applies(key: str, user: User) -> bool:
-    hook = registry.hook_for("selfcheck", key)
+    hook = _hook(key)
     if hook is None:
         return APPLIES[key](user)
     if hook.option("server", False):
         return user.level.allows(SERVER_CAPABILITY)
-    return store.is_connected(user, hook.addon)
+    return hook.addon in registry.active_addons(user)
 
 
 def keys_for(user: User) -> Tuple[str, ...]:

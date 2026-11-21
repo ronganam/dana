@@ -59,13 +59,16 @@ def build_chat_context(user: Optional[User], kind: str, ref_id: str) -> Dict[str
             raise LookupError("Saving not found")
         store.require(user, money_config.ADDON)
         return money_savings.chat_context(user, ref_id)
-    hook = registry.hook_for("context_card", kind)
+    try:
+        hook = registry.hook_for("context_card", kind, user)
+    except store.NotConnected:
+        raise LookupError(f"{kind.capitalize()} not found") from None
     if hook is not None:
-        if user is None or not store.is_connected(user, hook.addon):
+        if user is None:
             raise LookupError(f"{kind.capitalize()} not found")
         return hook.func(user, ref_id)
     kinds = ["suggestion", "call", "notification", "person", "review", "transaction", "saving",
-             *[h.key for h in registry.hooks("context_card")]]
+             *[h.key for h in registry.hooks("context_card", None)]]
     raise ValueError(f"kind must be one of {', '.join(kinds)}")
 
 
@@ -119,8 +122,13 @@ def context_prompt(user: Optional[User], ctx: Optional[Dict[str, Any]]) -> Optio
             if user is None or not store.is_connected(user, money_config.ADDON):
                 return None
             return money_savings.context_prompt(user, ref)
-        hook = registry.hook_for("context", str(kind or ""))
-        if hook is not None and user is not None and store.is_connected(user, hook.addon):
+        if user is None:
+            return None
+        try:
+            hook = registry.hook_for("context", str(kind or ""), user)
+        except store.NotConnected:
+            return None
+        if hook is not None:
             return hook.func(user, ref, ContextRequest(block=lambda k, rid: _block(user, k, rid)))
     except Exception as e:
         logger.warning(f"context for {(ctx or {}).get('kind')} {(ctx or {}).get('ref_id')} failed: {e}")

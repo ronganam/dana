@@ -106,6 +106,12 @@ def register(item_type: ItemType) -> ItemType:
     return item_type
 
 
+def forget_addon(addon: str) -> None:
+    """Remove every item type of ``addon`` (the loader, for an addon that did not load after all)."""
+    for name in [n for n, t in _types.items() if t.addon == addon]:
+        del _types[name]
+
+
 def item_type(name: str) -> ItemType:
     """The registered type called ``name``.
 

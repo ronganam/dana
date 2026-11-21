@@ -18,6 +18,7 @@ Folders that do not exist are skipped. An addon folder is a sub-folder with an
 ``addon.py``.
 """
 
+import ast
 import json
 import os
 from dataclasses import dataclass
@@ -58,6 +59,43 @@ class Source:
 
 
 @dataclass(frozen=True)
+class Manifest:
+    """What an ``addon.py`` declares, read without running it: the name and the ``needs``."""
+    name: str
+    needs: Tuple[str, ...] = ()
+
+
+def read_manifest(addon_py: Path) -> Optional[Manifest]:
+    """The name and ``needs`` that ``addon.py`` declares (``addon = Addon("<name>", needs=(...), ...)``),
+    read with :mod:`ast`, never run; None when no such declaration is found. ``needs`` must be a
+    literal tuple / list of strings to be read (anything else reads as none)."""
+    try:
+        tree = ast.parse(addon_py.read_text(encoding="utf-8"))
+    except (OSError, SyntaxError, ValueError):
+        return None
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "addon" for t in node.targets)):
+            continue
+        call = node.value
+        if not (isinstance(call, ast.Call) and getattr(call.func, "id", getattr(call.func, "attr", "")) == "Addon"):
+            continue
+        args: List[Any] = list(call.args[:1]) + [k.value for k in call.keywords if k.arg == "name"]
+        if not (args and isinstance(args[0], ast.Constant) and isinstance(args[0].value, str)):
+            continue
+        needs: Tuple[str, ...] = ()
+        for k in call.keywords:
+            if k.arg == "needs":
+                try:
+                    value = ast.literal_eval(k.value)
+                except ValueError:
+                    value = ()
+                if isinstance(value, (tuple, list)) and all(isinstance(v, str) for v in value):
+                    needs = tuple(value)
+        return Manifest(args[0].value, needs)
+    return None
+
+
+@dataclass(frozen=True)
 class AddonFolder:
     """One addon's folder: its name (the folder name) and where it came from."""
     name: str
@@ -68,6 +106,12 @@ class AddonFolder:
     def migrations(self) -> Path:
         """Its migrations folder (may not exist)."""
         return self.path / "migrations"
+
+    @property
+    def needs(self) -> Tuple[str, ...]:
+        """The ``needs`` its ``addon.py`` declares, read without importing it (:func:`read_manifest`)."""
+        manifest = read_manifest(self.path / "addon.py")
+        return manifest.needs if manifest else ()
 
 
 def installed_dir() -> Path:

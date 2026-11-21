@@ -14,7 +14,8 @@ One description per pending call, rendered by two clients:
      "question": "Send this WhatsApp message?"}
 
 A tool declared with ``@addon.tool(describe=fn)`` is described by its addon
-(``fn(args)`` → ``core.addons.Approval``, the same shape); the others named
+(``fn(user, args)`` → ``core.addons.Approval``, the same shape; the current
+user's, and the default card when ``fn`` raises); the others named
 here are described below. Tools without a description of their own get a
 generic one: the tool name as the action and every argument as "Label: value". Names are looked up where
 that is a plain DB read (a reminder's title by its id, a WhatsApp number in
@@ -24,18 +25,21 @@ from __future__ import annotations
 
 import datetime
 import json
+import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
-from core import users
+from core import clock, users
 from core.text import escape_markdown
 from addons.calendar import today as calendar_today
 from addons.contacts import store as contacts_store
-from core.addons import store as addon_store
+from core.addons import helpers, store as addon_store
 from core.addons.addon import find_tool
 from addons.gmail import compose as gmail_compose, content as gmail_content, seen as gmail_seen
 from addons.gmail.config import ADDON as GMAIL
 from addons.knowledge import entries as knowledge_entries, projects as knowledge_projects
 from addons.people import store as people_store
+
+logger = logging.getLogger(__name__)
 
 Fact = Tuple[str, str]
 
@@ -59,12 +63,10 @@ def _when(value: Any) -> str:
     if not raw:
         return ""
     try:
-        from core import clock
-        from core.now import when_phrase
         dt = datetime.datetime.fromisoformat(raw.replace("Z", "+00:00").replace(" ", "T", 1))
         if dt.tzinfo is None:
             dt = dt.replace(tzinfo=clock.get_timezone())
-        return when_phrase(dt)
+        return helpers.when_phrase(dt)
     except Exception:
         return raw
 
@@ -201,7 +203,11 @@ def describe(tool_name: str, tool_args: Optional[Dict[str, Any]]) -> Dict[str, A
     t = tool_name or ""
     tool = find_tool(t)
     if tool is not None and tool.describe is not None:
-        return tool.describe(a).to_json()  # the addon's own words (@addon.tool(describe=...))
+        try:
+            return tool.describe(users.current(), a).to_json()  # the addon's own words (@addon.tool(describe=...))
+        except Exception:
+            logger.warning(f"describe= of {t} failed; showing the default card", exc_info=True)
+            return _generic(t, a)
     if t == "send_whatsapp_message":
         who = whatsapp_who(a.get("chat_id"))
         return _d(f"Send a WhatsApp message to {who}", "WhatsApp message", "💬", "Send this WhatsApp message?",

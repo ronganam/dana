@@ -25,10 +25,14 @@ from core.db import convert, migrations
 FIXTURE = os.path.join(testenv.FIXTURES, "db_9_0.sql")
 OFFICIAL = migrations.official_with_migrations()
 BASELINES = ["core:0001_baseline"] + [f"{a}:0001_baseline" for a in sorted(OFFICIAL)]
-# Core's migrations after its baseline: applied on a fresh database and after converting 9.0.
+# Core's migrations after its baseline.
 CORE_LATER = dict(migrations.all_migrations())[migrations.CORE][1:]
 CORE_LABELS = [m.label for m in CORE_LATER]
-CORE_ROWS = [("core", m.version, m.name) for m in CORE_LATER]
+# Every migration after a baseline (core's, then the official addons'): applied on a fresh
+# database and after converting 9.0, in the order the runner applies them.
+LATER = [m for _, ms in migrations.all_migrations() for m in ms[1:]]
+LATER_LABELS = [m.label for m in LATER]
+LATER_ROWS = [(m.addon, m.version, m.name) for m in LATER]
 # Tables a later core migration drops (m0003: the env import is gone).
 DROPPED = {"connection_imports", "connection_import_settings"}
 # Old migration 34 renames these 9.0 tables (and the column ``kind`` → ``addon``).
@@ -130,12 +134,12 @@ def refused(path: str) -> str:
     return ""
 
 
-def write_addon(root: str, name: str, files: dict) -> None:
-    """An addon folder ``root/name`` with ``addon.py`` and the given ``migrations/`` files."""
+def write_addon(root: str, name: str, files: dict, needs: tuple = ()) -> None:
+    """An addon folder ``root/name`` with ``addon.py`` (declaring ``needs``) and the given ``migrations/`` files."""
     folder = os.path.join(root, name, "migrations")
     os.makedirs(folder, exist_ok=True)
     with open(os.path.join(root, name, "addon.py"), "w", encoding="utf-8") as f:
-        f.write(f"from core.addons import Addon\naddon = Addon(name={name!r}, description='Test addon.')\n")
+        f.write(f"from core.addons import Addon\naddon = Addon(name={name!r}, description='Test addon.', needs={needs!r})\n")
     for file, body in files.items():
         with open(os.path.join(folder, file), "w", encoding="utf-8") as f:
             f.write(textwrap.dedent(body))
@@ -167,10 +171,15 @@ def test_fresh():
     path = new_path("fresh.sqlite3")
     applied = db.migrate(path)
     check("fresh: core first, then every official addon's baseline", applied[0] == "core:0001_baseline"
-          and sorted(applied) == sorted(BASELINES + CORE_LABELS), str(applied))
+          and sorted(applied) == sorted(BASELINES + LATER_LABELS), str(applied))
+    check("fresh: tasks m0002 (the project link without a foreign key) is among them",
+          "tasks:0002_project_link" in applied and applied.failed == {}, str(applied))
     check("fresh: recorded per addon in schema_migrations",
           sorted(db.applied_migrations(path))
-          == sorted([("core", 1)] + [(a, 1) for a in OFFICIAL] + [(a, v) for a, v, _ in CORE_ROWS]))
+          == sorted([("core", 1)] + [(a, 1) for a in OFFICIAL] + [(a, v) for a, v, _ in LATER_ROWS]))
+    fks = sql(path, "PRAGMA foreign_key_list(tasks)")
+    check("fresh: tasks reference no other addon's table (only task_groups and users)",
+          sorted({r[2] for r in fks}) == ["task_groups", "users"], str(fks))
     check("fresh: schema_migrations has (addon, version, name, applied_at)",
           [r[1] for r in sql(path, "PRAGMA table_info(schema_migrations)")] == ["addon", "version", "name", "applied_at"])
     check("fresh: no snapshot of an empty database", snapshots(path) == [], str(snapshots(path)))
@@ -207,14 +216,14 @@ def test_convert_9_0():
     load_fixture(path)
     before = dump_data(path)
     check("9.0 fixture: at version 33", max(r[0] for r in sql(path, "SELECT version FROM schema_migrations")) == 33)
-    check("9.0 fixture: pending = every migration but the baselines it is marked with (core's later ones)",
-          [m.label for m in db.pending_migrations(path)] == CORE_LABELS, str(db.pending_migrations(path)))
+    check("9.0 fixture: pending = every migration but the baselines it is marked with (the later ones)",
+          [m.label for m in db.pending_migrations(path)] == LATER_LABELS, str(db.pending_migrations(path)))
     applied = db.migrate(path)
-    check("9.0: only core's later migrations run after the conversion (the baselines are marked, not run)",
-          applied == CORE_LABELS, str(applied))
-    check("9.0: schema_migrations marks core's and every official addon's baseline, and core's later ones",
+    check("9.0: only the later migrations run after the conversion (the baselines are marked, not run)",
+          applied == LATER_LABELS, str(applied))
+    check("9.0: schema_migrations marks core's and every official addon's baseline, and the later ones",
           sorted(sql(path, "SELECT addon, version, name FROM schema_migrations"))
-          == sorted([("core", 1, "baseline")] + [(a, 1, "baseline") for a in OFFICIAL] + CORE_ROWS))
+          == sorted([("core", 1, "baseline")] + [(a, 1, "baseline") for a in OFFICIAL] + LATER_ROWS))
     a, b = shape(fresh), shape(path)
     diff = sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
     check("9.0: same schema as a fresh database (tables, ordered columns, indexes, FKs, triggers)", not diff, str(diff))
@@ -248,7 +257,7 @@ def test_convert_9_0():
     conn.execute("INSERT INTO schema_migrations (version, name, applied_at) VALUES (34, 'connections', 'x')")
     conn.commit()
     conn.close()
-    check("9.0 at 34: converts", db.migrate(p34) == CORE_LABELS
+    check("9.0 at 34: converts", db.migrate(p34) == LATER_LABELS
           and snapshots(p34)[:1] == ["at34-before-addons-from-0034.sqlite3"],
           str(snapshots(p34)))
     check("9.0 at 34: same schema and rows", shape(p34) == shape(path) and dump_data(p34) == after)
@@ -258,11 +267,11 @@ def test_core_connections_renamed():
     path = new_path("conn.sqlite3")
     load_fixture(path)
     uid = sql(path, "SELECT id FROM users")[0][0]
+    before = sql(path, "SELECT user_id, kind, credentials, settings, account, created_at, updated_at, account_conflict "
+                       "FROM integrations ORDER BY kind")
+    check("9.0 fixture: has connections (the first admin's core and tasks)",
+          [r[1] for r in before] == ["core", "tasks"], str(before))
     conn = sqlite3.connect(path)
-    conn.execute("INSERT INTO integrations (user_id, kind, credentials, settings, account, created_at, updated_at) "
-                 "VALUES (?, 'core', '', '{}', '', 'x', 'x')", (uid,))
-    conn.execute("INSERT INTO integrations (user_id, kind, credentials, settings, account, created_at, updated_at) "
-                 "VALUES (?, 'tasks', '', '{}', '', 'x', 'x')", (uid,))
     conn.execute("INSERT INTO notifications (id, user_id, package, title, text, posted_at, content_hash, triage) "
                  "VALUES ('n-conv', ?, 'p', 't', 'x', 'x', 'x', '{\"ron_wrote_it\": true}')", (uid,))
     conn.commit()
@@ -270,6 +279,11 @@ def test_core_connections_renamed():
     db.migrate(path)
     check("9.0 at 33: integrations are connections, core's is essentials",
           sorted(sql(path, "SELECT addon FROM connections")) == [("essentials",), ("tasks",)])
+    after = sql(path, "SELECT user_id, addon, credentials, settings, account, created_at, updated_at, account_conflict "
+                      "FROM connections ORDER BY addon")
+    check("9.0 at 33: every value of every connection kept (only the addon name changes)",
+          after == [tuple("essentials" if v == "core" else v for v in r) for r in before], str(after))
+    check("9.0 at 33: the connection rows belong to the fixture's user", {r[0] for r in after} == {uid})
     check("9.0 at 33: the triage names the owner, not a name",
           sql(path, "SELECT triage FROM notifications WHERE id = 'n-conv'") == [('{"owner_wrote_it": true}',)])
 
@@ -366,12 +380,9 @@ def test_addon_migrations_later():
                 if FAIL:
                     raise RuntimeError("disk on fire")
             """})
-        try:
-            db.migrate(path)
-            raised = False
-        except RuntimeError:
-            raised = True
-        check("failed migration: the error propagates", raised)
+        result = db.migrate(path)
+        check("failed migration of a site addon: recorded in .failed with the error, the start goes on",
+              result == [] and "disk on fire" in result.failed.get("notes_x", ""), f"{result} {result.failed}")
         check("failed migration: its changes are rolled back, not recorded",
               "notes_x_tags" not in tables(path) and ("notes_x", 3) not in db.applied_migrations(path))
         m3 = [m for m in db.pending_migrations(path) if m.version == 3][0]
@@ -392,6 +403,95 @@ def test_addon_migrations_later():
         os.environ["DANA_ADDON_DIRS"] = ""
 
 
+def migration(name: str, sql_text: str, fail: bool = False, version: int = 1) -> dict:
+    """One migration file running ``sql_text`` (raising after it when ``fail``)."""
+    body = f"""
+        VERSION = {version}
+        NAME = "{name}"
+
+        def up(conn):
+            conn.execute({sql_text!r})
+        """
+    if fail:
+        body += "    raise RuntimeError('broken on purpose')\n"
+    return {f"m{version:04d}_{name}.py": body}
+
+
+def test_isolation_and_order():
+    root = testenv.scratch_path("addon_dirs_iso")
+    os.environ["DANA_ADDON_DIRS"] = root
+    try:
+        path = new_path("iso.sqlite3")
+        db.migrate(path)
+        # aaa needs zzz: zzz's migrations run first although aaa comes first by name.
+        write_addon(root, "zzz", migration("base", "CREATE TABLE zzz_items (id INTEGER PRIMARY KEY)"))
+        write_addon(root, "aaa", migration("base", "CREATE TABLE aaa_items (id INTEGER PRIMARY KEY, "
+                                           "z INTEGER REFERENCES zzz_items(id))"), needs=("zzz",))
+        # bad: m0001 works, m0002 fails: both roll back together (one transaction per addon).
+        write_addon(root, "bad", {**migration("base", "CREATE TABLE bad_items (id INTEGER PRIMARY KEY)"),
+                                  **migration("more", "CREATE TABLE bad_more (id INTEGER)", fail=True, version=2)})
+        # needbad needs bad: not migrated either.
+        write_addon(root, "needbad", migration("base", "CREATE TABLE needbad_items (id INTEGER)"), needs=("bad",))
+        # loop1 / loop2 need each other; lost needs an addon that is not there.
+        write_addon(root, "loop1", migration("base", "CREATE TABLE loop1_items (id INTEGER)"), needs=("loop2",))
+        write_addon(root, "loop2", migration("base", "CREATE TABLE loop2_items (id INTEGER)"), needs=("loop1",))
+        write_addon(root, "lost", migration("base", "CREATE TABLE lost_items (id INTEGER)"), needs=("absent",))
+        write_addon(root, "skipped", migration("base", "CREATE TABLE skipped_items (id INTEGER)"))
+        result = db.migrate(path, skip={"skipped"})
+        check("needs order: zzz (needed) before aaa", result == ["zzz:0001_base", "aaa:0001_base"], str(result))
+        check("isolation: a failing site addon rolls back all its migrations of this start, alone",
+              "bad_items" not in tables(path) and "bad_more" not in tables(path)
+              and not [a for a, _ in db.applied_migrations(path) if a == "bad"])
+        check("isolation: its error is recorded", "broken on purpose" in result.failed.get("bad", ""), result.failed)
+        check("isolation: an addon that needs it is not migrated and recorded",
+              "needbad_items" not in tables(path) and "bad" in result.failed.get("needbad", ""), result.failed)
+        check("needs: a cycle and a missing need are recorded, not migrated, the rest goes on",
+              "cycle" in result.failed.get("loop1", "") and "cycle" in result.failed.get("loop2", "")
+              and "absent" in result.failed.get("lost", "")
+              and not {"loop1_items", "loop2_items", "lost_items"} & tables(path), result.failed)
+        check("skip: an addon the loader failed is not migrated (and not reported again)",
+              "skipped_items" not in tables(path) and "skipped" not in result.failed)
+        check("plan: the order puts every addon after its needs",
+              [a for a, _ in migrations.plan().order].index("zzz") < [a for a, _ in migrations.plan().order].index("aaa"))
+    finally:
+        os.environ["DANA_ADDON_DIRS"] = ""
+
+    # An official addon's failing migration stops the start; core's committed before it stays.
+    path = new_path("official_fail.sqlite3")
+    about = dict(migrations.all_migrations())["about"][0]
+    original = about.module.up
+
+    def broken(conn):
+        conn.execute("CREATE TABLE about_partial (id INTEGER)")
+        raise RuntimeError("official broken")
+    about.module.up = broken
+    try:
+        try:
+            db.migrate(path)
+            msg = ""
+        except RuntimeError as e:
+            msg = str(e)
+    finally:
+        about.module.up = original
+    check("official addon: a failing migration stops the start", msg == "official broken", msg)
+    check("official addon: its transaction rolled back, core's (an earlier addon's) kept",
+          "about_partial" not in tables(path) and "about_facts" not in tables(path) and "users" in tables(path))
+
+
+def test_convert_refuses_gaps():
+    path = new_path("gap90.sqlite3")
+    load_fixture(path)
+    conn = sqlite3.connect(path)
+    conn.execute("DELETE FROM schema_migrations WHERE version = 17")
+    conn.commit()
+    conn.close()
+    before = schema_objects(path)
+    msg = refused(path)
+    check("9.0 conversion: a database missing an old migration (17 of 1..33) is refused with a clear message",
+          "has not recorded migration(s) 17" in msg and "Dana 9.0" in msg, msg)
+    check("9.0 conversion: refused untouched, no snapshot", schema_objects(path) == before and snapshots(path) == [])
+
+
 test_connection()
 test_fresh()
 test_convert_9_0()
@@ -399,6 +499,8 @@ test_core_connections_renamed()
 test_older_database()
 test_newer_database()
 test_addon_migrations_later()
+test_isolation_and_order()
+test_convert_refuses_gaps()
 
 passed = sum(1 for _, ok in results if ok)
 print(f"\n{passed}/{len(results)} passed")

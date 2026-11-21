@@ -337,6 +337,53 @@ def remove_task_rows(task_id: str) -> None:
         conn.commit()
 
 
+# --- The project link (``tasks.project_id``: a knowledge project's id, no foreign key) ---
+
+def project_task_counts(user: User, project_ids: Sequence[str]) -> Dict[str, int]:
+    """How many tasks ``user`` can see carry each of ``project_ids`` (ids without any are left out)."""
+    if not project_ids:
+        return {}
+    where, args = visible_sql(user, "")
+    with get_db_connection() as conn:
+        rows = conn.execute(f"SELECT project_id, COUNT(*) AS n FROM tasks WHERE project_id IN "
+                            f"({','.join('?' * len(project_ids))}) AND {where} GROUP BY project_id",
+                            (*project_ids, *args)).fetchall()
+    return {r["project_id"]: r["n"] for r in rows}
+
+
+def project_tasks(user: User, project_id: str) -> List[Dict[str, Any]]:
+    """The tasks ``user`` can see that carry ``project_id``, open first, newest
+    first, as API payloads show them (:func:`public_task`)."""
+    where, args = visible_sql(user, "")
+    with get_db_connection() as conn:
+        rows = conn.execute(f"SELECT * FROM tasks WHERE project_id = ? AND {where} "
+                            "ORDER BY status ASC, created_at DESC", (project_id, *args)).fetchall()
+    return [public_task(user, dict(r)) for r in rows]
+
+
+def project_in_use(project_id: str) -> bool:
+    """Any task (anyone's) carries ``project_id``: the knowledge addon keeps a
+    project whose creation is undone once something was saved into it."""
+    with get_db_connection() as conn:
+        # scoped: only whether the project is in use, nothing of the task is returned
+        return conn.execute("SELECT 1 FROM tasks WHERE project_id = ? LIMIT 1", (project_id,)).fetchone() is not None
+
+
+def forget_project(owner: User, project_id: str) -> None:
+    """A project was deleted by its ``owner``: their tasks that carry it are
+    deleted (with their links), everyone else's only lose the link."""
+    with get_db_connection() as conn:
+        ids = [r["id"] for r in conn.execute("SELECT id FROM tasks WHERE project_id = ? AND user_id = ?",
+                                             (project_id, owner.id))]
+        for tid in ids:
+            # scoped: the owner's own tasks (selected above)
+            conn.execute("DELETE FROM tasks WHERE id = ?", (tid,))
+            conn.execute("DELETE FROM task_links WHERE task_id = ?", (tid,))
+        # scoped: the project is gone (its owner deleted it): others' tasks only lose the link
+        conn.execute("UPDATE tasks SET project_id = NULL WHERE project_id = ?", (project_id,))
+        conn.commit()
+
+
 def complete_task(user: User, task_id: str) -> Dict[str, Any]:
     """Mark a task done. Returns the row as it was before.
 

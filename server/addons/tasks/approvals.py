@@ -1,13 +1,14 @@
 """The words of the Approve card of the tasks tools that can ask first
-(``@addon.tool(describe=...)``; core/approval_text.py shows them)."""
+(``@addon.tool(describe=...)``: ``f(user, args)``; core/approval_text.py shows them)."""
 
 import datetime
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
-from core import clock, now as now_screen, users
-from core.addons import Approval
+from core import clock
+from core.addons import Approval, helpers
 from core.addons.hooks import clean
+from core.users import User
 from addons.tasks import service
 
 _UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
@@ -17,14 +18,14 @@ def _quote(text: Any, limit: int = 80) -> str:
     return f"“{clean(text, limit)}”"
 
 
-def _title(item: Any) -> str:
+def _title(user: Optional[User], item: Any) -> str:
     """The task an ``item`` argument names: its title when it is the id of a
-    task the current user can see, else the argument itself ("" for an unseen id)."""
+    task ``user`` can see, else the argument itself ("" for an unseen id)."""
     raw = clean(item, 200)
     m = _UUID.search(raw)
     if not m:
         return raw
-    task = service.get_task(users.current(), m.group(0))
+    task = service.get_task(user, m.group(0))
     return (task.get("title") or "") if task else ""
 
 
@@ -39,21 +40,21 @@ def _when(value: Any) -> str:
         return raw
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=clock.get_timezone())
-    return now_screen.when_phrase(dt)
+    return helpers.when_phrase(dt)
 
 
-def delete_task(a: Dict[str, Any]) -> Approval:
-    name = _title(a.get("item"))
+def delete_task(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    name = _title(user, a.get("item"))
     return Approval(f"Delete the reminder {_quote(name)}" if name else "Delete a reminder", "Delete reminder", "❌",
                     "Delete this reminder?")
 
 
-def remove_task_group(a: Dict[str, Any]) -> Approval:
+def remove_task_group(user: Optional[User], a: Dict[str, Any]) -> Approval:
     return Approval(f"Remove the group {_quote(a.get('name'))}", "Remove group", "❌", "Remove this group?",
                     facts=[("Its reminders", "move to General")])
 
 
-def add_task(a: Dict[str, Any]) -> Approval:
+def add_task(user: Optional[User], a: Dict[str, Any]) -> Approval:
     loc = a.get("location")
     return Approval(f"Add the reminder {_quote(a.get('title') or 'Untitled')}", "New reminder", "📋",
                     "Add this reminder?", body_label="Note", body=a.get("description"),
@@ -63,8 +64,8 @@ def add_task(a: Dict[str, Any]) -> Approval:
                            ("Priority", a.get("priority"))])
 
 
-def update_task(a: Dict[str, Any]) -> Approval:
-    name = _title(a.get("item"))
+def update_task(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    name = _title(user, a.get("item"))
     return Approval(f"Change the reminder {_quote(name)}" if name else "Change a reminder", "Change reminder", "🔄",
                     "Make this change?", body_label="Note", body=a.get("description"),
                     facts=[("New title", a.get("summary") or a.get("title")), ("Status", a.get("status")),

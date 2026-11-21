@@ -20,7 +20,6 @@ the start), a reserved name, a path leaving the repository, a folder without
 folder (the addon's tables and rows stay).
 """
 
-import ast
 import datetime
 import json
 import os
@@ -127,24 +126,6 @@ def check_name(name: str, root: Path) -> None:
                                "two addons with one name would stop the server.")
 
 
-def manifest_name(addon_py: Path) -> Optional[str]:
-    """The name ``addon.py`` declares (``addon = Addon("<name>", ...)``), read without running it; None when not found."""
-    try:
-        tree = ast.parse(addon_py.read_text(encoding="utf-8"))
-    except (OSError, SyntaxError, ValueError):
-        return None
-    for node in ast.walk(tree):
-        if not (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "addon" for t in node.targets)):
-            continue
-        call = node.value
-        if not (isinstance(call, ast.Call) and getattr(call.func, "id", getattr(call.func, "attr", "")) == "Addon"):
-            continue
-        args: List[Any] = list(call.args[:1]) + [k.value for k in call.keywords if k.arg == "name"]
-        if args and isinstance(args[0], ast.Constant) and isinstance(args[0].value, str):
-            return args[0].value
-    return None
-
-
 def _git(args: Iterable[str], cwd: Path) -> None:
     if shutil.which("git") is None:
         raise InstallError("git is not installed on this server.")
@@ -192,7 +173,8 @@ def install(source: Source, root: Path, *, name: Optional[str] = None, by: str =
         folder = fetch(source, Path(tmp))
         if not (folder / "addon.py").is_file():
             raise InstallError(f"{source.path or 'The repository root'} has no addon.py at {source.ref[:12]}.")
-        declared = manifest_name(folder / "addon.py")
+        manifest = addon_dirs.read_manifest(folder / "addon.py")
+        declared = manifest.name if manifest else None
         if declared is None:
             raise InstallError('addon.py must declare addon = Addon("<name>", ...).')
         if name is not None and declared != name:
