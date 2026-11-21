@@ -11,8 +11,8 @@ For an admin, a value is shown as ``******`` when any of these holds:
 - its name contains ``key``, ``token``, ``password``, ``secret``, ``auth``,
   ``credential``, ``private``, ``cookie``, ``passwd``, ``session`` or
   ``service_account``, or ends in ``_json``;
-- its name is one the one-time integration import stores as a credential
-  (:data:`integrations.bootstrap.CREDENTIAL_ENV`: the Home Assistant host,
+- its name is one the one-time addon import stores as a credential
+  (:data:`addons.bootstrap.CREDENTIAL_ENV`: the Home Assistant host,
   the WAHA URL and session, …);
 - its value holds a PEM block (``-----BEGIN``), parses as JSON with a
   secret-looking key (``private_key``, ``client_secret``, ``token``, …) at any
@@ -25,7 +25,7 @@ import re
 from typing import Any, Dict
 
 from core.users import User
-from integrations.bootstrap import CREDENTIAL_ENV
+from addons.bootstrap import CREDENTIAL_ENV
 
 MASK = "******"
 _NAME_MARKERS = ("key", "token", "password", "passwd", "secret", "auth", "credential", "private", "cookie",

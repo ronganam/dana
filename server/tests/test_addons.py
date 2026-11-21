@@ -1,0 +1,450 @@
+"""Checks for the addons framework (docs/access.md, "Addon"). Run: bin/test test_addons
+
+Discovery, schema parsing and execution of every addon's tools, listed and run
+for a user; connections with encrypted credentials; the startup key check and
+the first admin's env import. Nothing calls Home Assistant, WAHA, Google or
+the web: only tools that stay inside Dana are executed.
+"""
+
+import asyncio
+import os
+import re
+import sqlite3
+import sys
+
+import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
+# Every addon / identity env name is unset: this test decides what the environment configures.
+testenv.isolate("addons_test")
+os.environ["FRIGATE_URL"] = "https://frigate.example.com"  # the first admin's Frigate (env import)
+os.environ["OWNER_NAME"] = "Robin"
+
+from cryptography.fernet import Fernet
+
+from core import db, users
+from core.access import MEMBER
+from core.paths import DATABASE_PATH
+from addons.tasks.groups import ensure_default_groups_for_everyone
+
+db.migrate()
+users.bootstrap()
+ensure_default_groups_for_everyone()
+
+import addons
+from addons import bootstrap as addons_bootstrap
+from core.addons import Addon, crypto, registry, store
+from core.addons.crypto import CredentialsKeyError
+from core.addons.addon import all_tools, find_tool, get_addon, all_addons
+
+ADMIN = users.first_admin()
+results = []
+
+
+def check(name, cond, detail=""):
+    results.append((name, bool(cond)))
+    print(f"[{'PASS' if cond else 'FAIL'}] {name}" + (f" — {detail}" if detail and not cond else ""))
+
+
+def raises(fn, exc, contains=""):
+    try:
+        fn()
+    except exc as e:
+        return contains in str(e)
+    except Exception:
+        return False
+    return False
+
+
+async def araises(coro, exc):
+    try:
+        await coro
+    except exc as e:
+        return str(e)
+    return None
+
+
+def names(schemas):
+    return [(s.get("function") or s)["name"] for s in schemas]
+
+
+# --- 1. Startup with nothing to protect -------------------------------------------------
+
+def test_startup_without_key():
+    imported = addons_bootstrap.bootstrap()
+    check("startup: no key and nothing to protect -> starts", True)
+    check("startup: official addons imported for the first admin",
+          imported == ["tasks", "shopping", "knowledge", "about", "people", "phone", "cameras", "ops"],
+          str(imported))
+    check("startup: credentialed addons without env values are not connected",
+          not any(store.is_connected(ADMIN, k) for k in ("homeassistant", "whatsapp", "calendar")))
+    check("startup: imported settings: FRIGATE_URL for cameras, the defaults otherwise",
+          store.require(ADMIN, "cameras").settings["url"] == "https://frigate.example.com"
+          and dict(store.require(ADMIN, "shopping").settings) == {"active_list": None},
+          str(dict(store.require(ADMIN, "shopping").settings)))
+    check("startup: second run imports nothing", addons_bootstrap.bootstrap() == [])
+
+
+# --- 2. Discovery and schemas -----------------------------------------------------------
+
+EXPECTED_ORDER = ["essentials", "tasks", "shopping", "knowledge", "about", "people", "phone", "homeassistant", "whatsapp",
+                  "calendar", "contacts", "gmail", "telegram_account", "money", "cameras", "ops"]
+
+
+def test_discovery():
+    check("discovery: every addon registered, in the fixed order", [k.name for k in all_addons()] == EXPECTED_ORDER,
+          str([k.name for k in all_addons()]))
+    check("discovery: ADDON_ORDER is the order", list(addons.ADDON_ORDER) == EXPECTED_ORDER)
+    tools = all_tools()
+    check("discovery: 99 tools", len(tools) == 99, str(len(tools)))
+    check("discovery: tool names unique", len({t.name for t in tools}) == len(tools))
+    check("discovery: cameras (no tools) has none, every other addon has some",
+          not get_addon("cameras").tools and all(get_addon(k).tools for k in EXPECTED_ORDER if k != "cameras"))
+    check("discovery: money tools", [t.name for t in get_addon("money").tools]
+          == ["money_summary", "search_transactions", "money_overview", "recurring_charges", "money_forecast",
+              "money_insights", "meal_card", "investment_portfolio", "categorize_transaction", "sync_money", "saving_opportunities",
+              "update_saving"], [t.name for t in get_addon("money").tools])
+    check("discovery: core tools", [t.name for t in get_addon("essentials").tools]
+          == ["get_current_time", "request_user_selection", "web_search", "share_item"])
+    check("discovery: ops is admin only, core is everyone's",
+          get_addon("ops").requires == "ops" and get_addon("essentials").everyone)
+    for t in tools[:3] + tools[-3:]:
+        print(f"  - {t.addon}.{t.name}: {t.schema['function']['description'][:70]}")
+
+
+def test_schemas():
+    bad = []
+    for t in all_tools():
+        s = t.schema
+        fn = s.get("function", {})
+        params = fn.get("parameters", {})
+        if (s.get("type") != "function" or fn.get("name") != t.name or not fn.get("description")
+                or params.get("type") != "object" or not set(params.get("required", [])) <= set(params.get("properties", {}))):
+            bad.append(t.name)
+    check("schema: every tool has an OpenAI-compatible function schema", not bad, str(bad))
+    with_conn = [t.name for t in all_tools() if "conn" in t.schema["function"]["parameters"]["properties"]
+                 or "conn" in t.schema["function"]["parameters"]["required"]]
+    check("schema: conn is in no schema", not with_conn, str(with_conn))
+    add_task = find_tool("add_task").schema["function"]["parameters"]
+    check("schema: add_task needs a title, priority optional",
+          add_task["required"] == ["title"] and "priority" in add_task["properties"], str(add_task["required"]))
+    ws = find_tool("web_search").schema["function"]
+    check("schema: docstring descriptions (web_search query)",
+          ws["parameters"]["properties"]["query"] == {"type": "string", "description": "The search query string."}
+          and ws["description"].startswith("Search the web"))
+    forget = find_tool("forget_info").schema["function"]["parameters"]["properties"]
+    check("schema: **kwargs is not a parameter", "kwargs" not in forget, str(list(forget)))
+    rt = registry.realtime_tool_schemas(ADMIN)
+    check("schema: realtime list is flat", all("function" not in s and s["type"] == "function" and "name" in s
+                                               for s in rt))
+
+    demo = Addon("zz_schema_demo")
+    try:
+        @demo.tool()
+        async def zz_no_conn(query: str) -> str:
+            """No connection parameter."""
+            return query
+        no_conn_refused = False
+    except TypeError:
+        no_conn_refused = True
+    check("schema: a tool whose first parameter is not conn is refused", no_conn_refused)
+    check("schema: a tool name owned by another addon is refused",
+          raises(lambda: demo.tool(name="add_task")(lambda conn: None), ValueError, "tasks"))
+
+
+# --- 3. Who has what --------------------------------------------------------------------
+
+MEMBER_USER = None
+
+
+def test_per_user_lists():
+    global MEMBER_USER
+    MEMBER_USER = users.create("Member", MEMBER)
+    check("users: a new user has only core", store.connected_addons(MEMBER_USER) == ("essentials",),
+          str(store.connected_addons(MEMBER_USER)))
+    member_tools = names(registry.tool_schemas(MEMBER_USER))
+    check("tools: the member gets the core tools only", member_tools
+          == ["get_current_time", "request_user_selection", "web_search"], str(member_tools))
+    admin_tools = names(registry.tool_schemas(ADMIN))
+    expected = [t.name for k in all_addons() if k.name in store.connected_addons(ADMIN) for t in k.tools]
+    check("tools: the admin's list is the tools of their addons, in addon then definition order",
+          # two users: core has share_item (the admin has tasks, an addon with shareable items) and shopping
+          # has choose_shopping_list
+          admin_tools == expected and len(admin_tools) == 4 + 7 + 5 + 13 + 4 + 4 + 11 + 2, str(len(admin_tools)))
+    check("tools: no HA / WhatsApp / calendar tools without those addons",
+          not {"call_ha_service", "send_whatsapp_message", "add_event"} & set(admin_tools))
+    check("tools: the order is deterministic (same list every time, realtime too)",
+          names(registry.tool_schemas(ADMIN)) == admin_tools and names(registry.realtime_tool_schemas(ADMIN)) == admin_tools)
+    check("tools: core cannot be connected or disconnected",
+          raises(lambda: store.connect(MEMBER_USER, "essentials"), ValueError)
+          and raises(lambda: store.disconnect(MEMBER_USER, "essentials"), ValueError))
+    check("tools: ops cannot be connected for a member", raises(lambda: store.connect(MEMBER_USER, "ops"), PermissionError)
+          and not store.is_connected(MEMBER_USER, "ops"))
+    check("tools: connecting twice is refused", raises(lambda: store.connect(ADMIN, "tasks"), ValueError))
+    check("tools: unknown addon refused", raises(lambda: store.connect(ADMIN, "nope"), KeyError))
+
+
+async def test_execution():
+    out = await registry.execute(ADMIN, "add_task", {"title": "Verify the addons", "priority": "high"})
+    check("execute: add_task for the admin", "Verify the addons" in str(out) and "Error" not in str(out), str(out))
+    out = await registry.execute(ADMIN, "list_tasks", {"completed": False})
+    check("execute: list_tasks sees it", "Verify the addons" in str(out), str(out)[:200])
+    out = await registry.execute(ADMIN, "create_project", {"title": "Addons test project", "tags": ["test"]})
+    import re
+    m = re.search(r"ID `([^`]+)`", str(out))
+    project_id = m.group(1) if m else None
+    check("execute: create_project", project_id is not None, str(out))
+    out = await registry.execute(ADMIN, "save_knowledge_item", {
+        "project_id": project_id, "title": "Framework note", "body": "## Hello\n\nWorld", "kind": "note",
+        "fields": [{"name": "Score", "type": "number", "value": "9"}], "tags": ["test"]})
+    check("execute: save_knowledge_item", "Error" not in str(out), str(out))
+    out = await registry.execute(ADMIN, "search_knowledge", {"query": "framework note", "project_id": project_id})
+    check("execute: search_knowledge finds it", "Framework note" in str(out), str(out)[:200])
+    out = await registry.execute(ADMIN, "delete_project", {"project_id": project_id})
+    check("execute: delete_project", "Error" not in str(out), str(out))
+    out = await registry.execute(MEMBER_USER, "get_current_time", {})
+    check("execute: a core tool for the member (sync tool)", str(out).startswith("The current time is"), str(out))
+    out = await registry.execute(MEMBER_USER, "request_user_selection",
+                                 {"prompt": "Which?", "options": [{"label": "A", "value": "a"}]})
+    check("execute: request_user_selection for the member", "- A" in str(out), str(out))
+
+    unconnected = await araises(registry.execute(MEMBER_USER, "add_task", {"title": "x"}), ValueError)
+    missing = await araises(registry.execute(MEMBER_USER, "zz_no_such_tool", {}), ValueError)
+    check("execute: a tool of an unconnected addon is refused by name", unconnected is not None, str(unconnected))
+    check("execute: the refusal looks like the one for a tool that does not exist",
+          unconnected is not None and missing is not None
+          and unconnected.replace("add_task", "X") == missing.replace("zz_no_such_tool", "X"),
+          f"{unconnected!r} vs {missing!r}")
+    admin_ops = await araises(registry.execute(MEMBER_USER, "run_python", {"code": "print(1)"}), ValueError)
+    check("execute: the member cannot run an ops tool", admin_ops == "Tool 'run_python' is not registered.", str(admin_ops))
+    no_user = await araises(registry.execute(None, "get_current_time", {}), RuntimeError)
+    check("execute: never without a user", no_user is not None)
+
+    from core.agent import AgentOrchestrator
+    with users.acting_as(MEMBER_USER):
+        msg = await AgentOrchestrator(model="x")._execute_tool("c1", "add_task", {"title": "x"})
+    check("execute: through the agent loop the refusal is an error result, not a crash",
+          msg["content"] == "Error executing tool: Tool 'add_task' is not registered.", msg["content"])
+    check("approval flags unchanged: confirm, callable confirm, acts_outside",
+          registry.needs_confirmation("delete_task") and not registry.needs_confirmation("add_task", {})
+          and registry.needs_confirmation("add_event") and not registry.needs_confirmation("add_event", {"summary": "x"})
+          and registry.needs_confirmation("add_event", {"attendees": "a@b.c"})
+          and registry.needs_confirmation("call_ha_service", {}, untrusted=True)
+          and not registry.needs_confirmation("call_ha_service", {})
+          and registry.is_write_tool("request_user_selection") and not registry.is_write_tool("list_tasks"))
+
+
+async def test_needs():
+    zz_a = Addon("zz_a")
+    calls = []
+
+    @zz_a.tool(needs=("tasks",))
+    async def zz_needs_tasks(conn, value: str) -> str:
+        """A tool that also needs the tasks addon.
+
+        Args:
+            value: Anything.
+        """
+        calls.append((conn.user.id, conn.addon, value))
+        return "ok"
+
+    user = users.create("Needs", MEMBER)
+    store.connect(user, "zz_a")
+    check("needs: not offered with only its own addon", "zz_needs_tasks" not in names(registry.tool_schemas(user)))
+    refused = await araises(registry.execute(user, "zz_needs_tasks", {"value": "1"}), ValueError)
+    check("needs: refused with only its own addon", refused == "Tool 'zz_needs_tasks' is not registered.", str(refused))
+    store.connect(user, "tasks")
+    tools = names(registry.tool_schemas(user))
+    check("needs: offered once every addon is connected (after the official addons: test addons come last)",
+          tools[-1] == "zz_needs_tasks" and "add_task" in tools, str(tools))
+    out = await registry.execute(user, "zz_needs_tasks", {"value": "2"})
+    check("needs: runs with the tool's own addon as conn", out == "ok" and calls == [(user.id, "zz_a", "2")], str(calls))
+    check("needs: link_task_to_person needs tasks",
+          find_tool("link_task_to_person").needs == ("tasks",) and find_tool("accept_call_suggestion").needs == ("tasks",))
+    store.disconnect(user, "tasks")
+    store.connect(user, "people")
+    check("needs: people without tasks has no link_task_to_person",
+          "get_person" in names(registry.tool_schemas(user))
+          and "link_task_to_person" not in names(registry.tool_schemas(user)))
+
+
+# --- 4. Credentials, key, env import ----------------------------------------------------
+
+def raw_db_bytes() -> bytes:
+    data = b""
+    for suffix in ("", "-wal", "-journal"):
+        path = str(DATABASE_PATH) + suffix
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                data += f.read()
+    return data
+
+
+def test_credentials():
+    check("credentials: connecting with credentials needs a key",
+          raises(lambda: store.connect(MEMBER_USER, "whatsapp",
+                                       credentials={"url": "http://waha.test", "session": "s1"}),
+                 CredentialsKeyError, "CREDENTIALS_KEY is not set"))
+    check("credentials: the failed connect left nothing", not store.is_connected(MEMBER_USER, "whatsapp"))
+    os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
+    secret = "waha-secret-" + Fernet.generate_key().decode()[:16]
+    conn = store.connect(MEMBER_USER, "whatsapp", credentials={"url": "http://waha.test", "api_key": secret,
+                                                               "session": "s1"},
+                         settings={"voice_telegram_chat_id": 42}, account="972500000000@c.us")
+    check("credentials: round trip", dict(conn.credentials) == {"url": "http://waha.test", "api_key": secret,
+                                                                 "session": "s1"}, str(dict(conn.credentials)))
+    check("credentials: settings and account kept",
+          conn.settings["voice_telegram_chat_id"] == 42 and conn.account == "972500000000@c.us")
+    with sqlite3.connect(str(DATABASE_PATH)) as raw:
+        stored = raw.execute("SELECT credentials, settings FROM connections WHERE user_id = ? AND addon = 'whatsapp'",
+                             (MEMBER_USER.id,)).fetchone()
+    check("credentials: stored as a Fernet token, not plaintext",
+          stored[0].startswith("gAAAA") and secret not in stored[0] and "waha.test" not in stored[0])
+    check("credentials: settings are plain JSON", stored[1] == '{"voice_telegram_chat_id": 42}', stored[1])
+    check("credentials: the plaintext is nowhere in the database file", secret.encode() not in raw_db_bytes())
+    check("credentials: a required credential is checked",
+          raises(lambda: store.connect(users.create("NoCreds", MEMBER), "calendar"), ValueError, "refresh_token"))
+    check("credentials: unknown names refused",
+          raises(lambda: store.update(MEMBER_USER, "whatsapp", credentials={"password": "x"}), ValueError, "password"))
+    info = store.list_connections(MEMBER_USER)
+    check("credentials: listing never shows them",
+          [i.addon for i in info] == ["essentials", "whatsapp"] and info[1].has_credentials
+          and not hasattr(info[1], "credentials"))
+
+
+def test_settings_and_cache():
+    before = store.require(ADMIN, "cameras")
+    again = store.require(ADMIN, "cameras")
+    check("cache: a second lookup reuses the decoded values", before.settings is again.settings)
+    after = store.update(ADMIN, "cameras", settings={"url": "https://frigate.example"})
+    check("settings: update applies at once (cache invalidated)",
+          after.settings["url"] == "https://frigate.example"
+          and store.require(ADMIN, "cameras").settings["url"] == "https://frigate.example")
+    check("settings: None goes back to the declared default",
+          store.update(ADMIN, "cameras", settings={"url": None}).settings["url"] is None)
+    check("settings: unknown setting refused",
+          raises(lambda: store.update(ADMIN, "cameras", settings={"colour": "red"}), ValueError, "colour"))
+    check("settings: updating an addon that is not connected is refused",
+          raises(lambda: store.update(MEMBER_USER, "cameras", settings={"url": "x"}), store.NotConnected))
+    secret2 = "rotated-" + Fernet.generate_key().decode()[:12]
+    conn = store.update(MEMBER_USER, "whatsapp", credentials={"api_key": secret2})
+    check("credentials: update merges into the stored ones",
+          conn.credentials["api_key"] == secret2 and conn.credentials["url"] == "http://waha.test")
+
+    # A change made outside this process is seen once the cache is older than its TTL.
+    with sqlite3.connect(str(DATABASE_PATH)) as raw:
+        raw.execute("UPDATE connections SET settings = '{\"url\": \"https://elsewhere\"}' "
+                    "WHERE user_id = ? AND addon = 'cameras'", (ADMIN.id,))
+    check("cache: an outside change is not seen within the TTL",
+          store.require(ADMIN, "cameras").settings["url"] is None)
+    saved = store.CACHE_TTL_SECONDS
+    store.CACHE_TTL_SECONDS = 0
+    try:
+        check("cache: ... and is seen after it", store.require(ADMIN, "cameras").settings["url"] == "https://elsewhere")
+    finally:
+        store.CACHE_TTL_SECONDS = saved
+    check("cache: disconnect removes the tools at once",
+          store.disconnect(MEMBER_USER, "whatsapp") and not store.is_connected(MEMBER_USER, "whatsapp")
+          and not store.disconnect(MEMBER_USER, "whatsapp"))
+
+
+def test_env_import():
+    with open(addons_bootstrap.__file__, encoding="utf-8") as f:
+        read = set(re.findall(r'"([A-Z][A-Z0-9_]+)"', f.read()))
+    check("env import: every env name it reads is blanked for tests (testenv.ADDON_ENV)",
+          read and read <= set(testenv.ADDON_ENV), str(sorted(read - set(testenv.ADDON_ENV))))
+    key = os.environ["CREDENTIALS_KEY"]
+    os.environ["HOMEASSISTANT_TOKEN"] = "ha-env-token"
+    os.environ["PHONE_INTERACTIVE_SENSOR"] = "binary_sensor.new_phone_interactive"
+    os.environ["CREDENTIALS_KEY"] = ""
+    msg = ""
+    try:
+        addons_bootstrap.bootstrap()
+    except CredentialsKeyError as e:
+        msg = str(e)
+    check("key: env credentials waiting to be imported and no key -> startup refused, saying what to do",
+          "waiting to be imported" in msg and "Fernet.generate_key()" in msg and "CREDENTIALS_KEY" in msg, msg)
+    check("key: nothing imported while refused", not store.is_connected(ADMIN, "homeassistant"))
+    os.environ["CREDENTIALS_KEY"] = "not-a-key"
+    check("key: a malformed key is refused", raises(addons_bootstrap.bootstrap, CredentialsKeyError, "not a valid"))
+    os.environ["CREDENTIALS_KEY"] = key
+    os.environ["WAHA_URL"] = "https://waha.example.com/api/"
+    os.environ["WAHA_API_KEY"] = "waha-env-key"
+    os.environ["GOOGLE_REFRESH_TOKEN"] = "google-env-refresh"
+    imported = addons_bootstrap.bootstrap()
+    check("import: the credentialed addons now in env are imported", imported == ["homeassistant", "whatsapp", "calendar"],
+          str(imported))
+    ha = store.require(ADMIN, "homeassistant")
+    check("import: HA credentials, host from today's default",
+          dict(ha.credentials) == {"host": "http://homeassistant.local:8123", "token": "ha-env-token"},
+          str(dict(ha.credentials)))
+    check("import: HA settings: env value where set, the addon's default (weather) or nothing otherwise",
+          ha.settings["phone_interactive_sensor"] == "binary_sensor.new_phone_interactive"
+          and ha.settings["person"] is None
+          and ha.settings["phone_battery_sensor"] is None
+          and ha.settings["phone_notify_service"] is None
+          and ha.settings["weather_entity"] == "weather.forecast_home", str(dict(ha.settings)))
+    with sqlite3.connect(str(DATABASE_PATH)) as raw:
+        stored = raw.execute("SELECT settings FROM connections WHERE user_id = ? AND addon = 'homeassistant'",
+                             (ADMIN.id,)).fetchone()[0]
+    check("import: defaults are stored as values (a later default change does not move them)",
+          '"weather_entity": "weather.forecast_home"' in stored, stored)
+    wa = store.require(ADMIN, "whatsapp")
+    # the address is stored normalised (no trailing slash; core/addons/addresses.py)
+    check("import: WhatsApp url and key from env, session default",
+          dict(wa.credentials) == {"url": "https://waha.example.com/api", "api_key": "waha-env-key", "session": "default"},
+          str(dict(wa.credentials)))
+    cal = store.require(ADMIN, "calendar")
+    check("import: calendar refresh token, calendar id default",
+          cal.credentials["refresh_token"] == "google-env-refresh" and cal.settings["calendar_id"] == "primary")
+    check("import: the admin now has every addon the env import knows (contacts and gmail come only from the Google "
+          "sign-in, telegram_account only from the QR sign-in; money is turned on by hand)",
+          store.connected_addons(ADMIN) == tuple(k for k in EXPECTED_ORDER
+                                                if k not in ("contacts", "gmail", "telegram_account", "money")),
+          str(store.connected_addons(ADMIN)))
+    check("import: the env values are not in the database file",
+          b"ha-env-token" not in raw_db_bytes() and b"google-env-refresh" not in raw_db_bytes())
+
+    check("import: done once (a second start imports nothing)", addons_bootstrap.bootstrap() == [])
+    store.disconnect(ADMIN, "homeassistant")
+    check("import: an addon the admin disconnected is not re-created at the next start",
+          addons_bootstrap.bootstrap() == [] and not store.is_connected(ADMIN, "homeassistant"))
+
+    os.environ["CREDENTIALS_KEY"] = ""
+    msg = ""
+    try:
+        addons_bootstrap.bootstrap()
+    except CredentialsKeyError as e:
+        msg = str(e)
+    check("key: stored credentials and no key -> startup refused", "stored credentials" in msg
+          and "Fernet.generate_key()" in msg, msg)
+    os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
+    msg = ""
+    try:
+        addons_bootstrap.bootstrap()
+    except CredentialsKeyError as e:
+        msg = str(e)
+    check("key: stored credentials and the wrong key -> startup refused", "not the key" in msg, msg)
+    os.environ["CREDENTIALS_KEY"] = key
+    check("key: the right key starts again", addons_bootstrap.bootstrap() == [])
+    check("crypto: generate_key makes a usable key", Fernet(crypto.generate_key().encode()) is not None)
+
+
+async def main():
+    test_startup_without_key()
+    test_discovery()
+    test_schemas()
+    test_per_user_lists()
+    await test_execution()
+    await test_needs()
+    test_credentials()
+    test_settings_and_cache()
+    test_env_import()
+
+
+asyncio.run(main())
+passed = sum(1 for _, ok in results if ok)
+print(f"\n{passed}/{len(results)} passed")
+if passed != len(results):
+    for name, ok in results:
+        if not ok:
+            print(f"  FAILED: {name}")
+    sys.exit(1)

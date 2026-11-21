@@ -25,7 +25,7 @@ from core import usage
 from core.agent import limit_tool_output
 from core.auth import request_user
 from core.users import User
-from integrations.framework import registry
+from core.addons import registry
 
 logger = logging.getLogger(__name__)
 
@@ -290,7 +290,7 @@ async def assistant_realtime_ws_api(request: web.Request) -> web.WebSocketRespon
                                             output_str = limit_tool_output(json.dumps(result) if not isinstance(result, str) else result)
                                             status = "completed"
                                         except registry.ToolNotAvailable as e:
-                                            # Made up, or of an integration this user does not have: the same answer.
+                                            # Made up, or of an addon this user does not have: the same answer.
                                             logger.warning(f"Refused realtime tool call '{tool_name}': {e}")
                                             output_str = json.dumps({"error": str(e), "status": "failed"})
                                             status = "failed"

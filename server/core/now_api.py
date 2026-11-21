@@ -9,7 +9,7 @@
 Every route answers for the request's user (core/now.py, core/checks.py, core/search.py).
 
 The Notifications screen's endpoints (``/api/notifications/overview``,
-``/api/notifications/rule-suggestions``) live in integrations/phone/notifications/api.py
+``/api/notifications/rule-suggestions``) live in addons/phone/notifications/api.py
 next to the other notification routes, so they are matched before ``/api/notifications/{id}``.
 """
 import asyncio
@@ -19,7 +19,7 @@ from aiohttp import web
 
 from core import checks, now, search
 from core.auth import request_user
-from integrations.framework.store import NotConnected
+from core.addons.store import NotConnected
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ async def now_act_api(request: web.Request) -> web.Response:
     except now.ActError as e:
         return web.json_response({"ok": False, "error": str(e)}, status=e.status)
     except NotConnected:
-        raise  # answered by core.auth.integration_middleware
+        raise  # answered by core.auth.addon_middleware
     except Exception as e:
         logger.error(f"Now action {data.get('action')} on {data.get('id')} failed: {e}", exc_info=True)
         return web.json_response({"ok": False, "error": f"That didn't work: {e}"}, status=500)
@@ -52,7 +52,7 @@ async def now_act_api(request: web.Request) -> web.Response:
 
 
 async def checks_api(request: web.Request) -> web.Response:
-    """The caller's checks: those of their own integrations (the server's own only with ``see_everyone``)."""
+    """The caller's checks: those of their own addons (the server's own only with ``see_everyone``)."""
     items = await asyncio.to_thread(checks.for_user, request_user(request))
     return web.json_response({"checks": [checks.public(c) for c in items]})
 

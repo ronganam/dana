@@ -1,6 +1,6 @@
 """REST routes for the wake signal, the wake briefing and the weekly review
 (composers: docs/people.md); ``setup(app)`` registers them. The people routes
-are the people kind's (integrations/people/api.py).
+are the people addon's (addons/people/api.py).
 
 ``POST /api/phone/unlock {at?}`` is the phone's unlock: the caller's wake
 signal (core/wake.py), ``{"status": "unavailable"}`` without ``phone`` and

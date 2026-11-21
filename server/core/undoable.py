@@ -1,4 +1,4 @@
-"""Helpers integration tools use to register undos for changes they make at
+"""Helpers addon tools use to register undos for changes they make at
 once (the registry itself is :mod:`core.undo`).
 
 Every undo here is *guarded*: it first checks that the thing still looks the

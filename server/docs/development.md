@@ -24,7 +24,7 @@ How to iterate on Dana quickly without losing quality. It covers the inner loop,
 ## Shipping small
 
 - Every push to master that changes the app deploys, as `<VERSION>-<commit>`, with no version bump (`docs/operations.md`). The pre-push test gate makes that safe. Several small pushes beat one big release: each is easier to verify, and a problem points at fewer changes. A push of only docs or tests deploys nothing.
-- New work can go live for one user first. A kind is used only by users who have it connected, so a new kind or a new tool can run for the admin for a few days before anyone else gets it (`bin/users.py integrations connect`).
+- New work can go live for one user first. An addon is used only by users who have it connected, so a new addon or a new tool can run for the admin for a few days before anyone else gets it (`bin/users.py addons connect`).
 - After a deploy, verify with the self-checks (`/api/checks`) and the log, not by reading code (`docs/operations.md`).
 
 ## Before a big change
@@ -40,7 +40,7 @@ A cold agent costs a few minutes to get oriented, and most of its time goes to w
 **Shape of the work**
 1. **Foundations go one after another**: the schema and identity, the framework, enforcement. Each builds on the one before.
 2. **Do the first slice of a repeated pattern alone,** for example the first kind converted or the first client built. Give it one deep, independent review, then turn the findings into rules in the brief. Every later slice then starts with them, instead of a review finding the same hole in eight places at the end.
-3. **Run the remaining slices in parallel waves of 3–4,** each agent in its own git worktree on its own branch. Clients (web, Android, watch, Raycast) can run together once the server API is fixed and its payload fixture is captured (`test_fixtures/*_web.json`).
+3. **Run the remaining slices in parallel waves of 3–4,** each agent in its own git worktree on its own branch. Clients (web, Android, watch, Raycast) can run together once the server API is fixed and its payload fixture is captured (`tests/fixtures/*_web.json`).
 4. **The orchestrator merges each wave,** applies the shared-doc notes, runs `bin/test` once, and starts the next wave. It does not re-run each agent's checks; it reads the reports and spot-checks what looks off.
 5. **Final review**: one independent review of the whole diff against `docs/access.md` (Security rules).
 
@@ -48,7 +48,7 @@ A cold agent costs a few minutes to get oriented, and most of its time goes to w
 - **Migration numbers**: the brief gives each agent its number (`m0021_…` for one, `m0022_…` for the next). Discovery refuses gaps and repeats, so a mistake fails at import, not in production.
 - **Shared docs** (`AGENTS.md`, `docs/access.md`, `docs/operations.md`): agents change their own area's doc. Changes to a shared doc go in the report as notes, and the orchestrator applies them once per wave.
 - **Tests**: one script per area (`test_<area>.py`). There is no list to update; its docstring is the description.
-- **Fixtures** (`test_fixtures/parity/`, `golden.sse`, `*_web.json`): only the agent whose task changes them regenerates them, and the brief names who that is.
+- **Fixtures** (`tests/fixtures/parity/`, `golden.sse`, `*_web.json`): only the agent whose task changes them regenerates them, and the brief names who that is.
 
 **Effort**: use high reasoning for design, frameworks and anything security-related. Use medium for applying an established pattern to one more area, and for client work against a fixed API.
 
@@ -76,7 +76,7 @@ Hard rules
   your report if one is needed, and do without it).
 - Follow AGENTS.md "Key conventions" (core/llm.py with purpose=, core.clock, core/paths.py,
   schema only by a new migration with the number you were given, tools through the
-  integrations framework, sharing through integrations/framework/sharing.py, every
+  addons framework, sharing through core/addons/sharing.py, every
   query scoped to the acting user: another user's id answers like a missing one).
 - Payloads other clients depend on change only where your task says so.
 - Typed public functions, short docstrings that say what, no import inside a function

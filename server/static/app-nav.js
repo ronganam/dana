@@ -15,8 +15,8 @@ const screenPanels = document.querySelectorAll(".screen-panel");
 
 function switchTab(tabId) {
     activeTab = tabId;
-    // Integrations is a page of Settings: Settings stays the highlighted tab.
-    const navTab = tabId === "integrations" ? "settings" : tabId;
+    // Addons is a page of Settings: Settings stays the highlighted tab.
+    const navTab = tabId === "addons" ? "settings" : tabId;
     railButtons.forEach(btn => {
         btn.classList.toggle("active", btn.getAttribute("data-tab") === navTab);
     });
@@ -33,7 +33,7 @@ function switchTab(tabId) {
     if (tabId === "people") window.DanaPeople?.show(); else window.DanaPeople?.hide();
     if (tabId === "review") window.DanaReview?.show(); else window.DanaReview?.hide();
     if (tabId === "usage") window.DanaUsage?.show(); else window.DanaUsage?.hide();
-    if (tabId === "integrations") window.DanaIntegrations?.show(); else window.DanaIntegrations?.hide();
+    if (tabId === "addons") window.DanaAddons?.show(); else window.DanaAddons?.hide();
     if (tabId === "shopping") window.DanaShopping?.show(); else window.DanaShopping?.hide();
     if (tabId === "money") window.DanaMoney?.show(); else window.DanaMoney?.hide();
     if (tabId === "projects") window.DanaProjects?.show(); else window.DanaProjects?.hide();
@@ -71,4 +71,4 @@ bottomNavButtons.forEach(btn => btn.addEventListener("click", () => switchTab(bt
 document.getElementById("rail-brand")?.addEventListener("click", () => switchTab("chat"));
 document.getElementById("btn-open-debug-tab")?.addEventListener("click", () => switchTab("debug"));
 document.getElementById("btn-open-usage-tab")?.addEventListener("click", () => switchTab("usage"));
-document.getElementById("btn-open-integrations-tab")?.addEventListener("click", () => switchTab("integrations"));
+document.getElementById("btn-open-addons-tab")?.addEventListener("click", () => switchTab("addons"));

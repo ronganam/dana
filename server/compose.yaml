@@ -21,7 +21,7 @@ services:
       - data:/app/db
     restart: unless-stopped
 
-  # The money kind's bank syncs: shares the app's network (Dana reaches it on 127.0.0.1:8090)
+  # The money addon's bank syncs: shares the app's network (Dana reaches it on 127.0.0.1:8090)
   # and only the money/ folder of the data, which money-dir creates first.
   money-dir:
     profiles: [money]

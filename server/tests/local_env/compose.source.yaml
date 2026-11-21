@@ -7,6 +7,6 @@ services:
       - ../../main.py:/app/main.py:ro
       - ../../VERSION:/app/VERSION:ro
       - ../../core:/app/core:ro
-      - ../../integrations:/app/integrations:ro
+      - ../../addons:/app/addons:ro
       - ../../static:/app/static:ro
       - ../../bin/users.py:/app/bin/users.py:ro

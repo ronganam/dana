@@ -1,6 +1,6 @@
 # Telegram account (your own chats and channels)
 
-The `telegram_account` kind reads a user's **own** Telegram account, read-only:
+The `telegram_account` addon reads a user's **own** Telegram account, read-only:
 their channels, groups and private chats, to list and summarize what is
 unread. It is not Dana's Telegram bot (`core/telegram_bot.py`), which only
 sees chats with the bot.
@@ -8,12 +8,12 @@ sees chats with the bot.
 It uses Telegram's user API (MTProto) through Telethon, signed in as the user
 the way a second Telegram Desktop is.
 
-## Pieces (`integrations/telegram_account/`)
+## Pieces (`addons/telegram_account/`)
 
 | File | What |
 |---|---|
-| `config.py` | the kind name, the credential `session`, the server's Telegram app (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) |
-| `kind.py` | the declaration: credential `session`, `connect_url=/telegram/connect`, `connect_label="Connect Telegram"`, `realtime=False`, `on_change` drops the user's clients, the prompt guide |
+| `config.py` | the addon's name, the credential `session`, the server's Telegram app (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) |
+| `addon.py` | the declaration: credential `session`, `connect_url=/telegram/connect`, `connect_label="Connect Telegram"`, `realtime=False`, `on_change` drops the user's clients, the prompt guide |
 | `client.py` | `make_client` (the one place Telethon is built; tests replace it), `acquire(conn)`, `dialogs`, `messages`, `check`, `explain` (errors in words), plain `Chat` / `Message` data |
 | `login.py` | the QR sign-in, per user, in memory |
 | `api.py` | the connect page and the sign-in routes |
@@ -29,7 +29,7 @@ sign-in connects it.
 
 ## Sign-in (QR)
 
-The Integrations page shows **Connect Telegram** (`connect_url`, the caller's
+The Addons page shows **Connect Telegram** (`connect_url`, the caller's
 own only), which opens `/telegram/connect` (`static/telegram-connect.html`).
 The page starts a sign-in and polls it:
 
@@ -54,7 +54,7 @@ The page starts a sign-in and polls it:
   disconnects. One sign-in per user at a time; another user's is never
   visible.
 
-Disconnecting on the Integrations page removes the stored session. The
+Disconnecting on the Addons page removes the stored session. The
 session stays listed in Telegram's Devices as "Dana" until the user removes it
 there.
 
@@ -64,7 +64,7 @@ there.
   first use and dropped after 10 minutes unused or when the connection
   changes (`on_change`). Reading clients take no updates: nothing runs in the
   background and the account is not shown online. A session Telegram no
-  longer accepts says "signed out … sign in again on the Integrations page"
+  longer accepts says "signed out … sign in again on the Addons page"
   (also the `check`).
 - `dialogs(conn)`: every chat, most recent first, with its type (`channel`,
   `group`, `private`, `bot`), unread and mention counts, `muted` (the chat's
@@ -89,4 +89,4 @@ saying the messages are others' text. Chat only (`realtime=False`, as gmail).
 | `read_telegram_chat(chat, limit, unread_only)` | one chat by id, `@username`, exact or partial name (several matches: the candidates) |
 | `summarize_telegram_unread(chat_type, include_muted, include_archived, max_chats, focus)` | reads the newest 40 unread messages of each unread chat (up to 30 chats, three at a time), at most 60,000 characters, fenced between `<<<MESSAGES` / `MESSAGES>>>`, and has the `telegram` job (`TELEGRAM_SUMMARY_MODEL` → `BACKGROUND_MODEL`, purpose `telegram_summary`) write 1–4 bullets per chat; then what it covered and what it could not read |
 
-Tests: `python test_telegram_account.py` (a fake Telethon client per session).
+Tests: `bin/test test_telegram_account` (a fake Telethon client per session).

@@ -5,17 +5,17 @@ per user and synced from Google's People API; Dana searches and reads that
 copy, the user's people are filled in from it, and Dana adds or changes a
 Google contact only after the user approves.
 
-Kind `contacts` (`docs/access.md` → Kinds, Google account). Tests: `python
-test_contacts_users.py`.
+Addon `contacts` (`docs/access.md` → Addons, Google account). Tests: `bin/test
+test_contacts_users`.
 
 ## Code
 
-`integrations/contacts/`:
+`addons/contacts/`:
 
 | Module | Holds |
 |---|---|
-| `config.py` | The kind's name, the People API field mask (`PERSON_FIELDS`), the sync interval (`CONTACTS_SYNC_MINUTES`) |
-| `kind.py` | The declaration: credential `refresh_token`, the scope, the connection hooks, the prompt parts |
+| `config.py` | The addon's name, the People API field mask (`PERSON_FIELDS`), the sync interval (`CONTACTS_SYNC_MINUTES`) |
+| `addon.py` | The declaration: credential `refresh_token`, the scope, the connection hooks, the prompt parts |
 | `client.py` | The People API over the user's connection: `list_changes`, `get`, `create`, `update`, `check` |
 | `store.py` | Each user's copy: writing a sync result, one contact, `search`, `caller_name`, the sync token |
 | `sync.py` | `sync_user`, `sync_all` / `sync_loop`, what happens on connect, on another refresh token and on disconnect |
@@ -24,12 +24,12 @@ test_contacts_users.py`.
 
 ## Connection
 
-- A Google kind (`integrations/google_account/oauth.py`): the credential is
+- A Google addon (`addons/google_account/oauth.py`): the credential is
   the `refresh_token` the Google sign-in stores, the scope is exactly
   `https://www.googleapis.com/auth/contacts`, the People API client is built
   per call from `oauth.credentials(conn)`. No settings. It is never connected
   by the env import: only by the sign-in (or a token typed by hand).
-- `check` (`POST /api/integrations/contacts/test`): one request for the first
+- `check` (`POST /api/addons/contacts/test`): one request for the first
   contact's name; a failure is a short reason without a token.
 - No HTTP endpoint of its own.
 
@@ -45,7 +45,7 @@ user's contact id answers like an unknown one.
 | `google_contacts_sync` | per user: `sync_token`, `synced_at` |
 
 - A phone's `number` is its digits normalised exactly like a person's numbers
-  (`integrations/people/values.py::norm_phone`: country code added to local
+  (`addons/people/values.py::norm_phone`: country code added to local
   numbers, `DEFAULT_COUNTRY_CODE`), from Google's `canonicalForm` when it
   gives one, else from the value; `value` and `type` are kept as Google has
   them, so an update sends the other numbers back unchanged. A value that is
@@ -75,7 +75,7 @@ page.
 When it runs:
 
 - **On connect** (`on_connect`): in the background; the request that
-  connected the kind does not wait. Until it finishes, the tools answer that
+  connected the addon does not wait. Until it finishes, the tools answer that
   the contacts have not been read yet. A connection made from another
   process (`bin/users.py`) is read by the loop's next run.
 - **Another refresh token** (`on_credentials_change`, e.g. signing in to
@@ -85,7 +85,7 @@ When it runs:
   startup, then every `CONTACTS_SYNC_MINUTES` (60), every user with the
   kind, each as that user (`users.acting_as`), one after another; a user
   whose sync fails is logged (the reason only) and the next one still runs.
-- **Disconnect** (`on_change`, once the kind is gone): the user's rows in
+- **Disconnect** (`on_change`, once the addon is gone): the user's rows in
   the three tables are deleted, and their people forget which contact they
   were filled from (what was filled in stays).
 
@@ -95,7 +95,7 @@ When it runs:
 changed a contact, only for a user who also has `people`. It never creates a
 person. For each of the user's people whose number is on exactly one of
 their contacts — or on the contact the person is already linked to — the
-person takes from that contact (`integrations/people/store.py::fill_from_contact`):
+person takes from that contact (`addons/people/store.py::fill_from_contact`):
 
 | What | When |
 |---|---|
@@ -115,7 +115,7 @@ person takes from that contact (`integrations/people/store.py::fill_from_contact
 
 **The caller's name** (`store.caller_name(user, phone)`, the one function
 `people` asks): the name the user's contacts give a number — exact, else by
-the last 9 digits; none without the kind, for an unknown number, or when
+the last 9 digits; none without the addon, for an unknown number, or when
 contacts with different names share it. `people` uses it in two places
 (`docs/people.md`): a new caller whose call carries no name is created with
 that name (shown, not a hidden number), or linked to the person who already
@@ -131,7 +131,7 @@ people has shows that name.
 | `update_contact(contact_id, name, add_phone, remove_phone, add_email, remove_email, birthday, organisation)` | yes | changes an existing Google contact |
 | `add_contact(name, phone, email, birthday, organisation)` | yes | adds a Google contact |
 
-There is no tool that deletes a contact. Without the kind the tools are not
+There is no tool that deletes a contact. Without the addon the tools are not
 offered and are refused like a made-up tool name.
 
 - **Search** scores each contact and returns the best first: the name itself,
@@ -159,6 +159,6 @@ offered and are refused like a made-up tool name.
   the phone, email, birthday and organisation; "Change *name* in Google
   Contacts" with each change — the name comes from the user's own copy, never
   from a Google call.
-- **Prompt** (`kind.py`): Dana looks a person's number or email up with
+- **Prompt** (`addon.py`): Dana looks a person's number or email up with
   `search_contacts` instead of asking, and calls `add_contact` /
   `update_contact` without asking in text (the Approve button does).

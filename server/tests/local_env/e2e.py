@@ -11,7 +11,7 @@ Sections: the upgrade (first start from the 8.1.0 database, the env import, a
 restart, the CREDENTIALS_KEY refusals); existing clients (the endpoints the
 web UI loads, the login cookie, a streamed chat turn, approval, undo); a
 second user made with the CLI (empty data, the admin's ids 404, 403
-not_connected, own integrations through the API, own tools and prompt, a
+not_connected, own addons through the API, own tools and prompt, a
 hidden tool refused and not executed, admin-only endpoints); sharing (task
 list, project through share_item in chat, the shopping list: invitation, use
 with moving items and its undo, the live stream, aisles from the model stub); the Home Assistant watcher; WAHA inbound routing and the internal-host
@@ -19,7 +19,7 @@ rule; phone events and notifications; Telegram; usage; the security rules
 (debug export, cameras admin-only, addresses, Telegram chats, the WAHA session,
 webhook and media origin, device rows); the second review's findings (a task
 move undone by a member, one connection per WhatsApp account); the web
-Integrations page (its assets, every request it makes answering with the
+Addons page (its assets, every request it makes answering with the
 fields it reads for the admin and the member, the admin's Home Assistant moved
 to the second stub and back with connection tests, a member's refused change
 with the reason the page shows).
@@ -53,7 +53,7 @@ UNKNOWN_TG = 333333333
 ADMIN_ACCOUNT, MEMBER_ACCOUNT = "972500000001@c.us", "972500000002@c.us"
 SECRETS_IN_ENV = ("API_TOKEN", "CREDENTIALS_KEY", "HOMEASSISTANT_TOKEN", "WAHA_API_KEY", "GOOGLE_REFRESH_TOKEN",
                   "TELEGRAM_BOT_TOKEN", "GOOGLE_CLIENT_SECRET", "APP_PUBLISH_TOKEN")
-ALL_KINDS = ["core", "tasks", "shopping", "knowledge", "about", "people", "phone", "homeassistant", "whatsapp",
+ALL_KINDS = ["essentials", "tasks", "shopping", "knowledge", "about", "people", "phone", "homeassistant", "whatsapp",
              "calendar", "cameras", "ops"]
 
 results: List[Tuple[str, bool, str]] = []
@@ -229,7 +229,7 @@ def ids(items: Any, key: str = "id") -> set:
 
 def golden_types() -> set:
     out = set()
-    for line in (ROOT / "test_fixtures" / "golden.sse").read_text().splitlines():
+    for line in (ROOT / "tests" / "fixtures" / "golden.sse").read_text().splitlines():
         if line.startswith("data: "):
             out.add(json.loads(line[6:])["type"])
     return out
@@ -267,8 +267,8 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     check("upgrade: first start logged the snapshot", "Database snapshot before migrating: /app/db/snapshots/db-before-0001.sqlite3" in logs)
     check("upgrade: migrations 0001..0020 applied", all(f"Applied database migration {n:04d}_" in logs for n in range(1, 21)),
           [n for n in range(1, 21) if f"migration {n:04d}_" not in logs])
-    check("upgrade: env import for the first admin, every kind",
-          "Integrations imported for Robin: tasks, shopping, knowledge, about, people, phone, homeassistant, "
+    check("upgrade: env import for the first admin, every addon",
+          "Addons imported for Robin: tasks, shopping, knowledge, about, people, phone, homeassistant, "
           "whatsapp, calendar, cameras, ops" in logs)
     check("upgrade: no CREDENTIALS_KEY error, no traceback at start",
           "CREDENTIALS_KEY" not in logs.split("Webhook & Web UI server listening")[0] and "Traceback" not in logs,
@@ -285,7 +285,7 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     check("upgrade: /api/health 200 with this VERSION", health.status == 200 and version in health.text, health)
 
     me = await c.get("/api/me")
-    check("upgrade: /api/me is the admin with every kind",
+    check("upgrade: /api/me is the admin with every addon",
           me.status == 200 and me.body.get("name") == ADMIN_NAME and me.body.get("access") == "admin"
           and me.body.get("kinds") == ALL_KINDS, me)
     admin_id = (me.body or {}).get("id")
@@ -349,10 +349,10 @@ async def upgrade(c: Client) -> Dict[str, Any]:
                       "OR name = 'shopping_operations'\")))")
     check("upgrade: the catalog tables and the shopping operations log are gone", out.strip() == "[]", out)
 
-    # The integrations the env import created.
-    integ = await c.get("/api/integrations")
-    by_kind = {i["kind"]: i for i in (integ.body or {}).get("integrations", [])}
-    check("upgrade: /api/integrations lists every kind connected",
+    # The addons the env import created.
+    integ = await c.get("/api/addons")
+    by_kind = {i["name"]: i for i in (integ.body or {}).get("addons", [])}
+    check("upgrade: /api/addons lists every addon connected",
           integ.status == 200 and all(by_kind.get(k, {}).get("connected") for k in ALL_KINDS[1:]), integ)
     check("upgrade: secret credentials only reported as set; addresses with their value (no secret anywhere)",
           all(cr.get("set") is True and ("value" not in cr if cr["secret"] else cr.get("value", "").startswith("http://"))
@@ -371,27 +371,27 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     check("upgrade: cameras url; shopping has only the active-list setting", settings.get("cameras", {}).get("url") == "http://stubs:5000"
           and settings.get("shopping") == {"active_list": None}, (settings.get("cameras"), settings.get("shopping")))
     for kind in ("homeassistant", "whatsapp", "cameras"):
-        r = await c.post(f"/api/integrations/{kind}/test")
-        check(f"upgrade: POST /api/integrations/{kind}/test ok against the stub",
+        r = await c.post(f"/api/addons/{kind}/test")
+        check(f"upgrade: POST /api/addons/{kind}/test ok against the stub",
               r.status == 200 and (r.body or {}).get("ok") is True, r)
-    r = await c.post("/api/integrations/calendar/test")
+    r = await c.post("/api/addons/calendar/test")
     check("upgrade: calendar test (Google is not stubbed) answers ok:false with a short reason, no secret",
           r.status == 200 and (r.body or {}).get("checked") is True and (r.body or {}).get("ok") is False
           and not no_secret_in(r.text), r)
 
     code, out = users_cli("list")
-    check("cli: users.py list runs in the image: one admin, Telegram id, every kind",
+    check("cli: users.py list runs in the image: one admin, Telegram id, every addon",
           code == 0 and "Robin  [admin] (first admin)" in out and "telegram ids: 111111111" in out
-          and "integrations: tasks, shopping, knowledge, about, people, phone, homeassistant, whatsapp, calendar, cameras, ops" in out, out)
-    code, out = users_cli("integrations", "show", "Robin")
-    check("cli: integrations show: credentials 'set', no secret printed", code == 0 and "set" in out and not no_secret_in(out),
+          and "addons: tasks, shopping, knowledge, about, people, phone, homeassistant, whatsapp, calendar, cameras, ops" in out, out)
+    code, out = users_cli("addons", "show", "Robin")
+    check("cli: addons show: credentials 'set', no secret printed", code == 0 and "set" in out and not no_secret_in(out),
           (code, no_secret_in(out), out[:300]))
     r = await c.get("/api/checks")
     keys = {x["key"]: x for x in (r.body or {}).get("checks", [])}
     check("upgrade: self-check ha_watcher connected, no ha_entities missing",
           keys.get("ha_watcher", {}).get("ok") is True and keys.get("ha_entities", {}).get("ok", True) is True,
           {k: keys.get(k) for k in ("ha_watcher", "ha_entities")})
-    return {"admin_id": admin_id, "integrations": integ.text}
+    return {"admin_id": admin_id, "addons": integ.text}
 
 
 async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
@@ -404,14 +404,14 @@ async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
     logs = app_logs()
     check("restart: started twice, migrated once, imported once, one snapshot",
           logs.count("Initializing modular AI assistant") == 2 and logs.count("Database migrated:") == 1
-          and logs.count("Integrations imported for") == 1 and logs.count("Database snapshot before migrating") == 1,
+          and logs.count("Addons imported for") == 1 and logs.count("Database snapshot before migrating") == 1,
           (logs.count("Initializing modular AI assistant"), logs.count("Database migrated:"),
-           logs.count("Integrations imported for")))
+           logs.count("Addons imported for")))
     code, out = dexec("ls", "/app/db/snapshots")
     check("restart: still one snapshot", out.split() == ["db-before-0001.sqlite3"], out)
-    r = await c.get("/api/integrations")
-    check("restart: integrations unchanged", r.text == before["integrations"],
-          "integrations payload differs after restart")
+    r = await c.get("/api/addons")
+    check("restart: addons unchanged", r.text == before["addons"],
+          "addons payload differs after restart")
     _, users_after = users_cli("list")
     check("restart: users unchanged", users_after == users_before, users_after)
 
@@ -428,7 +428,7 @@ async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
 
     code, out = start(None, "/tmp/k/db.sqlite3")
     check("key: migrated DB without CREDENTIALS_KEY refuses to start with the documented message",
-          code == 1 and "CREDENTIALS_KEY is not set but 3 integration(s) have stored credentials." in out
+          code == 1 and "CREDENTIALS_KEY is not set but 3 addon(s) have stored credentials." in out
           and "Fernet.generate_key()" in out and "Webhook & Web UI server listening" not in out, (code, out[-500:]))
     code, out = start("not-a-key", "/tmp/k/db.sqlite3")
     check("key: malformed key refuses to start", code == 1 and "CREDENTIALS_KEY is not a valid Fernet key" in out,
@@ -436,20 +436,20 @@ async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
     _, other = dexec("python", "-c", "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
     code, out = start(other.strip(), "/tmp/k/db.sqlite3")
     check("key: a different key refuses to start ('not the key the stored … were encrypted with')",
-          code == 1 and "is not the key the stored integration credentials were encrypted" in out, (code, out[-400:]))
+          code == 1 and "is not the key the stored addon credentials were encrypted" in out, (code, out[-400:]))
     check("key: no key value in those messages", not no_secret_in(out) and other.strip() not in out)
 
     # The fixture as production has it today, first start without the key.
-    run(["docker", "cp", str(ROOT / "test_fixtures" / "db_8_1_0.sql"), f"{app_container()}:/tmp/db_8_1_0.sql"])
+    run(["docker", "cp", str(ROOT / "tests" / "fixtures" / "db_8_1_0.sql"), f"{app_container()}:/tmp/db_8_1_0.sql"])
     dexec("python", "-c", "import sqlite3, os; os.makedirs('/tmp/f', exist_ok=True);"
           " c=sqlite3.connect('/tmp/f/db.sqlite3'); c.executescript(open('/tmp/db_8_1_0.sql').read()); c.close()")
     code, out = start(None, "/tmp/f/db.sqlite3")
     check("key: 8.1.0 DB + env credentials, no key: refuses to start, says how to generate one",
           code == 1 and "CREDENTIALS_KEY is not set" in out and "Fernet.generate_key()" in out
-          and "Integrations imported" not in out, (code, out[-500:]))
+          and "Addons imported" not in out, (code, out[-500:]))
     code, out = start(ENV["CREDENTIALS_KEY"], "/tmp/f/db.sqlite3")
     check("key: the same DB with the key added: import happens on that start",
-          "Integrations imported for Robin" in out and "Database migrated" not in out, out[-600:])
+          "Addons imported for Robin" in out and "Database migrated" not in out, out[-600:])
     dexec("rm", "-rf", "/tmp/k", "/tmp/f", "/tmp/db_8_1_0.sql")
 
 
@@ -516,7 +516,7 @@ APP_SCRIPTS = [f"/static/{name}.js" for name in (
     "app-projects-table", "app-calls", "app-settings", "app-calendar", "app-debug", "app")]
 
 PAGES = ["/", "/dashboard", "/calendar", *APP_SCRIPTS, "/static/styles.css", "/manifest.json", "/sw.js",
-         "/static/integrations.js", "/static/integrations.css", "/shopping", "/static/shopping.js",
+         "/static/addons.js", "/static/addons.css", "/shopping", "/static/shopping.js",
          "/static/shopping-core.js", "/static/shopping.css"]
 
 
@@ -640,7 +640,7 @@ NOT_CONNECTED = [
 
 
 async def second_user(c: Client, admin_id: str) -> Dict[str, str]:
-    print("\n== 3. A second user (CLI, then their own integrations through the API)")
+    print("\n== 3. A second user (CLI, then their own addons through the API)")
     code, out = users_cli("add", MEMBER_NAME, "--pronoun", "she", "--context",
                           "Maya is a nurse in Haifa. Dalia is her sister.", "--telegram-chat", str(MEMBER_TG))
     m = re.search(r"\(([0-9a-f]{12}), member\)", out)
@@ -654,7 +654,7 @@ async def second_user(c: Client, admin_id: str) -> Dict[str, str]:
     check("cli: Telegram id added", code == 0, out)
     code, out = users_cli("tokens", "list", "maya")
     check("cli: tokens list never prints the token", code == 0 and token not in out, out)
-    code, out = users_cli("integrations", "connect", "maya", "ops")
+    code, out = users_cli("addons", "connect", "maya", "ops")
     check("cli: ops cannot be connected for a member", code != 0, out)
     STATE.joinpath("users.json").write_text(json.dumps({
         "url": BASE, "admin": {"name": ADMIN_NAME, "id": admin_id, "token": ADMIN_TOKEN},
@@ -662,24 +662,24 @@ async def second_user(c: Client, admin_id: str) -> Dict[str, str]:
 
     me = await until(lambda: _me(c, token), timeout=15)
     check("member: /api/me with the DB token: member, only core", me and me.get("access") == "member"
-          and me.get("kinds") == ["core"], me)
+          and me.get("kinds") == ["essentials"], me)
 
     for path, kind in NOT_CONNECTED:
         r = await c.get(path, token)
         check(f"member: {path.split('?')[0]} 403 not_connected ({kind})", r.status == 403 and r.body == {
-            "error": "not_connected", "integration": kind}, r)
+            "error": "not_connected", "addon": kind}, r)
 
-    # Admin-only endpoints and other users' integrations.
+    # Admin-only endpoints and other users' addons.
     for method, path in [("GET", "/api/debug/logs"), ("DELETE", "/api/debug/logs"),
-                         (("GET"), f"/api/integrations?user={admin_id}"),
+                         (("GET"), f"/api/addons?user={admin_id}"),
                          ("GET", "/api/usage?user=all")]:
         r = await c.req(method, path, token, json_body={} if method == "POST" else None)
         check(f"member: {method} {path.split('?')[0]}{'?user=…' if 'user=' in path else ''} 403", r.status == 403, r)
-    r = await c.put("/api/integrations/ops", {}, token)
-    check("member: PUT /api/integrations/ops 403 forbidden", r.status == 403 and (r.body or {}).get("error") == "forbidden", r)
-    r = await c.get("/api/integrations", token)
-    check("member: /api/integrations does not offer ops", r.status == 200 and "ops" not in
-          {i["kind"] for i in (r.body or {}).get("integrations", [])}, r)
+    r = await c.put("/api/addons/ops", {}, token)
+    check("member: PUT /api/addons/ops 403 forbidden", r.status == 403 and (r.body or {}).get("error") == "forbidden", r)
+    r = await c.get("/api/addons", token)
+    check("member: /api/addons does not offer ops", r.status == 200 and "ops" not in
+          {i["name"] for i in (r.body or {}).get("addons", [])}, r)
 
     # Tools and prompt are hers; hidden tools refused and not executed.
     await c.ctrl("POST", "/reset")
@@ -714,22 +714,22 @@ async def second_user(c: Client, admin_id: str) -> Dict[str, str]:
 
     # Connect her kinds through the API with her own token.
     for kind in ("tasks", "shopping", "knowledge", "about", "people", "phone"):
-        r = await c.put(f"/api/integrations/{kind}", {}, token)
-        check(f"member: PUT /api/integrations/{kind} connects (201)", r.status == 201 and (r.body or {}).get("connected"), r)
-    r = await c.put("/api/integrations/homeassistant", {
+        r = await c.put(f"/api/addons/{kind}", {}, token)
+        check(f"member: PUT /api/addons/{kind} connects (201)", r.status == 201 and (r.body or {}).get("connected"), r)
+    r = await c.put("/api/addons/homeassistant", {
         "credentials": {"host": "http://stubs:8124", "token": "local-ha-token-b"},
         "settings": {"person": "person.maya", "car_sensor": "sensor.maya_phone_bluetooth_connection", "car_device": "Maya Car"}}, token)
     check("member: connects her own Home Assistant (201, token not echoed)", r.status == 201 and "local-ha-token-b" not in r.text, r)
-    r = await c.put("/api/integrations/whatsapp", {
+    r = await c.put("/api/addons/whatsapp", {
         "credentials": {"url": "http://stubs:3000/api/", "api_key": "local-waha-key", "session": "maya"},
         "settings": {"voice_telegram_chat_id": MEMBER_TG}}, token)
     check("member: connects her own WhatsApp session (201)", r.status == 201 and "local-waha-key" not in r.text, r)
     for kind in ("homeassistant", "whatsapp"):
-        r = await c.post(f"/api/integrations/{kind}/test", token=token)
+        r = await c.post(f"/api/addons/{kind}/test", token=token)
         check(f"member: {kind} test ok against the stub", (r.body or {}).get("ok") is True, r)
     acct = await until(lambda: _account(c, token), timeout=15)
     check("member: her WhatsApp account learned on connect", acct == MEMBER_ACCOUNT, acct)
-    r = await c.get("/api/integrations/homeassistant/options", token)
+    r = await c.get("/api/addons/homeassistant/options", token)
     opts = json.dumps(r.body or {})
     check("member: options come from her own Home Assistant", r.status == 200 and "person.maya" in opts
           and "person.robin" not in opts, r)
@@ -810,7 +810,7 @@ async def _me(c: Client, token: str) -> Optional[Dict[str, Any]]:
 
 
 async def _account(c: Client, token: str) -> Optional[str]:
-    r = await c.get("/api/integrations/whatsapp", token)
+    r = await c.get("/api/addons/whatsapp", token)
     return (r.body or {}).get("account")
 
 
@@ -1007,7 +1007,7 @@ async def watcher(c: Client, maya: Dict[str, str]) -> None:
           await reminders(c, ADMIN_TOKEN, "E2E arrive work"))
 
     # A settings change through the API takes effect without a restart.
-    r = await c.put("/api/integrations/homeassistant", {"settings": {"person": "person.robin_alt"}})
+    r = await c.put("/api/addons/homeassistant", {"settings": {"person": "person.robin_alt"}})
     check("watcher: admin changes the person setting (200)", r.status == 200, r)
     subs = await until(lambda: _subscribed(c, "a", "person.robin_alt"), timeout=25)
     check("watcher: the watcher re-subscribed to the new entity", subs, subs)
@@ -1017,11 +1017,11 @@ async def watcher(c: Client, maya: Dict[str, str]) -> None:
     await c.ctrl("POST", "/ha/a/state", {"entity_id": "person.robin_alt", "state": "Office"})
     got = await until(lambda: reminders(c, ADMIN_TOKEN, "E2E arrive office"), timeout=15)
     check("watcher: the new entity fires", got and len(got) == 1, got)
-    r = await c.put("/api/integrations/homeassistant", {"settings": {"person": "person.robin"}})
+    r = await c.put("/api/addons/homeassistant", {"settings": {"person": "person.robin"}})
     check("watcher: setting put back", r.status == 200, r)
 
     # Disconnecting stops her watcher.
-    r = await c.delete("/api/integrations/homeassistant", tok)
+    r = await c.delete("/api/addons/homeassistant", tok)
     check("watcher: she disconnects Home Assistant", r.status == 200 and (r.body or {}).get("connected") is False, r)
     gone = await until(lambda: _no_subscribers(c, "b"), timeout=25)
     check("watcher: her watcher stopped (no subscriber on her Home Assistant)", gone, await c.ctrl("GET", "/ha/b/log"))
@@ -1089,7 +1089,7 @@ async def waha_inbound(c: Client, maya: Dict[str, str]) -> None:
     r = await c.post("/webhook/waha", voice_event(ADMIN_ACCOUNT, "default", "E2EVY"), token=None)
     check("waha: same request from a non-internal host without a token → 401", r.status == 401, r)
     for method, path in [("GET", "/api/tasks"), ("GET", "/api/phone/events"), ("POST", "/webhook"),
-                         ("GET", "/api/integrations"), ("POST", "/api/notifications/batch"), ("GET", "/media/x.jpg")]:
+                         ("GET", "/api/addons"), ("POST", "/api/notifications/batch"), ("GET", "/media/x.jpg")]:
         r = await c.req(method, path, None, json_body={} if method == "POST" else None, headers=internal)
         check(f"waha: internal host on {method} {path} without a token → 401", r.status == 401, r)
 
@@ -1207,29 +1207,29 @@ async def security(c: Client, maya: Dict[str, str]) -> None:
                                                      "WAHA_API_KEY", "API_TOKEN", "CREDENTIALS_KEY")), sorted(shown)[:8])
     check("debug: no secret value in either export", not no_secret_in(r.text), no_secret_in(r.text))
 
-    r = await c.put("/api/integrations/cameras", {"settings": {"url": "http://stubs:5000"}}, tok)
+    r = await c.put("/api/addons/cameras", {"settings": {"url": "http://stubs:5000"}}, tok)
     check("cameras: a member's PUT → 403 forbidden (an admin changes it)", r.status == 403
           and (r.body or {}).get("needs") == "manage_users", r)
-    r = await c.delete("/api/integrations/cameras", tok)
+    r = await c.delete("/api/addons/cameras", tok)
     check("cameras: a member's DELETE → 403", r.status == 403, r)
 
     # Her Home Assistant was disconnected by the watcher section: each of these would connect it.
     for host, why in [("http://stubs:9999", "an origin no admin uses"), ("http://stubs:8124/?x=", "a query"),
                       ("http://user:pw@stubs:8124", "a user name"), ("file:///etc/passwd", "not http(s)")]:
-        r = await c.put("/api/integrations/homeassistant", {"credentials": {"host": host, "token": "local-ha-token-b"}}, tok)
+        r = await c.put("/api/addons/homeassistant", {"credentials": {"host": host, "token": "local-ha-token-b"}}, tok)
         check(f"address: {why} → 400 on host", r.status == 400 and (r.body or {}).get("field") == "host", r)
-    r = await c.put("/api/integrations/homeassistant", {"credentials": {"host": "http://stubs:8124/",
+    r = await c.put("/api/addons/homeassistant", {"credentials": {"host": "http://stubs:8124/",
                                                                         "token": "local-ha-token-b"}}, tok)
-    ha = await c.get("/api/integrations/homeassistant/options", tok)
+    ha = await c.get("/api/addons/homeassistant/options", tok)
     check("address: the allowed origin connects (stored normalised) and works", r.status == 201 and ha.status == 200,
           (r, ha))
     r = await c.get("/api/ha/state/light.living_room%3Fx", tok)
     check("address: a malformed entity id → 400", r.status == 400, r)
 
-    r = await c.put("/api/integrations/whatsapp", {"settings": {"voice_telegram_chat_id": ADMIN_TG}}, tok)
+    r = await c.put("/api/addons/whatsapp", {"settings": {"voice_telegram_chat_id": ADMIN_TG}}, tok)
     check("telegram chat: a member can't send her transcripts to another user's chat (400)", r.status == 400
           and (r.body or {}).get("field") == "voice_telegram_chat_id", r)
-    r = await c.put("/api/integrations/whatsapp", {"credentials": {"session": "default"}}, tok)
+    r = await c.put("/api/addons/whatsapp", {"credentials": {"session": "default"}}, tok)
     check("whatsapp: a member can't take the admin's WAHA session (400)", r.status == 400
           and (r.body or {}).get("field") == "session", r)
 
@@ -1304,18 +1304,18 @@ async def second_review(c: Client, maya: Dict[str, str]) -> None:
           and mine and "shared_by" not in mine and not await _task(c, ADMIN_TOKEN, tb), (r, mine))
 
     # One connection per WhatsApp account: her session now reports the admin's account.
-    r = await c.put("/api/integrations/whatsapp", {"credentials": {"session": "maya-lies"}}, tok)
+    r = await c.put("/api/addons/whatsapp", {"credentials": {"session": "maya-lies"}}, tok)
     conflict = await until(lambda: _conflict(c, tok), timeout=15)
-    mine = (await c.get("/api/integrations/whatsapp", tok)).body or {}
+    mine = (await c.get("/api/addons/whatsapp", tok)).body or {}
     check("whatsapp: a session reporting the admin's account gets no account (conflict shown)",
           r.status == 200 and conflict == ADMIN_ACCOUNT and mine.get("account") is None, (r, mine))
-    seen = (await c.get(f"/api/integrations/whatsapp?user={mid}")).body or {}
-    admin_own = (await c.get("/api/integrations/whatsapp")).body or {}
+    seen = (await c.get(f"/api/addons/whatsapp?user={mid}")).body or {}
+    admin_own = (await c.get("/api/addons/whatsapp")).body or {}
     check("whatsapp: the admin sees the conflict; her own connection keeps the account",
           seen.get("account_conflict") == ADMIN_ACCOUNT and admin_own.get("account") == ADMIN_ACCOUNT
           and "account_conflict" not in admin_own, (seen, admin_own))
-    code, out = users_cli("integrations", "show", mid)
-    check("whatsapp: users.py integrations show names the conflict", code == 0 and "account conflict" in out, out)
+    code, out = users_cli("addons", "show", mid)
+    check("whatsapp: users.py addons show names the conflict", code == 0 and "account conflict" in out, out)
     check("whatsapp: the conflict is logged (user ids, no content)",
           "is already connected by user" in app_logs(), "")
 
@@ -1337,15 +1337,15 @@ async def second_review(c: Client, maya: Dict[str, str]) -> None:
           and not [x for x in requests if x["session"] == "maya-lies" and "/sessions" not in x["path"]],
           (tool_end, requests))
 
-    r = await c.put("/api/integrations/whatsapp", {"credentials": {"session": "maya"}}, tok)
+    r = await c.put("/api/addons/whatsapp", {"credentials": {"session": "maya"}}, tok)
     ok = await until(lambda: _account_is(c, tok, MEMBER_ACCOUNT), timeout=15)
-    mine = (await c.get("/api/integrations/whatsapp", tok)).body or {}
+    mine = (await c.get("/api/addons/whatsapp", tok)).body or {}
     check("whatsapp: back on her own session, her account is learned and the conflict is gone",
           r.status == 200 and ok and "account_conflict" not in mine, mine)
 
 
 async def _conflict(c: Client, token: str) -> Optional[str]:
-    return ((await c.get("/api/integrations/whatsapp", token)).body or {}).get("account_conflict")
+    return ((await c.get("/api/addons/whatsapp", token)).body or {}).get("account_conflict")
 
 
 async def _account_is(c: Client, token: str, account: str) -> bool:
@@ -1353,15 +1353,15 @@ async def _account_is(c: Client, token: str, account: str) -> bool:
 
 
 # =================================================================================================
-# 12. The web Integrations page (static/integrations.js)
+# 12. The web Addons page (static/addons.js)
 # =================================================================================================
 
 FIELD_KEYS = {"name", "description", "type", "can_change", "why_not", "rule"}
 
 
-def integration_shape(i: Any) -> bool:
-    """The fields static/integrations.js reads from one <integration>."""
-    if not (isinstance(i, dict) and {"kind", "description", "connected", "can_change", "why_not", "credentials",
+def addon_shape(i: Any) -> bool:
+    """The fields static/addons.js reads from one <addon>."""
+    if not (isinstance(i, dict) and {"name", "description", "connected", "can_change", "why_not", "credentials",
                                      "settings", "account", "check", "options"} <= set(i)):
         return False
     creds_ok = all(FIELD_KEYS | {"required", "set", "secret"} <= set(f) and (f["secret"] or "value" in f)
@@ -1373,18 +1373,18 @@ def integ_field(item: Dict[str, Any], name: str) -> Dict[str, Any]:
     return next((f for f in (*item.get("credentials", []), *item.get("settings", [])) if f["name"] == name), {})
 
 
-async def integrations_page(c: Client, maya: Dict[str, str]) -> None:
-    print("\n== 12. The Integrations page")
+async def addons_page(c: Client, maya: Dict[str, str]) -> None:
+    print("\n== 12. The Addons page")
     tok, mid = maya["token"], maya["id"]
     index = await c.get("/")
     check("page: the Settings tile, the panel and its assets are in the web UI",
-          index.status == 200 and 'id="btn-open-integrations-tab"' in index.text and 'id="panel-integrations"' in index.text
-          and "/static/integrations.js" in index.text and "/static/integrations.css" in index.text, index)
-    js = await c.get("/static/integrations.js", token=None)
+          index.status == 200 and 'id="btn-open-addons-tab"' in index.text and 'id="panel-addons"' in index.text
+          and "/static/addons.js" in index.text and "/static/addons.css" in index.text, index)
+    js = await c.get("/static/addons.js", token=None)
     sw = await c.get("/sw.js", token=None)
     check("page: its script is public like the other static files and the service worker lets its API through",
-          js.status == 200 and "DanaIntegrationsCore" in js.text and sw.status == 200
-          and '"/api/integrations"' in sw.text and "ganam-hub-v12" in sw.text, (js.status, sw.status))
+          js.status == 200 and "DanaAddonsCore" in js.text and sw.status == 200
+          and '"/api/addons"' in sw.text and "ganam-hub-v12" in sw.text, (js.status, sw.status))
 
     # Every request the page makes, with the fields it reads: the admin, then the member.
     seen: List[str] = []
@@ -1400,20 +1400,20 @@ async def integrations_page(c: Client, maya: Dict[str, str]) -> None:
         else:
             check("page (member): GET /api/users → 403 (no picker)", users_r.status == 403
                   and users_r.body == {"error": "forbidden", "needs": "manage_users"}, users_r)
-        lst = await c.get("/api/integrations", token)
-        items = (lst.body or {}).get("integrations") or []
-        check(f"page ({who}): GET /api/integrations has every field the page reads",
-              lst.status == 200 and items and all(integration_shape(i) for i in items),
-              [i.get("kind") for i in items if not integration_shape(i)] or lst)
+        lst = await c.get("/api/addons", token)
+        items = (lst.body or {}).get("addons") or []
+        check(f"page ({who}): GET /api/addons has every field the page reads",
+              lst.status == 200 and items and all(addon_shape(i) for i in items),
+              [i.get("name") for i in items if not addon_shape(i)] or lst)
         seen.append(lst.text)
-    admin_items = {i["kind"]: i for i in (await c.get("/api/integrations")).body["integrations"]}
-    for_maya = await c.get(f"/api/integrations?user={mid}")
-    check("page (admin): ?user= gives Maya's integrations in the same shape", for_maya.status == 200
-          and for_maya.body["user_id"] == mid and all(integration_shape(i) for i in for_maya.body["integrations"]), for_maya)
+    admin_items = {i["name"]: i for i in (await c.get("/api/addons")).body["addons"]}
+    for_maya = await c.get(f"/api/addons?user={mid}")
+    check("page (admin): ?user= gives Maya's addons in the same shape", for_maya.status == 200
+          and for_maya.body["user_id"] == mid and all(addon_shape(i) for i in for_maya.body["addons"]), for_maya)
     seen.append(for_maya.text)
-    opts = await c.get("/api/integrations/homeassistant/options")
+    opts = await c.get("/api/addons/homeassistant/options")
     check("page (admin): the Home Assistant suggestions answer {kind, settings: {name: [{value, label}]}}",
-          opts.status == 200 and opts.body["kind"] == "homeassistant"
+          opts.status == 200 and opts.body["name"] == "homeassistant"
           and all(isinstance(v, list) and all({"value", "label"} <= set(o) for o in v) for v in opts.body["settings"].values()),
           opts)
 
@@ -1424,31 +1424,31 @@ async def integrations_page(c: Client, maya: Dict[str, str]) -> None:
           original == "http://stubs:8123" and integ_field(ha, "token").get("set") is True
           and "value" not in integ_field(ha, "token"), ha["credentials"])
     before = len((await c.ctrl("GET", "/ha/b/log"))["requests"])
-    r = await c.put("/api/integrations/homeassistant", {"credentials": {"host": "http://stubs:8124/"}})
+    r = await c.put("/api/addons/homeassistant", {"credentials": {"host": "http://stubs:8124/"}})
     check("flow: Save with only the new address → 200, the address stored normalised, the token kept",
           r.status == 200 and integ_field(r.body, "host").get("value") == "http://stubs:8124"
           and integ_field(r.body, "token").get("set") is True, r)
-    t = await c.post("/api/integrations/homeassistant/test")
+    t = await c.post("/api/addons/homeassistant/test")
     check("flow: Test connection → the second stub refuses the old token, said in short",
           t.status == 200 and t.body["ok"] is False and t.body["reason"] == "Home Assistant refused the token (HTTP 401).", t)
-    r = await c.put("/api/integrations/homeassistant", {"credentials": {"token": "local-ha-token-b"}})
-    t = await c.post("/api/integrations/homeassistant/test")
+    r = await c.put("/api/addons/homeassistant", {"credentials": {"token": "local-ha-token-b"}})
+    t = await c.post("/api/addons/homeassistant/test")
     log_b = (await c.ctrl("GET", "/ha/b/log"))["requests"][before:]
     check("flow: with its token the test passes against the second stub",
-          r.status == 200 and t.body == {"kind": "homeassistant", "checked": True, "ok": True, "reason": ""}
+          r.status == 200 and t.body == {"name": "homeassistant", "checked": True, "ok": True, "reason": ""}
           and any(x["path"] == "/api/config" and x["token_ok"] for x in log_b), (r, t))
-    r = await c.put("/api/integrations/homeassistant", {"credentials": {"host": original,
+    r = await c.put("/api/addons/homeassistant", {"credentials": {"host": original,
                                                                         "token": ENV["HOMEASSISTANT_TOKEN"]}})
-    t = await c.post("/api/integrations/homeassistant/test")
+    t = await c.post("/api/addons/homeassistant/test")
     check("flow: back to the first stub, test passes again",
           r.status == 200 and integ_field(r.body, "host").get("value") == original and t.body.get("ok") is True, (r, t))
     seen += [r.text, t.text]
 
     # A member trying what the page shows as read-only gets the reason the page shows.
-    mine = {i["kind"]: i for i in (await c.get("/api/integrations", tok)).body["integrations"]}
+    mine = {i["name"]: i for i in (await c.get("/api/addons", tok)).body["addons"]}
     check("member: cameras are shown read-only with the reason", mine["cameras"]["can_change"] is False
           and mine["cameras"]["why_not"] == "Set by an admin", mine["cameras"])
-    r = await c.put("/api/integrations/cameras", {"settings": {"url": "http://stubs:5000"}}, tok)
+    r = await c.put("/api/addons/cameras", {"settings": {"url": "http://stubs:5000"}}, tok)
     check("member: …saving anyway → 403 manage_users (the page says: only an admin can change this)",
           r.status == 403 and r.body == {"error": "forbidden", "needs": "manage_users"}, r)
     check("member: shopping shows only the active-list setting",
@@ -1540,7 +1540,7 @@ async def main() -> int:
             await existing_clients(c)
             maya = await second_user(c, state["admin_id"])
             for fn in (sharing, watcher, waha_inbound, phone, telegram, usage, security, second_review,
-                       integrations_page, shopping_page):
+                       addons_page, shopping_page):
                 try:
                     await fn(c, maya)
                 except Exception as e:

@@ -9,7 +9,7 @@ from core.runs import emit, add_undos
 from core.models import ModelProfile, resolve_profile
 from core import clock, llm, undo, usage, user_profile, users
 from core.users import User
-from integrations.framework import registry
+from core.addons import registry
 
 logger = logging.getLogger(__name__)
 
@@ -51,21 +51,21 @@ def limit_tool_output(text: str, limit: int = MAX_TOOL_RESULT_CHARS) -> str:
 
 def home_map_section(user: Optional[User]) -> str:
     """``user``'s Home Assistant home map as a system-prompt section: the
-    ``homeassistant`` kind's prompt section ("" without a user, without the
-    kind connected or while nothing is cached yet). Never waits on HA."""
+    ``homeassistant`` addon's prompt section ("" without a user, without the
+    addon connected or while nothing is cached yet). Never waits on HA."""
     return registry.prompt_section(user, "homeassistant")
 
 
 def about_section(user: Optional[User]) -> str:
     """What Dana knows about ``user``, as a system-prompt section: the ``about``
-    kind's prompt section ("" without a user, without the kind connected or
+    addon's prompt section ("" without a user, without the addon connected or
     with no facts). Cached text; never blocks or raises."""
     return registry.prompt_section(user, "about")
 
 
 def money_section(user: Optional[User]) -> str:
     """``user``'s bank accounts and cards as a system-prompt section: the ``money``
-    kind's prompt section ("" without a user, without the kind or without accounts)."""
+    addon's prompt section ("" without a user, without the addon or without accounts)."""
     return registry.prompt_section(user, "money")
 
 
@@ -83,13 +83,13 @@ def _examples(items: List[str], text: str = "") -> str:
 
 def instructions(user: Optional[User]) -> str:
     """Dana's fixed instructions for ``user``: the general rules below, the
-    parts of each kind the user has connected (``Integration(prompt_parts=)``,
+    parts of each addon the user has connected (``Addon(prompt_parts=)``,
     placed in the slots named here: ``tools``, ``read_examples``,
     ``id_examples``, ``prompt_ids``, ``undoable``, ``runs_at_once``, ``done_examples``,
     ``send_via``, ``action_examples``, ``routing_heading``, ``routing``,
     ``choice_examples``, ``guides``) and the user's name as their profile
-    gives it (core/user_profile.py; ``{user}`` in a part). Adding a kind adds
-    its parts in its own ``kind.py``, never here. Stable text only: the
+    gives it (core/user_profile.py; ``{user}`` in a part). Adding an addon adds
+    its parts in its own ``addon.py``, never here. Stable text only: the
     per-turn date/time and the cached sections are added by the caller."""
     who = user_profile.for_user(user)
     name = who.referent or "the user"
@@ -436,7 +436,7 @@ class AgentOrchestrator:
             except asyncio.CancelledError:
                 raise
             except registry.ToolNotAvailable as e:
-                # Made up, or of an integration this user does not have: the same answer.
+                # Made up, or of an addon this user does not have: the same answer.
                 logger.warning(f"Refused tool call '{tool_name}': {e}")
                 tool_result_str = f"Error executing tool: {e}"
                 ok = False

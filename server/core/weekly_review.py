@@ -5,8 +5,8 @@
    snoozed 3+ times, suggestions pending over a week (with ``phone``), and
    people they usually talk to but haven't lately (with ``people``). With
    ``money``, a Money section: spent this week vs a usual week, the top
-   groups, new recurring charges and price changes (``integrations/money/queries.py::week``)
-   and a savings line (``integrations/money/savings.py::week_line``).
+   groups, new recurring charges and price changes (``addons/money/queries.py::week``)
+   and a savings line (``addons/money/savings.py::week_line``).
 2. The model proposes one action per item (complete / reschedule / delete /
    move to a group / keep; accept or dismiss a suggestion; a "reach out"
    task for a person) plus a few lines about the week, written for them
@@ -14,7 +14,7 @@
 3. They review the list (phone, web), untick what they disagree with and
    apply it with one call: ``POST /api/review/{id}/apply``.
 
-For every user with ``tasks`` (:data:`KINDS`); reviews belong to their user
+For every user with ``tasks`` (:data:`ADDONS`); reviews belong to their user
 (``weekly_reviews.user_id``). Schedule: ``WEEKLY_REVIEW_AT`` ("sat 20:00"); a
 review missed by a restart is still made until noon the next day. One review
 per user and ISO week.
@@ -34,15 +34,15 @@ from core import clock, composers, llm, user_profile, users
 from core.db import get_db_connection
 from core.notify import notify
 from core.users import User
-from integrations.calendar import config as calendar_config, events as calendar_events
-from integrations.money import config as money_config, queries as money_queries, savings as money_savings
-from integrations.framework import store
-from integrations.people import cadence as people_cadence
-from integrations.people.values import KIND as PEOPLE
-from integrations.phone import push as phone_push, suggestions as phone_suggestions
-from integrations.phone.calls import actions as suggestion_actions
-from integrations.phone.config import KIND as PHONE
-from integrations.tasks import groups as task_groups, service as tasks_service, triggers as task_triggers
+from addons.calendar import config as calendar_config, events as calendar_events
+from addons.money import config as money_config, queries as money_queries, savings as money_savings
+from core.addons import store
+from addons.people import cadence as people_cadence
+from addons.people.values import ADDON as PEOPLE
+from addons.phone import push as phone_push, suggestions as phone_suggestions
+from addons.phone.calls import actions as suggestion_actions
+from addons.phone.config import ADDON as PHONE
+from addons.tasks import groups as task_groups, service as tasks_service, triggers as task_triggers
 
 logger = logging.getLogger(__name__)
 
@@ -59,20 +59,20 @@ ACTIONS = {
     "person": ("reach_out", "keep"),
 }
 # The weekly review is about a user's tasks.
-KINDS = (tasks_service.KIND,)
+ADDONS = (tasks_service.ADDON,)
 # user id → the lock that keeps one generation of their review at a time.
 _locks: Dict[str, asyncio.Lock] = {}
 
 
 def available(user: Optional[User]) -> bool:
     """Whether ``user`` gets a weekly review (``tasks`` connected)."""
-    return user is not None and composers.has_all(user, KINDS)
+    return user is not None and composers.has_all(user, ADDONS)
 
 
 def require(user: User) -> None:
     """Raise ``NotConnected`` (403 ``not_connected``, ``tasks``) when ``user`` gets no review."""
     if not available(user):
-        raise store.NotConnected(user, tasks_service.KIND)
+        raise store.NotConnected(user, tasks_service.ADDON)
 
 
 def _now_iso() -> str:
@@ -203,11 +203,11 @@ def candidates(user: User, now: Optional[datetime.datetime] = None) -> Dict[str,
 
 
 def money_week(user: User, now: datetime.datetime) -> Optional[Dict[str, Any]]:
-    """``user``'s money this week (``integrations/money/queries.py::week``) with its savings line
-    (``savings`` — saved so far, ideas open, targets: ``integrations/money/savings.py::week_line``);
+    """``user``'s money this week (``addons/money/queries.py::week``) with its savings line
+    (``savings`` — saved so far, ideas open, targets: ``addons/money/savings.py::week_line``);
     None without ``money`` or with nothing to say (no spending this week or before, no recurring
     news, no savings line)."""
-    if not store.is_connected(user, money_config.KIND):
+    if not store.is_connected(user, money_config.ADDON):
         return None
     try:
         week = money_queries.week(user, now.date())
@@ -227,7 +227,7 @@ def money_week(user: User, now: datetime.datetime) -> Optional[Dict[str, Any]]:
 async def next_week(user: User, now: Optional[datetime.datetime] = None) -> Optional[Dict[str, Any]]:
     """Events per day of ``user``'s calendar for the coming 7 days (from tomorrow); None without it."""
     now = now or clock.now()
-    conn = store.get(user, calendar_config.KIND)
+    conn = store.get(user, calendar_config.ADDON)
     if conn is None:
         return None
     try:
@@ -382,7 +382,7 @@ async def generate(user: User, now: Optional[datetime.datetime] = None,
 
 def _to_api(user: User, r) -> Dict[str, Any]:
     d = _loads(r["data"], {})
-    money = d.get("money") if d.get("money") and store.is_connected(user, money_config.KIND) else None
+    money = d.get("money") if d.get("money") and store.is_connected(user, money_config.ADDON) else None
     return {"id": r["id"], "week": r["week"], "status": r["status"], "headline": r["headline"],
             "summary": d.get("summary") or [], "stats": d.get("stats") or {}, "next_week": d.get("next_week"),
             "groups": d.get("groups") or [], "items": d.get("items") or [], "money": money,

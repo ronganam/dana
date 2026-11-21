@@ -1,0 +1,4275 @@
+{
+ "active": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 0,
+    "to_buy": 0
+   },
+   "invites": [],
+   "items": [],
+   "list": {
+    "access": "owner",
+    "id": "11b180e5d174",
+    "name": "Shopping list",
+    "owner": {
+     "id": "898b15beb4e5",
+     "name": "Tom Hadad"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     }
+    ],
+    "version": 2
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "11b180e5d174",
+     "name": "Shopping list",
+     "owner": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     }
+    },
+    {
+     "access": "edit",
+     "active": false,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "undo": {
+    "id": "796924d71074",
+    "label": "Switched to your own shopping list"
+   },
+   "usuals": []
+  },
+  "status": 200
+ },
+ "add": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 0,
+    "to_buy": 6
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    ],
+    "version": 1
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "results": [
+    {
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "status": "added"
+    },
+    {
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "status": "added"
+    },
+    {
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "status": "added"
+    },
+    {
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "status": "added"
+    },
+    {
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "status": "added"
+    },
+    {
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "status": "added"
+    }
+   ],
+   "undo": {
+    "id": "cdedb46797d4",
+    "label": "Added 6 items to the shopping list"
+   },
+   "usuals": []
+  },
+  "status": 200
+ },
+ "add_mixed": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 1,
+    "to_buy": 10
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "836f9af1-a8c8-412f-8972-117fddcfcf2c",
+     "name": "Hummus",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    ],
+    "version": 6
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "results": [
+    {
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "status": "already"
+    },
+    {
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "status": "restored"
+    },
+    {
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "status": "added"
+    }
+   ],
+   "undo": {
+    "id": "eb9e20051e25",
+    "label": "Added 'Avocado' and 'Eggs' to the shopping list"
+   },
+   "usuals": []
+  },
+  "status": 200
+ },
+ "check": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 1,
+    "to_buy": 9
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "836f9af1-a8c8-412f-8972-117fddcfcf2c",
+     "name": "Hummus",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    ],
+    "version": 4
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "undo": {
+    "id": "eacd8ced7c46",
+    "label": "Bought 'Eggs'"
+   },
+   "usuals": []
+  },
+  "status": 200
+ },
+ "clear_bought": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 0,
+    "to_buy": 12
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "note": "for guacamole",
+     "quantity": "3"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "4d8a3df7-52ea-4255-8cd3-38f07e208814",
+     "name": "Pasta",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3628a5cb-f518-4a6f-8b1b-c130330036e6",
+     "name": "Olive oil",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "39ab6c1e-4d45-4ffe-b59a-8705a0e193ef",
+     "name": "Toilet paper",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     {
+      "access": "edit",
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     {
+      "access": "read",
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    ],
+    "version": 21
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "undo": {
+    "id": "32b698e4d5ac",
+    "label": "Cleared 2 bought items"
+   },
+   "usuals": [
+    {
+     "category": "dairy",
+     "name": "Eggs",
+     "times": 2
+    },
+    {
+     "category": "other",
+     "name": "Pita",
+     "times": 1
+    },
+    {
+     "category": "other",
+     "name": "Oat milk",
+     "times": 1
+    },
+    {
+     "category": "pantry",
+     "name": "Hummus",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "edit": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 2,
+    "to_buy": 9
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "note": "ripe",
+     "quantity": "3"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "836f9af1-a8c8-412f-8972-117fddcfcf2c",
+     "name": "Hummus",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    ],
+    "version": 13
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "undo": {
+    "id": "74535688a0e9",
+    "label": "Changed 'Avocado' on the shopping list"
+   },
+   "usuals": [
+    {
+     "category": "other",
+     "name": "Pita",
+     "times": 1
+    },
+    {
+     "category": "other",
+     "name": "Oat milk",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "error_duplicate": {
+  "body": {
+   "error": "duplicate",
+   "message": "'bread' is already on the list."
+  },
+  "status": 409
+ },
+ "error_invalid": {
+  "body": {
+   "error": "invalid",
+   "message": "Send {text} or {items: [...]}."
+  },
+  "status": 400
+ },
+ "error_not_connected": {
+  "body": {
+   "addon": "shopping",
+   "error": "not_connected"
+  },
+  "status": 403
+ },
+ "error_not_found": {
+  "body": {
+   "error": "not_found",
+   "message": "Item not found"
+  },
+  "status": 404
+ },
+ "error_read_only": {
+  "body": {
+   "error": "read_only",
+   "message": "This shopping list is shared with you read-only."
+  },
+  "status": 403
+ },
+ "error_too_many": {
+  "body": {
+   "error": "too_many",
+   "max": 30,
+   "message": "At most 30 items at a time."
+  },
+  "status": 400
+ },
+ "forget": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 0,
+    "to_buy": 12
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "note": "for guacamole",
+     "quantity": "3"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "4d8a3df7-52ea-4255-8cd3-38f07e208814",
+     "name": "Pasta",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3628a5cb-f518-4a6f-8b1b-c130330036e6",
+     "name": "Olive oil",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "39ab6c1e-4d45-4ffe-b59a-8705a0e193ef",
+     "name": "Toilet paper",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     {
+      "access": "edit",
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     {
+      "access": "read",
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    ],
+    "version": 22
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "undo": {
+    "id": "3780d65bf6e2",
+    "label": "Stopped suggesting 'Hummus'"
+   },
+   "usuals": [
+    {
+     "category": "dairy",
+     "name": "Eggs",
+     "times": 2
+    },
+    {
+     "category": "other",
+     "name": "Pita",
+     "times": 1
+    },
+    {
+     "category": "other",
+     "name": "Oat milk",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "invite_dismiss": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 0,
+    "to_buy": 0
+   },
+   "invites": [],
+   "items": [],
+   "list": {
+    "access": "owner",
+    "id": "7ebc4542f383",
+    "name": "Shopping list",
+    "owner": {
+     "id": "604085dae098",
+     "name": "Gal"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    ],
+    "version": 0
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "7ebc4542f383",
+     "name": "Shopping list",
+     "owner": {
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    },
+    {
+     "access": "read",
+     "active": false,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "undo": {
+    "id": "1c1647d1729b",
+    "label": "Hid Noa Peretz's shopping list invitation"
+   },
+   "usuals": []
+  },
+  "status": 200
+ },
+ "invite_use": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 2,
+    "to_buy": 12
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "note": "for guacamole",
+     "quantity": "3"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "4d8a3df7-52ea-4255-8cd3-38f07e208814",
+     "name": "Pasta",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3628a5cb-f518-4a6f-8b1b-c130330036e6",
+     "name": "Olive oil",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "39ab6c1e-4d45-4ffe-b59a-8705a0e193ef",
+     "name": "Toilet paper",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "836f9af1-a8c8-412f-8972-117fddcfcf2c",
+     "name": "Hummus",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "edit",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     {
+      "access": "edit",
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     {
+      "access": "read",
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    ],
+    "version": 20
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": false,
+     "id": "11b180e5d174",
+     "name": "Shopping list",
+     "owner": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     }
+    },
+    {
+     "access": "edit",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "undo": {
+    "id": "4275bd5d6f6d",
+    "label": "Switched to Noa Peretz's shopping list and moved 3 items"
+   },
+   "usuals": [
+    {
+     "category": "other",
+     "name": "Pita",
+     "times": 1
+    },
+    {
+     "category": "other",
+     "name": "Oat milk",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "lists": {
+  "body": {
+   "active": "11b180e5d174",
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "11b180e5d174",
+     "name": "Shopping list",
+     "owner": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     }
+    },
+    {
+     "access": "edit",
+     "active": false,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ]
+  },
+  "status": 200
+ },
+ "member_invite": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 0,
+    "to_buy": 3
+   },
+   "invites": [
+    {
+     "access": "edit",
+     "list_id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "items": [
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "4d8a3df7-52ea-4255-8cd3-38f07e208814",
+     "name": "Pasta",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3628a5cb-f518-4a6f-8b1b-c130330036e6",
+     "name": "Olive oil",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "39ab6c1e-4d45-4ffe-b59a-8705a0e193ef",
+     "name": "Toilet paper",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "11b180e5d174",
+    "name": "Shopping list",
+    "owner": {
+     "id": "898b15beb4e5",
+     "name": "Tom Hadad"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     }
+    ],
+    "version": 1
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "11b180e5d174",
+     "name": "Shopping list",
+     "owner": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     }
+    },
+    {
+     "access": "edit",
+     "active": false,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "usuals": []
+  },
+  "status": 200
+ },
+ "member_shared": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 2,
+    "to_buy": 12
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "note": "for guacamole",
+     "quantity": "3"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "4d8a3df7-52ea-4255-8cd3-38f07e208814",
+     "name": "Pasta",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3628a5cb-f518-4a6f-8b1b-c130330036e6",
+     "name": "Olive oil",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "39ab6c1e-4d45-4ffe-b59a-8705a0e193ef",
+     "name": "Toilet paper",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "836f9af1-a8c8-412f-8972-117fddcfcf2c",
+     "name": "Hummus",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "edit",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     {
+      "access": "edit",
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     {
+      "access": "read",
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    ],
+    "version": 20
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": false,
+     "id": "11b180e5d174",
+     "name": "Shopping list",
+     "owner": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     }
+    },
+    {
+     "access": "edit",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "usuals": [
+    {
+     "category": "other",
+     "name": "Pita",
+     "times": 1
+    },
+    {
+     "category": "other",
+     "name": "Oat milk",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "owner_alone": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 2,
+    "to_buy": 9
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "836f9af1-a8c8-412f-8972-117fddcfcf2c",
+     "name": "Hummus",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    ],
+    "version": 12
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "usuals": [
+    {
+     "category": "other",
+     "name": "Pita",
+     "times": 1
+    },
+    {
+     "category": "other",
+     "name": "Oat milk",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "owner_shared": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 2,
+    "to_buy": 12
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "note": "for guacamole",
+     "quantity": "3"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "4d8a3df7-52ea-4255-8cd3-38f07e208814",
+     "name": "Pasta",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3628a5cb-f518-4a6f-8b1b-c130330036e6",
+     "name": "Olive oil",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "39ab6c1e-4d45-4ffe-b59a-8705a0e193ef",
+     "name": "Toilet paper",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "836f9af1-a8c8-412f-8972-117fddcfcf2c",
+     "name": "Hummus",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     {
+      "access": "edit",
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     {
+      "access": "read",
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    ],
+    "version": 20
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "usuals": [
+    {
+     "category": "other",
+     "name": "Pita",
+     "times": 1
+    },
+    {
+     "category": "other",
+     "name": "Oat milk",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "remove": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 2,
+    "to_buy": 8
+   },
+   "invites": [],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "836f9af1-a8c8-412f-8972-117fddcfcf2c",
+     "name": "Hummus",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "owner",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    ],
+    "version": 14
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "undo": {
+    "id": "79116c6fc563",
+    "label": "Removed 'Avocado' from the shopping list"
+   },
+   "usuals": [
+    {
+     "category": "other",
+     "name": "Pita",
+     "times": 1
+    },
+    {
+     "category": "other",
+     "name": "Oat milk",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "share_get": {
+  "body": {
+   "id": "3bb8522ed6e5",
+   "item_type": "shopping_list",
+   "owner": {
+    "id": "4b1d692bc9f7",
+    "name": "Noa Peretz"
+   },
+   "shared_with": [
+    {
+     "level": "edit",
+     "name": "Tom Hadad",
+     "user_id": "898b15beb4e5"
+    },
+    {
+     "level": "read",
+     "name": "Gal",
+     "user_id": "604085dae098"
+    }
+   ],
+   "title": "Shopping list",
+   "users": [
+    {
+     "id": "5f5264e85fc3",
+     "name": "Robin Levi"
+    },
+    {
+     "id": "8170a1dc778e",
+     "name": "Bob Builder"
+    },
+    {
+     "id": "4f78e3012a27",
+     "name": "Eve"
+    },
+    {
+     "id": "77ec97788f28",
+     "name": "Carl"
+    },
+    {
+     "id": "898b15beb4e5",
+     "name": "Tom Hadad"
+    },
+    {
+     "id": "604085dae098",
+     "name": "Gal"
+    }
+   ]
+  },
+  "status": 200
+ },
+ "share_put": {
+  "body": {
+   "id": "3bb8522ed6e5",
+   "item_type": "shopping_list",
+   "owner": {
+    "id": "4b1d692bc9f7",
+    "name": "Noa Peretz"
+   },
+   "shared_with": [
+    {
+     "level": "edit",
+     "name": "Tom Hadad",
+     "user_id": "898b15beb4e5"
+    }
+   ],
+   "title": "Shopping list",
+   "users": [
+    {
+     "id": "5f5264e85fc3",
+     "name": "Robin Levi"
+    },
+    {
+     "id": "8170a1dc778e",
+     "name": "Bob Builder"
+    },
+    {
+     "id": "4f78e3012a27",
+     "name": "Eve"
+    },
+    {
+     "id": "77ec97788f28",
+     "name": "Carl"
+    },
+    {
+     "id": "898b15beb4e5",
+     "name": "Tom Hadad"
+    },
+    {
+     "id": "604085dae098",
+     "name": "Gal"
+    }
+   ]
+  },
+  "status": 200
+ },
+ "suggestions": {
+  "body": {
+   "suggestions": [
+    {
+     "category": "pantry",
+     "name": "Hummus",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "undo_conflict": {
+  "body": {
+   "error": "'Avocado' was changed again since, so it was left as it is.",
+   "ok": false
+  },
+  "status": 409
+ },
+ "undo_gone": {
+  "body": {
+   "error": "This can no longer be undone.",
+   "ok": false
+  },
+  "status": 404
+ },
+ "undo_ok": {
+  "body": {
+   "label": "Removed 'Avocado' from the shopping list",
+   "ok": true
+  },
+  "status": 200
+ },
+ "viewer": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 2,
+    "to_buy": 12
+   },
+   "invites": [
+    {
+     "access": "read",
+     "list_id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "items": [
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f089a5a1-1cf8-4987-be4b-1d65809f8af0",
+     "name": "עגבניות שרי",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3cf34634-aa17-4512-8cdd-037aa6d43987",
+     "name": "bananas",
+     "note": "",
+     "quantity": "1 kg"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "produce",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "0a44971b-7fcc-45ef-81c1-14237780ab07",
+     "name": "Avocado",
+     "note": "for guacamole",
+     "quantity": "3"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "bakery",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "20bb08bb-e801-4d8e-aacf-493ddf445ee4",
+     "name": "Bread",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5e51ecec-30ad-472f-beba-bae6ace43b48",
+     "name": "חלב",
+     "note": "",
+     "quantity": "2"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "f2f9bf68-df57-4890-be4f-018231525202",
+     "name": "יוגורט",
+     "note": "בלי סוכר",
+     "quantity": "4"
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "5857ff18-cf79-4eb4-9fc3-80b6a5a46d17",
+     "name": "Coffee beans",
+     "note": "dark roast",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "4d8a3df7-52ea-4255-8cd3-38f07e208814",
+     "name": "Pasta",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "pantry",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "3628a5cb-f518-4a6f-8b1b-c130330036e6",
+     "name": "Olive oil",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "b9872238-cda0-4199-8480-326e4ff5a514",
+     "name": "Dish soap",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     "category": "household",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "39ab6c1e-4d45-4ffe-b59a-8705a0e193ef",
+     "name": "Toilet paper",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "other",
+     "checked": false,
+     "checked_at": null,
+     "checked_by": null,
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "1aa532b4-7728-445a-8247-7abc7e2104fe",
+     "name": "Birthday candles",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "dairy",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "d74588a7-3b56-47e3-843d-153b82d8d621",
+     "name": "Eggs",
+     "note": "",
+     "quantity": ""
+    },
+    {
+     "added_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "category": "pantry",
+     "checked": true,
+     "checked_at": "2026-11-21T11:18:48+00:00",
+     "checked_by": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     "created_at": "2026-11-21T11:18:48+00:00",
+     "id": "836f9af1-a8c8-412f-8972-117fddcfcf2c",
+     "name": "Hummus",
+     "note": "",
+     "quantity": ""
+    }
+   ],
+   "list": {
+    "access": "read",
+    "id": "3bb8522ed6e5",
+    "name": "Shopping list",
+    "owner": {
+     "id": "4b1d692bc9f7",
+     "name": "Noa Peretz"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     },
+     {
+      "access": "edit",
+      "id": "898b15beb4e5",
+      "name": "Tom Hadad"
+     },
+     {
+      "access": "read",
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    ],
+    "version": 20
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "7ebc4542f383",
+     "name": "Shopping list",
+     "owner": {
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    },
+    {
+     "access": "read",
+     "active": false,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "usuals": [
+    {
+     "category": "other",
+     "name": "Pita",
+     "times": 1
+    },
+    {
+     "category": "other",
+     "name": "Oat milk",
+     "times": 1
+    }
+   ]
+  },
+  "status": 200
+ },
+ "viewer_invite": {
+  "body": {
+   "categories": [
+    {
+     "key": "produce",
+     "name": "Fruit & vegetables"
+    },
+    {
+     "key": "bakery",
+     "name": "Bread & bakery"
+    },
+    {
+     "key": "dairy",
+     "name": "Dairy & eggs"
+    },
+    {
+     "key": "meat",
+     "name": "Meat & fish"
+    },
+    {
+     "key": "pantry",
+     "name": "Pantry"
+    },
+    {
+     "key": "snacks",
+     "name": "Snacks & sweets"
+    },
+    {
+     "key": "drinks",
+     "name": "Drinks"
+    },
+    {
+     "key": "frozen",
+     "name": "Frozen"
+    },
+    {
+     "key": "household",
+     "name": "Cleaning & household"
+    },
+    {
+     "key": "care",
+     "name": "Personal care & pharmacy"
+    },
+    {
+     "key": "baby",
+     "name": "Baby"
+    },
+    {
+     "key": "pets",
+     "name": "Pets"
+    },
+    {
+     "key": "other",
+     "name": "Other"
+    }
+   ],
+   "counts": {
+    "bought": 0,
+    "to_buy": 0
+   },
+   "invites": [
+    {
+     "access": "read",
+     "list_id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "items": [],
+   "list": {
+    "access": "owner",
+    "id": "7ebc4542f383",
+    "name": "Shopping list",
+    "owner": {
+     "id": "604085dae098",
+     "name": "Gal"
+    },
+    "people": [
+     {
+      "access": "owner",
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    ],
+    "version": 0
+   },
+   "lists": [
+    {
+     "access": "owner",
+     "active": true,
+     "id": "7ebc4542f383",
+     "name": "Shopping list",
+     "owner": {
+      "id": "604085dae098",
+      "name": "Gal"
+     }
+    },
+    {
+     "access": "read",
+     "active": false,
+     "id": "3bb8522ed6e5",
+     "name": "Shopping list",
+     "owner": {
+      "id": "4b1d692bc9f7",
+      "name": "Noa Peretz"
+     }
+    }
+   ],
+   "usuals": []
+  },
+  "status": 200
+ }
+}

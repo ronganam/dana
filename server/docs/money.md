@@ -1,6 +1,6 @@
 # Money
 
-Bank and credit-card transactions in Dana, investment accounts and the meal card from work: the `money` kind (`integrations/money/`). Dana signs in to the user's bank, card, trading and meal-card sites through the **bank-worker** sidecar (`bank-worker/`, its `README.md` is the HTTP contract), stores accounts, transactions, holdings and meals per user, and keeps them current on a schedule. It supports Bank Hapoalim, Cal, Psagot Trade (read-only: "Investment accounts" below) and Pluxee (Cibus; read-only: "Meal cards" below). From the same data it finds ways to save and spending to watch ("Savings" below).
+Bank and credit-card transactions in Dana, investment accounts and the meal card from work: the `money` addon (`addons/money/`). Dana signs in to the user's bank, card, trading and meal-card sites through the **bank-worker** sidecar (`bank-worker/`, its `README.md` is the HTTP contract), stores accounts, transactions, holdings and meals per user, and keeps them current on a schedule. It supports Bank Hapoalim, Cal, Psagot Trade (read-only: "Investment accounts" below) and Pluxee (Cibus; read-only: "Meal cards" below). From the same data it finds ways to save and spending to watch ("Savings" below).
 
 ```
  schedule (2×/day) · signal · "Sync now" · first sync ──► sync.py (one source)
@@ -11,9 +11,9 @@ Bank and credit-card transactions in Dana, investment accounts and the meal card
  phone: Wallet notification (Inbox observer) · card app push (POST /api/money/signals) ──► signals.py ──► provisional row + request_soon
 ```
 
-## The kind and its sources
+## The addon and its sources
 
-- `money` is an ordinary kind (`kind.py`) with **no credentials of its own**: connecting it is the on/off switch (Integrations page). It is offered in realtime voice. Its `check` (the Integrations page's Test) asks whether the worker answers `GET /health`.
+- `money` is an ordinary addon (`addon.py`) with **no credentials of its own**: connecting it is the on/off switch (Addons page). It is offered in realtime voice. Its `check` (the Addons page's Test) asks whether the worker answers `GET /health`.
 - Each bank or card login is a **source**: a row of `money_sources` (`sources.py`). A user may have several (two cards, a bank and a card). The login fields come from `companies.py`:
 
   | Company | Kind | Fields | SMS code |
@@ -23,7 +23,7 @@ Bank and credit-card transactions in Dana, investment accounts and the meal card
   | `psagot` (Psagot Trade) | investment | `username` "ID number or user", `password` (secret) | sender `Psagot`, regex `פסגות טרייד הוא:?\s*(\d{4,8})` (only on the first sign-in: "Investment accounts") |
   | `pluxee` (Pluxee, formerly Cibus) | meal | `phone` "Mobile number" | sender `1700701130` (and its other spellings), regex `(?<!\d)(\d{6})(?!\d)` (when the 24-hour session has ended: "Meal cards") |
 
-- Credentials are checked against the company's fields (all required, no unknown names), stored only as a Fernet token (`integrations/framework/crypto.py`, `CREDENTIALS_KEY`) and decrypted only by `sync.py` to start a worker job. No API response, payload or log line carries them (`credentials_set` says whether they exist).
+- Credentials are checked against the company's fields (all required, no unknown names), stored only as a Fernet token (`core/addons/crypto.py`, `CREDENTIALS_KEY`) and decrypted only by `sync.py` to start a worker job. No API response, payload or log line carries them (`credentials_set` says whether they exist).
 - Adding a source starts its first sync at once (`trigger="connect"`). New credentials (`sources.update`) clear any login problem: the source becomes `new`, its failures reset, and it syncs at once. Removing a source (`sources.remove`) stops its running sync, closes its code request, deletes its browser profile on the worker (best-effort) and, if asked, its accounts and their transactions; otherwise the accounts stay with no source.
 - Disconnecting `money` deletes all of that user's money rows and the Money section of their weekly reviews, and asks the worker to delete their profiles (`sources.on_change` → `store.delete_all`). A review's Money section is shown only to a user who has `money`.
 
@@ -144,7 +144,7 @@ Flows: `purchase`, `refund`, `transfer_out`, `transfer_in`, `income`, `card_bill
 
 ## API
 
-`integrations/money/api.py`. Every route needs the `money` kind (403 `not_connected` otherwise); another user's ids answer 404, like missing ones. JSON; amounts in agorot.
+`addons/money/api.py`. Every route needs the `money` addon (403 `not_connected` otherwise); another user's ids answer 404, like missing ones. JSON; amounts in agorot.
 
 | Route | Answer |
 |---|---|
@@ -179,11 +179,11 @@ A source:
 
 ## Health check
 
-`money` in `core/checks.py` (for users with the kind): it fails while a source waits for a code (`needs_code`), needs its login fixed (`needs_attention`), or has had no successful sync for 24 hours (a new source: since it was added); the detail names the source and why, and the facts block lists every problem. A failing check becomes a Now card like the others.
+`money` in `core/checks.py` (for users with the addon): it fails while a source waits for a code (`needs_code`), needs its login fixed (`needs_attention`), or has had no successful sync for 24 hours (a new source: since it was added); the detail names the source and why, and the facts block lists every problem. A failing check becomes a Now card like the others.
 
 ## Classification
 
-`classify.py`, an ingest hook registered in `kind.py` after the reconciliation of provisional rows (below). The hook returns at once and the work runs in the background as the user, one run per user at a time: a sync never waits for the model.
+`classify.py`, an ingest hook registered in `addon.py` after the reconciliation of provisional rows (below). The hook returns at once and the work runs in the background as the user, one run per user at a time: a sync never waits for the model.
 
 A run takes the sync's new and changed scraped rows plus up to 200 rows (newest first) still missing something: a flow, a category (except `card_bill` / `own_transfer` rows, which take none) or a display name (`merchant` still equals the description and its key has no remembered name). Each step fills only what is still missing; a category set by the user (`user`) or a rule (`rule`) is never changed.
 
@@ -208,7 +208,7 @@ The merchant memory (`classify.py`, each taking an open connection): `alias(conn
 
 `signals.py`. A payment notification on the phone becomes a transaction at once and pulls that card's sync earlier. Two ways in:
 
-- **Google Wallet** (`com.google.android.apps.walletnfcrel`), already in the Inbox: `processing.schedule` hands every batch of new notification ids to the phone kind's observers (`integrations/phone/notifications/observers.py`), where `kind.py` registers `signals.observe` (the phone kind never imports money). It records the user's own new Wallet notifications, only for users with `money`.
+- **Google Wallet** (`com.google.android.apps.walletnfcrel`), already in the Inbox: `processing.schedule` hands every batch of new notification ids to the phone addon's observers (`addons/phone/notifications/observers.py`), where `addon.py` registers `signals.observe` (the phone addon never imports money). It records the user's own new Wallet notifications, only for users with `money`.
 - **The card / bank apps** (`com.onoapps.cal4u` Cal, `com.ideomobile.hapoalim`, `com.max.android`, `com.isracard.isracardapp`) never reach the Inbox: the phone posts them to `POST /api/money/signals`:
 
   ```json
@@ -250,7 +250,7 @@ One engine gives the page, Dana's tools, Now and the weekly review the same numb
 
 **Yearly** (`insights.yearly(user)`, `detect_yearly(rows, today, fixed_keys)`): charges that come once a year — insurance renewals, the car licence and service, a yearly subscription, school fees, a tax. Money out in the categories insurance, car, subscriptions, education, taxes, ₪300–₪10,000 a renewal (an installment plan counts at its total: a ₪3,600 policy in 12 payments is one ₪3,600 renewal), not a merchant already in a monthly / bimonthly series. Rows within 45 days of each other are one renewal, and the next is expected 12 months after the last (a single renewal is enough); two renewals less than 300 days apart mean it is not yearly; it stops being expected 60 days after its next date passes. The user's marks win: `yearly = 1` makes any row a renewal, `yearly = 0` or `one_off = 1` keeps it out. Each: `{merchant, merchant_key, category, category_label, amount (the last renewal), payments, last_date, next_date, monthly_cost, marked, row_ids, account_id, account_kind}`. **Unusual** (`insights.unusual(user, since)`, newest first, one reason each): the same amount at the same merchant twice within 10 minutes (both with exact times, not a notification row beside a scraped one; never two payments of installment plans), ≥ 3× the median of ≥ 4 earlier charges of the merchant (and ≥ ₪200), or a first charge from a merchant over ₪500 — not in the first 60 days of the user's data (every merchant is new then). An installment plan is judged once, by its total; each with `title` ("₪1,500.00 at סופר פארם"), `why` ("about 14× the usual ₪105.00 there") and the transaction.
 
-Routes (`api.py`, its page section; every amount in agorot, dates ISO, `end` inclusive). `test_fixtures/money_web.json` holds every payload of a synthetic two-user dataset (written by `WRITE_WEB_FIXTURE=1 python test_money_page.py`):
+Routes (`api.py`, its page section; every amount in agorot, dates ISO, `end` inclusive). `tests/fixtures/money_web.json` holds every payload of a synthetic two-user dataset (written by `WRITE_WEB_FIXTURE=1 bin/test test_money_page`):
 
 | Route | Answer |
 |---|---|
@@ -422,7 +422,7 @@ The first `doing` / `done` / `watching` stores the **baseline** (the numbers it 
 
 **Bank of Israel** (`reference.py`). It reads the SDMX CSV API: no key, no user data. `policy_rate(today)` gives `{rate, date, year_ago, year_ago_date}`. `fx_rates(currency, start, end)` gives `{date: rate}` for currencies quoted per unit (all of `FX_CURRENCIES` are fetched whenever the user spent abroad, so the requests never say which); `rate_on` takes the same day or up to 7 days back. Answers are cached for a day in memory and in `MONEY_DIR/boi-cache.json`. The fetch is automatic, as part of computing the items. A failed fetch is logged and not retried for 15 minutes. The items that need the data are left out: `cash` and `cushion`, and the arnona's net.
 
-Routes (`api.py`; keys are URL-encoded, since they hold `:` and Hebrew). Another user's key answers 404, and a user without `money` gets 403 `not_connected`. `test_fixtures/money_savings_web.json` holds `{savings, item_check, patch}` from a synthetic dataset (written by `WRITE_WEB_FIXTURE=1 python test_money_savings.py`):
+Routes (`api.py`; keys are URL-encoded, since they hold `:` and Hebrew). Another user's key answers 404, and a user without `money` gets 403 `not_connected`. `tests/fixtures/money_savings_web.json` holds `{savings, item_check, patch}` from a synthetic dataset (written by `WRITE_WEB_FIXTURE=1 bin/test test_money_savings`):
 
 | Route | Answer |
 |---|---|
@@ -436,7 +436,7 @@ Elsewhere:
 - **Chat:** "Ask Dana" on a savings card opens the `saving` context chat (`core/context_chats.py`, also an on-screen kind): the item's numbers, math, steps and script, its merchant text fenced as written by others.
 - **Now:** a way to save due within 14 days, or a bill increase found in the last 7 days (`money_save:<key>`), and a target at 80 % of this month's or last month's result (`money_target:<key>:<YYYY-MM>`) (docs/now.md). There are no push notifications.
 - **Weekly review:** one line in the Money section (`savings.week_line`).
-- **Overview insights:** the month in progress gets a `savings` card ("N ways to save ₪a–₪b a year", `link {view: "save"}`: it opens the Save view), which `kind.py` registers with `dashboard.on_insights`.
+- **Overview insights:** the month in progress gets a `savings` card ("N ways to save ₪a–₪b a year", `link {view: "save"}`: it opens the Save view), which `addon.py` registers with `dashboard.on_insights`.
 
 ## Agent tools
 
@@ -457,13 +457,13 @@ Elsewhere:
 | `saving_opportunities()` | read, `untrusted_result` | The totals, the open ways to save (`[key]`, the saving and its basis or the money at stake, effort, timing, the first step), spending to watch, this month's targets, outcomes of what was acted on, the user's choices |
 | `update_saving(key, status?, monthly_target?)` | `is_write` (runs at once with Undo), `untrusted_result` | A status of the item's group, or a monthly target in ₪ for spending to watch; mistakes are answered `Error: …` in words |
 
-Prompt: the kind's parts (`tools`, `read_examples`, `undoable`, and a `guides` paragraph: money questions go to these tools with a period name, amounts in ₪, what "spent" means, ways to save go through `saving_opportunities` / `update_saving` with the tool's numbers) and its `prompt_section` (`kind.accounts_section`: the user's accounts and cards), which `core/agent.py` adds to the chat system prompt after the About section. Elsewhere: Now's unusual-charge cards (`core/now.py::_money_items`) and savings cards (`_savings_items`), the weekly review's Money section (`core/weekly_review.py::money_week` → `queries.week`, with `savings.week_line`), and the `transaction` chat kind (`core/context_chats.py`, `SCREEN_KINDS`).
+Prompt: the addon's parts (`tools`, `read_examples`, `undoable`, and a `guides` paragraph: money questions go to these tools with a period name, amounts in ₪, what "spent" means, ways to save go through `saving_opportunities` / `update_saving` with the tool's numbers) and its `prompt_section` (`kind.accounts_section`: the user's accounts and cards), which `core/agent.py` adds to the chat system prompt after the About section. Elsewhere: Now's unusual-charge cards (`core/now.py::_money_items`) and savings cards (`_savings_items`), the weekly review's Money section (`core/weekly_review.py::money_week` → `queries.week`, with `savings.week_line`), and the `transaction` chat kind (`core/context_chats.py`, `SCREEN_KINDS`).
 
 Every tool's result is `untrusted_result`: merchant names and descriptions come from the merchants and the banks, so after one runs the turn's `acts_outside` tools ask first (docs/agent-actions.md). The `transaction` chat's prompt puts the merchant, the description and the memo (cut at 300 characters) between `<<external <nonce>>>` / `<</external <nonce>>>` fences with a random nonce per turn, named in the warning above them; a turn in such a chat, or with a transaction on screen, runs with `untrusted_content` (`session_runner.UNTRUSTED_CONTEXT_KINDS`), so its `acts_outside` tools ask too.
 
 ## Money tab
 
-The web page `static/money.js` (the controller, `window.DanaMoney`: state, loading, events, the Transactions view, sheets, the Save view's writes and price-check polling), `static/money-dash.js` (`window.DanaMoneyDash`: renders the Overview, Spending, Cash flow, Save, Investments and Meal card views and their SVG charts; no network, no state of its own), `static/money-core.js` (the pure part: ₪ formatting, dates, chart geometry, tile and sentence words, day grouping, filters ↔ query string / hash, the Save view's sections, chips, actions, offer rows and target progress; tested by `test_web_money.mjs` against `test_fixtures/money_web.json`, `money_portfolio_web.json`, `money_meals_web.json` and `money_savings_web.json`) and `static/money.css`. The rail / bottom-nav button shows only when `/api/me` lists `money`; a 403 `not_connected` hides it again.
+The web page `static/money.js` (the controller, `window.DanaMoney`: state, loading, events, the Transactions view, sheets, the Save view's writes and price-check polling), `static/money-dash.js` (`window.DanaMoneyDash`: renders the Overview, Spending, Cash flow, Save, Investments and Meal card views and their SVG charts; no network, no state of its own), `static/money-core.js` (the pure part: ₪ formatting, dates, chart geometry, tile and sentence words, day grouping, filters ↔ query string / hash, the Save view's sections, chips, actions, offer rows and target progress; tested by `test_web_money.mjs` against `tests/fixtures/money_web.json`, `money_portfolio_web.json`, `money_meals_web.json` and `money_savings_web.json`) and `static/money.css`. The rail / bottom-nav button shows only when `/api/me` lists `money`; a 403 `not_connected` hides it again.
 
 The header has the month switcher (hidden on Save, Investments and Meal card, which are not tied to a month), "Synced 2 h ago" (spinner while a sync runs), Accounts, and the views: Overview · Spending · Cash flow · Save · Investments (only for a user with an investment account) · Meal card (only with a meal card) · Transactions. On a phone the views' strip scrolls sideways when the names don't fit. Each view loads only its own endpoints (plus `overview`, `sources` and `categories`, which every view uses), and a month switch shows skeletons, never the old month's numbers.
 

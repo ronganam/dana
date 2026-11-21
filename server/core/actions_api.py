@@ -17,7 +17,7 @@ from aiohttp import web
 from core import shortcuts, undo
 from core.auth import request_user
 from core.undoable import UndoConflict
-from integrations.framework.store import NotConnected
+from core.addons.store import NotConnected
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +52,7 @@ async def undo_api(request: web.Request) -> web.Response:
     except KeyError:
         return web.json_response({"ok": False, "error": "This can no longer be undone."}, status=404)
     except NotConnected:
-        raise  # answered by core.auth.integration_middleware
+        raise  # answered by core.auth.addon_middleware
     except UndoConflict as e:
         logger.info(f"Undo {undo_id} refused: {e}")
         return web.json_response({"ok": False, "error": str(e)}, status=409)

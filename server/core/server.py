@@ -2,7 +2,7 @@
 background loops started with it.
 
 Every route lives in the module that owns it (``core/<area>_api.py`` or a
-kind's ``integrations/<kind>/api.py``), each registering its routes with
+addon's ``addons/<name>/api.py``), each registering its routes with
 ``setup(app)``; :data:`ROUTE_MODULES` is the order they are registered in.
 """
 import asyncio
@@ -13,30 +13,31 @@ import os
 
 from aiohttp import web
 
+import addons
 from core import (actions_api, app_updates, assistant_api, briefing, briefing_api, checks, debug_api,
-                  integrations_api, now_api, pages_api, sessions_api, sharing_api, usage, usage_api, wake,
+                  addons_api, now_api, pages_api, sessions_api, sharing_api, usage, usage_api, wake,
                   weekly_review)
 from core.auth import setup_auth
-from integrations.about import api as about_api
-from integrations.calendar import api as calendar_api
-from integrations.google_account import api as google_api
-from integrations.cameras import api as cameras_api
-from integrations.contacts import sync as contacts_sync
-from integrations.homeassistant import api as homeassistant_api, home_map
-from integrations.homeassistant.watcher import Watchers as HAWatchers
-from integrations.knowledge import api as knowledge_api
-from integrations.money import api as money_api, schedule as money_schedule
-from integrations.people import api as people_api, briefs as people_briefs
-from integrations.phone import api as phone_api, config as phone_config
-from integrations.phone.calls import api as calls_api, processing as calls_processing, retention as calls_retention
-from integrations.phone.notifications import api as notifications_api
-from integrations.phone.notifications import digest as notification_digest, escalation as notification_escalation
-from integrations.phone.notifications import processing as notification_processing
-from integrations.phone.notifications import retention as notification_retention
-from integrations.shopping import api as shopping_api
-from integrations.tasks import api as tasks_api, triggers as task_triggers
-from integrations.telegram_account import api as telegram_account_api
-from integrations.whatsapp import accounts as whatsapp_accounts, api as whatsapp_api
+from addons.about import api as about_api
+from addons.calendar import api as calendar_api
+from addons.google_account import api as google_api
+from addons.cameras import api as cameras_api
+from addons.contacts import sync as contacts_sync
+from addons.homeassistant import api as homeassistant_api, home_map
+from addons.homeassistant.watcher import Watchers as HAWatchers
+from addons.knowledge import api as knowledge_api
+from addons.money import api as money_api, schedule as money_schedule
+from addons.people import api as people_api, briefs as people_briefs
+from addons.phone import api as phone_api, config as phone_config
+from addons.phone.calls import api as calls_api, processing as calls_processing, retention as calls_retention
+from addons.phone.notifications import api as notifications_api
+from addons.phone.notifications import digest as notification_digest, escalation as notification_escalation
+from addons.phone.notifications import processing as notification_processing
+from addons.phone.notifications import retention as notification_retention
+from addons.shopping import api as shopping_api
+from addons.tasks import api as tasks_api, triggers as task_triggers
+from addons.telegram_account import api as telegram_account_api
+from addons.whatsapp import accounts as whatsapp_accounts, api as whatsapp_api
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +47,15 @@ logger = logging.getLogger(__name__)
 ROUTE_MODULES = (
     pages_api, tasks_api, about_api, knowledge_api, assistant_api, app_updates, debug_api, calls_api, phone_api,
     notifications_api, sessions_api, whatsapp_api, calendar_api, google_api, homeassistant_api, cameras_api,
-    people_api, briefing_api, actions_api, now_api, usage_api, sharing_api, integrations_api, shopping_api,
+    people_api, briefing_api, actions_api, now_api, usage_api, sharing_api, addons_api, shopping_api,
     money_api, telegram_account_api,
 )
 
 
-def plugin_route_modules() -> tuple:
-    """The ``api`` module (with ``setup(app)``) of each plugin kind that has one (docs/plugins.md)."""
-    import integrations
-    return tuple(importlib.import_module(f"integrations.{kind}.api") for kind in integrations.PLUGIN_KINDS
-                 if importlib.util.find_spec(f"integrations.{kind}.api") is not None)
+def site_route_modules() -> tuple:
+    """The ``api`` module (with ``setup(app)``) of each site addon that has one (docs/writing-an-addon.md)."""
+    return tuple(importlib.import_module(f"addons.{name}.api") for name in addons.SITE_ADDONS
+                 if importlib.util.find_spec(f"addons.{name}.api") is not None)
 
 
 async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
@@ -82,7 +82,7 @@ async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
     if not os.path.exists(static_dir):
         os.makedirs(static_dir, exist_ok=True)
         
-    for module in ROUTE_MODULES + plugin_route_modules():
+    for module in ROUTE_MODULES + site_route_modules():
         module.setup(app)
 
     # Serve static directory after endpoints
@@ -102,7 +102,7 @@ async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
     # ``phone``, each as that user).
     _start_phone_background(app)
 
-    # Every other loop runs per user (each user with the kinds it needs, as
+    # Every other loop runs per user (each user with the addons it needs, as
     # that user, a failing one not stopping the next).
     _start_background(app)
     return runner

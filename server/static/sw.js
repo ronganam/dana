@@ -106,10 +106,10 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Who is signed in and their integrations (static/integrations.js): always the server's current
+  // Who is signed in and their addons (static/addons.js): always the server's current
   // answer, never a cached copy (a stale "connected" would be a false claim).
   if (requestUrl.pathname === "/api/me" || requestUrl.pathname === "/api/users"
-      || requestUrl.pathname.startsWith("/api/integrations")) {
+      || requestUrl.pathname.startsWith("/api/addons")) {
     return;
   }
 

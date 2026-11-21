@@ -2,7 +2,7 @@
  *
  * The run model (readSseStream … applyAssistantState) is pure: no DOM, no network. It turns one run's
  * events (core/runs.py) into the chat model `chatMessages` (app-core.js). test_web_stream.mjs loads this
- * file in Node and feeds it the server's captured stream (test_fixtures/golden.sse). Below the model, the
+ * file in Node and feeds it the server's captured stream (tests/fixtures/golden.sse). Below the model, the
  * render cadence and the transport (POST or reattach, resume after a drop, stop) call into the Chat
  * screen (app-chat.js) while a run is followed. Loading the file only declares.
  */

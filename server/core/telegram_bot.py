@@ -25,10 +25,10 @@ from core.users import User
 from core.runs import SessionBusyError, live_undos
 from core import undo
 from core.images import save_image
-from integrations.framework import registry, store
-from integrations.about import legacy as about_legacy
-from integrations.money import otp as money_otp
-from integrations.whatsapp import config as whatsapp_config
+from core.addons import registry, store
+from addons.about import legacy as about_legacy
+from addons.money import otp as money_otp
+from addons.whatsapp import config as whatsapp_config
 import asyncio
 import os
 
@@ -43,15 +43,15 @@ _WA_VOICE_CACHE_MAX = 200
 def report_whatsapp_voice_chats() -> None:
     """Log, per user with WhatsApp, where their voice transcripts go (their
     ``voice_telegram_chat_id`` setting) — loudly when nowhere. Startup only."""
-    for uid in store.users_with(whatsapp_config.KIND):
+    for uid in store.users_with(whatsapp_config.ADDON):
         user = users.get(uid)
-        conn = store.get(user, whatsapp_config.KIND) if user else None
+        conn = store.get(user, whatsapp_config.ADDON) if user else None
         if conn is None:
             continue
         chat_id = whatsapp_config.voice_chat_id(conn)
         if chat_id is None:
             logger.warning(f"WhatsApp voice transcripts of user {uid} will NOT be sent to Telegram: their "
-                           f"{whatsapp_config.KIND} setting {whatsapp_config.VOICE_CHAT} is not a chat id.")
+                           f"{whatsapp_config.ADDON} setting {whatsapp_config.VOICE_CHAT} is not a chat id.")
         else:
             logger.info(f"WhatsApp voice transcripts of user {uid} go to Telegram chat {chat_id}")
 
@@ -95,10 +95,10 @@ class AuthMiddleware:
             return await handler(event, data)
 
 
-# The /memory menu runs the About-you tools (integrations/about); without that
-# integration it answers with NO_MEMORY_TEXT instead of the registry's refusal.
+# The /memory menu runs the About-you tools (addons/about); without that
+# addon it answers with NO_MEMORY_TEXT instead of the registry's refusal.
 MEMORY_KIND = "about"
-NO_MEMORY_TEXT = "🧠 Memory isn't set up for you: the About you integration is not connected."
+NO_MEMORY_TEXT = "🧠 Memory isn't set up for you: the About you addon is not connected."
 
 def api_session() -> Optional[AiohttpSession]:
     """The Bot API server from ``TELEGRAM_API_BASE`` (e.g. a self-hosted
@@ -177,7 +177,7 @@ class TelegramBot:
         ctype = getattr(message.chat, "type", "?")
         await message.reply(
             f"🆔 Chat ID: `{message.chat.id}`\nType: {ctype}\n\n"
-            f"Use this value for the WhatsApp integration's voice_telegram_chat_id setting.",
+            f"Use this value for the WhatsApp connection's voice_telegram_chat_id setting.",
             parse_mode="Markdown",
         )
 

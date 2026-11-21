@@ -10,3 +10,6 @@ CLAUDE.local.md
 .vscode/
 .agents/
 .claude/settings.local.json
+
+# Python bytecode (the example addon is imported by the tests)
+__pycache__/

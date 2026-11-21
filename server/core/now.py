@@ -25,11 +25,11 @@ until a time in ``now_hidden`` (per user: core/now_hidden.py). The contract is
 in docs/now.md.
 
 Per user: ``build(user)`` / ``act(user, …)`` compose and act only on that
-user's items, from the kinds they have connected; a kind they lack adds no
+user's items, from the addons they have connected; an addon they lack adds no
 card, count, slot or choice (needs-you notifications, suggestions and the
 quiet list need ``phone``, reminders and the review ``tasks``, events
 ``calendar``, weather and the "at home" slot / choices ``homeassistant``, the
-"on waking" ones the wake flow's kinds, unusual charges ``money``). Acting on a card of a kind they lack
+"on waking" ones the wake flow's addons, unusual charges ``money``). Acting on a card of an addon they lack
 answers 403 ``not_connected``; another user's card 404.
 """
 from __future__ import annotations
@@ -47,21 +47,21 @@ from typing import Any, Dict, List, Optional, Tuple
 from core import approval_text, briefing, checks, clock, now_hidden, undo, users, wake, weekly_review
 from core.db import get_db_connection
 from core.users import User
-from integrations.calendar import config as calendar_config, today as calendar_today_cache, tools as calendar_tools
-from integrations.framework import store
-from integrations.homeassistant import client as ha_client, config as ha_config
-from integrations.money import config as money_config, insights as money_insights, queries as money_queries
-from integrations.money import savings as money_savings, store as money_store
-from integrations.people.values import ago as people_ago
-from integrations.phone import push as phone_push, suggestions as phone_suggestions
-from integrations.phone.calls import actions as suggestion_actions
-from integrations.phone.calls.store import parse_call_time
-from integrations.phone.config import KIND as PHONE
-from integrations.phone.notifications import overview as notification_overview, shade as notification_shade
-from integrations.phone.notifications import store as notification_store
-from integrations.phone.notifications.triage import NO, YES
-from integrations.tasks import links as task_links, service as tasks_service, triggers as task_triggers
-from integrations.tasks.service import KIND as TASKS
+from addons.calendar import config as calendar_config, today as calendar_today_cache, tools as calendar_tools
+from core.addons import store
+from addons.homeassistant import client as ha_client, config as ha_config
+from addons.money import config as money_config, insights as money_insights, queries as money_queries
+from addons.money import savings as money_savings, store as money_store
+from addons.people.values import ago as people_ago
+from addons.phone import push as phone_push, suggestions as phone_suggestions
+from addons.phone.calls import actions as suggestion_actions
+from addons.phone.calls.store import parse_call_time
+from addons.phone.config import ADDON as PHONE
+from addons.phone.notifications import overview as notification_overview, shade as notification_shade
+from addons.phone.notifications import store as notification_store
+from addons.phone.notifications.triage import NO, YES
+from addons.tasks import links as task_links, service as tasks_service, triggers as task_triggers
+from addons.tasks.service import ADDON as TASKS
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +165,7 @@ def _home_zone() -> str:
 
 def _has_home(user: Optional[User]) -> bool:
     """Whether "at home" means something for ``user`` (a Home Assistant to have zones)."""
-    return user is not None and store.is_connected(user, ha_config.KIND)
+    return user is not None and store.is_connected(user, ha_config.ADDON)
 
 
 def _has_wake(user: Optional[User]) -> bool:
@@ -179,7 +179,7 @@ async def _resolve_home_zone(user: User) -> str:
     cache = _home.setdefault(user.id, {"name": "home", "at": 0.0})
     if time.monotonic() - cache["at"] < 600:
         return cache["name"]
-    conn = store.get(user, ha_config.KIND)
+    conn = store.get(user, ha_config.ADDON)
     if conn is None:
         return cache["name"]
     try:
@@ -286,7 +286,7 @@ def _refresh(cache: Dict[str, Any], fn) -> Optional[asyncio.Task]:
 async def calendar_today(user: User, wait: float = CALENDAR_WAIT_SECONDS) -> Optional[List[Dict[str, Any]]]:
     """``user``'s events today (their calendar's cache, refreshed in the
     background every 5 min). Waits up to ``wait`` seconds only when there is
-    nothing for today yet; None when not read today or without the kind."""
+    nothing for today yet; None when not read today or without the addon."""
     return await calendar_today_cache.events_today(user, wait)
 
 
@@ -301,7 +301,7 @@ async def _fetch_weather(user: User, cache: Dict[str, Any]) -> None:
 
 def weather_cached(user: User) -> Optional[Dict[str, Any]]:
     """``user``'s cached weather (None without their Home Assistant)."""
-    if not store.is_connected(user, ha_config.KIND):
+    if not store.is_connected(user, ha_config.ADDON):
         return None
     cache = _weather.setdefault(user.id, {"value": None, "at": 0.0, "task": None})
     if time.monotonic() - cache["at"] > WEATHER_TTL:
@@ -465,7 +465,7 @@ def notification_why(n: Dict[str, Any], rule: Optional[str], subject: str = "") 
             return 0.5  # not asked / not answered: unsettled
 
     person, action, soon = sig("from_person"), sig("needs_action"), sig("time_sensitive")
-    asks_now, to_me, own = sig("urgent_request"), sig("addressed_to_ron"), sig("ron_wrote_it")
+    asks_now, to_me, own = sig("urgent_request"), sig("addressed_to_owner"), sig("owner_wrote_it")
     cat = n.get("category") or ""
     who = (n.get("sender") or "").strip()
     if not who and person >= YES:
@@ -884,7 +884,7 @@ def _reminder_items(user: User, now: datetime.datetime, hidden: Dict[str, Any]) 
 
 def _money_items(user: User, now: datetime.datetime, hidden: Dict[str, Any]) -> List[Dict[str, Any]]:
     """``user``'s unusual charges of the last :data:`MONEY_DAYS` days (with ``money``), one card each."""
-    if not store.is_connected(user, money_config.KIND):
+    if not store.is_connected(user, money_config.ADDON):
         return []
     out = []
     for u in money_insights.unusual(user, now.date() - datetime.timedelta(days=MONEY_DAYS - 1)):
@@ -912,7 +912,7 @@ def _savings_items(user: User, now: datetime.datetime, hidden: Dict[str, Any]) -
     """``user``'s saving cards (with ``money``): a way to save due within :data:`SAVINGS_DUE_DAYS` or a bill
     increase first seen in the last :data:`SAVINGS_NEW_DAYS` days, a watched target at
     :data:`TARGET_WARN_SHARE` of this month's, and last month's result in the first days of a month."""
-    if not store.is_connected(user, money_config.KIND):
+    if not store.is_connected(user, money_config.ADDON):
         return []
     today = now.date()
     try:
@@ -1059,7 +1059,7 @@ def day_hours(now: datetime.datetime) -> List[int]:
 
 def day_slots(user: User, now: datetime.datetime, events: Optional[List[Dict[str, Any]]]) -> List[Dict[str, Any]]:
     """The day strip of ``user``: hour slots, then "At home" (with Home
-    Assistant) and "On waking" (with the wake flow's kinds)."""
+    Assistant) and "On waking" (with the wake flow's addons)."""
     hours = day_hours(now)
     first = hours[0] if hours else 24
     slots = {str(h): {"key": str(h), "label": f"{h:02d}:00", "items": []} for h in hours}
@@ -1149,7 +1149,7 @@ def _lede(user: User, now: datetime.datetime, events: Optional[List[Dict[str, An
 # --- The whole screen ------------------------------------------------------------
 
 async def build(user: User) -> Dict[str, Any]:
-    """The Now screen for ``user``: only their items, from the kinds they have connected."""
+    """The Now screen for ``user``: only their items, from the addons they have connected."""
     with users.acting_as(user):  # the formatting helpers (home zone) and to_thread see them
         now = clock.now()
         events = await calendar_today(user)
@@ -1262,7 +1262,7 @@ def _hide_with_undo(user: User, item_id: str, until: datetime.datetime, label: s
 
 async def act(user: User, item_id: str, action: str, args: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Carry out one action on ``user``'s Now card. Raises ActError (message +
-    HTTP status) and ``NotConnected`` (403) when the card's kind is not theirs."""
+    HTTP status) and ``NotConnected`` (403) when the card's addon is not theirs."""
     args = args if isinstance(args, dict) else {}
     action = (action or "").strip().lower()
     kind, _, ref = (item_id or "").partition(":")
@@ -1346,7 +1346,7 @@ async def _accept_suggestion(user: User, sid: str, s: Dict[str, Any], overrides:
                     pass
             if not done and event_ref.startswith("event:") and len(event_ref) > 6:
                 out = await asyncio.to_thread(calendar_tools.delete_event,
-                                              store.require(user, calendar_config.KIND), event_ref[6:])
+                                              store.require(user, calendar_config.ADDON), event_ref[6:])
                 if str(out).startswith("Error"):
                     raise RuntimeError(out)
             _restore_suggestion(sid, original, "accepted")
@@ -1554,7 +1554,7 @@ async def _act_task(user, task_id, action, args, now):
 # --- Money -----------------------------------------------------------------------------------
 
 async def _act_money(user, txn_id, action, args, now):
-    store.require(user, money_config.KIND)  # NotConnected → 403 not_connected
+    store.require(user, money_config.ADDON)  # NotConnected → 403 not_connected
     if money_store.get_transaction(user, txn_id) is None:
         raise ActError("Transaction not found", 404)
     if action == "dismiss":
@@ -1585,7 +1585,7 @@ async def _act_money_target(user, ref, action, args, now):
 
 async def _hide_saving_card(user, key, item_id, action, args, now):
     """Hide a saving card; the saving's own status stays as it is."""
-    store.require(user, money_config.KIND)  # NotConnected → 403 not_connected
+    store.require(user, money_config.ADDON)  # NotConnected → 403 not_connected
     if await asyncio.to_thread(money_savings.get_item, user, key, now.date()) is None:
         raise ActError("Saving not found", 404)
     if action == "dismiss":

@@ -11,7 +11,7 @@
  *   app-settings.js, app-calendar.js, app-debug.js   one screen each
  *   app.js           this file, last
  * index.html loads them in this order, `defer`, before the self-contained panel scripts (inbox.js,
- * people.js, review.js, usage.js, integrations.js, shopping-core.js, shopping.js, money-core.js, money-dash.js,
+ * people.js, review.js, usage.js, addons.js, shopping-core.js, shopping.js, money-core.js, money-dash.js,
  * money.js, projects-core.js, projects.js): Chat is open and window.danaSwitchTab is set before any of those asks for its own tab
  * (`#inbox`, `/shopping`, `#money`), and
  * switchTab reaches their window.Dana* once they have loaded. While it loads, a script only uses what

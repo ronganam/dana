@@ -4,7 +4,7 @@
  * docs/shopping.md "API") into what the panel shows, applies the user's pending changes on top of it
  * (optimistic), says what each change sends, words results and errors, and renders HTML strings.
  * Exercised by test_web_shopping.mjs against payloads captured from the real API
- * (test_fixtures/shopping_web.json, written by test_shopping_users.py).
+ * (tests/fixtures/shopping_web.json, written by test_shopping_users.py).
  *
  * The model: `server` is the last screen the server answered (a GET or a write's answer); `ops` are the
  * user's changes still on their way. What is shown is always applyOps(server, ops): a failed request
@@ -33,7 +33,7 @@
   }
   const plural = (n, one, many) => `${n} ${n === 1 ? one : many || one + "s"}`;
 
-  /** The server's name key (integrations/shopping/names.py: NFKC, case folded, Hebrew marks out,
+  /** The server's name key (addons/shopping/names.py: NFKC, case folded, Hebrew marks out,
    *  dashes and slashes as spaces, other punctuation out, spaces collapsed). */
   function nameKey(name) {
     let out = "";
@@ -223,7 +223,7 @@
     const b = body || {};
     if (status === 0) return "You're offline — nothing was changed.";
     if (b.error === "read_only") return "This list is view only.";
-    if (b.error === "not_connected") return "Shopping isn't turned on for you. An admin can connect it in Settings → Integrations.";
+    if (b.error === "not_connected") return "Shopping isn't turned on for you. An admin can connect it in Settings → Addons.";
     if (b.error === "too_many") return `At most ${b.max || MAX_ITEMS} items at a time.`;
     if (b.error === "duplicate") return String(b.message || "That's already on the list.").replace(/^'([^']+)'/, "$1");
     if (status === 404) return "That's no longer on the list — someone may have changed it.";

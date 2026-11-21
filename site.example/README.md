@@ -13,7 +13,7 @@ ln -s ~/my-dana-site site             # or point DANA_SITE at it
 | File | Read by | What |
 |---|---|---|
 | `deploy.env` | `server/bin/deploy`, the pre-push hook | Where your images go and how they roll out (fill in `deploy.env.example` and rename it). Without it, pushing runs the tests and deploys nothing |
-| `plugins/<kind>/` | the server (local runs), `server/bin/deploy` (the image) | Your own integration kinds, written like the built-in ones (`server/docs/plugins.md`; a working example: `server/examples/plugins/hello/`) |
+| `addons/<name>/` | the server (local runs), `server/bin/deploy` (the image) | Your own addons, written like the official ones (`server/docs/writing-an-addon.md`; a working example: `examples/addons/hello/`) |
 | `android.env` | the Android build, `android/bin/deploy-*.sh` | Your server's URL (the apps' default), the TV's LAN DNS, your adb serials, how to get the publish token |
 | `tv-defaults.json` | the Android TV build | The TV home screen's first-run apps, Home Assistant entities, cameras and remote buttons |
 | `google-services.json` | the Android phone build | Your Firebase project, for direct push (optional) |

@@ -2,9 +2,9 @@
 
 A self-contained copy of the production setup on your machine: the real image
 built from the `Dockerfile` (as `bin/deploy` builds it), started from the 8.1.0 database
-(`test_fixtures/db_8_1_0.sql`) with an env file shaped like production's before
+(`tests/fixtures/db_8_1_0.sql`) with an env file shaped like production's before
 the multi-user upgrade, so the first start is the real upgrade (snapshot,
-migrations, first-admin bootstrap, env import into encrypted integrations).
+migrations, first-admin bootstrap, env import into encrypted connections).
 Every outside service is a stub. Nothing reaches production or the internet.
 
 ```bash
@@ -18,7 +18,7 @@ bin/local-env.sh restart # restart the app
 ```
 
 **Iterating on code**: with `DANA_LOCAL_SOURCE=1` the app runs your working tree
-(`core/`, `integrations/`, `static/`, `main.py`, `bin/users.py` mounted read-only
+(`core/`, `addons/`, `static/`, `main.py`, `bin/users.py` mounted read-only
 over the image's copy, `tests/local_env/compose.source.yaml`). `up` then builds the
 image only when it is missing, `restart` (about 8 s) picks up a Python change, and a
 static file change is live on the next browser reload. Rebuild with
@@ -62,7 +62,7 @@ misconfigured URL cannot reach a real service.
 | 9000 | control API | `POST /ha/{a,b}/state {entity_id, state, attributes?}` (pushes the change to subscribers), `GET /ha/{a,b}/log`, `GET /waha/log`, `GET /frigate/log`, `POST /llm/script [{match, reply: {text} \| {tool: {name, args}} \| {tools: [...]}, reasoning?}]`, `GET /llm/requests?match=` (system message, tool names, conversation of every model call), `POST /llm/transcript {text}`, `POST /telegram/message {from_id, chat_id?, text}`, `POST /telegram/callback`, `GET /telegram/log`, `POST /reset` (forget the records) |
 
 Not stubbed: **Google Calendar** (unreachable: calendar reads come back empty,
-`POST /api/integrations/calendar/test` answers `ok: false`), **FCM** (not
+`POST /api/addons/calendar/test` answers `ok: false`), **FCM** (not
 configured: push events queue and the phone fetches them with `GET
 /api/phone/events`), **TypeSafe** (no key: notifications stay untriaged),
 web search, kubectl.
@@ -107,11 +107,11 @@ Home Assistant stub, which no admin uses, so a member may connect it) and
 `tests/local_env/e2e.py` drives the running container over HTTP only, plus
 `docker exec … bin/users.py` and `docker` (restart, start-up refusals). It
 covers: the upgrade (log lines, snapshot, every fixture row with its id through
-the API, `/api/me`, the imported integrations, their tests against the stubs,
+the API, `/api/me`, the imported connections, their tests against the stubs,
 the CLI, a restart that imports nothing twice, missing / malformed / wrong
 `CREDENTIALS_KEY` on the migrated database and on a fresh 8.1.0 one); the
 endpoints `static/*.js` load and the fields they read, the pages, the login
-cookie, a streamed chat turn compared with `test_fixtures/golden.sse`'s event
+cookie, a streamed chat turn compared with `tests/fixtures/golden.sse`'s event
 types, reattach, approval, undo; a second user made with the CLI (403
 `not_connected`, admin-only endpoints, `ops` refused, her tool list and system
 message as the model received them, hidden tools refused and not executed,
@@ -138,7 +138,7 @@ refused with 409 once the list is unshared; her WAHA session reporting the
 admin's account gets no account — conflict in the API, the CLI and the log,
 voice notes still the admin's only, her WhatsApp tools refuse — and recovers
 on her own session; the stub WAHA's `maya-lies` session stands in for a
-member-run WAHA); the web Integrations page (its assets, every request it
+member-run WAHA); the web Addons page (its assets, every request it
 makes answering with the fields it reads for the admin and the member, the
 admin's Home Assistant moved to the second stub and back with connection
 tests in between, a member's refused change with the reason the page
@@ -168,11 +168,11 @@ Possible, and not done by the script for you. Read all of this first.
    catalog), the provider key, and `OPENAI_API_BASE=` (empty) when the
    provider is OpenAI. It needs a route out: `DANA_LOCAL_EGRESS=1`
    (`compose.egress.yaml`). **With egress the app can reach everything its
-   integrations point at**: a post-upgrade copy with the real key talks to
+   addons point at**: a post-upgrade copy with the real key talks to
    the real Home Assistant, WAHA, Google and Frigate (and runs the watchers,
    briefings and reminders against them). Before turning egress on, repoint
-   or disconnect those integrations with `docker exec -i dana-local-app-1
-   python bin/users.py integrations update|disconnect …` while egress is
+   or disconnect those connections with `docker exec -i dana-local-app-1
+   python bin/users.py addons update|disconnect …` while egress is
    still off. Telegram stays on the stub regardless (`TELEGRAM_API_BASE`).
 5. The end-to-end script assumes the fixture's data; on a real copy use the
    environment by hand.

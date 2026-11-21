@@ -21,9 +21,9 @@ UPLOADS_DIR = DATA_DIR / "uploads"
 IMAGES_DIR = UPLOADS_DIR / "images"
 APP_UPDATES_DIR = DATA_DIR / "app-updates"
 SNAPSHOTS_DIR = DATA_DIR / "snapshots"
-# The money kind: the bank worker's token file and its browser profiles (shared with the sidecar).
+# The money addon: the bank worker's token file and its browser profiles (shared with the sidecar).
 MONEY_DIR = DATA_DIR / "money"
-# Files kept on knowledge entries (quotes, voice notes; integrations/knowledge/files.py).
+# Files kept on knowledge entries (quotes, voice notes; addons/knowledge/files.py).
 KNOWLEDGE_FILES_DIR = DATA_DIR / "knowledge"
 
 

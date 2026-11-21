@@ -12,7 +12,7 @@ What this can and cannot enforce: it checks the URL before the download
 starts. The downloader (yt-dlp, a subprocess) resolves the name again and
 follows redirects itself, which cannot be checked from here; for such a user
 it therefore runs with site extractors only (``--use-extractors
-default,-generic``, integrations/knowledge/media.py), which fetch only from
+default,-generic``, addons/knowledge/media.py), which fetch only from
 their own sites' APIs and CDNs, never an arbitrary URL a page or redirect
 names.
 """

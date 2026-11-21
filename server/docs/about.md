@@ -1,8 +1,8 @@
 # About you (what Dana knows about each user)
 
-Short plain-text facts Dana keeps about a user — who people are, what "the gate" means, standing preferences — always in that user's system prompt, each one editable and removable on the app's **About you** page. Replaces the old Memory tab. Everything here is **per user** (the `about` integration kind, built in, no sharing): facts, "do not re-add", the size cap, the prompt block, the learner's bookmarks and back-off. Another user's fact id is "not found" (404 / no match) exactly like an id that does not exist; a user without `about` connected gets no About section, no memory tools and 403 `{"error": "not_connected", "integration": "about"}` on every endpoint below.
+Short plain-text facts Dana keeps about a user — who people are, what "the gate" means, standing preferences — always in that user's system prompt, each one editable and removable on the app's **About you** page. Replaces the old Memory tab. Everything here is **per user** (the `about` addon, built in, no sharing): facts, "do not re-add", the size cap, the prompt block, the learner's bookmarks and back-off. Another user's fact id is "not found" (404 / no match) exactly like an id that does not exist; a user without `about` connected gets no About section, no memory tools and 403 `{"error": "not_connected", "addon": "about"}` on every endpoint below.
 
-Code: the package `integrations/about/` — `values.py` (sections, limits, the text rules: clean, duplicate, "do not re-add", secrets, section guess), `facts.py` (each user's facts: store, cap, lookups; rebuilds their prompt block), `prompt.py` (the block and its per-user cache; the kind's prompt section), `legacy.py` (the old `memories` table, the old `/api/memories` shape), `learner.py` (the per-user learner), `api.py` (routes, starts the learner), `tools.py` (the memory tools), `kind.py`. Tests: `python test_about.py` (one user), `python test_about_users.py` (several users, the migration).
+Code: the package `addons/about/` — `values.py` (sections, limits, the text rules: clean, duplicate, "do not re-add", secrets, section guess), `facts.py` (each user's facts: store, cap, lookups; rebuilds their prompt block), `prompt.py` (the block and its per-user cache; the addon's prompt section), `legacy.py` (the old `memories` table, the old `/api/memories` shape), `learner.py` (the per-user learner), `api.py` (routes, starts the learner), `tools.py` (the memory tools), `addon.py`. Tests: `bin/test test_about` (one user), `bin/test test_about_users` (several users, the migration).
 
 ## Facts
 
@@ -27,7 +27,7 @@ Table `about_facts` (baseline schema; owner from migration `m0009_about_per_user
 
 ## Prompt section
 
-The `about` kind declares `Integration(prompt_section=prompt.section)`; `core/agent.py::about_section(user)` asks `integrations.framework.registry.prompt_section(user, "about")` on every turn for the run's user ("" without a user, without `about` connected, or when the section fails). The block is placed after the home map and before the date/time line (the agent decides where each kind's section goes; Home Assistant's home map will use the same hook):
+The `about` addon declares `Addon(prompt_section=prompt.section)`; `core/agent.py::about_section(user)` asks `core.addons.registry.prompt_section(user, "about")` on every turn for the run's user ("" without a user, without `about` connected, or when the section fails). The block is placed after the home map and before the date/time line (the agent decides where each addon's section goes; Home Assistant's home map will use the same hook):
 
 ```
 --- ABOUT ROBIN (what you know) ---
@@ -39,21 +39,21 @@ Home:
 -----------------------------------
 ```
 
-The name is the user's `name` (`core/users.py`; the first admin's comes from `OWNER_NAME` when it is created, default `Owner`; change it with `bin/users.py update`). The cache holds one block per user: built at startup for every user with `about` (`facts.load_prompts()`, `main.py`), when the kind is connected (`on_connect`) and after every change to that user's facts; `prompt.section(user)` never touches the DB, never blocks and never raises. No facts → `""`. Hard cap `ABOUT_MAX_CHARS + 800` characters (whole lines only).
+The name is the user's `name` (`core/users.py`; the first admin's comes from `OWNER_NAME` when it is created, default `Owner`; change it with `bin/users.py update`). The cache holds one block per user: built at startup for every user with `about` (`facts.load_prompts()`, `main.py`), when the addon is connected (`on_connect`) and after every change to that user's facts; `prompt.section(user)` never touches the DB, never blocks and never raises. No facts → `""`. Hard cap `ABOUT_MAX_CHARS + 800` characters (whole lines only).
 
 ## Migration from `memories`
 
-`memories` is not per user, and other code still keeps its own rows there (below). Its real memories belong to one user: the one marked by the `about_state` row `legacy_memories`, which migration `m0009_about_per_user` gives to the first admin of a database that existed before it (a database created later has no such user; it never had real memories). Only that user gets the copy, the "older notes" in `recall_info`, old keys in the Telegram `/memory` pickers and the deletion of an old key (`forget_info`, `DELETE /api/memories/{key}`); everyone else gets nothing from `memories` (`integrations/about/legacy.py`).
+`memories` is not per user, and other code still keeps its own rows there (below). Its real memories belong to one user: the one marked by the `about_state` row `legacy_memories`, which migration `m0009_about_per_user` gives to the first admin of a database that existed before it (a database created later has no such user; it never had real memories). Only that user gets the copy, the "older notes" in `recall_info`, old keys in the Telegram `/memory` pickers and the deletion of an old key (`forget_info`, `DELETE /api/memories/{key}`); everyone else gets nothing from `memories` (`addons/about/legacy.py`).
 
 On every start (`legacy.migrate_legacy()`, `main.py`), `memories` rows that are real memories become that user's `imported` facts, once per key (`legacy_key` is unique, so a fact the owner removed is not re-imported). The `memories` rows themselves are left untouched. Not copied:
 
 - `category = 'system'` rows: wake state that `core/wake.py` and `core/checks.py` read and write (the notification digest's old `notif_digest_*` rows were moved to `notification_digest_state` by migration `m0013_phone_per_user`);
-- `selected_calendars` (app state for the calendar picker; migration `m0012_calendar_per_user` moves it into the first admin's `calendar` integration and removes the row);
+- `selected_calendars` (app state for the calendar picker; migration `m0012_calendar_per_user` moves it into the first admin's `calendar` addon and removes the row);
 - credential-looking rows (key or category mentions password / token / secret / api key / credential / pin / otp, or the value looks sensitive). These stay answerable by `recall_info` as "older notes".
 
 Text: `Key words: value` (e.g. `wife_phone` → "Wife phone: 0501234567"), or just the value when it already contains the key words. Section from the old category (contact(s)/family → people, preference(s) → habits, otherwise guessed from the text).
 
-## The model's tools (`integrations/about/tools.py`)
+## The model's tools (`addons/about/tools.py`)
 
 Same names as before, backed by facts. They work on the connection's user's own facts, run at once (registered without `is_write`, so no approval under any registry version; `remember_info` is `acts_outside`, so it asks in a turn carrying a shared phone screen) and record an undo (`core/undo.py`, the user's own), so the agent attaches the Undo button to the tool call.
 
@@ -68,7 +68,7 @@ The old `key` / `value` / `category` arguments are still accepted (Telegram `/me
 
 ## Learner
 
-`learner.learner_loop()` is started on app startup by `integrations/about/api.py::setup` (an `on_startup` hook). It runs **per user**: every user with `about` connected (`learner.learners()`) gets a pass 2 min after start, then one every `ABOUT_LEARN_INTERVAL_MINUTES` (the loop looks every minute for users whose pass is due, `learner.run_due()`); each pass runs as its user (`users.acting_as`: the model call's usage row is theirs), one user after another, and one user's failure never stops the others. Each pass:
+`learner.learner_loop()` is started on app startup by `addons/about/api.py::setup` (an `on_startup` hook). It runs **per user**: every user with `about` connected (`learner.learners()`) gets a pass 2 min after start, then one every `ABOUT_LEARN_INTERVAL_MINUTES` (the loop looks every minute for users whose pass is due, `learner.run_due()`); each pass runs as its user (`users.acting_as`: the model call's usage row is theirs), one user after another, and one user's failure never stops the others. Each pass:
 
 1. **Collects** what finished since that user's bookmark (`about_state` row `(user, 'learner')`):
    - the user's own conversations (`sessions` of that user, `main` included) quiet for `ABOUT_LEARN_QUIET_MINUTES` and not running / waiting for approval. Only the messages after the last one it read (stored as a hash per session, so the 40-message Telegram window works) — user and assistant text, tool results left out;
@@ -81,7 +81,7 @@ The old `key` / `value` / `category` arguments are still accepted (Telegram `/me
 
 **Cost bounds**: one model call per pass at most, none when nothing non-trivial is new; ≤ 8 items / 14k characters of input per call; ≤ 5 changes per pass. **Failure**: that user's bookmark stays, and their next pass waits interval × 2^failures (max 6 h, counted per user); a success resets it. **No API key** for the model: passes are skipped with one warning. `ABOUT_LEARN=0` turns the loop off.
 
-## HTTP API (`integrations/about/api.py`)
+## HTTP API (`addons/about/api.py`)
 
 Bearer auth as everywhere; every route answers for the request's user, who needs `about` connected (else 403 `not_connected`). Another user's fact id answers 404, their undo id 404. Undo ids go to `POST /api/undo/{id}` (→ `{ok, label}`, 404 when expired after 15 min or used).
 
@@ -114,7 +114,7 @@ All four sections are always present, in this order; hide empty ones. Facts are 
 
 ### Old `/api/memories` (current Android and web Memory screens)
 
-Served from the caller's facts, in the old shape (handlers in `integrations/about/api.py`, calling `legacy.py`; 403 `not_connected` without `about`):
+Served from the caller's facts, in the old shape (handlers in `addons/about/api.py`, calling `legacy.py`; 403 `not_connected` without `about`):
 
 - `GET /api/memories` → `[{"key": "fact_<id>", "value": <text>, "category": <section>, "updated_at", "source"}]`, sorted by section. System rows and other old `memories` rows are no longer listed.
 - `POST /api/memories {key, value, category}` → key `fact_<id>` edits that fact of the caller (category = a section moves it); any other key (also another user's `fact_<id>`) adds a fact for the caller (`"Key words: value"`, section from category, source `owner`). Reply `{"status": "created", "key": "fact_<id>"}`.

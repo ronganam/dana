@@ -10,7 +10,7 @@ This file is the design of record. The phone, widget and watch screens live in
 
 ## Code
 
-`integrations/shopping/`, one module per seam:
+`addons/shopping/`, one module per seam:
 
 | Module | Holds |
 |---|---|
@@ -25,11 +25,11 @@ This file is the design of record. The phone, widget and watch screens live in
 | `events.py` | The change transaction that raises the version, stream listeners, the coalesced phone push |
 | `screen.py` | The screen payload |
 | `api.py` | The HTTP routes |
-| `tools.py`, `kind.py` | Dana's tools, the kind and its prompt words |
+| `tools.py`, `addon.py` | Dana's tools, the addon and its prompt words |
 
 The web panel: `static/shopping-core.js` (the pure part: view model, pending
 changes, requests, words, HTML; tested by `test_web_shopping.mjs` against
-`test_fixtures/shopping_web.json`), `static/shopping.js` (the controller) and
+`tests/fixtures/shopping_web.json`), `static/shopping.js` (the controller) and
 `static/shopping.css` (below, "The web panel").
 
 Tables (migration `m0020_shopping_remake`): `shopping_lists` (+ `version`),

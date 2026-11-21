@@ -1,5 +1,5 @@
 ---
-name: Feature or integration
+name: Feature or addon
 about: Something Dana should do, or a service it should connect to
 labels: enhancement
 ---
@@ -8,4 +8,4 @@ labels: enhancement
 
 **Why** (the situation where you'd use it)
 
-**How you'd build it** (optional: which part, an integration kind, a plugin…)
+**How you'd build it** (optional: which part, an addon, a site addon…)

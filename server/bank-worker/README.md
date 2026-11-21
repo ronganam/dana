@@ -1,6 +1,6 @@
 # bank-worker
 
-A small Node service that logs in to Israeli bank and card sites with a real Chromium and returns their transactions, reads Psagot Trade portfolios over plain HTTPS, and reads the Pluxee (Cibus) meal card with its own code on the browser. It runs as a sidecar container in Dana's pod. Dana (`integrations/money/`) decides when to sync, holds the credentials (encrypted) and stores the results; the worker is a browser with no memory beyond its saved browser profiles.
+A small Node service that logs in to Israeli bank and card sites with a real Chromium and returns their transactions, reads Psagot Trade portfolios over plain HTTPS, and reads the Pluxee (Cibus) meal card with its own code on the browser. It runs as a sidecar container in Dana's pod. Dana (`addons/money/`) decides when to sync, holds the credentials (encrypted) and stores the results; the worker is a browser with no memory beyond its saved browser profiles.
 
 Built on [`israeli-bank-scrapers`](https://github.com/eshaham/israeli-bank-scrapers) (pinned in `package.json`), with our own handling for what the library misses: Hapoalim's SMS-code page (the bank asks when it decides to: a new device or address, not every new profile), Hapoalim's wrong-password message on its new login page, and Cal's forced password change. A login waits for the bank's redirect instead of the library's fixed 20 s, so a code can be entered.
 

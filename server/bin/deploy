@@ -8,9 +8,9 @@
 # Reads your site's deploy.env: site/deploy.env at the repository root, or
 # $DANA_SITE/deploy.env (docs/site.md; DANA_DEPLOY_CONFIG names another file).
 # Builds the Dockerfile's `app` stage from a clean checkout of the commit, with the
-# site's plugin kinds (site/plugins/, or the folders in DANA_IMAGE_PLUGINS) copied
-# into the image, tagged "<VERSION>-<short commit>", plus "-p<plugins hash>" when
-# there are plugins, so a plugin change alone is a new release (the RELEASE build arg
+# site's addons (site/addons/, or the folders in DANA_IMAGE_ADDONS) copied into the
+# image's /app/addons-site, tagged "<VERSION>-<short commit>", plus "-a<addons hash>"
+# when there are site addons, so a change to one alone is a new release (the RELEASE build arg
 # writes the name into the image's VERSION: /api/health shows it); and the
 # bank-worker sidecar (bank-worker/Dockerfile) with the same tag when
 # DANA_WORKER_IMAGE is set. Pushes the images (and Dana's `latest`). With
@@ -37,7 +37,7 @@ DANA_WORKER_IMAGE="${DANA_WORKER_IMAGE:-}"
 DANA_GITOPS_REPO="${DANA_GITOPS_REPO:-}"
 DANA_GITOPS_BRANCH="${DANA_GITOPS_BRANCH:-main}"
 DANA_GITOPS_VALUES="${DANA_GITOPS_VALUES:-}"
-DANA_IMAGE_PLUGINS="${DANA_IMAGE_PLUGINS:-$site/plugins}"
+DANA_IMAGE_ADDONS="${DANA_IMAGE_ADDONS:-$site/addons}"
 DANA_K8S_NAMESPACE="${DANA_K8S_NAMESPACE:-dana}"
 DANA_K8S_SELECTOR="${DANA_K8S_SELECTOR:-app=dana}"
 GITOPS=${XDG_CACHE_HOME:-$HOME/.cache}/dana-deploy/gitops
@@ -55,23 +55,23 @@ done
 sha="$(git rev-parse --verify "$ref^{commit}")"
 release="$(git show "$sha:${prefix}VERSION" | tr -d '[:space:]')-${sha:0:7}"
 
-# The site's plugin kinds: <folder>/<kind>/kind.py in each folder of DANA_IMAGE_PLUGINS.
-plugin_kinds=()
-IFS=: read -r -a plugin_dirs <<< "$DANA_IMAGE_PLUGINS"
-for dir in "${plugin_dirs[@]}"; do
+# The site's addons: <folder>/<name>/addon.py in each folder of DANA_IMAGE_ADDONS.
+site_addons=()
+IFS=: read -r -a addon_dirs <<< "$DANA_IMAGE_ADDONS"
+for dir in "${addon_dirs[@]}"; do
   [ -n "$dir" ] || continue
   dir="${dir/#\~/$HOME}"
-  [ -d "$dir" ] || { [ "$dir" = "$site/plugins" ] && continue; echo "deploy: plugin folder $dir is missing" >&2; exit 1; }
-  for kind in "$dir"/*/; do
-    if [ -f "$kind/kind.py" ]; then plugin_kinds+=("${kind%/}"); fi
+  [ -d "$dir" ] || { [ "$dir" = "$site/addons" ] && continue; echo "deploy: addon folder $dir is missing" >&2; exit 1; }
+  for addon in "$dir"/*/; do
+    if [ -f "$addon/addon.py" ]; then site_addons+=("${addon%/}"); fi
   done
 done
-if [ "${#plugin_kinds[@]}" -gt 0 ]; then
-  plugins_hash="$(for kind in "${plugin_kinds[@]}"; do
-      (cd "$kind/.." && find "$(basename "$kind")" -type f -not -path '*/__pycache__/*' -not -name '*.pyc' -print0 \
+if [ "${#site_addons[@]}" -gt 0 ]; then
+  addons_hash="$(for addon in "${site_addons[@]}"; do
+      (cd "$addon/.." && find "$(basename "$addon")" -type f -not -path '*/__pycache__/*' -not -name '*.pyc' -print0 \
         | sort -z | xargs -0 sha256sum)
     done | sha256sum | cut -c1-7)"
-  release="$release-p$plugins_hash"
+  release="$release-a$addons_hash"
 fi
 
 checkout="${DANA_DEPLOY_CHECKOUT:-}"
@@ -82,16 +82,17 @@ if [ -z "$checkout" ]; then
 fi
 context="$checkout/$prefix"
 
-# The site's plugin kinds go into the image's /app/plugins.
-for kind in "${plugin_kinds[@]}"; do
-  echo "deploy: with plugin $(basename "$kind")"
-  rm -rf "$context/plugins/$(basename "$kind")"
-  cp -r "$kind" "$context/plugins/"
-  find "$context/plugins/$(basename "$kind")" -name __pycache__ -prune -exec rm -rf {} +
+# The site's addons go into the image's /app/addons-site (the Dockerfile's site_addons build context).
+staging="$(mktemp -d "${TMPDIR:-/tmp}/dana-site-addons-XXXXXX")"
+trap 'rm -rf "$staging"; [ -n "${DANA_DEPLOY_CHECKOUT:-}" ] || git worktree remove --force "$checkout" >/dev/null 2>&1 || rm -rf "$checkout"' EXIT
+for addon in "${site_addons[@]}"; do
+  echo "deploy: with site addon $(basename "$addon")"
+  cp -r "$addon" "$staging/"
+  find "$staging/$(basename "$addon")" -name __pycache__ -prune -exec rm -rf {} +
 done
 
 echo "deploy: building $release"
-docker build -q --target app --build-arg "RELEASE=$release" \
+docker build -q --target app --build-arg "RELEASE=$release" --build-context "site_addons=$staging" \
   -t "$DANA_IMAGE:$release" -t "$DANA_IMAGE:latest" "$context" >/dev/null
 if [ -n "$DANA_WORKER_IMAGE" ]; then
   docker build -q -t "$DANA_WORKER_IMAGE:$release" "$context/bank-worker" >/dev/null

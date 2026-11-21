@@ -293,7 +293,7 @@ async function optional(ctx, what, read, fallback) {
 
 /**
  * Every account of the user: its balances view (holdings, cash, values), its activity from `startDate` and
- * its daily value. Raw Psagot objects: Dana reads them (integrations/money/portfolio.py).
+ * its daily value. Raw Psagot objects: Dana reads them (addons/money/portfolio.py).
  */
 async function readPortfolio(client, ctx, startDate) {
   const listed = await client.call('GET', '/V2/json/accounts');

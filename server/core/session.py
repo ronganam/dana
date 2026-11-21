@@ -5,7 +5,7 @@ from typing import List, Any, Mapping, Optional, Dict
 from core import thread
 from core.db import get_db_connection
 from core.history import prune_history
-from integrations.framework import registry
+from core.addons import registry
 
 logger = logging.getLogger(__name__)
 
