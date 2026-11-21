@@ -25,13 +25,12 @@ import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Mapping, Optional, Tuple
 
-from core import users
+from core import notify, users
 from core.db import get_db_connection
 from core.undoable import UndoConflict, safe_record
 from core.users import User
 from core.addons import sharing, store
 from core.addons.addon import InvalidValue
-from addons.phone import push
 from addons.shopping import events
 from addons.shopping.values import ACTIVE_SETTING, DEFAULT_NAME, ITEM_TYPE, ADDON, NotFound, ReadOnly
 
@@ -172,8 +171,8 @@ def _notify_invite(user: User, list_id: str) -> None:
         loop = asyncio.get_running_loop()
     except RuntimeError:
         return
-    loop.create_task(push.notify(user, "Shopping list", f"{owner.name} shared their shopping list with you",
-                                 tag=f"shopping-invite-{list_id}"))
+    loop.create_task(notify.push_notify(user, "Shopping list", f"{owner.name} shared their shopping list with you",
+                                        tag=f"shopping-invite-{list_id}"))
 
 
 sharing.register(sharing.ItemType(name=ITEM_TYPE, addon=ADDON, label="shopping list", owner_of=owner_of,

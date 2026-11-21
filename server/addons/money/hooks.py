@@ -21,7 +21,8 @@ from core import cards, now as now_screen
 from core.addons import BriefingContext, Card, Check, ContextRequest, NowContext, Section, helpers, minutes, store
 from core.db import get_db_connection
 from core.users import User
-from addons.money import classify, config, insights, otp, providers, queries, savings, schedule, store as money_store, sync
+from addons.money import (classify, config, insights, otp, providers, queries, savings, schedule,
+                          signals, store as money_store, sync)
 from addons.money.addon import addon
 
 logger = logging.getLogger(__name__)
@@ -44,6 +45,13 @@ async def recover(user: User) -> None:
 @addon.job(every=minutes(schedule.INTERVAL_SECONDS / 60), delay=schedule.STARTUP_DELAY_SECONDS)
 async def start_due_syncs(user: User) -> List[str]:
     return schedule.tick_user(user)
+
+
+@addon.on("phone.notification.ingested")
+async def on_notifications(user: User, data: Dict[str, Any]) -> None:
+    ids = [str(i) for i in (data.get("ids") or []) if i]
+    if ids:
+        await asyncio.to_thread(signals.observe, user, ids)
 
 
 # --- Now screen -----------------------------------------------------------------------------

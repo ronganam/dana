@@ -15,7 +15,6 @@ from core.users import User
 from core.addons import Addon, PromptPart, LlmJob, Web, Nav
 from addons.money import after_sync, classify, dashboard, savings, signals, sources, store
 from addons.money.config import ADDON
-from addons.phone.notifications import observers
 
 MONEY_GUIDE = (
     "Money (bank and cards):\n"
@@ -70,5 +69,4 @@ addon = Addon(
 
 after_sync.on_transactions(signals.reconcile_hook)
 after_sync.on_transactions(classify.on_sync)
-observers.register(signals.observe)
 dashboard.on_insights(savings.insight_cards)

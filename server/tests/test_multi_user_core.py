@@ -137,7 +137,7 @@ async def zz_mu_change(conn, value: str) -> str:
     return f"set {value}"
 
 
-@homeassistant_addon.tool(name="call_ha_service", is_write=True)
+@homeassistant_addon.tool(name="call_ha_service", is_write=True, shortcut=True)
 async def call_ha_service(conn, domain: str, service: str, entity_id: str) -> str:
     """Call a Home Assistant service (fake).
 

@@ -381,7 +381,7 @@ async def test_inbound() -> None:
     app.router.add_post("/webhook/waha", whatsapp_api.handle_waha_webhook)
     try:
         async with TestClient(TestServer(app)) as http:
-            phone_patch = patch.object(events.phone_push, "notify", phone)
+            phone_patch = patch.object(events.notify, "push_notify", phone)
             phone_patch.start()
             async def post(body) -> int:
                 n = len(bot.bot.send_message.await_args_list)
@@ -477,10 +477,11 @@ def test_startup_report() -> None:
         def emit(self, record):
             records.append(record)
 
+    from addons.whatsapp import hooks as wa_hooks
     handler = Grab()
-    level = tb.logger.level
-    tb.logger.setLevel(logging.INFO)
-    tb.logger.addHandler(handler)
+    level = wa_hooks.logger.level
+    wa_hooks.logger.setLevel(logging.INFO)
+    wa_hooks.logger.addHandler(handler)
     try:
         # a value stored before chat settings were validated (store.update refuses it now)
         with get_db_connection() as conn:
@@ -488,10 +489,10 @@ def test_startup_report() -> None:
                          "WHERE user_id = ? AND addon = 'whatsapp'", (BOB.id,))
             conn.commit()
         store.invalidate()
-        tb.report_whatsapp_voice_chats()
+        wa_hooks.report_whatsapp_voice_chats()
     finally:
-        tb.logger.removeHandler(handler)
-        tb.logger.setLevel(level)
+        wa_hooks.logger.removeHandler(handler)
+        wa_hooks.logger.setLevel(level)
         store.update(BOB, "whatsapp", settings={"voice_telegram_chat_id": 2002})
     text = [r.getMessage() for r in records]
     check("startup: where each user's transcripts go is reported per connection",

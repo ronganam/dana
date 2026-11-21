@@ -1,9 +1,9 @@
 """The wake flow: one daily "the user is up" event per user → the event
 ``core.user.woke`` (``why``; the tasks addon fires the wake-trigger tasks) and
-their morning briefing (docs/people.md, "Wake detection"). A composer: the
-phone's unlock signal plus the phone's screen history from the user's Home
-Assistant (their ``phone_interactive_sensor`` setting). Only for a user with
-both ``phone`` and ``homeassistant``; anyone else is skipped.
+their morning briefing (docs/people.md, "Wake detection"). A composer: a
+delivery channel (the phone's unlock signal) plus the ``screen_sessions``
+provider (the phone's screen history from Home Assistant). Only for a user with
+both; anyone else is skipped.
 
 Per user: the confirmed wakes (``wake_log``, one row per user and date: the
 "once a day" record), the check in flight (in memory), the last raw signal
@@ -16,34 +16,19 @@ import logging
 import os
 from typing import Dict, List, Optional
 
-from core import briefing, clock, composers, events, users
+from core import briefing, checks, clock, composers, events, users
+from core.addons import registry
 from core.db import get_db_connection
 from core.users import User
-from core.addons import store
-from addons.homeassistant import client as ha_client, config as ha_config
-from addons.phone import config as phone_config
 
 logger = logging.getLogger(__name__)
-
-# Signals (docs/tasks-and-triggers.md):
-# - the phone app reports an unlock (POST /api/phone/unlock) — the main one: an
-#   alarm ringing or a glance at the clock never unlocks the phone;
-# - a fallback poll of the phone's screen history in HA, strict enough that the
-#   alarm screen (on for minutes while it rings) can't trip it.
-# A signal is confirmed WAKE_CONFIRM_SECONDS later from HA's history: the screen
-# was on for WAKE_MIN_SCREEN_SECONDS since the signal. Otherwise nothing is
-# recorded and the next unlock tries again.
 
 WAKE_CONFIRM_SECONDS = int(os.getenv("WAKE_CONFIRM_SECONDS", "600"))
 WAKE_MIN_SCREEN_SECONDS = int(os.getenv("WAKE_MIN_SCREEN_SECONDS", "90"))
 WAKE_WINDOW = (int(os.getenv("WAKE_WINDOW_START_HOUR", "5")), int(os.getenv("WAKE_WINDOW_END_HOUR", "12")))
-# Fallback: screen on ≥ this much, in ≥ WAKE_FALLBACK_SESSIONS sessions, within the last 30 min.
 WAKE_FALLBACK_SECONDS = int(os.getenv("WAKE_FALLBACK_SECONDS", "360"))
 WAKE_FALLBACK_SESSIONS = int(os.getenv("WAKE_FALLBACK_SESSIONS", "3"))
 WAKE_POLL_SECONDS = int(os.getenv("WAKE_POLL_SECONDS", "300"))
-# The addons the wake flow needs: the phone (unlock signal, briefing push) and
-# Home Assistant (the screen history).
-ADDONS = (phone_config.ADDON, ha_config.ADDON)
 SIGNAL_MARK = "wake_signal"
 
 # user id → the local date a confirmation check is running for.
@@ -51,8 +36,8 @@ _pending: Dict[str, str] = {}
 
 
 def available(user: Optional[User]) -> bool:
-    """Whether the wake flow runs for ``user`` (``phone`` and ``homeassistant`` connected)."""
-    return user is not None and composers.has_all(user, ADDONS)
+    """Whether the wake flow runs for ``user`` (delivery channel + screen_sessions provider)."""
+    return user is not None and bool(registry.channels(user)) and registry.provider("screen_sessions", user) is not None
 
 
 def done_today(user: User, today: str) -> bool:
@@ -68,32 +53,10 @@ def done_today(user: User, today: str) -> bool:
 
 async def _screen_sessions(user: User, since_utc: datetime.datetime,
                            until_utc: datetime.datetime) -> Optional[List[float]]:
-    """Seconds of each screen-on stretch of ``user``'s phone screen sensor in
-    [since, until], from their Home Assistant's history. None when it can't
-    be asked (no Home Assistant, no screen sensor set, HA failing)."""
-    conn = store.get(user, ha_config.ADDON)
-    entity = ha_config.setting(conn, ha_config.SCREEN_SENSOR) if conn is not None else None
-    if conn is None or not entity:
+    hook = registry.provider("screen_sessions", user)
+    if hook is None:
         return None
-    rows = await ha_client.history(conn, entity, since_utc, until_utc)
-    if rows is None:
-        return None
-    points = []
-    for x in rows:
-        try:
-            t = datetime.datetime.fromisoformat(str(x.get("last_changed")).replace("Z", "+00:00"))
-        except ValueError:
-            continue
-        points.append((t, x.get("state")))
-    out: List[float] = []
-    for i, (t, state) in enumerate(points):
-        if state != "on":
-            continue
-        t_end = points[i + 1][0] if i + 1 < len(points) else until_utc
-        a, b = max(t, since_utc), min(t_end, until_utc)
-        if b > a:
-            out.append((b - a).total_seconds())
-    return out
+    return await hook.func(user, since_utc, until_utc)
 
 
 def _in_window(now: datetime.datetime) -> bool:
@@ -101,13 +64,11 @@ def _in_window(now: datetime.datetime) -> bool:
 
 
 async def handle_wake(user: User, source: str = "unlock", signal_utc: Optional[datetime.datetime] = None) -> str:
-    """A wake signal for ``user``. Returns: "unavailable" (no ``phone`` or no
-    Home Assistant: nothing recorded) | "outside_window" | "done" (already
-    today) | "confirming" (a check is running or was just started)."""
+    """A wake signal for ``user``. Returns: "unavailable" | "outside_window" | "done" | "confirming"."""
     if not available(user):
         logger.info(f"Wake signal ({source}) for user {user.id} without the phone and Home Assistant; skipped.")
         return "unavailable"
-    phone_config.mark(SIGNAL_MARK, user.id, True, source)
+    checks.mark(f"{SIGNAL_MARK}:{user.id}", True, source)
     now = clock.now()
     if not _in_window(now):
         logger.info(f"Wake signal ({source}) at {now:%H:%M} is outside the wake window; ignored.")
@@ -144,8 +105,7 @@ async def _confirm_wake(user: User, today: str, since_utc: datetime.datetime, so
 
 
 async def check_wake_fallback(user: User) -> bool:
-    """The poll: no signal came, but ``user``'s screen history says they have
-    been up a while. False right away without ``phone`` and Home Assistant."""
+    """The poll: no signal came, but ``user``'s screen history says they have been up a while."""
     if not available(user):
         return False
     now = clock.now()
@@ -166,8 +126,7 @@ async def check_wake_fallback(user: User) -> bool:
 
 
 async def poll_once() -> Dict[str, bool]:
-    """One fallback poll for every user with the wake flow (each as that user,
-    a failing one not stopping the next): user id → whether a wake fired."""
+    """One fallback poll for every user with the wake flow."""
     return await composers.for_each("Wake poll", available, check_wake_fallback)
 
 

@@ -29,10 +29,10 @@ from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
 from core import clock
+from core.text import redact_otp as redact
 from core.users import User
 from core.addons import store as connections
 from addons.money import classify, config, ingest, schedule, store
-from addons.phone.notifications.ingest import redact
 
 logger = logging.getLogger(__name__)
 

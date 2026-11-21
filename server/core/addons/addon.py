@@ -159,6 +159,9 @@ class Tool:
     available: Optional[AvailabilityRule] = None
     untrusted_result: bool = False
     describe: Optional[DescribeRule] = None
+    shortcut: ConfirmRule = False
+    shortcut_prep: bool = False
+    shortcut_describe: Optional[Callable[[Optional[User], Dict[str, Any]], str]] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -354,6 +357,8 @@ class Addon:
     def tool(self, name: Optional[str] = None, *, is_write: bool = False, confirm: ConfirmRule = False,
              acts_outside: bool = False, needs: Sequence[str] = (), available: Optional[AvailabilityRule] = None,
              untrusted_result: bool = False, describe: Optional[DescribeRule] = None,
+             shortcut: ConfirmRule = False, shortcut_prep: bool = False,
+             shortcut_describe: Optional[Callable[[Optional[User], Dict[str, Any]], str]] = None,
              **extra: Any) -> Callable[[F], F]:
         """Register a function as a tool of this addon. The function's first
         parameter is ``conn`` (the user's connection), never in the schema.
@@ -409,7 +414,8 @@ class Addon:
             registered = Tool(name=tool_name, addon=self.name, func=func, schema=generate_schema(tool_name, func),
                               is_write=bool(is_write or confirm), confirm=confirm, acts_outside=bool(acts_outside),
                               needs=needs_t, available=available, untrusted_result=bool(untrusted_result),
-                              describe=describe, extra=dict(extra))
+                              describe=describe, shortcut=shortcut, shortcut_prep=bool(shortcut_prep),
+                              shortcut_describe=shortcut_describe, extra=dict(extra))
             if existing is not None:
                 self.tools[self.tools.index(existing)] = registered
                 logger.info(f"Replaced tool: {tool_name} ({self.name})")

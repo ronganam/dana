@@ -251,8 +251,27 @@ async def test_delivery() -> None:
           and hkx.SEEN == [("slow started", ROBIN.id)], hkx.SEEN)
 
 
+def test_core_imports_no_addons() -> None:
+    import ast
+    core_dir = Path(__file__).resolve().parent.parent / "core"
+    offenders = []
+    for path in sorted(core_dir.rglob("*.py")):
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Import):
+                for alias in node.names:
+                    if alias.name == "addons" or alias.name.startswith("addons."):
+                        offenders.append(f"{path.relative_to(core_dir)}:{node.lineno}:{alias.name}")
+            elif isinstance(node, ast.ImportFrom):
+                mod = node.module or ""
+                if mod == "addons" or mod.startswith("addons."):
+                    offenders.append(f"{path.relative_to(core_dir)}:{node.lineno}:{mod}")
+    check("core imports zero addons", not offenders, offenders)
+
+
 test_scope()
 test_composers()
+test_core_imports_no_addons()
 test_describe()
 asyncio.run(test_delivery())
 

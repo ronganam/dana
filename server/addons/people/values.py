@@ -9,11 +9,11 @@ import datetime
 import json
 import os
 import re
-import unicodedata
 from typing import Any, Iterable, List, Optional
 
-from core import clock, user_locale
-from addons.whatsapp.resolve import transliterate_he_to_en
+from core import clock
+from core.text import (HEBREW, clean_list, looks_like_number, norm_name, norm_phone, shown_phone,
+                       transliterate_he_to_en, valid_birthday)
 
 ADDON = "people"
 
@@ -22,32 +22,7 @@ BRIEF_BATCH = int(os.getenv("PEOPLE_BRIEF_BATCH", "6"))
 DRIFT_MIN_DAYS = int(os.getenv("PEOPLE_DRIFT_MIN_DAYS", "14"))
 BRIEF_STYLE = "1"
 UNKNOWN_NAMES = {"", "unknown", "me", "private number", "מספר חסוי", "חסוי", "no caller id"}
-HEBREW = re.compile(r"[֐-׿]")
 LATIN = re.compile(r"[A-Za-z]")
-
-
-def norm_phone(value: Optional[str]) -> str:
-    """'+972 50-123-4567' / '972501234567@c.us' → '972501234567'; '050-1234567' → '972501234567' with
-    ``DEFAULT_COUNTRY_CODE=972``, '0501234567' without one (core/user_locale.py); '' if not a number."""
-    d = user_locale.international_digits((value or "").split("@")[0])
-    return d if len(d) >= 7 else ""
-
-
-def shown_phone(digits: str) -> str:
-    """A stored number as people read it: '+972501234567', or '0501234567' as
-    is (a local number, kept when no ``DEFAULT_COUNTRY_CODE`` is set)."""
-    return digits if not digits or digits.startswith("0") else "+" + digits
-
-
-def norm_name(value: Optional[str]) -> str:
-    """Lower-case, no emoji or punctuation, single spaces: 'גל כהן 🚀❤️' → 'גל כהן'."""
-    s = unicodedata.normalize("NFKC", value or "").lower()
-    s = re.sub(r"[^\w\s]", " ", s).replace("_", " ")
-    return " ".join(s.split())
-
-
-def looks_like_number(name: str) -> bool:
-    return bool(re.fullmatch(r"[\d\s+\-().*#]+", name or "")) and bool(re.search(r"\d", name or ""))
 
 
 def now_iso() -> str:
@@ -96,16 +71,6 @@ def translit(text: str) -> str:
         return text
 
 
-def clean_list(values: Iterable[str], limit: int = 20) -> List[str]:
-    """Trimmed, de-duplicated (by normalised name) names, at most ``limit``."""
-    out: List[str] = []
-    for v in values or []:
-        v = re.sub(r"\s+", " ", str(v or "")).strip()[:120]
-        if v and norm_name(v) not in {norm_name(x) for x in out}:
-            out.append(v)
-    return out[:limit]
-
-
 def clean_emails(values: Iterable[str], limit: int = 10) -> List[str]:
     """Trimmed email addresses, each once (whatever the case), at most ``limit``."""
     out: List[str] = []
@@ -114,20 +79,6 @@ def clean_emails(values: Iterable[str], limit: int = 10) -> List[str]:
         if "@" in v and v.lower() not in {x.lower() for x in out}:
             out.append(v)
     return out[:limit]
-
-
-def valid_birthday(v: str) -> str:
-    """``YYYY-MM-DD`` / ``MM-DD`` / '' (ValueError otherwise)."""
-    v = (v or "").strip()
-    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", v) or re.fullmatch(r"\d{2}-\d{2}", v):
-        try:
-            datetime.date.fromisoformat(v if len(v) == 10 else f"2000-{v}")
-            return v
-        except ValueError:
-            pass
-    if v:
-        raise ValueError("birthday must be YYYY-MM-DD or MM-DD")
-    return ""
 
 
 def upcoming_birthday(bday: str, today: Optional[datetime.date] = None, within: int = 14) -> Optional[int]:

@@ -10,8 +10,8 @@ from addons.contacts import client, enrich, store
 from addons.contacts.addon import addon
 from core.addons import Approval, Connection
 from core.addons.hooks import clean
+from core.text import norm_phone, shown_phone, valid_birthday
 from core.users import User
-from addons.people.values import norm_phone, shown_phone, valid_birthday
 
 logger = logging.getLogger(__name__)
 

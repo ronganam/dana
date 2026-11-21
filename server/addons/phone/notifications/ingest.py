@@ -19,6 +19,7 @@ from typing import Any, Dict, Iterable, List, Optional
 
 from core import clock
 from core.db import get_db_connection
+from core.text import redact_otp as redact
 from core.users import User
 from addons.phone.notifications.values import ESCALATION_PREFIX, MAX_BATCH, posted_iso, s
 
@@ -26,16 +27,6 @@ logger = logging.getLogger(__name__)
 
 # Our own notifications and the escalation re-posts must never loop back in.
 _OWN_PACKAGES = ("io.github.ronganam.dana",)  # the app and its .kiosk / .tv flavors (a prefix)
-
-_OTP_CONTEXT = re.compile(r"(code|otp|password|passcode|verification|verify|pin|קוד|סיסמ|אימות)", re.I)
-_OTP_NUMBER = re.compile(r"(?<!\d)(\d[\d\- ]{2,8}\d)(?!\d)")
-
-
-def redact(text: str) -> str:
-    """Hide one-time codes (the phone already does this; this is the safety net)."""
-    if not text or not _OTP_CONTEXT.search(text):
-        return text
-    return _OTP_NUMBER.sub(lambda m: "[code]" if sum(c.isdigit() for c in m.group(1)) >= 4 else m.group(1), text)
 
 
 def content_hash(n: Dict[str, Any]) -> str:
