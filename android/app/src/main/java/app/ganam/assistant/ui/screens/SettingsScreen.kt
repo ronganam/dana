@@ -93,24 +93,6 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                             ) { Text(mode.label) }
                         }
                     }
-                    if (!BuildConfig.KIOSK && !BuildConfig.TV) {
-                        HorizontalDivider(modifier = Modifier.padding(vertical = 4.dp))
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("Previous layout", style = MaterialTheme.typography.titleSmall)
-                                Text(
-                                    "The old main screen with eight tabs and the chat list. Turn it off to go back to Now, Reminders, Notifications and More.",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Switch(
-                                checked = app.ganam.assistant.ui.shell.LayoutSettings.previousLayout,
-                                onCheckedChange = { app.ganam.assistant.ui.shell.LayoutSettings.set(context, it) }
-                            )
-                        }
-                    }
                 }
             }
 
@@ -212,25 +194,6 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
             Spacer(Modifier.height(8.dp))
             SectionLabel("Notifications")
             NotificationInboxSettings(viewModel)
-
-            // --- Memory: the previous layout's way in (the new layout has About you) ---
-            if (app.ganam.assistant.ui.shell.LayoutSettings.previousLayout) {
-            Spacer(Modifier.height(8.dp))
-            SectionLabel("Memory")
-            GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "What Dana remembers about you, your people and your preferences.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    OutlinedButton(
-                        onClick = { viewModel.navigateTo("memory") },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                    ) { Text("Open memory") }
-                }
-            }
-            }
 
             // --- App update ---
             Spacer(Modifier.height(8.dp))

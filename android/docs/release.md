@@ -20,7 +20,6 @@ bin/deploy-app.sh --watch-ip <watch-ip>:5555    # wear APK; uses adb wireless de
 - Published APKs live in the server's data dir (`app-updates/` next to the DB) (`/api/app/version`, `/api/app/download/{file}`; publish with `POST /api/app/upload` + `APP_PUBLISH_TOKEN`).
 - The phone app checks `/api/app/version` on launch and in **Settings > App Update**, downloads to `cacheDir/updates/`, verifies sha256, then hands off to the system installer (`FileProvider` + `REQUEST_INSTALL_PACKAGES`).
 - Version tracking: `app` and `wear` `versionName`/`versionCode` are kept in sync by the script. The phone pushes its `version_code` in the `/ganam_config` DataMap; the watch publishes its own version on the `/ganam/version` data item (`WearVersionPublisher`). The watch itself cannot self-update — install over adb via the script.
-- `:watchface` has no committed Kotlin sources and is excluded from this flow.
 
 ## Wear ↔ Phone companion signing (CRITICAL — do not break)
 

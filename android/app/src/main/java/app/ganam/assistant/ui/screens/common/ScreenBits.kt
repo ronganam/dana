@@ -53,12 +53,6 @@ fun QuietEmptyState(
     }
 }
 
-/** "FRI 6 NOV"-style date for kickers. */
-@Composable
-fun todayKicker(): String = remember {
-    SimpleDateFormat("EEE d MMM", Locale.getDefault()).format(Date()).uppercase()
-}
-
 /** Follow the content's script for alignment/direction (Hebrew items right-align, Latin left-align). */
 fun TextStyle.auto(): TextStyle = copy(textDirection = TextDirection.Content)
 

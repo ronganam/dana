@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <string name="watch_face_name">Dana</string>
-    <string name="event_slot_1_label">Next Event</string>
-    <string name="event_slot_2_label">Following Event</string>
-    <string name="task_slot_1_label">Next Task</string>
-    <string name="task_slot_2_label">Following Task</string>
-    <string name="watch_face_description">Dana assistant watch face with events and tasks</string>
-</resources>

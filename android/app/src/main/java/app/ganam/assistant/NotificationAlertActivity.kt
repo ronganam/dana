@@ -193,7 +193,7 @@ class NotificationAlertActivity : ComponentActivity() {
 
     private val replay = object : Runnable {
         override fun run() {
-            try { ringtone?.play() } catch (_: Exception) {}
+            try { ringtone?.play() } catch (e: Exception) { android.util.Log.w("NotificationAlert", "Couldn't play the alert sound", e) }
             handler.postDelayed(this, REPLAY_MS)
         }
     }
@@ -237,8 +237,8 @@ class NotificationAlertActivity : ComponentActivity() {
 
     private fun stopAlerts() {
         handler.removeCallbacksAndMessages(null)
-        try { ringtone?.stop() } catch (_: Exception) {}
-        try { vibrator?.cancel() } catch (_: Exception) {}
+        try { ringtone?.stop() } catch (e: Exception) { android.util.Log.w("NotificationAlert", "Couldn't stop the alert sound", e) }
+        try { vibrator?.cancel() } catch (e: Exception) { android.util.Log.w("NotificationAlert", "Couldn't stop vibrating", e) }
     }
 
     override fun onDestroy() {

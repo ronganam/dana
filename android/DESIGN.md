@@ -13,7 +13,6 @@ Real windows (360 dpi): cover ≈ 555×876 dp, inner ≈ 1088×821 dp (821×1088
 `windowTier()` from live width: COMPACT <600 (cover screen/phone: bottom bar, single pane) · MEDIUM 600–839 (unfolded portrait: rail + list + content) · EXPANDED ≥840 (unfolded landscape/tablet: rail + list + content + context pane). Use `PaneRow` / `Pane(width=…)` with `PaneWidth.list/listNarrow/context`. The activity handles fold/size configChanges itself, so **state must survive a fold/unfold** (hoist in ViewModel / `rememberSaveable`, don't rely on recreation). Never assume a fixed width; panes must degrade gracefully tier by tier.
 
 Per-screen pane plan (EXPANDED → MEDIUM → COMPACT):
-- **Chat** (previous layout only): Sessions list | Conversation | Context (today's reminders, relevant memories, tool output) → Sessions | Conversation → Conversation (sessions in a sheet). The new layout has no session list: one thread (below).
 - **Reminders** (main-screen shell): list (tinted) | editor | thread, under the day strip → list | editor, thread as a sheet → list → editor drill-down.
 - **Memory**: Categories | Memory list | Memory detail → list | detail → list.
 - **Projects** (a wide place): side list (projects, the open project's sections) | project or section page (two columns; the compare table across the width, option names fixed) | entry pane beside it from a 760dp stage, else over it → one level at a time on the cover (projects → project → section → entry), Back pops a level.

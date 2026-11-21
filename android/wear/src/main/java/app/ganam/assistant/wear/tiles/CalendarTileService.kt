@@ -271,7 +271,9 @@ class CalendarTileService : TileService() {
                     )
                 )
             }
-        } catch (_: Exception) {}
+        } catch (e: org.json.JSONException) {
+            android.util.Log.w("CalendarTile", "Cached events aren't valid JSON", e)
+        }
         return result.sortedBy { parseIsoTime(it.startTime) ?: 0L }
     }
 
@@ -306,7 +308,9 @@ class CalendarTileService : TileService() {
                 }
                 val date = sdf.parse(s) ?: continue
                 return date.time
-            } catch (_: Exception) {}
+            } catch (_: java.text.ParseException) {
+                // Not this format: try the next one.
+            }
         }
         return null
     }

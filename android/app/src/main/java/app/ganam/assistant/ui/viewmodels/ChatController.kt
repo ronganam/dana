@@ -151,7 +151,7 @@ class ChatController(
     private var initialized = false
     private var threadMode = false
 
-    /** Whether this controller talks in the shared thread (false = "Previous layout" sessions). */
+    /** Whether this controller talks in the shared thread (from [initialize] on). */
     val isThreadMode: Boolean get() = threadMode
 
     private val _inThread = MutableStateFlow(false)
@@ -244,47 +244,14 @@ class ChatController(
     fun initialize() {
         store.migrateFromPrefs(prefs)
         initialized = true
-        threadMode = !prefs.getBoolean(KEY_PREVIOUS_LAYOUT, false)
-        sessionId = if (threadMode) ThreadModel.MAIN else savedSessionId()
+        threadMode = true
+        sessionId = ThreadModel.MAIN
         _currentSessionId.value = sessionId
         _inThread.value = inThreadNow()
-        if (threadMode) store.load(ThreadModel.MAIN)?.let { _chatMessages.value = it }
+        store.load(ThreadModel.MAIN)?.let { _chatMessages.value = it }
         loadActiveSessionHistory()
         fetchSessions()
         fetchModels()
-    }
-
-    /** The "Previous layout" chat's session id (kept apart from the thread). */
-    private fun savedSessionId(): String {
-        var id = prefs.getString(KEY_SESSION_ID, "").orEmpty()
-        if (id.isEmpty() || id == ThreadModel.MAIN) {
-            id = UUID.randomUUID().toString()
-            prefs.edit().putString(KEY_SESSION_ID, id).apply()
-        }
-        return id
-    }
-
-    /**
-     * Switch between the shared thread and the old per-session chats (Settings
-     * → "Previous layout"). A no-op before [initialize], which reads the
-     * setting itself.
-     */
-    fun setThreadMode(on: Boolean) {
-        if (!initialized || on == threadMode) return
-        detachFromSession()
-        threadMode = on
-        viewFloorMs = 0L
-        sessionId = if (on) ThreadModel.MAIN else savedSessionId()
-        _currentSessionId.value = sessionId
-        _inThread.value = inThreadNow()
-        _chatMessages.value = if (on) store.load(ThreadModel.MAIN).orEmpty() else emptyList()
-        _undos.value = emptyList()
-        _memory.value = ThreadModel.Memory.Unknown
-        _sessionContext.value = null
-        _chatStatusText.value = ""
-        loadActiveSessionHistory()
-        fetchSessions()
-        onSessionChanged()
     }
 
     /** Back to the shared thread after looking at another conversation. */
@@ -1387,12 +1354,10 @@ class ChatController(
     }
 
     /**
-     * Content shared from another app: open a fresh chat with it ready to
+     * Content shared from another app: put it in the thread's input, ready to
      * send, so the user can add "summarize this" / "remind me" first.
      */
-    /** Shared text/image into the input. [newSession]: the old layout starts a fresh chat; the shell keeps its one thread. */
-    fun startChatFromShare(text: String?, imageUri: Uri?, newSession: Boolean = true) {
-        if (newSession) startNewSession()
+    fun startChatFromShare(text: String?, imageUri: Uri?) {
         _pendingImageUri.value = imageUri
         _draftText.value = text?.trim()?.takeIf { it.isNotEmpty() }
     }
@@ -1963,13 +1928,12 @@ class ChatController(
                     fmt.isLenient = false
                     return fmt.parse(t)?.time
                 } catch (_: java.text.ParseException) {
+                    // Not this format: try the next one.
                 }
             }
             return null
         }
         private const val KEY_SESSION_ID = "chat_session_id"
-        /** Settings → "Previous layout" (`LayoutSettings`): per-session chats instead of the thread. */
-        private const val KEY_PREVIOUS_LAYOUT = "previous_layout"
         private const val DEFAULT_GAP_MINUTES = 20.0
         private const val BUSY_CLEAR = "Dana is still answering — try again when the reply is done."
         /** Thread messages per page (the server's own default for the state frame). */

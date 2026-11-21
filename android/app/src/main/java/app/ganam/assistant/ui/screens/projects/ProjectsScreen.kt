@@ -85,29 +85,3 @@ private fun NothingOpen(c: ProjectsController, empty: Boolean) {
         InkButton("New project", emphasis = if (empty) InkEmphasis.SOLID else InkEmphasis.PRIMARY) { c.newProject() }
     }
 }
-
-/** The previous layout's Projects tab: the same panes, arranged by the screen's own width. */
-@Composable
-fun ProjectsScreen(viewModel: MainViewModel) {
-    val c = viewModel.projectsController
-    val projectId by c.projectId.collectAsState()
-    val auto by c.auto.collectAsState()
-    val list by c.list.collectAsState()
-    LaunchedEffect(c) { c.refresh() }
-    BoxWithConstraints(Modifier.fillMaxSize().statusBarsPadding()) {
-        val cover = maxWidth < 600.dp
-        LaunchedEffect(list, cover) { if (!cover) c.autoOpen() }
-        if (cover) {
-            val picked = projectId != null && !auto
-            BackHandler(enabled = picked) { c.back() }
-            if (picked) ProjectsStage(viewModel, cover = true) else ProjectList(c, tree = false)
-        } else Row(Modifier.fillMaxSize()) {
-            Box(
-                Modifier.width(sidePaneWidth()).fillMaxHeight()
-                    .background(MaterialTheme.colorScheme.surfaceContainerLow).edgeRule(end = true)
-            ) { ProjectList(c, tree = true) }
-            Box(Modifier.weight(1f).fillMaxHeight()) { ProjectsStage(viewModel, cover = false) }
-        }
-        ProjectsOverlays(c)
-    }
-}

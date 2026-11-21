@@ -424,7 +424,9 @@ class RealtimeCallEngine(
         try {
             val hangupJson = JSONObject().put("type", "hangup").toString()
             webSocket?.send(hangupJson)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't send the hangup frame", e)
+        }
 
         recordingJob?.cancel()
         playbackJob?.cancel()
@@ -434,7 +436,9 @@ class RealtimeCallEngine(
 
         try {
             webSocket?.close(1000, "Call ended by user")
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't close the call socket", e)
+        }
         webSocket = null
 
         // Drain channel

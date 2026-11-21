@@ -19,7 +19,7 @@ Projects on the phone: a wedding, a trip, a flat hunt — decisions whose option
 | `ProjectEditors.kt` | The project editor (icon, name, description, date, budget, colour, Archive / Restore, Delete) and the section editor (icon, name, kind, columns) |
 | `ProjectMarkdown.kt` | The small Markdown of summaries and details: headings, lists, checks, code, quotes, pipe tables (shared column widths, sideways scroll), rules; each line runs in its own script's direction |
 | `ProjectsUi.kt` | Shared bits: `ProjectScope` (Hebrew projects lay out right to left and speak Hebrew), kicker, back link, tile, ring, bar, decision pill, `ValueText`, the overlays (editor + confirm) |
-| `ProjectsScreen.kt` | `ProjectsStage` (what the stage shows) and the previous layout's tab |
+| `ProjectsScreen.kt` | `ProjectsStage` (what the stage shows) |
 | `ui/shell/destinations/ProjectsDestination.kt` | The place in the shell |
 
 ## The place

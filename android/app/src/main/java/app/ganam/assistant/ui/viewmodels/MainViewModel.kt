@@ -128,8 +128,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         },
         onThingsChanged = { refreshAfterDana() }
     ).also { chat ->
-        // What is open on the main screen goes with each message (null outside the new layout).
-        chat.screenProvider = { if (app.ganam.assistant.ui.shell.LayoutSettings.previousLayout) null else shellController.screen.value }
+        // What is open on the main screen goes with each message.
+        chat.screenProvider = { shellController.screen.value }
     }
 
     /** Dana acted (a run with tools, an Undo): refresh what the screens show. */
@@ -342,7 +342,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 val sdf = SimpleDateFormat(fmt, Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
                 return sdf.parse(s)?.time ?: continue
-            } catch (_: Exception) {
+            } catch (_: java.text.ParseException) {
+                // Not this format: try the next one.
             }
         }
         return null
@@ -365,28 +366,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun dismissSuggestion(s: app.ganam.assistant.data.models.CallSuggestion) = callsController.dismissSuggestion(s)
     fun updateCallLabels(callId: String, labelIds: List<String>) = callsController.updateCallLabels(callId, labelIds)
 
-    /**
-     * "Ask Dana about this". In the new layout: the thread opens with the item
-     * pinned as on-screen context. In the previous layout: a fresh chat with
-     * it attached (the agent gets it as context; the chat shows it as a card
-     * with quick prompts).
-     */
+    /** "Ask Dana about this": the thread opens with the item pinned as on-screen context. */
     fun openContextChat(kind: String, id: String, title: String = "") {
-        if (chatController.isThreadMode && !app.ganam.assistant.ui.shell.LayoutSettings.previousLayout) {
-            chatController.returnToThread()
-            shellController.openThread(ThreadContext(kind, id, title))
-            return
-        }
-        viewModelScope.launch {
-            val sessionId = ctx.load("ContextChat") { apiService.startContextChat(kind, id) }
-            if (sessionId == null) {
-                userMessages.post("Couldn't open the chat — is the server reachable?")
-                return@launch
-            }
-            chatController.loadSession(sessionId)
-            chatController.fetchSessions()
-            navigateTo("chat")
-        }
+        chatController.returnToThread()
+        shellController.openThread(ThreadContext(kind, id, title))
     }
 
     /** A call the Calls screen should select when it next shows (from the Debrief / a task link). */
@@ -488,8 +471,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     fun clearPendingImage() = chatController.clearPendingImage()
     val draftText get() = chatController.draftText
     fun consumeDraft() = chatController.consumeDraft()
-    fun startChatFromShare(text: String?, imageUri: Uri?, newSession: Boolean = true) {
-        chatController.startChatFromShare(text, imageUri, newSession)
+    fun startChatFromShare(text: String?, imageUri: Uri?) {
+        chatController.startChatFromShare(text, imageUri)
         navigateTo("chat")
     }
     fun startVoiceRecording() = chatController.startVoiceRecording()

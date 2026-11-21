@@ -888,14 +888,6 @@ class ApiService(private val serverUrl: String, private val apiToken: String) {
         send(buildRequest("/api/suggestions/${enc(id)}/dismiss") { post(body) })
     }
 
-    /** New chat with a suggestion / call / task attached. Returns the session id. */
-    suspend fun startContextChat(kind: String, id: String): String = withContext(Dispatchers.IO) {
-        val body = JSONObject().put("kind", kind).put("id", id).toString()
-            .toRequestBody("application/json".toMediaTypeOrNull())
-        val json = JSONObject(fetch(buildRequest("/api/chat/context") { post(body) }, "Couldn't start the chat", "{}"))
-        json.optString("session_id").ifEmpty { throw ApiException(500, "No session id returned") }
-    }
-
     // --- PEOPLE / CALL CARD / BRIEFING / WEEKLY REVIEW (server docs/people.md) ---
 
     private fun jsonBody(o: JSONObject) = o.toString().toRequestBody("application/json".toMediaTypeOrNull())
