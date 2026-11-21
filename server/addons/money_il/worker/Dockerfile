@@ -1,6 +1,6 @@
 # The bank-worker sidecar: Node + Debian's Chromium around israeli-bank-scrapers (README.md).
 # The money addon's worker: built and pushed by bin/deploy as <DANA_IMAGE>-money:<release>, next to Dana's image.
-FROM node:22-slim
+FROM node:26-slim
 
 # Chromium from Debian (puppeteer's own download is skipped); tzdata for the dates of TZ, which the
 # deployment sets to Dana's TIMEZONE (compose.yaml does; unset: UTC).
