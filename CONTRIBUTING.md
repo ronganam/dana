@@ -25,7 +25,7 @@ Android: JDK 21 and the Android SDK; open `android/` in Android Studio or use `.
 ```bash
 cd server
 bin/test --changed      # while working: only what your change touches (seconds)
-bin/test                # before you open a pull request (about 2 minutes)
+bin/test                # before you open a pull request (about 75 s on 16 threads, a little longer the first time)
 bin/test --list         # what each test script covers
 
 cd android
