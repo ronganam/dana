@@ -6,10 +6,10 @@ Android clients of **Dana** (the assistant). The server is `../server` (its `AGE
 
 | Variant | Package | Source sets | Built on | Build / deploy |
 |---|---|---|---|---|
-| `:app` **phone** flavor | `app.ganam.assistant` | `main` + `phone` | Galaxy Z Fold | `bin/deploy-app.sh` publishes; install `adb -s <phone> install -r app/build/outputs/apk/phone/release/app-phone-release.apk` |
-| `:app` **kiosk** flavor ("Dana Kiosk") | `app.ganam.assistant.kiosk` | `main` + `kiosk` + `wake` + `nopush` | Galaxy Tab S4 | `bin/deploy-kiosk.sh` |
-| `:app` **tv** flavor ("Dana TV") | `app.ganam.assistant.tv` | `main` + `tv` + `wake` + `nopush` | TCL 75C7K (Google TV) | `bin/deploy-tv.sh` |
-| `:wear` | `app.ganam.assistant` (same id + **same signing key** as phone) | `wear/` | OnePlus Watch 2 | `bin/deploy-app.sh --watch-ip <ip:port \| serial>` |
+| `:app` **phone** flavor | `io.github.ronganam.dana` | `main` + `phone` | Galaxy Z Fold | `bin/deploy-app.sh` publishes; install `adb -s <phone> install -r app/build/outputs/apk/phone/release/app-phone-release.apk` |
+| `:app` **kiosk** flavor ("Dana Kiosk") | `io.github.ronganam.dana.kiosk` | `main` + `kiosk` + `wake` + `nopush` | Galaxy Tab S4 | `bin/deploy-kiosk.sh` |
+| `:app` **tv** flavor ("Dana TV") | `io.github.ronganam.dana.tv` | `main` + `tv` + `wake` + `nopush` | TCL 75C7K (Google TV) | `bin/deploy-tv.sh` |
+| `:wear` | `io.github.ronganam.dana` (same id + **same signing key** as phone) | `wear/` | OnePlus Watch 2 | `bin/deploy-app.sh --watch-ip <ip:port \| serial>` |
 
 - Flavor rules: shared code in `main`; phone-only code with its own dependencies in `src/phone` (Firebase push), with a no-op twin in `src/nopush` for kiosk/TV; wake word + hands-free session in `src/wake` (kiosk + TV). Phone-only manifest entries stay in `main` and the kiosk/TV manifests drop them with `tools:node="remove"` — add the removal when you add a phone-only component. `BuildConfig.KIOSK` / `BuildConfig.TV` for small runtime differences.
 - An emulator (`emulator-5554`) is often attached: always pass `-s <serial>`.
@@ -26,9 +26,9 @@ bin/dev-install.sh phone --boot    # :app phone debug → emulator-5554 (AVD "ga
 bin/dev-install.sh watch --boot    # :wear debug → emulator-5556 (AVD "dana_watch"; booted alone by other means it is emulator-5554: pass -s)
 bin/dev-install.sh kiosk|tv        # the other flavors, same emulator-5554
 # by hand: ./gradlew :app:assemblePhoneDebug && adb -s emulator-5554 install -r -t app/build/outputs/apk/phone/debug/app-phone-debug.apk \
-#   && adb -s emulator-5554 shell am start -n app.ganam.assistant/.MainActivity
+#   && adb -s emulator-5554 shell am start -n io.github.ronganam.dana/.MainActivity
 # watch:   ./gradlew :wear:assembleDebug && adb -s emulator-5556 install -r -t wear/build/outputs/apk/debug/wear-debug.apk \
-#   && adb -s emulator-5556 shell am start -n app.ganam.assistant/app.ganam.assistant.wear.MainActivity
+#   && adb -s emulator-5556 shell am start -n io.github.ronganam.dana/io.github.ronganam.dana.wear.MainActivity
 ```
 
 Build only the variant you need (`:app:assemblePhoneDebug`, not `assembleDebug`). With a warm daemon a one-line change rebuilds the phone APK in ~3 s and a no-change build is <1 s (configuration cache); a clean phone debug build ~30 s. Boot one emulator at a time and stop it after (`adb -s <serial> emu kill`); `./gradlew --stop` frees the daemons (Gradle `-Xmx4g` + Kotlin daemon `-Xmx3g` in `gradle.properties`: measured peak RSS ~7.5 GB for the phone + watch release build, ~9 GB building all eight variants at once). The first compile after the Kotlin daemon starts is slower (~45 s clean) than with a warm one (~26 s).
@@ -62,17 +62,17 @@ The phone also offers published versions in Settings → App Update. Commit the 
 - **Main screen (phone)**: `ui/shell/DanaShell` — places Now, Reminders, Notifications, Projects (with `knowledge`), More (Shopping and Money there, each with its integration in `/api/me`), the ask bar, one shared thread with Dana (`session_id: "main"`, server `docs/agent-actions.md`; sheet when folded, right pane unfolded; Undo under replies, "On screen" context) and a day strip; About you lives under More; each place is a `Destination` (list + stage) in `ui/shell/destinations/`. Server pings that should refresh what's on screen go through `data/sync/LiveRefresh`. Details in `docs/phone.md`, layout in `DESIGN.md`.
 - **UI**: design system is "Ink & Paper" — see `DESIGN.md` (tokens in `ui/theme/`, shared bits in `ui/components/DesignSystem.kt`, window tiers/panes in `ui/adaptive/`). Screens adapt COMPACT/MEDIUM/EXPANDED via `windowTier()` (the owner's Fold at 360 dpi: cover ≈ 555×876 dp = COMPACT, inner ≈ 1088×821 dp, 821×1088 rotated = EXPANDED with the rail — see `docs/phone.md`); the nav rail only appears from 720dp. Three panes need ~900dp of content width, so the rotated inner screen gets two (Calls, Reminders). The power-button assistant sheet is `ui/components/FloatingAssistantOverlay.kt` + `ui/components/assistant/`. Its opt-in **Screen** chip (screen as context for one message, off by default, `data/screen/` + `ScreenShareController`) is described in `docs/phone.md`. Debug builds allow cleartext HTTP (mock servers at `http://10.0.2.2:PORT`). Compose screens in `ui/screens/` (the Projects screen is split across `ui/screens/projects/`), shared components in `ui/components/`. One legacy XML layout remains (`assistant_bottom_sheet.xml`).
 - **State**: Kotlin `StateFlow` / `MutableStateFlow` throughout.
-- **Prefs**: `SharedPreferences` file `GanamPrefs`: server config and small flags only (the phone, the overlay, the watch, kiosk and TV all talk in the thread `main`).
+- **Prefs**: `SharedPreferences` file `DanaPrefs`: server config and small flags only (the phone, the overlay, the watch, kiosk and TV all talk in the thread `main`).
 - **Name & icon**: the assistant is **Dana** in every user-facing string (internal ids, package names and the `"Assistant"` chat sender stay as they are). The launcher icon (phone + watch, adaptive with monochrome) is the italic Instrument Serif "d" in paper (#F2EBDD) with a vermilion full stop (#FF6A3D) on ink (#13100E). Its vector paths are generated from `res/font/instrument_serif_italic.ttf` with fontTools; don't hand-edit them.
-- **Offline queues** (`data/sync/`): reminder Complete/Snooze (phone alarm and watch) go through `TaskActionQueue`. It tries once (6s), queues to `filesDir/pending_task_actions.json` if the server is unreachable or answers 5xx, and `PendingSyncWorker` (WorkManager) or the server coming back ONLINE flushes it. Shopping changes have their own ordered queue (`data/shopping/ShoppingStore`, `filesDir/pending_shopping.json`) flushed the same ways (`docs/shopping.md`). The watch keeps its own shopping requests while the phone is out of reach (`GanamWearPrefs` `shopping_pending`, sent when a snapshot arrives or the screen opens; `docs/wear.md` → Shopping). Call-recording uploads run in `CallUploadWorker` (network constraint, backoff, foreground `dataSync` job, Retry action), with handled recordings remembered in `filesDir/call_uploads.json`. WorkManager is the only library that brings Room, and only internally. **WorkManager starts on demand** from `GanamApp` (`Configuration.Provider`, default process = the package; the androidx.startup initializer is removed in the manifest) so it also works in the assistant sheet's `:session` process — content providers only run in the main process, and the sheet's `MainViewModel.initialize` → Inbox sync crashed there with "WorkManager is not initialized" (7.4.1–7.8.0). The TV flavor's `DanaTvApplication` extends `GanamApp`. Still no codegen in this project.
+- **Offline queues** (`data/sync/`): reminder Complete/Snooze (phone alarm and watch) go through `TaskActionQueue`. It tries once (6s), queues to `filesDir/pending_task_actions.json` if the server is unreachable or answers 5xx, and `PendingSyncWorker` (WorkManager) or the server coming back ONLINE flushes it. Shopping changes have their own ordered queue (`data/shopping/ShoppingStore`, `filesDir/pending_shopping.json`) flushed the same ways (`docs/shopping.md`). The watch keeps its own shopping requests while the phone is out of reach (`DanaWearPrefs` `shopping_pending`, sent when a snapshot arrives or the screen opens; `docs/wear.md` → Shopping). Call-recording uploads run in `CallUploadWorker` (network constraint, backoff, foreground `dataSync` job, Retry action), with handled recordings remembered in `filesDir/call_uploads.json`. WorkManager is the only library that brings Room, and only internally. **WorkManager starts on demand** from `DanaApp` (`Configuration.Provider`, default process = the package; the androidx.startup initializer is removed in the manifest) so it also works in the assistant sheet's `:session` process — content providers only run in the main process, and the sheet's `MainViewModel.initialize` → Inbox sync crashed there with "WorkManager is not initialized" (7.4.1–7.8.0). The TV flavor's `DanaTvApplication` extends `DanaApp`. Still no codegen in this project.
 
 ## Key services
 
 | Service | Purpose |
 |---|---|
-| `GanamVoiceInteractionService` | System-level voice interaction (BIND_VOICE_INTERACTION) |
-| `GanamVoiceInteractionSessionService` | Voice session handling, runs in `:session` process |
-| `GanamRecognitionService` | Custom speech recognition service |
+| `DanaVoiceInteractionService` | System-level voice interaction (BIND_VOICE_INTERACTION) |
+| `DanaVoiceInteractionSessionService` | Voice session handling, runs in `:session` process |
+| `DanaRecognitionService` | Custom speech recognition service |
 | `CallRecordingObserverService` | Foreground service for call recording detection/upload |
 | `DanaNotificationListener` | Notification access → Dana's Inbox, plus bank sign-in codes / bank and card notifications for the `money` kind (`data/money/`; phone flavor only) |
 | `DanaMessagingService` | FCM wake-up pings → `PhoneEvents.catchUp` (phone flavor only; see `docs/notifications.md`) |
@@ -84,15 +84,15 @@ The phone also offers published versions in Settings → App Update. Commit the 
 - Toolchain: Gradle 9.9.1, AGP 9.5.1 (built-in Kotlin: modules apply no `kotlin-android` plugin; versions in the root `build.gradle.kts`), Kotlin 2.4.21 (K2) with the Compose compiler Gradle plugin (strong skipping kept **off** in both modules — the flag is gone in Kotlin 2.5, so turning it on and testing the screens comes first). JVM target 1.8, compileSdk/targetSdk 36, minSdk 26; Compose BOM 2024.04.00, Material3, Navigation 2.7.7. `android.r8.strictFullModeForKeepRules=false` keeps the AGP 8 meaning of the libraries' keep rules.
 - Extra source dirs in `app/build.gradle.kts` go in `kotlin.directories` (AGP 9: Kotlin files added to `java.directories` are not compiled).
 - No codegen, no annotation processing, no Hilt/Dagger/Room, no Retrofit/Gson; `org.json` + OkHttp.
-- Packages: `app.ganam.assistant.{data,ui}.{models,network,screens,components,theme,viewmodels}`, plus `push/`, `wake/`, `tv/`, `kiosk/`.
+- Packages: `io.github.ronganam.dana.{data,ui}.{models,network,screens,components,theme,viewmodels}`, plus `push/`, `wake/`, `tv/`, `kiosk/`.
 - Hebrew/RTL: text direction is decided per message/line by script, never assumed. Mixed " · " kicker lines go through `isolatedParts()` (each part isolated, LTR dots) so a Hebrew name can't reorder them.
-- Server URL and API token come from Settings (`GanamPrefs`); background code uses `ApiService.fromPrefs(context)`.
+- Server URL and API token come from Settings (`DanaPrefs`); background code uses `ApiService.fromPrefs(context)`.
 
 ## Gotchas
 
 - No early `return` inside a `@Composable` (crashed the app twice): branch into a child composable.
 
-- The assistant sheet runs in the `:session` process: no content providers there (WorkManager is initialised on demand in `GanamApp`; push setup only runs in the main process). It has its own `MainViewModel`, so it re-reads the thread from the server; it never creates a session.
+- The assistant sheet runs in the `:session` process: no content providers there (WorkManager is initialised on demand in `DanaApp`; push setup only runs in the main process). It has its own `MainViewModel`, so it re-reads the thread from the server; it never creates a session.
 - Voice services need the app to be the device's assist app (`BIND_VOICE_INTERACTION`).
 - `CallRecordingObserverService` is a `specialUse` foreground service and also keeps the process alive (so "app start" can be weeks apart).
 

@@ -33,7 +33,7 @@ val firebaseConfig: Map<String, String> = File(siteDir, "google-services.json")
     val json = groovy.json.JsonSlurper().parse(gs) as Map<String, Any>
     val project = json["project_info"] as Map<String, Any>
     val client = (json["client"] as List<Map<String, Any>>).first {
-        ((it["client_info"] as Map<String, Any>)["android_client_info"] as Map<String, Any>)["package_name"] == "app.ganam.assistant"
+        ((it["client_info"] as Map<String, Any>)["android_client_info"] as Map<String, Any>)["package_name"] == "io.github.ronganam.dana"
     }
     mapOf(
         "FIREBASE_PROJECT_ID" to project["project_id"].toString(),
@@ -57,11 +57,11 @@ fun quoted(s: String): String =
 val tvDefaultsJson: String = File(siteDir, "tv-defaults.json").let { if (it.exists()) it.readText().trim() else "" }
 
 android {
-    namespace = "app.ganam.assistant"
+    namespace = "io.github.ronganam.dana"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.ganam.assistant"
+        applicationId = "io.github.ronganam.dana"
         minSdk = 26
         targetSdk = 36
         versionCode = 56
@@ -78,15 +78,15 @@ android {
             create("release") {
                 storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyAlias = keystoreProperties.getProperty("keyAlias", "dana")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
             }
         }
     }
 
-    // phone: the full app (package app.ganam.assistant, pairs with the watch).
+    // phone: the full app (package io.github.ronganam.dana, pairs with the watch).
     // kiosk: the wall-tablet build — dashboard WebView + "Hey Dana" wake word +
-    // the assistant overlay; installs side by side as app.ganam.assistant.kiosk.
+    // the assistant overlay; installs side by side as io.github.ronganam.dana.kiosk.
     // tv: the living-room TV home screen ("Dana TV") — favourite apps, Home
     // Assistant tiles, camera picture-in-picture on remote buttons, "Hey Dana".
     flavorDimensions += "target"

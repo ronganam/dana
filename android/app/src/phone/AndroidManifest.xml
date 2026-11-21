@@ -59,7 +59,7 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:taskAffinity=""
-            android:theme="@style/Theme.GanamAssistant.VoiceSession"
+            android:theme="@style/Theme.Dana.VoiceSession"
             android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
         <receiver android:name=".widgets.ShoppingWidgetReceiver" android:exported="true" android:label="@string/widget_shopping">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>

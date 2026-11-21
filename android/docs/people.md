@@ -11,7 +11,7 @@ Phone-side of the server features in `server/docs/people.md`.
 
 ## Wake signal (`data/wake/UnlockWatcher.kt`)
 
-- An `ACTION_USER_PRESENT` receiver is registered at runtime, both from the notification listener (which Android keeps bound) and from `GanamApp`. Between 05:00 and 12:00, an unlock enqueues `UnlockReportWorker`, which posts `POST /api/phone/unlock {at}` (unique work, network constraint, retried up to 3 times, and dropped if more than an hour late).
+- An `ACTION_USER_PRESENT` receiver is registered at runtime, both from the notification listener (which Android keeps bound) and from `DanaApp`. Between 05:00 and 12:00, an unlock enqueues `UnlockReportWorker`, which posts `POST /api/phone/unlock {at}` (unique work, network constraint, retried up to 3 times, and dropped if more than an hour late).
 - Unlocks are reported at most once every 2 min. Once the server answers `done`, nothing more is sent that day (pref `wake_done_date`). The server confirms from the screen history; see the server's `docs/people.md` → Wake detection.
 - Each unlock is logged (`adb logcat -s UnlockWatcher`).
 
@@ -32,4 +32,4 @@ Phone-side of the server features in `server/docs/people.md`.
 - The widgets are Ask Dana, Today, Waiting on you, People (pinned), Inbox and Shopping (the Shopping widget and its quick-add window → `docs/shopping.md`). Receivers and `res/xml/widget_*.xml` live in the phone source set. Kiosk / TV get a no-op `DanaWidgets` from `src/nopush`.
 - One snapshot (pref `widget_snapshot`) feeds every widget. `WidgetRefreshWorker` rebuilds it every 30 min, and also on app start, after a widget action and on a briefing push (`DanaWidgets.refresh`). It fetches briefing, tasks, suggestions, pinned people, inbox counts + overview and calendar in parallel and refreshes the shopping store (`ShoppingSync`, whose fields it merges with `ShoppingSnapshot`), keeps the old value for any call that fails, and sends a trimmed copy to the watch (`WearCards.sendSnapshot`).
 - Ticking a task, accepting or dismissing a suggestion, removes the item from the snapshot first (the optimistic update), then calls the server (tasks go through `TaskActionQueue`, so they work offline), then refreshes. A shopping tick goes through `ShoppingSync` (shown at once, queued offline) and every change of that store redraws the Shopping widget and re-sends the snapshot to the watch.
-- Ask Dana → `AskDanaActivity`, which calls `GanamVoiceInteractionService.openSession()` (`showSession`) when Dana is the default assistant, and otherwise opens the chat.
+- Ask Dana → `AskDanaActivity`, which calls `DanaVoiceInteractionService.openSession()` (`showSession`) when Dana is the default assistant, and otherwise opens the chat.
