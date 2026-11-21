@@ -12,6 +12,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
     <!-- Live push-to-talk transcription binds the system speech recognizer. -->
@@ -37,6 +38,13 @@
         android:theme="@style/Theme.Dana"
         android:usesCleartextTraffic="${usesCleartextTraffic}"
         tools:targetApi="36">
+
+        <!-- WorkManager's foreground service for long uploads (dataSync; every flavor shares the upload code) -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
 
         <!-- WorkManager starts on demand from DanaApp (Configuration.Provider),
              so it also works in the assistant sheet's :session process. -->

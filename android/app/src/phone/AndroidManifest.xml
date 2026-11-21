@@ -17,7 +17,6 @@
     <!-- In-app updates: lets the app hand the downloaded APK to the system installer -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- WorkManager runs long call-recording uploads as a foreground job -->
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- Caller card: notice incoming / outgoing calls (callcard/CallerCard.kt). -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
@@ -97,12 +96,6 @@
         <receiver
             android:name=".data.sync.CallUploadReceiver"
             android:exported="false" />
-
-        <!-- WorkManager's foreground service for long uploads (dataSync) -->
-        <service
-            android:name="androidx.work.impl.foreground.SystemForegroundService"
-            android:foregroundServiceType="dataSync"
-            tools:node="merge" />
 
         <!-- Dana as the device's assistant app (power-button sheet) -->
         <service
