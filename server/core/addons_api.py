@@ -151,12 +151,18 @@ def _disabled(name: str) -> web.Response:
 
 
 def me_payload(user: User) -> Dict[str, Any]:
+    """``GET /api/me``. ``kinds`` repeats ``addons`` for the Android app built
+    before the addons rename (package ``app.ganam.assistant``), so its Projects
+    tab and money signals keep working until every device runs the new app;
+    remove it then."""
+    addons_on = list(store.connected_addons(user))
     return {
         "id": user.id,
         "name": user.name,
         "access": user.access,
         "capabilities": [c for c in CAPABILITIES if user.level.allows(c)],
-        "addons": list(store.connected_addons(user)),
+        "addons": addons_on,
+        "kinds": addons_on,
         "languages": list(user_locale.languages(user)),
         "currency": user_locale.currency(user),
     }

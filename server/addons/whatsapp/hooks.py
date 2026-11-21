@@ -6,13 +6,14 @@
 
 import datetime
 import logging
+import os
 from typing import Optional
 
-from core import users
 from core.addons import store
 from core.users import User
 from addons.whatsapp import accounts, config
 from addons.whatsapp.addon import addon
+from addons.whatsapp.api import SECRET_ENV
 
 logger = logging.getLogger(__name__)
 
@@ -30,17 +31,13 @@ def report_voice_chat(user: User) -> None:
         logger.info(f"WhatsApp voice transcripts of user {user.id} go to Telegram chat {chat_id}")
 
 
-def report_whatsapp_voice_chats() -> None:
-    """Log, per user with WhatsApp, where their voice transcripts go."""
-    for uid in store.users_with(config.ADDON):
-        user = users.get(uid)
-        if user is not None:
-            report_voice_chat(user)
-
-
 @addon.job(at_start=True)
 async def log_voice_chat(user: User) -> None:
     report_voice_chat(user)
+    if not os.getenv(SECRET_ENV, "").strip():
+        logger.error(f"User {user.id} has WhatsApp, but {SECRET_ENV} is not set: every WAHA webhook is refused, so "
+                     f"incoming messages and voice notes are not received. Set it to WAHA's WHATSAPP_HOOK_HMAC_KEY "
+                     f"(docs/whatsapp.md)")
 
 
 @addon.job(every=datetime.timedelta(seconds=accounts.REFRESH_SECONDS))

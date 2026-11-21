@@ -2316,8 +2316,8 @@
     },
     "evidence": {
      "lines": [
-      "MIDJOURNEY BASIC PLAN: ₪74.20 a month",
-      "PERPLEXITY PRO MONTHLY: ₪74.20 a month",
+      "CHATGPT PLUS PLAN: ₪74.20 a month",
+      "CLAUDE PRO MONTHLY: ₪74.20 a month",
       "ענן הצפון: ₪50.00 a month",
       "תוכנת הדרום שנתי: ₪480.00 a year"
      ],
@@ -2413,8 +2413,8 @@
       "amount": 7420,
       "cadence": "monthly",
       "choice": null,
-      "key": "midjourney basic plan",
-      "merchant": "MIDJOURNEY BASIC PLAN",
+      "key": "chatgpt plus plan",
+      "merchant": "CHATGPT PLUS PLAN",
       "next_date": "2026-12-12",
       "yearly": 89040
      },
@@ -2423,8 +2423,8 @@
       "amount": 7420,
       "cadence": "monthly",
       "choice": null,
-      "key": "perplexity pro monthly",
-      "merchant": "PERPLEXITY PRO MONTHLY",
+      "key": "claude pro monthly",
+      "merchant": "CLAUDE PRO MONTHLY",
       "next_date": "2026-12-05",
       "yearly": 89040
      },
@@ -2472,8 +2472,8 @@
     "effort": null,
     "evidence": {
      "lines": [
-      "MIDJOURNEY BASIC PLAN: ₪890.40 a year",
-      "PERPLEXITY PRO MONTHLY: ₪890.40 a year"
+      "CHATGPT PLUS PLAN: ₪890.40 a year",
+      "CLAUDE PRO MONTHLY: ₪890.40 a year"
      ],
      "link": {
       "view": "transactions"
@@ -2554,8 +2554,8 @@
     "saving": null,
     "scope": {
      "merchants": [
-      "midjourney basic plan",
-      "perplexity pro monthly"
+      "chatgpt plus plan",
+      "claude pro monthly"
      ]
     },
     "script": null,
@@ -2570,7 +2570,7 @@
     ],
     "subitems": null,
     "suggested_target": null,
-    "summary": "MIDJOURNEY BASIC PLAN and PERPLEXITY PRO MONTHLY: ₪1,780.80 a year together. Do you need both?",
+    "summary": "CHATGPT PLUS PLAN and CLAUDE PRO MONTHLY: ₪1,780.80 a year together. Do you need both?",
     "target": null,
     "timing": null,
     "title": "2 AI assistants at once",

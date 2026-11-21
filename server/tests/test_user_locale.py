@@ -150,8 +150,8 @@ async def api() -> None:
               and users.get(ADMIN.id).currency == "ILS")
         r = await c.get("/api/me", headers=bob_auth)
         me = await r.json()
-        check("me: addons, languages and currency (no 'kinds')", r.status == 200 and me["languages"] == ["de", "en"]
-              and me["currency"] == "CHF" and "essentials" in me["addons"] and "kinds" not in me, me)
+        check("me: addons, languages and currency (kinds repeats addons for the old app)", r.status == 200 and me["languages"] == ["de", "en"]
+              and me["currency"] == "CHF" and "essentials" in me["addons"] and me["kinds"] == me["addons"], me)
         r = await c.put("/api/profile", headers=bob_auth, json={"currency": "francs"})
         body = await r.json()
         check("profile: a bad currency is 400 with the field, nothing changed",

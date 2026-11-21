@@ -1053,14 +1053,13 @@ connect).
   for the app / web login) and, for Telegram, `bin/dana users telegram add maya
   <her Telegram user id>` plus `update maya --telegram-chat <chat id>` for
   proactive messages. She starts with only `essentials`.
-- **Connect an addon from the page.** Settings → Addons, open
-  the service (an admin first picks the user at the top), fill in the
-  address and the key / token, Connect; then Test connection, pick the
-  settings from the suggestions (Home Assistant: your person, the car's
-  Bluetooth sensor and name, the phone's sensors, the weather entity) and
-  Save. A official addon (Tasks, Shopping, …) is one Connect on its row. A
-  field marked "Set by an admin" is one an admin sets for you (pick your
-  name, change it, Save).
+- **Connect an addon from the page.** Settings → Addons (an admin first
+  picks the user at the top), open the addon and follow its numbered steps:
+  what to do outside Dana, then the sign-in button or the fields (each with
+  where to find it), then Connect. Connect runs the connection check by
+  itself and says what to fix when it fails; then pick the settings from the
+  suggestions. Built-in addons (Tasks, Shopping, …) are one "Turn on". A
+  field marked "Set by an admin" is one an admin sets for you.
 - **Connect an addon with the CLI or the API.** Official addons need nothing:
   `bin/dana addons connect maya tasks` (her default lists are made
   at once). A service: put the credentials in a file (`host=…`,

@@ -89,7 +89,7 @@ def hapoalim_accounts(pending: bool = True) -> List[Dict[str, Any]]:
         # Two identical transfers on the same day (Hapoalim repeats identifier; only the row position differs).
         poalim_txn("2026-11-09T22:00:00.000Z", -250, "העברה לחשבון", "לדני כהן", serial=3),
         poalim_txn("2026-11-09T22:00:00.000Z", -250, "העברה לחשבון", "לדני כהן", serial=4),
-        poalim_txn("2026-11-09T22:00:00.000Z", 15000.0, "משכורת אופק בע\"מ", SALARY_MEMO, identifier=9001,
+        poalim_txn("2026-11-09T22:00:00.000Z", 15000.0, "משכורת נוגה תעשיות בע\"מ", SALARY_MEMO, identifier=9001,
                    beneficiaryId="123456782", partyAccount="12-600-123456789"),
         poalim_txn("2026-11-11T22:00:00.000Z", -120, "העברה מכרטיס", "כרטיס 4580123412341234 חשבון 12-600-123456789 "
                    "אסמכתא 123456789"),
@@ -273,7 +273,7 @@ def test_pending_and_changes() -> None:
 # --- 3. Scrub, merchant keys, rules at ingest, per user --------------------------------------------
 
 def test_scrub_and_rules() -> None:
-    salary = by_desc(ADMIN, "משכורת אופק בע\"מ")[0]
+    salary = by_desc(ADMIN, "משכורת נוגה תעשיות בע\"מ")[0]
     check("scrub: the ID number in the salary memo → [id], the name stays",
           salary["memo"] == "עבור: לוי דנה מזהה [id].", salary["memo"])
     check("scrub: no ID number anywhere in the stored raw row", "123456782" not in salary["raw"]

@@ -134,25 +134,27 @@ def users_for(addon: str) -> List[User]:
 
 async def run_once(job: Job) -> Dict[str, Any]:
     """One pass of ``job``: ``func(user)`` for every user who has its addon,
-    each as that user and within ``job.timeout`` seconds. Returns user id →
-    result (a user whose run raised or timed out is logged and left out);
-    nothing while the addon is disabled on the server."""
-    out: Dict[str, Any] = {}
+    concurrently, each as that user and within ``job.timeout`` seconds (one
+    user's slow service never holds up the others). Returns user id → result
+    (a user whose run raised or timed out is logged and left out); nothing
+    while the addon is disabled on the server."""
     if not state.is_enabled(job.addon):
-        return out
-    failed = 0
-    for user in users_for(job.addon):
+        return {}
+
+    async def one(user: User) -> Tuple[str, bool, Any]:
         try:
             with users.acting_as(user):
-                out[user.id] = await asyncio.wait_for(job.func(user), timeout=job.timeout)
+                return user.id, True, await asyncio.wait_for(job.func(user), timeout=job.timeout)
         except asyncio.TimeoutError:
-            failed += 1
             logger.error(f"Job {job.key} took longer than {job.timeout:.0f}s for user {user.id}; cancelled")
         except Exception:
-            failed += 1
             logger.exception(f"Job {job.key} failed for user {user.id}")
+        return user.id, False, None
+
+    results = await asyncio.gather(*(one(u) for u in users_for(job.addon)))
+    failed = sum(1 for _, ok, _ in results if not ok)
     _heartbeat(job, failed == 0, f"{failed} user(s) failed" if failed else "")
-    return out
+    return {uid: value for uid, ok, value in results if ok}
 
 
 def _daily_time(job: Job) -> Tuple[int, int]:
