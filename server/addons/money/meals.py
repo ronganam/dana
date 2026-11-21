@@ -1,17 +1,18 @@
-"""Meal cards (Pluxee / Cibus): storing a sync's charges and reading the budget (docs/money.md, "Meal cards").
+"""Meal cards: storing a sync's charges and reading the budget (docs/money.md, "Meal cards").
 
-The worker returns the site's own rows for the card (addons/money/worker/README.md,
-"Pluxee"): ``budgets`` (the current cycle's budgets: ``CreatioBudget``,
-``CurrBudget``, ``CreationDate``, ``ExpirationDate``) and ``deals`` (every
-charge since the job's start date). :func:`store_account` keeps them in the
-ingest's transaction: the account upserted (``balance`` = what is left of the
-budget, ``details`` = the cycle), each charge upserted by its deal id into
-``money_meals``. A meal is never a ``money_transactions`` row: the employer's
-budget is not the user's spending. What the budget did not cover goes on the
-user's own card, which the site bills once a month for a whole cycle ("סיבוס
-פלאקסי" on the 10th, about seven weeks after the cycle ends):
-:func:`billed_lines` finds that line for each cycle by its exact amount, and
-:func:`card_line` says which cycle a card line paid for.
+A provider returns a meal card (a company of kind ``meal``) in the ingest
+format's meal shape (docs/money.md, "Ingest format"): ``budget`` (the current
+cycle: ``{amount, left, start, end}``) and ``meals`` (every charge since the
+sync's start date, each with its ``ext_key``). :func:`store_account` keeps
+them in the ingest's transaction: the account upserted (``balance`` = what is
+left of the budget, ``details`` = the cycle), each charge upserted by its key
+into ``money_meals``. A meal is never a ``money_transactions`` row: the
+employer's budget is not the user's spending. What the budget did not cover
+goes on the user's own card, which the meal card company may bill once a
+month for a whole cycle: :func:`billed_lines` finds that line for each cycle
+by its exact amount among the rows whose merchant key holds one of the
+company's ``card_line_words``, and :func:`card_line` says which cycle a card
+line paid for.
 
 A cycle runs from the budget's day of the month (the 22nd: 22 Oct – 21 Nov)
 to the day before it a month later; past cycles take the current cycle's day."""
@@ -26,90 +27,29 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from core import clock
 from core.users import User
-from addons.money import companies, ingest, store
+from addons.money import ingest, providers, store
 
 logger = logging.getLogger(__name__)
 
-ORDER_TYPES = {0: "restaurant", 1: "delivery", 2: "voucher"}
+# A meal's ``order_type`` in the ingest format (anything else is shown as given).
 ORDER_LABELS = {"restaurant": "At the restaurant / pickup", "delivery": "Delivery", "voucher": "Voucher"}
-# The user's card line for a cycle's overflow: the merchant key holds one of these words.
-CARD_LINE_WORDS = ("סיבוס", "פלאקסי", "pluxee", "cibus")
 # The card line comes this many days after the cycle ends, at most (seen: 19 days, the 10th of the next month).
 BILL_DAYS = 75
 PLACES_TOP = 10
 
 
-def _num(value: Any) -> Optional[float]:
-    if value is None or value == "" or isinstance(value, bool):
-        return None
-    try:
-        return float(str(value).replace(",", ""))
-    except ValueError:
-        return None
-
-
-def parse_dmy(value: Any) -> Optional[datetime.date]:
-    """``21/11/2026`` → a date; None otherwise."""
-    try:
-        return datetime.datetime.strptime(str(value or "").strip()[:10], "%d/%m/%Y").date()
-    except ValueError:
-        return None
-
-
-def deal_row(raw: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
-    """One charge as stored (no ids): None without a deal id, a date or a price. Amounts in agorot:
-    ``total`` the whole meal, ``card_paid`` what went on the user's own card (``otl_price``), ``budget_paid``
-    the rest (from the employer's budget)."""
-    deal_id = str(raw.get("deal_id") or "").strip()
-    day = parse_dmy(raw.get("date"))
-    total = ingest.agorot(raw.get("price"))
-    if not deal_id or day is None or total is None:
-        return None
-    card_paid = ingest.agorot(raw.get("otl_price")) or 0
-    occurred = None
-    time = str(raw.get("time") or "").strip()
-    try:
-        hh, mm = (int(x) for x in time.split(":")[:2])
-        occurred = datetime.datetime.combine(day, datetime.time(hh, mm), clock.get_timezone()).isoformat(timespec="seconds")
-    except ValueError:
-        pass
-    order = raw.get("order_type")
-    try:
-        order_type = ORDER_TYPES.get(int(order), str(order))
-    except (TypeError, ValueError):
-        order_type = None
-    return {
-        "ext_key": f"pluxee:{deal_id}", "date": day.isoformat(), "occurred_at": occurred,
-        "place": ingest.scrub(str(raw.get("rest_name") or "").strip()) or None,
-        "place_id": str(raw.get("restaurant_id") or "").strip() or None, "order_type": order_type,
-        "total": total, "card_paid": card_paid, "budget_paid": total - card_paid,
-        "discount": ingest.agorot(raw.get("discount")) or None,
-        "active": 0 if str(raw.get("is_active")) == "0" else 1,
-        "budget_name": ingest.scrub(str(raw.get("rule_name") or "").strip()) or None,
-        "raw": json.dumps(ingest.scrub_value(dict(raw)), ensure_ascii=False, sort_keys=True),
-    }
-
-
-def budget_details(budgets: Sequence[Mapping[str, Any]]) -> Dict[str, Any]:
-    """The current cycle from the site's budgets: ``{amount, left, start, end}`` (agorot, ISO dates)."""
-    rows = [b for b in budgets if isinstance(b, Mapping)]
-    amount = sum(ingest.agorot(b.get("CreatioBudget")) or 0 for b in rows)
-    left = sum(ingest.agorot(b.get("CurrBudget")) or 0 for b in rows)
-    starts = [d for d in (parse_dmy(b.get("CreationDate")) for b in rows) if d]
-    ends = [d for d in (parse_dmy(b.get("ExpirationDate")) for b in rows) if d]
-    return {"amount": amount if rows else None, "left": left if rows else None,
-            "start": min(starts).isoformat() if starts else None, "end": max(ends).isoformat() if ends else None}
-
-
-def store_account(conn, user: User, source_id: str, company: companies.Company, account: Mapping[str, Any],
+def store_account(conn, user: User, source_id: str, company: providers.Company, account: Mapping[str, Any],
                   now: str) -> Optional[str]:
-    """Store one meal card of a sync (inside the ingest's transaction); returns its id."""
+    """Store one meal card of a sync (inside the ingest's transaction); returns its id. ``account``:
+    ``{accountNumber, budget {amount, left, start, end}, balance?, meals [...]}`` (agorot; ``balance``:
+    what is left when the budget does not say)."""
     number = str(account.get("accountNumber") or "").strip()
     if not number:
         logger.warning(f"Money ingest for source {source_id}: a meal card without a number was skipped")
         return None
-    details = budget_details(account.get("budgets") or [])
-    left = details["left"] if details["left"] is not None else ingest.agorot(account.get("balance"))
+    budget = account.get("budget") if isinstance(account.get("budget"), Mapping) else {}
+    details = {k: budget.get(k) for k in ("amount", "left", "start", "end")}
+    left = details["left"] if details["left"] is not None else account.get("balance")
     payload = json.dumps(details, sort_keys=True)
     row = conn.execute("SELECT id FROM money_accounts WHERE user_id = ? AND company = ? AND number = ?",
                        (user.id, company.id, number)).fetchone()
@@ -125,9 +65,11 @@ def store_account(conn, user: User, source_id: str, company: companies.Company, 
         conn.execute("UPDATE money_accounts SET source_id = ?, kind = 'meal', balance = ?, balance_at = ?, details = ?, "
                      "updated_at = ? WHERE id = ?",
                      (source_id, left, now if left is not None else None, payload, now, account_id))
-    for d in (deal_row(r) for r in account.get("deals") or [] if isinstance(r, Mapping)):
-        if d is None:
+    for d in account.get("meals") or []:
+        if not isinstance(d, Mapping) or not d.get("ext_key") or not d.get("date") or d.get("total") is None:
             continue
+        card_paid = d.get("card_paid") or 0
+        raw = d.get("raw")
         conn.execute(
             "INSERT INTO money_meals (id, user_id, account_id, ext_key, date, occurred_at, place, place_id, order_type, "
             "total, budget_paid, card_paid, discount, active, budget_name, raw, created_at, updated_at) "
@@ -137,10 +79,17 @@ def store_account(conn, user: User, source_id: str, company: companies.Company, 
             "budget_paid = excluded.budget_paid, card_paid = excluded.card_paid, discount = excluded.discount, "
             "active = excluded.active, budget_name = excluded.budget_name, raw = excluded.raw, "
             "updated_at = excluded.updated_at",
-            (uuid.uuid4().hex, user.id, account_id, d["ext_key"], d["date"], d["occurred_at"], d["place"], d["place_id"],
-             d["order_type"], d["total"], d["budget_paid"], d["card_paid"], d["discount"], d["active"],
-             d["budget_name"], d["raw"], now, now))
+            (uuid.uuid4().hex, user.id, account_id, str(d["ext_key"]), d["date"], d.get("occurred_at"),
+             _text(d.get("place")), d.get("place_id"), d.get("order_type"), d["total"],
+             d.get("budget_paid", d["total"] - card_paid), card_paid, d.get("discount"), 0 if d.get("active") in (0, False) else 1,
+             _text(d.get("budget_name")),
+             json.dumps(ingest.scrub_value(dict(raw)), ensure_ascii=False, sort_keys=True) if isinstance(raw, Mapping) else None,
+             now, now))
     return account_id
+
+
+def _text(value: Any) -> Optional[str]:
+    return ingest.scrub(str(value).strip()) or None if value not in (None, "") else None
 
 
 # --- Cycles -------------------------------------------------------------------------------
@@ -207,15 +156,24 @@ def _cycles(rows: Sequence[Mapping[str, Any]], start_day: int) -> List[Dict[str,
     return [out[k] for k in sorted(out, reverse=True)]
 
 
-def _card_line_rows(user: User) -> List[Dict[str, Any]]:
+def card_line_words(accounts: Sequence[Mapping[str, Any]]) -> List[str]:
+    """The words of the card line of these meal cards' companies (``Company.card_line_words``)."""
+    words = {w for a in accounts for w in getattr(providers.company(a["company"]), "card_line_words", ())}
+    return sorted(words)
+
+
+def _card_line_rows(user: User, accounts: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
     """The user's card / bank rows that may be a meal card's monthly overflow line (money out)."""
-    words = " OR ".join("t.merchant_key LIKE ?" for _ in CARD_LINE_WORDS)
+    words = card_line_words(accounts)
+    if not words:
+        return []
+    where = " OR ".join("t.merchant_key LIKE ?" for _ in words)
     with store.db() as conn:
         return [dict(r) for r in conn.execute(
             f"SELECT t.id, t.purchase_date, t.amount, t.account_id FROM money_transactions t "
             f"JOIN money_accounts a ON a.id = t.account_id WHERE t.user_id = ? AND a.kind != 'meal' "
-            f"AND t.amount < 0 AND t.status != 'unmatched' AND ({words}) ORDER BY t.purchase_date",
-            (user.id, *[f"%{w}%" for w in CARD_LINE_WORDS]))]
+            f"AND t.amount < 0 AND t.status != 'unmatched' AND ({where}) ORDER BY t.purchase_date",
+            (user.id, *[f"%{w}%" for w in words]))]
 
 
 def billed_lines(cycles: Sequence[Dict[str, Any]], lines: Sequence[Mapping[str, Any]]) -> Dict[str, Dict[str, Any]]:
@@ -271,7 +229,7 @@ def meal_accounts(user: User) -> List[Dict[str, Any]]:
     for a in _meal_accounts(user):
         cur = _current(a, _meal_rows(user, [a["id"]], since=(today - datetime.timedelta(days=40)).isoformat()), today)
         out.append({"id": a["id"], "label": store.account_label(a["company"], a["kind"], a["number"], a.get("label")),
-                    "number": a["number"], "company": a["company"], "company_name": companies.name_of(a["company"]),
+                    "number": a["number"], "company": a["company"], "company_name": providers.name_of(a["company"]),
                     "balance_at": a.get("balance_at"),
                     **{k: cur[k] for k in ("left", "budget", "start", "end", "days_left", "used", "card_paid",
                                            "runs_out")}})
@@ -301,7 +259,7 @@ def meals(user: User, months: int = 12, recent: int = 40) -> Dict[str, Any]:
     rows = _meal_rows(user, [a["id"] for a in accounts], since=since)
     start_day = _start_day(accounts[0]) if accounts else 1
     cycles = _cycles(rows, start_day)[:months]
-    billed = billed_lines(cycles, _card_line_rows(user)) if cycles else {}
+    billed = billed_lines(cycles, _card_line_rows(user, accounts)) if cycles else {}
     for c in cycles:
         c["billed"] = billed.get(c["start"])
     first = cycles[-1]["start"] if cycles else today.isoformat()
@@ -336,7 +294,7 @@ def card_line(user: User, txn_id: str) -> Optional[Dict[str, Any]]:
     accounts = _meal_accounts(user)
     if not accounts:
         return None
-    lines = _card_line_rows(user)
+    lines = _card_line_rows(user, accounts)
     if not any(line["id"] == txn_id for line in lines):
         return None
     rows = _meal_rows(user, [a["id"] for a in accounts])

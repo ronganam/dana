@@ -21,7 +21,7 @@ import statistics
 from typing import Any, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 
 from core.users import User
-from addons.money import categories, companies, ingest, insights, meals, periods, portfolio, store
+from addons.money import categories, ingest, insights, meals, periods, portfolio, providers, store
 from addons.money.periods import Period
 
 GROUP_BY = ("group", "category", "merchant", "account", "month", "week", "day")
@@ -435,7 +435,7 @@ def find_account(user: User, term: str) -> Dict[str, Any]:
     def matches(a: Dict[str, Any]) -> bool:
         digits = re.sub(r"\D", "", text)
         number = re.sub(r"\D", "", a["number"] or "")
-        name = companies.name_of(a["company"]).casefold()
+        name = providers.name_of(a["company"]).casefold()
         return bool((digits and len(digits) >= 3 and number.endswith(digits))
                     or (a.get("label") and norm == a["label"].strip().casefold())
                     or (norm and (norm == a["company"].casefold() or norm in name))
@@ -487,7 +487,7 @@ def overview(user: User, month: Optional[str] = None) -> Dict[str, Any]:
     def base(a: Dict[str, Any]) -> Dict[str, Any]:
         shown = store.account_payload(a)
         return {"id": a["id"], "label": store.account_label(a["company"], a["kind"], a["number"], a.get("label")),
-                "number": shown["number"], "company": a["company"], "company_name": companies.name_of(a["company"])}
+                "number": shown["number"], "company": a["company"], "company_name": providers.name_of(a["company"])}
 
     cards = [{**base(a), "next_charge": a.get("next_charge"), "next_charge_date": a.get("next_charge_date"),
               "billed_from_account_id": a.get("billed_from_account_id")} for a in accounts if a["kind"] == "card"]
@@ -495,7 +495,7 @@ def overview(user: User, month: Optional[str] = None) -> Dict[str, Any]:
              for a in accounts if a["kind"] == "bank"]
     rec = insights.recurring(user, now)
     sources = store.list_sources(user)
-    source_rows = [{"id": s["id"], "company": s["company"], "company_name": companies.name_of(s["company"]),
+    source_rows = [{"id": s["id"], "company": s["company"], "company_name": providers.name_of(s["company"]),
                     "label": s.get("label"), "name": store.source_name(s), "state": s["state"],
                     "state_reason": s.get("state_reason"), "last_ok_at": s.get("last_ok_at"),
                     "last_sync_at": s.get("last_sync_at"), "next_sync_at": s.get("next_sync_at")} for s in sources]

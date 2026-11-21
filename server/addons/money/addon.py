@@ -1,7 +1,8 @@
 """The ``money`` addon: bank and card transactions (docs/money.md).
 
 The connection itself has no credentials: it is the on/off switch. Each bank
-or card login is a row of ``money_sources`` (``sources.py``). After each
+or card login is a row of ``money_sources`` (``sources.py``) at a company a
+provider addon brings (``providers.py``: ``money_il`` for Israel). After each
 ingest, provisional rows from phone notifications are merged first (they
 carry their category), then classification runs; new phone notifications
 reach ``signals.observe`` through the phone addon's observers; the month's
@@ -10,11 +11,9 @@ parts below (every money question goes to the money tools, what "spent"
 means) and a section listing the user's accounts (:func:`accounts_section`).
 Tools: ``tools.py``."""
 
-from typing import Any, Optional
-
 from core.users import User
-from core.addons import Addon, PromptPart, LlmJob, Worker, Web, Nav
-from addons.money import after_sync, classify, dashboard, savings, signals, sources, store, worker_client
+from core.addons import Addon, PromptPart, LlmJob, Web, Nav
+from addons.money import after_sync, classify, dashboard, savings, signals, sources, store
 from addons.money.config import ADDON
 from addons.phone.notifications import observers
 
@@ -55,17 +54,9 @@ def accounts_section(user: User) -> str:
     return "\n\n## Money accounts\n" + "\n".join(lines)
 
 
-async def _check(conn: Any) -> Optional[str]:
-    """``POST /api/addons/money/test``: whether the bank worker answers."""
-    return None if await worker_client.health() is not None else "bank worker not reachable"
-
-
 addon = Addon(
-    ADDON, web=Web(panel="money.js", style="money.css", nav=Nav("Money", icon="wallet", order=20)), order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories"), "money_market": LlmJob("balanced", "Money price checks")},
+    ADDON, web=Web(panel="money.js", style="money.css", nav=Nav("Money", icon="wallet", order=20)), order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories")},
     description="Bank and card transactions",
-    # The bank-worker sidecar, built from worker/ by bin/deploy (docs/operations.md, "Workers").
-    worker=Worker(port=8090, url_env="MONEY_WORKER_URL"),
-    test=_check,
     on_change=sources.on_change,
     prompt_section=accounts_section,
     prompt_parts=(

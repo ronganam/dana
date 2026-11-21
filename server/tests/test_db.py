@@ -220,7 +220,8 @@ def test_convert_9_0():
           [m.label for m in db.pending_migrations(path)] == LATER_LABELS, str(db.pending_migrations(path)))
     applied = db.migrate(path)
     check("9.0: only the later migrations run after the conversion (the baselines are marked, not run)",
-          applied == LATER_LABELS, str(applied))
+          applied == LATER_LABELS and "core:0002_addon_state" in applied and "money:0002_money_il" in applied,
+          str(applied))
     check("9.0: schema_migrations marks core's and every official addon's baseline, and the later ones",
           sorted(sql(path, "SELECT addon, version, name FROM schema_migrations"))
           == sorted([("core", 1, "baseline")] + [(a, 1, "baseline") for a in OFFICIAL] + LATER_ROWS))

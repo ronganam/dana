@@ -1,4 +1,4 @@
-"""Bank of Israel public data for the savings engine (docs/money.md, "Savings").
+"""Bank of Israel public data: money's reference rates (docs/money-il.md, "Bank of Israel"; docs/money.md, "Providers").
 
 The Bank of Israel's SDMX API (CSV, no key, no user data in the request):
 the policy rate (series ``BR/MNT_RIB_BOI_D``) and the representative
@@ -150,17 +150,3 @@ def fx_rates(currency: str, start: datetime.date, end: datetime.date) -> Dict[st
         return {}
     return _series(f"EXR/1.0/RER_{code}_ILS", start, end)
 
-
-def rate_on(rates: Dict[str, float], day: str) -> Optional[float]:
-    """The rate of ``day`` or of the last business day before it (within a week), None without one."""
-    if day in rates:
-        return rates[day]
-    try:
-        d = datetime.date.fromisoformat(day[:10])
-    except ValueError:
-        return None
-    for back in range(1, 8):
-        value = rates.get((d - datetime.timedelta(days=back)).isoformat())
-        if value is not None:
-            return value
-    return None

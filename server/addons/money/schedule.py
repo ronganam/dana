@@ -2,7 +2,8 @@
 
 :func:`loop` (started with the app) looks every minute at every user with
 ``money``, as that user, and starts the sources whose ``next_sync_at`` has
-come, unless they are syncing, waiting for a code or need attention. Regular
+come, unless they are syncing, waiting for a code or need attention, or their
+provider addon is off for the user (``providers.available``). Regular
 slots are ``MONEY_SYNC_TIMES`` (local) with a stable per-source jitter
 (``slots.py``). :func:`request_soon` pulls a sync earlier (a phone payment
 signal: at most :data:`config.SIGNAL_SYNCS_PER_DAY` a local day, never in the
@@ -18,7 +19,7 @@ from typing import Any, Dict, List, Optional
 from core import clock, users
 from core.users import User
 from core.addons import store as connections
-from addons.money import classify, config, slots, store, sync
+from addons.money import config, providers, slots, store, sync
 
 logger = logging.getLogger(__name__)
 
@@ -84,12 +85,15 @@ def sync_now(user: User, source_id: str, trigger: str = "manual") -> str:
 
     Raises:
         LookupError: no such source of the user.
+        UnknownCompany: no loaded provider reads its company any more.
+        NotConnected: its company's provider addon is off for the user.
         NeedsAttention: its login must be fixed first.
         TooSoon: a manual sync ran less than :data:`config.MANUAL_MINUTES` ago.
     """
     source = store.get_source(user, source_id)
     if source is None:
         raise LookupError(f"unknown money source {source_id!r}")
+    providers.get(user, source["company"])
     running = sync.running(source_id)
     if running:
         return running
@@ -114,10 +118,10 @@ def due_sources(user: User, now: Optional[datetime.datetime] = None) -> List[Dic
     at = store.iso(now or store.utc_now())
     marks = ",".join("?" * len(_WAITING))
     with store.db() as conn:
-        rows = conn.execute(f"SELECT id, next_sync_at FROM money_sources WHERE user_id = ? AND next_sync_at IS NOT NULL "
-                            f"AND next_sync_at <= ? AND state NOT IN ({marks}) ORDER BY next_sync_at",
-                            (user.id, at, *_WAITING)).fetchall()
-    return [dict(r) for r in rows if not sync.running(r["id"])]
+        rows = conn.execute(f"SELECT id, company, next_sync_at FROM money_sources WHERE user_id = ? "
+                            f"AND next_sync_at IS NOT NULL AND next_sync_at <= ? AND state NOT IN ({marks}) "
+                            f"ORDER BY next_sync_at", (user.id, at, *_WAITING)).fetchall()
+    return [dict(r) for r in rows if not sync.running(r["id"]) and providers.available(user, r["company"])]
 
 
 def tick_user(user: User, now: Optional[datetime.datetime] = None) -> List[str]:

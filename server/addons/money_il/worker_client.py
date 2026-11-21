@@ -1,4 +1,4 @@
-"""Client of the bank-worker sidecar (addons/money/worker/README.md; docs/money.md, "Worker").
+"""Client of the bank-worker sidecar (worker/README.md; docs/money-il.md, "Worker").
 
 The worker listens on the pod's localhost (``MONEY_WORKER_URL``) and checks a
 bearer token read from a file on the shared volume; Dana creates that file
@@ -15,7 +15,7 @@ from typing import Any, Dict, List, Mapping, Optional
 
 import httpx
 
-from addons.money import config
+from addons.money_il import config
 
 logger = logging.getLogger(__name__)
 

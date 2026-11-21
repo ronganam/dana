@@ -25,7 +25,7 @@
      "update_available": false
     }
    ],
-   "origin": "/tmp/dana-test-rf1m390u/catalog.json",
+   "origin": "/home/ronganam/.t3/userdata/antigravity-tmp/ac0a3dfd6ddd/run-31Wag7/dana-test-rza_rabj/catalog.json",
    "problems": [
     "later: source.ref 'FILL-ME' is not a full commit hash"
    ],
@@ -449,7 +449,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:40397",
+       "value": "http://127.0.0.1:45181",
        "why_not": null
       },
       {
@@ -803,7 +803,7 @@
     {
      "account": null,
      "can_change": true,
-     "check": true,
+     "check": false,
      "connect_label": null,
      "connect_url": null,
      "connected": false,
@@ -818,6 +818,31 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "version": "",
+     "web": null,
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "everyone": false,
+     "name": "money_il",
+     "needs": [
+      "money"
+     ],
+     "options": false,
+     "requires": null,
+     "settings": [],
+     "source": "official",
+     "state": "available",
+     "title": "Money (Israel)",
      "version": "",
      "web": null,
      "why_not": null,
@@ -908,7 +933,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "4a2da8aea6d4"
+   "user_id": "ca0b943bb8c6"
   },
   "status": 200
  },
@@ -1104,7 +1129,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38267",
+       "value": "http://127.0.0.1:46863",
        "why_not": null
       },
       {
@@ -1242,7 +1267,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:37301/api",
+       "value": "http://127.0.0.1:34067/api",
        "why_not": null
       },
       {
@@ -1466,7 +1491,7 @@
     {
      "account": null,
      "can_change": true,
-     "check": true,
+     "check": false,
      "connect_label": null,
      "connect_url": null,
      "connected": false,
@@ -1481,6 +1506,31 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "version": "",
+     "web": null,
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "everyone": false,
+     "name": "money_il",
+     "needs": [
+      "money"
+     ],
+     "options": false,
+     "requires": null,
+     "settings": [],
+     "source": "official",
+     "state": "available",
+     "title": "Money (Israel)",
      "version": "",
      "web": null,
      "why_not": null,
@@ -1508,7 +1558,7 @@
        "name": "url",
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "type": "address",
-       "value": "http://127.0.0.1:36177",
+       "value": "http://127.0.0.1:38209",
        "why_not": null
       }
      ],
@@ -1548,7 +1598,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "99a555fde23f"
+   "user_id": "7ecae0cc3c70"
   },
   "status": 200
  },
@@ -1891,7 +1941,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:37301/api",
+       "value": "http://127.0.0.1:34067/api",
        "why_not": null
       },
       {
@@ -2107,7 +2157,7 @@
     {
      "account": null,
      "can_change": true,
-     "check": true,
+     "check": false,
      "connect_label": null,
      "connect_url": null,
      "connected": false,
@@ -2122,6 +2172,31 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "version": "",
+     "web": null,
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "everyone": false,
+     "name": "money_il",
+     "needs": [
+      "money"
+     ],
+     "options": false,
+     "requires": null,
+     "settings": [],
+     "source": "official",
+     "state": "available",
+     "title": "Money (Israel)",
      "version": "",
      "web": null,
      "why_not": null,
@@ -2189,7 +2264,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "5ca869748df4"
+   "user_id": "45af809c220f"
   },
   "status": 200
  },
@@ -2385,7 +2460,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38267",
+       "value": "http://127.0.0.1:46863",
        "why_not": null
       },
       {
@@ -2523,7 +2598,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:37301/api",
+       "value": "http://127.0.0.1:34067/api",
        "why_not": null
       },
       {
@@ -2747,7 +2822,7 @@
     {
      "account": null,
      "can_change": true,
-     "check": true,
+     "check": false,
      "connect_label": null,
      "connect_url": null,
      "connected": false,
@@ -2762,6 +2837,31 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "version": "",
+     "web": null,
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "everyone": false,
+     "name": "money_il",
+     "needs": [
+      "money"
+     ],
+     "options": false,
+     "requires": null,
+     "settings": [],
+     "source": "official",
+     "state": "available",
+     "title": "Money (Israel)",
      "version": "",
      "web": null,
      "why_not": null,
@@ -2789,7 +2889,7 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:36177",
+       "value": "http://127.0.0.1:38209",
        "why_not": "Set by an admin"
       }
      ],
@@ -2827,7 +2927,7 @@
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "99a555fde23f"
+   "user_id": "7ecae0cc3c70"
   },
   "status": 200
  },
@@ -3023,7 +3123,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38267",
+       "value": "http://127.0.0.1:46863",
        "why_not": null
       },
       {
@@ -3161,7 +3261,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:37301/api",
+       "value": "http://127.0.0.1:34067/api",
        "why_not": null
       },
       {
@@ -3385,7 +3485,7 @@
     {
      "account": null,
      "can_change": true,
-     "check": true,
+     "check": false,
      "connect_label": null,
      "connect_url": null,
      "connected": false,
@@ -3400,6 +3500,31 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "version": "",
+     "web": null,
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "everyone": false,
+     "name": "money_il",
+     "needs": [
+      "money"
+     ],
+     "options": false,
+     "requires": null,
+     "settings": [],
+     "source": "official",
+     "state": "available",
+     "title": "Money (Israel)",
      "version": "",
      "web": null,
      "why_not": null,
@@ -3427,7 +3552,7 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:36177",
+       "value": "http://127.0.0.1:38209",
        "why_not": "Set by an admin"
       }
      ],
@@ -3465,7 +3590,7 @@
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "99a555fde23f"
+   "user_id": "7ecae0cc3c70"
   },
   "status": 200
  },
@@ -3489,7 +3614,7 @@
     "manage_server"
    ],
    "currency": "ILS",
-   "id": "4a2da8aea6d4",
+   "id": "ca0b943bb8c6",
    "languages": [
     "he",
     "en"
@@ -3510,7 +3635,7 @@
    ],
    "capabilities": [],
    "currency": "USD",
-   "id": "99a555fde23f",
+   "id": "7ecae0cc3c70",
    "languages": [
     "en"
    ],
@@ -3536,7 +3661,7 @@
      "secret": false,
      "set": true,
      "type": "address",
-     "value": "http://127.0.0.1:37301/api",
+     "value": "http://127.0.0.1:34067/api",
      "why_not": "Set by an admin"
     },
     {
@@ -3666,17 +3791,17 @@
    "users": [
     {
      "access": "admin",
-     "id": "4a2da8aea6d4",
+     "id": "ca0b943bb8c6",
      "name": "Robin Levi"
     },
     {
      "access": "member",
-     "id": "99a555fde23f",
+     "id": "7ecae0cc3c70",
      "name": "Bob Builder"
     },
     {
      "access": "member",
-     "id": "5ca869748df4",
+     "id": "45af809c220f",
      "name": "Carl"
     }
    ]

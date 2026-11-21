@@ -252,7 +252,7 @@ A page uses only its own elements and these; nothing else of the shell is its bu
 
 ## Workers
 
-`worker=Worker(port=8091, url_env="MY_ADDON_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained: the app image leaves it out); the addon reaches it at the URL in `url_env`. Deploying and running workers: `operations.md`, "Workers"; money's bank worker (`addons/money/worker/`) is the example.
+`worker=Worker(port=8091, url_env="MY_ADDON_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained: the app image leaves it out); the addon reaches it at the URL in `url_env`. Deploying and running workers: `operations.md`, "Workers"; `money_il`'s bank worker (`addons/money_il/worker/`) is the example.
 
 ## Rules that save time
 

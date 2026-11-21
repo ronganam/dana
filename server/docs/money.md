@@ -1,119 +1,111 @@
 # Money
 
-Bank and credit-card transactions in Dana, investment accounts and the meal card from work: the `money` addon (`addons/money/`). Dana signs in to the user's bank, card, trading and meal-card sites through the **bank-worker** sidecar (`addons/money/worker/`, its `README.md` is the HTTP contract), stores accounts, transactions, holdings and meals per user, and keeps them current on a schedule. It supports Bank Hapoalim, Cal, Psagot Trade (read-only: "Investment accounts" below) and Pluxee (Cibus; read-only: "Meal cards" below). From the same data it finds ways to save and spending to watch ("Savings" below).
+Bank and credit-card transactions in Dana, investment accounts and meal cards: the `money` addon (`addons/money/`). `money` itself signs in nowhere: **provider** addons (`needs=("money",)`) bring the institutions, central-bank rates and price checks (Israeli banks, cards, Psagot Trade, Pluxee, Bank of Israel and price checks live in `money_il`, `docs/money-il.md`). `money` owns the sources and their encrypted credentials, the sync schedule and code broker, ingest, classification, dashboards, savings, tools, API and web tab.
 
 ```
  schedule (2×/day) · signal · "Sync now" · first sync ──► sync.py (one source)
-     ──► worker_client.py ──► bank-worker sidecar (127.0.0.1, a browser profile per source)
+     ──► Company.sync (provider addon, e.g. money_il → bank-worker)
            └─ needs_code ──► otp.py ──► push otp_request + Telegram ──► code back via API / Telegram
-     ◄── accounts + transactions
+     ◄── SyncResult (accounts in ingest format, optional device key)
  ingest.py: scrub → keys → upsert (rules) ──► money_* tables ──► hooks: signals.reconcile → classify (background) ──► API
  phone: Wallet notification (Inbox observer) · card app push (POST /api/money/signals) ──► signals.py ──► provisional row + request_soon
 ```
 
 ## The addon and its sources
 
-- `money` is an ordinary addon (`addon.py`) with **no credentials of its own**: connecting it is the on/off switch (Addons page). It is offered in realtime voice. Its `check` (the Addons page's Test) asks whether the worker answers `GET /health`.
-- Each bank or card login is a **source**: a row of `money_sources` (`sources.py`). A user may have several (two cards, a bank and a card). The login fields come from `companies.py`:
+- `money` is an ordinary addon (`addon.py`) with **no credentials of its own**: connecting it is the on/off switch (Addons page). It is offered in realtime voice.
+- Each bank, card, investment or meal-card login is a **source**: a row of `money_sources` (`sources.py`). A user may have several (two cards, a bank and a card). Which companies a user can add comes from the provider addons that user has connected (`providers.companies(user)`).
+- Credentials are checked against the company's fields (all required, no unknown names), stored only as a Fernet token (`core/addons/crypto.py`, `CREDENTIALS_KEY`) and decrypted only by `sync.py` to hand to the provider's `sync(job)`. No API response, payload or log line carries them (`credentials_set` says whether they exist).
+- Adding a source starts its first sync at once (`trigger="connect"`). New credentials (`sources.update`) clear any login problem: the source becomes `new`, its failures reset, and it syncs at once. Removing a source (`sources.remove`) stops its running sync, closes its code request, calls the company's `forget([source_id])` (best-effort) and, if asked, deletes its accounts and their transactions; otherwise the accounts stay with no source.
+- Disconnecting a provider addon (`sources.provider_changed(user, addon)`) removes that user's logins at that provider's companies (and calls `forget`), while keeping their accounts and transactions. Disconnecting `money` deletes all of that user's money rows and the Money section of their weekly reviews, and calls `forget` for every source (`sources.on_change` → `store.delete_all`). A review's Money section is shown only to a user who has `money`.
 
-  | Company | Kind | Fields | SMS code |
-  |---|---|---|---|
-  | `hapoalim` (Bank Hapoalim) | bank | `userCode` "User code", `password` (secret) | sender `BHapoalim`, regex `קוד האימות הוא:?\s*(\d{4,8})` |
-  | `visaCal` (Cal) | card | `username` "Username", `password` (secret) | — |
-  | `psagot` (Psagot Trade) | investment | `username` "ID number or user", `password` (secret) | sender `Psagot`, regex `פסגות טרייד הוא:?\s*(\d{4,8})` (only on the first sign-in: "Investment accounts") |
-  | `pluxee` (Pluxee, formerly Cibus) | meal | `phone` "Mobile number" | sender `1700701130` (and its other spellings), regex `(?<!\d)(\d{6})(?!\d)` (when the 24-hour session has ended: "Meal cards") |
+Source states: `new` → `syncing` → (`needs_code` → `syncing`) → `ok` | `failing` | `needs_attention`. `state_reason` says why in plain words, `error_type` is the provider's.
 
-- Credentials are checked against the company's fields (all required, no unknown names), stored only as a Fernet token (`core/addons/crypto.py`, `CREDENTIALS_KEY`) and decrypted only by `sync.py` to start a worker job. No API response, payload or log line carries them (`credentials_set` says whether they exist).
-- Adding a source starts its first sync at once (`trigger="connect"`). New credentials (`sources.update`) clear any login problem: the source becomes `new`, its failures reset, and it syncs at once. Removing a source (`sources.remove`) stops its running sync, closes its code request, deletes its browser profile on the worker (best-effort) and, if asked, its accounts and their transactions; otherwise the accounts stay with no source.
-- Disconnecting `money` deletes all of that user's money rows and the Money section of their weekly reviews, and asks the worker to delete their profiles (`sources.on_change` → `store.delete_all`). A review's Money section is shown only to a user who has `money`.
+## Providers
 
-Source states: `new` → `syncing` → (`needs_code` → `syncing`) → `ok` | `failing` | `needs_attention`. `state_reason` says why in plain words, `error_type` is the worker's.
+`providers.py` is `money`'s extension point. A provider addon (`needs=("money",)`, e.g. `money_il`, `docs/money-il.md`) registers what it brings when its `addon.py` is imported; `money` never imports any provider. Everything a provider registers is offered to a user only while that provider addon is on for them (403 `not_connected` naming the provider addon otherwise):
+
+- **`register_company(Company)`**: `id` (unique across providers), `name`, `kind` (`bank` | `card` | `investment` | `meal`), `fields` (`LoginField(name, label, secret)`), `addon`, `sync: async (SyncJob) -> SyncResult`, optional `sms_senders`, `code_regex`, `id_key`, `hash_key`, `card_line_words`, `forget: async (source_ids) -> None`. `SyncJob` gives decrypted `credentials`, kept `device`, `start_date`, `ask_code()` and `signed_in()`. `SyncResult` returns `accounts` in money's ingest format, plus optional `device` (stored encrypted) or `device_dropped=True`. Failures raise `SyncError(error_type, message)` (`LOGIN_ERRORS`, `CODE_TIMEOUT`, or `GENERIC`).
+- **`register_rates(Rates)`**: central-bank `policy_rate(today)` and `fx_rates(currency, start, end)` with `currencies` (cached; savings leaves out items that need rates when none is registered).
+- **`register_price_checks(PriceChecks)`**: `topics`, `latest(user, topic, params)`, `start(user, topic, params)` (raising `PriceCheckUnavailable`, `PriceCheckRunning`, `PriceCheckTooSoon`). Without one, price checks show as unavailable (503).
+
+`addons/money/tests/test_money_providers.py` exercises every part of this contract with a made-up provider addon (`money_test`).
 
 ## Storage
 
-Migration `m0025_money.py` (its docstring describes each column). All tables are per user (`user_id`, cascade on user delete); ids are uuid4 hex; times ISO UTC; amounts integer agorot, signed (money out is negative).
+Migration `addons/money/migrations/m0001_baseline.py` (baseline of all `money_*` tables) and `m0002_money_il.py` (connects `money_il` for existing users with Israeli sources or accounts). All tables are per user (`user_id`, cascade on user delete); ids are uuid4 hex; times ISO UTC; amounts integer minor units (agorot for ILS), signed (money out is negative).
 
-- `money_sources` — logins (above), with sync bookkeeping: `failures`, `last_sync_at`, `last_ok_at`, `next_sync_at`, the signal-sync count of a local day, `last_manual_at`.
-- `money_accounts` — a bank account or a card, unique per `(user, company, number)`: a bank's number is the full account number (shown masked to its last 3 digits), a card's the last 4 Cal gives. `balance` (bank), `next_charge` / `next_charge_date` (a card's next bill), `billed_from_account_id`, `hidden`.
-- `money_transactions` — unique per `(account, ext_key)`; `source` `scrape` | `notification`, `status` `provisional` | `pending` | `completed` | `unmatched`; `purchase_date` / `charge_date` (local dates), `occurred_at` (an aware local time when known); `description` (scrubbed), `merchant` (display name), `merchant_key`, `memo`; `category` + `category_source` (`bank` | `memory` | `model` | `rule` | `user`), `flow`; installment n / total; `note`; `one_off` / `yearly` (the user's marks, `m0027_money_dashboards.py`: NULL = Dana decides); `raw` (the scrubbed scraper row, JSON). Full-text search: `money_transactions_fts` (merchant, description, memo, note), kept in step by triggers.
+- `money_sources` — logins (above), with sync bookkeeping: `failures`, `last_sync_at`, `last_ok_at`, `next_sync_at`, the signal-sync count of a local day, `last_manual_at`, and `device` (encrypted provider key).
+- `money_accounts` — a bank account, card, investment account or meal card, unique per `(user, company, number)`: a bank / investment account's number is shown masked to its last 3 digits, a card's / meal card's the last 4. `balance`, `next_charge` / `next_charge_date`, `billed_from_account_id`, `details` (JSON for investment/meal summaries), `hidden`.
+- `money_transactions` — unique per `(account, ext_key)`; `source` `scrape` | `notification`, `status` `provisional` | `pending` | `completed` | `unmatched`; `purchase_date` / `charge_date` (local dates), `occurred_at` (an aware local time when known); `description` (scrubbed), `merchant` (display name), `merchant_key`, `memo`; `category` + `category_source` (`bank` | `memory` | `model` | `rule` | `user`), `flow`; installment n / total; `note`; `one_off` / `yearly` (the user's marks: NULL = Dana decides); `raw` (the scrubbed provider row, JSON). Full-text search: `money_transactions_fts` (merchant, description, memo, note), kept in step by triggers.
 - `money_rules` (merchant key → category / display name / flow), `money_aliases` (learned spellings of a merchant), `money_syncs` (one row per sync run), `money_code_requests` (the code itself is never stored).
-- Investment accounts (`m0028_money_portfolio.py`): `money_accounts.kind = 'investment'` with its summary in `details` (JSON) and its value in `balance`; `money_sources.device` (the encrypted quick-view key); `money_holdings` (one row per security, replaced each sync), `money_account_values` (the account's value per day) and `money_trades` (the account's activity, unique per `(account, ext_key)`). "Investment accounts" below.
-- Meal cards (`m0031_money_meals.py`): `money_accounts.kind = 'meal'` with what is left of the budget in `balance` and the cycle in `details` (JSON); `money_meals` (one row per charge, unique per `(account, ext_key)`). "Meal cards" below.
-- `money_savings` (`m0029_money_savings.py`): one row per item Dana found, unique per `(user, key)`. It holds the status and when it was set, `snooze_until`, `first_seen_at`, `answers` (JSON: question answers and `sub:<line>` choices), `target` (agorot a month), `baseline` (JSON), `snapshot` (the last detected payload) and `done_at`. "Savings" below.
-
-## Worker
-
-`worker_client.py` is the client of the sidecar. It listens on the pod's localhost, `MONEY_WORKER_URL` (default `http://127.0.0.1:8090`), and checks a bearer token read from `MONEY_DIR/worker-token` (`core/paths.py`: `<data dir>/money/`), which Dana creates with `secrets.token_urlsafe(32)` and mode 0600 when it is missing (both containers run as uid 1001; the worker mounts only the volume's `money/` folder and keeps its browser profiles in `money/profiles/`, `addons/money/worker/README.md`). Calls: `start_job` (`POST /jobs`; a profile still busy from before a restart gets its old job cancelled and is started again), `get_job` (long poll, `wait` ≤ 30 s, `seen`), `post_code`, `cancel_job`, `delete_profile`, `health`. Request bodies carry credentials and codes: nothing logs a body. A worker that cannot be reached is an ordinary sync failure (`GENERIC`, "bank worker not reachable").
+- Investment accounts: `money_accounts.kind = 'investment'`, `money_holdings` (one row per security, replaced each sync), `money_account_values` (value per day) and `money_trades` (activity, unique per `(account, ext_key)`).
+- Meal cards: `money_accounts.kind = 'meal'`, `money_meals` (one row per charge, unique per `(account, ext_key)`).
+- `money_savings`: one row per item Dana found, unique per `(user, key)` (status, `snooze_until`, `first_seen_at`, `answers`, `target`, `baseline`, `snapshot`, `done_at`).
+- `money_market_checks`: cached price checks per `(user_id, topic, params_key)` (used by price-check providers).
 
 ## Sync
 
 `sync.start(user, source_id, trigger)` (`trigger`: `schedule` | `signal` | `manual` | `connect` | `agent`) writes a `money_syncs` row, marks the source `syncing` and runs in the background as the user (`users.acting_as`); one sync per source at a time (starting another returns the running one's id). `sync.run` does the same and waits for the end. Steps:
 
-1. Decrypt the credentials; start a job from the last good sync minus 10 days (the first sync: one year back). At most 2 jobs run at once (the worker's browser limit); one sync gives up after 15 minutes.
-2. Follow the job with long polls. `needs_code` → the code broker (below); the code goes to the worker, and once the job moves on the phone gets a quiet "Signed in to Bank Hapoalim" notice.
-3. `done` → `ingest.apply` in a thread → every hook (`after_sync.on_transactions`) → the source is `ok`, `failures = 0`, `last_ok_at`, `next_sync_at` = its next slot (or a sooner time a signal set while it ran).
-4. `failed`:
-   - `INVALID_PASSWORD`, `CHANGE_PASSWORD`, `ACCOUNT_BLOCKED`, `CODE_REJECTED` (the bank refused the code), `LOGIN_UNKNOWN` (the password went out and the site neither let the worker in nor said why: an error page the worker does not know, a stall, a crash mid-login — it may have been a refused password) → `needs_attention` with what to do ("Cal wants a new password: change it on Cal's site, then update it here"), `next_sync_at` empty: Dana never signs in again on its own (not the loop, a payment signal or the agent), because a repeated wrong password is what locks a login. New credentials restart it; after `CODE_REJECTED` and `LOGIN_UNKNOWN` the user's own "Sync now" (trigger `manual`) also signs in once more (`store.HAND_RETRY_ERRORS`; the source payload's `can_sync`).
-   - No code in time (`CODE_TIMEOUT`) → `failing`, "no sign-in code arrived", next sync at the next regular slot (no quick retry, so no stream of SMS codes); "Sync now" is allowed. A second one in a row → `needs_attention` (each try sends the user an SMS) until the user's "Sync now".
-   - Anything else → `failing` with the reason; retried after 30 minutes, then 2 hours, then at the regular slots (so a source that keeps failing signs in no more often than a healthy one: payment signals never pull a failing source).
+1. Decrypt the credentials (and kept `device`, if any); call the company's `sync(job)` with `start_date` = last good sync minus 10 days (first sync: one year back). One sync gives up after 15 minutes.
+2. When the provider calls `job.ask_code()`, the code broker (below) obtains the code; `job.signed_in()` sends the quiet "Signed in to …" notice.
+3. On `SyncResult` → persist `device` (or clear it on `device_dropped`) → `ingest.apply` in a thread → every hook (`after_sync.on_transactions`) → the source is `ok`, `failures = 0`, `last_ok_at`, `next_sync_at` = its next slot (or a sooner time a signal set while it ran).
+4. On `SyncError` (or unexpected error):
+   - `LOGIN_ERRORS` (`INVALID_PASSWORD`, `CHANGE_PASSWORD`, `ACCOUNT_BLOCKED`, `CODE_REJECTED`, `LOGIN_UNKNOWN`) → `needs_attention` with what to do, `next_sync_at` empty: Dana never signs in again on its own, because repeated wrong passwords lock a login. New credentials restart it; after `CODE_REJECTED` and `LOGIN_UNKNOWN` the user's own "Sync now" (trigger `manual`) also signs in once more (`store.HAND_RETRY_ERRORS`; the source payload's `can_sync`).
+   - No code in time (`CODE_TIMEOUT`) → `failing`, "no sign-in code arrived", next sync at the next regular slot; "Sync now" is allowed. A second one in a row → `needs_attention` until the user's "Sync now".
+   - Anything else (`GENERIC`) → `failing` with the reason; retried after 30 minutes, then 2 hours, then at the regular slots.
 
-   The worker's error text can quote the site, so it is scrubbed (`ingest.scrub`: ID, card and account numbers) before it is stored as `state_reason` or the run's `error`; the worker itself drops URL query strings and masks the credentials.
+   Error text is scrubbed (`ingest.scrub`: ID, card and account numbers) before it is stored as `state_reason` or the run's `error`.
 
-Each finished sync writes the health mark `money_sync:<user id>`. After a restart, the `recover` job (`hooks.py`) ends what the previous process left mid-sync ("interrupted by a restart": the run failed, the code request cancelled, the source `failing`); the interruption counts as a failure and is retried like one (30 minutes, 2 hours, then the slots), so a restart loop cannot sign in over and over.
+Each finished sync writes the health mark `money_sync:<user id>`. After a restart, the `recover` job (`hooks.py`) ends what the previous process left mid-sync ("interrupted by a restart": the run failed, the code request cancelled, the source `failing`); the interruption counts as a failure and is retried like one.
 
 ## Sign-in codes
 
-`otp.py`, for Hapoalim's SMS code on a new browser profile:
+`otp.py`, for any company whose `sync` calls `job.ask_code()`:
 
-1. On `needs_code`: a `money_code_requests` row (expires in 4 minutes; an older pending one of the source is cancelled), the source `needs_code`, a push `otp_request {request_id}` to the user's phone (only with `phone`; TTL 4 minutes in `push.TTL`) and a Telegram message: "Bank Hapoalim sent you a sign-in code for Dana. Reply here with the code within 4 minutes."
-2. The phone fetches `GET /api/money/code-requests/{id}` (`senders`, `code_regex`: a new bank needs no app update), reads the SMS and posts the code. The Money page can post it too, and a Telegram message that is only 4–8 digits, while the user has a pending request, is taken as the code (`core/telegram_bot.py` → `otp.telegram_reply`): answered "Thanks, signing in to Bank Hapoalim…", never logged, never shown to the agent or kept in history. Such a message with no request pending, within 15 minutes of one (`otp.LATE_CODE_MINUTES`), is still kept from the agent: "Dana already has the code" when the phone was quicker, "That code came too late" when the request expired.
-3. `otp.submit(user, request_id, code, via)` checks the request is the user's, pending, unexpired and the code `^\d{4,8}$`, marks it `done` with `answered_by` (`phone` | `web` | `telegram`) and wakes the waiting sync through an in-memory future. The code exists only in memory until the sync posts it to the worker.
-4. Nothing within 4 minutes: the request is `expired`, the worker job cancelled, the source `failing` until its next regular slot; a second miss in a row stops it (`needs_attention`) until the user's "Sync now" (above).
+1. On `ask_code()`: a `money_code_requests` row (expires in 4 minutes; an older pending one of the source is cancelled), the source `needs_code`, a push `otp_request {request_id}` to the user's phone (only with `phone`; TTL 4 minutes in `push.TTL`) and a Telegram message asking the user to reply with the code within 4 minutes.
+2. The phone fetches `GET /api/money/code-requests/{id}` (`senders`, `code_regex` from the company: a new bank needs no app update), reads the SMS and posts the code. The Money page can post it too, and a Telegram message that is only 4–8 digits, while the user has a pending request, is taken as the code (`core/telegram_bot.py` → `otp.telegram_reply`): never logged, never shown to the agent or kept in history. Such a message with no request pending, within 15 minutes of one (`otp.LATE_CODE_MINUTES`), is still kept from the agent.
+3. `otp.submit(user, request_id, code, via)` checks the request is the user's, pending, unexpired and the code `^\d{4,8}$`, marks it `done` with `answered_by` (`phone` | `web` | `telegram`) and wakes the waiting sync through an in-memory future. The code exists only in memory until the sync hands it to the provider.
+4. Nothing within 4 minutes: the request is `expired`, `ask_code()` raises `SyncError(CODE_TIMEOUT, …)`, the source `failing` until its next regular slot; a second miss in a row stops it (`needs_attention`) until the user's "Sync now" (above).
 
 ## Investment accounts
 
-Psagot Trade (`trade.psagot.co.il`, a Flutter web app on a TradeOne backend at `trade1.psagot.co.il`) is read over plain HTTPS by the worker (`addons/money/worker/src/psagot.js`; no browser), not through a scraper library. It is **read-only by construction**: the client refuses any path outside its allow-list (`ALLOWED`: sign-in, the quick-view device, accounts, balances, transactions, daily values, the market table for security names), so no order, password change or alert call can be made, whatever the caller asks.
+`portfolio.py` stores and reads accounts from any provider company of `kind="investment"` (e.g. Psagot Trade in `money_il`, `docs/money-il.md`).
 
-- **Signing in.** The first sync sends the password once (`POST /V2/json2/login`, method `2FA`); Psagot texts a code, which reaches the job through the usual code broker (the phone reads the SMS by sender `Psagot`). Signed in, the worker registers a **quick-view device** named "Dana" (Psagot's own "צפייה מהירה": view-only, no password, no SMS) and hands Dana its RSA private key with the job's result (`device {user, udid, key}`). Dana stores it encrypted with `CREDENTIALS_KEY` (`money_sources.device`, `store.set_device`) and sends it with every later job; those sign in by signing Psagot's challenge with the key: no password and no code go out. The user sees the device in their Psagot settings and can remove it there.
-- **A refused device** (removed by the user, expired): the job drops it (`device_dropped`, Dana clears it), signs in with the password and the SMS code once more and registers a new one in the same job. A device is used only for the username it was registered for: after new credentials for another user, the job signs in with the password and registers a new one.
-- **Refusals** map to the usual error types: a wrong password `INVALID_PASSWORD`, a wrong code `CODE_REJECTED`, an expired password `CHANGE_PASSWORD`, a blocked user `ACCOUNT_BLOCKED`, anything else at the login `LOGIN_UNKNOWN` (each stops the source: never retried on its own). A device sign-in that fails sends no password, so it never counts against the login.
-- **What is read**, per account: the balances view with real-time prices (`calcMode=RT`, as the app asks; without it the day's values are the previous close, so today's change reads 0; closing prices when refused) — value, cash, today's change from the morning value, profit over cost, the holdings (security number, units, value in ₪, profit, its own currency; **no names**: the positions' `Key` and the meta's `hebName` come back empty, in the app too); the holdings' names from the market table (`GET /V2/json2/market/table/simple?securities=&fields=HebName,EngName,EngSymbol,HebSymbol`, optional); the activity of the sync window and the account's value per day (a year on the first sync; newest first). The account holder's name is left out; every raw row is scrubbed like a bank row.
-- **Ingest** (`portfolio.store_account`, from `ingest.apply` for a company of kind `investment`): the account upserted (masked like a bank's, last 3 digits), its activity upserted by `ext_key` (`psagot:<hash>:<n>`) with a kind from the site's Hebrew words (`portfolio.action_kind`: `buy`, `sell`, `dividend`, `interest`, `deposit` ("התקבל מח.בסניף"), `withdrawal`, `tax`, `split`, `redemption`, `benefit`, `expiry`, `other`), its holdings replaced (a name from the market table, else from the security's latest activity row, else none: "Security #<number>"), its values per day upserted (today's from the summary). Security numbers lose their padding (the activity writes `01100007`, the holdings `1100007`). Each trade also comes as the cash account's side, twice (`נע-קניה…` on `עו"ש מט"י`, the trade day and the value day, its whole amount in the tax field): those rows are dropped (`portfolio.is_cash_leg`). Rows on the account's cash (a deposit, tax, interest: `עו"ש`, numbers `99xxxxxx`) keep no security or name. An investment account **never makes `money_transactions`**: spending, income and the dashboards are the bank's and the cards'; a transfer from the bank to the broker stays "set aside" there.
-- **Units** (checked against a real account): the site's money figures are shekels (`OnlineValue`, `OnlineVL` / `OnlineNisVL`, `AveragePriceProfitLossNis`, a trade's `VL` / `NisVL` / `Commission`) → agorot; Tel Aviv prices are agorot (`LastRate`, `BaseRate`, `AveragePrice`, a trade's `Price`, kept as given). A holding's `price` is value ÷ units in its own currency (a decimal: ₪1.25, ₪310.00) and its `cost` value − profit (equal to the site's `AveragePriceVL`). Commissions are negative. The daily values carry no return (`Yield` is 0): deposits and withdrawals move the value, so the Investments view and the tool give the change without them (`flows`).
+- **Ingest** (`portfolio.store_account`, from `ingest.apply`): upserts the account (masked to last 3 digits, summary in `details`, value in `balance`), replaces `money_holdings` (names from the provider, falling back to latest trade or "Security #…"), upserts `money_trades` by `ext_key` and `money_account_values` per day. An investment account **never makes `money_transactions`**: spending, income and dashboards are the bank's and cards'; a transfer from bank to broker stays "set aside" there.
+- **Read** (`portfolio.portfolio`): total value, cash, today's change, profit over cost, per-account holdings and daily history, allocation, trades, and `flows` (deposits/withdrawals separated so the Investments view and tool show return without cash flows).
 
 ## Meal cards
 
-Pluxee (`consumers.pluxee.co.il`, formerly Cibus: an Angular app over Cibus's JSON API at `api.consumers.pluxee.co.il/api/main.py`) is read by the worker's own code on the browser (`addons/money/worker/src/pluxee.js`), not a scraper library. Sign-in needs the browser: Google's invisible reCAPTCHA v3 scores both the SMS request and the code (`api.capir.pluxee.co.il/auth/sendOTP`, `/auth/authToken`) and refuses a browser that says it is automated, so this site's Chromium runs without the automation flags. Once signed in, the worker reads from inside the page through an allow-list of three calls (`prx_get_budgets`, `get_user_cards`, `prx_user_deals`): no order, transfer or card change can be sent.
+`meals.py` stores and reads accounts from any provider company of `kind="meal"` (e.g. Pluxee/Cibus in `money_il`, `docs/money-il.md`).
 
-- **Signing in.** The phone number, then the SMS code through the usual code broker (sender `1700701130`, 6 digits). The site keeps the session in a `token` cookie for 24 hours in the source's browser profile, so a sync within that time needs no SMS; at the regular two slots a day that is about one SMS a day, read by the phone. "Remember this device" applies only to the site's password + SMS sign-in, not to the code-only one. Refusals: reCAPTCHA (`GENERIC`, before the SMS goes out, so it is retried like any failure), an unknown phone `INVALID_PASSWORD`, a wrong code `CODE_REJECTED`, blocked `ACCOUNT_BLOCKED`.
-- **What is read**: the current budget cycle (`CreatioBudget` the amount, `CurrBudget` what is left, `CreationDate` / `ExpirationDate`), the active card's last 4 digits (the account's number), and every charge since the job's start date: the place, date and time, the deal id, `price` (the whole meal), `otl_price` (what went on the user's own card once the budget ran out; "שולם באשראי"), `order_type` (0 at the restaurant / pickup, 1 delivery, 2 a voucher), `is_active` (0 = cancelled).
-- **Ingest** (`meals.store_account`, from `ingest.apply` for a company of kind `meal`): the account upserted (`balance` = what is left, `details` = `{amount, left, start, end}`), each charge upserted by `pluxee:<deal id>` into `money_meals` with `total`, `card_paid` (`otl_price`) and `budget_paid` (the rest) in agorot, the place scrubbed. A meal card **never makes `money_transactions`**: the employer's budget is not the user's spending.
-- **The card line.** What the budget did not cover is not charged per meal: the user's card shows one line a month for a whole cycle ("סיבוס פלאקסי" on Cal on the 10th, about seven weeks after the cycle ended), and that line is ordinary spending. `meals.billed_lines` finds each cycle's line: a card or bank row whose merchant key holds סיבוס / פלאקסי / pluxee / cibus, of exactly the cycle's `card_paid`, dated after the cycle ended and within 75 days, each line used once (checked against a real account: every line matched to the agora). `meals.card_line(user, txn_id)` gives the transaction detail's `meal_cycle`.
-- **Cycles** run from the budget's day of the month (the 22nd: 22 Oct – 21 Nov); past cycles take the current one's day. The current cycle's pace: `per_day_left` (what is left ÷ the days left) and `runs_out` (the day the budget ends at the cycle's pace so far; today when nothing is left; None when it lasts).
+- **Ingest** (`meals.store_account`, from `ingest.apply`): upserts the account (`balance` = budget left, `details` = `{amount, left, start, end}`), upserts each charge into `money_meals` (`ext_key`, `total`, `budget_paid`, `card_paid`, scrubbed `place`, `order_type`, `active`). A meal card **never makes `money_transactions`**: an employer's budget is not the user's spending.
+- **The card line**: overflow charged to the user's own card in one monthly line is matched by `meals.billed_lines` using the company's `card_line_words` (card or bank row of exact `card_paid` within 75 days after cycle end, each line used once). `meals.card_line(user, txn_id)` gives the transaction detail's `meal_cycle`.
+- **Cycles** run from the budget's day of the month; past cycles take the current one's day. Current cycle pace: `per_day_left` and `runs_out`.
 
 ## Schedule
 
-`schedule.py` + the job `start_due_syncs` (`hooks.py`, every minute) look at every user with `money`, as that user, and starts each source whose `next_sync_at` has come, unless it is `syncing`, `needs_code` or `needs_attention`.
+`schedule.py` + the job `start_due_syncs` (`hooks.py`, every minute) look at every user with `money`, as that user, and starts each source whose provider is on for them and whose `next_sync_at` has come, unless it is `syncing`, `needs_code` or `needs_attention`.
 
 - Regular slots: `MONEY_SYNC_TIMES` (default `07:00,19:00`, local time) moved by a stable per-source jitter within ±20 minutes (`slots.py`).
 - `request_soon(user, source_id, minutes=30, reason="signal")` pulls `next_sync_at` earlier (an earlier time already set is kept): at most 4 times per source per local day, never in 00:00–06:00 (moved to 06:00 + the jitter), never for a `failing` or `needs_attention` source. The loop then starts it as a `signal` sync.
 - `sync_now(user, source_id, trigger="manual")`: "Sync now" (the page, the agent). `manual` / `agent` syncs are refused within 10 minutes of the last one (`TooSoon.retry_after`, seconds) and for `needs_attention` (`NeedsAttention.reason`; a `manual` one is allowed after `CODE_REJECTED`, `LOGIN_UNKNOWN` or two missed codes: `store.hand_sync_allowed`); a running sync's id is returned as is.
 
-Every sync is a full sign-in: the library keeps no session between runs. The saved browser profile is what keeps Hapoalim from asking for a code each time (a trusted device), so a normal day is two sign-ins per source plus, for a card, one per payment signal (at most 4).
-
-## Ingest
+## Ingest format and ingest
 
 `ingest.apply(user, source, accounts)` stores one sync's result in one transaction and returns `{"new": [ids], "changed": [ids], "accounts": [ids]}`.
 
-- **Accounts**: upserted by `(user, company, number)` (`accountNumber`), claimed by the syncing source. A bank's `balance` → `balance` (agorot). Cal's `balance` is the next card bill (negative) → `next_charge` (positive agorot), `next_charge_date` = the first `charge_date` from today among its rows. An account with no transactions and no balance is still stored.
-- **Amounts**: `chargedAmount` × 100, signed; `originalAmount` / `originalCurrency` kept (`₪` → ILS, `$` → USD, `€` → EUR, others as given).
-- **Dates**: the scrapers give UTC instants of local midnight → local dates in the server's zone (`core.clock`). Cal's `date` carries the real time of a purchase → `occurred_at` when it is not local midnight. For Cal installments (`type == "installments"`) the library moves `date` to the payment's month, so the purchase date and time come from `rawTransaction.trnPurchaseDate`; `installments.number` / `total` are kept.
-- **Keys** (`ext_key`): Cal with an identifier → `cal:{identifier}:{installment number or 0}` (payments of one purchase share the identifier); Hapoalim has no stable id → `poalim:{sha1(purchase_date|charge_date|amount|description|memo)[:16]}:{n}`, `n` counting identical tuples in the pull in order (two identical transfers on one day stay two rows); any other row → `x:{same hash}:{n}`. The hash is over scrubbed text.
+- **Bank / card accounts**: `{accountNumber, balance?, txns: [{date, processedDate?, purchaseDate?, chargedAmount, originalAmount?, originalCurrency?, status ("completed"|"pending"), description, memo?, identifier?, type?, installments?: {number, total}, rawTransaction?}]}`. Upserted by `(user, company, number)`, claimed by the syncing source. A bank's `balance` → `balance` (minor units); a card's negative `balance` → `next_charge` (positive) with `next_charge_date` = first `charge_date` from today.
+- **Investment accounts**: `{accountNumber, summary {value, cash, day_change, profit, cost}, holdings [...], trades [...], values [{date, value}]}`.
+- **Meal accounts**: `{accountNumber, budget {amount, left, start, end}, meals [{ext_key, date, occurred_at, place, total, budget_paid, card_paid, order_type, active}]}`.
+- **Amounts & dates**: `chargedAmount` × 100, signed; `originalAmount` / `originalCurrency` kept (`₪` → ILS, `$` → USD, `€` → EUR, others as given). Dates converted to local dates in `core.clock`'s zone; non-midnight times kept as `occurred_at`; `purchaseDate` overrides `date` when present (e.g. installments).
+- **Keys** (`ext_key`): if the company sets `id_key` and the row has `identifier` → `{id_key}:{identifier}:{installment number or 0}`; otherwise `{hash_key}:{sha1(purchase_date|charge_date|amount|description|memo)[:16]}:{n}` over scrubbed text.
 - **Pending rows**: every sync deletes the account's scraped `pending` rows that are not in the new pull (provisional rows from notifications are left alone). Completed rows upsert by key; when a scraped field changed (amount, dates, status, text, installments) the row is updated and reported as `changed`. Category, merchant, flow and note are never overwritten by a pull.
-- **Text**: `description` and `memo` as the bank wrote them, scrubbed; `merchant` starts as the description (classification replaces it with a clean name); `merchant_key(text)` = lower case, quotes dropped, other punctuation as spaces, number-only tokens (branch numbers) removed, spaces collapsed.
-- **Transfers the user sent**: Hapoalim's note "לטובת: <payee>. עבור: <purpose>." (`ingest.transfer_payee(memo)` → `(payee, purpose)`, typed by the user in the bank's app) makes the payee the row's merchant key and, without its legal suffix (`clean_payee`: "בית ההשקעות הראשון בע"מ" → "בית ההשקעות הראשון"), its display name: the merchant memory and "always for this payee" rules then work per payee, not for the bank's generic "העב' לאחר-נייד". The purpose stays in the memo.
-- **Scrub** (description, memo and every string in `raw`, plus integers in `raw`): 9-digit numbers that pass the Israeli ID checksum → `[id]` (a salary memo carries the user's ID), 16-digit card numbers and `NN-NNN-NNNN…` account numbers → `••••` + their last 3 digits. Names stay.
-- **Category**: none from the bank here (Cal's own category text stays in `raw` for classification); a `money_rules` row for the merchant key sets `category` (`category_source = 'rule'`) and, when it has them, the display name and flow.
+- **Text**: `description` and `memo` as given, scrubbed; `merchant` starts as the description (classification replaces it with a clean name); `merchant_key(text)` = lower case, quotes dropped, other punctuation as spaces, number-only tokens removed, spaces collapsed.
+- **Transfers with payee note**: Hapoalim's note "לטובת: <payee>. עבור: <purpose>." (`ingest.transfer_payee(memo)` → `(payee, purpose)`) makes the payee the row's merchant key and, without its legal suffix (`clean_payee`), its display name. The purpose stays in the memo.
+- **Scrub** (description, memo and every string in `raw`, plus integers in `raw`): 9-digit numbers passing the Israeli ID checksum → `[id]`, 16-digit card numbers and `NN-NNN-NNNN…` account numbers → `••••` + their last 3 digits. Names stay.
+- **Category**: a `money_rules` row for the merchant key sets `category` (`category_source = 'rule'`) and, when it has them, display name and flow.
 
 `after_sync.on_transactions(fn)` (`after_sync.py`) registers `fn(user, source_id, new_ids, changed_ids)` (sync or async); `sync.py` calls every hook after each ingest, as the user, logging and swallowing errors.
 
@@ -273,44 +265,7 @@ A list item: `{id, account_id, account_kind, account_label, purchase_date, charg
 
 ### Price checks
 
-`market.py`: the "Check prices" button of a saving card looks up current offers on the web. A check runs **only when the user asks** (`market.start`, called from the API); nothing runs one in the background.
-
-| Topic | Params (strict: unknown keys refused) | Item (amounts in agorot) | Order |
-|---|---|---|---|
-| `telecom` | `service` (`mobile` \| `home_internet` \| `triple` \| `mobile_and_internet`), `lines` (1–10 or null), `current_price` (whole ₪ a month, 1–2000) | `{provider, plan, price (regular, a month), promo_price \| null, promo_months \| null, avg_12, conditions, source}` | `avg_12` |
-| `electricity` | — | `{supplier, plan, discount_pct, hours, days, smart_meter, source}` | discount, biggest first |
-| `fx_card` | — | `{name, kind (card \| wallet \| bank), fx_fee_pct, monthly_fee, conditions, source}` | `fx_fee_pct` |
-| `arnona` | `city` (Hebrew letters, spaces, `-` and quotes, ≤ 40), `year` (this year ± 1) | exactly one: `{found, discount_pct \| null, deadline (YYYY-MM-DD) \| null, method, source \| null}` | — |
-
-At most 8 items; `source` is `{title, url}`. `avg_12` is computed in code: (promo price × min(promo months, 12) + price × the rest of the 12 months) / 12, so offers compare by what the first year costs a month.
-
-**What is sent.** The search prompt is a fixed template per topic filled with that topic's params and the current month, nothing else: no names, transactions, merchants, account numbers, or amounts other than `current_price`. The second call gets the search's text and its pages, again without any user data. `test_money_market.py` asserts both.
-
-**Pipeline** (`_find`, run as an asyncio task bound to the user, at most `CHECK_TIMEOUT_SECONDS` = 4 min):
-
-1. `llm.search(prompt, purpose="money_market")` asks the `search` model (`SEARCH_MODEL` → `MODEL`, `docs/configuration.md`) with LiteLLM's `web_search_options`. It returns the answer and the pages the provider grounded it on: Gemini's grounding chunks, OpenAI's `url_citation` annotations, or Anthropic's citations. Gemini's grounding supports add a `[n]` after each passage a page backs. With no pages it raises `llm.NoSearch` (the model did not search).
-2. Google's grounding redirect links (`vertexaisearch.cloud.google.com/grounding-api-redirect/…`) are resolved with an `httpx` HEAD that follows redirects (5 s). When the HEAD fails, the redirect link is kept. Only http(s) pages can be cited.
-3. `llm.complete_json(job="money", purpose="money_market")` extracts the topic's schema from the text and the numbered list of usable pages. Each item gives the number of its page.
-4. Validation in code drops:
-   - an item whose page number is not one of the search's usable pages;
-   - a telecom price outside ₪5–₪500 a month (a promotion must cost less than the regular price and last 1–36 months, or it is dropped and the offer kept);
-   - an electricity discount outside (0, 30] %;
-   - an FX fee outside 0–5 %, a monthly fee over ₪100, or an unknown kind;
-   - a repeat: the same provider and plan, the same supplier, plan and hours, or the same card name. The best of them stays.
-
-   For arnona, a "found" without a usable page reads as not found. A discount outside (0, 30] % or a malformed deadline becomes null.
-
-**Outcomes.** A check either ends `ok` with its items, or `failed` with a plain-words `error`: the model did not search; no offer with a source; the search or extraction failed; the check took too long. A telecom, electricity or FX check with no valid item counts as failed. An arnona "not found" is an `ok` result.
-
-**Rate limits.** `start` raises:
-- `ValueError` for an unknown topic or bad params;
-- `Unavailable` when the `search` model has no key, or LiteLLM's model map says it has no web search (`llm.can_search`);
-- `Running` while the same check runs, or its row says `checking` and is less than 5 minutes old;
-- `TooSoon(retry_after)` when the same (user, topic, params) started less than 6 hours ago, or less than 5 minutes ago if it failed.
-
-**Storage** (`m0030_money_market.py`): `money_market_checks` keeps one row per `(user_id, topic, params_key)`, where `params_key` is the canonical JSON of the params. Its columns: `params`, `state` (`checking` / `ok` / `failed`), `items` and `sources` (JSON), `model`, `error`, `started_at` and `checked_at`. A new check reuses the row. `items`, `sources` and `checked_at` stay those of the last check that succeeded: they remain visible while a new check runs and after one fails.
-
-`market.latest(user, topic, params)` → `{topic, params, state, started_at, checked_at, stale (checked_at older than 45 days), items, sources [{title, url}], error}`, or None. A `checking` row older than 5 minutes was cut off by a restart (no check runs that long) and reads as `failed`. Every read is scoped to the user. Disconnecting `money` deletes the rows (`store.delete_all`).
+Price checks come from the user's registered `PriceChecks` provider (`providers.price_checks(user)`; Israeli telecom, electricity, FX card and arnona checks live in `money_il`, `docs/money-il.md`). A check runs only when the user asks (`POST /api/money/savings/{key}/check`); without a provider, checks show as `unavailable` (503). Results are stored per user in `money_market_checks`.
 
 ## Dashboards
 
@@ -418,9 +373,7 @@ The first `doing` / `done` / `watching` stores the **baseline** (the numbers it 
 
 `no_change` covers the opposite: still charged after 30 or 70 days, or the deadline passed; for `renewal` and `fx` also no renewal / no foreign purchase on that card long after (moved to another insurer or card: not measurable here). `waiting` covers the time before.
 
-**Price checks** (`market.py`). Its interface is `TOPICS` (`telecom`, `electricity`, `fx_card`, `arnona`), `latest(user, topic, params)` → the newest check `{topic, params, state, checked_at, stale, items, sources, error}` | None, and `start(user, topic, params)` → `{state: "checking"}`, raising `Unavailable` / `Running` / `TooSoon(retry_after)`. Checks run only when the user asks. An item reads the check with exactly its own `params`. After `Unavailable`, the topic shows `unavailable` for an hour.
-
-**Bank of Israel** (`reference.py`). It reads the SDMX CSV API: no key, no user data. `policy_rate(today)` gives `{rate, date, year_ago, year_ago_date}`. `fx_rates(currency, start, end)` gives `{date: rate}` for currencies quoted per unit (all of `FX_CURRENCIES` are fetched whenever the user spent abroad, so the requests never say which); `rate_on` takes the same day or up to 7 days back. Answers are cached for a day in memory and in `MONEY_DIR/boi-cache.json`. The fetch is automatic, as part of computing the items. A failed fetch is logged and not retried for 15 minutes. The items that need the data are left out: `cash` and `cushion`, and the arnona's net.
+**Price checks & reference rates.** Both come from the user's connected provider (`providers.price_checks(user)`, `providers.rates(user)`); `money_il` registers the Bank of Israel's SDMX rates and Israel's price checks (`docs/money-il.md`). Without rates, items that need them (`cash`, `cushion`, `fx`, arnona's net) are left out. Without price checks, cards show `unavailable`.
 
 Routes (`api.py`; keys are URL-encoded, since they hold `:` and Hebrew). Another user's key answers 404, and a user without `money` gets 403 `not_connected`. `tests/fixtures/money_savings_web.json` holds `{savings, item_check, patch}` from a synthetic dataset (written by `WRITE_WEB_FIXTURE=1 bin/test test_money_savings`):
 

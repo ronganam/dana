@@ -1,21 +1,17 @@
-"""Money configuration: the addon's name, the bank worker's address and token
-file, the sync slots and the limits (docs/money.md, docs/configuration.md).
+"""Money configuration: the addon's name, the sync slots and the limits
+(docs/money.md, docs/configuration.md).
 
 The env values are read when used, so a test can point them elsewhere."""
 
 import datetime
 import os
-from pathlib import Path
 from typing import List
-
-from core import paths
 
 ADDON = "money"
 
-DEFAULT_WORKER_URL = "http://127.0.0.1:8090"
 DEFAULT_SYNC_TIMES = "07:00,19:00"
 
-# A sign-in code request lives this long (the worker waits 5 minutes).
+# A sign-in code request lives this long.
 CODE_MINUTES = 4
 # "Sync now" (the page, the agent) at most this often per source.
 MANUAL_MINUTES = 10
@@ -30,20 +26,10 @@ RETRY_MINUTES = (30, 120)
 # The first sync of a source reads this far back; later ones from the last good sync minus the overlap.
 FIRST_SYNC_DAYS = 365
 OVERLAP_DAYS = 10
-# One sync gives up after this long (the worker kills a job after 10 minutes).
+# One sync gives up after this long (a provider's own wait included).
 SYNC_TIMEOUT_MINUTES = 15
 # The self-check fails for a source with no good sync for this long.
 STALE_HOURS = 24
-
-
-def worker_url() -> str:
-    """The bank worker's base URL (``MONEY_WORKER_URL``)."""
-    return (os.getenv("MONEY_WORKER_URL") or DEFAULT_WORKER_URL).strip().rstrip("/")
-
-
-def token_file() -> Path:
-    """The file holding the token the worker checks (shared volume)."""
-    return paths.MONEY_DIR / "worker-token"
 
 
 def sync_times() -> List[datetime.time]:

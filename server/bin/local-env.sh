@@ -20,8 +20,8 @@
 #   DANA_LOCAL_EGRESS=1      let the app reach the internet (needed for a real model key)
 #   DANA_LOCAL_SOURCE=1      run the working tree's code (mounted read-only) instead of the image's
 #                            copy; `up` builds only when the image is missing, `restart` reloads code
-#   DANA_LOCAL_MONEY=1       also run the bank-worker sidecar (built from addons/money/worker/); the real bank
-#                            sites need DANA_LOCAL_EGRESS=1 as well (docs/money.md)
+#   DANA_LOCAL_MONEY=1       also run money_il's bank-worker sidecar (built from addons/money_il/worker/); the real
+#                            bank sites need DANA_LOCAL_EGRESS=1 as well (docs/money-il.md)
 #
 # Nothing here talks to production: no registry push, no kubectl; the app has no
 # route out of the machine unless DANA_LOCAL_EGRESS=1.
@@ -64,8 +64,8 @@ build() {
 build_worker() {
     [[ "${DANA_LOCAL_MONEY:-}" == "1" ]] || return 0
     local image="${DANA_LOCAL_WORKER_IMAGE:-dana-local/bank-worker:latest}"
-    echo "==> Building $image from addons/money/worker/"
-    docker build -q -t "$image" "$ROOT/addons/money/worker" >/dev/null
+    echo "==> Building $image from addons/money_il/worker/"
+    docker build -q -t "$image" "$ROOT/addons/money_il/worker" >/dev/null
 }
 
 in_image() {

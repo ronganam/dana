@@ -290,9 +290,10 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     snap = "db-before-addons-from-0033.sqlite3"
     check("upgrade: first start logged the snapshot", f"Database snapshot before migrating: /app/db/snapshots/{snap}" in logs)
     applied = re.findall(r"Applied database migration (\S+)", logs)
-    check("upgrade: the 9.0 database converted to per-addon migrations, then only core's later migrations",
+    check("upgrade: the 9.0 database converted to per-addon migrations, then only the later ones (core's, money's money_il)",
           "Database converted to per-addon migrations (from version 33)" in logs
-          and applied and all(a.startswith("core:") for a in applied), [l for l in logs.splitlines() if "migrat" in l][:6])
+          and applied and all(a.startswith("core:") or a == "money:0002_money_il" for a in applied),
+          [l for l in logs.splitlines() if "migrat" in l][:6])
     check("upgrade: the first admin's default addons turned on (nothing read from env)",
           f"Default addons turned on for Robin: {DEFAULT_ADDONS}" in logs and "Addons imported" not in logs)
     check("upgrade: no CREDENTIALS_KEY error, no traceback at start",
