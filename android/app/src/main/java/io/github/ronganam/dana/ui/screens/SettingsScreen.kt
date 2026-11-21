@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.BuildConfig
+import io.github.ronganam.dana.CallRecordingObserverService
 import io.github.ronganam.dana.data.update.UpdateManager
 import io.github.ronganam.dana.data.voice.DeviceSpeech
 import io.github.ronganam.dana.ui.components.GlassCard
@@ -281,12 +282,17 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
     }
 }
 
-/** Auto-upload of call recordings: on/off, length threshold, Wi-Fi only, never-upload contacts, backlog. */
+/**
+ * Call recordings: the master switch (off by default; Samsung's recorder
+ * folder only), then auto-upload, length threshold, Wi-Fi only, never-upload
+ * contacts, backlog.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun CallRecordingSettings() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    var enabled by remember { mutableStateOf(CallUploadSettings.enabled(context)) }
     var auto by remember { mutableStateOf(CallUploadSettings.autoUpload(context)) }
     var threshold by remember { mutableFloatStateOf(CallUploadSettings.thresholdSeconds(context).toFloat()) }
     var wifiOnly by remember { mutableStateOf(CallUploadSettings.wifiOnly(context)) }
@@ -296,9 +302,40 @@ private fun CallRecordingSettings() {
     }
     var backlogBusy by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { callLogGranted = it }
+    // Turning call recordings on asks for the recordings folder and the call log, then starts watching.
+    val enableLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
+        callLogGranted = result[android.Manifest.permission.READ_CALL_LOG] ?: callLogGranted
+        if (result[CallUploadSettings.storagePermission] == false) {
+            Toast.makeText(context, "Dana needs access to audio files to see call recordings", Toast.LENGTH_LONG).show()
+        }
+        CallRecordingObserverService.start(context)
+    }
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Watch for call recordings", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        "Works only with Samsung's built-in call recorder, which saves to Recordings/Call. " +
+                            "New recordings there are sent to your Dana server.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                Switch(checked = enabled, onCheckedChange = {
+                    enabled = it
+                    CallUploadSettings.setEnabled(context, it)
+                    if (it) {
+                        enableLauncher.launch(arrayOf(CallUploadSettings.storagePermission, android.Manifest.permission.READ_CALL_LOG))
+                    } else {
+                        CallRecordingObserverService.stop(context)
+                    }
+                })
+            }
+            if (!enabled) return@Column
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
                     Text("Upload calls automatically", style = MaterialTheme.typography.titleSmall)

@@ -31,25 +31,24 @@ class CallRecordingObserverService : Service() {
             private set
 
         /**
-         * Start it if it isn't running and storage access is granted. Called
+         * Start it if it isn't running, the user turned call recordings on
+         * and storage access is granted. Called
          * from places Android reliably brings back after an update or a kill
          * (the notification listener, the hourly sync), because the update
          * broadcast and the app's own screen don't always arrive.
          */
         fun ensureRunning(context: Context) {
-            if (running) return
-            val permission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                android.Manifest.permission.READ_MEDIA_AUDIO
-            } else {
-                android.Manifest.permission.READ_EXTERNAL_STORAGE
-            }
-            if (context.checkSelfPermission(permission) != android.content.pm.PackageManager.PERMISSION_GRANTED) return
+            if (running || !CallUploadSettings.canWatch(context)) return
             Log.i(TAG, "Observer not running; starting it")
             start(context.applicationContext)
         }
 
-        /** Start (or keep) the observer; safe to call from the app or at boot. */
+        /** Start (or keep) the observer when call recordings are on and readable; safe to call from the app or at boot. */
         fun start(context: Context) {
+            if (!CallUploadSettings.canWatch(context)) {
+                Log.i(TAG, "Call recordings off or no storage access; not starting the observer")
+                return
+            }
             val intent = Intent(context, CallRecordingObserverService::class.java)
             try {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -60,6 +59,11 @@ class CallRecordingObserverService : Service() {
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to start CallRecordingObserverService", e)
             }
+        }
+
+        /** Stop watching (call recordings turned off in Settings). */
+        fun stop(context: Context) {
+            context.stopService(Intent(context, CallRecordingObserverService::class.java))
         }
         private const val NOTIFICATION_ID = 9999
         private const val UPLOAD_ACTION = "io.github.ronganam.dana.UPLOAD_CALL"
@@ -89,6 +93,10 @@ class CallRecordingObserverService : Service() {
 
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!CallUploadSettings.enabled(this)) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
         when (intent?.action) {
             UPLOAD_ACTION -> {
                 val filePath = intent.getStringExtra(EXTRA_FILE_PATH) ?: ""

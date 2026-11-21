@@ -5,6 +5,7 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.util.Log
+import io.github.ronganam.dana.data.sync.CallUploadSettings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -61,12 +62,14 @@ class MainActivity : ComponentActivity() {
         val permissionsToRequest = mutableListOf<String>()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             permissionsToRequest.add(android.Manifest.permission.POST_NOTIFICATIONS)
-            permissionsToRequest.add(android.Manifest.permission.READ_MEDIA_AUDIO)
-        } else {
-            permissionsToRequest.add(android.Manifest.permission.READ_EXTERNAL_STORAGE)
         }
-        // Call direction / number / name for auto-uploaded recordings.
-        permissionsToRequest.add(android.Manifest.permission.READ_CALL_LOG)
+        // Call recordings are off until turned on in Settings (which asks for
+        // these then); once on, ask again here for anything since revoked.
+        if (CallUploadSettings.enabled(this)) {
+            permissionsToRequest.add(CallUploadSettings.storagePermission)
+            // Call direction / number / name for auto-uploaded recordings.
+            permissionsToRequest.add(android.Manifest.permission.READ_CALL_LOG)
+        }
         // Caller card: notice when the phone rings (phone build only declares it).
         if (!BuildConfig.KIOSK && !BuildConfig.TV) permissionsToRequest.add(android.Manifest.permission.READ_PHONE_STATE)
 
@@ -229,15 +232,6 @@ class MainActivity : ComponentActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 1001) {
-            val hasStoragePermission = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                checkSelfPermission(android.Manifest.permission.READ_MEDIA_AUDIO) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            } else {
-                checkSelfPermission(android.Manifest.permission.READ_EXTERNAL_STORAGE) == android.content.pm.PackageManager.PERMISSION_GRANTED
-            }
-            if (hasStoragePermission) {
-                startCallObserverService()
-            }
-        }
+        if (requestCode == 1001) startCallObserverService()
     }
 }
