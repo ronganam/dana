@@ -18,7 +18,7 @@ import java.time.ZoneId
 
 /**
  * The Save view against the server's payloads: `server/tests/fixtures/money_savings_web.json`
- * of the server repo (synthetic), the same assertions as its `test_web_money.mjs`.
+ * (synthetic), the same assertions as `server/addons/money/tests/test_web_money.mjs`.
  */
 class MoneySaveTest {
     private val f = JSONObject(MoneySaveTest::class.java.classLoader!!.getResource("money_savings_web.json")!!.readText())

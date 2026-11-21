@@ -18,7 +18,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Bank sign-in codes for the server's `money` add-on. When Dana's server signs
+ * Bank sign-in codes for the server's `money` addon. When Dana's server signs
  * in to a bank that texts a one-time code, it pushes `otp_request` with only
  * a request id. [handle] fetches the request (`GET
  * /api/money/code-requests/{id}`) and, while it is pending, **arms** it:

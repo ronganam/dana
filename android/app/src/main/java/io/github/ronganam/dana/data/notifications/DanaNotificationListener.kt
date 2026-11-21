@@ -99,7 +99,7 @@ class DanaNotificationListener : NotificationListenerService() {
 
     /** Queue [sbn] when it is new content; true if something was queued. */
     private fun capture(sbn: StatusBarNotification): Boolean {
-        // Bank / card apps go to the money add-on instead, never to the Inbox
+        // Bank / card apps go to the money addon instead, never to the Inbox
         // (whatever "skip banking apps" says), while the user has it.
         if (MoneySignals.routes(this, sbn.packageName)) return captureMoney(sbn)
         val item = try {

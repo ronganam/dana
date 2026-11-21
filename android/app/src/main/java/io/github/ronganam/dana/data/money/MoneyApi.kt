@@ -30,7 +30,7 @@ class MoneyApiError(
  * The `/api/money/…` routes (server docs/money.md → API, Page API). Every
  * answer is JSON, amounts in agorot; non-2xx throws [MoneyApiError], an
  * unreachable server `IOException`. A 403 `not_connected` also forgets the
- * add-on ([Me.drop]) so More hides Money.
+ * addon ([Me.drop]) so More hides Money.
  */
 class MoneyApi(private val context: Context, private val api: () -> ApiService) {
 
@@ -85,7 +85,7 @@ class MoneyApi(private val context: Context, private val api: () -> ApiService) 
     }
 }
 
-/** What the phone itself sends the money add-on: bank sign-in codes and bank / card app notifications. */
+/** What the phone itself sends the money addon: bank sign-in codes and bank / card app notifications. */
 class MoneyDeviceApi(private val http: ApiClient) {
     /** `GET /api/money/code-requests/{id}`: what the server waits for (`status`, `senders`, `code_regex`, `expires_at`). */
     suspend fun codeRequest(id: String): JSONObject =
