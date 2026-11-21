@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.wear
 
+import io.github.ronganam.dana.protocol.WearPaths
 import android.content.Context
 import android.util.Log
 import com.google.android.gms.wearable.Wearable
@@ -23,18 +24,13 @@ import org.json.JSONObject
  */
 object WearCards {
     private const val TAG = "WearCards"
-    const val PATH_CARD = "/wear/dana_card"
-    const val PATH_CLEAR = "/wear/dana_card_clear"
 
     fun send(context: Context, kind: String, title: String, subtitle: String, lines: List<String>, ref: String = "") {
         val payload = JSONObject().put("kind", kind).put("title", title).put("subtitle", subtitle)
             .put("lines", JSONArray(lines.take(6))).put("ref", ref)
-        sendToWatches(context, PATH_CARD, payload)
+        sendToWatches(context, WearPaths.CARD, payload)
     }
 
-    const val PATH_SNAPSHOT = "/wear/dana_snapshot"
-    const val PATH_SUGGESTION_ACTION = "/suggestion_action"
-    const val PATH_SHOPPING_ACTION = "/shopping_action"
 
     /** The parts of the phone's widget snapshot the watch shows (kept well under the message size limit). */
     fun sendSnapshot(context: Context, snapshot: JSONObject) {
@@ -49,10 +45,10 @@ object WearCards {
         firstN("tasks", 4)?.let { o.put("tasks", it) }
         firstN("suggestions", 3)?.let { o.put("suggestions", it) }
         firstN("shopping", 40)?.let { o.put("shopping", it) }
-        sendToWatches(context, PATH_SNAPSHOT, o)
+        sendToWatches(context, WearPaths.SNAPSHOT, o)
     }
 
-    fun clear(context: Context, kind: String) = sendToWatches(context, PATH_CLEAR, JSONObject().put("kind", kind))
+    fun clear(context: Context, kind: String) = sendToWatches(context, WearPaths.CARD_CLEAR, JSONObject().put("kind", kind))
 
     private fun sendToWatches(context: Context, path: String, payload: JSONObject) {
         if (io.github.ronganam.dana.BuildConfig.KIOSK || io.github.ronganam.dana.BuildConfig.TV) return

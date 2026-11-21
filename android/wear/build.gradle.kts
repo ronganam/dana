@@ -73,7 +73,7 @@ composeCompiler {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(project(":protocol"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
 

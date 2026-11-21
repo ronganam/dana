@@ -15,7 +15,7 @@ import io.github.ronganam.dana.data.sync.TaskActionQueue
 import io.github.ronganam.dana.data.update.AppVersionInfo
 import io.github.ronganam.dana.data.update.UpdateManager
 import io.github.ronganam.dana.data.wear.WearSyncManager
-import io.github.ronganam.dana.data.wear.WearVersionInfo
+import io.github.ronganam.dana.protocol.WearVersion
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -276,8 +276,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _updateCheckDone = MutableStateFlow(false)
     val updateCheckDone: StateFlow<Boolean> = _updateCheckDone.asStateFlow()
 
-    private val _wearVersionInfo = MutableStateFlow<WearVersionInfo?>(null)
-    val wearVersionInfo: StateFlow<WearVersionInfo?> = _wearVersionInfo.asStateFlow()
+    private val _wearVersionInfo = MutableStateFlow<WearVersion?>(null)
+    val wearVersionInfo: StateFlow<WearVersion?> = _wearVersionInfo.asStateFlow()
 
     private val _wearUpdateInfo = MutableStateFlow<AppVersionInfo?>(null)
     val wearUpdateInfo: StateFlow<AppVersionInfo?> = _wearUpdateInfo.asStateFlow()

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.wear.cards
 
+import io.github.ronganam.dana.protocol.WearPaths
 import android.app.Activity
 import android.os.Bundle
 import android.util.Log
@@ -27,7 +28,7 @@ class SuggestionActionActivity : Activity() {
                     Toast.makeText(app, "Phone not connected", Toast.LENGTH_SHORT).show()
                     return@addOnSuccessListener
                 }
-                nodes.forEach { Wearable.getMessageClient(app).sendMessage(it.id, PATH, bytes) }
+                nodes.forEach { Wearable.getMessageClient(app).sendMessage(it.id, WearPaths.SUGGESTION_ACTION, bytes) }
                 DanaSnapshot.removeSuggestion(app, id)
                 Toast.makeText(app, if (action == "accept") "Accepted" else "Dismissed", Toast.LENGTH_SHORT).show()
             }
@@ -39,6 +40,5 @@ class SuggestionActionActivity : Activity() {
     }
 
     companion object {
-        const val PATH = "/suggestion_action"
     }
 }

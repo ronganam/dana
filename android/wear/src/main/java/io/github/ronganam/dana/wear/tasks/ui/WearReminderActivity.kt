@@ -1,5 +1,8 @@
 package io.github.ronganam.dana.wear.tasks
 
+import io.github.ronganam.dana.protocol.SnoozeRequest
+import io.github.ronganam.dana.protocol.TaskStatusRequest
+import io.github.ronganam.dana.protocol.WearPaths
 import android.content.Context
 import android.os.Build
 import android.os.Bundle
@@ -124,16 +127,13 @@ class WearReminderActivity : ComponentActivity() {
                     onComplete = {
                         stopVibration()
                         WearReminderSync.handledOnWatch(this, taskId)
-                        sendAction("/update_task_status", JSONObject().apply {
-                            put("task_id", taskId)
-                            put("status", "completed")
-                        })
+                        sendAction(WearPaths.UPDATE_TASK_STATUS, TaskStatusRequest(taskId, "completed").toJson())
                         finish()
                     },
                     onSnooze = { option ->
                         stopVibration()
                         WearReminderSync.handledOnWatch(this, taskId)
-                        sendAction("/snooze_task", option.payload().put("task_id", taskId))
+                        sendAction(WearPaths.SNOOZE_TASK, option.request(taskId).toJson())
                         finish()
                     },
                     onDismiss = {
@@ -182,7 +182,7 @@ class WearReminderActivity : ComponentActivity() {
     }
 }
 
-/** One snooze the watch offers; [payload] is what `/snooze_task` sends to the phone. */
+/** One snooze the watch offers; [request] is what [WearPaths.SNOOZE_TASK] sends to the phone. */
 data class WearSnooze(
     val group: String,
     val label: String,
@@ -194,13 +194,11 @@ data class WearSnooze(
     val event: String = "",
     val action: String = ""
 ) {
-    fun payload(): JSONObject = JSONObject().apply {
-        put("type", type)
-        when (type) {
-            "time" -> put("minutes", minutes)
-            "location" -> { put("location", location); put("event", event) }
-            "car" -> put("action", action)
-        }
+    fun request(taskId: String): SnoozeRequest = when (type) {
+        "time" -> SnoozeRequest(taskId, type, minutes = minutes)
+        "location" -> SnoozeRequest(taskId, type, location = location, event = event)
+        "car" -> SnoozeRequest(taskId, type, action = action)
+        else -> SnoozeRequest(taskId, type)
     }
 }
 

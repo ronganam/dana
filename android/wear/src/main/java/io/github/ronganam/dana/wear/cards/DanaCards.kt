@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.wear.cards
 
+import io.github.ronganam.dana.protocol.WearPaths
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -37,17 +38,14 @@ class DanaCardListenerService : WearableListenerService() {
             Log.w(TAG, "Bad payload on ${event.path}", it); return
         }
         when (event.path) {
-            PATH_CARD -> showCard(this, json)
-            PATH_CLEAR -> notificationManager(this).cancel(notificationId(json.optString("kind")))
-            PATH_SNAPSHOT -> DanaSnapshot.save(this, json)
+            WearPaths.CARD -> showCard(this, json)
+            WearPaths.CARD_CLEAR -> notificationManager(this).cancel(notificationId(json.optString("kind")))
+            WearPaths.SNAPSHOT -> DanaSnapshot.save(this, json)
         }
     }
 
     companion object {
         private const val TAG = "DanaCards"
-        const val PATH_CARD = "/wear/dana_card"
-        const val PATH_CLEAR = "/wear/dana_card_clear"
-        const val PATH_SNAPSHOT = "/wear/dana_snapshot"
 
         private const val CHANNEL_CALLER = "dana_caller"
         private const val CHANNEL_CARDS = "dana_cards"
