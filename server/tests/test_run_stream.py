@@ -24,6 +24,7 @@ import time
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("run_stream_test")
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
 
 import litellm
 from aiohttp import web
@@ -403,6 +404,39 @@ async def test_retry(client):
     check("retry: final has only the recovered text", final["content"] == "Recovered.")
 
 
+async def test_missing_key(client):
+    """An authentication error (no key / a refused key) is not retried: one short
+    message saying which variable to set, as the error and the stored answer."""
+    from core import llm
+    error = litellm.AuthenticationError(message="x-api-key header is required", llm_provider="anthropic",
+                                        model="claude-sonnet-5-5")
+    fake.load([error], answer_script(["never used"]))
+    res = await client.post("/api/assistant/message",
+                            json={"session_id": "s_nokey", "message": "hi", "model": "balanced"})
+    frames = await read_sse(res)
+    t = types(frames)
+    errors = [f for f in frames if f["type"] == "error"]
+    check("missing key: no retry, one error naming the variable to set",
+          "retry" not in t and len(fake.calls) == 1 and len(errors) == 1
+          and errors[0]["message"] == "No API key for anthropic: set ANTHROPIC_API_KEY in server/.env", str(errors or t))
+    fake.scripts.clear()
+    await wait_idle("s_nokey")
+    check("missing key: the message is the stored answer",
+          (get_history(OWNER.id, "s_nokey") or [{}])[-1].get("content") == errors[0]["message"] if errors else False)
+    os.environ["ANTHROPIC_API_KEY"] = ""
+    os.environ["GEMINI_API_KEY"] = "test-gemini-key"
+    check("missing key: an empty ANTHROPIC_API_KEY counts as missing (startup warning)",
+          llm._missing_keys("anthropic/claude-sonnet-5-5") == ["ANTHROPIC_API_KEY"]
+          and llm._missing_keys("gemini/gemini-3.1-flash-lite") == [])
+    os.environ["ANTHROPIC_API_KEY"] = "sk-ant-test"
+    check("missing key: with a key set, a refusal says to check it",
+          llm._missing_keys("anthropic/claude-sonnet-5-5") == []
+          and llm.missing_key_message("anthropic/claude-sonnet-5-5")
+          == "The anthropic API key was refused: check ANTHROPIC_API_KEY in server/.env")
+    os.environ.pop("ANTHROPIC_API_KEY")
+    os.environ.pop("GEMINI_API_KEY")
+
+
 async def test_cancel(client):
     fake.load(answer_script(["never ", "finishes"], gap=2.0))
     res = await client.post("/api/assistant/message", json={"session_id": "s_cancel", "message": "go"})
@@ -458,6 +492,7 @@ async def main():
         await test_approval_keeps_model(client)
         await test_change_runs_at_once_with_undo(client)
         await test_retry(client)
+        await test_missing_key(client)
         await test_cancel(client)
         await test_voice_ws(client)
     finally:

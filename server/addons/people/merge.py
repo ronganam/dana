@@ -29,6 +29,7 @@ def merge_people(user: User, keep_id: str, other_id: str) -> Dict[str, Any]:
         notes = "\n".join(x for x in (keep["notes"], other["notes"]) if x).strip()
         emails = clean_emails([*loads(keep["emails"], []), *loads(other["emails"], [])])
         conn.execute(
+            # scoped: both people checked as the user's (store.row) above
             "UPDATE people SET aliases = ?, notes = ?, relation = ?, birthday = ?, emails = ?, contact_resource = ?, "
             "pinned = ?, hidden = ?, source = ?, brief_signature = NULL, updated_at = ? WHERE id = ?",
             (json.dumps(aliases, ensure_ascii=False), notes[:4000], keep["relation"] or other["relation"],
@@ -37,9 +38,11 @@ def merge_people(user: User, keep_id: str, other_id: str) -> Dict[str, Any]:
              1 if (keep["pinned"] or other["pinned"]) else 0,
              1 if (keep["hidden"] and other["hidden"]) else 0,
              "manual" if "manual" in (keep["source"], other["source"]) else keep["source"], now_iso(), keep_id))
+        # scoped: both people checked as the user's (store.row) above
         conn.execute("UPDATE person_phones SET person_id = ? WHERE person_id = ?", (keep_id, other_id))
         activity.move_person(conn, other_id, keep_id)
         task_links.move_ref("person", other_id, keep_id, conn)
+        # scoped: both people checked as the user's (store.row) above
         conn.execute("DELETE FROM people WHERE id = ?", (other_id,))
         activity.recheck_unmatched(conn, user)
         conn.commit()

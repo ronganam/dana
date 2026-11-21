@@ -21,14 +21,14 @@
 - **Keep deployments on upstream**: anything one deployment needs goes in its site (`site/addons/` for its own addons), or becomes a setting or extension point that every deployment gets. Never a fork of Dana's code (`docs/site.md`). The shipped example addon (`examples/addons/hello/`) is tested; keep it working when the framework changes.
 - **Docs** stay current in the same commit as the code; a new area gets a doc and one line in its part's guide.
 - **Nothing personal in the repository**: no real names, phone numbers, addresses, domains, device serials, account ids or real money data in code, tests, fixtures or docs. Tests use made-up people (`server/tests/testenv.py`: Robin, Gal, Maya…). A deployment's own setup lives in its site (`site/`) and in gitignored secrets: `server/.env`, `android/keystore.properties`, `android/local.properties` (`sdk.dir`).
-- **Old internal identifiers stay**: the project used to be called `ganam-assistant`, and ids that live on devices and in databases keep that prefix: the Android `applicationId` / package `app.ganam.assistant` (a new id would be a different app, without updates or data), `GanamPrefs`, the web cookie `ganam_session` and `localStorage` keys `ganam_*`. Don't rename them; user-facing text says Dana.
+- **Old internal identifiers stay**: the project used to be called `ganam-assistant`, and ids that live on devices and in databases keep that prefix: `GanamPrefs`, the web cookie `ganam_session` and `localStorage` keys `ganam_*`. Don't rename them; user-facing text says Dana.
 
 ## Setup (once per clone)
 
 ```bash
 git config core.hooksPath .githooks
 cp -r site.example site      # or link your own site: ln -s ~/my-dana-site site
-cd server && python3.14 -m venv .venv && .venv/bin/pip install -r requirements.txt && cp .env.example .env
+cd server && python3 -m venv .venv && .venv/bin/pip install -r requirements.lock && cp .env.example .env  # Python 3.12+, tested on 3.14
 ```
 
 Contributor docs for people: `README.md`, `CONTRIBUTING.md`.

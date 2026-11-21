@@ -1,6 +1,6 @@
 """Frigate configuration of one user: the addon's name and its setting
-(docs/access.md, "Addons"). Nothing here reads env: the first admin's address
-is imported once by ``addons/bootstrap.py``; the tuning value
+(docs/access.md, "Addons"). Nothing here reads env (the address is set on the
+Addons page or with bin/dana); the tuning value
 ``FRIGATE_MOTION_THRESHOLD`` is server-wide (addons/cameras/client.py)."""
 
 from core.addons import Connection

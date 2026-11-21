@@ -70,7 +70,7 @@ def _labels_line(user: User, row) -> str:
 # Registered tools
 # ---------------------------------------------------------------------------
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def list_recent_calls(conn: Connection, limit: int = 5, label: Optional[str] = None) -> str:
     """List the most recent call recordings and voice memos with titles, labels, summaries, and durations.
 
@@ -119,7 +119,7 @@ async def list_recent_calls(conn: Connection, limit: int = 5, label: Optional[st
         return f"Error listing recent calls: {e}"
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def search_calls(conn: Connection, query: str) -> str:
     """Search call recordings and voice memos by person name, topic, or both.
 
@@ -242,7 +242,7 @@ async def search_calls(conn: Connection, query: str) -> str:
         return f"Error searching calls: {e}"
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def get_call_transcript(conn: Connection, call_id: str) -> str:
     """Retrieve the full transcript and summary of a specific call or voice memo by ID.
 

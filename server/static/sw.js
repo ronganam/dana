@@ -1,4 +1,4 @@
-const CACHE_NAME = "ganam-hub-v20";
+const CACHE_NAME = "dana-hub-v22";
 // Pages ("/", "/dashboard", ...) are not pre-cached: they require sign-in, and an
 // unauthenticated install would cache the login redirect in their place.
 const STATIC_ASSETS = [
@@ -26,13 +26,14 @@ const STATIC_ASSETS = [
   "/static/projects-core.js",
   "/static/projects.js",
   "/static/projects.css",
+  "/static/profile.js",
   "/static/favicon.png",
   "/manifest.json",
   "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap",
   "https://fonts.gstatic.com/s/inter/v18/UcCO3FwrK3iLTeHuS_fvQtMwCp50KnMw2boKoduKmMEVuLyfAZJhjp-Ek-_eeAmF.woff2",
-  "https://unpkg.com/lucide@latest",
-  "https://cdn.jsdelivr.net/npm/marked@12/marked.min.js",
-  "https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"
+  "/static/vendor/lucide.min.js",
+  "/static/vendor/marked.min.js",
+  "/static/vendor/purify.min.js"
 ];
 
 // Install Event

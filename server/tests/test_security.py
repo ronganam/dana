@@ -2,8 +2,8 @@
 Run: bin/test test_security
 
 One check group per finding of the security reviews of the multi-user
-branch, each against the real handlers / functions: the first admin (every
-addon from the env import), Bob (a member with his own token and Telegram id)
+branch, each against the real handlers / functions: the first admin (the
+default addons plus Home Assistant, WhatsApp and Frigate), Bob (a member with his own token and Telegram id)
 and Carl (another member). In-process fakes only (Home Assistant, WAHA,
 Frigate, an "internal service", an "attacker" server); no network beyond
 localhost (and name lookups that are refused).
@@ -22,7 +22,8 @@ localhost (and name lookups that are refused).
    Retry: a member's link refused early when plainly internal, and downloaded
    restricted whenever the user who set it lacks ``manage_server`` — whoever
    presses Retry; editing other fields or undoing keeps who set the link.
-3. ``/webhook/waha``: only an internal host without credentials or a user with
+3. ``/webhook/waha``: only a body WAHA signed with ``WAHA_WEBHOOK_SECRET``
+   (HMAC-SHA512; the ``Host`` header counts for nothing) or a user with
    ``manage_server``; media always fetched from the connection's own origin,
    the API key never sent elsewhere.
 3b. A WhatsApp account belongs to one connection: a second connection whose
@@ -64,7 +65,8 @@ testenv.isolate("security_test")
 os.environ["API_TOKEN"] = "security-test-env-token"
 os.environ["ALLOWED_TELEGRAM_USER_IDS"] = "111"
 os.environ.setdefault("GEMINI_API_KEY", "test-not-a-key")
-os.environ["INTERNAL_HOSTS"] = "dana.internal"
+WAHA_SECRET = "test-waha-webhook-secret"  # a test value
+os.environ["WAHA_WEBHOOK_SECRET"] = WAHA_SECRET
 os.environ["TIMEZONE"] = "UTC"  # no Home Assistant lookup for the server's zone
 from cryptography.fernet import Fernet  # noqa: E402
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
@@ -73,11 +75,8 @@ FAKE_SA = '{"type": "service_account", "private_key": "-----BEGIN PRIVATE KEY---
 os.environ["FCM_SERVICE_ACCOUNT_JSON"] = FAKE_SA
 os.environ["SOME_HARMLESS_NAME"] = '{"client": "x", "private_key": "abc"}'
 os.environ["OWNER_CONTEXT"] = "The admin's private profile text"
-os.environ["HOMEASSISTANT_HOST"] = "http://homeassistant.internal:8123"
-os.environ["HOMEASSISTANT_TOKEN"] = "fake-ha-token"
-os.environ["WAHA_URL"] = "http://waha.internal:3000/api"
+os.environ["HOMEASSISTANT_TOKEN"] = "fake-ha-token"  # a secret-looking name in the env: masked for an admin
 os.environ["WAHA_SESSION"] = "default"
-os.environ["FRIGATE_URL"] = "http://frigate.internal:5000"
 os.environ["PLAIN_SETTING_FOR_TEST"] = "visible-value"
 
 from aiohttp import web  # noqa: E402
@@ -89,7 +88,11 @@ from core import db, users  # noqa: E402
 db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
-IMPORTED = addons_bootstrap.bootstrap()
+addons_bootstrap.bootstrap()
+# The admin's own services (what an operator connects with bin/dana).
+testenv.connect_admin("homeassistant", credentials={"host": "http://homeassistant.internal:8123", "token": "fake-ha-token"})
+testenv.connect_admin("whatsapp", credentials={"url": "http://waha.internal:3000/api", "session": "default"})
+testenv.connect_admin("cameras", settings={"url": "http://frigate.internal:5000"})
 
 import core.addons_api as addons_api  # noqa: E402
 import core.now as now  # noqa: E402
@@ -152,6 +155,13 @@ for u in (BOB, CARL):
 
 def h(token: str) -> Dict[str, str]:
     return {"Authorization": f"Bearer {token}"}
+
+
+def signed_by_waha(event: Dict[str, Any]) -> Dict[str, Any]:
+    """Request arguments for a webhook body signed the way WAHA signs it (HMAC-SHA512 with the secret)."""
+    raw = json.dumps(event).encode()
+    return {"data": raw, "headers": {"Content-Type": "application/json", "X-Webhook-Hmac-Algorithm": "sha512",
+                                     "X-Webhook-Hmac": whatsapp_api.signature(WAHA_SECRET, raw)}}
 
 
 async def tool(user, name: str, **args: Any) -> str:
@@ -225,7 +235,7 @@ async def test_debug_export(http: TestClient) -> None:
     check("debug: an admin still gets the environment", r.status == 200 and env.get("PLAIN_SETTING_FOR_TEST") ==
           "visible-value", str(env.get("PLAIN_SETTING_FOR_TEST")))
     for name in ("FCM_SERVICE_ACCOUNT_JSON", "SOME_HARMLESS_NAME", "API_TOKEN", "CREDENTIALS_KEY",
-                 "HOMEASSISTANT_TOKEN", "HOMEASSISTANT_HOST", "WAHA_URL", "WAHA_SESSION", "GEMINI_API_KEY"):
+                 "HOMEASSISTANT_TOKEN", "WAHA_SESSION", "GEMINI_API_KEY"):
         check(f"debug: an admin's export masks {name}", masked(name), str(env.get(name))[:60])
     check("debug: no private key anywhere in an admin's export", "PRIVATE KEY" not in json.dumps(env))
 
@@ -568,13 +578,32 @@ async def test_waha(http: TestClient, waha: FakeWAHA, evil: Recorder) -> None:
         r = await http.post("/webhook/waha", json=body, headers=h(ADMIN_TOKEN))
         await asyncio.sleep(0.05)
         check("webhook: a user with manage_server may post (testing)", r.status == 200 and len(handled) == 1, r.status)
-        r = await http.post("/webhook/waha", json=body, headers={"Host": "dana.internal"})
+        raw = json.dumps(body).encode()
+        signed = {"Content-Type": "application/json", "X-Webhook-Hmac-Algorithm": "sha512",
+                  "X-Webhook-Hmac": whatsapp_api.signature(WAHA_SECRET, raw)}
+        r = await http.post("/webhook/waha", data=raw, headers={"Host": "dana.internal",
+                                                                 "Content-Type": "application/json"})
         await asyncio.sleep(0.05)
-        check("webhook: an internal host without credentials is accepted", r.status == 200 and len(handled) == 2,
-              r.status)
-        r = await http.post("/webhook/waha", json=body, headers={"Host": "dana.internal", **h(BOB_TOKEN)})
+        check("webhook: an unsigned POST is refused, whatever its Host (no trusted internal hosts)",
+              r.status == 403 and len(handled) == 1, r.status)
+        r = await http.post("/webhook/waha", data=raw, headers={**signed, "X-Webhook-Hmac": "0" * 128})
         await asyncio.sleep(0.05)
-        check("webhook: a member's credentials from an internal host are still refused",
+        check("webhook: a forged signature is refused", r.status == 403 and len(handled) == 1, r.status)
+        r = await http.post("/webhook/waha", data=raw + b" ", headers=signed)
+        await asyncio.sleep(0.05)
+        check("webhook: a signature of another body is refused", r.status == 403 and len(handled) == 1, r.status)
+        r = await http.post("/webhook/waha", data=raw, headers=signed)
+        await asyncio.sleep(0.05)
+        check("webhook: WAHA's valid signature (HMAC-SHA512 of the raw body) is accepted",
+              r.status == 200 and len(handled) == 2 and handled[-1] == body, r.status)
+        r = await http.post("/webhook/waha", data=raw, headers={**signed, **h(BOB_TOKEN)})
+        await asyncio.sleep(0.05)
+        check("webhook: a member's credentials are refused even with a valid signature",
+              r.status == 403 and len(handled) == 2, r.status)
+        with patch.dict(os.environ, {"WAHA_WEBHOOK_SECRET": ""}):
+            r = await http.post("/webhook/waha", data=raw, headers=signed)
+        await asyncio.sleep(0.05)
+        check("webhook: without WAHA_WEBHOOK_SECRET every unauthenticated webhook is refused",
               r.status == 403 and len(handled) == 2, r.status)
 
     # Own pass: a member cannot connect a WAHA session another user already uses on that WAHA.
@@ -666,10 +695,9 @@ async def test_waha_accounts(http: TestClient, waha: FakeWAHA, bobs: FakeWAHA) -
     async def fake_process(conn, data):
         seen.append(conn.user.id)
     with patch.object(whatsapp_api.whatsapp_events, "process_event", new=fake_process):
-        r = await http.post("/webhook/waha", json=event, headers={"Host": "dana.internal"})
+        r = await http.post("/webhook/waha", **signed_by_waha(event))
         await asyncio.sleep(0.1)
-        r2 = await http.post("/webhook/waha", json={**event, "me": None, "session": "bob"},
-                             headers={"Host": "dana.internal"})
+        r2 = await http.post("/webhook/waha", **signed_by_waha({**event, "me": None, "session": "bob"}))
         await asyncio.sleep(0.1)
     check("accounts: through the webhook, processed as the admin only (never also as Bob)",
           r.status == 200 and seen == [ADMIN.id], seen)

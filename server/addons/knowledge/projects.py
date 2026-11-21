@@ -22,7 +22,7 @@ Payloads never carry the owner column; a project seen through a share carries
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from core import users
+from core import user_locale, users
 from core.db import get_db_connection
 from core.users import User
 from core.addons import sharing, store
@@ -42,6 +42,12 @@ class ReadOnly(PermissionError):
         super().__init__("This project is shared with you read-only, so nothing in it can be changed.")
 
 
+def _payload(row: Any) -> Dict[str, Any]:
+    """A project row as the API shows it, plus ``currency``: the owner's
+    (core/user_locale.py), what its budget and prices are in, also for a share."""
+    return {**serialize_project(row), "currency": user_locale.currency(users.get(row["user_id"]))}
+
+
 # --- Sharing -------------------------------------------------------------------------
 
 def owner_of(project_id: str) -> Optional[str]:
@@ -53,6 +59,7 @@ def owner_of(project_id: str) -> Optional[str]:
 
 def title_of(project_id: str) -> Optional[str]:
     with get_db_connection() as conn:
+        # scoped: title of an item the caller resolved for the user (sharing ItemType.title_of)
         row = conn.execute("SELECT title FROM projects WHERE id = ?", (project_id,)).fetchone()
     return row["title"] if row else None
 
@@ -167,7 +174,7 @@ def list_projects(user: User, status: Optional[str] = None) -> List[Dict[str, An
             (*task_args, *args),
         ).fetchall()
         stats = _stats(conn, [r["id"] for r in rows])
-    return [with_share({**serialize_project(r), **stats.get(r["id"], _EMPTY_STATS)},
+    return [with_share({**_payload(r), **stats.get(r["id"], _EMPTY_STATS)},
                        *share_note(user, r["user_id"], levels.get(r["id"]))) for r in rows]
 
 
@@ -193,6 +200,7 @@ def _stats(conn: Any, project_ids: List[str]) -> Dict[str, Dict[str, Any]]:
             price_cols[s["id"]] = [c.get("name") for c in loads_json(s["columns"], [])
                                    if isinstance(c, dict) and c.get("role") == "price"]
     if price_cols:
+        # scoped: sections of the projects list_projects found for the user
         chosen = conn.execute(f"SELECT project_id, section_id, fields FROM entries WHERE decision = 'chosen' "
                               f"AND section_id IN ({','.join('?' * len(price_cols))})", list(price_cols)).fetchall()
         decided: Set[str] = set()
@@ -214,10 +222,11 @@ def get_project(user: Optional[User], project_id: Optional[str]) -> Optional[Dic
     if level is None or user is None:
         return None
     with get_db_connection() as conn:
+        # scoped: access(user, project_id) checked above
         row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
     if row is None:
         return None
-    return with_share(serialize_project(row), *share_note(user, row["user_id"], level))
+    return with_share(_payload(row), *share_note(user, row["user_id"], level))
 
 
 def active_projects(user: Optional[User]) -> List[Dict[str, str]]:
@@ -291,6 +300,7 @@ def update_project(user: User, project_id: str, *, title: Optional[str] = None, 
     if not _owned(user, project_id, "change"):
         return None
     with get_db_connection() as conn:
+        # scoped: the user owns it (_owned, above)
         row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
         if row is None:
             return None
@@ -315,11 +325,13 @@ def update_project(user: User, project_id: str, *, title: Optional[str] = None, 
             sets.append("budget = ?"); args.append(as_number(budget))
         if sets:
             sets.append("updated_at = CURRENT_TIMESTAMP")
+            # scoped: the user owns it (_owned, above)
             conn.execute(f"UPDATE projects SET {', '.join(sets)} WHERE id = ?", (*args, project_id))
             conn.commit()
 
+        # scoped: the user owns it (_owned, above)
         row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
-        return serialize_project(row)
+        return _payload(row)
 
 
 def delete_project(user: User, project_id: str) -> bool:
@@ -334,11 +346,15 @@ def delete_project(user: User, project_id: str) -> bool:
     if not _owned(user, project_id, "delete"):
         return False
     with get_db_connection() as conn:
+        # scoped: the user owns the project (_owned, above): its entries go with it
         files.forget_entries(conn, [r["id"] for r in conn.execute("SELECT id FROM entries WHERE project_id = ?",
                                                                    (project_id,))])
         conn.execute("DELETE FROM tasks WHERE project_id = ? AND user_id = ?", (project_id, user.id))
+        # scoped: the user owns the project (_owned, above): others' tasks only lose the link
         conn.execute("UPDATE tasks SET project_id = NULL WHERE project_id = ?", (project_id,))
+        # scoped: the user owns the project (_owned, above): its entries go with it
         conn.execute("DELETE FROM entries WHERE project_id = ?", (project_id,))
+        # scoped: the user owns the project (_owned, above)
         rows = conn.execute("DELETE FROM projects WHERE id = ?", (project_id,)).rowcount
         conn.commit()
     sharing.forget(ITEM_TYPE, project_id)

@@ -9,14 +9,14 @@ Clients of this server's payloads: the Android app / tablet / TV / watch (`../an
 ## Quick start
 
 ```bash
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt   # then always use .venv/bin/python (system python lacks deps)
-cp .env.example .env  # fill TELEGRAM_BOT_TOKEN (optional) & the LLM keys (ANTHROPIC_API_KEY; GEMINI_API_KEY for transcription); CREDENTIALS_KEY once HA/WAHA/Google values are set
-bin/test                       # the whole suite in parallel (~1.5 min)
+python3 -m venv .venv            # Python 3.12+ (3.14 is what the image and the tests run)
+.venv/bin/pip install -r requirements.lock   # then always use .venv/bin/python (system python lacks deps)
+cp .env.example .env  # required: ANTHROPIC_API_KEY and API_TOKEN; optional: GEMINI_API_KEY (transcription), TELEGRAM_BOT_TOKEN
+bin/test                       # the whole suite in parallel (~75 s on 16 threads; docs/development.md)
 python main.py                 # run Telegram bot + web UI on :8080
 ```
 
-No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`). Python 3.14 everywhere: the container (`Dockerfile`) and the local venv. Run `git config core.hooksPath .githooks` once (from the repository root): pushing master then runs the tests first (`docs/operations.md`).
+No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`). Python 3.14 is tested (the container, `Dockerfile`, and the local venv); 3.12+ is supported (no newer syntax or library). Dependencies: `requirements.txt` (direct) → `requirements.lock` (pinned, what the image installs; `docs/operations.md` → Dependencies). Run `git config core.hooksPath .githooks` once (from the repository root): pushing master then runs the tests first (`docs/operations.md`).
 
 ## Tests
 
@@ -29,7 +29,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 
 ## Architecture
 
-- **Entrypoint** `main.py`: migrate, users bootstrap, addons bootstrap (credentials key check + the first admin's one-time env import), the conversation core, the Telegram adapter, the aiohttp web server (port 8080) and its background loops.
+- **Entrypoint** `main.py`: refuse to start without `API_TOKEN` (unless `DANA_INSECURE_DEV=1`), migrate, users bootstrap, addons bootstrap (credentials key or generated key file + the first admin's default addons, once), the conversation core, the Telegram adapter, the aiohttp web server (port 8080) and its background loops.
 - **Agent loop** `core/agent.py`: a custom ReAct loop over LiteLLM (no LangChain). Every call is streamed (`stream=True`, assembled with `litellm.stream_chunk_builder`); deltas and tool announcements are emitted as they arrive, a broken stream is retried, consecutive read-only tool calls run concurrently. The system message is the acting user's: their profile, the parts of the addons they have connected, cached per-turn sections (home map, About facts) and the date line.
 - **Conversation core** `core/session_runner.py` (starts every run for an explicit `User`), `core/session.py`, `core/thread.py` (the shared `main` thread), `core/history.py` (pruning) — all keyed by user. **Runs** `core/runs.py`: each piece of agent work is a run with an in-memory event log; clients reattach with `GET /api/sessions/{id}/stream?run_id=&after=`, disconnecting never cancels, one run per session per user (409 `active_run`). Event types at the top of `core/runs.py`. **Model profiles** `core/models.py` (`fast` / `balanced` / `deep`).
 - **Addons** (`addons/`, framework in `core/addons/`; design: `../docs/addons.md`): each addon is a package `addons/<name>/` — `addon.py` declares it as `addon = Addon("<name>", ...)` (credentials, settings, hooks such as `on_connect`, `prompt_parts`, `check`, `options`), `tools.py` its tools (`@addon.tool()`), every tool taking the user's `Connection` as first parameter `conn`, `tests/` its test scripts. Another module refers to an addon's object as `from addons.<name>.addon import addon as <name>_addon`. Tools are listed and run **for a user**, only from addons that user has connected (a user's instance of an addon is a **connection**: table `connections`, credentials encrypted with `CREDENTIALS_KEY`; `store.connect / update / disconnect / get / require`). Adding a tool: a function in the addon's `tools.py`; adding an addon: `bin/dana addons new <name>` (a site addon) or a package + one line in `addons/__init__.py` → `docs/access.md` (Addon), `docs/writing-an-addon.md`. Running the server's addons (sources, the server-wide disable `core/addons/state.py`, the catalog and install `core/addons/catalog.py` / `install.py`, the restart `core/lifecycle.py`, the `bin/dana` CLI in `cli/`) → `../docs/addons.md`.
@@ -51,7 +51,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
   | telegram_account | your own Telegram chats and channels, read-only (Telethon, QR sign-in at `/telegram/connect`): list / read / summarize unread, muted and archived skipped; never marks read; not the bot | `docs/telegram-account.md` |
   | money | bank / card logins (sources, credentials encrypted) synced by the bank-worker sidecar (`addons/money/worker/`), SMS sign-in codes from the phone, transactions, categories, dashboards (fixed / yearly / everyday / one-off spending, cash flow, the balance forecast without one-offs, insights: `addons/money/dashboard.py`), Psagot Trade portfolios read-only through a quick-view device (`addons/money/portfolio.py`, `addons/money/worker/src/psagot.js`), the Pluxee (Cibus) meal card read-only on the browser (budget, cycles, meals, never spending; each cycle's overflow matched to its monthly card line: `addons/money/meals.py`, `addons/money/worker/src/pluxee.js`), ways to save and spending to watch with the user's choices, targets and verified outcomes (`addons/money/savings.py`; Bank of Israel rates `reference.py`; price checks on request through `llm.search`: `market.py`), the web Money tab (`static/money*.js`, with the Save view: ways to save, spending to watch, price checks, targets; the Meal card view) | `docs/money.md` |
   | cameras | Frigate behind `/api/frigate/*` (no tools) | `docs/dashboard.md` |
-  | ops | kubectl + sandboxed Python (admin only) | — |
+  | ops | read-only kubectl + Python on the server that asks first (admin only, opt-in; not a sandbox) | `docs/access.md` (Security rules) |
   | *site addons* | a deployment's own addons, in its site's `addons/` (or `DANA_ADDON_DIRS`); a tested example in `../examples/addons/hello/` | `docs/writing-an-addon.md` |
 
 - **Database** SQLite through `core/db` (`get_db_connection()`); ordered migrations in `core/db/migrations/` (`mNNNN_<name>.py`, found by name, each docstring says what it changes), applied at startup after a snapshot → `docs/operations.md` (Database schema).
@@ -70,12 +70,12 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 - `is_write` / `confirm` / `acts_outside` flags are given to `@addon.tool`; `registry.needs_confirmation(name, args)` (`core/addons/registry.py`) decides in the agent loop. `untrusted_result=True` marks a tool whose result is text written by other people (the Gmail reads): for the rest of that turn `acts_outside` tools ask first.
 - `escape_markdown()` from `core.text` required for Telegram-safe strings.
 - **Schema**: only through a new migration in `core/db/migrations/` (never `CREATE TABLE` / `ALTER TABLE` in a module, never at import time).
-- **Addon config**: whose account / which entities belongs to the user's connection (credentials encrypted, settings JSON); server-wide settings stay in env. Only `addons/bootstrap.py` reads the old per-account env names, once, to create the first admin's connections.
+- **Addon config**: whose account / which entities belongs to the user's connection (credentials encrypted, settings JSON); server-wide settings stay in env. Nothing reads an addon's account from env: connections are made on the Addons page, with `bin/dana` or the API.
 - **Time**: the container runs in UTC. Never call `datetime.now()` for anything user-facing — use `core.clock.now()` (aware, user's zone), `clock.from_timestamp()`, and `clock.describe_now()` for prompts. One zone for the server: `TIMEZONE` env → the first admin's Home Assistant → `TZ` → UTC (resolved once at startup).
 - **Data paths**: everything persistent lives in the directory holding the DB (`core/paths.py`: `recordings/`, `media/`, `uploads/images/`, `app-updates/`, `snapshots/`). In k8s that is the PVC at `/app/db`; never write state elsewhere — it is lost on restart.
 - **Tool results** are capped at `MAX_TOOL_RESULT_CHARS` (`core/agent.py::limit_tool_output`) and stored history at 40 messages / `MAX_HISTORY_CHARS` (`core/history.py::prune_history`, applied by `session.append_history`).
 - **User context**: a tool runs only through `registry.execute(user, name, args)` (the run's / request's / handler's user, or `users.current()`), which refuses tools of addons that user has not connected (`registry.ToolNotAvailable`); decide anything about a tool call (asks? write?) only after `registry.has_tool(user, name)`. A handler that calls a tool function directly passes `store.require(user, "<name>")` and lets `NotConnected` reach the middleware (re-raise it before a catch-all `except`). Server-wide endpoints get `@requires("<capability>")`; never compare access level names in code. Shareable items go through `core/addons/sharing.py` (register an `ItemType`; lookups add `shared_ids`, writes check `access`, payloads add `shared_by` / `access` only for shared items). New background work takes a `User` and binds it with `users.acting_as`; never look up the first admin (`users.first_admin()` only for the env token / dev mode, the open Telegram bot, the server timezone, bootstrap / migrations, startup logging). A prompt about a user takes their words from `user_profile.for_user(user)`, never a name or pronoun in the text.
-- **Web auth** (`core/auth.py`): with `API_TOKEN` set, every request needs `Authorization: Bearer <token>` (`API_TOKEN` or a user's DB token) or the `/login` session cookie, and gets `request["user"]`; except public paths (`/login`, `/api/health`, `/api/app/*`, `/static/*`, `/sw.js`, `/manifest.json`) and credential-less requests whose `Host` is in `INTERNAL_HOSTS` on `/webhook/waha` only (in-cluster callers via the Service DNS name; no user set). No `API_TOKEN`: every request is the first admin.
+- **Web auth** (`core/auth.py`): every request needs `Authorization: Bearer <token>` (`API_TOKEN` or a user's DB token) or the `/login` session cookie, and gets `request["user"]`; except public paths (`/login`, `/api/health`, `/api/app/*`, `/static/*`, `/sw.js`, `/manifest.json`) and `/webhook/waha`, which takes no token but only events WAHA signed with `WAHA_WEBHOOK_SECRET` (no user set; the `Host` header is never trusted). No `API_TOKEN`: the server refuses to start; `DANA_INSECURE_DEV=1` (local development) makes every request the first admin and listens on 127.0.0.1 only.
 
 ## Deploy (summary — details in `docs/operations.md`)
 
@@ -99,7 +99,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 | `docs/now.md` | Now screen (`/api/now`, `/api/now/act`), notifications overview / rule suggestions, self-checks, search |
 | `docs/about.md` | About you facts, prompt section, learner, `/api/about`, old `/api/memories` |
 | `docs/usage.md` | Usage and cost tracking: what is captured, attribution, storage and roll-up, `/api/usage`, the Usage screen |
-| `docs/configuration.md` | Environment variables, Infisical, `CREDENTIALS_KEY` and the env values imported into connections |
+| `docs/configuration.md` | Environment variables: the minimal first run, security values (`API_TOKEN`, `CREDENTIALS_KEY` and its key file, `WAHA_WEBHOOK_SECRET`, `APP_PUBLISH_TOKEN`), models, services, tuning |
 | `docs/operations.md` | Deploy (`bin/deploy`, the pre-push hook), k8s, logs, DB debugging, database schema and migrations, API endpoint list, backups |
 | `docs/shopping.md` | The shopping list: lists, invitations, items and the add rules, aisles, history, undo, the live stream and push, the API, Dana's tools |
 | `docs/knowledge.md` | Projects and entries: per user, sharing, FTS search, link media processing and the `/media/` files |

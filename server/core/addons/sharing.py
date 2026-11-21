@@ -191,6 +191,7 @@ def can_edit(user: Optional[User], type_name: str, item_id: Optional[str]) -> bo
 def shares(type_name: str, item_id: str) -> List[Share]:
     """Who besides the owner has access to the item, oldest grant first."""
     item_type(type_name)
+    # scoped: grants of one item; callers checked that the caller owns it
     return _rows("SELECT * FROM item_access WHERE item_type = ? AND item_id = ? ORDER BY granted_at, rowid",
                  (type_name, item_id))
 
@@ -252,5 +253,6 @@ def forget(type_name: str, item_id: str) -> None:
     """Drop every grant of an item (its service calls this when it deletes the item)."""
     item_type(type_name)
     with get_db_connection() as conn:
+        # scoped: the item's owner deletes it (its service calls this)
         conn.execute("DELETE FROM item_access WHERE item_type = ? AND item_id = ?", (type_name, item_id))
         conn.commit()

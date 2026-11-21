@@ -170,6 +170,7 @@ def last_fired(user: Optional[User]) -> Dict[str, Tuple[datetime.datetime, str]]
 def last_transition(prefix: str, user: Optional[User] = None) -> Optional[datetime.datetime]:
     """When the latest ``prefix`` transition (``location``, ``car``) arrived,
     for ``user`` or for anyone (None)."""
+    # scoped: user_id is added below when a user is given; None asks about every user (self-checks)
     sql = "SELECT MAX(at) AS at FROM task_trigger_marks WHERE key LIKE ?"
     args: List[Any] = [f"last_event_v2_{prefix}%"]
     if user is not None:
@@ -255,10 +256,12 @@ async def trigger_reminder(item: Dict[str, Any], trigger_type: str, user: User, 
             logger.info(f"Removing time trigger from task '{summary}' (UID: {uid}) in local DB...")
             try:
                 with get_db_connection() as conn:
+                    # scoped: the trigger engine's task, firing for its creator
                     row = conn.execute("SELECT triggers FROM tasks WHERE id = ?", (uid,)).fetchone()
                     if row:
                         trig = json.loads(row["triggers"] or '{}')
                         trig.pop("time", None)
+                        # scoped: the trigger engine's task, firing for its creator
                         conn.execute("UPDATE tasks SET triggers = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                                      (json.dumps(trig), uid))
                         conn.commit()

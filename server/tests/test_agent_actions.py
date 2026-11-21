@@ -19,7 +19,8 @@ from cryptography.fernet import Fernet
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("agent_actions_test")
-os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: the startup import encrypts env credentials
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.pop("SHORTCUTS", None)
 
 import aiohttp
@@ -35,7 +36,7 @@ from addons.tasks.groups import ensure_default_groups_for_everyone
 
 db.migrate()
 users.bootstrap()
-addons_bootstrap.bootstrap()  # the first admin's addons (built-ins + env)
+addons_bootstrap.bootstrap()  # the first admin's default addons
 OWNER = users.first_admin()  # no API_TOKEN: every request is the first admin
 ensure_default_groups_for_everyone()
 from addons.homeassistant.addon import addon as homeassistant_addon
@@ -681,9 +682,10 @@ def test_device_screen_unit():
     outside = sorted(t.name for t in all_tools() if registry.acts_outside(t.name))
     check("device_screen: the acts_outside tools", outside ==
           ["call_ha_service", "control_android_tv", "remember_info", "run_kubectl", "run_python"], str(outside))
-    check("device_screen: acts_outside tools ask only with untrusted content",
+    check("device_screen: acts_outside tools ask only with untrusted content (run_python always asks)",
           all(registry.needs_confirmation(t, {}, untrusted=True) and not registry.needs_confirmation(t, {})
-              for t in outside))
+              for t in outside if t != "run_python")
+          and registry.needs_confirmation("run_python", {}) and registry.needs_confirmation("run_python", {}, untrusted=True))
     # remember_info is not here: a saved fact feeds every later prompt, so it asks in such a turn.
     at_once = ["add_task", "update_task", "add_shopping_items", "save_knowledge_item", "forget_info", "dismiss_notifications"]
     check("device_screen: reversible writes still run at once with untrusted content",

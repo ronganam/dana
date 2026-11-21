@@ -83,7 +83,7 @@ MOCK_SEARCH_RESULTS: Dict[str, str] = {
     "joe's coffee": "Joe's Coffee is located at 456 Elm St. Hours: 7 AM - 6 PM daily. Known for its cold brew."
 }
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 def web_search(conn: Connection, query: str) -> str:
     """Search the web for public information using DuckDuckGo.
     
@@ -100,11 +100,8 @@ def web_search(conn: Connection, query: str) -> str:
     logger.info(f"Performing web search for: '{query}'")
     
     try:
-        try:
-            from ddgs import DDGS
-        except ImportError:
-            from duckduckgo_search import DDGS
-        
+        from ddgs import DDGS
+
         # Build DDG search client and run search query
         with DDGS() as ddgs:
             results = list(ddgs.text(query, max_results=3))

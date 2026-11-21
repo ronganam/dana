@@ -8,14 +8,15 @@ for restarts and the start-up refusals. The stubs' control API
 asked. Prints PASS / FAIL per check and exits non-zero on any failure.
 
 Sections: the upgrade (first start from the 9.0 database, its conversion to per-addon
-migrations, the env import, a
-restart, the CREDENTIALS_KEY refusals); existing clients (the endpoints the
+migrations, the first admin's default addons, the addons bin/local-env.sh
+connected to the stubs, a restart, the credentials key file and the
+CREDENTIALS_KEY refusals); existing clients (the endpoints the
 web UI loads, the login cookie, a streamed chat turn, approval, undo); a
 second user made with the CLI (empty data, the admin's ids 404, 403
 not_connected, own addons through the API, own tools and prompt, a
 hidden tool refused and not executed, admin-only endpoints); sharing (task
 list, project through share_item in chat, the shopping list: invitation, use
-with moving items and its undo, the live stream, aisles from the model stub); the Home Assistant watcher; WAHA inbound routing and the internal-host
+with moving items and its undo, the live stream, aisles from the model stub); the Home Assistant watcher; WAHA inbound routing and the signed-webhook
 rule; phone events and notifications; Telegram; usage; the security rules
 (debug export, cameras admin-only, addresses, Telegram chats, the WAHA session,
 webhook and media origin, device rows); the second review's findings (a task
@@ -45,15 +46,18 @@ STATE = HERE / ".state"
 COMPOSE = ["docker", "compose", "-f", str(HERE / "compose.yaml")]
 BASE = f"http://127.0.0.1:{os.getenv('DANA_LOCAL_PORT', '18080')}"
 CTRL = f"http://127.0.0.1:{os.getenv('DANA_LOCAL_CONTROL_PORT', '18090')}"
-INTERNAL_HOST = "ganam-assistant.ganam-assistant"
+INTERNAL_HOST = "dana.dana"  # a Host header naming the in-cluster Service: proves nothing
 
 # Identities shared with stubs.py and the generated env file (bin/local-env.sh).
 ADMIN_NAME, ADMIN_TG = "Robin", 111111111
 MEMBER_NAME, MEMBER_TG = "Maya Katz", 222222222
 UNKNOWN_TG = 333333333
 ADMIN_ACCOUNT, MEMBER_ACCOUNT = "972500000001@c.us", "972500000002@c.us"
-SECRETS_IN_ENV = ("API_TOKEN", "CREDENTIALS_KEY", "HOMEASSISTANT_TOKEN", "WAHA_API_KEY", "GOOGLE_REFRESH_TOKEN",
-                  "TELEGRAM_BOT_TOKEN", "GOOGLE_CLIENT_SECRET", "APP_PUBLISH_TOKEN")
+SECRETS_IN_ENV = ("API_TOKEN", "CREDENTIALS_KEY", "TELEGRAM_BOT_TOKEN", "GOOGLE_CLIENT_SECRET", "APP_PUBLISH_TOKEN",
+                  "WAHA_WEBHOOK_SECRET")
+# The admin's stub credentials bin/local-env.sh connects (connect_addons).
+STUB_SECRETS = ("local-ha-token-a", "local-waha-key", "local-google-refresh-token")
+DEFAULT_ADDONS = "tasks, shopping, knowledge, about, people, phone"
 ALL_KINDS = ["essentials", "tasks", "shopping", "knowledge", "about", "people", "phone", "homeassistant", "whatsapp",
              "calendar", "cameras", "ops"]
 
@@ -108,7 +112,16 @@ def app_logs() -> str:
 
 
 def no_secret_in(text: str) -> List[str]:
-    return [k for k in SECRETS_IN_ENV if ENV.get(k) and ENV[k] in text]
+    return [k for k in SECRETS_IN_ENV if ENV.get(k) and ENV[k] in text] + [s for s in STUB_SECRETS if s in text]
+
+
+def waha_signed(body: Any) -> Tuple[bytes, Dict[str, str]]:
+    """``body`` as WAHA sends it, signed with WAHA_WEBHOOK_SECRET (HMAC-SHA512 of the raw bytes)."""
+    import hashlib
+    import hmac
+    raw = json.dumps(body).encode()
+    sig = hmac.new(ENV["WAHA_WEBHOOK_SECRET"].encode(), raw, hashlib.sha512).hexdigest()
+    return raw, {"X-Webhook-Hmac": sig, "X-Webhook-Hmac-Algorithm": "sha512", "Content-Type": "application/json"}
 
 
 # --- HTTP helpers ----------------------------------------------------------------------------------
@@ -154,6 +167,13 @@ class Client:
 
     async def delete(self, path: str, token: Optional[str] = ADMIN_TOKEN, **kw: Any) -> Resp:
         return await self.req("DELETE", path, token, **kw)
+
+    async def waha(self, event: Any, signed: bool = True, headers: Optional[Dict[str, str]] = None) -> Resp:
+        """POST ``event`` to /webhook/waha as WAHA does: no token, signed with WAHA_WEBHOOK_SECRET (or not)."""
+        raw, h = waha_signed(event)
+        if not signed:
+            h = {"Content-Type": "application/json"}
+        return await self.req("POST", "/webhook/waha", None, data=raw, headers={**h, **(headers or {})})
 
     async def ctrl(self, method: str, path: str, body: Any = None) -> Any:
         async with self.s.request(method, CTRL + path, json=body) as r:
@@ -269,17 +289,17 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     logs = app_logs()
     snap = "db-before-addons-from-0033.sqlite3"
     check("upgrade: first start logged the snapshot", f"Database snapshot before migrating: /app/db/snapshots/{snap}" in logs)
-    check("upgrade: the 9.0 database converted to per-addon migrations, nothing else applied",
+    applied = re.findall(r"Applied database migration (\S+)", logs)
+    check("upgrade: the 9.0 database converted to per-addon migrations, then only core's later migrations",
           "Database converted to per-addon migrations (from version 33)" in logs
-          and "Applied database migration" not in logs, [l for l in logs.splitlines() if "migrat" in l][:5])
-    check("upgrade: env import for the first admin, every addon",
-          "Addons imported for Robin: tasks, shopping, knowledge, about, people, phone, homeassistant, "
-          "whatsapp, calendar, cameras, ops" in logs)
+          and applied and all(a.startswith("core:") for a in applied), [l for l in logs.splitlines() if "migrat" in l][:6])
+    check("upgrade: the first admin's default addons turned on (nothing read from env)",
+          f"Default addons turned on for Robin: {DEFAULT_ADDONS}" in logs and "Addons imported" not in logs)
     check("upgrade: no CREDENTIALS_KEY error, no traceback at start",
           "CREDENTIALS_KEY" not in logs.split("Webhook & Web UI server listening")[0] and "Traceback" not in logs,
           [l for l in logs.splitlines() if "Traceback" in l or "CREDENTIALS_KEY" in l][:3])
     code, out = dexec("ls", "/app/db/snapshots")
-    check("upgrade: snapshot file exists in the data volume", code == 0 and out.split() == [snap], out)
+    check("upgrade: snapshot file exists in the data volume", code == 0 and out.split()[:1] == [snap], out)
     code, out = dexec("python", "-c", f"import sqlite3; c=sqlite3.connect('/app/db/snapshots/{snap}');"
                       "print(c.execute('SELECT COUNT(*) FROM tasks').fetchone()[0], "
                       "c.execute('SELECT MAX(version) FROM schema_migrations').fetchone()[0])")
@@ -287,8 +307,8 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     code, out = dexec("python", "-c", "import sqlite3; c=sqlite3.connect('/app/db/db.sqlite3');"
                       "print(*sorted(r[0] for r in c.execute('SELECT addon FROM schema_migrations')))")
     check("upgrade: schema_migrations names core's and each official addon's baseline",
-          out.split() == sorted(["core", "about", "contacts", "knowledge", "money", "people", "phone", "shopping",
-                                 "tasks", "whatsapp"]), out)
+          sorted(set(out.split())) == sorted(["core", "about", "contacts", "knowledge", "money", "people", "phone",
+                                              "shopping", "tasks", "whatsapp"]), out)
 
     health = await c.get("/api/health", token=None)
     version = (ROOT / "VERSION").read_text().strip()
@@ -297,7 +317,7 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     me = await c.get("/api/me")
     check("upgrade: /api/me is the admin with every addon",
           me.status == 200 and me.body.get("name") == ADMIN_NAME and me.body.get("access") == "admin"
-          and me.body.get("kinds") == ALL_KINDS, me)
+          and me.body.get("addons") == ALL_KINDS, me)
     admin_id = (me.body or {}).get("id")
 
     # Every row of the fixture, with its id, through the API.
@@ -359,7 +379,7 @@ async def upgrade(c: Client) -> Dict[str, Any]:
                       "OR name = 'shopping_operations'\")))")
     check("upgrade: the catalog tables and the shopping operations log are gone", out.strip() == "[]", out)
 
-    # The addons the env import created.
+    # The defaults, and the addons bin/local-env.sh connected to the stubs.
     integ = await c.get("/api/addons")
     by_kind = {i["name"]: i for i in (integ.body or {}).get("addons", [])}
     check("upgrade: /api/addons lists every addon connected",
@@ -369,7 +389,7 @@ async def upgrade(c: Client) -> Dict[str, Any]:
               for k in ("homeassistant", "whatsapp", "calendar") for cr in by_kind[k]["credentials"] if cr["required"])
           and not no_secret_in(integ.text), no_secret_in(integ.text))
     settings = {k: {s["name"]: s["value"] for s in v["settings"]} for k, v in by_kind.items()}
-    check("upgrade: homeassistant settings from env (+ the car defaults)", settings.get("homeassistant") == {
+    check("upgrade: homeassistant settings as connected", settings.get("homeassistant") == {
         "person": "person.robin", "car_sensor": "sensor.pixel_8_bluetooth_connection", "car_device": "CarKit-1234",
         "phone_interactive_sensor": "binary_sensor.robin_phone_interactive",
         "phone_battery_sensor": "sensor.robin_phone_battery", "phone_notify_service": "mobile_app_robin_phone",
@@ -412,14 +432,16 @@ async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
                           == "healthy", timeout=120, every=2)
     check("restart: the container comes back healthy", code == 0 and healthy, out)
     logs = app_logs()
-    check("restart: started twice, converted once, imported once, one snapshot",
+    check("restart: started twice, converted once, defaults given once, no new snapshot",
           logs.count("Initializing modular AI assistant") == 2
           and logs.count("Database converted to per-addon migrations") == 1
-          and logs.count("Addons imported for") == 1 and logs.count("Database snapshot before migrating") == 1,
+          and logs.count("Default addons turned on for") == 1,
           (logs.count("Initializing modular AI assistant"), logs.count("Database converted to per-addon migrations"),
-           logs.count("Addons imported for")))
+           logs.count("Default addons turned on for")))
     code, out = dexec("ls", "/app/db/snapshots")
-    check("restart: still one snapshot", out.split() == ["db-before-addons-from-0033.sqlite3"], out)
+    check("restart: no new snapshot (the conversion's, and the one before core's later migrations)",
+          out.split()[:1] == ["db-before-addons-from-0033.sqlite3"] and len(out.split()) == 2
+          and logs.count("Database snapshot before migrating") == 2, out)
     r = await c.get("/api/addons")
     check("restart: addons unchanged", r.text == before["addons"],
           "addons payload differs after restart")
@@ -438,9 +460,10 @@ async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
                      "timeout", "40", "python", "main.py", timeout=60)
 
     code, out = start(None, "/tmp/k/db.sqlite3")
-    check("key: migrated DB without CREDENTIALS_KEY refuses to start with the documented message",
-          code == 1 and "CREDENTIALS_KEY is not set but 3 addon(s) have stored credentials." in out
-          and "Fernet.generate_key()" in out and "Webhook & Web UI server listening" not in out, (code, out[-500:]))
+    check("key: migrated DB without CREDENTIALS_KEY (and no key file) refuses to start with the documented message",
+          code == 1 and "CREDENTIALS_KEY is not set (and there is no key file) but 3 connection(s) have stored "
+          "credentials." in out and "Fernet.generate_key()" in out and "Webhook & Web UI server listening" not in out,
+          (code, out[-500:]))
     code, out = start("not-a-key", "/tmp/k/db.sqlite3")
     check("key: malformed key refuses to start", code == 1 and "CREDENTIALS_KEY is not a valid Fernet key" in out,
           (code, out[-400:]))
@@ -455,12 +478,12 @@ async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
     dexec("python", "-c", "import sqlite3, os; os.makedirs('/tmp/f', exist_ok=True);"
           " c=sqlite3.connect('/tmp/f/db.sqlite3'); c.executescript(open('/tmp/db_9_0.sql').read()); c.close()")
     code, out = start(None, "/tmp/f/db.sqlite3")
-    check("key: 9.0 DB + env credentials, no key: refuses to start, says how to generate one",
-          code == 1 and "CREDENTIALS_KEY is not set" in out and "Fernet.generate_key()" in out
-          and "Addons imported" not in out, (code, out[-500:]))
-    code, out = start(ENV["CREDENTIALS_KEY"], "/tmp/f/db.sqlite3")
-    check("key: the same DB with the key added: import happens on that start",
-          "Addons imported for Robin" in out and "Database migrated" not in out, out[-600:])
+    _, mode = dexec("stat", "-c", "%a", "/tmp/f/credentials.key")
+    check("key: 9.0 DB (nothing encrypted yet), no key: generates <data dir>/credentials.key (0600), says to back it up",
+          "generated the credentials key in /tmp/f/credentials.key" in out and "BACK IT UP" in out
+          and mode.strip() == "600", (code, mode, out[-500:]))
+    _, key = dexec("cat", "/tmp/f/credentials.key")
+    check("key: the generated key is not printed", key.strip() and key.strip() not in out)
     dexec("rm", "-rf", "/tmp/k", "/tmp/f", "/tmp/db_9_0.sql")
 
 
@@ -510,7 +533,6 @@ WEB_LOAD = [
     ("/api/debug/logs", lambda b: b is not None),
     ("/api/calendar/events?start_date=2026-11-15&end_date=2026-11-22", lambda b: isinstance(b, list)),
     ("/api/frigate/events/ptz?limit=12", has("events", "server_time")),
-    ("/api/frigate/activity/ptz?hours=12", has("series", "bucket")),
     ("/api/about", has("sections", "used_chars", "max_chars")),
     ("/api/shortcuts", has("shortcuts", "enabled")),
     ("/api/now", has("now", "items")),
@@ -1059,7 +1081,7 @@ async def _tg_to(c: Client, chat: int, text: str) -> List[Dict[str, Any]]:
 
 
 # =================================================================================================
-# 6. WAHA inbound and the internal-host rule
+# 6. WAHA inbound and the signed-webhook rule
 # =================================================================================================
 
 async def voice_pushes(c: Client, token: str, mid: str) -> List[Dict[str, Any]]:
@@ -1072,15 +1094,15 @@ async def waha_inbound(c: Client, maya: Dict[str, str]) -> None:
     tok = maya["token"]
     internal = {"Host": INTERNAL_HOST}
     await c.ctrl("POST", "/llm/transcript", {"text": "Voice note for whoever owns this account."})
-    r = await c.post("/webhook/waha", voice_event(ADMIN_ACCOUNT, "default", "E2EVA"), token=None, headers=internal)
-    check("waha: internal host posts without a token (200)", r.status == 200, r)
+    r = await c.waha(voice_event(ADMIN_ACCOUNT, "default", "E2EVA"))
+    check("waha: a signed event without a token (200)", r.status == 200, r)
     got = await until(lambda: voice_pushes(c, ADMIN_TOKEN, "E2EVA"), timeout=15)
     check("waha: the admin's account → the admin's phone", got, (await c.phone_events(ADMIN_TOKEN))["events"][-3:])
     tg = await until(lambda: _tg_to(c, ADMIN_TG, "Voice note for whoever"), timeout=10)
     check("waha: … and the admin's voice Telegram chat", tg, await c.telegram_sent())
     check("waha: nothing for the member", not await voice_pushes(c, tok, "E2EVA"))
 
-    r = await c.post("/webhook/waha", voice_event(MEMBER_ACCOUNT, "maya", "E2EVM"), token=None, headers=internal)
+    r = await c.waha(voice_event(MEMBER_ACCOUNT, "maya", "E2EVM"))
     got = await until(lambda: voice_pushes(c, tok, "E2EVM"), timeout=15)
     check("waha: her account → her phone", r.status == 200 and got, r)
     tg = await until(lambda: _tg_to(c, MEMBER_TG, "Voice note for whoever"), timeout=10)
@@ -1091,18 +1113,24 @@ async def waha_inbound(c: Client, maya: Dict[str, str]) -> None:
     check("waha: media fetched with the WAHA key", media and all(x["key_ok"] for x in media), media)
 
     before = (await c.ctrl("GET", "/llm/requests"))["transcriptions"]
-    r = await c.post("/webhook/waha", voice_event("972599999999@c.us", "stranger", "E2EVX"), token=None, headers=internal)
+    r = await c.waha(voice_event("972599999999@c.us", "stranger", "E2EVX"))
     await asyncio.sleep(3)
     after = (await c.ctrl("GET", "/llm/requests"))["transcriptions"]
     check("waha: an unknown account is dropped (nothing transcribed, nobody pushed)", r.status == 200 and after == before
           and not await voice_pushes(c, ADMIN_TOKEN, "E2EVX") and not await voice_pushes(c, tok, "E2EVX"), (before, after))
 
-    r = await c.post("/webhook/waha", voice_event(ADMIN_ACCOUNT, "default", "E2EVY"), token=None)
-    check("waha: same request from a non-internal host without a token → 401", r.status == 401, r)
+    r = await c.waha(voice_event(ADMIN_ACCOUNT, "default", "E2EVY"), signed=False, headers=internal)
+    check("waha: the same event unsigned, even with the in-cluster Host → 403", r.status == 403, r)
+    raw, h = waha_signed(voice_event(ADMIN_ACCOUNT, "default", "E2EVY"))
+    r = await c.req("POST", "/webhook/waha", None, data=raw.replace(b"E2EVY", b"E2EVZ"), headers=h)
+    check("waha: a body changed after signing → 403", r.status == 403, r)
+    await asyncio.sleep(2)
+    check("waha: … neither reached anyone", not await voice_pushes(c, ADMIN_TOKEN, "E2EVY")
+          and not await voice_pushes(c, ADMIN_TOKEN, "E2EVZ"))
     for method, path in [("GET", "/api/tasks"), ("GET", "/api/phone/events"), ("POST", "/webhook"),
                          ("GET", "/api/addons"), ("POST", "/api/notifications/batch"), ("GET", "/media/x.jpg")]:
         r = await c.req(method, path, None, json_body={} if method == "POST" else None, headers=internal)
-        check(f"waha: internal host on {method} {path} without a token → 401", r.status == 401, r)
+        check(f"waha: the in-cluster Host on {method} {path} without a token → 401", r.status == 401, r)
 
 
 # =================================================================================================
@@ -1244,14 +1272,13 @@ async def security(c: Client, maya: Dict[str, str]) -> None:
     check("whatsapp: a member can't take the admin's WAHA session (400)", r.status == 400
           and (r.body or {}).get("field") == "session", r)
 
-    internal = {"Host": INTERNAL_HOST}
     r = await c.post("/webhook/waha", voice_event(ADMIN_ACCOUNT, "default", "E2EVF"), token=tok)
     check("waha: a member's token on the webhook → 403", r.status == 403, r)
     check("waha: … nothing for the admin", not await voice_pushes(c, ADMIN_TOKEN, "E2EVF"))
     before = len((await c.ctrl("GET", "/frigate/log"))["requests"])
     event = voice_event(ADMIN_ACCOUNT, "default", "E2EVO")
     event["payload"]["media"]["url"] = "http://stubs:5000/api/files/voice.ogg"
-    r = await c.post("/webhook/waha", event, token=None, headers=internal)
+    r = await c.waha(event)
     await until(lambda: voice_pushes(c, ADMIN_TOKEN, "E2EVO"), timeout=15)
     frigate = (await c.ctrl("GET", "/frigate/log"))["requests"][before:]
     check("waha: media named on another host is fetched from the connection's own WAHA (key never sent elsewhere)",
@@ -1330,9 +1357,8 @@ async def second_review(c: Client, maya: Dict[str, str]) -> None:
     check("whatsapp: the conflict is logged (user ids, no content)",
           "is already connected by user" in app_logs(), "")
 
-    internal = {"Host": INTERNAL_HOST}
     await c.ctrl("POST", "/llm/transcript", {"text": "Second review voice note."})
-    r = await c.post("/webhook/waha", voice_event(ADMIN_ACCOUNT, "default", "E2EVC"), token=None, headers=internal)
+    r = await c.waha(voice_event(ADMIN_ACCOUNT, "default", "E2EVC"))
     got = await until(lambda: voice_pushes(c, ADMIN_TOKEN, "E2EVC"), timeout=15)
     await asyncio.sleep(2)
     check("whatsapp: the admin's voice note still goes to the admin only", r.status == 200 and got

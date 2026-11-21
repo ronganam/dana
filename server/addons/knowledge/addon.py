@@ -32,14 +32,14 @@ KNOWLEDGE_GUIDE = (
     "  - `title`: SHORT label, max ~8 words (an option: the vendor's name), no markdown.\n"
     "  - `body`: full details as clean Markdown — '##' headings, **bold** key figures, '- ' bullets. "
     "Keep every fact, number, date and name verbatim.\n"
-    "  - money values are plain numbers in NIS (13400, not \"13,400 ₪\"); a range stays text.\n"
+    "  - money values are plain numbers in {currency} (13400, not \"13,400 {currency}\"); a range stays text.\n"
     "  - `tags`: 2-4 short labels in the user's language.\n"
     "EDITING: fix or extend earlier saves with `update_knowledge_item` / `update_section` (same ID) — "
     "never duplicate. `update_project` handles project metadata; finished projects: status='archived'.\n"
     "-----------------------------------\n\n"
 )
 
-addon = Addon("knowledge", order=40, llm_jobs={"media_summary": LlmJob("fast", "Link / media summaries"), "knowledge_file": LlmJob("fast", "Project file transcripts")}, description="Projects and saved entries", prompt_parts=(
+addon = Addon("knowledge", order=40, default_on=True, llm_jobs={"media_summary": LlmJob("fast", "Link / media summaries"), "knowledge_file": LlmJob("fast", "Project file transcripts")}, description="Projects and saved entries", prompt_parts=(
     PromptPart("undoable", "notes", rank=40),
     PromptPart("guides", KNOWLEDGE_GUIDE, rank=40),
 ))

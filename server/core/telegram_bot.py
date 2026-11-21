@@ -59,20 +59,20 @@ def report_whatsapp_voice_chats() -> None:
 UNAUTHORIZED_TEXT = "⛔ You are not authorized to use this bot."
 
 
+def unauthorized_text(telegram_user_id: int) -> str:
+    """The refusal a sender no user has gets: their Telegram id and how an admin links it."""
+    return (f"{UNAUTHORIZED_TEXT}\nYour Telegram id is {telegram_user_id}. To use Dana here, the server's "
+            f"admin links it to your user: bin/dana users telegram add <user> {telegram_user_id}")
+
+
 class AuthMiddleware:
     """Lets in Telegram users that resolve to a user (core/users.py), passes
     that user on to handlers as ``user`` and runs the handler as that user
-    (``users.acting_as``: runs, tools, undo and usage see it). While no user
-    has a Telegram id the bot is open and everyone is the first admin
-    (core.users.telegram_open); otherwise unknown ids are refused."""
+    (``users.acting_as``: runs, tools, undo and usage see it). Every other
+    sender is refused with their id and how to be linked — also while no user
+    has a Telegram id at all (fail closed)."""
 
     async def __call__(self, handler, event, data):
-        if users.telegram_open():
-            user = users.first_admin()
-            if user is None:
-                return await handler(event, data)
-            return await self._as(user, handler, event, data)
-
         user_id = event.from_user.id if event.from_user else None
         if user_id is None:
             return
@@ -81,9 +81,9 @@ class AuthMiddleware:
         if user is None:
             logger.warning(f"Unauthorized access denied for user ID {user_id}")
             if isinstance(event, types.CallbackQuery):
-                await event.answer(UNAUTHORIZED_TEXT, show_alert=True)
+                await event.answer(unauthorized_text(user_id), show_alert=True)
             else:
-                await event.reply(UNAUTHORIZED_TEXT)
+                await event.reply(unauthorized_text(user_id))
             return
 
         return await self._as(user, handler, event, data)
@@ -311,7 +311,7 @@ class TelegramBot:
                 return
             
             # Sub-parse the key and value from parts[2]
-            # E.g. "girlfriend_chat_id 972500000301@c.us -c contact"
+            # E.g. "favorite_coffee oat flat white -c preference"
             rem_parts = parts[2].split(maxsplit=1)
             if len(rem_parts) < 2:
                 await message.reply("⚠️ *Usage:* `/memory remember <key> <value> [-c <category>]`", reply_markup=self.get_keyboard(), parse_mode="Markdown")
@@ -1023,8 +1023,8 @@ class TelegramBot:
                 "➕ *Add Memory*\n\nPlease type the information you want to save using the format:\n"
                 "`key: value`   or   `key: value | category`\n\n"
                 "*Example:*\n"
-                "`girlfriend_chat_id: 972500000301@c.us`  or\n"
-                "`girlfriend_chat_id: 972500000301@c.us | contact`",
+                "`favorite_coffee: oat flat white`  or\n"
+                "`favorite_coffee: oat flat white | preference`",
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )

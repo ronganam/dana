@@ -95,6 +95,7 @@ def list_notifications(user: User, *, status: Optional[str] = "active", bucket: 
     if fts:
         where.append("n.id IN (SELECT id FROM notifications_fts WHERE notifications_fts MATCH ?)")
         params.append(fts)
+    # scoped: where starts with n.user_id = ? (above)
     sql = f"SELECT n.* FROM notifications n WHERE {' AND '.join(where)} ORDER BY n.posted_at DESC LIMIT ?"
     params.append(max(1, min(int(limit or 200), 1000)))
     with get_db_connection() as conn:
@@ -148,6 +149,8 @@ def delete_ids(conn: sqlite3.Connection, ids: List[str]) -> None:
     for i in range(0, len(ids), 500):
         chunk = ids[i:i + 500]
         marks = ",".join("?" * len(chunk))
+        # scoped: ids from the user's notifications (callers: purge_old, delete_package)
         conn.execute(f"DELETE FROM call_suggestions WHERE source_type = 'notification' AND status = 'pending' "
                      f"AND call_id IN ({marks})", chunk)
+        # scoped: ids from the user's notifications (callers: purge_old, delete_package)
         conn.execute(f"DELETE FROM notifications WHERE id IN ({marks})", chunk)

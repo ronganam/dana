@@ -1,5 +1,5 @@
 """One user's Frigate, over that user's own connection (the ``url`` setting):
-the dashboard's events rail, the activity strip, event / motion previews and
+the dashboard's events rail, event / motion previews and
 clips, and go2rtc WebRTC signaling. The handlers live in api.py and
 turn what this returns into responses.
 
@@ -11,7 +11,7 @@ dots is refused: it would be a path segment of its own), motion windows are
 integers, and the go2rtc stream name travels as an encoded query parameter.
 
 Every function takes the user's :class:`~core.addons.Connection`;
-caches (events, activity, clips) are per :func:`signature`, never shared
+caches (events, clips) are per :func:`signature`, never shared
 between connections.
 """
 
@@ -40,7 +40,7 @@ EVENTS_TTL = 5.0  # seconds; several viewers share one upstream call
 # Frigate's motion is camera-wide (zones only apply to objects);
 # /api/review/activity/motion gives the % of the frame that moved per 30 s
 # bucket, and buckets above the threshold are joined into segments. Off by
-# default: on this camera it's mostly night IR noise and changing daylight.
+# default: raw motion also counts noise and changing light.
 try:
     MOTION_THRESHOLD = float(os.environ.get("FRIGATE_MOTION_THRESHOLD", "0"))
 except ValueError:
@@ -50,15 +50,10 @@ MOTION_LOOKBACK = 24 * 3600  # continuous recordings are kept 1 day
 MOTION_PAD = 10             # an object event within this many seconds swallows the segment
 MOTION_MEDIA_MAX = 60       # preview / clip cover at most the first minute of a segment
 
-ACTIVITY_BUCKET = 120   # seconds per cell of the dashboard activity strip
-ACTIVITY_TTL = 30.0
-ACTIVITY_LABEL_MAP = {"bark": "dog"}   # audio: a barking dog is an awake dog
-
 CLIP_MAX_BYTES = 60 * 1024 * 1024
 CLIP_CACHE_SIZE = 4  # clips kept in memory, all connections together (keyed per connection)
 
 _events_cache: Dict[Tuple[Signature, str], Tuple[float, Dict[str, Any]]] = {}
-_activity_cache: Dict[Tuple[Signature, str], Tuple[float, Dict[str, Any]]] = {}
 _clip_cache: "collections.OrderedDict[Tuple[Signature, str], bytes]" = collections.OrderedDict()
 
 
@@ -132,7 +127,7 @@ def _motion_media_window(start: int, end: int) -> Tuple[int, int]:
 
 
 # ---------------------------------------------------------------------------
-# Events rail and activity strip
+# Events rail
 # ---------------------------------------------------------------------------
 
 async def events(conn: Connection, camera_name: str, limit: int) -> Dict[str, Any]:
@@ -222,67 +217,6 @@ async def events(conn: Connection, camera_name: str, limit: int) -> Dict[str, An
     out.sort(key=lambda e: e.get("start_time") or 0, reverse=True)
     payload = {"server_time": now, "events": out[:limit]}
     _events_cache[cache_key] = (time.monotonic(), payload)
-    return payload
-
-
-async def activity(conn: Connection, camera_name: str, hours: int) -> Dict[str, Any]:
-    """``GET /api/frigate/activity/{camera}``: seconds of activity per label per
-    :data:`ACTIVITY_BUCKET`-second cell over the last ``hours`` (from Frigate's
-    tracked-object events; ``bark`` folded into ``dog``), and each label's
-    latest event end (None while one runs). Cached :data:`ACTIVITY_TTL` s per
-    connection.
-
-    Raises:
-        FrigateError: 502 when Frigate's events cannot be read.
-    """
-    cache_key = (signature(conn), f"{camera_name}:{hours}")
-    hit = _activity_cache.get(cache_key)
-    if hit and time.monotonic() - hit[0] < ACTIVITY_TTL:
-        return hit[1]
-
-    now = time.time()
-    n = hours * 3600 // ACTIVITY_BUCKET
-    end = (int(now) // ACTIVITY_BUCKET + 1) * ACTIVITY_BUCKET
-    start = end - n * ACTIVITY_BUCKET
-    try:
-        async with httpx.AsyncClient() as client:
-            r = await client.get(_url(conn, "/api/events"),
-                                 params={"camera": camera_name, "after": start - 3600, "limit": 2000},
-                                 timeout=10.0)
-        r.raise_for_status()
-        raw = r.json()
-    except Exception as e:
-        logger.warning(f"Frigate activity fetch failed for {camera_name}: {e}")
-        raise FrigateError(502, {"error": "frigate unavailable"}) from e
-
-    series: Dict[str, List[float]] = {}
-    last: Dict[str, Optional[float]] = {}   # label -> latest end_time; None = moving now
-    for e in raw:
-        label = e.get("label")
-        if not label or e.get("start_time") is None:
-            continue
-        label = ACTIVITY_LABEL_MAP.get(label, label)
-        e_end = e.get("end_time")
-        if label not in last or (last[label] is not None and (e_end is None or e_end > last[label])):
-            last[label] = e_end
-        a = max(float(e["start_time"]), start)
-        b = min(float(e.get("end_time") or now), end)
-        if b <= a:
-            continue
-        cells = series.setdefault(label, [0.0] * n)
-        i = int((a - start) // ACTIVITY_BUCKET)
-        while i < n:
-            c0 = start + i * ACTIVITY_BUCKET
-            overlap = min(b, c0 + ACTIVITY_BUCKET) - max(a, c0)
-            if overlap <= 0:
-                break
-            # Overlapping events of one label can't make a cell more than full.
-            cells[i] = min(ACTIVITY_BUCKET, cells[i] + overlap)
-            i += 1
-    payload = {"server_time": now, "start": start, "end": end, "bucket": ACTIVITY_BUCKET,
-               "series": {k: [round(v) for v in vs] for k, vs in series.items()},
-               "last": last}
-    _activity_cache[cache_key] = (time.monotonic(), payload)
     return payload
 
 

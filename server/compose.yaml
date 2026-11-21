@@ -1,7 +1,7 @@
 # Self-hosting Dana with Docker Compose (docs/operations.md, "Running it").
 #
-#   cp .env.example .env            # fill in at least the LLM key and API_TOKEN
-#   docker compose up -d            # http://localhost:8080
+#   cp .env.example .env            # fill in the LLM key and API_TOKEN (both required)
+#   docker compose up -d            # http://localhost:8080 (this machine only, see ports below)
 #   docker compose --profile money up -d   # also the money addon's worker: the bank syncs (docs/money.md)
 #
 # An addon's worker (its worker/ folder: docs/operations.md, "Workers") runs as a service under a
@@ -19,9 +19,18 @@ services:
     environment:
       DATABASE_PATH: /app/db/db.sqlite3
     ports:
-      - "8080:8080"
+      # Only this machine can reach Dana. To reach it from elsewhere, put it behind a reverse proxy
+      # with TLS (Caddy, Traefik, nginx…) on the same host, or change this to "8080:8080" on a network
+      # you trust. API_TOKEN is required either way (docs/operations.md, "Running it").
+      - "127.0.0.1:8080:8080"
     volumes:
       - data:/app/db
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
     restart: unless-stopped
 
   # The money addon's worker (addons/money/worker/): shares the app's network (Dana reaches it on
@@ -39,6 +48,8 @@ services:
     profiles: [money]
     image: dana-money
     network_mode: "service:app"
+    environment:
+      TZ: ${TIMEZONE:-UTC}   # the server's zone (from .env): the dates the sites are asked for
     volumes:
       - type: volume
         source: data

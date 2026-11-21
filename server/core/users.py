@@ -66,6 +66,9 @@ class User:
     pronoun: str = "they"
     other_names: str = ""
     prompt_name: str = ""
+    # Their own languages (comma list) and currency; "" = the server's (core/user_locale.py).
+    languages: str = ""
+    currency: str = ""
 
     @property
     def level(self) -> access.AccessLevel:
@@ -134,7 +137,7 @@ def _load() -> _Snapshot:
                                   telegram_chat_id=r["telegram_chat_id"], created_at=r["created_at"],
                                   telegram_ids=tuple(tg_by_user.get(r["id"], ())), context=r["context"],
                                   pronoun=r["pronoun"], other_names=r["other_names"],
-                                  prompt_name=r["prompt_name"])
+                                  prompt_name=r["prompt_name"], languages=r["languages"], currency=r["currency"])
             if first_admin_id is None and r["access"] == access.ADMIN:
                 first_admin_id = r["id"]
         tokens = conn.execute("SELECT id, user_id, token_hash, session_hash FROM user_tokens").fetchall()
@@ -170,6 +173,7 @@ def _touch(token_id: str) -> None:
     _touched[token_id] = now
     try:
         with get_db_connection() as conn:
+            # scoped: the token that just resolved a request
             conn.execute("UPDATE user_tokens SET last_used_at = ? WHERE id = ?", (_now_iso(), token_id))
             conn.commit()
     except Exception as e:
@@ -227,18 +231,15 @@ def _resolve_token(hit: Optional[Tuple[str, str]]) -> Optional[User]:
     return user
 
 
-def telegram_open() -> bool:
-    """No user has a Telegram id: the bot lets anyone in, as the first admin
-    (what an empty ``ALLOWED_TELEGRAM_USER_IDS`` always meant)."""
+def telegram_unlinked() -> bool:
+    """No user has a Telegram id yet: the bot refuses every sender (and tells
+    them how to be linked) until one is added."""
     return not _current().by_telegram
 
 
 def by_telegram_id(telegram_user_id: int) -> Optional[User]:
-    """The user a Telegram user id resolves to; the first admin for anyone
-    while :func:`telegram_open`; None for an unknown id otherwise."""
+    """The user a Telegram user id resolves to; None for an id no user has."""
     snap = _current()
-    if not snap.by_telegram:
-        return first_admin()
     user_id = snap.by_telegram.get(int(telegram_user_id))
     return snap.users.get(user_id) if user_id else None
 
@@ -308,14 +309,17 @@ _UNSET: object = object()
 
 def update(user_id: str, *, name: Optional[str] = None, access_level: Optional[str] = None,
            context: Optional[str] = None, pronoun: Optional[str] = None, other_names: Optional[str] = None,
-           prompt_name: Optional[str] = None, telegram_chat_id: object = _UNSET) -> User:
+           prompt_name: Optional[str] = None, languages: Optional[str] = None, currency: Optional[str] = None,
+           telegram_chat_id: object = _UNSET) -> User:
     """Change a user; arguments left out stay as they are
-    (``telegram_chat_id=None`` removes the proactive chat).
+    (``telegram_chat_id=None`` removes the proactive chat; ``languages`` /
+    ``currency`` ``""``: back to the server's).
 
     Raises:
         LookupError: no such user.
-        ValueError: an empty name, an unknown access level or pronoun, or
-            taking ``admin`` away from the last admin.
+        ValueError: an empty name, an unknown access level or pronoun, a
+            malformed language or currency code, or taking ``admin`` away
+            from the last admin.
     """
     user = get(user_id)
     if user is None:
@@ -330,7 +334,9 @@ def update(user_id: str, *, name: Optional[str] = None, access_level: Optional[s
         context=user.context if context is None else context,
         pronoun=user.pronoun if pronoun is None else pronoun,
         other_names=user.other_names if other_names is None else other_names,
-        prompt_name=user.prompt_name if prompt_name is None else prompt_name)
+        prompt_name=user.prompt_name if prompt_name is None else prompt_name,
+        languages=user.languages if languages is None else languages,
+        currency=user.currency if currency is None else currency)
     chat = user.telegram_chat_id if telegram_chat_id is _UNSET else telegram_chat_id
     try:
         with get_db_connection() as conn:
@@ -413,8 +419,8 @@ def move_telegram_id(telegram_user_id: int, user_id: str) -> None:
 
 def remove_telegram_id(telegram_user_id: int) -> bool:
     """Forget a Telegram user id (it no longer resolves to anyone). Returns
-    False when nobody had it. Removing the last one opens the bot to
-    everyone (see :func:`telegram_open`)."""
+    False when nobody had it. With no id left the bot refuses everyone
+    (see :func:`telegram_unlinked`)."""
     try:
         with get_db_connection() as conn:
             cur = conn.execute("DELETE FROM user_telegram WHERE telegram_user_id = ?", (int(telegram_user_id),))
@@ -449,6 +455,7 @@ def revoke_token(token_id: str) -> bool:
     """Delete a stored token (its Bearer header and web logins stop working).
     Returns False when there was no such token."""
     with get_db_connection() as conn:
+        # scoped: the admin CLI revokes a token by its id (bin/dana)
         cur = conn.execute("DELETE FROM user_tokens WHERE id = ?", (token_id,))
         conn.commit()
     invalidate()
@@ -480,9 +487,9 @@ def bootstrap() -> Optional[User]:
     if unknown and not created:
         logger.warning(f"ALLOWED_TELEGRAM_USER_IDS lists ids no user has ({unknown}); they are not let in. "
                        "The env value is read only when the first user is created.")
-    if telegram_open() and os.getenv("TELEGRAM_BOT_TOKEN"):
-        logger.warning("No Telegram user ids are known: the Telegram bot is PUBLIC "
-                       "(anyone can use it, as the first admin user)!")
+    if telegram_unlinked() and os.getenv("TELEGRAM_BOT_TOKEN"):
+        logger.warning("No user has a Telegram id: the Telegram bot refuses everyone. Link yours with "
+                       "`bin/dana users telegram add <user> <telegram id>` (the bot tells each sender their id).")
     else:
         logger.info(f"Telegram bot restricted to user IDs: {sorted(snap.by_telegram)}")
     return created

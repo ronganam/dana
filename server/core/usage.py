@@ -316,6 +316,7 @@ _EVENT_COLUMNS = ("ts", "day", "user_id", "kind", "purpose", "source", "ref", "p
 def _write(rows: List[Dict[str, Any]]) -> None:
     placeholders = ",".join("?" for _ in _EVENT_COLUMNS)
     with get_db_connection() as conn:
+        # scoped: inserts rows that carry their own user_id column
         conn.executemany(f"INSERT INTO usage_events ({','.join(_EVENT_COLUMNS)}) VALUES ({placeholders})",
                          [tuple(r[c] for c in _EVENT_COLUMNS) for r in rows])
         conn.commit()
@@ -350,6 +351,7 @@ def rollup_sync(raw_days: int = RAW_DAYS) -> int:
     to its row). Returns how many raw rows were folded."""
     cutoff = (clock.now().date() - datetime.timedelta(days=raw_days)).isoformat()
     with get_db_connection() as conn:
+        # scoped: server-wide roll-up of old raw rows into daily totals
         n = conn.execute("SELECT COUNT(*) FROM usage_events WHERE day < ?", (cutoff,)).fetchone()[0]
         if not n:
             return 0
@@ -365,6 +367,7 @@ def rollup_sync(raw_days: int = RAW_DAYS) -> int:
                 output_tokens = output_tokens + excluded.output_tokens,
                 cached_tokens = cached_tokens + excluded.cached_tokens, cost = cost + excluded.cost,
                 unpriced = unpriced + excluded.unpriced, ms = ms + excluded.ms""", (cutoff,))
+        # scoped: server-wide roll-up of old raw rows into daily totals
         conn.execute("DELETE FROM usage_events WHERE day < ?", (cutoff,))
         conn.commit()
     return n
@@ -430,6 +433,7 @@ def _grouped(conn, first: Optional[datetime.date], last: datetime.date, filters:
         where.append(f"{key} = ?")
         params.append(value)
     clause = " AND ".join(where)
+    # scoped: where gets user_id = ? when one user is asked; None = everyone (see_everyone)
     sql = f"""
         SELECT day, kind, purpose, source, model, SUM(calls) AS calls, SUM(failures) AS failures,
                SUM(input_tokens) AS input_tokens, SUM(output_tokens) AS output_tokens,
@@ -537,6 +541,7 @@ def events(limit: int = 50, before: Optional[int] = None, sort: str = "recent", 
     limit = max(1, min(int(limit), 200))
     with get_db_connection() as conn:
         rows = [dict(r) for r in conn.execute(
+            # scoped: where gets user_id = ? when one user is asked; None = everyone (see_everyone)
             f"SELECT * FROM usage_events WHERE {' AND '.join(where)} ORDER BY {order} LIMIT ?", params + [limit]).fetchall()]
     for r in rows:
         r["ok"] = bool(r["ok"])

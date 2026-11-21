@@ -36,6 +36,7 @@ from cli import main as cli  # noqa: E402
 from core.addons import sharing  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import store  # noqa: E402
+from core.addons.addon import all_addons  # noqa: E402
 from addons.tasks import groups  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
@@ -77,6 +78,10 @@ def test_users() -> None:
     bob = next((u for u in users.list_users() if u.name == "Bob Builder"), None)
     check("add: a member with their profile", rc == 0 and bob is not None and bob.access == "member"
           and bob.pronoun == "he" and bob.context.startswith("Bob is a builder") and bob.id in out, out)
+    defaults = [a.name for a in all_addons() if a.default_on]
+    check("add: the default addons turned on (no credentials), named in the output",
+          defaults and list(store.connected_addons(bob)[1:]) == defaults and ", ".join(defaults) in out
+          and not store.is_connected(bob, "ops"), (store.connected_addons(bob), out))
     rc, _, _ = run("users", "add", "Carl", "--access", "member", "--telegram-chat", "4242")
     carl = next(u for u in users.list_users() if u.name == "Carl")
     check("add: proactive chat, default pronoun they", rc == 0 and carl.telegram_chat_id == 4242 and carl.pronoun == "they")
@@ -128,16 +133,16 @@ def test_tokens() -> None:
 def test_telegram() -> None:
     bob = next(u for u in users.list_users() if u.name == "Bob B")
     carl = next(u for u in users.list_users() if u.name == "Carl")
-    check("telegram: open before any id", users.telegram_open())
+    check("telegram: unlinked before any id (the bot refuses everyone)", users.telegram_unlinked() and users.by_telegram_id(1001) is None)
     rc, _, _ = run("users", "telegram", "add", bob.id, "1001")
-    check("telegram add", rc == 0 and users.by_telegram_id(1001).id == bob.id and not users.telegram_open())
+    check("telegram add", rc == 0 and users.by_telegram_id(1001).id == bob.id and not users.telegram_unlinked())
     rc, _, err = run("users", "telegram", "add", carl.id, "1001")
     check("telegram add: an id someone has is refused, move suggested", rc == 1 and "telegram move" in err, err)
     rc, _, _ = run("users", "telegram", "move", "1001", "carl")
     check("telegram move", rc == 0 and users.by_telegram_id(1001).id == carl.id)
     rc, _, err = run("users", "telegram", "remove", "1001")
-    check("telegram remove: the last id is refused (the bot would open)",
-          rc == 1 and "--allow-open-bot" in err and users.by_telegram_id(1001).id == carl.id)
+    check("telegram remove: the last id is refused (the bot would refuse everyone)",
+          rc == 1 and "--allow-no-ids" in err and users.by_telegram_id(1001).id == carl.id)
     run("users", "telegram", "add", ADMIN.id, "1002")
     rc, _, _ = run("users", "telegram", "remove", "1001")
     check("telegram remove", rc == 0 and users.by_telegram_id(1001) is None and users.by_telegram_id(1002).id == ADMIN.id)
@@ -170,11 +175,11 @@ def test_addons(tmp: Path) -> None:
           rc == 0 and conn.credentials == {"host": "http://ha-bob.invalid", "token": "new-secret-456"}
           and conn.settings["car_device"] is None and conn.settings["weather_entity"] == "weather.bob"
           and "new-secret-456" not in out, out)
+    check("add: on_connect ran for the default tasks addon (default task lists)",
+          len(groups.list_groups(users.get(bob.id))) >= 1)
+    run("addons", "disconnect", "bob", "shopping")
     rc, out, _ = run("addons", "connect", "bob", "shopping")
     check("connect: an addon without credentials", rc == 0 and store.is_connected(users.get(bob.id), "shopping"), out)
-    rc, _, _ = run("addons", "connect", "bob", "tasks")
-    check("connect: on_connect runs (default task lists)", rc == 0
-          and len(groups.list_groups(users.get(bob.id))) >= 1)
     rc, _, err = run("addons", "connect", "bob", "ops")
     check("connect: ops refused for a member", rc == 1 and "ops" in err and not store.is_connected(users.get(bob.id), "ops"))
     rc, _, err = run("addons", "connect", "bob", "homeassistant", "--credentials-stdin",
@@ -204,7 +209,7 @@ def test_addons(tmp: Path) -> None:
           rc == 0 and "homeassistant" in out and "token set" in out and '"person.bob"' in out and "new-secret" not in out
           and "shopping" in out and "tasks" in out, out)
     rc, out, _ = run("users", "list")
-    check("list: connected addons", "addons: tasks, shopping, homeassistant" in out, out)
+    check("list: connected addons", "addons: tasks, shopping, knowledge, about, people, phone, homeassistant" in out, out)
     rc, _, _ = run("addons", "disconnect", "bob", "shopping")
     check("disconnect", rc == 0 and not store.is_connected(users.get(bob.id), "shopping"))
     rc, _, err = run("addons", "disconnect", "bob", "shopping")
@@ -221,9 +226,7 @@ def test_addons(tmp: Path) -> None:
 def test_sharing_and_remove() -> None:
     bob = users.get(next(u for u in users.list_users() if u.name == "Bob B").id)
     carl = users.get(next(u for u in users.list_users() if u.name == "Carl").id)
-    store.connect(carl, "tasks")
-    store.connect(carl, "knowledge")
-    store.connect(bob, "knowledge")
+    # Carl and Bob have tasks and knowledge from the defaults of `add`.
     rc, out, _ = run("users", "sharing")
     check("sharing: nothing yet", rc == 0 and "Nothing is shared" in out)
     bob_list = groups.list_groups(bob)[0]

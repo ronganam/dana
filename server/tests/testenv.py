@@ -39,17 +39,19 @@ from typing import Optional
 SERVER = Path(__file__).resolve().parent.parent
 FIXTURES = SERVER / "tests" / "fixtures"
 
-# Every env name addons/bootstrap.py reads to create addons
-# (test_addons.py checks this list against the module), plus the
-# credentials key and the identity values core/users.py reads at bootstrap.
+# The old env import's per-account names (read by nothing now: removed so a
+# value in your shell cannot hide that), plus the credentials key and the
+# identity / locale values core/users.py and core/user_locale.py read.
 ADDON_ENV = (
     "HOMEASSISTANT_HOST", "HOMEASSISTANT_TOKEN", "PRIMARY_PERSON", "PHONE_INTERACTIVE_SENSOR",
     "PHONE_BATTERY_SENSOR", "PHONE_NOTIFY_SERVICE", "BRIEFING_WEATHER_ENTITY",
     "WAHA_URL", "WAHA_API_KEY", "WAHA_TOKEN", "WAHA_SESSION", "WHATSAPP_VOICE_TELEGRAM_CHAT_ID",
     "GOOGLE_REFRESH_TOKEN", "GOOGLE_CALENDAR_ID", "FRIGATE_URL",
 )
-IDENTITY_ENV = ("DANA_ADDON_DIRS", "DANA_SITE", "DANA_CATALOG_URL", "DANA_CATALOG_FILE", "CREDENTIALS_KEY", "API_TOKEN", "ALLOWED_TELEGRAM_USER_IDS", "TELEGRAM_CHAT_ID",
-                "OWNER_NAME", "OWNER_CONTEXT", "OWNER_PRONOUN", "OWNER_OTHER_NAMES")
+IDENTITY_ENV = ("DANA_ADDON_DIRS", "DANA_SITE", "DANA_CATALOG_URL", "DANA_CATALOG_FILE", "CREDENTIALS_KEY", "API_TOKEN",
+                "DANA_INSECURE_DEV", "WAHA_WEBHOOK_SECRET", "ALLOWED_TELEGRAM_USER_IDS", "TELEGRAM_CHAT_ID",
+                "OWNER_NAME", "OWNER_CONTEXT", "OWNER_PRONOUN", "OWNER_OTHER_NAMES", "OWNER_LANGUAGES",
+                "OWNER_CURRENCY", "DEFAULT_LANGUAGES", "CURRENCY", "DEFAULT_COUNTRY_CODE")
 
 # The first admin of every test database: a made-up person.
 OWNER_NAME = "Robin Levi"
@@ -60,8 +62,12 @@ OWNER_CONTEXT = (
     "they are planning their wedding. 'אמא' is Robin's mother. נועה is Robin's sibling. "
     "Pepper (פפר) is Robin and Gal's dog."
 )
+# Robin speaks Hebrew and English and pays in shekels (the server's defaults stay en / USD).
+OWNER_LANGUAGES = "he,en"
+OWNER_CURRENCY = "ILS"
 OWNER_ENV = {"OWNER_NAME": OWNER_NAME, "OWNER_PRONOUN": OWNER_PRONOUN,
-             "OWNER_OTHER_NAMES": OWNER_OTHER_NAMES, "OWNER_CONTEXT": OWNER_CONTEXT}
+             "OWNER_OTHER_NAMES": OWNER_OTHER_NAMES, "OWNER_CONTEXT": OWNER_CONTEXT,
+             "OWNER_LANGUAGES": OWNER_LANGUAGES, "OWNER_CURRENCY": OWNER_CURRENCY}
 
 _dir: Optional[str] = None
 
@@ -91,3 +97,18 @@ def isolate(name: str) -> str:
     path = scratch_path(f"{name}.sqlite3")
     os.environ["DATABASE_PATH"] = path
     return path
+
+
+def connect_admin(addon: str, credentials: Optional[dict] = None, settings: Optional[dict] = None) -> None:
+    """Connect ``addon`` for the first admin, as the server (``by=None``), the
+    way an operator does with ``bin/dana addons connect``: for a test whose
+    first admin has an addon with credentials or settings. Call it after
+    ``users.bootstrap()``; the app is imported here, not at this module's import."""
+    from core import users
+    from core.addons import store
+    admin = users.first_admin()
+    assert admin is not None, "connect_admin needs users.bootstrap() first"
+    if store.is_connected(admin, addon):
+        store.update(admin, addon, credentials=credentials, settings=settings)
+    else:
+        store.connect(admin, addon, credentials=credentials, settings=settings)

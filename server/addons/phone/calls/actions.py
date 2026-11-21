@@ -147,9 +147,11 @@ def _resolve(suggestion_id: str, status: str, result_ref: Optional[str], payload
     """Close a suggestion the caller already found among the user's own."""
     with get_db_connection() as conn:
         if payload is not None:
+            # scoped: the caller found the suggestion among the user's own
             conn.execute("UPDATE call_suggestions SET payload = ? WHERE id = ?",
                          (json.dumps(payload, ensure_ascii=False), suggestion_id))
         conn.execute(
+            # scoped: the caller found the suggestion among the user's own
             "UPDATE call_suggestions SET status = ?, result_ref = ?, resolved_at = CURRENT_TIMESTAMP WHERE id = ?",
             (status, result_ref, suggestion_id))
         conn.commit()
@@ -175,6 +177,7 @@ def update_suggestion_payload(user: Optional[User], suggestion_id: str,
     payload = dict(s["payload"])
     payload.update({k: v for k, v in changes.items() if v is not None})
     with get_db_connection() as conn:
+        # scoped: get_suggestion(user, suggestion_id) checked above
         conn.execute("UPDATE call_suggestions SET payload = ? WHERE id = ?",
                      (json.dumps(payload, ensure_ascii=False), suggestion_id))
         conn.commit()

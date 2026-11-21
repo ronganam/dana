@@ -7,7 +7,8 @@ by label: ``person`` the person entities, ``car_sensor`` the sensors with a
 ``connected_paired_devices`` attribute (``car_device`` the Bluetooth names
 those sensors list now), ``phone_interactive_sensor`` the binary sensors,
 ``phone_battery_sensor`` the battery sensors, ``weather_entity`` the weather
-entities. ``phone_notify_service`` is a service, not an entity: no candidates.
+entities, ``tv_entity`` the media players. ``phone_notify_service`` is a
+service and ``tv_channel_command`` a command, not entities: no candidates.
 """
 
 import ast
@@ -16,7 +17,7 @@ from typing import Any, Dict, List
 
 from core.addons import Connection
 from addons.homeassistant import client
-from addons.homeassistant.config import (BATTERY_SENSOR, CAR_DEVICE, CAR_SENSOR, PERSON, SCREEN_SENSOR,
+from addons.homeassistant.config import (BATTERY_SENSOR, CAR_DEVICE, CAR_SENSOR, PERSON, SCREEN_SENSOR, TV,
                                                WEATHER)
 
 Option = Dict[str, Any]
@@ -52,7 +53,7 @@ async def entity_options(conn: Connection) -> Dict[str, List[Option]]:
     """
     states = await client.fetch_states(conn)
     out: Dict[str, List[Option]] = {PERSON: [], CAR_SENSOR: [], CAR_DEVICE: [], SCREEN_SENSOR: [],
-                                    BATTERY_SENSOR: [], WEATHER: []}
+                                    BATTERY_SENSOR: [], WEATHER: [], TV: []}
     devices: Dict[str, None] = {}
     for s in states:
         eid = str(s.get("entity_id") or "")
@@ -64,6 +65,8 @@ async def entity_options(conn: Connection) -> Dict[str, List[Option]]:
             out[SCREEN_SENSOR].append(_option(s))
         elif domain == "weather":
             out[WEATHER].append(_option(s))
+        elif domain == "media_player":
+            out[TV].append(_option(s))
         elif domain == "sensor":
             if "connected_paired_devices" in attrs:
                 out[CAR_SENSOR].append(_option(s))

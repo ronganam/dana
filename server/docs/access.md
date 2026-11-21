@@ -23,6 +23,8 @@ first user's values), tables from migrations `m0002_users` and
 | `pronoun` | `he` / `she` / `they` (default `they`): how prompts refer to them, verbs agreeing ("she does", "they do"). |
 | `other_names` | Other spellings of their first name (another script), shown in brackets where a prompt reads a transcript: "Robin (רובין)". |
 | `prompt_name` | What Dana's own instructions call them (the agent prompt, the shared phone screen); '' = their first name. The first admin's is `the owner`. |
+| `languages` | Comma list of language codes (`he,en`), the first their default reply language: the agent's language rule and the transcription prompt are worded for them (`core/user_locale.py`, core migration `m0004_user_locale`). '' = the server's `DEFAULT_LANGUAGES` (default `en`). |
+| `currency` | ISO 4217 code (`ILS`): what money values mean where an addon does not know better (knowledge's budgets and prices; `{currency}` in a prompt part). '' = the server's `CURRENCY` (default `USD`). Changed by the user on the web Settings → Profile card (`PUT /api/profile`) or with `bin/dana users update --languages / --currency`. |
 | identities | Telegram user ids (`user_telegram`) and API tokens (`user_tokens`, one per device, with a label, created / last-used) that resolve to this user. |
 
 - **First user.** `users.bootstrap()` runs at startup (`main.py`, after
@@ -30,7 +32,8 @@ first user's values), tables from migrations `m0002_users` and
   (default `Owner`), access `admin`, Telegram ids from
   `ALLOWED_TELEGRAM_USER_IDS` (non-numeric entries skipped), proactive chat
   `TELEGRAM_CHAT_ID`, and a profile from `OWNER_CONTEXT`, `OWNER_PRONOUN`
-  (default `they`), `OWNER_OTHER_NAMES` and the prompt name `the owner`
+  (default `they`), `OWNER_OTHER_NAMES`, `OWNER_LANGUAGES`, `OWNER_CURRENCY`
+  (unset: the server's) and the prompt name `the owner`
   (`user_rows.first_user_profile()`; migration `m0016_user_profile` gives the
   same values to an existing first admin). Those env values are read only
   then; later changes are not applied (startup warns when
@@ -54,22 +57,26 @@ first user's values), tables from migrations `m0002_users` and
   Public paths (`/login`, `/api/health`, `/api/app/version`,
   `/api/app/upload`, `/api/app/download/*`, `/static/*`, `/sw.js`,
   `/manifest.json`) need nothing and get no user.
-- **Internal hosts.** Requests without credentials whose `Host` is in
-  `INTERNAL_HOSTS` are accepted only on the inbound webhook path
-  (`/webhook/waha`; `auth.INBOUND_PATHS`), with no `request["user"]`: that
-  handler finds its user from the payload (see "Inbound"). Home Assistant
-  posts nothing any more (`/webhook` is gone: "Home Assistant triggers"). Every other path
-  needs credentials from any host (before: an internal host could call every
-  path).
-- **Local development.** With no `API_TOKEN` set, every request is the first
-  admin user (no user is set only if `bootstrap()` never ran, e.g. a test that
-  skips it).
+- **Inbound webhook.** A request without credentials reaches only the
+  inbound webhook path (`/webhook/waha`; `auth.INBOUND_PATHS`), with no
+  `request["user"]`; its handler accepts it only when WAHA signed the raw body
+  with `WAHA_WEBHOOK_SECRET` (HMAC-SHA512 in `X-Webhook-Hmac`; "Inbound") and
+  finds its user from the payload. The `Host` header proves nothing: an
+  in-cluster Service name is as easy to send as any other. Home Assistant
+  posts nothing any more (`/webhook` is gone: "Home Assistant triggers").
+  Every other path needs credentials.
+- **No `API_TOKEN`.** The server refuses to start (`auth.startup_problem()`,
+  `main.py`). For local development only, `DANA_INSECURE_DEV=1` starts it
+  anyway: every request is the first admin, the server listens on
+  `127.0.0.1` only (`auth.bind_host()`) and the start logs a warning. Without
+  either (a test app that skips `main.py`), every request is refused (401).
 - **Telegram** (`core/telegram_bot.py::AuthMiddleware`): the sender's Telegram
   id resolves to a user, passed to handlers as `user` in the handler data, and
   the handler runs as that user (see "The current user"). Unknown ids are
-  refused with the same message as before. While no user has any Telegram id (`ALLOWED_TELEGRAM_USER_IDS`
-  was empty at bootstrap) the bot stays open, as it was, and everyone is the
-  first admin (`users.telegram_open()`).
+  refused with a reply that gives their id and how an admin links it
+  (`bin/dana users telegram add <user> <id>`). While no user has any Telegram id
+  (`ALLOWED_TELEGRAM_USER_IDS` was empty at bootstrap, `users.telegram_unlinked()`)
+  every sender is refused that way; the bot is never open.
 - **Profile in prompts** (`core/user_profile.py`): `for_user(user)` gives
   every prompt its words for the user — name, first name, context, `called`
   (first name with `other_names`), pronoun forms (`obj`, `possessive`,
@@ -261,10 +268,7 @@ network through something they control. Tests: `bin/test test_security`
   with `manage_server`; everyone else gets `{}` (same payload shape). For an
   admin a value is masked (`******`) when its name has `key`, `token`,
   `password`, `passwd`, `secret`, `auth`, `credential`, `private`, `cookie`,
-  `session` or `service_account` in it, ends in `_json`, or is one of the
-  names the one-time import reads (`addons/bootstrap.py`
-  `CREDENTIAL_ENV`: `HOMEASSISTANT_HOST`, `HOMEASSISTANT_TOKEN`, `WAHA_URL`,
-  `WAHA_API_KEY`, `WAHA_TOKEN`, `WAHA_SESSION`, `GOOGLE_REFRESH_TOKEN`); and
+  `session` or `service_account` in it, or ends in `_json`; and
   when the value holds a PEM block (`-----BEGIN`), is a URL with a user name /
   password, or parses as JSON with a secret-looking key anywhere (a service
   account's `private_key`).
@@ -272,7 +276,7 @@ network through something they control. Tests: `bin/test test_security`
   only a user with that capability may connect, update or disconnect the addon,
   for themselves or for another user (`?user=`); everyone else gets 403
   `{"error": "forbidden", "needs": "manage_users"}` (`store.Forbidden`).
-  `bin/dana` and the env import act as the server (`by=None`). Today:
+  `bin/dana` and startup act as the server (`by=None`). Today:
   `cameras` (the Frigate address is the only thing it holds).
 - **Addresses** (`core/addons/addresses.py`, `Field(type=ADDRESS)`:
   Home Assistant `host`, WAHA `url`, cameras `url`). For everyone: `http` /
@@ -336,9 +340,11 @@ network through something they control. Tests: `bin/test test_security`
   non-public address, no `localhost`; names are judged at download time) and
   refused with 400 `{"error": "invalid", "field": "url"}` / a tool error.
   Admins' own links: unchanged.
-- **The WAHA webhook** (`/webhook/waha`) is accepted only from a host in
-  `INTERNAL_HOSTS` without credentials (WAHA in the cluster) or from a user
-  with `manage_server`; anyone else gets 403. Media named by an event is
+- **The WAHA webhook** (`/webhook/waha`) is accepted only when WAHA signed
+  the raw body with `WAHA_WEBHOOK_SECRET` (`X-Webhook-Hmac`: hex HMAC-SHA512,
+  compared in constant time; `X-Webhook-Hmac-Algorithm` must be `sha512`), or
+  from a user with `manage_server` (testing); anyone else gets 403, a forged
+  `Host` header included. Without the secret every unsigned event is refused. Media named by an event is
   fetched from the connection's own WAHA (its scheme and host; only the path
   and query come from the event), so the API key never goes elsewhere.
 - **Shopping** (`docs/shopping.md`). The active list is the user's own
@@ -374,6 +380,28 @@ network through something they control. Tests: `bin/test test_security`
 - **Telegram selections** (the multi-select prompt's toggles) are kept per
   `(user, session)`; a button pressed by someone else gets the "not yours"
   alert.
+- **SQL scoping** (`bin/test test_sql_scoping`). Every SQL string in
+  `server/` (not migrations or tests) that names a table with a `user_id`
+  column mentions `user_id`, interpolates a scope helper (`visible_sql`,
+  `owned_sql`, `calls_sql`…: a `*_sql` / `*_where` function whose source
+  mentions `user_id`), or carries `# scoped: <reason>` on its line or the line
+  before (by id after an access check, a server-wide job, an owner join…). A
+  new unscoped statement fails the test until it is scoped or says why.
+- **Text written by others** (`bin/test test_untrusted_tools`). Every tool
+  whose result carries third-party text (web pages, emails, chat messages,
+  notifications, calendar invitations, call transcripts, briefs and entries
+  made from them) is `untrusted_result=True`, so for the rest of that turn
+  every `acts_outside` tool asks first; every tool that sends to other people
+  is `confirm`.
+- **ops** (kubectl and Python on the server, `addons/ops/`). Admin only and
+  never turned on by itself (not a default, not given by startup): an admin
+  turns it on. `run_kubectl` runs only read-only verbs (`get`, `describe`
+  except secrets, `logs`, `top`…) with the pod's service account; `run_python`
+  always asks first (`confirm`) and is **not a sandbox**: a child process in
+  a temporary working directory with CPU / memory / file-size limits,
+  Python's isolated mode and a minimal environment (`PATH`, `HOME`, `TMPDIR`,
+  locale: no `CREDENTIALS_KEY`, API keys or tokens), but the server's user,
+  file system and network.
 
 ## Addon
 
@@ -412,7 +440,7 @@ has a natural seam: `homeassistant/client.py` + `home_map.py`,
 - optional **change_requires**: a capability the user *making* the change
   needs (`cameras`: `manage_users`), else `store.Forbidden` (403). Every
   `store.connect / update / disconnect` takes `by=` (the acting user; None
-  for the server itself, `bin/dana` and the env import).
+  for the server itself, startup and `bin/dana`).
 - optional **validate**: `Addon(validate=)`, a rule across fields and
   users called with `(user, changes, credentials, settings, by)` before a
   change is saved; it raises `InvalidValue` (WhatsApp: a session another user
@@ -461,7 +489,8 @@ has a natural seam: `homeassistant/client.py` + `home_map.py`,
   entities), `car_sensor` (sensors with a `connected_paired_devices`
   attribute), `car_device` (the device names in those attributes),
   `phone_interactive_sensor` (binary sensors), `phone_battery_sensor`
-  (sensors of device class `battery`), `weather_entity` (weather entities).
+  (sensors of device class `battery`), `weather_entity` (weather entities),
+  `tv_entity` (media players).
 - **inbound handlers** (webhooks, phone uploads) and **background jobs** (run
   once per user who has the addon connected, as that user) — not part of the
   framework: each addon runs its own per user (`tasks` time checker, `about`
@@ -558,15 +587,15 @@ Rules:
 | `about` | About-you facts and learner | none | none | built in, no sharing; facts, "do not re-add", the size cap, the prompt section and the learner per user (docs/about.md) |
 | `people` | people, briefs | none | none | built in, no sharing; people, their numbers (unique per user), briefs and the call card per user; calls / notifications linked only from the user's own (both by their `user_id`, `activity.calls_sql` / `notifications_sql`) (docs/people.md) |
 | `phone` | the Android phone: push, notifications Inbox, calls and suggestions | none (devices register with the user's API token) | none | built in. Devices, push events (one `seq` numbering for the server, each event fetched only by its user), notifications (FTS, rules, summaries, declines, action requests, digest state), calls (uploads, recordings, transcripts, labels, FTS search, processing / reanalysis / backfill as the owner), call and notification suggestions (only their owner's: listed, accepted, dismissed, edited, undone, popped up), context chats on them, the self-check marks `push` / `notification_sync` / `triage`, the calls check and the loops per user; `/api/phone/*`, `/api/notifications/*`, `/api/calls/*` and `/api/suggestions/*` for the caller, 403 `not_connected` without the addon (docs/notifications.md, docs/calls.md) |
-| `homeassistant` | Home Assistant | `host` (an address), `token` | `person` (person entity: zone triggers), `car_sensor` (the phone's Bluetooth connection sensor) + `car_device` (the car's Bluetooth name in its `connected_paired_devices`): car triggers, `phone_interactive_sensor` (screen on: wake confirmation), `phone_battery_sensor` (bedroom dashboard tile), `phone_notify_service` (only reported by `/api/client-config`), `weather_entity` (`weather.forecast_home`: briefing, Now); no other defaults (the first admin's values come from the env import) | no limits on Dana's side: whatever the token can do. Everything per connection: REST / WebSocket clients, zones, states cache, home map, the entity watcher (docs/tasks-and-triggers.md). Tools, `/api/ha/*`, `/api/zones`, `/api/client-config`, the HA camera proxies (which also need `cameras`): the caller's connection, 403 `not_connected` without it |
+| `homeassistant` | Home Assistant | `host` (an address), `token` | `person` (person entity: zone triggers), `car_sensor` (the phone's Bluetooth connection sensor) + `car_device` (the car's Bluetooth name in its `connected_paired_devices`): car triggers, `phone_interactive_sensor` (screen on: wake confirmation), `phone_battery_sensor` (bedroom dashboard tile), `phone_notify_service` (only reported by `/api/client-config`), `weather_entity` (`weather.forecast_home`: briefing, Now), `tv_entity` (the Android TV media player `control_android_tv` uses when not given one) + `tv_channel_command` (an ADB command with `{channel}` for its `watch_channel`, e.g. a TV provider app's deep link; unset: no channel changes); no other defaults | no limits on Dana's side: whatever the token can do. Everything per connection: REST / WebSocket clients, zones, states cache, home map, the entity watcher (docs/tasks-and-triggers.md). Tools, `/api/ha/*`, `/api/zones`, `/api/client-config`, the HA camera proxies (which also need `cameras`): the caller's connection, 403 `not_connected` without it |
 | `whatsapp` | WAHA | `url` (an address), `api_key` (optional), `session` (a name, not one another user's connection uses) | `voice_telegram_chat_id` (none): the user's voice-transcript chat (their own Telegram id unless an admin sets it) | account: the session's WhatsApp id, learned from WAHA (routes inbound events, see "Inbound"). Tools, name maps, "me", dedupe, saved contacts (`whatsapp_contacts`) and the images its tools save per connection / user (docs/whatsapp.md). No HTTP endpoint of its own besides the inbound webhook |
 | `calendar` | Google Calendar | `refresh_token` (from the Google sign-in, "Google account") | `calendar_id` (`primary`): where new events go, `selected_calendars` (none): ids of the calendars shown and searched (none chosen: `calendar_id`) | OAuth client id/secret are server-wide. Tools, `/api/calendar/*`, undo of events, accepting an event suggestion and the composers' calendar reads (Now, briefing, meeting cards, weekly review, the `calendar` self-check) use the acting user's connection; credentials (access token) and today's events cached per connection; 403 `not_connected` without it. No sharing on Dana's side: calendars Google shares with a user show through their own account (docs/now.md) |
-| `contacts` | Google Contacts | `refresh_token` (from the Google sign-in) | none | a copy of the user's contacts, synced in the background (`CONTACTS_SYNC_MINUTES`) and deleted on disconnect; search / read tools, `add_contact` / `update_contact` ask first; fills the user's people and names unknown callers; never connected by the env import (docs/contacts.md) |
-| `gmail` | Gmail | `refresh_token` (from the Google sign-in) | none | account: the mailbox address. Chat tools only (`Addon(realtime=False)`: not offered or run in realtime voice, which has no Approve step); sending asks first, other changes have Undo; reading tools are `untrusted_result`; nothing is stored; never connected by the env import (docs/gmail.md) |
-| `telegram_account` | the user's own Telegram account (Telethon) | `session` (from the QR sign-in, `/telegram/connect`) | none | account: the Telegram name and @username. The app (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) is server-wide. Read-only tools, `untrusted_result`, chat only (`realtime=False`); nothing is marked read; one client per connection; never connected by the env import (docs/telegram-account.md) |
-| `cameras` | Frigate | none | `url` (an address; none; the first admin's from the env import) | changed only by a user with `manage_users` (for anyone); no tools, only the camera endpoints (`/api/frigate/*`, `/api/camera/{entity}/proxy`), each for the caller's own Frigate, 403 `not_connected` without the addon; the two that go through Home Assistant also need `homeassistant`; caches per connection (docs/dashboard.md) |
-| `money` | bank / card sites through the bank-worker sidecar | none of its own: each bank / card login is a row of `money_sources`, its credentials a Fernet token under the same `CREDENTIALS_KEY`, decrypted only in `addons/money/sync.py` to start a worker job, never returned by an API or tool, never logged | `MONEY_SYNC_TIMES` is server-wide | built in for nobody: connected per user; sources, accounts, transactions, rules, syncs and code requests per user (another user's source / request id answers 404); disconnecting deletes all of them and the user's browser profiles. SMS sign-in codes are never stored or logged: the phone posts them to `/api/money/code-requests/{id}`, and a Telegram message of only 4–8 digits is taken as the code (before the agent, history or logs) only while that user has a pending request; never connected by the env import (docs/money.md) |
-| `ops` | kubectl, Python | none | none | `admin` only |
+| `contacts` | Google Contacts | `refresh_token` (from the Google sign-in) | none | a copy of the user's contacts, synced in the background (`CONTACTS_SYNC_MINUTES`) and deleted on disconnect; search / read tools, `add_contact` / `update_contact` ask first; fills the user's people and names unknown callers (docs/contacts.md) |
+| `gmail` | Gmail | `refresh_token` (from the Google sign-in) | none | account: the mailbox address. Chat tools only (`Addon(realtime=False)`: not offered or run in realtime voice, which has no Approve step); sending asks first, other changes have Undo; reading tools are `untrusted_result`; nothing is stored (docs/gmail.md) |
+| `telegram_account` | the user's own Telegram account (Telethon) | `session` (from the QR sign-in, `/telegram/connect`) | none | account: the Telegram name and @username. The app (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) is server-wide. Read-only tools, `untrusted_result`, chat only (`realtime=False`); nothing is marked read; one client per connection (docs/telegram-account.md) |
+| `cameras` | Frigate | none | `url` (an address; none) | changed only by a user with `manage_users` (for anyone); no tools, only the camera endpoints (`/api/frigate/*`, `/api/camera/{entity}/proxy`), each for the caller's own Frigate, 403 `not_connected` without the addon; the two that go through Home Assistant also need `homeassistant`; caches per connection (docs/dashboard.md) |
+| `money` | bank / card sites through the bank-worker sidecar | none of its own: each bank / card login is a row of `money_sources`, its credentials a Fernet token under the same `CREDENTIALS_KEY`, decrypted only in `addons/money/sync.py` to start a worker job, never returned by an API or tool, never logged | `MONEY_SYNC_TIMES` is server-wide | built in for nobody: connected per user; sources, accounts, transactions, rules, syncs and code requests per user (another user's source / request id answers 404); disconnecting deletes all of them and the user's browser profiles. SMS sign-in codes are never stored or logged: the phone posts them to `/api/money/code-requests/{id}`, and a Telegram message of only 4–8 digits is taken as the code (before the agent, history or logs) only while that user has a pending request (docs/money.md) |
+| `ops` | kubectl, Python | none | none | `admin` only; never turned on by itself; `run_python` asks first and is not a sandbox ("Security rules") |
 
 Server-wide configuration stays in env: model keys and model names, the
 Telegram bot token, the FCM sender key, the Google OAuth client, TypeSafe,
@@ -574,43 +603,34 @@ realtime voice, the Telegram app of `telegram_account`, timezone, and every tuni
 entities" lives in an addon.
 
 Each addon reads its configuration only from the connection (credentials and
-settings); nothing reads the old env names except the one-time import below.
+settings); nothing is read from env for an addon (`docs/configuration.md` →
+The minimal first run).
 
 ### Credentials
 
 Stored in the `connections` table only as a Fernet token of their JSON
-(`core/addons/crypto.py`), with the key from the env var
-`CREDENTIALS_KEY` (kept in your secret store); settings are plain JSON. At startup
-(`addons.bootstrap.bootstrap()`, `main.py`, after `users.bootstrap()`)
-the key is checked: if credentials are stored (or env values are waiting to
-be imported) and the key is missing, malformed or not the one they were
-encrypted with, the server refuses to start and the message says what to do
-(including how to generate a key). With nothing to protect it starts without
-a key.
+(`core/addons/crypto.py`); settings are plain JSON. The key is
+`CREDENTIALS_KEY` when set (kept in your secret store), else the key file
+`<data dir>/credentials.key`. At startup (`addons.bootstrap.bootstrap()`,
+`main.py`, after `users.bootstrap()`):
 
-Then, for the first admin user only, each addon that was never imported is
-connected from env and recorded in `connection_imports`, so an addon the admin
-disconnects later is not created again at the next start:
+- **No key yet** (neither set) and nothing encrypted: the key file is
+  generated (mode 0600, created exclusively) and the start logs where it is
+  and to back it up with the database.
+- **A key** that is malformed, or not the one the stored credentials were
+  encrypted with, or **no key** while credentials are stored: the server
+  refuses to start and the message says what to do (including how to
+  generate a key). The env value wins over the file.
 
-- official addons (`tasks`, `shopping`, `knowledge`, `about`, `people`,
-  `phone`, `ops`) always;
-- `homeassistant` when `HOMEASSISTANT_TOKEN` is set, `whatsapp` when
-  `WAHA_URL` is set, `calendar` when `GOOGLE_REFRESH_TOKEN` is set, `cameras`
-  when `FRIGATE_URL` is set (an addon whose env values are
-  absent is not recorded, so it is imported at the first start that has them);
-- settings a migration moved out of older storage before the addon existed
-  (`connection_import_settings`; today only `calendar`'s
-  `selected_calendars`, from migration `m0012_calendar_per_user`) are added
-  to what the import connects with, and removed when the addon is recorded;
-- every credential and setting with the value the code resolves today: the
-  env value, else today's default (stored as a value, so a later default
-  change does not move it). The env names are listed in
-  `docs/configuration.md` → Addon credentials.
-
-`addons/bootstrap.py` is the one module that reads those env names, and
-only to create addons: after the first start that imported an addon,
-its env values can be removed and the values are edited on the
-Addons page (`docs/operations.md` → Upgrading from 8.1.0).
+Then, once (`system_marks['addons:first_admin_defaults']`), the first admin
+gets every `default_on` addon their level allows (`tasks`, `shopping`,
+`knowledge`, `about`, `people`, `phone`), so one they turn off later is not
+turned on again. Nothing else is connected at startup and nothing is read
+from env: addons with an account are connected on the Addons page, with
+`bin/dana addons connect` or the API. `bin/dana users add` gives a new
+user the same defaults. Core migration `m0003_drop_env_imports` removed the
+old one-time env import's tables (a database that had imported counts as
+having had its defaults).
 
 ### Google account
 
@@ -670,8 +690,8 @@ setting; the addon registers the lookup) → `TZ` → UTC, once at startup.
 
 ### Inbound
 
-- **WAHA** posts to `/webhook/waha` (accepted only from an `INTERNAL_HOSTS`
-  host without credentials or from a user with `manage_server`; everyone
+- **WAHA** posts to `/webhook/waha` (accepted only when signed with
+  `WAHA_WEBHOOK_SECRET`, or from a user with `manage_server`; everyone
   else 403, see "Security rules"). The event is routed to the user
   whose WhatsApp addon has the account the event names (`me.id`) and
   processed as that user (`addons/whatsapp/accounts.py`, `events.py`).
@@ -886,15 +906,15 @@ once). The running server sees a change within its 10 s cache refresh. Tests:
 
 ```
 users list                              users: access, Telegram ids, tokens, addons
-users add NAME [--access] [--context] [--pronoun] [--telegram-chat]
-users update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
+users add NAME [--access] [--context] [--pronoun] [--languages] [--currency] [--telegram-chat]
+users update USER [--name] [--access] [--context] [--pronoun] [--languages] [--currency] [--other-names] [--prompt-name] [--telegram-chat]
 users remove USER [--delete-data]       without the flag: says what would be deleted, removes nothing
 users tokens issue USER [--label]       prints the token once
 users tokens list [USER]
 users tokens revoke TOKEN_ID
 users telegram add USER TELEGRAM_ID
 users telegram move TELEGRAM_ID USER
-users telegram remove TELEGRAM_ID [--allow-open-bot]
+users telegram remove TELEGRAM_ID [--allow-no-ids]
 users sharing [USER]                    who has access to what
 addons list                             every addon: source, version, state, fields; the ones that failed
 addons show USER                        a user's connections (credential values never shown)
@@ -913,16 +933,14 @@ addons disconnect USER ADDON
 - The access level is respected (`ops` only for an admin), as in
   `store.connect`. The last admin cannot be removed or made a member.
 - `telegram remove` refuses to remove the last Telegram id of all (the bot
-  would become open to anyone) unless `--allow-open-bot`.
+  would then refuse everyone) unless `--allow-no-ids`.
 - **Removing a user** (`remove USER --delete-data`): their row and everything
   they own go — sessions, thread, learned phrases, tokens, Telegram ids,
   addons (credentials included), task lists and tasks, shopping list,
   projects and entries, About facts, people, phone devices / notifications /
   calls (recording files and saved images deleted from disk), briefings,
   reviews, Now state, and the shares they gave or were given. Kept: usage
-  rows (the server's cost history; their `user_id` stays as it was),
-  `connection_imports` (so the env import never runs again for whoever
-  becomes first admin), and what they added to other users' shared lists or
+  rows (the server's cost history; their `user_id` stays as it was) and what they added to other users' shared lists or
   projects (it belongs to the list's / project's owner; `created_by` keeps
   their old id). Other users' tasks pointing at a removed project lose the
   link. Without `--delete-data` it lists the counts and removes nothing.
@@ -982,7 +1000,8 @@ page" section of `tests/local_env/e2e.py`.
 
 | | |
 |---|---|
-| `GET /api/me` | `{id, name, access, capabilities: [...], kinds: [...]}` — the caller, their level's capabilities, their connected addons (`essentials` first) |
+| `GET /api/me` | `{id, name, access, capabilities: [...], addons: [...], languages: [...], currency}` — the caller, their level's capabilities, their connected addons (`essentials` first), their languages (the first is the default reply language) and currency (their own, else the server's: `core/user_locale.py`) |
+| `GET` / `PUT /api/profile` | the caller's languages and currency: what counts, what they chose (`own`), the server's `defaults`; `PUT {languages, currency}` changes them (`[]` / `""`: back to the server's; a malformed code 400 `invalid` with `field`) (`core/profile_api.py`; the web Settings → Profile card) |
 | `GET /api/users` | `{users: [{id, name, access}]}` — every user, for a caller with `manage_users` (the Addons page's picker); nothing else about them; 403 `forbidden` without the capability |
 | `GET /api/addons` | `{user_id, addons: [<addon>, ...]}` — every addon the user may connect (not `essentials`; `ops` only with the `ops` capability) |
 | `GET /api/addons/{name}` | `<addon>` |

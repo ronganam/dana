@@ -2,16 +2,30 @@
 
 ## Running it
 
-- **Locally**: `python main.py` (README). The web UI and API on `:8080`, Telegram if `TELEGRAM_BOT_TOKEN` is set.
-- **Docker Compose**: `docker compose up -d` in `server/` builds the image and keeps the data in the `data` volume (`compose.yaml`; the bank-worker sidecar of the `money` addon: `docker compose --profile money up -d`).
-- **Kubernetes** (one replica: SQLite): the image (`Dockerfile`, `app` stage) runs as UID 1001 and keeps everything it writes in the directory holding the database (`DATABASE_PATH`, default `/app/db/db.sqlite3`; `core/paths.py`), so mount one volume there. Secrets come in as env vars (`docs/configuration.md`). Probes: TCP on 8080. The bank worker (`bank-worker/README.md`) runs as a sidecar on `127.0.0.1:8090` mounting only `<data dir>/money`. Backups: copy `<data dir>/snapshots/db.sqlite3` after `python3 -m core.db_snapshot` (a consistent copy; a raw copy of a live SQLite file can catch it mid-write), e.g. from a Velero pre-backup hook.
+- **Locally**: `python main.py` (README). The web UI and API on `:8080`, Telegram if `TELEGRAM_BOT_TOKEN` is set. It needs `API_TOKEN` (or `DANA_INSECURE_DEV=1`: no authentication, `127.0.0.1` only) and an LLM key.
+- **Docker Compose**: `docker compose up -d` in `server/` builds the image and keeps the data in the `data` volume (`compose.yaml`; the bank-worker sidecar of the `money` addon: `docker compose --profile money up -d`). The port is published on `127.0.0.1:8080` only: to reach Dana from other machines, put a reverse proxy with HTTPS in front of it (Caddy, Traefik, nginx) or change the mapping knowingly. The healthcheck polls `/api/health`.
+- **Data to back up**: the database directory (`DATABASE_PATH`'s folder: the database, `recordings/`, `media/`, `uploads/`…) including `credentials.key` when `CREDENTIALS_KEY` is not set (the generated key: without it the stored addon credentials are lost).
+- **Kubernetes** (one replica: SQLite): the image (`Dockerfile`, `app` stage) runs as UID 1001 and keeps everything it writes in the directory holding the database (`DATABASE_PATH`, default `/app/db/db.sqlite3`; `core/paths.py`), so mount one volume there. Secrets come in as env vars (`docs/configuration.md`). Probes: TCP on 8080. The bank worker (`addons/money/worker/README.md`) runs as a sidecar on `127.0.0.1:8090` mounting only `<data dir>/money`. Backups: copy `<data dir>/snapshots/db.sqlite3` after `python3 -m core.db_snapshot` (a consistent copy; a raw copy of a live SQLite file can catch it mid-write), e.g. from a Velero pre-backup hook.
+
+## Dependencies
+
+- `requirements.txt`: the direct dependencies, each with a lower bound (what the code imports, plus the `mcp` workaround noted there). `requirements.lock`: every package pinned with its hashes, for Python 3.12 and newer on every platform; the image installs it (`pip install --require-hashes -r requirements.lock`) and so does the suggested local setup (README).
+- After changing `requirements.txt` (or to take upgrades), regenerate the lock and run the suite:
+
+  ```bash
+  uv pip compile requirements.txt --universal --python-version 3.12 --generate-hashes --no-header --no-annotate -o requirements.lock
+  .venv/bin/pip install -r requirements.lock && bin/test
+  ```
+
+  (`uv pip compile --upgrade` takes the newest versions; without it, versions already pinned stay.) Commit both files together; the pre-push hook then also runs the image's `test` stage.
+- No new runtime dependency without a reason in the commit; check its license against `../THIRD_PARTY.md` (e.g. `mutagen` is GPL-2.0-or-later).
 
 ## Deploy
 
 `git push origin master` tests and, when configured, deploys, all from your machine. The repository's `.githooks/pre-push` hook (once per clone: `git config core.hooksPath .githooks`), on a clean checkout of the pushed commit:
 
-1. runs `bin/test` when the push changes more than docs under `server/`, plus the Dockerfile's `test` stage (the suite on the exact image, Python 3.14) when it changes `server/Dockerfile` or `server/requirements.txt`;
-2. when it changes what the images contain (`core/`, `addons/` with the addon workers, `static/`, `cli/`, `main.py`, `requirements.txt`, `Dockerfile`, `VERSION`, `bin/dana`) and your site has a `deploy.env` (`site/deploy.env` at the repository root, or `$DANA_SITE/deploy.env`; `../docs/site.md`), runs `bin/deploy`.
+1. runs `bin/test` when the push changes more than docs under `server/`, plus the Dockerfile's `test` stage (the suite on the exact image, Python 3.14) when it changes `server/Dockerfile` or `server/requirements.txt` / `requirements.lock`;
+2. when it changes what the images contain (`core/`, `addons/` with the addon workers, `static/`, `cli/`, `main.py`, `requirements.txt` / `requirements.lock`, `Dockerfile`, `VERSION`, `bin/dana`) and your site has a `deploy.env` (`site/deploy.env` at the repository root, or `$DANA_SITE/deploy.env`; `../docs/site.md`), runs `bin/deploy`.
 
 A failure stops the push. `DANA_NO_DEPLOY=1 git push …` pushes without deploying; `git push --no-verify` skips tests and deploy. Android changes are not tested by the hook.
 
@@ -117,7 +131,7 @@ kubectl cp -n "$NS" "$POD":/app/db/recordings/<filename> ./recording.m4a
 
 ## API endpoints
 
-The web server listens on port 8080. Every path but the public ones (`docs/access.md`) needs `Authorization: Bearer <token>` (`API_TOKEN` or a user's token), from inside a cluster too: an `INTERNAL_HOSTS` Host only opens the inbound webhook `/webhook/waha` without a token.
+The web server listens on port 8080. Every path but the public ones (`docs/access.md`) needs `Authorization: Bearer <token>` (`API_TOKEN` or a user's token), from inside a cluster too; the inbound webhook `/webhook/waha` takes no token but only events WAHA signed with `WAHA_WEBHOOK_SECRET` (`docs/whatsapp.md`). Without `API_TOKEN` the server refuses to start (`DANA_INSECURE_DEV=1` for local development: no authentication, `127.0.0.1` only).
 
 | Endpoint | What it returns |
 |---|---|
@@ -126,7 +140,8 @@ The web server listens on port 8080. Every path but the public ones (`docs/acces
 | `POST /api/sessions/main/clear` | New topic in the shared thread: Dana forgets it so far, messages stay (docs/agent-actions.md) |
 | `GET /api/assistant/models` | Chat model catalog + default id (the profiles the caller's access level may use) |
 | `GET /api/assistant/voice_stream` | WebSocket: PCM in, then the same run events as JSON frames, closed by `state` (or `no_speech`) |
-| `GET /api/me` | The caller: `{id, name, access, capabilities, kinds}` |
+| `GET /api/me` | The caller: `{id, name, access, capabilities, addons, languages, currency}` |
+| `GET` / `PUT /api/profile` | The caller's languages and currency (`core/profile_api.py`) |
 | `GET /api/users` | `manage_users` only: `{users: [{id, name, access}]}` — the Addons page's user picker |
 | `GET /api/addons` · `GET /api/addons/{name}` | The caller's addons (`?user=<id>` with `manage_users`): fields with their type, whether each credential is set (never a secret's value; an address's value is shown), settings, account, and whether the caller may change each addon / field (`can_change`, `why_not`, `rule`) (`docs/access.md` → Managing users) |
 | `PUT /api/addons/{name}` | Connect (201) or update (200): `{credentials?, settings?}`, merged; 400 `invalid` with the field; 403 `forbidden` for an addon the level may not have |

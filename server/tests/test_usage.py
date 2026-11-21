@@ -24,6 +24,7 @@ import time
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("usage_test")
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
 os.environ.setdefault("GEMINI_API_KEY", "test-key")  # transcription
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 os.environ["TIMEZONE"] = "Asia/Jerusalem"

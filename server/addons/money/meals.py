@@ -121,6 +121,7 @@ def store_account(conn, user: User, source_id: str, company: companies.Company, 
                       payload, now, now))
     else:
         account_id = row["id"]
+        # scoped: the account found by user_id above
         conn.execute("UPDATE money_accounts SET source_id = ?, kind = 'meal', balance = ?, balance_at = ?, details = ?, "
                      "updated_at = ? WHERE id = ?",
                      (source_id, left, now if left is not None else None, payload, now, account_id))

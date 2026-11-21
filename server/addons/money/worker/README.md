@@ -80,7 +80,7 @@ Deletes that profile's folder (a removed source) → `200 {"ok": true}`; `409` w
 ```bash
 cd server/addons/money/worker && PUPPETEER_SKIP_DOWNLOAD=1 npm ci     # uses the system Chromium
 BANK_WORKER_TOKEN_FILE=/tmp/token BANK_WORKER_PROFILES=/tmp/profiles \
-  CHROMIUM_PATH=/usr/bin/chromium TZ=Asia/Jerusalem node src/main.js
+  CHROMIUM_PATH=/usr/bin/chromium TZ="$TIMEZONE" node src/main.js
 ```
 Debugging a site change: `BANK_WORKER_HEADFUL=1` shows the browser, `BANK_WORKER_DUMP_DIR=<dir>` saves a screenshot of a failed login, `DEBUG=israeli-bank-scrapers:*` turns on the library's log. Never in production: the screenshot and the library's log show account data.
 
@@ -88,4 +88,4 @@ Debugging a site change: `BANK_WORKER_HEADFUL=1` shows the browser, `BANK_WORKER
 
 ## Image
 
-`Dockerfile`: Debian's Chromium on `node:22-slim`, `TZ=Asia/Jerusalem`, user 1001 (Dana's, both write `/app/db/money`), `BANK_WORKER_NO_SANDBOX=1` (a pod has no user namespaces for Chromium's sandbox). It is the `money` addon's worker (`Worker(port=8090, url_env="MONEY_WORKER_URL")` in `../addon.py`; this folder is self-contained so it can move with the addon): `bin/deploy` builds it as `$DANA_IMAGE-money:<release>`, the same tag as Dana's image, and writes that image into the GitOps values (`docs/operations.md`, "Workers"), where the deployment's `initContainers` and `extraContainers` entries use it. The sidecar mounts only the `money/` folder of Dana's volume (subPath, at `/app/db/money`): it never sees Dana's database. An init container (the same image) creates that folder as uid 1001 first, since a subPath kubelet creates itself would belong to root. The sidecar runs without privilege escalation, with every capability dropped and the runtime's seccomp profile, and needs no env or secrets.
+`Dockerfile`: Debian's Chromium on `node:22-slim` with tzdata (the deployment sets `TZ` to Dana's `TIMEZONE`: `compose.yaml` does, a k8s sidecar sets it in its env; unset: UTC), user 1001 (Dana's, both write `/app/db/money`), `BANK_WORKER_NO_SANDBOX=1` (a pod has no user namespaces for Chromium's sandbox). It is the `money` addon's worker (`Worker(port=8090, url_env="MONEY_WORKER_URL")` in `../addon.py`; this folder is self-contained so it can move with the addon): `bin/deploy` builds it as `$DANA_IMAGE-money:<release>`, the same tag as Dana's image, and writes that image into the GitOps values (`docs/operations.md`, "Workers"), where the deployment's `initContainers` and `extraContainers` entries use it. The sidecar mounts only the `money/` folder of Dana's volume (subPath, at `/app/db/money`): it never sees Dana's database. An init container (the same image) creates that folder as uid 1001 first, since a subPath kubelet creates itself would belong to root. The sidecar runs without privilege escalation, with every capability dropped and the runtime's seccomp profile, and needs no secrets (only `TZ`).

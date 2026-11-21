@@ -126,6 +126,7 @@ def owner_of(list_id: str) -> Optional[str]:
 
 def title_of(list_id: str) -> Optional[str]:
     with get_db_connection() as conn:
+        # scoped: title of a list the caller resolved for the user (sharing ItemType.title_of)
         row = conn.execute("SELECT name FROM shopping_lists WHERE id = ?", (list_id,)).fetchone()
     return row["name"] if row else None
 

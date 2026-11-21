@@ -52,7 +52,7 @@ addon = Addon("my_addon", title="My addon", description="One line for the Addons
 
 Other fields (`default_on`, `everyone`, `requires`, `test=`, `options=`, `validate=`, `on_connect=`, `on_change=`, `connect_url=`, …): the `Addon` docstring in `core/addons/addon.py`.
 
-**Prompt slots**: `PromptPart(slot, text, rank)`; the slots are the table `SLOTS` in `core/agent.py`, each with its joiner (`tools` lists "a, b, and c", `guides` are paragraphs, `send_via` keeps its leading space). `{user}` becomes the user's name. An unknown slot fails the load.
+**Prompt slots**: `PromptPart(slot, text, rank)`; the slots are the table `SLOTS` in `core/agent.py`, each with its joiner (`tools` lists "a, b, and c", `guides` are paragraphs, `send_via` keeps its leading space). `{user}` becomes the user's name, `{currency}` their currency (ISO 4217, `core/user_locale.py`). An unknown slot fails the load.
 
 **LLM jobs**: each purpose the addon passes to `core.llm.complete(purpose=...)` is declared in `llm_jobs` with its default profile (`fast` / `balanced` / `deep`, or `LlmJob("fast", "Label")`). `MODEL_<PURPOSE>` in env overrides it; an undeclared purpose raises.
 

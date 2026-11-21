@@ -140,6 +140,7 @@ def list_entries(user: User, project_id: str) -> List[Dict[str, Any]]:
         return []
     from addons.knowledge.files import files_of  # files imports this module
     with get_db_connection() as conn:
+        # scoped: project access checked above (projects.access)
         rows = conn.execute("SELECT * FROM entries WHERE project_id = ? ORDER BY created_at DESC",
                             (project_id,)).fetchall()
     files = files_of([r["id"] for r in rows])
@@ -163,6 +164,7 @@ def entry_previews(user: User, project_id: str, kind: Optional[str] = None, stat
     args.append(max(1, min(int(limit or 50), 200)))
     with get_db_connection() as db:
         rows = db.execute(
+            # scoped: project access checked above (projects.access)
             f"""
             SELECT id, kind, title, body, status, priority, tags, url, updated_at, section_id, decision, fields,
                    (SELECT COUNT(*) FROM entry_files f WHERE f.entry_id = entries.id) AS file_count
@@ -355,8 +357,10 @@ def update_entry(user: User, entry_id: str, *, kind: Optional[str] = None, title
     with get_db_connection() as conn:
         if sets:
             sets.append("updated_at = CURRENT_TIMESTAMP")
+            # scoped: writable_entry(user, entry_id) checked above
             conn.execute(f"UPDATE entries SET {', '.join(sets)} WHERE id = ?", (*args, entry_id))
             conn.commit()
+        # scoped: writable_entry(user, entry_id) checked above
         row = conn.execute("SELECT * FROM entries WHERE id = ?", (entry_id,)).fetchone()
     return _public(user, row)
 
@@ -374,6 +378,7 @@ def delete_entry(user: User, entry_id: str) -> bool:
         return False
     with get_db_connection() as conn:
         files.forget_entries(conn, [entry_id])
+        # scoped: writable_entry(user, entry_id) checked above
         rows = conn.execute("DELETE FROM entries WHERE id = ?", (entry_id,)).rowcount
         conn.commit()
     return rows > 0

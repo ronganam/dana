@@ -73,6 +73,7 @@ def apply_analysis(user: User, call_id: str, analysis: Dict[str, Any], *, replac
             sets += ["title = ?", "summary = ?"]
             params += [analysis.get("title") or row["title"], analysis.get("summary") or row["summary"]]
         params.append(call_id)
+        # scoped: the user's call, checked above (id AND user_id)
         conn.execute(f"UPDATE phone_calls SET {', '.join(sets)} WHERE id = ?", params)
         count = 0
         if create_suggestions:
@@ -127,6 +128,7 @@ async def _process(owner: User, call_id: str, custom_instructions: Optional[str]
             logger.error(f"Transcription failed for call {call_id}: {err_text(e)}")
             transcript = f"{FAILED_TRANSCRIPT_PREFIX}: {err_text(e)}]"
         with get_db_connection() as conn:
+            # scoped: calls_store.get_row(owner, call_id) checked above
             conn.execute("UPDATE phone_calls SET transcript = ? WHERE id = ?", (transcript, call_id))
             conn.commit()
 

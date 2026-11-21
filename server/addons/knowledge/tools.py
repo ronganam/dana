@@ -34,7 +34,9 @@ def _record_project_created(user: User, project_id: str, title: str) -> None:
 
     def _undo():
         with get_db_connection() as conn:
+            # scoped: undo of the project this user just created: anything saved into it since keeps it
             busy = (conn.execute("SELECT 1 FROM entries WHERE project_id = ?", (project_id,)).fetchone()
+                    # scoped: undo of the project this user just created: anything saved into it since keeps it
                     or conn.execute("SELECT 1 FROM tasks WHERE project_id = ?", (project_id,)).fetchone())
         if busy:
             raise undoable.UndoConflict("Things were saved into the project since, so it was kept.")
@@ -80,14 +82,14 @@ def _section_id(user: User, project_id: Optional[str], ref: Optional[str]) -> Op
     return found["id"]
 
 
-def _value_text(field: dict) -> str:
+def _value_text(field: dict, currency: str) -> str:
     value = field.get("value")
     if value is None or value == "":
         return "—"
     if field.get("type") == "checkbox":
         return "yes" if value else "no"
     if field.get("type") == "money" and as_number(value) is not None:
-        return f"{as_number(value):,} NIS"
+        return f"{as_number(value):,} {currency}"
     return str(value)
 
 
@@ -110,7 +112,7 @@ async def create_project(conn: Connection, title: str, description: str = "", ic
         color: Optional accent color as a hex value (e.g. "#e11d48").
         tags: Optional list of short labels for the project.
         target_date: Optional ISO date the project points at (the wedding day, the flight), shown as a countdown.
-        budget: Optional total budget in NIS; chosen options' prices are counted against it.
+        budget: Optional total budget in the user's currency; chosen options' prices are counted against it.
     """
     try:
         project_id = projects.create_project(conn.user, title, description, icon, color, tags, target_date, budget)
@@ -185,13 +187,14 @@ async def list_project_entries(conn: Connection, project_id: str, kind: Optional
         if status and status not in STATUSES:
             return f"Error: status must be one of {', '.join(STATUSES)}."
 
+        money = project["currency"]  # the owner's, also through a share
         rows = entries.entry_previews(conn.user, project_id, kind, status, limit)
         secs = sections.list_sections(conn.user, project_id)
         head = f"Project {project.get('icon') or ''} {escape_markdown(project['title'])}"
         if project.get("target_date"):
             head += f" | date {project['target_date']}"
         if project.get("budget"):
-            head += f" | budget {as_number(project['budget']):,}"
+            head += f" | budget {as_number(project['budget']):,} {money}"
         res = head + "\n"
         if not rows and not secs:
             return res + "No sections and no entries yet. Nothing saved."
@@ -208,7 +211,7 @@ async def list_project_entries(conn: Connection, project_id: str, kind: Optional
             if columns:
                 names = [c["name"] for c in columns]
                 by_name = {f.get("name"): f for f in fields}
-                values = [f"{escape_markdown(n)}: {escape_markdown(_value_text(by_name[n]))}" for n in names if n in by_name]
+                values = [f"{escape_markdown(n)}: {escape_markdown(_value_text(by_name[n], money))}" for n in names if n in by_name]
                 if values:
                     line += "\n  " + " | ".join(values)
             preview = " ".join((e["body"] or "").split())[:120]
@@ -238,7 +241,7 @@ async def list_project_entries(conn: Connection, project_id: str, kind: Optional
         return f"Error listing project entries: {e}"
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def get_knowledge_item(conn: Connection, item_id: str) -> str:
     """Read one saved entry in full — its complete Markdown body, structured fields, summary,
     transcript, tags and comments.
@@ -322,14 +325,14 @@ async def save_knowledge_item(conn: Connection, project_id: str, kind: str = "no
         - Phone: **050-1234567**
         - Email: yanai@example.com
         ## Budget
-        - Price: 4,500 NIS
+        - Price: 4,500
         - Deposit paid: **yes** (12/06/2026)
     - kind: 'note' for free text (ideas, general notes), 'record' for structured data (contacts,
       vendors, prices, contracts) — pair with fields, 'link' when saving a URL (auto-processed for
       transcript, summary and media).
     - fields: capture the few facts you might want to query later as
       [{"name": "<label>", "type": "<type>", "value": <value>}] where type is one of
-      text, number, money (a plain number in NIS), phone, checkbox, date, url, select, rating (1-5). Example:
+      text, number, money (a plain number in the user's currency), phone, checkbox, date, url, select, rating (1-5). Example:
       [{"name": "Phone", "type": "text", "value": "050-1234567"},
        {"name": "Price", "type": "number", "value": 4500},
        {"name": "Paid", "type": "checkbox", "value": true}]
@@ -427,7 +430,7 @@ async def update_project(conn: Connection, project_id: str, title: Optional[str]
         color: Optional new accent color (hex).
         tags: Optional new list of labels.
         target_date: Optional ISO date the project points at (e.g. the wedding day), or "" to clear.
-        budget: Optional total budget in NIS.
+        budget: Optional total budget in the user's currency.
     """
     try:
         before = undoable.row("projects", "id", project_id, PROJECT_COLUMNS)
@@ -574,6 +577,7 @@ async def create_section(conn: Connection, project_id: str, title: str, kind: st
 
         def _undo():
             with get_db_connection() as db:
+                # scoped: undo of the section this user just created: anything saved into it since keeps it
                 busy = db.execute("SELECT 1 FROM entries WHERE section_id = ?", (section_id,)).fetchone()
             if busy:
                 raise undoable.UndoConflict("Things were saved into the section since, so it was kept.")
