@@ -62,14 +62,17 @@ DescribeRule = Callable[[User, Dict[str, Any]], Any]
 EVENT_NAME = re.compile(r"^[a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+$")
 DAILY = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 # Composer hooks: their functions are plain (not async): composers call them in
-# a worker thread, next to their own database reads.
-SYNC_HOOKS = ("now_cards", "day_items", "briefing", "review", "search", "selfcheck", "context", "context_card",
+# a worker thread, next to their own database reads. ``FLEX_HOOKS`` accept either
+# sync or async functions (e.g. ``briefing`` sections that fetch weather, or ``provide``).
+SYNC_HOOKS = ("now_cards", "day_items", "review", "search", "selfcheck", "context", "context_card",
               "context_block")
+FLEX_HOOKS = ("briefing", "provide")
 # Hooks declared for a key (a card prefix, a section key, a check key, an item
-# type, a context kind): one addon per key and kind across every addon (the
+# type, a context kind, a provider key): one addon per key and kind across every addon (the
 # loader fails the later addon that repeats one).
 KEYED_HOOKS = ("now_action", "briefing", "review", "review_action", "selfcheck", "context", "context_card",
-               "context_block")
+               "context_block", "provide")
+_MISSING = object()
 
 
 @dataclass(frozen=True)
@@ -486,7 +489,7 @@ class Addon:
             if kind in SYNC_HOOKS and inspect.iscoroutinefunction(func):
                 raise TypeError(f"{self.name}: @addon.{kind} takes a plain function (composers call it in a "
                                 f"worker thread), not {func.__name__!r} (async)")
-            if kind not in SYNC_HOOKS:
+            if kind not in SYNC_HOOKS and kind not in FLEX_HOOKS:
                 _require_async(self.name, kind, func)
             if key and any(h.kind == kind and h.key == key for h in self.hooks):
                 raise ValueError(f"{self.name}: @addon.{kind}({key!r}) is declared twice")
@@ -494,9 +497,11 @@ class Addon:
             return func
         return decorator
 
-    def now_cards(self, func: F) -> F:
-        """``def f(user, ctx: NowContext) -> list[Card]``: cards on the Now screen."""
-        return self._hook("now_cards")(func)
+    def now_cards(self, func: Optional[F] = None, *, order: int = 50) -> Any:
+        """``def f(user, ctx: NowContext) -> list[Card]``: cards on the Now screen.
+        Usable as ``@addon.now_cards`` or ``@addon.now_cards(order=20)``."""
+        dec = self._hook("now_cards", order=order)
+        return dec(func) if func is not None else dec
 
     def day_items(self, func: F) -> F:
         """``def f(user, ctx: NowContext) -> list[DayItem]``: items in the Now day strip."""
@@ -509,14 +514,21 @@ class Addon:
         The user must have this addon (403 ``not_connected`` otherwise)."""
         return self._hook("now_action", prefix)
 
-    def briefing(self, key: str, *, counts: Sequence[str] = ()) -> Callable[[F], F]:
-        """``def f(user, ctx: BriefingContext) -> Section | None``: this addon's
+    def briefing(self, key: str, *, counts: Sequence[str] = (), default: Any = _MISSING,
+                 rank: int = 50) -> Callable[[F], F]:
+        """``def f(user, ctx: BriefingContext) -> Section | None`` (or async): this addon's
         section of the morning briefing, stored under ``key`` in the briefing's
         data (unique across addons). ``counts``: the keys of ``Section.counts``
-        it may give the briefing's push (unique across addons; others are dropped)."""
+        it may give the briefing's push (unique across addons; others are dropped).
+        ``default``: stored under ``key`` when the addon is not active for a user
+        or returns None. ``rank``: orders plain-briefing points (lower first)."""
         if not key:
             raise ValueError(f"{self.name}: @addon.briefing needs a section key")
-        return self._hook("briefing", key, counts=tuple(counts))
+        opts: Dict[str, Any] = {"counts": tuple(counts), "rank": rank}
+        if default is not _MISSING:
+            opts["has_default"] = True
+            opts["default"] = default
+        return self._hook("briefing", key, **opts)
 
     def review(self, key: str) -> Callable[[F], F]:
         """``def f(user, ctx: BriefingContext) -> Section | None``: this addon's
@@ -527,11 +539,13 @@ class Addon:
             raise ValueError(f"{self.name}: @addon.review needs a section key")
         return self._hook("review", key)
 
-    def review_action(self, item_type: str, actions: Sequence[str]) -> Callable[[F], F]:
+    def review_action(self, item_type: str, actions: Sequence[str], *, primary: bool = True) -> Callable[[F], F]:
         """``async def f(user, item, action, decision, today) -> str``: applying
         a weekly-review item of ``item_type`` (``actions``: what the model may
-        propose for it; ``keep`` is always allowed). Returns the result's words."""
-        return self._hook("review_action", item_type, actions=tuple(actions))
+        propose for it; ``keep`` is always allowed). ``primary=False`` marks a
+        type that enriches a review without making a user eligible on its own.
+        Returns the result's words."""
+        return self._hook("review_action", item_type, actions=tuple(actions), primary=primary)
 
     def search(self, func: F) -> F:
         """``def f(user, query, limit) -> list[Hit]``: at most ``limit`` results in
@@ -559,6 +573,13 @@ class Addon:
         """``def f(user, ref_id) -> str``: a plain description of this addon's
         item of ``kind`` for another addon's context prompt (e.g. a task's source call)."""
         return self._hook("context_block", kind)
+
+    def provide(self, key: str) -> Callable[[F], F]:
+        """Register a named capability ``key`` (sync or async) that core composers
+        look up through :func:`core.addons.registry.provider` without importing the addon."""
+        if not key:
+            raise ValueError(f"{self.name}: @addon.provide needs a key")
+        return self._hook("provide", key)
 
 
 def _require_async(addon: str, what: str, func: Callable[..., Any]) -> None:

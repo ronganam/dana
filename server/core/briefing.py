@@ -1,31 +1,30 @@
 """Wake briefing + meeting context cards, per user.
 
 A user's briefing is built once a day when they are confirmed awake (the wake
-signal in core/wake.py), from their own addons only: today's calendar, each addon's
-``@addon.briefing`` section (the tasks addon: due or overdue, high priority,
-today's reminders), pending suggestions, the Inbox briefing (already cached), the
-weather from their Home Assistant and people nudges (birthdays, people they
-usually talk to but haven't lately); an addon they have not connected adds
+signal in core/wake.py), from their active addons' ``@addon.briefing`` sections
+(calendar events, tasks, pending suggestions, Inbox, weather, people nudges,
+and any installed addon's section); an addon they have not connected adds
 nothing. The model turns that into a headline + a few points, written for
 them (``core/user_profile.for_user``); if it fails, a plain version is
-written from the same data. One row per user and local date in
-``briefings``; pushed to their phone as a ``briefing`` event and read by the
-widgets / bedroom dashboard from ``GET /api/briefing/today``.
+written from the same data. One row per user and local date in ``briefings``;
+delivered through ``core.notify.send`` (``briefing``) and read by the widgets /
+bedroom dashboard from ``GET /api/briefing/today``.
 
-Who gets one (:func:`available`): a user with ``phone``, or with a Telegram
-chat and at least one addon that has something to say. If no wake is seen by
-``BRIEFING_FALLBACK_TIME`` (10:00) each such user's briefing is made anyway
-(not pushed) so the app and widgets have it.
+Who gets one (:func:`available`): a user with a delivery channel (e.g. phone
+push), or with a Telegram chat and at least one briefing hook. If no wake is
+seen by ``BRIEFING_FALLBACK_TIME`` (10:00) each such user's briefing is made
+anyway (not pushed) so the app and widgets have it.
 
-Meeting cards: ``MEETING_CARD_MINUTES`` (10) before an event of a user's
-calendar whose title or attendees name one of their people, that person's
-card is pushed to their phone as a ``context_card`` event (same card as for
-an incoming call); for every user with ``calendar`` and ``phone``.
+Meeting cards: ``MEETING_CARD_MINUTES`` (10) before an upcoming calendar event
+whose title or attendees name a person, that person's card is delivered as a
+``context_card`` notification.
 """
 from __future__ import annotations
 
 import asyncio
+import copy
 import datetime
+import inspect
 import json
 import logging
 import os
@@ -33,19 +32,11 @@ import re
 import time
 from typing import Any, Dict, FrozenSet, List, Optional
 
-from core import clock, composers, llm, user_profile, users
+from core import clock, composers, llm, notify as notify_mod, user_profile, users
+from core.addons import BriefingContext, Section, registry, store
 from core.db import get_db_connection
 from core.notify import notify
 from core.users import User
-from addons.calendar import config as calendar_config, events as calendar_events
-from core.addons import BriefingContext, Section, registry, store
-from addons.homeassistant import client as ha_client, config as ha_config
-from addons.people import cadence as people_cadence, detail as people_detail, store as people_store
-from addons.people.values import ADDON as PEOPLE
-from addons.phone import push as phone_push
-from addons.phone.config import ADDON as PHONE
-from addons.phone.notifications import store as notification_store, summary as notification_summary
-
 
 logger = logging.getLogger(__name__)
 
@@ -56,14 +47,11 @@ MEETING_CARD_MINUTES = int(os.getenv("MEETING_CARD_MINUTES", "10"))
 MEETING_CARDS = os.getenv("MEETING_CARDS", "1") != "0"
 MEETING_BACKOFF_SECONDS = 900
 
-# Addons whose data a briefing is made of (with nothing of these there is nothing to say).
-# The addons whose content a briefing has, besides every addon with an ``@addon.briefing`` hook.
-CONTENT_KINDS = (PHONE, calendar_config.ADDON, PEOPLE, ha_config.ADDON)
 # Where gather() keeps the addons' sections (their plain points, headline and
 # counts) until the briefing is written; never stored or shown to the model.
 SECTIONS = "_sections"
-# Who meeting cards are for: the event comes from their calendar, the card goes to their phone.
-MEETING_KINDS = (calendar_config.ADDON, PHONE)
+# The keys of the briefing's own metadata: an addon section under one of these is left out.
+CORE_KEYS = frozenset({"date", "weekday", "calendar_ok", SECTIONS})
 
 # user id → the lock that keeps one build of their briefing at a time.
 _build_locks: Dict[str, asyncio.Lock] = {}
@@ -74,21 +62,20 @@ _meeting_backoff: Dict[str, float] = {}
 
 
 def available(user: Optional[User]) -> bool:
-    """Whether ``user`` gets a briefing: ``phone`` connected (pushed there), or
-    a Telegram chat to send it to and at least one addon with something to say."""
+    """Whether ``user`` gets a briefing: a delivery channel (phone), or a
+    Telegram chat with at least one briefing section addon."""
     if user is None:
         return False
-    mine = store.connected_addons(user)
-    if PHONE in mine:
+    if registry.channels(user):
         return True
-    return user.telegram_chat_id is not None and (any(k in mine for k in CONTENT_KINDS)
-                                                  or bool(registry.hooks("briefing", user)))
+    return user.telegram_chat_id is not None and bool(registry.hooks("briefing", user))
 
 
 def require(user: User) -> None:
-    """Raise ``NotConnected`` (403 ``not_connected``, ``phone``) when ``user`` gets no briefing."""
+    """Raise ``NotConnected`` (403 ``not_connected``) when ``user`` gets no briefing."""
     if not available(user):
-        raise store.NotConnected(user, PHONE)
+        ch = next((c.addon for a in registry.all_addons() for c in a.channels), "phone")
+        raise store.NotConnected(user, ch)
 
 
 def _today() -> str:
@@ -116,54 +103,29 @@ def get_today(user: User) -> Optional[Dict[str, Any]]:
 # Gathering
 # ---------------------------------------------------------------------------
 
-def _hhmm(iso: Optional[str]) -> str:
-    try:
-        dt = datetime.datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
-        if dt.tzinfo:
-            dt = dt.astimezone(clock.get_timezone())
-        return dt.strftime("%H:%M")
-    except (TypeError, ValueError):
-        return ""
-
-
-async def _events_today(user: User) -> Optional[List[Dict[str, Any]]]:
-    """``user``'s events today (remaining and past); None when their
-    calendar isn't reachable or they have none."""
-    conn = store.get(user, calendar_config.ADDON)
-    if conn is None:
-        return None
-    try:
-        now = clock.now()
-        start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-        evs = await asyncio.to_thread(calendar_events.list_events, conn, start, start + datetime.timedelta(days=1))
-    except Exception as e:
-        logger.info(f"Briefing: calendar unavailable ({e})")
-        return None
-    out = []
-    for e in evs:
-        if e["all_day"] and str(e["start"])[:10] != start.date().isoformat():
-            continue
-        out.append({"title": e["title"], "time": "all day" if e["all_day"] else _hhmm(e["start"]),
-                    "end": "" if e["all_day"] else _hhmm(e["end"]), "location": e["location"][:80]})
-    return out
-
-
-# The keys of the briefing's own data: an addon section under one of these is left out.
-CORE_KEYS = frozenset({"date", "weekday", "events", "calendar_ok", "suggestions", "inbox", "weather", "people",
-                       SECTIONS})
+def _trim_counts(kind: str, hook: Any, section: Section) -> Section:
+    declared = hook.option("counts", ())
+    extra = sorted(set(section.counts) - set(declared))
+    if extra:
+        logger.warning(f"The {kind} section of {hook.addon} gave undeclared counts {extra}; left out")
+        section.counts = {k: v for k, v in section.counts.items() if k in declared}
+    return section
 
 
 def collect(kind: str, user: User, now: datetime.datetime,
             reserved: FrozenSet[str] = frozenset()) -> Dict[str, Section]:
-    """Section key → section of every ``@addon.<kind>`` hook (``briefing`` or
-    ``review``) of the addons active for ``user``, in addon order; one that
-    fails or returns None is left out (logged), so is one under a ``reserved``
-    key. A briefing section keeps only the ``counts`` its decorator declares."""
+    """Section key → section of every synchronous ``@addon.<kind>`` hook
+    (``briefing`` or ``review``) of the addons active for ``user``, in rank /
+    addon order; one that fails or returns None is left out (logged), so is one
+    under a ``reserved`` key. A briefing section keeps only its declared ``counts``."""
     out: Dict[str, Section] = {}
     ctx = BriefingContext(now=now)
-    for hook in registry.hooks(kind, user):
+    hooks = sorted(registry.hooks(kind, user), key=lambda h: h.option("rank", 50))
+    for hook in hooks:
         if hook.key in reserved:
             logger.warning(f"The {kind} section {hook.key!r} of {hook.addon} is one of core's keys; left out")
+            continue
+        if inspect.iscoroutinefunction(hook.func):
             continue
         try:
             section = hook.func(user, ctx)
@@ -172,103 +134,67 @@ def collect(kind: str, user: User, now: datetime.datetime,
             continue
         if section is None:
             continue
-        declared = hook.option("counts", ())
-        extra = sorted(set(section.counts) - set(declared))
-        if extra:
-            logger.warning(f"The {kind} section of {hook.addon} gave undeclared counts {extra}; left out")
-            section.counts = {k: v for k, v in section.counts.items() if k in declared}
-        out[hook.key] = section
+        out[hook.key] = _trim_counts(kind, hook, section)
+    return out
+
+
+async def collect_async(kind: str, user: User, now: datetime.datetime,
+                        reserved: FrozenSet[str] = frozenset()) -> Dict[str, Section]:
+    """Async counterpart to :func:`collect`: runs both sync (in a thread) and
+    async ``@addon.<kind>`` hooks for ``user`` in rank / addon order."""
+    out: Dict[str, Section] = {}
+    ctx = BriefingContext(now=now)
+    hooks = sorted(registry.hooks(kind, user), key=lambda h: h.option("rank", 50))
+    for hook in hooks:
+        if hook.key in reserved:
+            logger.warning(f"The {kind} section {hook.key!r} of {hook.addon} is one of core's keys; left out")
+            continue
+        try:
+            if inspect.iscoroutinefunction(hook.func):
+                section = await hook.func(user, ctx)
+            else:
+                section = await asyncio.to_thread(hook.func, user, ctx)
+        except Exception as e:
+            logger.warning(f"The {kind} section of {hook.addon} failed for user {user.id}: {e}", exc_info=True)
+            continue
+        if section is None:
+            continue
+        out[hook.key] = _trim_counts(kind, hook, section)
     return out
 
 
 def sections(user: User, now: datetime.datetime) -> Dict[str, Section]:
-    """The addons' parts of ``user``'s briefing (``@addon.briefing``), by section key."""
+    """The addons' synchronous parts of ``user``'s briefing (``@addon.briefing``), by section key."""
     return collect("briefing", user, now, CORE_KEYS)
 
 
-def _suggestions(conn, user: User) -> Dict[str, Any]:
-    """``user``'s pending suggestions (none without ``phone``: they come from calls and notifications)."""
-    if not store.is_connected(user, PHONE):
-        return {"count": 0, "top": []}
-    rows = conn.execute("SELECT payload FROM call_suggestions WHERE status = 'pending' AND user_id = ? "
-                        "ORDER BY created_at DESC", (user.id,)).fetchall()
-    titles = []
-    for r in rows[:3]:
-        try:
-            titles.append(json.loads(r["payload"] or "{}").get("title") or "")
-        except Exception:
-            pass
-    return {"count": len(rows), "top": [t for t in titles if t]}
-
-
-def _inbox(user: User) -> Dict[str, Any]:
-    """``user``'s notifications Inbox (empty without ``phone``)."""
-    if not store.is_connected(user, PHONE):
-        return {"needs_you": 0, "active": 0, "points": []}
-    try:
-        c = notification_store.counts(user)
-        s = notification_summary.get_summaries(user, refresh=False)
-        overall = (s.get("overall") or {}).get("points") or []
-        return {"needs_you": c.get("needs_you", 0), "active": c.get("active", 0), "points": overall[:3]}
-    except Exception as e:
-        logger.debug(f"Briefing inbox failed: {e}")
-        return {"needs_you": 0, "active": 0, "points": []}
-
-
 async def weather(user: User) -> Optional[Dict[str, Any]]:
-    """``user``'s weather (their Home Assistant ``weather_entity``):
-    condition and temperature, today's high / low / rain chance when the
-    forecast answers. None without Home Assistant or when it fails."""
-    conn = store.get(user, ha_config.ADDON)
-    entity = ha_config.setting(conn, ha_config.WEATHER) if conn is not None else None
-    if conn is None or not entity:
+    """``user``'s weather via the active ``weather`` provider (None when unavailable)."""
+    hook = registry.provider("weather", user)
+    if hook is None:
         return None
     try:
-        s = await ha_client.entity_state(conn, entity)
-        if s is None:
-            return None
-        out = {"condition": str(s.get("state") or "").replace("-", " "),
-               "temperature": (s.get("attributes") or {}).get("temperature"),
-               "unit": (s.get("attributes") or {}).get("temperature_unit") or "°C"}
-        d = await ha_client.forecast(conn, entity)
-        if d:
-            out.update({"high": d.get("temperature"), "low": d.get("templow"),
-                        "rain_chance": d.get("precipitation_probability")})
-        return out
+        return await hook.func(user) if inspect.iscoroutinefunction(hook.func) else await asyncio.to_thread(hook.func, user)
     except Exception as e:
         logger.debug(f"Briefing weather failed: {e}")
         return None
 
 
-def _people(user: User) -> Dict[str, Any]:
-    """``user``'s birthdays soon and people to reach out to (none without ``people``)."""
-    if not store.is_connected(user, PEOPLE):
-        return {"birthdays": [], "reach_out": []}
-    try:
-        everyone = people_cadence.list_people(user, sort="recent")
-    except Exception as e:
-        logger.debug(f"Briefing people failed: {e}")
-        return {"birthdays": [], "reach_out": []}
-    bdays = [{"id": p["id"], "name": p["name"], "in_days": p["birthday_in_days"]}
-             for p in everyone if p.get("birthday_in_days") is not None and p["birthday_in_days"] <= 3]
-    drifting = [p for p in everyone if p["stats"]["drifting"]]
-    drifting.sort(key=lambda p: (not p["pinned"], -(p["stats"]["contact_days"] or 0)))
-    reach = [{"id": p["id"], "name": p["name"], "days_since": p["stats"]["days_since"],
-              "typical_gap_days": p["stats"]["typical_gap_days"]} for p in drifting[:2]]
-    return {"birthdays": sorted(bdays, key=lambda b: b["in_days"]), "reach_out": reach}
-
-
 async def gather(user: User) -> Dict[str, Any]:
-    """What ``user``'s briefing is made of, from their own addons."""
+    """What ``user``'s briefing is made of, from their own active addons."""
     now = clock.now()
     today = now.date().isoformat()
-    events, weather_now = await asyncio.gather(_events_today(user), weather(user))
-    parts = await asyncio.to_thread(sections, user, now)
-    with get_db_connection() as conn:
-        sugg = _suggestions(conn, user)
-    return {"date": today, "weekday": now.strftime("%A"), "events": events or [],
-            "calendar_ok": events is not None, **{key: p.data for key, p in parts.items()}, "suggestions": sugg,
-            "inbox": _inbox(user), "weather": weather_now, "people": _people(user), SECTIONS: list(parts.values())}
+    defaults: Dict[str, Any] = {}
+    for hook in sorted(registry.hooks("briefing", None), key=lambda h: h.option("rank", 50)):
+        if hook.key not in CORE_KEYS and hook.option("has_default", False):
+            defaults[hook.key] = copy.deepcopy(hook.option("default"))
+    parts = await collect_async("briefing", user, now, CORE_KEYS)
+    data: Dict[str, Any] = {"date": today, "weekday": now.strftime("%A"), "calendar_ok": "events" in parts}
+    data.update(defaults)
+    for key, section in parts.items():
+        data[key] = section.data
+    data[SECTIONS] = list(parts.values())
+    return data
 
 
 # ---------------------------------------------------------------------------
@@ -277,27 +203,30 @@ async def gather(user: User) -> Dict[str, Any]:
 
 def plain_briefing(d: Dict[str, Any]) -> Dict[str, Any]:
     """The no-model version: always works, says the same things more plainly."""
-    pts: List[str] = []
-    evs = d["events"]
-    if evs:
-        first = evs[0]
-        more = f" + {len(evs) - 1} more" if len(evs) > 1 else ""
-        pts.append(f"{first['time']} {first['title']}{more}")
     parts: List[Section] = d.get(SECTIONS) or []
-    for p in parts:
-        pts += p.points
-    if d["inbox"]["needs_you"]:
-        pts.append(f"{d['inbox']['needs_you']} notification(s) need you")
-    if d["suggestions"]["count"]:
-        pts.append(f"{d['suggestions']['count']} suggestion(s) waiting")
-    for b in d["people"]["birthdays"][:1]:
-        pts.append(f"{b['name']}'s birthday " + ("today" if b["in_days"] == 0 else f"in {b['in_days']} days"))
-    for r in d["people"]["reach_out"][:1]:
-        pts.append(f"Haven't talked to {r['name']} in {r['days_since']} days")
-    w = d.get("weather")
-    if w and w.get("temperature") is not None:
-        hi = f", high {w['high']}°" if w.get("high") is not None else ""
-        pts.insert(0, f"{w['condition'].capitalize()}, {w['temperature']}°{hi}")
+    pts: List[str] = []
+    if parts:
+        for p in parts:
+            pts += p.points
+    else:
+        w = d.get("weather")
+        if w and w.get("temperature") is not None:
+            hi = f", high {w['high']}°" if w.get("high") is not None else ""
+            pts.append(f"{w['condition'].capitalize()}, {w['temperature']}°{hi}")
+        evs = d.get("events") or []
+        if evs:
+            first = evs[0]
+            more = f" + {len(evs) - 1} more" if len(evs) > 1 else ""
+            pts.append(f"{first['time']} {first['title']}{more}")
+        if (d.get("inbox") or {}).get("needs_you"):
+            pts.append(f"{d['inbox']['needs_you']} notification(s) need you")
+        if (d.get("suggestions") or {}).get("count"):
+            pts.append(f"{d['suggestions']['count']} suggestion(s) waiting")
+        for b in (d.get("people") or {}).get("birthdays", [])[:1]:
+            pts.append(f"{b['name']}'s birthday " + ("today" if b["in_days"] == 0 else f"in {b['in_days']} days"))
+        for r in (d.get("people") or {}).get("reach_out", [])[:1]:
+            pts.append(f"Haven't talked to {r['name']} in {r['days_since']} days")
+    evs = d.get("events") or []
     n = len(evs)
     headline = f"{d['weekday']}: " + (f"{n} event{'s' if n != 1 else ''}" if n else "a clear calendar")
     headline += "".join(p.headline for p in parts)
@@ -370,13 +299,13 @@ async def ensure_today(user: User, trigger: str) -> Dict[str, Any]:
 
 def push_payload(b: Dict[str, Any], counts: Optional[Dict[str, int]] = None) -> Dict[str, Any]:
     """The phone's ``briefing`` event: the stored briefing ``b`` plus the
-    addons' ``counts`` (the tasks addon's ``due``: due today, not overdue)."""
+    addons' ``counts`` (e.g. ``due`` from tasks, ``needs_you`` from inbox)."""
     d = b.get("data") or {}
     evs = d.get("events") or []
     return {"date": b["date"], "headline": b["headline"], "points": b["points"],
             "next_event": (f"{evs[0]['time']} {evs[0]['title']}" if evs else None),
             "due": (counts or {}).get("due", 0),
-            "needs_you": (d.get("inbox") or {}).get("needs_you", 0)}
+            "needs_you": (d.get("inbox") or {}).get("needs_you", (counts or {}).get("needs_you", 0))}
 
 
 def counts(user: User) -> Dict[str, int]:
@@ -389,8 +318,10 @@ def counts(user: User) -> Dict[str, int]:
 
 
 async def deliver(b: Dict[str, Any], user: User) -> bool:
-    """Push the briefing to ``user``'s phone and, with ``BRIEFING_TELEGRAM``, to them on Telegram."""
-    ok = await phone_push.send(user, "briefing", push_payload(b, await asyncio.to_thread(counts, user)))
+    """Push the briefing to ``user``'s channels and, with ``BRIEFING_TELEGRAM``, to them on Telegram."""
+    payload = push_payload(b, await asyncio.to_thread(counts, user))
+    res = await notify_mod.send(user, notify_mod.Message(kind="briefing", data=payload))
+    ok = any(res.values())
     with get_db_connection() as conn:
         conn.execute("UPDATE briefings SET delivered_at = ? WHERE user_id = ? AND date = ?",
                      (_now_iso(), user.id, b["date"]))
@@ -409,7 +340,7 @@ async def on_wake(user: User) -> Optional[Dict[str, Any]]:
         if b and b.get("delivered_at"):
             return b
         if not b or b.get("trigger") == "fallback":
-            b = await build_and_store(user, "wake")  # fresh data: the fallback one may be hours old
+            b = await build_and_store(user, "wake")
         await deliver(b, user)
         return b
     except Exception as e:
@@ -453,20 +384,19 @@ async def fallback_loop(interval_seconds: int = 60) -> None:
 # ---------------------------------------------------------------------------
 
 def meetings_available(user: Optional[User]) -> bool:
-    """Whether meeting cards are checked for ``user`` (``calendar`` and ``phone``)."""
-    return user is not None and composers.has_all(user, MEETING_KINDS)
+    """Whether meeting cards are checked for ``user`` (calendar + delivery channel)."""
+    return user is not None and registry.provider("events_between", user) is not None and bool(registry.channels(user))
 
 
 async def check_meetings(user: User, now: Optional[datetime.datetime] = None) -> int:
-    """Push the card of anyone named in an event of ``user``'s calendar
-    starting within MEETING_CARD_MINUTES to their phone (nothing without
-    their calendar and phone; no card without their people)."""
-    conn = store.get(user, calendar_config.ADDON)
-    if conn is None or not store.is_connected(user, PHONE):
+    """Push the card of anyone named in an upcoming event of ``user``'s calendar
+    starting within MEETING_CARD_MINUTES."""
+    ev_hook = registry.provider("events_between", user)
+    if ev_hook is None or not registry.channels(user):
         return 0
     now = now or clock.now()
-    evs = await asyncio.to_thread(calendar_events.list_events, conn, now,
-                                  now + datetime.timedelta(minutes=MEETING_CARD_MINUTES + 1))
+    evs = await ev_hook.func(user, now, now + datetime.timedelta(minutes=MEETING_CARD_MINUTES + 1)) or []
+    card_hook = registry.provider("person_cards_for_text", user)
     sent = 0
     for e in evs:
         if e["all_day"] or not e["start"]:
@@ -482,17 +412,13 @@ async def check_meetings(user: User, now: Optional[datetime.datetime] = None) ->
         if key in _sent_meeting_cards:
             continue
         _sent_meeting_cards[key] = now.date().isoformat()
-        pids: List[str] = []
-        for text in [e["title"], *e["attendees"]]:
-            for pid in people_store.mentioned_in(user, text):
-                if pid not in pids:
-                    pids.append(pid)
-        for pid in pids[:2]:
-            c = people_detail.card(user, pid)
-            if not c or not (c["last_call"] or c["points"] or c["open"]):
-                continue
-            await phone_push.send(user, "context_card", {"reason": "meeting", "event_title": e["title"],
-                                                         "starts_at": e["start"], "minutes": round(mins), "card": c})
+        cards_out = card_hook.func(user, [e["title"], *e["attendees"]], 2) if card_hook is not None else []
+        for c in cards_out:
+            await notify_mod.send(user, notify_mod.Message(
+                kind="context_card",
+                data={"reason": "meeting", "event_title": e["title"], "starts_at": e["start"],
+                      "minutes": round(mins), "card": c},
+            ))
             sent += 1
     today = now.date().isoformat()
     for k in [k for k, d in _sent_meeting_cards.items() if d != today]:
@@ -512,7 +438,7 @@ async def _meetings_for(user: User) -> int:
 
 
 async def meetings_once() -> Dict[str, int]:
-    """One meeting-card check for every user with ``calendar`` and ``phone``
+    """One meeting-card check for every user with a calendar and delivery channel
     (each as that user; one failing backs off for 15 min, the next still runs)."""
     return await composers.for_each("Meeting cards", meetings_available, _meetings_for)
 

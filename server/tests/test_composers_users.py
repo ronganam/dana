@@ -639,7 +639,8 @@ async def test_now(client: TestClient) -> None:
     choice_text = json.dumps(sug, ensure_ascii=False)
     check("now: Bob's suggestion offers the home / wake choices (he has both)",
           "When I get home" in choice_text and "When I wake" in choice_text, choice_text[:300])
-    labels = [o["label"] for o in now_mod._suggestion_choices(CARL, {}, clock.now())]
+    from addons.phone import now_cards as phone_now
+    labels = [o["label"] for o in phone_now.suggestion_choices(CARL, {}, clock.now())]
     check("now: no home / wake choices without Home Assistant / the wake flow",
           "When I get home" not in labels and "When I wake" not in labels, labels)
     # Lede: the briefing headline is per user.

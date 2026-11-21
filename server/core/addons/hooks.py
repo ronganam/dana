@@ -152,22 +152,27 @@ class Hook:
 class Card:
     """A card in the Now queue (docs/now.md). ``id`` is ``<kind prefix>:<id>``;
     the prefix routes ``POST /api/now/act`` to the addon's ``@addon.now_action``.
-    ``primary`` / ``secondary`` are actions (``core.cards.action``)."""
+    ``primary`` / ``secondary`` are actions (``core.cards.action``). Set ``why=None``
+    to omit the key from the payload; ``extra`` adds top-level keys."""
     id: str
     kind: str
     source: str
     title: str
-    why: str = ""
+    why: Optional[str] = ""
     primary: Optional[Dict[str, Any]] = None
     secondary: List[Dict[str, Any]] = field(default_factory=list)
     schedulable: bool = True
     ref: Optional[Dict[str, Any]] = None
     blocks: List[Dict[str, Any]] = field(default_factory=list)
+    extra: Dict[str, Any] = field(default_factory=dict)
 
     def to_json(self) -> Dict[str, Any]:
-        return {"id": self.id, "kind": self.kind, "source": self.source, "title": self.title, "why": self.why,
-                "primary": self.primary, "secondary": list(self.secondary), "schedulable": self.schedulable,
-                "ref": self.ref, "blocks": list(self.blocks)}
+        out: Dict[str, Any] = {"id": self.id, "kind": self.kind, "source": self.source, "title": self.title}
+        if self.why is not None:
+            out["why"] = self.why
+        out.update({"primary": self.primary, "secondary": list(self.secondary), "schedulable": self.schedulable,
+                    "ref": self.ref, "blocks": list(self.blocks), **self.extra})
+        return out
 
 
 @dataclass

@@ -967,7 +967,8 @@ async def test_targets(client: TestClient) -> None:
           and t["saved"] == 20_000 and json.loads(row(ROBIN, key)["baseline"])["pace"] == 86_000
           and json.loads(row(ROBIN, key)["baseline"])["targets"] == [{"month": "2026-09", "monthly": 70_000},
                                                                    {"month": "2026-11", "monthly": 35_000}], t)
-    cards = now_screen._savings_items(ROBIN, NOW, {})
+    from addons.money import hooks as money_hooks
+    cards = [c.to_json() for c in money_hooks.savings_cards(ROBIN, NOW, {})]
     check("now: a target at ≥ 80% of this month's", f"money_target:{key}:2026-11" in [c["id"] for c in cards],
           [c["id"] for c in cards])
     s, body = await call(client, "PATCH", url(key), ROBIN, {"target": None})
@@ -975,7 +976,7 @@ async def test_targets(client: TestClient) -> None:
     s, body = await call(client, "PATCH", url(key), ROBIN, {"target": 70_000})
     set_row(ROBIN, key, status_at="2026-09-10T08:00:00+00:00")
     later = datetime.datetime(2026, 12, 2, 9, 0, tzinfo=TZ)
-    cards = {c["id"]: c for c in now_screen._savings_items(ROBIN, later, {})}
+    cards = {c.id: c.to_json() for c in money_hooks.savings_cards(ROBIN, later, {})}
     nov = cards.get(f"money_target:{key}:2026-11")
     check("now: November's result in the first days of December (₪300 of ₪700: under by ₪400)",
           nov and nov["title"] == "Eating out in November: ₪300.00 of ₪700.00"
@@ -983,26 +984,27 @@ async def test_targets(client: TestClient) -> None:
 
 
 async def test_now(client: TestClient) -> None:
+    from addons.money import hooks as money_hooks
     # Looking at 2 December (test_targets) ended the renewal's snooze: snooze it again.
     s, _ = await call(client, "PATCH", url(RENEW_HOME), ROBIN, {"status": "snoozed", "snooze_days": 10})
-    cards = {c["id"] for c in now_screen._savings_items(ROBIN, NOW, {})}
+    cards = {c.id for c in money_hooks.savings_cards(ROBIN, NOW, {})}
     check("now: no card for a snoozed renewal or a bill already being handled (doing)",
           s == 200 and f"money_save:{RENEW_HOME}" not in cards and f"money_save:{PHONE}" not in cards, sorted(cards))
     s, body = await call(client, "PATCH", url(RENEW_HOME), ROBIN, {"status": "open"})
     s, body = await call(client, "PATCH", url(PHONE), ROBIN, {"status": "open"})
-    cards = {c["id"]: c for c in now_screen._savings_items(ROBIN, NOW, {})}
+    cards = {c.id: c.to_json() for c in money_hooks.savings_cards(ROBIN, NOW, {})}
     renew, bill = cards.get(f"money_save:{RENEW_HOME}"), cards.get(f"money_save:{PHONE}")
     check("now: the renewal in 10 days and the new bill increase, as money cards",
           renew and renew["why"] == "Renews around 28 Nov 2026 · in 10 days" and renew["kind"] == "money"
           and renew["ref"] == {"type": "saving", "id": RENEW_HOME} and bill and bill["title"].startswith("סלולר הצפון")
           and bill["blocks"][0]["items"][0] == "Saves ₪768.00–₪888.00 a year", sorted(cards))
     res = await now_screen.act(ROBIN, f"money_save:{RENEW_HOME}", "dismiss")
-    cards = {c["id"] for c in now_screen._savings_items(ROBIN, NOW, now_screen.now_hidden.active(ROBIN))}
+    cards = {c.id for c in money_hooks.savings_cards(ROBIN, NOW, now_screen.now_hidden.active(ROBIN))}
     check("now: dismissing the card hides it (the saving's own status stays open)",
           f"money_save:{RENEW_HOME}" not in cards and row(ROBIN, RENEW_HOME)["status"] == "open" and res.get("undo_id"))
     with users.acting_as(ROBIN):
         await undo.run(res["undo_id"])
-    cards = {c["id"] for c in now_screen._savings_items(ROBIN, NOW, now_screen.now_hidden.active(ROBIN))}
+    cards = {c.id for c in money_hooks.savings_cards(ROBIN, NOW, now_screen.now_hidden.active(ROBIN))}
     check("now: Undo shows it again", f"money_save:{RENEW_HOME}" in cards)
     try:
         await now_screen.act(ROBIN, f"money_save:{BOB_PHONE}", "dismiss")
@@ -1019,7 +1021,7 @@ async def test_now(client: TestClient) -> None:
     res = await now_screen.act(ROBIN, "money_target:creep:eating_out:2026-11", "dismiss")
     check("now: a target card is dismissed by month", res["ok"]
           and "money_target:creep:eating_out:2026-11" in now_screen.now_hidden.active(ROBIN))
-    check("now: nothing for Carl", now_screen._savings_items(CARL, NOW, {}) == [])
+    check("now: nothing for Carl", money_hooks.savings_cards(CARL, NOW, {}) == [])
 
 
 # --- API, isolation --------------------------------------------------------------------------------------

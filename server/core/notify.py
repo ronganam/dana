@@ -110,6 +110,13 @@ async def send(user: User, message: Message) -> Dict[str, bool]:
     return out
 
 
+async def push_notify(user: User, title: str, text: str, tag: str = "", channel: str = "messages") -> bool:
+    """Deliver a plain notification to ``user``'s device channels (e.g. the phone push channel)."""
+    res = await send(user, Message(kind="notify", data={"title": title[:200], "text": text[:4000],
+                                                        "tag": tag[:120] or None, "channel": channel}))
+    return any(res.values())
+
+
 async def whatsapp_voice(user: User, chat_id: Optional[int], sender: str, transcript: str, message_id: str) -> bool:
     """Hand ``user``'s inbound WhatsApp voice transcript to the Telegram
     channel, for ``chat_id`` (their ``voice_telegram_chat_id`` setting; None:
