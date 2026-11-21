@@ -22,4 +22,4 @@ curl_cffi==0.15.0
 mutagen>=1.47
 # The user's own Telegram account (MTProto) and its QR sign-in (addons/telegram_account).
 telethon>=1.46,<2
-qrcode>=8.0
+qrcode>=8.2
