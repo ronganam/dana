@@ -9,8 +9,11 @@ import io.github.ronganam.dana.data.network.Me
 import io.github.ronganam.dana.data.notifications.NotificationExtractor
 import io.github.ronganam.dana.data.notifications.Redactor
 import kotlinx.coroutines.CancellationException
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 
 /**
@@ -41,7 +44,7 @@ object MoneySignals {
         pkg != null && pkg in PACKAGES && Me.cached(context)?.has(ADDON) == true
 
     /** The signal for [sbn], or null (ongoing, a group summary, empty …). */
-    fun item(context: Context, sbn: StatusBarNotification): JSONObject? {
+    fun item(context: Context, sbn: StatusBarNotification): JsonObject? {
         if (!NotificationExtractor.isCapturable(context, sbn)) return null
         val extras = sbn.notification?.extras ?: return null
         fun cs(k: String) = extras.getCharSequence(k)?.toString()?.trim().orEmpty()
@@ -53,15 +56,16 @@ object MoneySignals {
     }
 
     /** The payload of one signal, codes hidden; null when it says nothing. */
-    fun build(key: String, pkg: String, appName: String, title: String, text: String, postedAt: Long): JSONObject? {
+    fun build(key: String, pkg: String, appName: String, title: String, text: String, postedAt: Long): JsonObject? {
         if (title.isBlank() && text.isBlank()) return null
-        return JSONObject()
-            .put("key", key)
-            .put("package", pkg)
-            .put("app_name", appName)
-            .put("title", Redactor.redact(title).take(500))
-            .put("text", Redactor.redact(text).take(4000))
-            .put("posted_at", postedAt)
+        return buildJsonObject {
+            put("key", key)
+            put("package", pkg)
+            put("app_name", appName)
+            put("title", Redactor.redact(title).take(500))
+            put("text", Redactor.redact(text).take(4000))
+            put("posted_at", postedAt)
+        }
     }
 
     // ---------- the queue ----------
@@ -69,16 +73,20 @@ object MoneySignals {
     private val lock = Any()
     private var seq = System.currentTimeMillis()
 
-    fun add(context: Context, item: JSONObject) = synchronized(lock) {
-        val arr = read(context)
-        arr.put(JSONObject().put("id", ++seq).put("data", item))
-        write(context, if (arr.length() > MAX_ITEMS) {
+    fun add(context: Context, item: JsonObject) = synchronized(lock) {
+        val list = read(context).toMutableList()
+        list += buildJsonObject {
+            put("id", ++seq)
+            put("data", item)
+        }
+        val kept = if (list.size > MAX_ITEMS) {
             Log.w(TAG, "Over $MAX_ITEMS queued; dropping the oldest")
-            JSONArray().also { out -> for (i in arr.length() - MAX_ITEMS until arr.length()) out.put(arr.get(i)) }
-        } else arr)
+            list.subList(list.size - MAX_ITEMS, list.size)
+        } else list
+        write(context, JsonArray(kept))
     }
 
-    fun size(context: Context): Int = synchronized(lock) { read(context).length() }
+    fun size(context: Context): Int = synchronized(lock) { read(context).size }
 
     /**
      * Send what is queued. True when nothing is left to retry (sent, refused
@@ -99,12 +107,12 @@ object MoneySignals {
             when {
                 code in 200..299 -> {
                     remove(context, ids)
-                    Log.i(TAG, "Sent ${ids.size} money signal(s): ${body.optInt("accepted")} accepted")
+                    Log.i(TAG, "Sent ${ids.size} money signal(s): ${body.intValue("accepted")} accepted")
                 }
-                code == 403 && body.optString("error") == "not_connected" -> {
+                code == 403 && body.string("error") == "not_connected" -> {
                     // Not (or no longer) connected: stop until /api/me says otherwise.
                     Me.drop(context, ADDON)
-                    synchronized(lock) { write(context, JSONArray()) }
+                    synchronized(lock) { write(context, EmptyJsonArray) }
                     Log.i(TAG, "No money addon; dropped the queued signals")
                     return true
                 }
@@ -121,42 +129,37 @@ object MoneySignals {
         return true
     }
 
-    private fun peek(context: Context): Pair<List<Long>, JSONArray> = synchronized(lock) {
+    private fun peek(context: Context): Pair<List<Long>, JsonArray> = synchronized(lock) {
         val arr = read(context)
         val ids = mutableListOf<Long>()
-        val out = JSONArray()
-        for (i in 0 until minOf(arr.length(), BATCH)) {
-            val o = arr.optJSONObject(i) ?: continue
-            ids += o.optLong("id")
-            o.optJSONObject("data")?.let { out.put(it) }
+        val out = buildJsonArray {
+            for (o in arr.objects().take(BATCH)) {
+                ids += o.longValue("id")
+                o.obj("data")?.let { add(it) }
+            }
         }
         ids to out
     }
 
     private fun remove(context: Context, ids: Collection<Long>) = synchronized(lock) {
         val drop = ids.toHashSet()
-        val arr = read(context)
-        val out = JSONArray()
-        for (i in 0 until arr.length()) {
-            val o = arr.optJSONObject(i) ?: continue
-            if (o.optLong("id") !in drop) out.put(o)
-        }
-        write(context, out)
+        val kept = read(context).objects().filter { it.longValue("id") !in drop }
+        write(context, JsonArray(kept))
     }
 
     private fun file(context: Context) = File(context.filesDir, FILE_NAME)
 
-    private fun read(context: Context): JSONArray = try {
+    private fun read(context: Context): JsonArray = try {
         val f = file(context)
-        if (f.exists()) JSONArray(f.readText()) else JSONArray()
+        if (f.exists()) jsonArrayOf(f.readText()) else EmptyJsonArray
     } catch (e: Exception) {
         Log.e(TAG, "Queue unreadable; starting over", e)
-        JSONArray()
+        EmptyJsonArray
     }
 
-    private fun write(context: Context, arr: JSONArray) {
+    private fun write(context: Context, arr: JsonArray) {
         val f = file(context)
-        if (arr.length() == 0) {
+        if (arr.isEmpty()) {
             f.delete()
             return
         }

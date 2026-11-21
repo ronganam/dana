@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.viewmodels
 
+import io.github.ronganam.dana.data.money.EmptyJson
 import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.money.CheckReply
 import io.github.ronganam.dana.data.money.MoneyApi
@@ -10,6 +11,9 @@ import io.github.ronganam.dana.data.money.MoneySave
 import io.github.ronganam.dana.data.money.SavingItem
 import io.github.ronganam.dana.data.money.SavingsOverview
 import io.github.ronganam.dana.data.money.Txn
+import io.github.ronganam.dana.data.money.jsonValue
+import io.github.ronganam.dana.data.money.obj
+import io.github.ronganam.dana.data.money.str
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -18,7 +22,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /** The loaded Transactions list: [key] = the filters and month it was loaded for. */
 data class TxnList(
@@ -106,7 +113,7 @@ class MoneyLedgerState(val money: MoneyController) {
         txJob = scope.launch {
             try {
                 val o = api.get("/transactions", MoneyLedger.query(filter.q, filter.category, filter.account, filter.min, filter.max, filter.allTime, month, limit))
-                _txns.value = TxnList(Txn.parseList(o), o.optString("next_cursor").takeIf { !o.isNull("next_cursor") && it.isNotBlank() }, false, true, null, key)
+                _txns.value = TxnList(Txn.parseList(o), o.str("next_cursor"), false, true, null, key)
             } catch (e: Exception) {
                 if (e is CancellationException) throw e
                 _txns.update { it.copy(loading = false, error = MoneyLedger.errorText(e)) }
@@ -126,7 +133,7 @@ class MoneyLedgerState(val money: MoneyController) {
                 _txns.update {
                     it.copy(
                         rows = MoneyLedger.merge(it.rows, Txn.parseList(o)),
-                        next = o.optString("next_cursor").takeIf { !o.isNull("next_cursor") && it.isNotBlank() },
+                        next = o.str("next_cursor"),
                         loading = false, error = null
                     )
                 }
@@ -184,27 +191,27 @@ class MoneyLedgerState(val money: MoneyController) {
     }
 
     /** A PATCH answer's transaction replaces the row in the list and the open detail. */
-    private fun put(answer: JSONObject) {
-        val o = answer.optJSONObject("transaction") ?: return
+    private fun put(answer: JsonObject) {
+        val o = answer.obj("transaction") ?: return
         val t = Txn.parse(o)
         _txns.update { l -> l.copy(rows = l.rows.map { if (it.id == t.id) t.copy(extras = null) else it }) }
         _detail.update { d -> if (d?.id == t.id) d.copy(txn = t, full = true) else d }
     }
 
-    private fun patchTxn(id: String, body: JSONObject, words: (JSONObject) -> String, after: () -> Unit = {}) =
+    private fun patchTxn(id: String, body: JsonObject, words: (JsonObject) -> String, after: () -> Unit = {}) =
         write { val a = api.patch("/transactions/${MoneyApi.enc(id)}", body); put(a); after(); a to words(a) }
 
     fun setCategory(t: Txn, category: String, label: String, forMerchant: Boolean) {
         _picker.value = null
-        patchTxn(t.id, JSONObject().put("category", category).put("for_merchant", forMerchant), { MoneyLedger.undoText(it, label, forMerchant) })
+        patchTxn(t.id, buildJsonObject { put("category", category); put("for_merchant", forMerchant) }, { MoneyLedger.undoText(it, label, forMerchant) })
     }
 
-    fun setFlow(t: Txn, flow: String) = patchTxn(t.id, JSONObject().put("flow", flow), { MoneyLedger.flowText(it) })
+    fun setFlow(t: Txn, flow: String) = patchTxn(t.id, buildJsonObject { put("flow", flow) }, { MoneyLedger.flowText(it) })
 
     /** One-off / Yearly: [state] yes | no | auto. */
     fun setMark(t: Txn, mark: String, state: String) {
         val value: Boolean? = when (state) { "yes" -> true; "no" -> false; else -> null }
-        patchTxn(t.id, JSONObject().put(mark, value ?: JSONObject.NULL), { MoneyLedger.markText(it, mark, value) })
+        patchTxn(t.id, buildJsonObject { put(mark, jsonValue(value)) }, { MoneyLedger.markText(it, mark, value) })
     }
 
     fun setNoteDraft(id: String, text: String?) {
@@ -213,7 +220,7 @@ class MoneyLedgerState(val money: MoneyController) {
 
     fun saveNote(id: String) {
         val note = _noteDrafts.value[id] ?: return
-        patchTxn(id, JSONObject().put("note", note), { MoneyLedger.undoText(it, null) }, after = { setNoteDraft(id, null) })
+        patchTxn(id, buildJsonObject { put("note", note) }, { MoneyLedger.undoText(it, null) }, after = { setNoteDraft(id, null) })
     }
 
     // ---------- Accounts ----------
@@ -285,19 +292,24 @@ class MoneyLedgerState(val money: MoneyController) {
         val f = _form.value ?: return
         if (f.mode != LoginForm.Mode.LOGIN || f.busy) return
         val company = _companies.value?.firstOrNull { it.id == f.company } ?: return
-        val credentials = JSONObject()
-        company.fields.forEach { credentials.put(it.name, f.values[it.name] ?: "") }
+        val credentials = buildJsonObject {
+            company.fields.forEach { put(it.name, f.values[it.name] ?: "") }
+        }
         val filled = company.fields.count { !f.values[it.name].isNullOrEmpty() }
         val label = f.label.trim()
-        val body = JSONObject()
-        if (f.sourceId != null) {
+        val body = if (f.sourceId != null) {
             if (filled in 1 until company.fields.size) { _form.value = f.copy(error = "Fill in every field to change the login.", fieldError = null); return }
-            if (filled > 0) body.put("credentials", credentials)
-            body.put("label", label)
+            buildJsonObject {
+                if (filled > 0) put("credentials", credentials)
+                put("label", label)
+            }
         } else {
             if (filled < company.fields.size) { _form.value = f.copy(error = "Fill in every field.", fieldError = null); return }
-            body.put("company", company.id).put("credentials", credentials)
-            if (label.isNotEmpty()) body.put("label", label)
+            buildJsonObject {
+                put("company", company.id)
+                put("credentials", credentials)
+                if (label.isNotEmpty()) put("label", label)
+            }
         }
         _form.value = f.copy(busy = true, error = null, fieldError = null)
         scope.launch {
@@ -365,7 +377,7 @@ class MoneyLedgerState(val money: MoneyController) {
         scope.launch {
             var reload = false
             try {
-                api.post("/code-requests/${MoneyApi.enc(requestId)}", JSONObject().put("code", code))
+                api.post("/code-requests/${MoneyApi.enc(requestId)}", buildJsonObject { put("code", code) })
                 _codeSent.update { it + requestId }
                 _codeDrafts.update { it - requestId }
                 money.watchClosely()
@@ -442,19 +454,19 @@ class MoneyLedgerState(val money: MoneyController) {
         val target = MoneySave.targetAgorot(_targetDraft.value)
         if (target == null) { _targetError.value = "Type the most to spend a month as a whole amount, for example 650."; return }
         _targetError.value = null
-        patchSaving(key, JSONObject().put("target", target))
+        patchSaving(key, buildJsonObject { put("target", target) })
     }
 
     /** A status, an answer, a target or a subscription line: the item takes the answer in place, with Undo. */
-    fun patchSaving(key: String, body: JSONObject) {
+    fun patchSaving(key: String, body: JsonObject) {
         if (key in _saveBusy.value) return
         _saveBusy.update { it + key }
-        if (body.has("answers")) _checkNotes.update { it - key }
+        if ("answers" in body) _checkNotes.update { it - key }
         write(finally = { _saveBusy.update { it - key } }) {
             val a = api.patch("/savings/${MoneyApi.enc(key)}", body)
-            val item = SavingItem.parse(a.optJSONObject("item") ?: JSONObject())
+            val item = SavingItem.parse(a.obj("item") ?: EmptyJson)
             putSaving(item)
-            if (body.has("target") || body.has("status")) { _targetFor.value = null; _targetError.value = null }
+            if ("target" in body || "status" in body) { _targetFor.value = null; _targetError.value = null }
             a to MoneySave.toast(item, body)
         }
     }
@@ -462,13 +474,18 @@ class MoneyLedgerState(val money: MoneyController) {
     /** A subscription line's Keep / Cancel; the same choice again clears it. */
     fun chooseSub(item: SavingItem, subKey: String, choice: String) {
         val cur = item.subitems.firstOrNull { it.key == subKey }?.choice
-        patchSaving(item.key, JSONObject().put("subitem", JSONObject().put("key", subKey).put("choice", if (cur == choice) JSONObject.NULL else choice)))
+        patchSaving(item.key, buildJsonObject {
+            put("subitem", buildJsonObject {
+                put("key", subKey)
+                put("choice", if (cur == choice) JsonNull else jsonValue(choice))
+            })
+        })
     }
 
     fun answer(item: SavingItem, questionId: String, value: Any) {
         val q = item.questions.firstOrNull { it.id == questionId } ?: return
         if (q.answer?.toString() == value.toString()) return
-        patchSaving(item.key, JSONObject().put("answers", JSONObject().put(questionId, value)))
+        patchSaving(item.key, buildJsonObject { put("answers", buildJsonObject { put(questionId, jsonValue(value)) }) })
     }
 
     /** "Check prices": only ever on this press. 202 (or 409: one runs) → poll the item. */
@@ -537,10 +554,10 @@ class MoneyLedgerState(val money: MoneyController) {
      * show): an `undo_id` makes it an Undo snackbar, then every view
      * refreshes. A failure is said in words.
      */
-    private fun write(finally: () -> Unit = {}, block: suspend () -> Pair<JSONObject, String>): Job = scope.launch {
+    private fun write(finally: () -> Unit = {}, block: suspend () -> Pair<JsonObject, String>): Job = scope.launch {
         try {
             val (answer, text) = block()
-            val undoId = answer.optString("undo_id").ifBlank { null }
+            val undoId = answer.str("undo_id")
             if (undoId != null) money.ctx.messages.postUndoable(text, onUndo = { money.undo(undoId) })
             else money.ctx.messages.post(text)
             money.refresh()

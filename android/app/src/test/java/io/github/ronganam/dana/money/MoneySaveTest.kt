@@ -1,13 +1,23 @@
 package io.github.ronganam.dana.money
 
 import io.github.ronganam.dana.data.money.Effort
+import io.github.ronganam.dana.data.money.EmptyJson
 import io.github.ronganam.dana.data.money.EvidenceLink
 import io.github.ronganam.dana.data.money.MoneySave
 import io.github.ronganam.dana.data.money.Outcome
 import io.github.ronganam.dana.data.money.SavingItem
 import io.github.ronganam.dana.data.money.SavingsOverview
 import io.github.ronganam.dana.data.money.Target
-import org.json.JSONObject
+import io.github.ronganam.dana.data.money.absent
+import io.github.ronganam.dana.data.money.arr
+import io.github.ronganam.dana.data.money.jsonObjectOf
+import io.github.ronganam.dana.data.money.obj
+import io.github.ronganam.dana.data.money.objects
+import io.github.ronganam.dana.data.money.string
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -21,9 +31,9 @@ import java.time.ZoneId
  * (synthetic), the same assertions as `server/addons/money/tests/test_web_money.mjs`.
  */
 class MoneySaveTest {
-    private val f = JSONObject(MoneySaveTest::class.java.classLoader!!.getResource("money_savings_web.json")!!.readText())
-    private val sv = SavingsOverview.parse(f.getJSONObject("savings"))
-    private val dayIso = f.getJSONObject("savings").getString("as_of").take(10)
+    private val f = jsonObjectOf(MoneySaveTest::class.java.classLoader!!.getResource("money_savings_web.json")!!.readText())
+    private val sv = SavingsOverview.parse(f.obj("savings")!!)
+    private val dayIso = f.obj("savings")!!.string("as_of").take(10)
     private val day = LocalDate.parse(dayIso)
     private val zone = ZoneId.of("Asia/Jerusalem")
     private fun svi(k: String) = sv.items.first { it.key == k }
@@ -85,8 +95,8 @@ class MoneySaveTest {
         assertEquals("On it since 18 Nov", MoneySave.statusLine(svi(bill), day, zone))
         assertEquals("Done 18 Nov", MoneySave.statusLine(svi("electricity"), day, zone))
         assertEquals("", MoneySave.statusLine(svi(arnona), day, zone))
-        // A body as sorted "k":v pairs, so JSONObject's key order does not matter.
-        fun norm(o: JSONObject?) = o?.let { b -> "{" + b.keys().asSequence().sorted().joinToString(",") { k -> "\"$k\":${JSONObject.wrap(b.opt(k)).let { v -> if (v is String) "\"$v\"" else v.toString() }}" } + "}" }
+        // A body as sorted "k":v pairs, so key order does not matter.
+        fun norm(o: JsonObject?) = o?.let { b -> "{" + b.keys.sorted().joinToString(",") { k -> "\"$k\":${b[k]}" } + "}" }
         fun acts(i: SavingItem) = MoneySave.actions(i).map { Triple(it.label, norm(it.body), it.input) }
         assertEquals(listOf(
             Triple("I'm on it", """{"status":"doing"}""", false), Triple("I did it", """{"status":"done"}""", false),
@@ -101,17 +111,17 @@ class MoneySaveTest {
         assertEquals(listOf(Triple("Dana decides again", """{"status":"open"}""", false)), acts(svi("fees").copy(status = "paused")))
         // Every choice the user made has a way back to Dana.
         sv.items.filter { it.status != "open" }.forEach { i ->
-            assertTrue(i.key, MoneySave.actions(i).any { a -> a.body?.let { it.optString("status") == "open" || (it.has("target") && it.isNull("target")) } == true })
+            assertTrue(i.key, MoneySave.actions(i).any { a -> a.body?.let { it.string("status") == "open" || ("target" in it && it.absent("target")) } == true })
         }
-        val patched = SavingItem.parse(f.getJSONObject("patch").getJSONObject("item"))
-        assertEquals("On it · ${MoneySave.isolateHebrew(patched.title)}", MoneySave.toast(patched, JSONObject().put("status", "doing"), day))
-        assertEquals("Snoozed until 18 Dec · ${svi(cash).title}", MoneySave.toast(svi(cash), JSONObject().put("status", "snoozed").put("snooze_days", 30), day))
-        assertEquals("Target ₪650 a month · Eating out is up: ₪860 a month", MoneySave.toast(svi("creep:eating_out"), JSONObject().put("target", 65000), day))
-        assertTrue(MoneySave.toast(svi("creep:eating_out"), JSONObject().put("target", JSONObject.NULL), day).startsWith("Stopped tracking · "))
+        val patched = SavingItem.parse(f.obj("patch")!!.obj("item")!!)
+        assertEquals("On it · ${MoneySave.isolateHebrew(patched.title)}", MoneySave.toast(patched, buildJsonObject { put("status", "doing") }, day))
+        assertEquals("Snoozed until 18 Dec · ${svi(cash).title}", MoneySave.toast(svi(cash), buildJsonObject { put("status", "snoozed"); put("snooze_days", 30) }, day))
+        assertEquals("Target ₪650 a month · Eating out is up: ₪860 a month", MoneySave.toast(svi("creep:eating_out"), buildJsonObject { put("target", 65000) }, day))
+        assertTrue(MoneySave.toast(svi("creep:eating_out"), buildJsonObject { put("target", JsonNull) }, day).startsWith("Stopped tracking · "))
         assertEquals("⁨ענן הצפון⁩: marked to cancel",
-            MoneySave.toast(svi("subscriptions"), JSONObject().put("subitem", JSONObject().put("key", "ענן הצפון").put("choice", "cancel")), day))
-        assertTrue(MoneySave.toast(svi(bill), JSONObject().put("answers", JSONObject().put("lines", 2)), day).startsWith("Answer saved · "))
-        assertTrue(MoneySave.toast(svi("fees"), JSONObject().put("status", "open"), day).startsWith("Dana decides again · "))
+            MoneySave.toast(svi("subscriptions"), buildJsonObject { put("subitem", buildJsonObject { put("key", "ענן הצפון"); put("choice", "cancel") }) }, day))
+        assertTrue(MoneySave.toast(svi(bill), buildJsonObject { put("answers", buildJsonObject { put("lines", 2) }) }, day).startsWith("Answer saved · "))
+        assertTrue(MoneySave.toast(svi("fees"), buildJsonObject { put("status", "open") }, day).startsWith("Dana decides again · "))
     }
 
     @Test
@@ -166,7 +176,7 @@ class MoneySaveTest {
         assertEquals(listOf("2% off", "31 Jan 2027", "באתר העירייה"), aro.rows.single().cells.map { it.text })
         assertEquals("example.com", MoneySave.hostOf("https://www.Example.com/a?b"))
         assertEquals("", MoneySave.hostOf("javascript:alert(1)"))
-        assertNull(MoneySave.safeSource(JSONObject().put("title", "x").put("url", "javascript:alert(1)")))
+        assertNull(MoneySave.safeSource(buildJsonObject { put("title", "x"); put("url", "javascript:alert(1)") }))
         assertNull(MoneySave.offerRows(null, day))
     }
 
@@ -186,16 +196,16 @@ class MoneySaveTest {
         mv(okm.copy(state = "unavailable", items = emptyList())).let { assertNull(it.button); assertTrue(it.text.contains("aren't available")) }
         assertTrue(mv(svi(arnona).market!!).checked.contains("municipality"))
         assertNull(MoneySave.marketView(null, day))
-        assertEquals("checking", MoneySave.checkReply(202, JSONObject().put("state", "checking")).kind)
-        assertEquals("checking", MoneySave.checkReply(409, JSONObject().put("error", "running")).kind)
-        val q = f.getJSONObject("savings").getJSONArray("items").let { a -> (0 until a.length()).map { a.getJSONObject(it) } }
-            .first { it.getString("key") == bill }.getJSONArray("questions").getJSONObject(0)
-        MoneySave.checkReply(400, JSONObject().put("error", "needs_answer").put("question", q)).let { assertEquals("question", it.kind); assertEquals("service", it.question?.id) }
-        assertTrue(MoneySave.checkReply(429, JSONObject().put("error", "too_soon").put("retry_after", 290)).text.endsWith("in 5 min."))
-        assertTrue(MoneySave.checkReply(429, JSONObject().put("error", "too_soon").put("retry_after", 21000)).text.endsWith("in 6 h."))
-        assertEquals("wait", MoneySave.checkReply(429, JSONObject()).kind)
-        assertTrue(MoneySave.checkReply(503, JSONObject().put("error", "unavailable")).text.contains("aren't available"))
-        assertEquals("This idea has no price check.", MoneySave.checkReply(400, JSONObject().put("error", "no_check")).text)
+        assertEquals("checking", MoneySave.checkReply(202, buildJsonObject { put("state", "checking") }).kind)
+        assertEquals("checking", MoneySave.checkReply(409, buildJsonObject { put("error", "running") }).kind)
+        val q = f.obj("savings")!!.arr("items").objects()
+            .first { it.string("key") == bill }.arr("questions").objects()[0]
+        MoneySave.checkReply(400, buildJsonObject { put("error", "needs_answer"); put("question", q) }).let { assertEquals("question", it.kind); assertEquals("service", it.question?.id) }
+        assertTrue(MoneySave.checkReply(429, buildJsonObject { put("error", "too_soon"); put("retry_after", 290) }).text.endsWith("in 5 min."))
+        assertTrue(MoneySave.checkReply(429, buildJsonObject { put("error", "too_soon"); put("retry_after", 21000) }).text.endsWith("in 6 h."))
+        assertEquals("wait", MoneySave.checkReply(429, EmptyJson).kind)
+        assertTrue(MoneySave.checkReply(503, buildJsonObject { put("error", "unavailable") }).text.contains("aren't available"))
+        assertEquals("This idea has no price check.", MoneySave.checkReply(400, buildJsonObject { put("error", "no_check") }).text)
         assertEquals("error", MoneySave.checkReply(0, null).kind)
     }
 

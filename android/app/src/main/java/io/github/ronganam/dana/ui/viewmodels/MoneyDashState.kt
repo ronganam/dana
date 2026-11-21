@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
 
 /**
  * State of the dashboard views (Overview, Spending, Cash flow, Investments,
@@ -25,7 +25,7 @@ import org.json.JSONObject
  */
 class MoneyDashState(val money: MoneyController) {
 
-    data class Loaded(val request: String, val body: JSONObject)
+    data class Loaded(val request: String, val body: JsonObject)
 
     private val _data = MutableStateFlow<Map<String, Loaded>>(emptyMap())
     val data: StateFlow<Map<String, Loaded>> = _data.asStateFlow()
@@ -84,7 +84,7 @@ class MoneyDashState(val money: MoneyController) {
     private fun key(name: String, month: String): String = request(name, month).let { (p, q) -> p + MoneyApi.qs(q) }
 
     /** A payload for [month] when it answers the request wanted now, else null (show a skeleton). */
-    fun got(data: Map<String, Loaded>, name: String, month: String): JSONObject? =
+    fun got(data: Map<String, Loaded>, name: String, month: String): JsonObject? =
         data[name]?.takeIf { it.request == key(name, month) }?.body
 
     /**

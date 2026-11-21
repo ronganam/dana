@@ -36,30 +36,32 @@ import io.github.ronganam.dana.ui.screens.money.charts.LegendItem
 import io.github.ronganam.dana.ui.screens.money.charts.MoneyPalette
 import io.github.ronganam.dana.ui.screens.money.charts.MonthsChart
 import io.github.ronganam.dana.ui.screens.money.charts.SparkBars
+import io.github.ronganam.dana.data.money.arr
+import io.github.ronganam.dana.data.money.obj
+import io.github.ronganam.dana.data.money.objects
+import io.github.ronganam.dana.data.money.string
 import io.github.ronganam.dana.ui.viewmodels.TxnFilter
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 // Spending: where it went (groups → categories), movers, 12 months stacked by
 // group, top merchants and the month's big purchases. A tap on a group or a
 // category focuses the view on it, the same filter Transactions uses.
 
 /** The category taxonomy of `GET categories` (labels, which group a category is in). */
-internal class Taxonomy(json: JSONObject?) {
+internal class Taxonomy(json: JsonObject?) {
     private val labels = mutableMapOf<String, String>()
     private val groupOf = mutableMapOf<String, String>()
 
     init {
-        val groups = json?.optJSONObject("taxonomy")?.optJSONArray("groups")
-        for (i in 0 until (groups?.length() ?: 0)) {
-            val g = groups!!.optJSONObject(i) ?: continue
-            val gk = g.optString("key")
-            labels[gk] = g.optString("label")
+        for (g in json?.obj("taxonomy")?.arr("groups").objects()) {
+            val gk = g.string("key")
+            labels[gk] = g.string("label")
             groupOf[gk] = gk
-            val cats = g.optJSONArray("categories")
-            for (j in 0 until (cats?.length() ?: 0)) {
-                val c = cats!!.optJSONObject(j) ?: continue
-                labels.putIfAbsent(c.optString("key"), c.optString("label"))
-                groupOf.putIfAbsent(c.optString("key"), gk)
+            for (c in g.arr("categories").objects()) {
+                labels.putIfAbsent(c.string("key"), c.string("label"))
+                groupOf.putIfAbsent(c.string("key"), gk)
             }
         }
     }
@@ -311,7 +313,7 @@ private fun BigRow(d: Dash, x: OneOff) {
         }
         Amount(MoneyFormat.amount(x.amount, Sign.NONE), MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.padding(end = 10.dp))
         InkButton("Not a one-off") {
-            val body = JSONObject().put("one_off", false)
+            val body = buildJsonObject { put("one_off", false) }
             d.money.write("Couldn't change it", undoText = "⁨$name⁩: not a one-off") { d.money.api.patch("/transactions/${x.id}", body) }
         }
     }

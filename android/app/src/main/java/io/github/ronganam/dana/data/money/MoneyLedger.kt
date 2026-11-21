@@ -1,7 +1,6 @@
 package io.github.ronganam.dana.data.money
 
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -75,15 +74,15 @@ data class Txn(
     val title: String get() = merchant.ifBlank { description }.ifBlank { "—" }
 
     companion object {
-        fun parse(o: JSONObject): Txn = Txn(
-            id = o.optString("id"),
+        fun parse(o: JsonObject): Txn = Txn(
+            id = o.string("id"),
             accountId = o.str("account_id") ?: "",
             accountKind = o.str("account_kind") ?: "",
             accountLabel = o.str("account_label") ?: "",
             purchaseDate = o.str("purchase_date") ?: "",
             chargeDate = o.str("charge_date"),
             occurredAt = o.str("occurred_at"),
-            amount = o.optLong("amount"),
+            amount = o.longValue("amount"),
             merchant = o.str("merchant") ?: "",
             merchantKey = o.str("merchant_key") ?: "",
             description = o.str("description") ?: "",
@@ -93,35 +92,35 @@ data class Txn(
             group = o.str("group"),
             categorySource = o.str("category_source"),
             flow = o.str("flow"),
-            spending = o.optBoolean("spending"),
+            spending = o.flag("spending"),
             kind = o.str("kind"),
             status = o.str("status") ?: "",
             note = o.str("note"),
-            badges = o.optJSONArray("badges").objects().map {
+            badges = o.arr("badges").objects().map {
                 TxnBadge(
-                    type = it.optString("type"),
-                    number = it.optInt("number"),
-                    total = it.optInt("total"),
-                    amount = it.optLong("amount"),
-                    currency = it.optString("currency")
+                    type = it.string("type"),
+                    number = it.intValue("number"),
+                    total = it.intValue("total"),
+                    amount = it.longValue("amount"),
+                    currency = it.string("currency")
                 )
             },
-            extras = if (!o.has("same_merchant") && !o.has("installment") && !o.has("one_off")) null else TxnExtras(
-                installment = o.optJSONObject("installment")?.let {
-                    Installment(it.optInt("number"), it.optInt("total"), if (it.isNull("purchase_amount")) null else it.optLong("purchase_amount"))
+            extras = if ("same_merchant" !in o && "installment" !in o && "one_off" !in o) null else TxnExtras(
+                installment = o.obj("installment")?.let {
+                    Installment(it.intValue("number"), it.intValue("total"), if (it.absent("purchase_amount")) null else it.longValue("purchase_amount"))
                 },
-                foreign = o.optJSONObject("foreign")?.let { Foreign(it.optLong("amount"), it.optString("currency")) },
+                foreign = o.obj("foreign")?.let { Foreign(it.longValue("amount"), it.string("currency")) },
                 bankCategory = o.str("bank_category"),
-                sameMerchant = o.optJSONObject("same_merchant")?.let { SameMerchant(it.optInt("count"), it.optLong("total"), it.str("first_date")) },
+                sameMerchant = o.obj("same_merchant")?.let { SameMerchant(it.intValue("count"), it.longValue("total"), it.str("first_date")) },
                 oneOff = o.bool("one_off"),
                 yearly = o.bool("yearly"),
-                mealCycle = o.optJSONObject("meal_cycle")?.let { mc ->
-                    TxnMealCycle(mc.str("start"), mc.str("end"), mc.optJSONArray("meals").objects().map { it.str("place") ?: "—" })
+                mealCycle = o.obj("meal_cycle")?.let { mc ->
+                    TxnMealCycle(mc.str("start"), mc.str("end"), mc.arr("meals").objects().map { it.str("place") ?: "—" })
                 }
             )
         )
 
-        fun parseList(o: JSONObject): List<Txn> = o.optJSONArray("transactions").objects().map { parse(it) }
+        fun parseList(o: JsonObject): List<Txn> = o.arr("transactions").objects().map { parse(it) }
     }
 }
 
@@ -141,10 +140,10 @@ data class SourceStatus(val tone: String, val label: String, val detail: String)
 /** A login in the add / update form: `GET companies`. */
 data class MoneyCompany(val id: String, val name: String, val kind: String, val fields: List<CompanyField>) {
     companion object {
-        fun parseAll(o: JSONObject): List<MoneyCompany> = o.optJSONArray("companies").objects().map { c ->
+        fun parseAll(o: JsonObject): List<MoneyCompany> = o.arr("companies").objects().map { c ->
             MoneyCompany(
-                id = c.optString("id"), name = c.optString("name"), kind = c.optString("kind"),
-                fields = c.optJSONArray("fields").objects().map { CompanyField(it.optString("name"), it.optString("label"), it.optBoolean("secret")) }
+                id = c.string("id"), name = c.string("name"), kind = c.string("kind"),
+                fields = c.arr("fields").objects().map { CompanyField(it.string("name"), it.string("label"), it.flag("secret")) }
             )
         }
     }
@@ -374,30 +373,30 @@ object MoneyLedger {
     fun kindText(kind: String?): String = KIND_LABELS[kind]?.let { "Dana counts it as $it." } ?: ""
 
     /** The Undo line after PATCH {one_off} / {yearly}. */
-    fun markText(answer: JSONObject?, mark: String, value: Boolean?): String {
-        val t = answer?.optJSONObject("transaction")
+    fun markText(answer: JsonObject?, mark: String, value: Boolean?): String {
+        val t = answer?.obj("transaction")
         val what = if (mark == "yearly") "a yearly charge" else "a one-off"
         val said = when (value) {
             true -> what
             false -> "not $what"
             null -> "Dana decides if it's ${if (mark == "yearly") "yearly" else "a one-off"}"
         }
-        val changed = answer?.optInt("changed") ?: 0
+        val changed = answer?.intValue("changed") ?: 0
         val more = if (changed > 1) " ($changed charges)" else ""
         return "${isolate(t?.str("merchant"))}: $said$more"
     }
 
     /** The Undo line after PATCH {flow}. */
-    fun flowText(answer: JSONObject?): String {
-        val t = answer?.optJSONObject("transaction")
+    fun flowText(answer: JsonObject?): String {
+        val t = answer?.obj("transaction")
         return "${isolate(t?.str("merchant"))} now counts as ${flowLabel(t?.str("flow"))}"
     }
 
     /** The Undo line after PATCH {category} ([label] the new category) or {note} ([label] null). */
-    fun undoText(answer: JSONObject?, label: String?, forMerchant: Boolean = false): String {
-        val t = answer?.optJSONObject("transaction") ?: return "Saved"
+    fun undoText(answer: JsonObject?, label: String?, forMerchant: Boolean = false): String {
+        val t = answer?.obj("transaction") ?: return "Saved"
         if (label == null) return if (t.str("note") != null) "Note saved" else "Note removed"
-        val changed = answer.optInt("changed")
+        val changed = answer.intValue("changed")
         val more = if (changed > 1) " ($changed charges)" else ""
         return "${isolate(t.str("merchant"))} → $label${if (forMerchant) ", now and from now on$more" else ""}"
     }
@@ -461,11 +460,11 @@ object MoneyLedger {
 
     // ---------- the taxonomy ----------
 
-    fun taxonomy(categories: JSONObject?): List<TaxGroup> =
-        categories?.optJSONObject("taxonomy")?.optJSONArray("groups").objects().map { g ->
+    fun taxonomy(categories: JsonObject?): List<TaxGroup> =
+        categories?.obj("taxonomy")?.arr("groups").objects().map { g ->
             TaxGroup(
-                key = g.optString("key"), label = g.optString("label"), labelHe = g.optString("label_he"), income = g.optBoolean("income"),
-                categories = g.optJSONArray("categories").objects().map { TaxCategory(it.optString("key"), it.optString("label"), it.optString("label_he")) }
+                key = g.string("key"), label = g.string("label"), labelHe = g.string("label_he"), income = g.flag("income"),
+                categories = g.arr("categories").objects().map { TaxCategory(it.string("key"), it.string("label"), it.string("label_he")) }
             )
         }
 
@@ -527,11 +526,8 @@ object MoneyLedger {
     }
 
     /** The overview's `attention` list (falls back to the sources' states when the overview isn't there). */
-    fun attention(overview: JSONObject?): List<Attention>? = overview?.optJSONArray("attention")?.objects()?.map {
-        Attention(it.optString("source_id"), it.optString("name"), it.optString("state"), it.str("reason"))
+    fun attention(overview: JsonObject?): List<Attention>? = overview?.arr("attention")?.objects()?.map {
+        Attention(it.string("source_id"), it.string("name"), it.string("state"), it.str("reason"))
     }
 
 }
-
-/** A string value, null when missing, JSON null or empty. */
-internal fun JSONArray?.objects(): List<JSONObject> = if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it) }
