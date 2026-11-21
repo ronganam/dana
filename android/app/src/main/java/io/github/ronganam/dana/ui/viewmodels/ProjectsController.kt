@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import androidx.core.net.toUri
 
 /** A project or section editor's draft (lives here so a fold / unfold keeps it). */
 sealed class ProjectsEditor {
@@ -476,7 +477,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
     fun openLink(link: String) {
         try {
             val action = if (link.startsWith("tel:")) Intent.ACTION_DIAL else Intent.ACTION_VIEW
-            appContext.startActivity(Intent(action, Uri.parse(link)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            appContext.startActivity(Intent(action, link.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         } catch (e: ActivityNotFoundException) {
             ctx.messages.post("No app opens that link")
         }

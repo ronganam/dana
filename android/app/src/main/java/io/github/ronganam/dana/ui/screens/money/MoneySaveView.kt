@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.ui.components.rememberCopyText
 import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -20,12 +21,10 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextDirection
@@ -245,7 +244,7 @@ private fun SavingBody(money: MoneyController, it: SavingItem, day: String?) {
     val busy = it.key in busySet
     val today = today(day)
     val uri = LocalUriHandler.current
-    val clipboard = LocalClipboardManager.current
+    val copy = rememberCopyText()
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 18.dp).padding(bottom = 28.dp)) {
         Text(MoneySave.isolateHebrew(it.title), style = MaterialTheme.typography.titleLarge.merge(Sentence).copy(fontWeight = FontWeight.SemiBold))
         if (it.summary.isNotEmpty()) Text(MoneySave.isolateHebrew(it.summary), style = MaterialTheme.typography.bodyMedium.merge(Sentence), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
@@ -328,7 +327,7 @@ private fun SavingBody(money: MoneyController, it: SavingItem, day: String?) {
             Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerLow, RoundedCornerShape(10.dp)).padding(12.dp)) {
                 Text(sc.text, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Rtl), modifier = Modifier.fillMaxWidth())
                 InkButton("Copy", modifier = Modifier.padding(top = 8.dp)) {
-                    clipboard.setText(AnnotatedString(sc.text))
+                    copy(sc.text)
                     money.ctx.messages.post("Copied")
                 }
             }

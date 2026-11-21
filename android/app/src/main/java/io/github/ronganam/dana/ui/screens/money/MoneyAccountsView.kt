@@ -88,7 +88,7 @@ internal fun AccountsView(money: MoneyController, modifier: Modifier = Modifier)
                         }
                         Spacer(Modifier.height(14.dp))
                     }
-                    if (adding && f != null) {
+                    if (adding) {
                         IntoView(f.mode to f.company, Modifier.loginBox()) { AddForm(money, f) }
                     } else if (list.isNotEmpty()) {
                         InkButton("+ Add a bank or card", emphasis = InkEmphasis.PRIMARY) { ledger.openAdd() }

@@ -81,10 +81,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.positionChange
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -138,7 +136,7 @@ fun FloatingAssistantOverlay(
     val context = LocalContext.current
     val density = LocalDensity.current
     val scope = rememberCoroutineScope()
-    val clipboardManager = LocalClipboardManager.current
+    val copy = rememberCopyText()
 
     val messages by viewModel.chatController.chatMessages.collectAsState()
     val isRecording by viewModel.chatController.isRecording.collectAsState()
@@ -429,7 +427,7 @@ fun FloatingAssistantOverlay(
                                             onDismiss = onDismiss,
                                             onCopySession = {
                                                 if (currentSessionId.isNotEmpty()) {
-                                                    clipboardManager.setText(AnnotatedString(currentSessionId))
+                                                    copy(currentSessionId)
                                                     Toast.makeText(context, "Session ID copied!", Toast.LENGTH_SHORT).show()
                                                 }
                                             }
@@ -492,7 +490,7 @@ fun FloatingAssistantOverlay(
                                                     AssistantTurn(
                                                         msg = msg,
                                                         context = context,
-                                                        clipboard = clipboardManager,
+                                                        copy = copy,
                                                         tapToSpeech = tapToSpeech,
                                                         serverUrl = viewModel.serverConfig.url,
                                                         apiToken = viewModel.serverConfig.token,

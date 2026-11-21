@@ -1,7 +1,6 @@
 package io.github.ronganam.dana.ui.screens.people
 
 import android.content.Intent
-import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -52,6 +51,7 @@ import io.github.ronganam.dana.ui.screens.common.QuietEmptyState
 import io.github.ronganam.dana.ui.theme.Space
 import io.github.ronganam.dana.ui.theme.Warning
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
+import androidx.core.net.toUri
 
 private val SORTS = listOf("recent" to "Recent", "drifting" to "Been a while", "name" to "A–Z")
 
@@ -80,7 +80,7 @@ fun PeopleScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
     }
 
     val call: (String) -> Unit = { phone ->
-        context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:+$phone")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        context.startActivity(Intent(Intent.ACTION_DIAL, "tel:+$phone".toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
     val needCount = people.count { it.needsYou() }
     val kicker = buildList {

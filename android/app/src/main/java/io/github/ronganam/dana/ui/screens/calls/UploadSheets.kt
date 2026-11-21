@@ -11,7 +11,6 @@ import io.github.ronganam.dana.ui.theme.CategoryPalette
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -350,15 +349,15 @@ fun RecordingSelectionSheet(
     val mediaPlayer = remember { mutableStateOf<MediaPlayer?>(null) }
     val currentlyPlayingPath = remember { mutableStateOf<String?>(null) }
     val isPlaying = remember { mutableStateOf(false) }
-    val currentPosition = remember { mutableStateOf(0f) }
-    val currentDuration = remember { mutableStateOf(0) }
+    val currentPosition = remember { mutableFloatStateOf(0f) }
+    val currentDuration = remember { mutableIntStateOf(0) }
 
     val progressRunnable = remember {
         object : Runnable {
             override fun run() {
                 mediaPlayer.value?.let { mp ->
                     if (mp.isPlaying) {
-                        currentPosition.value = mp.currentPosition.toFloat()
+                        currentPosition.floatValue = mp.currentPosition.toFloat()
                         handler.postDelayed(this, 250)
                     }
                 }
@@ -391,11 +390,11 @@ fun RecordingSelectionSheet(
                 setDataSource(path)
                 prepare()
                 start()
-                currentDuration.value = duration
-                currentPosition.value = 0f
+                currentDuration.intValue = duration
+                currentPosition.floatValue = 0f
                 setOnCompletionListener {
                     isPlaying.value = false
-                    currentPosition.value = 0f
+                    currentPosition.floatValue = 0f
                     handler.removeCallbacks(progressRunnable)
                 }
             }
@@ -416,7 +415,7 @@ fun RecordingSelectionSheet(
         mediaPlayer.value = null
         currentlyPlayingPath.value = null
         isPlaying.value = false
-        currentPosition.value = 0f
+        currentPosition.floatValue = 0f
         handler.removeCallbacks(progressRunnable)
     }
 
@@ -547,7 +546,7 @@ fun RecordingSelectionSheet(
                             }
 
                             // Seek bar when this file is playing
-                            if (isThisPlaying && currentDuration.value > 0) {
+                            if (isThisPlaying && currentDuration.intValue > 0) {
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -555,18 +554,18 @@ fun RecordingSelectionSheet(
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
                                     Text(
-                                        text = formatMsec(currentPosition.value.toInt()),
+                                        text = formatMsec(currentPosition.floatValue.toInt()),
                                         fontSize = 10.sp,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                                         modifier = Modifier.width(32.dp)
                                     )
                                     Slider(
-                                        value = currentPosition.value,
+                                        value = currentPosition.floatValue,
                                         onValueChange = {
-                                            currentPosition.value = it
+                                            currentPosition.floatValue = it
                                             mediaPlayer.value?.seekTo(it.toInt())
                                         },
-                                        valueRange = 0f..currentDuration.value.toFloat().coerceAtLeast(1f),
+                                        valueRange = 0f..currentDuration.intValue.toFloat().coerceAtLeast(1f),
                                         colors = SliderDefaults.colors(
                                             thumbColor = MaterialTheme.colorScheme.primary,
                                             activeTrackColor = MaterialTheme.colorScheme.primary
@@ -576,7 +575,7 @@ fun RecordingSelectionSheet(
                                             .height(18.dp)
                                     )
                                     Text(
-                                        text = formatMsec(currentDuration.value),
+                                        text = formatMsec(currentDuration.intValue),
                                         fontSize = 10.sp,
                                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                                         modifier = Modifier.width(32.dp)

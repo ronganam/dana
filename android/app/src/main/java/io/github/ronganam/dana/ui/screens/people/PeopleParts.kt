@@ -96,12 +96,12 @@ fun DirBullet(text: String, dot: Color, style: TextStyle = MaterialTheme.typogra
 // ---------------------------------------------------------------- time labels
 
 private val ZONE: ZoneId get() = ZoneId.systemDefault()
-private val HM = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
-private val WEEKDAY = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
-private val DAY_MONTH = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
-private val MONTH_YEAR = DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault())
-private val DAY_HEADER = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault())
-private val DAY_HEADER_YEAR = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale.getDefault())
+private val HM: DateTimeFormatter get() = DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())
+private val WEEKDAY: DateTimeFormatter get() = DateTimeFormatter.ofPattern("EEE", Locale.getDefault())
+private val DAY_MONTH: DateTimeFormatter get() = DateTimeFormatter.ofPattern("d MMM", Locale.getDefault())
+private val MONTH_YEAR: DateTimeFormatter get() = DateTimeFormatter.ofPattern("MMM yyyy", Locale.getDefault())
+private val DAY_HEADER: DateTimeFormatter get() = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault())
+private val DAY_HEADER_YEAR: DateTimeFormatter get() = DateTimeFormatter.ofPattern("EEEE d MMMM yyyy", Locale.getDefault())
 
 private fun parseLocal(at: String?) = at?.let { runCatching { OffsetDateTime.parse(it).atZoneSameInstant(ZONE) }.getOrNull() }
 

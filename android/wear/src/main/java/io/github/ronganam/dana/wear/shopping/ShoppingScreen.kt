@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.wear.shopping
 
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.remember
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -45,7 +47,6 @@ import androidx.wear.compose.foundation.ExperimentalWearFoundationApi
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.items
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.foundation.rememberActiveFocusRequester
 import androidx.wear.compose.material.Icon
 import androidx.wear.compose.material.MaterialTheme
 import androidx.wear.compose.material.PositionIndicator
@@ -71,7 +72,7 @@ fun ShoppingScreen(
     onAdd: (() -> Unit)?
 ) {
     val listState = rememberScalingLazyListState()
-    val focus = rememberActiveFocusRequester()
+    val focus = remember { FocusRequester() }
     val view = LocalView.current
     val canEdit = state.list?.canEdit ?: false
     val rows = Shop.rows(state, now)

@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 
@@ -35,15 +34,13 @@ object NotificationAlertReceiver {
         Log.i(TAG, "Alert for ${alert.app}: ${alert.title}")
 
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Urgent notifications", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Phone notifications Dana thinks you shouldn't miss"
-                    enableVibration(true)
-                    vibrationPattern = longArrayOf(0, 600, 150, 600, 150, 600, 900, 600, 150, 600)
-                }
-            )
-        }
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL, "Urgent notifications", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Phone notifications Dana thinks you shouldn't miss"
+                enableVibration(true)
+                vibrationPattern = longArrayOf(0, 600, 150, 600, 150, 600, 900, 600, 150, 600)
+            }
+        )
         val dnd = nm.currentInterruptionFilter.let {
             it != NotificationManager.INTERRUPTION_FILTER_ALL && it != NotificationManager.INTERRUPTION_FILTER_UNKNOWN
         }
@@ -55,13 +52,11 @@ object NotificationAlertReceiver {
             context, alert.notificationId, screen,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_QUIET, "Urgent notifications (screen open)", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Kept while the alert screen is showing (the screen rings itself)"
-                }
-            )
-        }
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_QUIET, "Urgent notifications (screen open)", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Kept while the alert screen is showing (the screen rings itself)"
+            }
+        )
         // The alert screen opens by itself and rings + vibrates on its own, so
         // its notification only stays in the shade: no heads-up over the screen.
         val popping = !dnd && android.provider.Settings.canDrawOverlays(context)

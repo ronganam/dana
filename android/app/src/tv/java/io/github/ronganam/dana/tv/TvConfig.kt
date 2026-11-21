@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONArray
 import org.json.JSONObject
+import androidx.core.content.edit
 
 /** A camera the TV can show in picture-in-picture. */
 data class Camera(
@@ -121,7 +122,7 @@ object TvConfig {
         load(context)
         val next = change(_settings.value)
         _settings.value = next
-        WakePrefs.prefs(context).edit().putString(KEY, encode(next).toString()).apply()
+        WakePrefs.prefs(context).edit { putString(KEY, encode(next).toString()) }
     }
 
     fun camera(id: String): Camera? = current.cameras.firstOrNull { it.id == id }

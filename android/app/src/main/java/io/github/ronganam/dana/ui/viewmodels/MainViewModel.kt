@@ -397,7 +397,6 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     override fun onCleared() {
-        super.onCleared()
         callController.endCall()
         chatController.release()
     }

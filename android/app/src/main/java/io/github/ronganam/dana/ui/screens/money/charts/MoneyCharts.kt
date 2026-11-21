@@ -133,9 +133,9 @@ fun DrawScope.drawSeg(s: MoneyDashGeometry.Seg, color: Color, radius: Float = 4.
     if (r == 0f) { drawRect(color, Offset(x, y), Size(w, h)); return }
     val b = y + h; val xr = x + w
     if (s.bottom) {
-        p.moveTo(x, y); p.lineTo(x, b - r); p.quadraticBezierTo(x, b, x + r, b); p.lineTo(xr - r, b); p.quadraticBezierTo(xr, b, xr, b - r); p.lineTo(xr, y); p.close()
+        p.moveTo(x, y); p.lineTo(x, b - r); p.quadraticTo(x, b, x + r, b); p.lineTo(xr - r, b); p.quadraticTo(xr, b, xr, b - r); p.lineTo(xr, y); p.close()
     } else {
-        p.moveTo(x, b); p.lineTo(x, y + r); p.quadraticBezierTo(x, y, x + r, y); p.lineTo(xr - r, y); p.quadraticBezierTo(xr, y, xr, y + r); p.lineTo(xr, b); p.close()
+        p.moveTo(x, b); p.lineTo(x, y + r); p.quadraticTo(x, y, x + r, y); p.lineTo(xr - r, y); p.quadraticTo(xr, y, xr, y + r); p.lineTo(xr, b); p.close()
     }
     drawPath(p, color)
 }
@@ -435,7 +435,7 @@ fun MonthsChart(
         onScrubEnd = { sel.value = null },
         tip = bar?.let { b ->
             {
-                val m = d.months.getOrNull(i!!)
+                val m = d.months.getOrNull(i)
                 TipTitle("${b.label} · ${money(b.total)}")
                 val parts = m?.groups?.filter { it.value > 0 }?.entries?.sortedByDescending { it.value }.orEmpty()
                 parts.take(6).forEach { (k, v) ->
@@ -492,7 +492,7 @@ fun CashflowChart(
         onScrubEnd = { sel.value = null },
         tip = bar?.let {
             {
-                val m = cf.months[i!!]
+                val m = cf.months[i]
                 TipTitle(m.label + if (m.complete) "" else " · so far")
                 listOf("income" to m.income, "fixed" to m.fixed, "yearly" to m.yearly, "everyday" to m.everyday, "one_off" to m.oneOff, "set_aside" to m.setAside)
                     .filter { it.second != 0L }

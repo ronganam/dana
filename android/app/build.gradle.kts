@@ -188,7 +188,6 @@ dependencies {
     implementation("androidx.appcompat:appcompat:1.8.0")
     implementation("androidx.activity:activity-ktx:1.13.0")
     implementation("com.google.android.material:material:1.14.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.2.2")
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
     // Typed server payloads (data/network/*Api.kt): parsed only in the data layer.
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")

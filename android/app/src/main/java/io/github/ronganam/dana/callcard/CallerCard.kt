@@ -58,6 +58,7 @@ import io.github.ronganam.dana.data.network.PeopleApi
 import io.github.ronganam.dana.data.network.long
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import androidx.core.content.edit
 
 /**
  * Caller card: while someone known calls (or the user calls them), a floating card
@@ -106,7 +107,7 @@ object CallerCards {
         ServerConfig.prefs(context).getBoolean(KEY_ENABLED, true)
 
     fun setEnabled(context: Context, on: Boolean) {
-        ServerConfig.prefs(context).edit().putBoolean(KEY_ENABLED, on).apply()
+        ServerConfig.prefs(context).edit { putBoolean(KEY_ENABLED, on) }
         if (!on) CallerCardOverlay.hide()
     }
 
@@ -180,7 +181,7 @@ object CallerCards {
             val keys = all.keys.sortedBy { (all[it] as? JsonObject)?.long("_t") ?: 0 }
             keys.take(all.size - CACHE_MAX).forEach { all.remove(it) }
         }
-        prefs.edit().putString(CACHE, JsonObject(all).toString()).apply()
+        prefs.edit { putString(CACHE, JsonObject(all).toString()) }
     }
 
     private fun key(number: String) = number.filter { it.isDigit() }.takeLast(9)
@@ -189,7 +190,7 @@ object CallerCards {
         ServerConfig.prefs(context).getInt(KEY_Y, -1)
 
     internal fun saveY(context: Context, y: Int) =
-        ServerConfig.prefs(context).edit().putInt(KEY_Y, y).apply()
+        ServerConfig.prefs(context).edit { putInt(KEY_Y, y) }
 }
 
 /**

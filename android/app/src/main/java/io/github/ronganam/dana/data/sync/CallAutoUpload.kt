@@ -25,6 +25,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
+import androidx.core.content.edit
 
 /** User settings for call recordings and their automatic upload (DanaPrefs). */
 object CallUploadSettings {
@@ -42,7 +43,7 @@ object CallUploadSettings {
      * (Samsung's built-in call recorder) have any.
      */
     fun enabled(c: Context): Boolean = prefs(c).getBoolean(KEY_ENABLED, false)
-    fun setEnabled(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_ENABLED, v).apply()
+    fun setEnabled(c: Context, v: Boolean) = prefs(c).edit { putBoolean(KEY_ENABLED, v) }
 
     /** The permission that lets the app read the recordings folder. */
     val storagePermission: String
@@ -56,22 +57,22 @@ object CallUploadSettings {
         enabled(c) && c.checkSelfPermission(storagePermission) == PackageManager.PERMISSION_GRANTED
 
     fun autoUpload(c: Context): Boolean = prefs(c).getBoolean(KEY_AUTO, true)
-    fun setAutoUpload(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_AUTO, v).apply()
+    fun setAutoUpload(c: Context, v: Boolean) = prefs(c).edit { putBoolean(KEY_AUTO, v) }
 
     /** Calls at least this long upload by themselves; shorter ones ask first. */
     fun thresholdSeconds(c: Context): Int = prefs(c).getInt(KEY_THRESHOLD, 10)
-    fun setThresholdSeconds(c: Context, v: Int) = prefs(c).edit().putInt(KEY_THRESHOLD, v.coerceIn(0, 600)).apply()
+    fun setThresholdSeconds(c: Context, v: Int) = prefs(c).edit { putInt(KEY_THRESHOLD, v.coerceIn(0, 600)) }
 
     fun wifiOnly(c: Context): Boolean = prefs(c).getBoolean(KEY_WIFI, false)
-    fun setWifiOnly(c: Context, v: Boolean) = prefs(c).edit().putBoolean(KEY_WIFI, v).apply()
+    fun setWifiOnly(c: Context, v: Boolean) = prefs(c).edit { putBoolean(KEY_WIFI, v) }
 
     /** Contacts whose calls are never uploaded. */
     fun skippedContacts(c: Context): Set<String> = prefs(c).getStringSet(KEY_SKIP, emptySet()).orEmpty()
     fun isSkipped(c: Context, contact: String) = skippedContacts(c).any { it.equals(contact.trim(), ignoreCase = true) }
     fun addSkipped(c: Context, contact: String) =
-        prefs(c).edit().putStringSet(KEY_SKIP, skippedContacts(c) + contact.trim()).apply()
+        prefs(c).edit { putStringSet(KEY_SKIP, skippedContacts(c) + contact.trim()) }
     fun removeSkipped(c: Context, contact: String) =
-        prefs(c).edit().putStringSet(KEY_SKIP, skippedContacts(c).filterNot { it.equals(contact, true) }.toSet()).apply()
+        prefs(c).edit { putStringSet(KEY_SKIP, skippedContacts(c).filterNot { it.equals(contact, true) }.toSet()) }
 }
 
 /** What we know about a recording before uploading it. */

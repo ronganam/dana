@@ -24,6 +24,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import androidx.core.content.edit
 
 /**
  * One snapshot for all home-screen widgets, kept in prefs (`widget_snapshot`)
@@ -70,7 +71,7 @@ data class WidgetSnapshot(
         }
 
         fun save(context: Context, o: JSONObject) {
-            ServerConfig.prefs(context).edit().putString(KEY, o.toString()).apply()
+            ServerConfig.prefs(context).edit { putString(KEY, o.toString()) }
         }
     }
 }

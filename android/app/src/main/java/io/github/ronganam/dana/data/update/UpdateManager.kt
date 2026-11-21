@@ -64,7 +64,7 @@ object UpdateManager {
                         Log.d(TAG, "version check HTTP ${response.code} for $base")
                         return@withContext null
                     }
-                    val body = response.body?.string() ?: return@withContext null
+                    val body = response.body.string()
                     val entry = (ApiJson.parseToJsonElement(body) as? JsonObject)?.get(artifact) as? JsonObject ?: return@withContext null
                     ApiJson.decodeFromJsonElement(VersionEntry.serializer(), entry).toInfo(artifact)
                 }
@@ -98,7 +98,7 @@ object UpdateManager {
                     Log.w(TAG, "APK download HTTP ${response.code}")
                     return@withContext null
                 }
-                val body = response.body ?: return@withContext null
+                val body = response.body
                 val updatesDir = File(context.cacheDir, "updates").apply { mkdirs() }
                 val target = File(updatesDir, info.file)
                 val digest = MessageDigest.getInstance("SHA-256")

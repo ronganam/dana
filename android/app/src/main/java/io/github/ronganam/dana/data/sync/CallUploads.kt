@@ -52,14 +52,12 @@ object CallUploads {
     const val KEY_NUMBER = "number"
 
     fun ensureChannel(context: Context) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            if (nm.getNotificationChannel(CHANNEL_ID) != null) return
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Call recordings", NotificationManager.IMPORTANCE_DEFAULT)
-                    .apply { description = "Handles call recording detection and upload progress" }
-            )
-        }
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        if (nm.getNotificationChannel(CHANNEL_ID) != null) return
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_ID, "Call recordings", NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = "Handles call recording detection and upload progress" }
+        )
     }
 
     /** Queue [file] for upload. [replace] restarts a failed/finished attempt. */

@@ -43,6 +43,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import java.util.Locale
+import androidx.core.content.edit
 
 class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(context),
     TextToSpeech.OnInitListener,
@@ -109,11 +110,9 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT
             )
-            w.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
             w.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            w.clearFlags(android.view.WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS)
-            w.statusBarColor = android.graphics.Color.TRANSPARENT
-            w.navigationBarColor = android.graphics.Color.TRANSPARENT
+            // Transparent system bars, content drawn behind them.
+            WindowCompat.enableEdgeToEdge(w)
 
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                 val params = w.attributes
@@ -121,8 +120,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
                 w.attributes = params
             }
 
-            w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
-            WindowCompat.setDecorFitsSystemWindows(w, false)
+            softInputResize(w)
         }
 
         tts = TextToSpeech(context, this)
@@ -210,7 +208,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
                 params.layoutInDisplayCutoutMode = android.view.WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
                 w.attributes = params
             }
-            w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            softInputResize(w)
             WindowCompat.setDecorFitsSystemWindows(w, false)
         }
 
@@ -224,7 +222,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
         if (isIdleTooLong || !hasMessages) {
             mainViewModel.startNewSession(saveOld = true)
         }
-        prefs.edit().putLong("last_active_timestamp", now).apply()
+        prefs.edit { putLong("last_active_timestamp", now) }
 
         // Brief delay before auto-starting voice recording to let session initialize
         // and avoid picking up ambient noise during transition
@@ -293,6 +291,8 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
         screenShare.onAssist(structure, content)
     }
 
+    // Android 10+ (older versions call the overload above).
+    @androidx.annotation.RequiresApi(android.os.Build.VERSION_CODES.Q)
     override fun onHandleAssist(state: AssistState) {
         // One call per visible activity (split screen): the focused one is what he is looking at.
         android.util.Log.d(
@@ -379,7 +379,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
         delayedVoiceRecordingJob?.cancel()
         delayedVoiceRecordingJob = null
         mainViewModel.chatController.stopVoiceRecording()
-        prefs.edit().putLong("last_active_timestamp", System.currentTimeMillis()).apply()
+        prefs.edit { putLong("last_active_timestamp", System.currentTimeMillis()) }
         voiceCollectionJob?.cancel()
         voiceCollectionJob = null
         tts?.stop()
@@ -409,5 +409,13 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
         store.clear()
         tts?.shutdown()
+    }
+
+    /** Below Android 11 the IME insets reach Compose only in adjustResize mode; later versions send them with edge-to-edge. */
+    private fun softInputResize(w: android.view.Window) {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.R) {
+            @Suppress("DEPRECATION")
+            w.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+        }
     }
 }

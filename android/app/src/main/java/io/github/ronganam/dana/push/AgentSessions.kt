@@ -9,7 +9,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.net.Uri
 import android.os.Build
 import android.util.Log
 import io.github.ronganam.dana.MainActivity
@@ -28,6 +27,8 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import java.time.OffsetDateTime
+import androidx.core.content.edit
+import androidx.core.net.toUri
 
 /**
  * The user's coding-agent sessions (Claude Code, Codex) on the laptop, live
@@ -133,7 +134,7 @@ object AgentSessions {
             val changed = was?.rev != s.rev
             when {
                 s.live -> steps += Step.Live(s, alert = changed && s.status == "waiting")
-                changed || was?.live == true -> steps += Step.Finished(s)
+                changed || was.live -> steps += Step.Finished(s)
             }
         }
         val ids = sessions.map { it.id }.toSet()
@@ -158,7 +159,7 @@ object AgentSessions {
         val next = buildJsonObject {
             sessions.forEach { put(it.id, buildJsonObject { put("rev", it.rev); put("live", it.live) }) }
         }
-        prefs.edit().putString(KEY_SHOWN, next.toString()).apply()
+        prefs.edit { putString(KEY_SHOWN, next.toString()) }
     }
 
     private fun loadShown(raw: String?): Map<String, Shown> {
@@ -198,7 +199,7 @@ object AgentSessions {
      */
     private fun tapIntent(context: Context, s: Session): PendingIntent {
         val intent = if (s.openUrl.isNotEmpty()) {
-            Intent(Intent.ACTION_VIEW, Uri.parse(s.openUrl)).addCategory(Intent.CATEGORY_BROWSABLE)
+            Intent(Intent.ACTION_VIEW, s.openUrl.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
         } else {
             Intent(context, MainActivity::class.java)
         }
@@ -296,7 +297,7 @@ object AgentSessions {
         nm.cancel(NOTIFICATION_TAG + id, 1)
         val prefs = ServerConfig.prefs(context)
         val shown = JsonObject(shownMap(prefs.getString(KEY_SHOWN, "{}")) - id)
-        prefs.edit().putString(KEY_SHOWN, shown.toString()).apply()
+        prefs.edit { putString(KEY_SHOWN, shown.toString()) }
     }
 }
 

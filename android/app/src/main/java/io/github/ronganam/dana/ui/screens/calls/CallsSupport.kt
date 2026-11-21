@@ -67,6 +67,7 @@ import io.github.ronganam.dana.ui.theme.isWideLayout
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import io.github.ronganam.dana.ui.viewmodels.PendingRecordingFile
 import io.github.ronganam.dana.ui.viewmodels.UploadFormState
+import androidx.core.net.toUri
 
 @Composable
 fun RtlSupportingText(
@@ -175,7 +176,7 @@ fun formatMsec(msec: Int): String {
     val totalSec = msec / 1000
     val min = totalSec / 60
     val sec = totalSec % 60
-    return String.format("%d:%02d", min, sec)
+    return String.format(java.util.Locale.getDefault(), "%d:%02d", min, sec)
 }
 
 fun getDisplayName(context: Context, uri: Uri): String {
@@ -195,7 +196,7 @@ fun getDisplayName(context: Context, uri: Uri): String {
 fun formatDuration(totalSeconds: Int): String {
     val min = totalSeconds / 60
     val sec = totalSeconds % 60
-    return String.format("%d:%02d", min, sec)
+    return String.format(java.util.Locale.getDefault(), "%d:%02d", min, sec)
 }
 
 class CallAudioPlayer(
@@ -206,15 +207,15 @@ class CallAudioPlayer(
     private var mediaPlayer: MediaPlayer? = null
     val currentPlayingCallId: MutableState<String?> = mutableStateOf(null)
     val isPlaying: MutableState<Boolean> = mutableStateOf(false)
-    val currentPosition: MutableState<Float> = mutableStateOf(0f)
-    val duration: MutableState<Int> = mutableStateOf(0)
+    val currentPosition: MutableFloatState = mutableFloatStateOf(0f)
+    val duration: MutableIntState = mutableIntStateOf(0)
 
     private val handler = Handler(Looper.getMainLooper())
     private val updateProgressAction = object : Runnable {
         override fun run() {
             mediaPlayer?.let {
                 if (it.isPlaying) {
-                    this@CallAudioPlayer.currentPosition.value = it.currentPosition.toFloat()
+                    this@CallAudioPlayer.currentPosition.floatValue = it.currentPosition.toFloat()
                     handler.postDelayed(this, 250)
                 }
             }
@@ -237,7 +238,7 @@ class CallAudioPlayer(
 
         val cleanUrl = serverUrl.removeSuffix("/")
         val url = "$cleanUrl/api/calls/$callId/audio"
-        val uri = Uri.parse(url)
+        val uri = url.toUri()
         val headers = HashMap<String, String>()
         if (apiToken.isNotEmpty()) {
             headers["Authorization"] = "Bearer $apiToken"
@@ -257,13 +258,13 @@ class CallAudioPlayer(
                     start()
                     this@CallAudioPlayer.currentPlayingCallId.value = callId
                     this@CallAudioPlayer.isPlaying.value = true
-                    this@CallAudioPlayer.duration.value = it.duration
-                    this@CallAudioPlayer.currentPosition.value = 0f
+                    this@CallAudioPlayer.duration.intValue = it.duration
+                    this@CallAudioPlayer.currentPosition.floatValue = 0f
                     handler.post(updateProgressAction)
                 }
                 setOnCompletionListener {
                     this@CallAudioPlayer.isPlaying.value = false
-                    this@CallAudioPlayer.currentPosition.value = 0f
+                    this@CallAudioPlayer.currentPosition.floatValue = 0f
                     handler.removeCallbacks(updateProgressAction)
                 }
             } catch (e: Exception) {
@@ -280,7 +281,7 @@ class CallAudioPlayer(
 
     fun seekTo(msec: Float) {
         mediaPlayer?.seekTo(msec.toInt())
-        currentPosition.value = msec
+        currentPosition.floatValue = msec
     }
 
     fun stop() {
@@ -289,8 +290,8 @@ class CallAudioPlayer(
         mediaPlayer = null
         currentPlayingCallId.value = null
         isPlaying.value = false
-        currentPosition.value = 0f
-        duration.value = 0
+        currentPosition.floatValue = 0f
+        duration.intValue = 0
         handler.removeCallbacks(updateProgressAction)
     }
 }

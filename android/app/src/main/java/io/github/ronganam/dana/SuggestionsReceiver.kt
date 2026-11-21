@@ -9,6 +9,7 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.content.edit
 
 /**
  * The server's `suggestions` push event (see [io.github.ronganam.dana.push.PhoneEvents])
@@ -29,25 +30,21 @@ object SuggestionsReceiver {
     /** Notification (kept until handled) + the pop-up when the phone is free. */
     fun show(context: Context, ids: List<String>, heading: String?, sourceKey: String, callId: String? = null) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Suggestions to review", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "Reminders and events Dana suggests after a call or a message"
-                }
-            )
-        }
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL, "Suggestions to review", NotificationManager.IMPORTANCE_HIGH).apply {
+                description = "Reminders and events Dana suggests after a call or a message"
+            }
+        )
         val screen = SuggestionsPopupActivity.intent(context, ids, heading, callId, notificationKey = sourceKey)
         val pending = PendingIntent.getActivity(
             context, sourceKey.hashCode(), screen,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_QUIET, "Suggestions to review (screen open)", NotificationManager.IMPORTANCE_LOW).apply {
-                    description = "Kept while the review screen is already showing"
-                }
-            )
-        }
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL_QUIET, "Suggestions to review (screen open)", NotificationManager.IMPORTANCE_LOW).apply {
+                description = "Kept while the review screen is already showing"
+            }
+        )
         val n = ids.size
         val busy = inCall(context) || dnd(nm)
         // The screen opens by itself: the notification only keeps them from
@@ -81,8 +78,7 @@ object SuggestionsReceiver {
     private const val PREFS = "suggestion_notifications"
 
     private fun remember(context: Context, notifId: Int, ids: List<String>) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
-            .putStringSet(notifId.toString(), ids.toSet()).apply()
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit { putStringSet(notifId.toString(), ids.toSet()) }
     }
 
     /**
@@ -92,16 +88,16 @@ object SuggestionsReceiver {
     fun reconcile(context: Context, pendingIds: Set<String>) {
         val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val edit = prefs.edit()
-        for ((k, v) in prefs.all) {
-            @Suppress("UNCHECKED_CAST")
-            val ids = (v as? Set<String>) ?: continue
-            if (ids.none { it in pendingIds }) {
-                k.toIntOrNull()?.let { nm.cancel(it) }
-                edit.remove(k)
+        prefs.edit {
+            for ((k, v) in prefs.all) {
+                @Suppress("UNCHECKED_CAST")
+                val ids = (v as? Set<String>) ?: continue
+                if (ids.none { it in pendingIds }) {
+                    k.toIntOrNull()?.let { nm.cancel(it) }
+                    remove(k)
+                }
             }
         }
-        edit.apply()
     }
 
     /** "Display over other apps": lets Dana open a screen from the background. */

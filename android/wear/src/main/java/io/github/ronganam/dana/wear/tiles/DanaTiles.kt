@@ -26,7 +26,7 @@ internal object DanaTile {
         LayoutElementBuilders.Text.Builder()
             .setText(s)
             .setMaxLines(lines)
-            .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE_END)
+            .setOverflow(LayoutElementBuilders.TEXT_OVERFLOW_ELLIPSIZE)
             .setMultilineAlignment(LayoutElementBuilders.TEXT_ALIGN_CENTER)
             .setFontStyle(
                 LayoutElementBuilders.FontStyle.Builder()

@@ -22,6 +22,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.util.UUID
+import androidx.core.content.edit
 
 /**
  * Direct push from the server (replaces the Home Assistant companion route).
@@ -49,7 +50,7 @@ object PhoneEvents {
     fun deviceId(context: Context): String {
         val prefs = ServerConfig.prefs(context)
         return prefs.getString(KEY_DEVICE, null) ?: UUID.randomUUID().toString().also {
-            prefs.edit().putString(KEY_DEVICE, it).apply()
+            prefs.edit { putString(KEY_DEVICE, it) }
         }
     }
 
@@ -69,9 +70,9 @@ object PhoneEvents {
         try {
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
             val res = ServerConfig.load(context).api().devices.registerPush(deviceId(context), token, Build.MODEL, version)
-            prefs.edit().putString(KEY_TOKEN, token).putLong(KEY_REGISTERED_AT, System.currentTimeMillis()).apply()
+            prefs.edit { putString(KEY_TOKEN, token); putLong(KEY_REGISTERED_AT, System.currentTimeMillis()) }
             // A fresh install starts from now instead of replaying old events.
-            if (!prefs.contains(KEY_SEQ)) prefs.edit().putLong(KEY_SEQ, res).apply()
+            if (!prefs.contains(KEY_SEQ)) prefs.edit { putLong(KEY_SEQ, res) }
             Log.i(TAG, "Registered for push (latest $res)")
         } catch (e: Exception) {
             Log.w(TAG, "Push registration failed", e)
@@ -99,13 +100,13 @@ object PhoneEvents {
                 // register again, otherwise pings would silently stop.
                 if (!res.registered) {
                     Log.w(TAG, "Server forgot this device; registering again")
-                    prefs.edit().remove(KEY_TOKEN).apply()
+                    prefs.edit { remove(KEY_TOKEN) }
                     PushSetup.ensureRegistered(context)
                 }
                 val events = res.events
                 if (events.isEmpty()) {
                     // The server's numbering went back (restored database): follow it.
-                    if (latest < after) prefs.edit().putLong(KEY_SEQ, latest).apply()
+                    if (latest < after) prefs.edit { putLong(KEY_SEQ, latest) }
                     return
                 }
                 for (ev in events) {
@@ -114,7 +115,7 @@ object PhoneEvents {
                     } catch (e: Exception) {
                         Log.e(TAG, "Event ${ev.seq} (${ev.type}) failed", e)
                     }
-                    prefs.edit().putLong(KEY_SEQ, ev.seq).apply()
+                    prefs.edit { putLong(KEY_SEQ, ev.seq) }
                 }
                 if (events.size < 50) return
             }
@@ -171,9 +172,7 @@ object PhoneEvents {
     private fun notify(context: Context, title: String, text: String, tag: String?, channel: String) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val (id, name, importance) = channels[channel] ?: channels.getValue("messages")
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(NotificationChannel(id, name, importance))
-        }
+        nm.createNotificationChannel(NotificationChannel(id, name, importance))
         // "Robin shared their shopping list with you" opens Shopping (under More).
         val open = if (tag?.startsWith("shopping-invite-") == true) {
             android.content.Intent(context, io.github.ronganam.dana.MainActivity::class.java)

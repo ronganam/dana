@@ -99,7 +99,7 @@ object HaClient {
     private suspend fun fetchList(context: Context, path: String): List<HaEntity> = withContext(Dispatchers.IO) {
         HttpClients.base.newCall(request(context, path).build()).execute().use { r ->
             if (!r.isSuccessful) throw IOException("HTTP ${r.code}")
-            val arr = JSONArray(r.body?.string().orEmpty())
+            val arr = JSONArray(r.body.string())
             List(arr.length()) { HaEntity.from(arr.getJSONObject(it)) }
         }
     }
@@ -117,7 +117,7 @@ object HaClient {
             val body = JSONObject().put("domain", domain).put("service", service)
                 .put("entity_id", entityId).put("service_data", data).toString().toRequestBody(json)
             HttpClients.base.newCall(request(context, "/api/ha/service").post(body).build()).execute().use { r ->
-                if (!r.isSuccessful) throw IOException("HTTP ${r.code}: ${r.body?.string()?.take(200)}")
+                if (!r.isSuccessful) throw IOException("HTTP ${r.code}: ${r.body.string().take(200)}")
             }
         }
 
@@ -125,7 +125,7 @@ object HaClient {
     suspend fun snapshot(context: Context, entityId: String, maxWidth: Int): Bitmap? = withContext(Dispatchers.IO) {
         HttpClients.base.newCall(request(context, "/api/camera/${enc(entityId)}/proxy").build()).execute().use { r ->
             if (!r.isSuccessful) return@withContext null
-            val bytes = r.body?.bytes() ?: return@withContext null
+            val bytes = r.body.bytes()
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
             BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
             var sample = 1

@@ -9,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.launch
 import java.io.File
+import androidx.core.content.edit
 
 /** A cached chat on disk, used for the offline session list. */
 data class CachedSession(
@@ -101,7 +102,7 @@ class ChatHistoryStore(
                     if (!file.exists() && value.length > 2) file.writeText(value)
                 }
                 prune()
-                prefs.edit().apply { legacy.keys.forEach { remove(it) } }.apply()
+                prefs.edit { legacy.keys.forEach { remove(it) } }
                 Log.i(TAG, "Migrated ${legacy.size} chat caches out of SharedPreferences")
             } catch (e: Exception) {
                 Log.w(TAG, "Chat cache migration failed", e)
