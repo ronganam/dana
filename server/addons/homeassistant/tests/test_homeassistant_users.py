@@ -16,7 +16,8 @@ fires a missed transition once after a reconnect (a duplicate does not
 refire), re-subscribes on a settings change, stops on disconnect, keeps going
 for one user while the other's Home Assistant is down; the self-check items;
 ``/webhook`` is gone while ``/webhook/waha`` takes only signed events (an
-internal Host header proves nothing); nothing reads the old env names. Phone push / Telegram
+internal Host header proves nothing); nothing reads the old env names; the TV tool takes its
+TV and channel command from the user's settings (a non-numeric channel refused). Phone push / Telegram
 are mocked; no network beyond localhost.
 """
 
@@ -103,6 +104,7 @@ HA_B = FakeHA("B", "tok-b", {
     "zone.bobplace": ("0", {"friendly_name": "BobPlace"}),
     "light.b_den": ("off", {"friendly_name": "B Den"}),
     "weather.b": ("rainy", {"temperature": 31, "temperature_unit": "°C"}),
+    "media_player.den_tv_adb": ("on", {"friendly_name": "Den TV (ADB)"}),
 }, {"light.b_den": "B Den"}, "Europe/London")
 
 ADMIN = users.first_admin()
@@ -525,6 +527,28 @@ async def test_watcher() -> None:
         check("stop: every watcher ended", not watchers.running() and await until(lambda: not HA_A.sockets))
 
 
+async def test_tv() -> None:
+    """control_android_tv: the TV and the channel command come from the user's settings, nothing built in."""
+    clear()
+    out = await tool(ADMIN, "control_android_tv", action="send_key", command="HOME")
+    check("tv: no TV given and no tv_entity setting → an error, nothing sent",
+          out.startswith("Error: no TV given") and not HA_A.service_calls, out)
+    if store.get(BOB, "homeassistant") is None:  # the watcher test may have turned it off
+        store.connect(BOB, "homeassistant", credentials={"host": HA_B.url, "token": "tok-b"})
+    store.update(BOB, "homeassistant", settings={"tv_entity": "media_player.den_tv_adb"})
+    out = await tool(BOB, "control_android_tv", action="watch_channel", channel="12")
+    check("tv: watch_channel without tv_channel_command → an error, nothing sent",
+          out.startswith("Error: no channel command") and not HA_B.service_calls, out)
+    store.update(BOB, "homeassistant", settings={"tv_channel_command": "am start -d \"tv://channel/{channel}\""})
+    out = await tool(BOB, "control_android_tv", action="watch_channel", channel="12; reboot")
+    check("tv: a channel that is not a number is refused (never reaches the ADB command)",
+          out.startswith("Error: 'channel' must be") and not HA_B.service_calls, out)
+    out = await tool(BOB, "control_android_tv", action="watch_channel", channel="12")
+    check("tv: watch_channel sends the user's command with the channel, to their TV",
+          ("androidtv.adb_command", {"entity_id": "media_player.den_tv_adb", "command": "am start -d \"tv://channel/12\""})
+          in HA_B.service_calls and not HA_A.service_calls, (out, HA_B.service_calls))
+
+
 async def main() -> None:
     await HA_A.start()
     await HA_B.start()
@@ -533,6 +557,7 @@ async def main() -> None:
     await test_reads()
     await test_http()
     await test_watcher()
+    await test_tv()
     await HA_A.server.close()
     await HA_B.server.close()
 

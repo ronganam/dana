@@ -45,6 +45,8 @@ services:
     profiles: [money]
     image: dana-bank-worker
     network_mode: "service:app"
+    environment:
+      TZ: ${TIMEZONE:-UTC}   # the server's zone (from .env): the dates the sites are asked for
     volumes:
       - type: volume
         source: data

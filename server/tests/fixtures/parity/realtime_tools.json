@@ -1951,7 +1951,7 @@
   {
     "type": "function",
     "name": "control_android_tv",
-    "description": "Control an Android TV / Google TV device using the androidtv integration. Use this tool to launch apps, change TV channels, search/play YouTube/Netflix, send remote keys, or run arbitrary ADB shell commands and get the output back. It automatically detects if an app is already open to avoid redundant launch commands and delays. This tool is for ADB-based TV control only. For simple media_player operations (volume, pause, play), use call_ha_service with the media_player domain instead. Actions: - \"launch_app\": Launch any app using its package/app ID (e.g. 'com.netflix.ninja', 'com.google.android.youtube.tv'). - \"watch_channel\": Open the Yes+ app ('il.co.yes.yesplus') and tune to a numeric channel. Only works with the Yes+ Israeli TV provider. For other TV services, use launch_app or send_key. - \"play_youtube\": Play a specific video by ID/URL, or search for a video query on YouTube. - \"play_netflix\": Play a specific Netflix title by ID, or search for a title query on Netflix. - \"send_key\": Send a remote key press (e.g. 'HOME', 'BACK', 'UP', 'DOWN', 'ENTER', 'VOLUME_UP'). - \"run_command\": Run an arbitrary ADB shell command on the TV and return its output (e.g. 'top -n 1 -s 9 -m 5', 'dumpsys battery').",
+    "description": "Control an Android TV / Google TV device using the androidtv integration. Use this tool to launch apps, change TV channels, search/play YouTube/Netflix, send remote keys, or run arbitrary ADB shell commands and get the output back. It automatically detects if an app is already open to avoid redundant launch commands and delays. This tool is for ADB-based TV control only. For simple media_player operations (volume, pause, play), use call_ha_service with the media_player domain instead. Actions: - \"launch_app\": Launch any app using its package/app ID (e.g. 'com.netflix.ninja', 'com.google.android.youtube.tv'). - \"watch_channel\": Tune to a numeric channel with the TV provider command the user set up (their Home Assistant setting tv_channel_command); without one, use launch_app or send_key. - \"play_youtube\": Play a specific video by ID/URL, or search for a video query on YouTube. - \"play_netflix\": Play a specific Netflix title by ID, or search for a title query on Netflix. - \"send_key\": Send a remote key press (e.g. 'HOME', 'BACK', 'UP', 'DOWN', 'ENTER', 'VOLUME_UP'). - \"run_command\": Run an arbitrary ADB shell command on the TV and return its output (e.g. 'top -n 1 -s 9 -m 5', 'dumpsys battery').",
     "parameters": {
       "type": "object",
       "properties": {
@@ -1960,8 +1960,15 @@
           "description": "The action to perform: \"launch_app\", \"watch_channel\", \"play_youtube\", \"play_netflix\", \"send_key\", \"run_command\"."
         },
         "entity_id": {
-          "type": "string",
-          "description": "The Android TV media_player entity ID (defaults to \"media_player.75c7k_adb\")."
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The Android TV media_player entity ID (defaults to the user's TV, the tv_entity setting)."
         },
         "app_id": {
           "anyOf": [
@@ -1983,7 +1990,7 @@
               "type": "null"
             }
           ],
-          "description": "The Yes+ channel number to tune to (required for \"watch_channel\")."
+          "description": "The channel number to tune to (required for \"watch_channel\")."
         },
         "query": {
           "anyOf": [

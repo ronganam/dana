@@ -30,7 +30,7 @@ function aborted(ctx) {
   if (ctx.signal && ctx.signal.aborted) throw new Error('cancelled');
 }
 
-/** `dd/MM/yyyy` of a date in the worker's zone (TZ=Asia/Jerusalem in the image), as the site asks. */
+/** `dd/MM/yyyy` of a date in the worker's zone (TZ: the server's TIMEZONE), as the site asks. */
 function ddmmyyyy(date) {
   const two = n => String(n).padStart(2, '0');
   return `${two(date.getDate())}/${two(date.getMonth() + 1)}/${date.getFullYear()}`;

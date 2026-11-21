@@ -25,7 +25,7 @@ from addons.phone.notifications.values import ESCALATION_PREFIX, MAX_BATCH, post
 logger = logging.getLogger(__name__)
 
 # Our own notifications and the escalation re-posts must never loop back in.
-_OWN_PACKAGES = ("app.ganam.assistant",)
+_OWN_PACKAGES = ("io.github.ronganam.dana",)  # the app and its .kiosk / .tv flavors (a prefix)
 
 _OTP_CONTEXT = re.compile(r"(code|otp|password|passcode|verification|verify|pin|קוד|סיסמ|אימות)", re.I)
 _OTP_NUMBER = re.compile(r"(?<!\d)(\d[\d\- ]{2,8}\d)(?!\d)")

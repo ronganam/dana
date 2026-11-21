@@ -8,7 +8,7 @@ it. The first admin connects an address and is then pointed at Frigate A; Bob ha
 Frigate B; Carl has no cameras; Erin has Home Assistant but no cameras.
 Checked: nothing reads ``FRIGATE_URL`` or holds the owner's address; every camera
 endpoint reaches only the caller's own Frigate, with the first admin's
-payloads as before; caches (events, activity, clips) per connection; no addon
+payloads as before; caches (events, clips) per connection; no addon
 → 403 on every camera route (streaming and WebRTC included); the two Home
 Assistant proxies need both addons; the upstream paths stay fixed (an id made
 only of dots refused, the WebRTC stream name sent encoded). No network beyond
@@ -203,7 +203,6 @@ def build_app() -> web.Application:
     r.add_get("/api/frigate/events/{camera_name}", cameras_api.frigate_events_api)
     r.add_get("/api/frigate/event/{event_id}/preview.gif", cameras_api.frigate_event_gif_api)
     r.add_get("/api/frigate/event/{event_id}/clip.mp4", cameras_api.frigate_event_clip_api)
-    r.add_get("/api/frigate/activity/{camera_name}", cameras_api.frigate_activity_api)
     r.add_get("/api/frigate/motion/{camera_name}/{start}/{end}/preview.gif", cameras_api.frigate_motion_gif_api)
     r.add_get("/api/frigate/motion/{camera_name}/{start}/{end}/clip.mp4", cameras_api.frigate_motion_clip_api)
     return app
@@ -212,7 +211,6 @@ def build_app() -> web.Application:
 MOTION_S0 = NOW - 7200
 CAMERA_ROUTES = [
     ("GET", "/api/frigate/events/yard"),
-    ("GET", "/api/frigate/activity/yard"),
     ("GET", "/api/frigate/event/A-e1/preview.gif"),
     ("GET", "/api/frigate/event/A-e1/clip.mp4"),
     ("GET", f"/api/frigate/motion/yard/{MOTION_S0}/{MOTION_S0 + 60}/preview.gif"),
@@ -267,15 +265,6 @@ async def test_endpoints() -> None:
 
         await call(ADMIN, "GET", "/api/frigate/events/yard?limit=6")
         check("events: the admin's second read within 5 s comes from his cache", not FR_A.calls())
-
-        status, body, _ = await call(ADMIN, "GET", "/api/frigate/activity/yard?hours=6")
-        p = json.loads(body)
-        check("activity: the admin's strip from Frigate A (dog seconds, last end)",
-              status == 200 and p["last"] == {"dog": NOW - 540, "speech": NOW - 290, "person": NOW - 2990}
-              and sum(p["series"]["dog"]) == 60 and {c[1] for c in FR_A.calls()} == {"/api/events"}
-              and not FR_B.calls(), p)
-        status, body, _ = await call(BOB, "GET", "/api/frigate/activity/porch")
-        check("activity: Bob's from Frigate B", status == 200 and FR_B.calls() and not FR_A.calls())
 
         status, body, headers = await call(ADMIN, "GET", "/api/frigate/event/shared-id/preview.gif?v=123")
         status_b, body_b, _ = await call(BOB, "GET", "/api/frigate/event/shared-id/preview.gif")
@@ -359,8 +348,7 @@ async def test_endpoints() -> None:
               HA_B.requests == ["/api/camera_proxy/camera.porch", "/api/camera_proxy_stream/camera.porch"],
               HA_B.requests)
 
-    keys = {k[0] for k in cam_client._events_cache} | {k[0] for k in cam_client._activity_cache} \
-        | {k[0] for k in cam_client._clip_cache}
+    keys = {k[0] for k in cam_client._events_cache} | {k[0] for k in cam_client._clip_cache}
     check("caches: keyed per connection (user and Frigate address)",
           keys == {(ADMIN.id, FR_A.url), (BOB.id, FR_B.url)}, keys)
 

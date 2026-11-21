@@ -56,7 +56,7 @@ misconfigured URL cannot reach a real service.
 
 | Port | Stands in for | Notes |
 |---|---|---|
-| 8123 | Home Assistant A (the first admin's) | `testfakes.FakeHA`: REST states / services / history / config, WebSocket auth + `subscribe_entities`; the entities the env import names |
+| 8123 | Home Assistant A (the first admin's) | `testfakes.FakeHA`: REST states / services / history / config, WebSocket auth + `subscribe_entities`; the entities `bin/local-env.sh` connects |
 | 8124 | Home Assistant B (the second test user's) | another token, other entities and zones |
 | 3000 | WAHA | `testfakes.FakeWAHA`: sessions `default` (account `972500000001@c.us`) and `maya` (`972500000002@c.us`), contacts, chats, send, media; records what was sent |
 | 5000 | Frigate | events, activity, previews, clips, WebRTC, version |

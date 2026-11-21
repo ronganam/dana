@@ -3,7 +3,7 @@
 from core.addons import ADDRESS, Field, Addon, PromptPart
 from addons.homeassistant import client, home_map, options, watcher
 from addons.homeassistant.config import (BATTERY_SENSOR, CAR_DEVICE, CAR_SENSOR, DEFAULT_WEATHER_ENTITY, ADDON,
-                                               NOTIFY_SERVICE, PERSON, SCREEN_SENSOR, WEATHER)
+                                               NOTIFY_SERVICE, PERSON, SCREEN_SENSOR, TV, TV_CHANNEL, WEATHER)
 
 # Entity settings have no default (whose entities they are is the user's
 # choice, set on the Addons page), except
@@ -22,6 +22,9 @@ addon = Addon(
         Field(BATTERY_SENSOR, "Phone battery level sensor (the bedroom dashboard's phone tile)"),
         Field(NOTIFY_SERVICE, "The phone's mobile_app notify service suffix (reported by /api/client-config)"),
         Field(WEATHER, "Weather entity for the wake briefing and the Now screen", DEFAULT_WEATHER_ENTITY),
+        Field(TV, "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default"),
+        Field(TV_CHANNEL, "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV "
+              "provider app's deep link); unset: no channel changes"),
     ),
     description="Home Assistant",
     prompt_section=home_map.prompt_section,

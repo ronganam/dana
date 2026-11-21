@@ -4,7 +4,7 @@ and HA camera snapshots (docs/dashboard.md; the Frigate logic is client.py).
 - ``GET /api/camera/{entity_id}/proxy``, ``GET /api/frigate/{camera_name}`` (MJPEG) — through
   the caller's Home Assistant: need ``homeassistant`` too
 - ``POST /api/frigate/webrtc/{camera_name}`` — go2rtc SDP signaling
-- ``GET /api/frigate/events/{camera_name}``, ``GET /api/frigate/activity/{camera_name}``
+- ``GET /api/frigate/events/{camera_name}``
 - ``GET /api/frigate/event/{event_id}/preview.gif|clip.mp4``,
   ``GET /api/frigate/motion/{camera_name}/{start}/{end}/preview.gif|clip.mp4``
 
@@ -178,31 +178,6 @@ async def frigate_events_api(request: web.Request) -> web.Response:
     return web.json_response(payload, headers={"Cache-Control": "no-store"})
 
 
-async def frigate_activity_api(request: web.Request) -> web.Response:
-    """GET /api/frigate/activity/{camera}?hours=6 — activity strip under the camera.
-
-    Built from Frigate's tracked-object events, not raw motion (at night raw
-    motion is mostly IR noise, by day changing light). Frigate only opens an
-    event while an object moves, so this is "when was the dog up". ``series``
-    maps a label (``bark`` folded into ``dog``) to seconds of activity per
-    ``bucket``-second cell from ``start``, oldest first. ``last`` maps a label
-    to its latest event end (epoch s), or null while one is still running.
-    """
-    conn = _cameras_conn(request)
-    camera_name = request.match_info["camera_name"]
-    if not cameras_client.valid_camera(camera_name):
-        return web.json_response({"error": "invalid camera_name"}, status=400)
-    try:
-        hours = max(1, min(24, int(request.query.get("hours", "6"))))
-    except ValueError:
-        hours = 6
-    try:
-        payload = await cameras_client.activity(conn, camera_name, hours)
-    except cameras_client.FrigateError as e:
-        return web.json_response(e.body, status=e.status)
-    return web.json_response(payload, headers={"Cache-Control": "no-store"})
-
-
 def _gif_response(request: web.Request, data: bytes) -> web.Response:
     """A finished event's GIF never changes: the client passes ``v=<end_time>``
     and gets a long-lived cache; ``v=live`` (event still running) is not cached."""
@@ -295,6 +270,5 @@ def setup(app: web.Application) -> None:
     app.router.add_get("/api/frigate/events/{camera_name}", frigate_events_api)
     app.router.add_get("/api/frigate/event/{event_id}/preview.gif", frigate_event_gif_api)
     app.router.add_get("/api/frigate/event/{event_id}/clip.mp4", frigate_event_clip_api)
-    app.router.add_get("/api/frigate/activity/{camera_name}", frigate_activity_api)
     app.router.add_get("/api/frigate/motion/{camera_name}/{start}/{end}/preview.gif", frigate_motion_gif_api)
     app.router.add_get("/api/frigate/motion/{camera_name}/{start}/{end}/clip.mp4", frigate_motion_clip_api)

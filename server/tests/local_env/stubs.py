@@ -7,7 +7,7 @@ network (the app reaches them as ``http://stubs:<port>``):
 8123  Home Assistant A (the first admin's): ``testfakes.FakeHA``
 8124  Home Assistant B (the second test user's): ``testfakes.FakeHA``
 3000  WAHA with two sessions / WhatsApp accounts: ``testfakes.FakeWAHA``
-5000  Frigate (events, activity, previews, clips, WebRTC, version)
+5000  Frigate (events, motion, previews, clips, WebRTC, version)
 9100  OpenAI-compatible model endpoint for LiteLLM (chat, streamed or not,
       structured output, audio transcription)
 8081  Telegram Bot API (getUpdates long polling, sendMessage, …)
