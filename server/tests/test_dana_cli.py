@@ -1,8 +1,8 @@
-"""bin/users.py, the server's user management tool (docs/access.md, "Managing users").
-Run: bin/test test_users_cli
+"""bin/dana users and the per-user bin/dana addons commands (docs/access.md, "Managing users").
+Run: bin/test test_dana_cli
 
-Calls its ``main(argv)`` in process against a temporary database (plus one
-real subprocess run): users (list, add, update, remove with and without
+Calls ``cli.main.main(argv)`` in process against a temporary database (plus one
+real subprocess run of bin/dana): users (list, add, update, remove with and without
 ``--delete-data``, the last admin protected), tokens (issued once, listed
 without the token, revoked), Telegram ids (add, move, remove, the last one
 protected), addons (kinds, show without credential values, connect /
@@ -12,7 +12,6 @@ that is not migrated. Stored secrets never appear in any output.
 """
 
 import contextlib
-import importlib.util
 import io
 import os
 import subprocess
@@ -32,10 +31,7 @@ from core import db, users  # noqa: E402
 db.migrate()
 users.bootstrap()
 
-_spec = importlib.util.spec_from_file_location("users_cli", ROOT / "bin" / "users.py")
-assert _spec is not None and _spec.loader is not None
-cli = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(cli)
+from cli import main as cli  # noqa: E402
 
 from core.addons import sharing  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
@@ -70,60 +66,62 @@ assert ADMIN is not None
 
 def test_users() -> None:
     rc, out, _ = run("--help")
-    check("help: lists the commands", rc == 0 and all(c in out for c in ("list", "add", "update", "remove", "tokens",
-                                                                          "telegram", "addons", "sharing")))
+    check("help: the two areas", rc == 0 and "users" in out and "addons" in out, out)
+    rc, out, _ = run("users", "--help")
+    check("help: lists the user commands", rc == 0 and all(c in out for c in ("list", "add", "update", "remove", "tokens",
+                                                                               "telegram", "sharing")), out)
     rc, out, _ = run("addons", "connect", "--help")
     check("help: per command", rc == 0 and "--credentials-file" in out and "SETTING=VALUE" in out)
 
-    rc, out, _ = run("add", "Bob Builder", "--pronoun", "he", "--context", "Bob is a builder. Wendy is his partner.")
+    rc, out, _ = run("users", "add", "Bob Builder", "--pronoun", "he", "--context", "Bob is a builder. Wendy is his partner.")
     bob = next((u for u in users.list_users() if u.name == "Bob Builder"), None)
     check("add: a member with their profile", rc == 0 and bob is not None and bob.access == "member"
           and bob.pronoun == "he" and bob.context.startswith("Bob is a builder") and bob.id in out, out)
-    rc, _, _ = run("add", "Carl", "--access", "member", "--telegram-chat", "4242")
+    rc, _, _ = run("users", "add", "Carl", "--access", "member", "--telegram-chat", "4242")
     carl = next(u for u in users.list_users() if u.name == "Carl")
     check("add: proactive chat, default pronoun they", rc == 0 and carl.telegram_chat_id == 4242 and carl.pronoun == "they")
-    rc, _, err = run("add", "Dora", "--pronoun", "it")
+    rc, _, err = run("users", "add", "Dora", "--pronoun", "it")
     check("add: an unknown pronoun is bad usage", rc == 2 and not any(u.name == "Dora" for u in users.list_users()))
 
-    rc, out, _ = run("list")
+    rc, out, _ = run("users", "list")
     check("list: every user with access, pronoun, addons", rc == 0 and "Bob Builder  [member]" in out
           and f"{ADMIN.name}  [admin] (first admin)" in out and "pronoun: he" in out and "proactive chat: 4242" in out,
           out)
 
-    rc, out, _ = run("update", "bob", "--name", "Bob B", "--pronoun", "they", "--other-names", "בוב",
+    rc, out, _ = run("users", "update", "bob", "--name", "Bob B", "--pronoun", "they", "--other-names", "בוב",
                      "--telegram-chat", "77")
     bob = users.get(bob.id)
     check("update: name, pronoun, other names, chat (a user found by the start of the name)",
           rc == 0 and bob.name == "Bob B" and bob.pronoun == "they" and bob.other_names == "בוב"
           and bob.telegram_chat_id == 77, out)
-    rc, _, _ = run("update", "Bob B", "--telegram-chat", "none")
+    rc, _, _ = run("users", "update", "Bob B", "--telegram-chat", "none")
     check("update: 'none' removes the proactive chat", rc == 0 and users.get(bob.id).telegram_chat_id is None)
-    rc, _, err = run("update", ADMIN.id, "--access", "member")
+    rc, _, err = run("users", "update", ADMIN.id, "--access", "member")
     check("update: the last admin keeps admin", rc == 1 and "last admin" in err and users.get(ADMIN.id).is_admin, err)
-    rc, _, err = run("update", "nobody-here", "--name", "x")
+    rc, _, err = run("users", "update", "nobody-here", "--name", "x")
     check("update: an unknown user is refused, users listed", rc == 1 and "No user" in err and "Bob B" in err, err)
-    rc, _, err = run("update", "Bob B")
+    rc, _, err = run("users", "update", "Bob B")
     check("update: nothing to change is refused", rc == 1 and "Nothing to change" in err)
-    rc, _, _ = run("update", "carl", "--access", "admin")
+    rc, _, _ = run("users", "update", "carl", "--access", "admin")
     check("update: access", rc == 0 and users.get(carl.id).is_admin)
-    rc, _, _ = run("update", "carl", "--access", "member")
+    rc, _, _ = run("users", "update", "carl", "--access", "member")
     check("update: access back (another admin exists)", rc == 0 and not users.get(carl.id).is_admin)
 
 
 def test_tokens() -> None:
     bob = next(u for u in users.list_users() if u.name == "Bob B")
-    rc, out, _ = run("tokens", "issue", bob.id, "--label", "phone")
+    rc, out, _ = run("users", "tokens", "issue", bob.id, "--label", "phone")
     raw = out.splitlines()[1].strip() if rc == 0 else ""
     check("tokens issue: printed once, it works", rc == 0 and users.by_token(raw) is not None
           and users.by_token(raw).id == bob.id, out)
     token = users.list_tokens(bob.id)[0]
-    rc, out, _ = run("tokens", "list")
+    rc, out, _ = run("users", "tokens", "list")
     check("tokens list: label and id, never the token", rc == 0 and token.id in out and "phone" in out and raw not in out, out)
-    rc, out, _ = run("list")
+    rc, out, _ = run("users", "list")
     check("list: token labels", f"phone ({token.id})" in out and raw not in out)
-    rc, _, _ = run("tokens", "revoke", token.id)
+    rc, _, _ = run("users", "tokens", "revoke", token.id)
     check("tokens revoke: the token stops working", rc == 0 and users.by_token(raw) is None)
-    rc, _, err = run("tokens", "revoke", token.id)
+    rc, _, err = run("users", "tokens", "revoke", token.id)
     check("tokens revoke: an unknown id is refused", rc == 1 and "No token" in err)
 
 
@@ -131,19 +129,19 @@ def test_telegram() -> None:
     bob = next(u for u in users.list_users() if u.name == "Bob B")
     carl = next(u for u in users.list_users() if u.name == "Carl")
     check("telegram: open before any id", users.telegram_open())
-    rc, _, _ = run("telegram", "add", bob.id, "1001")
+    rc, _, _ = run("users", "telegram", "add", bob.id, "1001")
     check("telegram add", rc == 0 and users.by_telegram_id(1001).id == bob.id and not users.telegram_open())
-    rc, _, err = run("telegram", "add", carl.id, "1001")
+    rc, _, err = run("users", "telegram", "add", carl.id, "1001")
     check("telegram add: an id someone has is refused, move suggested", rc == 1 and "telegram move" in err, err)
-    rc, _, _ = run("telegram", "move", "1001", "carl")
+    rc, _, _ = run("users", "telegram", "move", "1001", "carl")
     check("telegram move", rc == 0 and users.by_telegram_id(1001).id == carl.id)
-    rc, _, err = run("telegram", "remove", "1001")
+    rc, _, err = run("users", "telegram", "remove", "1001")
     check("telegram remove: the last id is refused (the bot would open)",
           rc == 1 and "--allow-open-bot" in err and users.by_telegram_id(1001).id == carl.id)
-    run("telegram", "add", ADMIN.id, "1002")
-    rc, _, _ = run("telegram", "remove", "1001")
+    run("users", "telegram", "add", ADMIN.id, "1002")
+    rc, _, _ = run("users", "telegram", "remove", "1001")
     check("telegram remove", rc == 0 and users.by_telegram_id(1001) is None and users.by_telegram_id(1002).id == ADMIN.id)
-    rc, _, err = run("telegram", "move", "999", "carl")
+    rc, _, err = run("users", "telegram", "move", "999", "carl")
     check("telegram move: an id nobody has is refused", rc == 1 and "No user has" in err)
 
 
@@ -205,7 +203,7 @@ def test_addons(tmp: Path) -> None:
     check("show: kinds, settings, credentials set / not set, no values",
           rc == 0 and "homeassistant" in out and "token set" in out and '"person.bob"' in out and "new-secret" not in out
           and "shopping" in out and "tasks" in out, out)
-    rc, out, _ = run("list")
+    rc, out, _ = run("users", "list")
     check("list: connected addons", "addons: tasks, shopping, homeassistant" in out, out)
     rc, _, _ = run("addons", "disconnect", "bob", "shopping")
     check("disconnect", rc == 0 and not store.is_connected(users.get(bob.id), "shopping"))
@@ -214,7 +212,7 @@ def test_addons(tmp: Path) -> None:
     rc, _, err = run("addons", "disconnect", "bob", "essentials")
     check("disconnect: core cannot be", rc == 1)
 
-    run("add", "Eve Admin", "--access", "admin")
+    run("users", "add", "Eve Admin", "--access", "admin")
     rc, _, _ = run("addons", "connect", "Eve Admin", "ops")
     check("connect: ops for an admin", rc == 0 and store.is_connected(next(u for u in users.list_users()
                                                                           if u.name == "Eve Admin"), "ops"))
@@ -226,14 +224,14 @@ def test_sharing_and_remove() -> None:
     store.connect(carl, "tasks")
     store.connect(carl, "knowledge")
     store.connect(bob, "knowledge")
-    rc, out, _ = run("sharing")
+    rc, out, _ = run("users", "sharing")
     check("sharing: nothing yet", rc == 0 and "Nothing is shared" in out)
     bob_list = groups.list_groups(bob)[0]
     sharing.set_level(bob, "task_list", str(bob_list["id"]), carl.id, "edit")
-    rc, out, _ = run("sharing")
+    rc, out, _ = run("users", "sharing")
     check("sharing: who has what", rc == 0 and f"task list '{bob_list['name']}'" in out and "of Bob B → Carl: edit" in out,
           out)
-    rc, out, _ = run("sharing", "Eve Admin")
+    rc, out, _ = run("users", "sharing", "Eve Admin")
     check("sharing: for one user", rc == 0 and "Nothing is shared by or with Eve Admin" in out)
 
     from addons.knowledge import projects
@@ -245,11 +243,11 @@ def test_sharing_and_remove() -> None:
                      "VALUES ('t-carl', 'Carl task', 'needs_action', ?, ?, ?, ?)", (carl_group, carl.id, carl.id, pid))
         conn.commit()
 
-    rc, out, err = run("remove", "Bob B")
+    rc, out, err = run("users", "remove", "Bob B")
     check("remove: without --delete-data says what would go and removes nothing",
           rc == 1 and "connections: " in out and "task_groups: " in out and "--delete-data" in err
           and users.get(bob.id) is not None, out + err)
-    rc, out, _ = run("remove", "Bob B", "--delete-data")
+    rc, out, _ = run("users", "remove", "Bob B", "--delete-data")
     with get_db_connection() as conn:
         left = {t: conn.execute(f"SELECT COUNT(*) FROM {t} WHERE user_id = ?", (bob.id,)).fetchone()[0]
                 for t in ("connections", "task_groups", "projects", "user_tokens", "user_telegram")}
@@ -263,8 +261,8 @@ def test_sharing_and_remove() -> None:
     store.invalidate()
     check("remove: no addons left for them", store.users_with("homeassistant") == [])
 
-    rc, _, _ = run("update", "Eve Admin", "--access", "member")
-    rc, _, err = run("remove", ADMIN.id, "--delete-data")
+    rc, _, _ = run("users", "update", "Eve Admin", "--access", "member")
+    rc, _, err = run("users", "remove", ADMIN.id, "--delete-data")
     check("remove: the last admin is refused", rc == 1 and "last admin" in err and users.get(ADMIN.id) is not None)
 
 
@@ -272,14 +270,14 @@ def test_not_migrated() -> None:
     real = cli.db.pending_migrations
     cli.db.pending_migrations = lambda *a, **k: ["tasks:0002_x"]
     try:
-        rc, _, err = run("list")
+        rc, _, err = run("users", "list")
     finally:
         cli.db.pending_migrations = real
     check("a database that is not up to date is refused", rc == 1 and "start the server once first" in err)
 
 
 def test_subprocess() -> None:
-    proc = subprocess.run([sys.executable, str(ROOT / "bin" / "users.py"), "list"], capture_output=True, text=True,
+    proc = subprocess.run([sys.executable, str(ROOT / "bin" / "dana"), "users", "list"], capture_output=True, text=True,
                           env={**os.environ, "DATABASE_PATH": DB_PATH}, timeout=120)
     check("runs as a script with the server's env", proc.returncode == 0 and "Carl  [member]" in proc.stdout,
           proc.stderr[-500:])

@@ -73,7 +73,7 @@ choices), `shopping_aisles` (the shared name → aisle table),
   items to buy from their own list, with the add rules below (an item already
   there is merged, a bought one there comes back); their bought items stay.
   The whole step (the active list, the answer, every moved item) has one undo.
-  A share made from `bin/users.py` (no running server) sends no notification;
+  A share made from `bin/dana users` (no running server) sends no notification;
   the banner still shows.
 - Removing a share, or lowering it to `read`, puts the user back on their own
   list. Removing a share also forgets the invitation's answer, so a new share

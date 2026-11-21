@@ -11,13 +11,38 @@
 `git push origin master` tests and, when configured, deploys, all from your machine. The repository's `.githooks/pre-push` hook (once per clone: `git config core.hooksPath .githooks`), on a clean checkout of the pushed commit:
 
 1. runs `bin/test` when the push changes more than docs under `server/`, plus the Dockerfile's `test` stage (the suite on the exact image, Python 3.14) when it changes `server/Dockerfile` or `server/requirements.txt`;
-2. when it changes what the images contain (`core/`, `addons/`, `static/`, `bank-worker/`, `main.py`, `requirements.txt`, `Dockerfile`, `VERSION`, `bin/users.py`) and your site has a `deploy.env` (`site/deploy.env` at the repository root, or `$DANA_SITE/deploy.env`; `../docs/site.md`), runs `bin/deploy`.
+2. when it changes what the images contain (`core/`, `addons/` with the addon workers, `static/`, `cli/`, `main.py`, `requirements.txt`, `Dockerfile`, `VERSION`, `bin/dana`) and your site has a `deploy.env` (`site/deploy.env` at the repository root, or `$DANA_SITE/deploy.env`; `../docs/site.md`), runs `bin/deploy`.
 
 A failure stops the push. `DANA_NO_DEPLOY=1 git push …` pushes without deploying; `git push --no-verify` skips tests and deploy. Android changes are not tested by the hook.
 
-- **`bin/deploy [<commit>] [--wait]`** reads the site's `deploy.env` (`DANA_DEPLOY_CONFIG` names another file; the template is `site.example/deploy.env.example`): builds the `app` stage of that commit (default HEAD) from a clean checkout, with the site's addons as the `site_addons` build context (`site/addons/`, or the folders in `DANA_IMAGE_ADDONS`; the image's `/app/addons-site`; `docs/writing-an-addon.md`), as `$DANA_IMAGE:<release>` and `latest`, plus the bank-worker sidecar `$DANA_WORKER_IMAGE:<release>` when set, and pushes them. The release is `<VERSION>-<commit>`, plus `-a<hash>` of the site addons' files when there are any, so changing only a site addon and running `bin/deploy` again is a new release that rolls out. With `DANA_GITOPS_REPO` it writes both tags into `DANA_GITOPS_VALUES` in that repository (from its own clone in `~/.cache/dana-deploy/gitops`) and pushes, for ArgoCD / Flux to roll the pod. It runs no tests. Use it to redeploy or roll back (`bin/deploy <older commit>`).
+- **`bin/deploy [<commit>] [--wait]`** reads the site's `deploy.env` (`DANA_DEPLOY_CONFIG` names another file; the template is `site.example/deploy.env.example`): builds the `app` stage of that commit (default HEAD) from a clean checkout, with the site's addons as the `site_addons` build context (`site/addons/`, or the folders in `DANA_IMAGE_ADDONS`; the image's `/app/addons-site`; `docs/writing-an-addon.md`), as `$DANA_IMAGE:<release>` and `latest`, plus one image per addon worker (below), and pushes them. The release is `<VERSION>-<commit>`, plus `-a<hash>` of the site addons' files when there are any, so changing only a site addon and running `bin/deploy` again is a new release that rolls out. With `DANA_GITOPS_REPO` it writes the release into `DANA_GITOPS_VALUES` (every `tag:` line and every worker's `image:`) in that repository (from its own clone in `~/.cache/dana-deploy/gitops`) and pushes, for ArgoCD / Flux to roll the pod. It runs no tests. Use it to redeploy or roll back (`bin/deploy <older commit>`).
 - The release name is written into the image's `VERSION` file: `/api/health` reports it and the dashboard's `?v=` cache-buster uses it, so every deploy reaches cached clients. **No VERSION bump is needed to ship**; bump it to name a release.
 - `bin/deploy --wait` waits until a pod in `DANA_K8S_NAMESPACE` matching `DANA_K8S_SELECTOR` runs the release and is ready.
+
+### Workers
+
+An addon that declares `worker=Worker(port, url_env)` (`core/addons/addon.py`) has a sidecar built from its own `worker/` folder (`worker/Dockerfile`, self-contained: the app image leaves `addons/*/worker` out). Today: money's bank worker, `addons/money/worker/` (Node + Chromium; `docs/money.md`).
+
+- **`bin/deploy`** builds every worker of the commit's official addons and of the site's addons as `$DANA_IMAGE-<addon>:<release>` (the same release as the app) and pushes it. `DANA_WORKERS` in `deploy.env`: `all` (default), `none`, or addon names (space or comma separated).
+- **GitOps values**: besides every `tag:` line, `bin/deploy` rewrites any `image: "<DANA_IMAGE>-<addon>:<old tag>"` to the new release, so name each worker's image in full under one key per addon; the convention is `workers.<addon>.image`:
+
+  ```yaml
+  image:
+    repository: registry.example/dana
+    tag: "9.0.0-abc1234"
+  workers:
+    money:
+      image: "registry.example/dana-money:9.0.0-abc1234"   # the sidecar / init container
+      port: 8090
+  ```
+
+  The chart (yours) runs it in the pod next to the app, sharing its network namespace and data volume, and the app reaches it at the addon's `url_env` (`MONEY_WORKER_URL`, default `http://127.0.0.1:8090`).
+- **Compose** (`compose.yaml`): each worker is a service under a profile named after its addon: `docker compose --profile money up -d` adds `money-worker` (image `dana-money`, built from `addons/money/worker/`).
+- Tests: a worker's own (`addons/<name>/worker/test/test_*.mjs`) run in `bin/test` with the rest.
+
+### Restarting
+
+Installing, updating or removing an addon (the web Addons page, `/api/addons/install`, `/api/addons/<name>/remove`) changes files on disk; the server loads addons only at start. `POST /api/server/restart` (admins: `manage_server`; the page's Restart button) makes `main.py` stop the bot and the web server and exit with status 0 (`core/lifecycle.py`); the **supervisor starts it again**: Docker's `restart: unless-stopped` (`compose.yaml`), Kubernetes' default `restartPolicy: Always`. Run by hand (`python main.py`) it just exits. Disabling or enabling an addon on the server needs no restart (`../docs/addons.md`).
 
 ## Database schema
 

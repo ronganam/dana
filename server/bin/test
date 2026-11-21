@@ -10,9 +10,10 @@
     bin/test -v                  print the whole output of failed scripts, not the tail
     bin/test -j 4                at most 4 at a time (default: one per CPU, fewer when memory is short)
 
-Scripts live in tests/ (core), addons/<name>/tests/ (each addon), bank-worker/test/
-(the bank worker's .mjs) and the tests/ folder of each site addon (the folders
-DANA_ADDON_DIRS names, else the site's addons/: docs/site.md). Each runs from this
+Scripts live in tests/ (core), addons/<name>/tests/ (each addon), addons/<name>/worker/test/
+(an addon's worker: the money addon's bank worker .mjs) and the tests/ and worker/test/
+folders of each site addon (the folders DANA_ADDON_DIRS names, else the site's addons/:
+docs/site.md). Each runs from this
 folder with it and tests/ on PYTHONPATH (so `import testenv` and the app's modules
 resolve); a script is named by its path from here (addons/tasks/tests/test_tasks_users.py).
 
@@ -75,10 +76,10 @@ def site_addon_dirs() -> list[Path]:
 
 
 def script_paths() -> list[Path]:
-    """Every test script: core's, each official addon's, the bank worker's, each site addon's."""
-    found = [*ROOT.glob("tests/test_*"), *ROOT.glob("addons/*/tests/test_*"), *ROOT.glob("bank-worker/test/test_*")]
+    """Every test script: core's, each official addon's and its worker's, each site addon's and its worker's."""
+    found = [*ROOT.glob("tests/test_*"), *ROOT.glob("addons/*/tests/test_*"), *ROOT.glob("addons/*/worker/test/test_*")]
     for folder in site_addon_dirs():
-        found += folder.glob("*/tests/test_*") if folder.is_dir() else []
+        found += [*folder.glob("*/tests/test_*"), *folder.glob("*/worker/test/test_*")] if folder.is_dir() else []
     return [p for p in found if p.suffix in (".py", ".mjs") and p.is_file() and p.name not in NEVER]
 
 
@@ -142,15 +143,13 @@ def select_changed(ref: str, scripts: list[str]) -> tuple[list[str], str]:
             picked.add(f)
         if f.startswith("static/"):
             picked.update(s for s in scripts if Path(s).name.startswith("test_web_"))
-        if f.startswith("bank-worker/"):
-            picked.update(s for s in scripts if s.startswith("bank-worker/"))
         if f.startswith("tests/fixtures/"):
             stem = Path(f).parts[2] if len(Path(f).parts) > 3 else Path(f).stem
             picked.update(s for s, src in sources.items() if stem in src)
         if f.startswith("../examples/"):
             picked.add("tests/test_addon_loading.py")
-        if f.startswith("bin/users.py"):
-            picked.add("tests/test_users_cli.py")
+        if f.startswith(("bin/dana", "cli/")):
+            picked.update({"tests/test_dana_cli.py", "tests/test_addon_market.py"})
         if f.startswith("addons/") and len(Path(f).parts) > 2:
             name = Path(f).parts[1]                           # addons/<name>/…: its tests, and scripts named after it
             picked.update(s for s in scripts if s.startswith(f"addons/{name}/") or name in Path(s).name)

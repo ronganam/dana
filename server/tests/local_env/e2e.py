@@ -2,7 +2,7 @@
 (docs/local-testing.md). Run: bin/local-env.sh test (after a fresh `up`).
 
 Drives the running container over HTTP / WebSocket only, plus
-``docker exec … python bin/users.py`` for administration and ``docker``
+``docker exec … python bin/dana`` for administration and ``docker``
 for restarts and the start-up refusals. The stubs' control API
 (tests/local_env/stubs.py) scripts the model and reads what every stub was
 asked. Prints PASS / FAIL per check and exits non-zero on any failure.
@@ -98,7 +98,9 @@ def dexec(*args: str, stdin: Optional[str] = None, timeout: float = 120) -> Tupl
 
 
 def users_cli(*args: str, stdin: Optional[str] = None) -> Tuple[int, str]:
-    return dexec("python", "bin/users.py", *args, stdin=stdin)
+    """``bin/dana users …`` in the image (``bin/dana addons …`` for the addons commands)."""
+    area = () if args and args[0] == "addons" else ("users",)
+    return dexec("python", "bin/dana", *area, *args, stdin=stdin)
 
 
 def app_logs() -> str:
@@ -388,7 +390,7 @@ async def upgrade(c: Client) -> Dict[str, Any]:
           and not no_secret_in(r.text), r)
 
     code, out = users_cli("list")
-    check("cli: users.py list runs in the image: one admin, Telegram id, every addon",
+    check("cli: bin/dana users list runs in the image: one admin, Telegram id, every addon",
           code == 0 and "Robin  [admin] (first admin)" in out and "telegram ids: 111111111" in out
           and "addons: tasks, shopping, knowledge, about, people, phone, homeassistant, whatsapp, calendar, cameras, ops" in out, out)
     code, out = users_cli("addons", "show", "Robin")
@@ -943,7 +945,7 @@ async def sharing(c: Client, maya: Dict[str, str]) -> None:
     r = await c.get(f"/api/shopping?list={lid}", tok)
     check("share: the admin's list is unknown to her now (404)", r.status == 404, r)
     code, out = users_cli("sharing")
-    check("cli: users.py sharing runs (nothing shared now)", code == 0, out)
+    check("cli: bin/dana users sharing runs (nothing shared now)", code == 0, out)
 
 
 # =================================================================================================
@@ -1324,7 +1326,7 @@ async def second_review(c: Client, maya: Dict[str, str]) -> None:
           seen.get("account_conflict") == ADMIN_ACCOUNT and admin_own.get("account") == ADMIN_ACCOUNT
           and "account_conflict" not in admin_own, (seen, admin_own))
     code, out = users_cli("addons", "show", mid)
-    check("whatsapp: users.py addons show names the conflict", code == 0 and "account conflict" in out, out)
+    check("whatsapp: bin/dana addons show names the conflict", code == 0 and "account conflict" in out, out)
     check("whatsapp: the conflict is logged (user ids, no content)",
           "is already connected by user" in app_logs(), "")
 

@@ -72,7 +72,7 @@ def _homeassistant() -> Optional[EnvImport]:
     if not _env("HOMEASSISTANT_TOKEN"):
         return None
     # Entities without an env value stay unset: the user picks them on the
-    # Addons page (or with bin/users.py).
+    # Addons page (or with bin/dana addons).
     return EnvImport(
         credentials={"host": _env_or("HOMEASSISTANT_HOST", ha_config.DEFAULT_HOST),
                      "token": _env("HOMEASSISTANT_TOKEN")},
@@ -156,7 +156,7 @@ def _connect(admin: User, name: str, values: EnvImport) -> bool:
             return True
         except InvalidValue as e:
             if e.field in settings:
-                logger.error(f"Env import of {name}: setting {e.field} left out ({e}); set it with bin/users.py.")
+                logger.error(f"Env import of {name}: setting {e.field} left out ({e}); set it with bin/dana addons update.")
                 settings.pop(e.field)
                 continue
             logger.error(f"Env import of {name} skipped: {e}. Fix the env value; it is imported at the next start.")

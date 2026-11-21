@@ -5,8 +5,10 @@
  * a browser and feeds it the *actual payloads* the API answered, captured in
  * tests/fixtures/addons_web.json by `WRITE_WEB_FIXTURE=1 bin/test test_addons_api` (the first
  * admin, a member, an admin acting for the member, a WhatsApp account conflict, addons not connected, a
- * field-level 400, a 403, a connection test). Checks what would be rendered and what would be sent:
- * untouched credentials are never sent, read-only fields have no input, a secret never reaches the HTML.
+ * field-level 400, a 403, a connection test, an addon that failed to load, one disabled on the server, the
+ * catalog, a refused install). Checks what would be rendered and what would be sent: untouched credentials
+ * are never sent, read-only fields have no input, a secret never reaches the HTML; the tabs, the admin's
+ * server actions, the catalog's install / update states and the install confirmation with the warning.
  *
  * Run: bin/test test_web_addons [path-to-fixture]
  */
@@ -191,6 +193,76 @@ const headOther = C.renderHeader({ me: meAdmin, users, target: meMember.id });
 check("header: editing another user is obvious", /itg-banner[\s\S]*You're editing[\s\S]*Bob Builder/.test(headOther) && headOther.includes("data-mine"));
 check("header: a member gets no picker", !C.renderHeader({ me: meMember, users: null, target: meMember.id }).includes("itg-user"));
 check("header: names are escaped", C.renderHeader({ me: { ...meAdmin, name: "<img src=x>" }, users: null }).includes("&lt;img src=x&gt;"));
+
+// --- tabs, sources, server-wide state (step 2b) ------------------------------------------------------
+const memberOff = byName(F.list_member_disabled);
+check("tabs: admins get Installed / Official / Catalog, members no Catalog",
+      JSON.stringify(plain(C.tabsFor(true)).map((t) => t[0])) === '["installed","official","catalog"]'
+      && JSON.stringify(plain(C.tabsFor(false)).map((t) => t[0])) === '["installed","official"]');
+check("tabs: the list answer says who can manage", F.list_admin.body.can_manage === true && F.list_member.body.can_manage === false);
+const official = C.tabItems(F.list_admin.body.addons, "official"), installedTab = C.tabItems(F.list_admin.body.addons, "installed");
+check("tabs: Official holds the shipped addons, Installed the rest (the failed site addon)",
+      official.length > 5 && official.every((i) => i.source === "official")
+      && installedTab.map((i) => i.name).join() === "broken", installedTab.map((i) => i.name).join());
+check("source badge: none for official, the source for the others",
+      C.sourceLabel(admin.tasks) === "" && C.sourceLabel(admin.broken) === "Site" && C.sourceLabel({ source: "installed" }) === "Installed");
+const body = C.renderBody({ items: F.list_admin.body.addons, ui: {}, open: null, tab: "installed", canManage: true });
+check("page: tabs with counts, the failed addon under Didn't load with its badge and error",
+      /data-tab="installed"[^>]*>Installed <span class="itg-count">1<\/span>/.test(body)
+      && body.includes('data-tab="catalog"') && /Didn&#39;t load[\s\S]*data-row="broken"[\s\S]*itg-badge site[\s\S]*ImportError: a missing package/.test(body), body.slice(0, 600));
+check("page: an unknown tab falls back to Official", C.renderBody({ items: F.list_member.body.addons, tab: "catalog", canManage: false, ui: {} }).includes('segmented-btn active" role="tab" aria-selected="true" data-tab="official"'));
+check("page: an empty Installed tab says how to get addons",
+      C.renderBody({ items: F.list_member.body.addons.filter((i) => i.source === "official"), tab: "installed", canManage: false, ui: {} }).includes("bin/dana addons new"));
+check("failed: the state, and only admins get the error", C.rowState(admin.broken).key === "failed"
+      && C.rowState(admin.broken).notes[0].includes("ImportError") && !("error" in (byName(F.list_member).broken || {})));
+check("failed: no connect, no server disable, nothing to remove (a site addon)",
+      !/data-act="(save|disable|remove)"/.test(C.renderRow(admin.broken, {}, false, true)));
+const off = memberOff.shopping;
+check("disabled: the member's shopping says Disabled on server and why, with no Connect / Save",
+      off.state === "disabled-on-server" && C.rowState(off).key === "disabled" && C.rowState(off).notes[0].includes("disabled it for everyone")
+      && /itg-state disabled/.test(C.renderRow(off, {}, false, false)) && !/data-act="(save|disconnect|test)"/.test(C.renderDetail(off, {}, false)));
+check("disabled: a member gets no server buttons", C.serverActions(off, false).length === 0 && !C.renderDetail(off, {}, false).includes("Enable on server"));
+check("server actions: admins disable an official addon (no remove), enable a disabled one",
+      JSON.stringify(plain(C.serverActions(admin.tasks, true))) === '[{"act":"disable","label":"Disable on server"}]'
+      && JSON.stringify(plain(C.serverActions(F.disable.body, true)).map((a) => a.act)) === '["enable"]'
+      && C.renderDetail(F.disable.body, {}, true).includes('data-act="enable"'));
+check("server actions: never for an addon every user has", C.serverActions(admin.essentials, true).length === 0);
+check("server actions: an installed addon can be removed", C.serverActions({ ...admin.tasks, source: "installed" }, true).map((a) => a.act).includes("remove"));
+check("disable / enable: the answers the page reads", F.disable.status === 200 && F.disable.body.state === "disabled-on-server"
+      && F.enable.status === 200 && F.enable.body.state === "on");
+
+// --- the catalog --------------------------------------------------------------------------------------
+const cat = F.catalog_admin.body, weatherEntry = cat.entries[0];
+check("catalog: members are refused", F.catalog_member.status === 403);
+check("catalog: an entry not installed can be installed", C.catalogState(weatherEntry).action === "install");
+check("catalog: installed at another commit → Update; at its commit → Installed; restart to load",
+      C.catalogState({ ...weatherEntry, installed: { commit: "b".repeat(40), loaded: true }, update_available: true }).action === "update"
+      && C.catalogState({ ...weatherEntry, installed: { commit: weatherEntry.source.ref, loaded: false } }).label.includes("restart")
+      && C.catalogState({ ...weatherEntry, installed: { commit: weatherEntry.source.ref, loaded: true } }).action === null);
+check("catalog: official names, other sources and too-new entries are not installable",
+      C.catalogState({ ...weatherEntry, official: true }).action === null && C.catalogState({ ...weatherEntry, present: "site" }).action === null
+      && C.catalogState({ ...weatherEntry, compatible: false }).label.includes(weatherEntry.min_dana));
+const catHtml = C.renderCatalog({ catalog: cat, catalogUi: {} });
+check("catalog: the full-access warning, the entry with Install, the skipped entries, the git form",
+      catHtml.includes(C.esc(C.FULL_ACCESS)) && catHtml.includes('data-install="weather"') && catHtml.includes(C.esc(cat.problems[0]))
+      && catHtml.includes('data-git-field="ref"'));
+check("catalog: an unreadable catalog says so with a retry", /Couldn't read the catalog[\s\S]*boom[\s\S]*data-catalog-retry/.test(C.renderCatalog({ catalogError: "boom" })));
+check("catalog: a homepage that is not http(s) is not linked",
+      !C.renderCatalogEntry({ ...weatherEntry, homepage: "javascript:alert(1)" }, {}).includes("javascript:"));
+check("install form: a full commit is required", C.installBody({ repo: "https://x/r.git", ref: "main" }).error
+      && C.installBody({ repo: "", ref: "a".repeat(40) }).error
+      && JSON.stringify(plain(C.installBody({ repo: " https://x/r.git ", path: "/addons/w/", ref: "A".repeat(40) })))
+         === JSON.stringify({ repo: "https://x/r.git", path: "addons/w", ref: "a".repeat(40) }));
+const conf = C.renderConfirm(C.installConfirm(weatherEntry.source, "weather", false));
+check("install confirm: the repository, the folder, the commit and the full-access warning",
+      conf.includes(weatherEntry.source.repo) && conf.includes(weatherEntry.source.path) && conf.includes(weatherEntry.source.ref)
+      && conf.includes(C.esc(C.FULL_ACCESS)) && conf.includes(">Install<"));
+check("install refused: the server's sentence", F.install_refused.status === 400
+      && C.errorText(F.install_refused.status, F.install_refused.body).message.includes("40-character"));
+check("restart banner: only when needed; a Restart button for admins only",
+      C.renderRestartBanner({}) === "" && C.renderRestartBanner({ restartNeeded: true, canManage: true }).includes("data-restart")
+      && !C.renderRestartBanner({ restartNeeded: true, canManage: false }).includes("data-restart")
+      && C.renderRestartBanner({ restarting: true }).includes("restarting"));
 
 // --- no secret reaches the HTML ----------------------------------------------------------------------
 const all = [F.list_admin, F.list_member, F.list_admin_for_member, F.list_conflict].flatMap((l) => l.body.addons);

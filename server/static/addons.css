@@ -114,5 +114,43 @@ button.itg-row-head:hover { background: var(--canvas-soft); }
   .itg-picker select { max-width: none; }
 }
 @media (prefers-reduced-motion: reduce) { .itg-skel { animation: none; } .itg-chev { transition: none; } }
+/* Tabs, source badges, server-wide states, the catalog and the restart banner. */
+.itg-tabs { max-width: 420px; }
+.itg-tabs .segmented-btn { border: 0; background: none; font-family: inherit; }
+.itg-tabs .segmented-btn.active { background: var(--ink); color: var(--on-primary); }
+.itg-count { font-family: var(--font-mono); font-size: 11px; opacity: .7; margin-inline-start: 4px; }
+.itg-tab-body { display: flex; flex-direction: column; gap: 22px; }
+.itg-badge { display: inline-block; margin-inline-start: 8px; padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid var(--hairline-strong);
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; letter-spacing: .4px; text-transform: uppercase; color: var(--body-strong);
+  vertical-align: 1px; }
+.itg-badge.installed { border-color: rgba(255,149,0,.45); color: var(--itg-warn); }
+.itg-state.disabled { color: var(--mute); }
+.itg-state.disabled .itg-dot { background: transparent; border: 1px solid var(--mute); }
+.itg-state.failed { color: var(--itg-bad); }
+.itg-state.failed .itg-dot { background: var(--itg-bad); }
+.itg-admin-chip, .itg-row-head .chip + .chip { margin-inline-start: 6px; }
+.itg-danger { color: var(--itg-bad); border-color: rgba(255,59,48,.4); }
+.itg-admin { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding-top: 10px; border-top: 1px dashed var(--hairline-strong); }
+.itg-admin-label { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; color: var(--body-strong); }
+.itg-admin-label svg { width: 14px; height: 14px; }
+.itg-installed { font-family: var(--font-mono); font-size: 11.5px; color: var(--mute); overflow-wrap: anywhere; }
+.itg-empty { display: flex; align-items: center; gap: 10px; padding: 16px; color: var(--mute); font-size: 13.5px; }
+.itg-empty svg { width: 18px; height: 18px; flex-shrink: 0; }
+.itg-restart { border-color: var(--hairline-strong); background: var(--canvas-soft); }
+.itg-restart svg { color: var(--ink); }
+.itg-restart span { flex: 1; min-width: 200px; }
+.itg-link { font-family: var(--font-inter); color: var(--body-strong); }
+.itg-problems { display: block; margin-top: 8px; }
+.itg-problems summary { cursor: pointer; }
+.itg-problems ul { margin: 6px 0 0; padding-inline-start: 18px; font-family: var(--font-mono); font-size: 11.5px; overflow-wrap: anywhere; }
+.itg-git { display: flex; flex-direction: column; gap: 12px; padding: 14px; }
+.itg-facts { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; margin: 0 0 14px; font-size: 13px; }
+.itg-facts dt { color: var(--mute); }
+.itg-facts dd { margin: 0; font-family: var(--font-mono); font-size: 12px; color: var(--ink); overflow-wrap: anywhere; }
+.itg-confirm .itg-note { margin-bottom: 14px; }
+@media (max-width: 767px) {
+  .itg-tabs { max-width: none; }
+  .itg-row.flat .itg-row-head { flex-wrap: wrap; }
+}
 /* The Google sign-in is a link styled as a button. */
 .itg-actions a.btn-primary { display: inline-flex; align-items: center; text-decoration: none; }

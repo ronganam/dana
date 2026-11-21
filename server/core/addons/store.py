@@ -24,7 +24,7 @@ from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Set, 
 from core import user_rows, users
 from core.db import get_db_connection
 from core.users import User
-from core.addons import addresses, crypto
+from core.addons import addresses, crypto, state
 from core.addons.addon import (ADDRESS, NAME, TELEGRAM_CHAT, Addon, InvalidValue,
                                          check_values, get_addon, all_addons)
 
@@ -136,23 +136,29 @@ def invalidate() -> None:
 # --- Lookups ----------------------------------------------------------------------
 
 def connected_addons(user: User) -> Tuple[str, ...]:
-    """The addons ``user`` has, in the fixed addon order (``everyone`` addons included)."""
+    """The addons ``user`` has, in the fixed addon order (``everyone`` addons
+    included; addons disabled on the server left out: core/addons/state.py)."""
     mine = _current().rows.get(user.id, {})
-    return tuple(k.name for k in all_addons() if k.everyone or k.name in mine)
+    off = state.disabled()
+    return tuple(k.name for k in all_addons() if (k.everyone or k.name in mine) and k.name not in off)
 
 
 def is_connected(user: User, name: str) -> bool:
     return name in connected_addons(user)
 
 
-def get(user: User, name: str) -> Optional[Connection]:
-    """``user``'s connection of ``name`` (None when not connected).
+def get(user: User, name: str, *, disabled_too: bool = False) -> Optional[Connection]:
+    """``user``'s connection of ``name`` (None when not connected, or when the
+    addon is disabled on the server unless ``disabled_too``: the Addons page
+    still shows a disabled addon's stored settings).
 
     Raises:
         KeyError: no such addon.
         CredentialsKeyError: its credentials cannot be decrypted.
     """
     addon = get_addon(name)
+    if not disabled_too and not state.is_enabled(name):
+        return None
     if addon.everyone:
         return Connection(user=user, addon=name, settings=MappingProxyType(addon.setting_defaults()))
     snap = _current()
@@ -197,7 +203,10 @@ def list_connections(user: User) -> List[ConnectionInfo]:
 
 
 def users_with(name: str) -> List[str]:
-    """Ids of the users who have ``name`` connected (not for ``everyone`` addons)."""
+    """Ids of the users who have ``name`` connected (not for ``everyone``
+    addons; none while it is disabled on the server)."""
+    if not state.is_enabled(name):
+        return []
     return sorted(uid for uid, mine in _current().rows.items() if name in mine)
 
 
@@ -205,7 +214,7 @@ def users_with(name: str) -> List[str]:
 
 def admin_change(by: Optional[User]) -> bool:
     """``by`` may set any address / chat: None (the server itself, an operator
-    with shell access: bin/users.py, the env import) or a user with
+    with shell access: bin/dana, the env import) or a user with
     :data:`ADMIN_CAPABILITY`."""
     return by is None or by.level.allows(ADMIN_CAPABILITY)
 
@@ -364,6 +373,8 @@ def _connectable(user: User, name: str, by: Optional[User]) -> Addon:
     if not addon.allowed_for(user):
         raise PermissionError(f"The {name} addon needs the '{addon.requires}' capability, "
                               f"which access level {user.access!r} does not have.")
+    if not state.is_enabled(name):
+        raise state.AddonDisabled(name)
     _changeable(addon, by)
     return addon
 
@@ -407,10 +418,12 @@ def _encrypt(credentials: Mapping[str, Any]) -> Optional[str]:
 
 def connect_defaults(user: User) -> List[str]:
     """Turn on, for a new ``user``, every ``default_on`` addon they may have
-    and lack (no credentials, its default settings). Returns the names turned on."""
+    and lack (no credentials, its default settings; not one disabled on the
+    server). Returns the names turned on."""
     done = []
     for addon in all_addons():
-        if not addon.default_on or addon.everyone or not addon.allowed_for(user) or is_connected(user, addon.name):
+        if not addon.default_on or addon.everyone or not addon.allowed_for(user) or is_connected(user, addon.name) \
+                or not state.is_enabled(addon.name):
             continue
         connect(user, addon.name)
         done.append(addon.name)
@@ -431,6 +444,7 @@ def connect(user: User, name: str, *, credentials: Optional[Mapping[str, Any]] =
         ValueError: already connected, an unknown credential / setting name,
             or a required credential missing; :class:`InvalidValue` for a
             value that is refused (an address, a Telegram chat, the addon's rule).
+        AddonDisabled: the addon is disabled on the server.
         CredentialsKeyError: there are credentials to store and no usable key.
     """
     addon = _connectable(user, name, by)
@@ -489,11 +503,14 @@ def update(user: User, name: str, *, credentials: Optional[Mapping[str, Any]] = 
     Raises:
         KeyError: no such addon.
         NotConnected: not connected for ``user``.
+        AddonDisabled: the addon is disabled on the server.
         Forbidden: ``by`` lacks the addon's ``change_requires``.
         ValueError: an unknown credential / setting name; InvalidValue for a refused value.
         CredentialsKeyError: no usable key for credentials.
     """
     addon = get_addon(name)
+    if not state.is_enabled(name):
+        raise state.AddonDisabled(name)
     _changeable(addon, by)
     current = require(user, name)
     check_values(addon, credentials, settings)

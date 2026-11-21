@@ -202,8 +202,8 @@ class Addon:
         llm_jobs: Its LLM purposes and their default model profile
             (``{"task_emoji": "fast"}``, or an :class:`~core.addons.hooks.LlmJob`
             with a label): ``core.llm`` accepts them as ``purpose=``.
-        web: Its page in the web app (:class:`~core.addons.hooks.Web`; served in step 2b).
-        worker: Its sidecar (:class:`~core.addons.hooks.Worker`; deployed in step 2b).
+        web: Its page in the web app (:class:`~core.addons.hooks.Web`): files served from its ``web/``.
+        worker: Its sidecar (:class:`~core.addons.hooks.Worker`), built from its ``worker/``.
         modules: More modules of its folder the loader imports after
             ``addon.py`` and ``tools.py`` (dotted, relative: ``"calls.tools"``):
             where its other tools and hooks are declared. ``hooks.py`` is

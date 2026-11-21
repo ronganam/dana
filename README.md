@@ -40,11 +40,13 @@ cp .env.example .env
 .venv/bin/python main.py
 ```
 
-Then connect addons on the web UI (Settings → Addons) or with `bin/users.py`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
+Then connect addons on the web UI (Settings → Addons) or with `bin/dana addons connect`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
 
 ## Your own deployment
 
 Run Dana as upstream ships it and keep what is yours in a **site** folder beside it: deploy settings, your own addons, the apps' server address and TV setup, and notes for you and your coding agents. Start from `site.example/`. Updating is then `git pull`, and your deployment never drifts from Dana: [`docs/site.md`](docs/site.md).
+
+Addons: write your own with `server/bin/dana addons new <name>` (a working addon in `site/addons/<name>`), or install one from the catalog on the Addons page or with `bin/dana addons install`. Installed addons are pinned to a git commit and **run with the server's full access**: install only code you trust. [`docs/addons.md`](docs/addons.md).
 
 ## Build the apps
 

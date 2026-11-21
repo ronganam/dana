@@ -10,7 +10,7 @@ the first user, with access level `admin`.
 Code: `core/users.py` (the `User` value, lookups, create / update / remove,
 tokens, Telegram ids, bootstrap), `core/user_rows.py` (the rows' SQL and the
 first user's values), tables from migrations `m0002_users` and
-`m0016_user_profile`. Tests: `bin/test test_users`, `bin/test test_users_cli`,
+`m0016_user_profile`. Tests: `bin/test test_users`, `bin/test test_dana_cli`,
 `bin/test test_prompts_users`.
 
 | Field | Meaning |
@@ -35,11 +35,11 @@ first user's values), tables from migrations `m0002_users` and
   same values to an existing first admin). Those env values are read only
   then; later changes are not applied (startup warns when
   `ALLOWED_TELEGRAM_USER_IDS` lists ids no user has): change a user with
-  `bin/users.py update`. "The first admin" is the oldest user with access
+  `bin/dana users update`. "The first admin" is the oldest user with access
   `admin`.
 - **Tokens.** `API_TOKEN` (env) is always a valid token of the first admin and
   is never stored. Other tokens are made by `users.issue_token(user_id, label)`
-  (returns the raw token once; `bin/users.py tokens issue`) and revoked by
+  (returns the raw token once; `bin/dana users tokens issue`) and revoked by
   `users.revoke_token(token_id)`. Stored hashed: `token_hash` = SHA-256 of the
   token (Bearer lookups), `session_hash` = SHA-256 of the session cookie made
   from it (cookie lookups). `last_used_at` is written at most once an hour per
@@ -85,12 +85,12 @@ first user's values), tables from migrations `m0002_users` and
 - **Where the first admin is still looked up** (`users.first_admin()`): the
   env token and local development in `core/auth.py`, the open Telegram bot,
   the server timezone (`core/clock.py`, their Home Assistant), bootstrap and
-  migrations, startup logging, and `bin/users.py list` (marks them). Nothing
+  migrations, startup logging, and `bin/dana users list` (marks them). Nothing
   else.
 - **Lookups are cheap**: an in-memory copy of the three tables, rebuilt after
   every change made through `core/users.py` and at most every
   `CACHE_TTL_SECONDS` (10 s), so a change made by another process
-  (`bin/users.py`) takes effect within 10 s.
+  (`bin/dana`) takes effect within 10 s.
 
 ## The current user
 
@@ -189,7 +189,7 @@ Covers only what addons cannot express.
 | Capability | `admin` | `member` | Enforced by |
 |---|---|---|---|
 | `ops`: connect the `ops` addon (kubectl, Python) | yes | no | `store.connect` (`Addon(requires="ops")`) → `PermissionError` |
-| `manage_users`: other users' addons over the API | yes | no | `?user=<id>` on `/api/addons*` (`core/addons_api.py`); `bin/users.py` works on the database and needs shell access to the server instead |
+| `manage_users`: other users' addons over the API | yes | no | `?user=<id>` on `/api/addons*` (`core/addons_api.py`); `bin/dana` works on the database and needs shell access to the server instead |
 | `see_everyone`: everyone's usage, the server's own self-checks | yes | own usage only; the self-checks of their own addons | `/api/usage` (`user=`), `core/checks.py` (`SERVER_CHECKS`: `reminders`) |
 | `manage_server`: the server's log buffer | yes | no | `GET` / `DELETE /api/debug/logs` |
 | `chat_profiles`: chat model profiles | all | `fast`, `balanced` | `core/models.py` (catalog, default, fallback) |
@@ -272,7 +272,7 @@ network through something they control. Tests: `bin/test test_security`
   only a user with that capability may connect, update or disconnect the addon,
   for themselves or for another user (`?user=`); everyone else gets 403
   `{"error": "forbidden", "needs": "manage_users"}` (`store.Forbidden`).
-  `bin/users.py` and the env import act as the server (`by=None`). Today:
+  `bin/dana` and the env import act as the server (`by=None`). Today:
   `cameras` (the Frigate address is the only thing it holds).
 - **Addresses** (`core/addons/addresses.py`, `Field(type=ADDRESS)`:
   Home Assistant `host`, WAHA `url`, cameras `url`). For everyone: `http` /
@@ -308,7 +308,7 @@ network through something they control. Tests: `bin/test test_security`
   like any connection without an account, so it recovers by itself once its
   WAHA reports another account (or the holder disconnects). An admin sees the
   conflict: `account_conflict` in `/api/addons` for that user (present
-  only then), `bin/users.py addons show`, and a warning in the log
+  only then), `bin/dana addons show`, and a warning in the log
   naming both user ids (no message content).
 - **Telegram chats.** `Field(type=TELEGRAM_CHAT)` (WhatsApp
   `voice_telegram_chat_id`): stored as a number. A user without
@@ -412,7 +412,7 @@ has a natural seam: `homeassistant/client.py` + `home_map.py`,
 - optional **change_requires**: a capability the user *making* the change
   needs (`cameras`: `manage_users`), else `store.Forbidden` (403). Every
   `store.connect / update / disconnect` takes `by=` (the acting user; None
-  for the server itself, `bin/users.py` and the env import).
+  for the server itself, `bin/dana` and the env import).
 - optional **validate**: `Addon(validate=)`, a rule across fields and
   users called with `(user, changes, credentials, settings, by)` before a
   change is saved; it raises `InvalidValue` (WhatsApp: a session another user
@@ -496,7 +496,7 @@ once, `watcher.request_reconcile`). With these, a change through the API
 needs no restart: the connection cache, the tool list and the prompt change
 at once, the watcher starts / restarts / stops, the WhatsApp account is
 learned, default task lists and the shopping list are made
-(`test_addons_api.py`). A change made by `bin/users.py` (another
+(`test_addons_api.py`). A change made by `bin/dana` (another
 process) reaches the server through the 10 s cache refresh and the watcher's
 periodic reconcile (`HA_WATCH_RECONCILE_SECONDS`); the CLI runs `on_connect`
 itself. Importing the `addons` package registers
@@ -736,7 +736,7 @@ facts and people are not shareable. Built: task lists, shopping lists, projects.
   list they cannot see, 403 `read_only` for a `read` one), the chat tool
   `choose_shopping_list(list_name)` (offered only when the server has more
   than one user; without a name it lists the lists; undoable), an admin with
-  `PUT /api/addons/shopping?user=` or `bin/users.py addons
+  `PUT /api/addons/shopping?user=` or `bin/dana addons
   update USER shopping active_list=<id>`. `GET /api/shopping/lists`
   (`{active, lists: [{id, name, owner, access, active}]}`, also how a client
   finds its list id for `/api/sharing`) shows which is active; any visible
@@ -868,38 +868,39 @@ chat if they have one today; their phone through `addons/phone/push.py`
 
 ## Managing users
 
-Three ways, the same rules: `bin/users.py` on the server (everything, any
+Three ways, the same rules: `bin/dana` on the server (everything, any
 user, works on the database directly), the HTTP API (a user's own
 addons; an admin's for anyone) and the web UI's **Addons** page
 built on that API (Settings → Addons). Users, tokens, Telegram ids and
 sharing have no screen: the CLI (and the API for sharing) cover them.
 
-### bin/users.py
+### bin/dana
 
-Plain argparse, `--help` on every command; run where the server's env is
+Plain argparse (`cli/`), `--help` on every command; run where the server's env is
 (`DATABASE_PATH`, `CREDENTIALS_KEY`), in production in the pod:
-`kubectl exec -n <namespace> deploy/<deployment> -- python bin/users.py list`.
+`kubectl exec -n <namespace> deploy/<deployment> -- bin/dana users list`.
 It refuses to run on a database with pending migrations (start the server
 once). The running server sees a change within its 10 s cache refresh. Tests:
-`bin/test test_users_cli`.
+`bin/test test_dana_cli`. The commands that run the server's addons (`new`,
+`install`, `remove`, `disable`, `enable`) are in `../docs/addons.md`.
 
 ```
-list                                    users: access, Telegram ids, tokens, addons
-add NAME [--access] [--context] [--pronoun] [--telegram-chat]
-update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
-remove USER [--delete-data]             without the flag: says what would be deleted, removes nothing
-tokens issue USER [--label]             prints the token once
-tokens list [USER]
-tokens revoke TOKEN_ID
-telegram add USER TELEGRAM_ID
-telegram move TELEGRAM_ID USER
-telegram remove TELEGRAM_ID [--allow-open-bot]
-addons list                             every addon with its credential and setting fields
+users list                              users: access, Telegram ids, tokens, addons
+users add NAME [--access] [--context] [--pronoun] [--telegram-chat]
+users update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
+users remove USER [--delete-data]       without the flag: says what would be deleted, removes nothing
+users tokens issue USER [--label]       prints the token once
+users tokens list [USER]
+users tokens revoke TOKEN_ID
+users telegram add USER TELEGRAM_ID
+users telegram move TELEGRAM_ID USER
+users telegram remove TELEGRAM_ID [--allow-open-bot]
+users sharing [USER]                    who has access to what
+addons list                             every addon: source, version, state, fields; the ones that failed
 addons show USER                        a user's connections (credential values never shown)
 addons connect USER ADDON [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
 addons update USER ADDON [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
 addons disconnect USER ADDON
-sharing [USER]                          who has access to what
 ```
 
 - `USER` is a user id or name (full name, or a unique start of one, any case).
@@ -1028,10 +1029,10 @@ connect).
 
 ### How to
 
-- **Add a user.** `bin/users.py add "Maya Levi" --pronoun she --context
+- **Add a user.** `bin/dana users add "Maya Levi" --pronoun she --context
   "Maya is a nurse in Haifa. Noa is her sister."`, then
-  `bin/users.py tokens issue maya --label phone` (give her the printed token
-  for the app / web login) and, for Telegram, `bin/users.py telegram add maya
+  `bin/dana users tokens issue maya --label phone` (give her the printed token
+  for the app / web login) and, for Telegram, `bin/dana users telegram add maya
   <her Telegram user id>` plus `update maya --telegram-chat <chat id>` for
   proactive messages. She starts with only `essentials`.
 - **Connect an addon from the page.** Settings → Addons, open
@@ -1043,9 +1044,9 @@ connect).
   field marked "Set by an admin" is one an admin sets for you (pick your
   name, change it, Save).
 - **Connect an addon with the CLI or the API.** Official addons need nothing:
-  `bin/users.py addons connect maya tasks` (her default lists are made
+  `bin/dana addons connect maya tasks` (her default lists are made
   at once). A service: put the credentials in a file (`host=…`,
-  `token=…`), `bin/users.py addons connect maya homeassistant
+  `token=…`), `bin/dana addons connect maya homeassistant
   --credentials-file ha.txt person=person.maya`, delete the file; or
   `PUT /api/addons/homeassistant` with her token. `POST
   /api/addons/homeassistant/test` says whether it answers, `GET
@@ -1053,7 +1054,7 @@ connect).
   settings. No restart.
 - **Share an item.** Ask Dana ("share the Groceries list with Maya, she can
   edit") — the `share_item` tool — or `PUT /api/sharing/{item_type}/{id}`
-  (see "Sharing" → How to share). `bin/users.py sharing [USER]` shows who has
+  (see "Sharing" → How to share). `bin/dana users sharing [USER]` shows who has
   access to what.
 
 ## Limits

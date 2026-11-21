@@ -118,7 +118,7 @@ dropped; it never reaches the model).
   its WAHA reports another account (or the holder disconnects); a
   credentials change forgets both and asks again. Admins see it in `GET
   /api/addons/whatsapp?user=<id>` (`account_conflict`, present only
-  then) and `bin/users.py addons show <user>`. This is what stops a
+  then) and `bin/dana addons show <user>`. This is what stops a
   member's own WAHA (allowed by `MEMBER_ALLOWED_ORIGINS`) from claiming the
   admin's number, and the admin's session being used under a second hostname
   of the same WAHA (the session check compares address strings).

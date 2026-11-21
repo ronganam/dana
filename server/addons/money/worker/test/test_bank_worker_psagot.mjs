@@ -1,5 +1,5 @@
 /**
- * The bank-worker's Psagot Trade client (bank-worker/src/psagot.js) against a fake TradeOne server.
+ * The bank-worker's Psagot Trade client (addons/money/worker/src/psagot.js) against a fake TradeOne server.
  *
  * The password sign-in with and without the SMS code, the quick-view device (registered after a password
  * sign-in, then used with a signed challenge; a refused one dropped and replaced in the same job), wrong

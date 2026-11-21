@@ -1,6 +1,6 @@
 """Meal cards (Pluxee / Cibus): storing a sync's charges and reading the budget (docs/money.md, "Meal cards").
 
-The worker returns the site's own rows for the card (bank-worker/README.md,
+The worker returns the site's own rows for the card (addons/money/worker/README.md,
 "Pluxee"): ``budgets`` (the current cycle's budgets: ``CreatioBudget``,
 ``CurrBudget``, ``CreationDate``, ``ExpirationDate``) and ``deals`` (every
 charge since the job's start date). :func:`store_account` keeps them in the

@@ -9,4 +9,5 @@ services:
       - ../../core:/app/core:ro
       - ../../addons:/app/addons:ro
       - ../../static:/app/static:ro
-      - ../../bin/users.py:/app/bin/users.py:ro
+      - ../../bin/dana:/app/bin/dana:ro
+      - ../../cli:/app/cli:ro

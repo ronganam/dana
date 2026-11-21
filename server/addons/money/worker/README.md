@@ -78,7 +78,7 @@ Deletes that profile's folder (a removed source) → `200 {"ok": true}`; `409` w
 ## Running locally
 
 ```bash
-cd bank-worker && PUPPETEER_SKIP_DOWNLOAD=1 npm ci     # uses the system Chromium
+cd server/addons/money/worker && PUPPETEER_SKIP_DOWNLOAD=1 npm ci     # uses the system Chromium
 BANK_WORKER_TOKEN_FILE=/tmp/token BANK_WORKER_PROFILES=/tmp/profiles \
   CHROMIUM_PATH=/usr/bin/chromium TZ=Asia/Jerusalem node src/main.js
 ```
@@ -88,4 +88,4 @@ Debugging a site change: `BANK_WORKER_HEADFUL=1` shows the browser, `BANK_WORKER
 
 ## Image
 
-`Dockerfile`: Debian's Chromium on `node:22-slim`, `TZ=Asia/Jerusalem`, user 1001 (Dana's, both write `/app/db/money`), `BANK_WORKER_NO_SANDBOX=1` (a pod has no user namespaces for Chromium's sandbox). `bin/deploy` builds it as `$DANA_WORKER_IMAGE:<release>`, the same tag as Dana's image, and sets it in the homelab's `initContainers` and `extraContainers` entries. The sidecar mounts only the `money/` folder of Dana's volume (subPath, at `/app/db/money`): it never sees Dana's database. An init container (the same image) creates that folder as uid 1001 first, since a subPath kubelet creates itself would belong to root. The sidecar runs without privilege escalation, with every capability dropped and the runtime's seccomp profile, and needs no env or secrets.
+`Dockerfile`: Debian's Chromium on `node:22-slim`, `TZ=Asia/Jerusalem`, user 1001 (Dana's, both write `/app/db/money`), `BANK_WORKER_NO_SANDBOX=1` (a pod has no user namespaces for Chromium's sandbox). It is the `money` addon's worker (`Worker(port=8090, url_env="MONEY_WORKER_URL")` in `../addon.py`; this folder is self-contained so it can move with the addon): `bin/deploy` builds it as `$DANA_IMAGE-money:<release>`, the same tag as Dana's image, and writes that image into the GitOps values (`docs/operations.md`, "Workers"), where the deployment's `initContainers` and `extraContainers` entries use it. The sidecar mounts only the `money/` folder of Dana's volume (subPath, at `/app/db/money`): it never sees Dana's database. An init container (the same image) creates that folder as uid 1001 first, since a subPath kubelet creates itself would belong to root. The sidecar runs without privilege escalation, with every capability dropped and the runtime's seccomp profile, and needs no env or secrets.

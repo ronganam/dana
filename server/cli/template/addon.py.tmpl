@@ -1,0 +1,14 @@
+"""The ``{{name}}`` manifest: one setting and one line of the agent's instructions."""
+
+from core.addons import Addon, Field, PromptPart
+
+addon = Addon(
+    "{{name}}",
+    title="{{title}}",
+    description="{{title}}: describe what it does in one line (the Addons page shows it)",
+    version="0.1.0",
+    # Per-user choices (plain JSON); credentials=(Field(...),) would be stored encrypted.
+    settings=(Field("greeting", "How {{name}} greets people", default="Hello"),),
+    # A piece of the agent's instructions, only for users who turned the addon on.
+    prompt_parts=(PromptPart("guides", "When the user asks for {{name}}, use {{name}}_hello.", rank=90),),
+)

@@ -11,7 +11,7 @@ load_dotenv()
 # Import our packages
 from core.telegram_bot import TelegramBot
 from core.server import start_webhook_listener
-from core import clock, db, llm, session_runner, users
+from core import clock, db, lifecycle, llm, session_runner, users
 from core.paths import DATA_DIR, ensure_data_dirs
 from addons import bootstrap as addons_bootstrap
 from core.addons import registry, store
@@ -82,10 +82,17 @@ async def main():
     runner = None
     try:
         runner = await start_webhook_listener(port=webhook_port)
-        if bot is not None:
-            await bot.start()
-        else:
-            await asyncio.Event().wait()  # serve the web server until stopped
+        # Serve until stopped, or until an admin asks for a restart (POST /api/server/restart:
+        # exit cleanly, the supervisor starts Dana again; core/lifecycle.py).
+        serving = asyncio.create_task(bot.start() if bot is not None else asyncio.Event().wait())
+        restart = asyncio.create_task(lifecycle.wait_for_restart())
+        done, _ = await asyncio.wait({serving, restart}, return_when=asyncio.FIRST_COMPLETED)
+        for task in (serving, restart):
+            if task not in done:
+                task.cancel()
+        await asyncio.gather(serving, restart, return_exceptions=True)
+        if serving in done:
+            serving.result()  # the bot stopped: re-raise what stopped it
     except Exception as e:
         logger.error(f"Critical error running assistant services: {e}", exc_info=True)
         sys.exit(1)

@@ -19,7 +19,7 @@ bin/local-env.sh restart # restart the app
 ```
 
 **Iterating on code**: with `DANA_LOCAL_SOURCE=1` the app runs your working tree
-(`core/`, `addons/`, `static/`, `main.py`, `bin/users.py` mounted read-only
+(`core/`, `addons/`, `static/`, `main.py`, `bin/dana`, `cli/` mounted read-only
 over the image's copy, `tests/local_env/compose.source.yaml`). `up` then builds the
 image only when it is missing, `restart` (about 8 s) picks up a Python change, and a
 static file change is live on the next browser reload. Rebuild with
@@ -43,7 +43,7 @@ user, so run `reset` before running it again.
 | `app` | the image `dana-local/app:latest` (the repo's `Dockerfile`, built from the files git tracks or would add, like `bin/deploy`'s clean checkout), `python main.py`, data volume at `/app/db`, env from `tests/local_env/.state/app.env` |
 | `stubs` | `tests/local_env/stubs.py` (same image, the directory mounted read-only): every outside service, each on its own port, plus a control API |
 | `gateway` | `tests/local_env/gateway.py`: forwards `127.0.0.1:18080` to the app and `127.0.0.1:18090` to the stubs' control API |
-| `bank-worker` | only with `DANA_LOCAL_MONEY=1` (`compose.money.yaml`): the bank-worker sidecar built from `bank-worker/`, in the app's network namespace and on its data volume, as in the pod. Signing in to the real bank sites also needs `DANA_LOCAL_EGRESS=1`, and real bank logins (`docs/money.md`) |
+| `bank-worker` | only with `DANA_LOCAL_MONEY=1` (`compose.money.yaml`): the bank-worker sidecar built from `addons/money/worker/`, in the app's network namespace and on its data volume, as in the pod. Signing in to the real bank sites also needs `DANA_LOCAL_EGRESS=1`, and real bank logins (`docs/money.md`) |
 
 The app and the stubs are only on an internal Docker network with no route out
 of the machine (`compose.yaml`, `internal: true`); the gateway is the one
@@ -88,12 +88,12 @@ Home Assistant stub, which no admin uses, so a member may connect it) and
     (also printed by `up`);
   - the second test user (Maya Levi, a member): after `test` has run,
     `tests/local_env/.state/users.json` holds her token. Without the test, make
-    one yourself: `docker exec -i dana-local-app-1 python bin/users.py add "Maya
-    Levi"` and `… bin/users.py tokens issue maya`.
+    one yourself: `docker exec -i dana-local-app-1 python bin/dana users add "Maya
+    Levi"` and `… bin/dana users tokens issue maya`.
   Use a private window for the second user (the session cookie is per browser).
 - The Android app (emulator): server `http://10.0.2.2:18080` with one of the tokens.
-- Administration: `docker exec -i dana-local-app-1 python bin/users.py list`
-  (every command of `docs/access.md` → "bin/users.py").
+- Administration: `docker exec -i dana-local-app-1 python bin/dana users list`
+  (every command of `docs/access.md` → "bin/dana").
 - Make something happen: `curl -X POST localhost:18090/ha/a/state -H
   'Content-Type: application/json' -d '{"entity_id": "person.robin", "state":
   "Work"}'` (Robin arrives at Work), or script the model: `curl -X POST
@@ -106,7 +106,7 @@ Home Assistant stub, which no admin uses, so a member may connect it) and
 ## The end-to-end rehearsal
 
 `tests/local_env/e2e.py` drives the running container over HTTP only, plus
-`docker exec … bin/users.py` and `docker` (restart, start-up refusals). It
+`docker exec … bin/dana` and `docker` (restart, start-up refusals). It
 covers: the upgrade (log lines, snapshot, every fixture row with its id through
 the API, `/api/me`, the imported connections, their tests against the stubs,
 the CLI, a restart that imports nothing twice, missing / malformed / wrong
@@ -173,7 +173,7 @@ Possible, and not done by the script for you. Read all of this first.
    the real Home Assistant, WAHA, Google and Frigate (and runs the watchers,
    briefings and reminders against them). Before turning egress on, repoint
    or disconnect those connections with `docker exec -i dana-local-app-1
-   python bin/users.py addons update|disconnect …` while egress is
+   python bin/dana addons update|disconnect …` while egress is
    still off. Telegram stays on the stub regardless (`TELEGRAM_API_BASE`).
 5. The end-to-end script assumes the fixture's data; on a real copy use the
    environment by hand.

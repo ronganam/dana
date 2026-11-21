@@ -1,0 +1,19 @@
+"""The ``{{name}}`` HTTP route: ``GET /api/{{name}}`` → ``{"greeting": ...}`` for the caller.
+
+Registered automatically (its ``setup(app)``), behind the same authentication;
+403 ``not_connected`` for a user who has not turned the addon on.
+"""
+
+from aiohttp import web
+
+from core.auth import request_user
+from core.addons import store
+
+
+async def get_{{name}}(request: web.Request) -> web.Response:
+    conn = store.require(request_user(request), "{{name}}")  # NotConnected → 403 in the middleware
+    return web.json_response({"greeting": conn.settings.get("greeting") or "Hello"})
+
+
+def setup(app: web.Application) -> None:
+    app.router.add_get("/api/{{name}}", get_{{name}})

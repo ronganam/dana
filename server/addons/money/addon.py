@@ -13,8 +13,8 @@ Tools: ``tools.py``."""
 from typing import Any, Optional
 
 from core.users import User
-from core.addons import Addon, PromptPart, LlmJob
-from addons.money import after_sync, classify, dashboard, savings, signals, sources, store, worker
+from core.addons import Addon, PromptPart, LlmJob, Worker
+from addons.money import after_sync, classify, dashboard, savings, signals, sources, store, worker_client
 from addons.money.config import ADDON
 from addons.phone.notifications import observers
 
@@ -57,12 +57,14 @@ def accounts_section(user: User) -> str:
 
 async def _check(conn: Any) -> Optional[str]:
     """``POST /api/addons/money/test``: whether the bank worker answers."""
-    return None if await worker.health() is not None else "bank worker not reachable"
+    return None if await worker_client.health() is not None else "bank worker not reachable"
 
 
 addon = Addon(
     ADDON, order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories"), "money_market": LlmJob("balanced", "Money price checks")},
     description="Bank and card transactions",
+    # The bank-worker sidecar, built from worker/ by bin/deploy (docs/operations.md, "Workers").
+    worker=Worker(port=8090, url_env="MONEY_WORKER_URL"),
     test=_check,
     on_change=sources.on_change,
     prompt_section=accounts_section,

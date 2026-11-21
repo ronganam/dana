@@ -23,7 +23,7 @@ forever; one user's failing connection never touches another's.
 :class:`Watchers` keeps the set in line with the connections (connect,
 settings change, disconnect): at once when the change is made in this
 process (the addon's ``on_change`` → :func:`request_reconcile`), else within
-:data:`RECONCILE_SECONDS` (a change made by ``bin/users.py``). What the
+:data:`RECONCILE_SECONDS` (a change made by ``bin/dana addons``). What the
 self-checks need is written by :mod:`.status`.
 
 The addon never imports the tasks addon: whoever starts :class:`Watchers`

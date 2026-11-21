@@ -58,6 +58,8 @@ _loading = False
 _failed: Dict[str, Failed] = {}
 _folders: Dict[str, AddonFolder] = {}
 _apis: Dict[str, ModuleType] = {}
+# The commit each installed (or site) addon was at when it loaded (its .installed.json).
+_commits: Dict[str, str] = {}
 
 
 def _package() -> ModuleType:
@@ -180,6 +182,9 @@ def _load() -> Tuple[str, ...]:
             raise LoadError(f"Addon {f.name!r} in {f.path} clashes with another addon of that name "
                             f"({_folders[f.name].path})")
         _folders[f.name] = f
+        info = addon_dirs.installed_info(f.path) if not f.source.official else None
+        if info and isinstance(info.get("commit"), str):
+            _commits[f.name] = info["commit"]
     package = _package()
     for src in addon_dirs.sources():
         if not src.official and str(src.path) not in package.__path__:
@@ -244,6 +249,23 @@ def folder(name: str) -> AddonFolder:
 def route_modules() -> Tuple[ModuleType, ...]:
     """The ``api`` module (with ``setup(app)``) of every loaded addon that has one, in order."""
     return tuple(_apis[n] for n in load() if n in _apis)
+
+
+def apis() -> Tuple[Tuple[str, ModuleType], ...]:
+    """(addon name, its ``api`` module) for every loaded addon that has one, in order."""
+    return tuple((n, _apis[n]) for n in load() if n in _apis)
+
+
+def loaded_commit(name: str) -> Optional[str]:
+    """The commit addon ``name`` was installed from when this process loaded it (None: not installed from git)."""
+    load()
+    return _commits.get(name)
+
+
+def folders() -> Dict[str, AddonFolder]:
+    """Every addon folder found at load (loaded and failed), by name."""
+    load()
+    return dict(_folders)
 
 
 def non_official() -> Tuple[str, ...]:

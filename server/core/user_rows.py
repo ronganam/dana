@@ -9,7 +9,7 @@ itself).
 
 ``OWNER_NAME``, ``OWNER_CONTEXT``, ``OWNER_PRONOUN``, ``OWNER_OTHER_NAMES``,
 ``ALLOWED_TELEGRAM_USER_IDS`` and ``TELEGRAM_CHAT_ID`` are read only here, when the first user is created or
-migrated; afterwards the user row is what counts (``bin/users.py update``).
+migrated; afterwards the user row is what counts (``bin/dana users update``).
 """
 
 import datetime

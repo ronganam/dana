@@ -1,7 +1,7 @@
 """Money syncs end to end against a fake bank worker: the code broker, the schedule, the API per user and the check.
 Run: bin/test test_money_sync
 
-``testfakes.FakeBankWorker`` plays the bank-worker sidecar (bank-worker/README.md)
+``testfakes.FakeBankWorker`` plays the bank-worker sidecar (addons/money/worker/README.md)
 with scripted outcomes; Dana's token file is the one it checks. The first
 admin and Bob have ``money`` (each with a Telegram chat); Carl has not. Phone
 push and Telegram are recorded, not sent. Checked: a sync that succeeds
@@ -81,7 +81,7 @@ from core import telegram_bot as tb  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import store as connections  # noqa: E402
-from addons.money import after_sync, api as money_api, config, otp, schedule, slots, sources, store, sync, worker  # noqa: E402
+from addons.money import after_sync, api as money_api, config, otp, schedule, slots, sources, store, sync, worker_client  # noqa: E402
 from addons.money.addon import addon as money_addon  # noqa: E402
 from addons.phone import push  # noqa: E402
 from testfakes import FakeBankWorker  # noqa: E402
@@ -589,7 +589,7 @@ async def test_unclear_login(client: TestClient) -> None:
 async def test_leftover_job() -> None:
     sid = IDS["old_cal"]
     WORKER.script(sid, accounts=CAL_ACCOUNTS)
-    left = await worker.start_job("visaCal", sid, datetime.date(2026, 11, 1), {"username": "u", "password": "p"})
+    left = await worker_client.start_job("visaCal", sid, datetime.date(2026, 11, 1), {"username": "u", "password": "p"})
     await sync.run(ADMIN, sid, "schedule")
     check("leftover job: the old job is cancelled and the sync runs", left in WORKER.cancelled
           and source_row(sid)["state"] == "ok" and syncs_of(sid)[-1]["state"] == "done", (WORKER.cancelled,

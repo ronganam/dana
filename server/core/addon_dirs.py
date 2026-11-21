@@ -18,10 +18,11 @@ Folders that do not exist are skipped. An addon folder is a sub-folder with an
 ``addon.py``.
 """
 
+import json
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import List, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from core.paths import ADDONS_DIR
 
@@ -35,6 +36,8 @@ IMAGE = "image"
 INSTALLED = "installed"
 # A folder named in DANA_ADDON_DIRS.
 EXTRA = "extra"
+# The file an installed addon's folder keeps its origin in (core/addons/install.py).
+INSTALLED_FILE = ".installed.json"
 
 
 @dataclass(frozen=True)
@@ -46,6 +49,12 @@ class Source:
     @property
     def official(self) -> bool:
         return self.kind == OFFICIAL
+
+    @property
+    def label(self) -> str:
+        """The source as people see it: official, site, image or installed (a
+        ``DANA_ADDON_DIRS`` folder counts as site: it replaces the site's)."""
+        return SITE if self.kind == EXTRA else self.kind
 
 
 @dataclass(frozen=True)
@@ -61,6 +70,11 @@ class AddonFolder:
         return self.path / "migrations"
 
 
+def installed_dir() -> Path:
+    """Where the server installs addons (the ``installed`` source): ``<data dir>/addons``."""
+    return ADDONS_DIR
+
+
 def site_dir() -> Path:
     """The deployment's site folder: ``DANA_SITE``, else ``site/`` at the repository root."""
     raw = os.environ.get("DANA_SITE", "").strip()
@@ -71,7 +85,9 @@ def sources() -> Tuple[Source, ...]:
     """The source folders that exist, official first."""
     raw = os.environ.get("DANA_ADDON_DIRS")
     if raw is not None:
-        others = [Source(EXTRA, Path(d).expanduser().resolve()) for d in raw.split(os.pathsep) if d.strip()]
+        # The data dir's addons/ named here is still the installed source (what the server installs into).
+        others = [Source(INSTALLED if p == ADDONS_DIR.resolve() else EXTRA, p)
+                  for p in (Path(d).expanduser().resolve() for d in raw.split(os.pathsep) if d.strip())]
     else:
         others = [Source(SITE, site_dir() / "addons"), Source(IMAGE, IMAGE_DIR), Source(INSTALLED, ADDONS_DIR)]
     found: List[Source] = [Source(OFFICIAL, OFFICIAL_DIR)]
@@ -89,3 +105,14 @@ def addon_folders() -> Tuple[AddonFolder, ...]:
             if p.is_dir() and (p / "addon.py").is_file() and p.name.isidentifier():
                 out.append(AddonFolder(p.name, p, src))
     return tuple(out)
+
+
+def installed_info(path: Path) -> Optional[Dict[str, Any]]:
+    """What an installed addon's folder says about its origin (``repo``,
+    ``path``, ``commit``, ``installed_at``…), or None without a readable
+    :data:`INSTALLED_FILE`."""
+    try:
+        data = json.loads((path / INSTALLED_FILE).read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None

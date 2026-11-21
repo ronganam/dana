@@ -16,8 +16,9 @@ RUN groupadd -g 1001 appgroup && useradd -u 1001 -g appgroup -d /app -s /sbin/no
 # Set the working directory
 WORKDIR /app
 
-# Install ffmpeg and curl
-RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl \
+# ffmpeg (audio), curl, and git: installing an addon fetches one commit of its repository
+# (core/addons/install.py)
+RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl git \
     && rm -rf /var/lib/apt/lists/*
 
 # Install standard dependencies first to optimize Docker build caching
@@ -40,13 +41,15 @@ FROM base AS app
 COPY main.py .
 COPY VERSION .
 COPY core/ ./core/
-COPY addons/ ./addons/
+# An addon's worker/ (a sidecar) is its own image (bin/deploy), not part of this one.
+COPY --exclude=*/worker addons/ ./addons/
 COPY static/ ./static/
 # Site addons (docs/writing-an-addon.md): the ones bin/deploy brings from your site; the loader reads
 # /app/addons-site when it exists (core/addon_dirs.py).
-COPY --from=site_addons / ./addons-site/
-# The user administration CLI (docs/access.md, "Managing users"): kubectl exec … python bin/users.py
-COPY bin/users.py ./bin/users.py
+COPY --from=site_addons --exclude=*/worker / ./addons-site/
+# The administration CLI (users, addons; docs/access.md, "Managing users"): kubectl exec … bin/dana users list
+COPY bin/dana ./bin/dana
+COPY cli/ ./cli/
 # The release name bin/deploy builds ("<VERSION>-<commit>"): /api/health reports it and the
 # dashboard's ?v= cache-buster uses it, so every deploy reaches cached clients.
 ARG RELEASE=""

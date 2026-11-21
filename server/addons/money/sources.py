@@ -13,7 +13,7 @@ from typing import Any, Dict, List, Mapping, Optional, Set
 
 from core.users import User
 from core.addons import crypto, store as connections
-from addons.money import companies, config, otp, schedule, store, sync, worker
+from addons.money import companies, config, otp, schedule, store, sync, worker_client
 
 logger = logging.getLogger(__name__)
 
@@ -132,14 +132,14 @@ async def remove(user: User, source_id: str, delete_transactions: bool = False) 
         conn.execute("DELETE FROM money_sources WHERE id = ? AND user_id = ?", (source_id, user.id))
     logger.info(f"Money source {source_id} of user {user.id} removed"
                 + (" with its transactions" if delete_transactions else ""))
-    await worker.delete_profile(source_id)
+    await worker_client.delete_profile(source_id)
     return True
 
 
 async def _forget(source_ids: List[str]) -> None:
     for source_id in source_ids:
         await sync.cancel(source_id)
-    await worker.delete_profiles(source_ids)
+    await worker_client.delete_profiles(source_ids)
 
 
 def on_change(user: User) -> None:

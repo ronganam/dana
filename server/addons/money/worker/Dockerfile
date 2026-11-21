@@ -1,5 +1,5 @@
 # The bank-worker sidecar: Node + Debian's Chromium around israeli-bank-scrapers (README.md).
-# Built and pushed by bin/deploy as <registry>/dana-bank-worker:<release>, next to Dana's image.
+# The money addon's worker: built and pushed by bin/deploy as <DANA_IMAGE>-money:<release>, next to Dana's image.
 FROM node:22-slim
 
 # Chromium from Debian (puppeteer's own download is skipped); tzdata for Asia/Jerusalem dates.

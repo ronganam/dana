@@ -39,7 +39,7 @@ Home:
 -----------------------------------
 ```
 
-The name is the user's `name` (`core/users.py`; the first admin's comes from `OWNER_NAME` when it is created, default `Owner`; change it with `bin/users.py update`). The cache holds one block per user: built at startup for every user with `about` (the `load_prompt` job, `hooks.py`), when the addon is connected (`on_connect`) and after every change to that user's facts; `prompt.section(user)` never touches the DB, never blocks and never raises. No facts → `""`. Hard cap `ABOUT_MAX_CHARS + 800` characters (whole lines only).
+The name is the user's `name` (`core/users.py`; the first admin's comes from `OWNER_NAME` when it is created, default `Owner`; change it with `bin/dana users update`). The cache holds one block per user: built at startup for every user with `about` (the `load_prompt` job, `hooks.py`), when the addon is connected (`on_connect`) and after every change to that user's facts; `prompt.section(user)` never touches the DB, never blocks and never raises. No facts → `""`. Hard cap `ABOUT_MAX_CHARS + 800` characters (whole lines only).
 
 ## Migration from `memories`
 

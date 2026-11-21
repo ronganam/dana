@@ -4,7 +4,7 @@
 
 | Path | What | Guide |
 |---|---|---|
-| `server/` | aiohttp server: the ReAct agent over LiteLLM, addons (each owns its tools; `docs/addons.md`), REST/SSE/WebSocket APIs, the web UI (`static/`), Telegram, background pipelines, the bank-worker sidecar (`bank-worker/`) | `server/AGENTS.md`, `server/docs/` |
+| `server/` | aiohttp server: the ReAct agent over LiteLLM, addons (each owns its tools; `docs/addons.md`), REST/SSE/WebSocket APIs, the web UI (`static/`), Telegram, background pipelines, the bank-worker sidecar (`addons/money/worker/`) | `server/AGENTS.md`, `server/docs/` |
 | `android/` | Gradle project: `:app` (flavors `phone`, `kiosk`, `tv`), `:wear` (watch), `:protocol` (phone↔watch Data Layer contract) | `android/AGENTS.md`, `android/docs/` |
 | `extensions/raycast-assistant/` | Raycast extension (macOS) | its `README.md` |
 | `examples/addons/hello/` | The example addon, loaded as a site addon by `server/tests/test_addon_loading.py` | `server/docs/writing-an-addon.md` |

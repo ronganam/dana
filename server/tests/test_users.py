@@ -222,7 +222,7 @@ def test_cache():
     elapsed = time.process_time() - started
     check("lookups are cheap (60k in well under a second of CPU, no DB per call)", elapsed < 1.0, f"{elapsed:.2f}s")
 
-    # A change made by another process (bin/users.py) shows up within the TTL.
+    # A change made by another process (bin/dana users) shows up within the TTL.
     with get_db_connection() as conn:
         conn.execute("UPDATE users SET name = 'Dana Renamed' WHERE id = ?", (STATE["member"].id,))
         conn.commit()
