@@ -103,6 +103,31 @@ Every field and its meaning: the `Addon` docstring in `core/addons/addon.py`; th
 - **Prompt slots**: `PromptPart(slot, text, rank)`; the slots are `SLOTS` in `core/agent.py`, each with its joiner (`tools` lists "a, b, and c", `guides` are paragraphs). `{user}` becomes the user's name, `{currency}` their currency. An unknown slot fails the load.
 - **LLM jobs**: each purpose passed to `core.llm.complete(purpose=...)` is declared in `llm_jobs` with its default profile (`fast` / `balanced` / `deep`, or `LlmJob("fast", "Label")`); `MODEL_<PURPOSE>` in env overrides it.
 
+### Make it easy to set up
+
+The Addons page is a step-by-step setup built only from your manifest; it knows no addon by name. Give it the words once, in plain language for someone who is not technical:
+
+```python
+addon = Addon(
+    "weather", title="Weather", icon="cloud-sun",                     # a Lucide icon name
+    description="The weather where you are, in chat and the briefing",  # one line in the list
+    features=("Today's weather and the week ahead", "Rain alerts before you leave"),  # "What it adds"
+    setup=("Make a free account at openweathermap.org.",),            # steps outside Dana, before connecting
+    examples=("Will it rain tomorrow?",),                              # "Try asking Dana", once it's on
+    disconnect_warning="",                                             # what turning it off deletes ("" = nothing)
+    credentials=(Field("api_key", "OpenWeather API key", label="API key",
+                       help="On openweathermap.org: your name → My API keys → copy the Default key.",
+                       url="https://home.openweathermap.org/api_keys", placeholder="0123456789abcdef"),),
+    test=check,                                                        # run by itself right after Connect
+)
+```
+
+- `Field(label=, help=, url=, placeholder=)`: the field's short name, where to find the value (one sentence, at most 200 characters), an `https://` page where it is found or made (shown as "Where to find it"; anything else is refused when the addon loads), and an example inside the empty input. `description` stays what the value is for (shown when there is no `help`).
+- `features`, `setup`, `examples`: tuples of short sentences (at most 8, 200 characters each). Without `features`, the page lists the first docstring line of your tools. Pages your `web=` adds are named under "What it adds" by themselves.
+- The steps the page shows: your `setup` lines, then the sign-in button (`connect_url`, `connect_label`) or the fields (credentials, and settings that are addresses), then Connect. Connect runs your `test=` and shows its reason in plain words when it fails, so return a reason a person can act on ("The API key was refused") rather than an exception name. Other settings appear once the addon is on, with suggestions from `options=`.
+- A new user with no optional addon on sees a welcome suggesting the addons they can turn on (not `default_on` / `everyone` ones, nor ones that need a capability); yours is among them automatically.
+- `tests/test_addons.py` checks that every official addon has an icon and features and every field a label and help.
+
 ### Tools
 
 `@addon.tool(...)` on `def f(conn, ...)` or `async def`. A write runs at once and registers an undo (`is_write=True`, `core/undo.py`); `confirm=True` asks the user first, and `describe=` gives the Approve card's words:

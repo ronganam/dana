@@ -36,7 +36,7 @@ from core import addon_dirs
 
 FULL_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 # Names that would shadow the Addons API's own paths (/api/addons/catalog, /install).
-RESERVED = frozenset({"catalog", "install", "restart", "addons", "core"})
+RESERVED = frozenset({"catalog", "install", "restart", "welcome", "addons", "core"})
 GIT_TIMEOUT_SECONDS = 120.0
 # Folders and files never copied out of the fetched repository.
 SKIPPED = shutil.ignore_patterns(".git", "__pycache__", "*.pyc", "node_modules", addon_dirs.INSTALLED_FILE)

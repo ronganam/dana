@@ -12,10 +12,11 @@ CALLS_GUIDE = (
     "  4. Once you have a call ID, use get_call_transcript to read the full transcript and answer specific questions. "
 )
 
-addon = Addon("phone",
-              web=(Page("inbox", panel="inbox.js", style="inbox.css", nav=Nav("Inbox", icon="inbox", order=30)),
-                   Page("calls", panel="calls.js", style="calls.css", nav=Nav("Calls", icon="phone", order=90))),
-              order=70, default_on=True, modules=('calls.tools', 'notification_tools'), llm_jobs={"call_transcript": LlmJob("fast", "Call transcription"), "call_analysis": LlmJob("fast", "Call analysis"), "notification_triage": LlmJob("fast", "Notification sorting"), "notification_extract": LlmJob("fast", "Notification → task / event"), "notification_summary": LlmJob("fast", "Inbox summaries")}, description="The Android phone: notifications Inbox, calls and suggestions, push",
+addon = Addon("phone", web=(Page("inbox", panel="inbox.js", style="inbox.css", nav=Nav("Inbox", icon="inbox", order=30)),
+                   Page("calls", panel="calls.js", style="calls.css", nav=Nav("Calls", icon="phone", order=90))), order=70, default_on=True, modules=('calls.tools', 'notification_tools'), llm_jobs={"call_transcript": LlmJob("fast", "Call transcription"), "call_analysis": LlmJob("fast", "Call analysis"), "notification_triage": LlmJob("fast", "Notification sorting"), "notification_extract": LlmJob("fast", "Notification → task / event"), "notification_summary": LlmJob("fast", "Inbox summaries")}, title="Phone", icon="smartphone", description="The Android phone: notifications Inbox, calls and suggestions, push",
+                    features=("Your phone's notifications sorted in an Inbox, with summaries",
+                              "Call recordings transcribed, with suggested tasks and events",
+                              "Push notifications from Dana on your phone"),
                     prompt_parts=(
                         PromptPart("tools", "call/voice memo history", rank=60),
                         PromptPart("read_examples", "searching calls", rank=20),

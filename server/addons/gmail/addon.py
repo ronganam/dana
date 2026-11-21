@@ -29,8 +29,14 @@ EMAIL_GUIDE = (
 # content, so mail is neither read nor sent there.
 addon = Addon(
     ADDON, order=120,
-    credentials=(Field("refresh_token", "Google OAuth refresh token"),),
-    description="Gmail",
+    title="Gmail", icon="mail",
+    credentials=(Field("refresh_token", "Google OAuth refresh token", label=oauth.TOKEN_LABEL, help=oauth.TOKEN_HELP),),
+    description="Search, read and write your mail in chat",
+    features=("Search and read your mail",
+              "Write new mail and replies (asks you before sending)",
+              "Archive, mark read and move to the trash, with Undo"),
+    setup=oauth.SETUP,
+    examples=("Summarize my unread emails", "Did the electricity company send me a bill this month?"),
     test=client.check,
     connect_url=oauth.CONNECT_PATH,
     on_connect=client.on_connect,

@@ -442,7 +442,7 @@ def test_kind() -> None:
     kind = get_addon("gmail")
     order = list(loader.loaded())
     check("kind: gmail, described as Gmail, after calendar in the addon order",
-          kind.description == "Gmail" and order.index("gmail") > order.index("calendar")
+          kind.title == "Gmail" and order.index("gmail") > order.index("calendar")
           and order.index("gmail") < order.index("cameras"), order)
     check("kind: exactly the gmail.modify and gmail.settings.basic scopes, connected by the Google sign-in, one credential, no settings",
           oauth.scopes_of("gmail") == ("https://www.googleapis.com/auth/gmail.modify",
