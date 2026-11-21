@@ -14,7 +14,7 @@ The shopping list on the phone: Shopping under More in the shell (it takes over 
 | `ShoppingSync.kt` | The one store of the process (shared by the screen, the widget, pushes, the watch bridge, `PendingSyncWorker`) |
 | `ShoppingSnapshot.kt` / `ShoppingWatch.kt` | The widget snapshot's shopping fields (also the watch's) / the watch's `/shopping_action` |
 | `ShoppingShortcut.kt` | The launcher shortcut "Shopping" (dynamic; phone flavor only) |
-| `data/network/Me.kt` | `GET /api/me` cached in `GanamPrefs` (`me_id`, `me_name`, `me_kinds`) |
+| `data/network/Me.kt` | `GET /api/me` cached in `DanaPrefs` (`me_id`, `me_name`, `me_kinds`) |
 | `ui/viewmodels/ShoppingController.kt` | The place's controller: enabled, the screen, the live stream, add / suggestions, tap-linger, editor, invitations, list switching, share sheet |
 | `ui/screens/shopping/ShoppingParts.kt` | Header, invitation banner, usuals, add field, suggestions, aisle header, row, Bought, empty state, editor and share sheet contents |
 | `ui/shell/destinations/ShoppingDestination.kt` | The place: cover (one column + bottom add dock + sheets) and wide (side: header / invites / usuals / Bought or the editor; stage: aisles + add dock) |

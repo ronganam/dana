@@ -135,15 +135,15 @@ if [[ -n "$WATCH_IP" ]]; then
   adb -s "$WATCH_IP" install -r "$WEAR_APK" || {
     echo "ERROR: watch install failed. If it reports UPDATE_INCOMPATIBLE_SIGNATURE," >&2
     echo "uninstall the old watch app first:" >&2
-    echo "  adb -s $WATCH_IP uninstall app.ganam.assistant" >&2
+    echo "  adb -s $WATCH_IP uninstall io.github.ronganam.dana" >&2
     exit 1
   }
   # Compile the baseline profile now: a sideloaded app otherwise runs
   # interpreted/JIT until the watch's idle dexopt reaches it (see AGENTS.md
   # "Watch assistant performance").
   adb -s "$WATCH_IP" shell am broadcast -a androidx.profileinstaller.action.INSTALL_PROFILE \
-    -n app.ganam.assistant/androidx.profileinstaller.ProfileInstallReceiver >/dev/null || true
-  adb -s "$WATCH_IP" shell cmd package compile -m speed-profile -f app.ganam.assistant >/dev/null || true
+    -n io.github.ronganam.dana/androidx.profileinstaller.ProfileInstallReceiver >/dev/null || true
+  adb -s "$WATCH_IP" shell cmd package compile -m speed-profile -f io.github.ronganam.dana >/dev/null || true
   echo "==> Watch app updated to $WEAR_VERSION_NAME"
 fi
 

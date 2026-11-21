@@ -46,4 +46,4 @@ cd android
 
 ## Pull requests
 
-One topic per pull request, with a description of what changed and how you checked it. CI runs the server suite and the Android unit tests.
+One topic per pull request, with a description of what changed and how you checked it. CI runs the server suite and, for Android, the unit tests, the phone and watch debug builds and lint.

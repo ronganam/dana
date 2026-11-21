@@ -5,12 +5,12 @@
 | Path | What | Guide |
 |---|---|---|
 | `server/` | aiohttp server: the ReAct agent over LiteLLM, addons (each owns its tools; `docs/addons.md`), REST/SSE/WebSocket APIs, the web UI (`static/`), Telegram, background pipelines, the bank-worker sidecar (`bank-worker/`) | `server/AGENTS.md`, `server/docs/` |
-| `android/` | Gradle project: `:app` (flavors `phone`, `kiosk`, `tv`), `:wear` (watch), `:watchface` | `android/AGENTS.md`, `android/docs/` |
+| `android/` | Gradle project: `:app` (flavors `phone`, `kiosk`, `tv`), `:wear` (watch), `:protocol` (phone↔watch Data Layer contract) | `android/AGENTS.md`, `android/docs/` |
 | `extensions/raycast-assistant/` | Raycast extension (macOS) | its `README.md` |
 | `examples/addons/hello/` | The example addon, loaded as a site addon by `server/tests/test_addon_loading.py` | `server/docs/writing-an-addon.md` |
 | `site.example/` | The template of a deployment's **site** folder: `site/` (gitignored, often a link to a private repository) holds one deployment's config, site addons, app defaults and notes | `docs/site.md` |
 | `.githooks/pre-push` | Pushing master runs the server tests, then deploys when `site/deploy.env` exists (`server/docs/operations.md`) | |
-| `.github/` | CI (server tests, Android unit tests), issue and PR templates | |
+| `.github/` | CI (server tests; Android unit tests, debug builds and lint), issue and PR templates | |
 
 **This deployment**: when `site/AGENTS.md` exists, read it first. It describes the deployment this checkout serves (production, secret store, devices, site addons). Change a deployment through its site (config, site addons), and Dana's code only in ways every deployment gets (`docs/site.md`). Never copy a site's details into the repository.
 

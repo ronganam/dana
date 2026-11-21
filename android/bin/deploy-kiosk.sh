@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build the wall-tablet kiosk (app.ganam.assistant.kiosk, `kiosk` flavor) and
+# Build the wall-tablet kiosk (io.github.ronganam.dana.kiosk, `kiosk` flavor) and
 # install it over adb. It is not published to the server's update channel.
 #
 # Usage:
@@ -31,7 +31,7 @@ lower=$(echo "$VARIANT" | tr '[:upper:]' '[:lower:]')
 APK="app/build/outputs/apk/kiosk/$lower/app-kiosk-$lower.apk"
 "${ADB[@]}" install -r -g "$APK"
 
-PKG=app.ganam.assistant.kiosk
+PKG=io.github.ronganam.dana.kiosk
 ACT=$PKG/$PKG.KioskActivity
 # Compile ahead of time from the profile shipped in the APK (a sideloaded app
 # otherwise runs interpreted/JIT until the tablet's idle dexopt gets to it).

@@ -15,11 +15,11 @@ val keystoreProperties = Properties().apply {
 }
 
 android {
-    namespace = "app.ganam.assistant.wear"
+    namespace = "io.github.ronganam.dana.wear"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "app.ganam.assistant"
+        applicationId = "io.github.ronganam.dana"
         minSdk = 30
         targetSdk = 34
         versionCode = 56
@@ -31,7 +31,7 @@ android {
             create("release") {
                 storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
                 storePassword = keystoreProperties.getProperty("storePassword")
-                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyAlias = keystoreProperties.getProperty("keyAlias", "dana")
                 keyPassword = keystoreProperties.getProperty("keyPassword")
             }
         }
@@ -73,7 +73,7 @@ composeCompiler {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation(project(":protocol"))
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
     implementation("com.google.android.gms:play-services-wearable:18.1.0")
 
