@@ -12,9 +12,9 @@ import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import androidx.core.content.edit
 
 enum class ThemeMode(val label: String) { SYSTEM("System"), LIGHT("Light"), DARK("Dark") }
 
@@ -31,7 +31,7 @@ object ThemeSettings {
 
     fun set(context: Context, value: ThemeMode) {
         mode = value
-        ServerConfig.prefs(context).edit().putString(KEY, value.name).apply()
+        ServerConfig.prefs(context).edit { putString(KEY, value.name) }
     }
 }
 
@@ -103,8 +103,6 @@ fun DanaTheme(
             while (ctx is android.content.ContextWrapper) {
                 if (ctx is Activity) {
                     val window = ctx.window
-                    window.statusBarColor = colorScheme.background.toArgb()
-                    window.navigationBarColor = colorScheme.background.toArgb()
                     val controller = WindowCompat.getInsetsController(window, view)
                     controller.isAppearanceLightStatusBars = !darkTheme
                     controller.isAppearanceLightNavigationBars = !darkTheme

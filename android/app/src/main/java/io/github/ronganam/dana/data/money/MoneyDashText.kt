@@ -363,7 +363,7 @@ object MoneyDashText {
         val units = t.quantity != null && t.quantity != 0.0 && t.security != null && t.kind != "deposit" && t.kind != "withdrawal"
         val meta = listOfNotNull(
             shortDate(t.date, today),
-            if (units) "${quantityText(abs(t.quantity!!))} units" else null,
+            if (units) "${quantityText(abs(t.quantity))} units" else null,
             t.commission?.takeIf { it != 0L }?.let { "fee ${MoneyFormat.amount(abs(it), MoneyFormat.Sign.NONE)}" },
             t.tax?.takeIf { it != 0L && t.kind != "tax" }?.let { "tax ${MoneyFormat.amount(abs(it), MoneyFormat.Sign.NONE)}" },
             if (word != null && t.action != null && t.kind != "buy" && t.kind != "sell") t.action else null

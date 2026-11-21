@@ -215,7 +215,7 @@ fun MemoryScreen(viewModel: MainViewModel) {
             }
         }
     ) { innerPadding ->
-        BoxWithConstraints(Modifier.padding(innerPadding).fillMaxSize()) {
+        Box(Modifier.padding(innerPadding).fillMaxSize()) {
             val sideWidth = sidePaneWidth()
 
             when (tier) {

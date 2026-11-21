@@ -55,9 +55,7 @@ class ReminderActivity : ComponentActivity() {
         }
 
         val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            keyguardManager.requestDismissKeyguard(this, null)
-        }
+        keyguardManager.requestDismissKeyguard(this, null)
 
         // Retrieve intent extras
         taskId = intent.getStringExtra("task_id") ?: ""
@@ -124,14 +122,9 @@ class ReminderActivity : ComponentActivity() {
             ringtone = RingtoneManager.getRingtone(applicationContext, alarmUri)
             ringtone?.play()
 
-            vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            vibrator = getSystemService(Vibrator::class.java)
             val pattern = longArrayOf(0, 1000, 500, 1000)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(pattern, 0)
-            }
+            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
         } catch (e: Exception) {
             Log.e("ReminderActivity", "Failed to start ringtone or vibrator", e)
         }
@@ -157,12 +150,7 @@ class ReminderActivity : ComponentActivity() {
     private fun resumeMainVibration() {
         try {
             val pattern = longArrayOf(0, 1000, 500, 1000)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(pattern, 0)
-            }
+            vibrator?.vibrate(VibrationEffect.createWaveform(pattern, 0))
         } catch (e: Exception) {
             Log.e("ReminderActivity", "Failed to resume vibrator", e)
         }

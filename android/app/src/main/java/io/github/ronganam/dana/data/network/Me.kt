@@ -6,6 +6,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import androidx.core.content.edit
 
 /**
  * Who the app's token belongs to (`GET /api/me`): id, name, the add-ons
@@ -63,13 +64,13 @@ object Me {
     }
 
     fun save(context: Context, info: Info) {
-        ServerConfig.prefs(context).edit()
-            .putString(KEY_ID, info.id)
-            .putString(KEY_NAME, info.name)
-            .putString(KEY_ADDONS, info.addons.sorted().joinToString(","))
-            .putString(KEY_LANGUAGES, info.languages.joinToString(","))
-            .putString(KEY_CURRENCY, info.currency)
-            .apply()
+        ServerConfig.prefs(context).edit {
+            putString(KEY_ID, info.id)
+            putString(KEY_NAME, info.name)
+            putString(KEY_ADDONS, info.addons.sorted().joinToString(","))
+            putString(KEY_LANGUAGES, info.languages.joinToString(","))
+            putString(KEY_CURRENCY, info.currency)
+        }
         MoneyFormat.use(info.currency)
         live?.value = info.addons
     }

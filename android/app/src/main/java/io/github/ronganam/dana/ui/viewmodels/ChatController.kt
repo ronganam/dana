@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
 import java.util.UUID
+import androidx.core.content.edit
 
 data class PendingApproval(
     val toolName: String,
@@ -242,7 +243,7 @@ class ChatController(
 
     fun setChatModel(id: String) {
         _chatModel.value = id
-        prefs.edit().putString(KEY_CHAT_MODEL, id).apply()
+        prefs.edit { putString(KEY_CHAT_MODEL, id) }
     }
 
     private fun selectedModel(): String? = _chatModel.value.ifEmpty { null }
@@ -402,10 +403,10 @@ class ChatController(
         detachFromSession()
         sessionId = UUID.randomUUID().toString()
         _currentSessionId.value = sessionId
-        prefs.edit()
-            .putString(KEY_SESSION_ID, sessionId)
-            .putLong(ChatCache.KEY_LAST_ACTIVE, System.currentTimeMillis())
-            .apply()
+        prefs.edit {
+            putString(KEY_SESSION_ID, sessionId)
+            putLong(ChatCache.KEY_LAST_ACTIVE, System.currentTimeMillis())
+        }
         _chatMessages.value = emptyList()
         _chatStatusText.value = ""
         _sessionContext.value = null
@@ -428,7 +429,7 @@ class ChatController(
         sessionId = targetSessionId
         _currentSessionId.value = sessionId
         _inThread.value = inThreadNow()
-        if (!threadMode) prefs.edit().putString(KEY_SESSION_ID, sessionId).apply()
+        if (!threadMode) prefs.edit { putString(KEY_SESSION_ID, sessionId) }
         viewFloorMs = 0L
         undoRow.clear()
         _chatMessages.value = if (inThreadNow()) store.load(ThreadModel.MAIN).orEmpty() else emptyList()

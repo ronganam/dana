@@ -16,6 +16,7 @@ import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import java.time.LocalDate
 import java.time.LocalTime
+import androidx.core.content.edit
 
 /**
  * The morning wake signal (server `server/core/wake.py`): the first
@@ -68,7 +69,7 @@ object UnlockWatcher {
         val prefs = ServerConfig.prefs(context)
         if (prefs.getString(KEY_DONE, null) == LocalDate.now().toString()) return
         if (now - prefs.getLong(KEY_LAST, 0) < MIN_GAP_MS) return
-        prefs.edit().putLong(KEY_LAST, now).apply()
+        prefs.edit { putLong(KEY_LAST, now) }
         WorkManager.getInstance(context).enqueueUniqueWork(
             "wake_unlock", ExistingWorkPolicy.KEEP,
             OneTimeWorkRequestBuilder<UnlockReportWorker>()
@@ -79,7 +80,7 @@ object UnlockWatcher {
     }
 
     internal fun markDone(context: Context) {
-        ServerConfig.prefs(context).edit().putString(KEY_DONE, LocalDate.now().toString()).apply()
+        ServerConfig.prefs(context).edit { putString(KEY_DONE, LocalDate.now().toString()) }
     }
 }
 

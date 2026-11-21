@@ -8,6 +8,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.serializer
+import androidx.core.content.edit
 
 /**
  * Home Assistant zones for place reminders and snoozes (`GET /api/zones`):
@@ -29,7 +30,7 @@ object Zones {
     /** The server's zones (cached for next time); the cached ones when it can't be reached. */
     suspend fun fetch(context: Context): List<String> = try {
         withTimeout(8000) { ServerConfig.load(context).api().tasks.zones() }.map { it.name }
-            .also { if (it.isNotEmpty()) ServerConfig.prefs(context).edit().putString(KEY, ApiJson.encodeToString(ListSerializer(String.serializer()), it)).apply() }
+            .also { if (it.isNotEmpty()) ServerConfig.prefs(context).edit { putString(KEY, ApiJson.encodeToString(ListSerializer(String.serializer()), it)) } }
             .ifEmpty { cached(context) }
     } catch (e: Exception) {
         Log.d(TAG, "Zone fetch failed, using the last known ones: ${e.message}")

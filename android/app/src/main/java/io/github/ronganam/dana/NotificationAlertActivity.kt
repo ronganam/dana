@@ -127,7 +127,7 @@ class NotificationAlertActivity : ComponentActivity() {
 
     private fun unlockThen(block: () -> Unit) {
         val km = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && km.isKeyguardLocked) {
+        if (km.isKeyguardLocked) {
             km.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
                 override fun onDismissSucceeded() = block()
             })
@@ -203,32 +203,27 @@ class NotificationAlertActivity : ComponentActivity() {
             val uri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
             ringtone = RingtoneManager.getRingtone(applicationContext, uri)?.apply {
                 audioAttributes = AudioAttributes.Builder()
-                    .setUsage(AudioAttributes.USAGE_NOTIFICATION_COMMUNICATION_INSTANT)
+                    .setUsage(AudioAttributes.USAGE_NOTIFICATION)
                     .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
             }
             handler.post(replay)
-            vibrator = getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+            vibrator = getSystemService(Vibrator::class.java)
             // Strong, insistent buzz: three pulses then a pause, full amplitude,
             // tagged as an alarm so silent / vibrate ringer modes don't mute it.
             val pattern = longArrayOf(0, 600, 150, 600, 150, 600, 900)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val amps = intArrayOf(0, 255, 0, 255, 0, 255, 0)
-                val effect = try {
-                    VibrationEffect.createWaveform(pattern, amps, 0)
-                } catch (_: Exception) {
-                    VibrationEffect.createWaveform(pattern, 0)
-                }
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(
-                    effect,
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_ALARM)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator?.vibrate(pattern, 0)
+            val amps = intArrayOf(0, 255, 0, 255, 0, 255, 0)
+            val effect = try {
+                VibrationEffect.createWaveform(pattern, amps, 0)
+            } catch (_: Exception) {
+                VibrationEffect.createWaveform(pattern, 0)
             }
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(
+                effect,
+                AudioAttributes.Builder()
+                    .setUsage(AudioAttributes.USAGE_ALARM)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build()
+            )
             handler.postDelayed({ stopAlerts() }, ALERT_MS)
         } catch (e: Exception) {
             android.util.Log.w("NotificationAlert", "Couldn't start sound/vibration", e)

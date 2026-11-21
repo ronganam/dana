@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.wear.tasks.ui
 
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.runtime.remember
 import io.github.ronganam.dana.wear.ui.components.rotaryScroll
 
 import androidx.compose.foundation.focusable
@@ -15,7 +17,6 @@ import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.wear.compose.foundation.ExperimentalWearFoundationApi
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
-import androidx.wear.compose.foundation.rememberActiveFocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.wear.compose.material.*
 
@@ -27,7 +28,7 @@ fun SnoozeScreen(
     onDismiss: () -> Unit
 ) {
     val listState = rememberScalingLazyListState()
-    val focusRequester = rememberActiveFocusRequester()
+    val focusRequester = remember { FocusRequester() }
 
     Scaffold(
         positionIndicator = {

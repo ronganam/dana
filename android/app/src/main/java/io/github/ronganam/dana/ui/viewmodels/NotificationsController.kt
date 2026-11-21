@@ -18,6 +18,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import androidx.core.content.edit
 
 /** Which slice of the Inbox is shown. */
 enum class InboxView(val label: String) {
@@ -89,7 +90,7 @@ class NotificationsController(
 
     fun setGroupByApp(on: Boolean) {
         _groupByApp.value = on
-        prefs.edit().putBoolean("group_by_app", on).apply()
+        prefs.edit { putBoolean("group_by_app", on) }
     }
 
     fun setView(v: InboxView) {

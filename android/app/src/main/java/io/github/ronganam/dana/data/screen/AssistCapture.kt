@@ -9,6 +9,7 @@ import android.text.InputType
 import android.util.Log
 import android.view.View
 import java.io.ByteArrayOutputStream
+import androidx.core.graphics.scale
 
 /** A screenshot of the app underneath: a small bitmap for the sheet and the JPEG that is sent. */
 class ScreenShot(val thumb: Bitmap, val jpeg: ByteArray, val width: Int, val height: Int)
@@ -134,7 +135,7 @@ object AssistCapture {
 
     /** Scale and encode the system's screenshot (it may be a hardware bitmap). */
     fun encode(screenshot: Bitmap): ScreenShot? = try {
-        val soft = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && screenshot.config == Bitmap.Config.HARDWARE) {
+        val soft = if (screenshot.config == Bitmap.Config.HARDWARE) {
             screenshot.copy(Bitmap.Config.ARGB_8888, false)
         } else screenshot
         val sent = scaled(soft, SHOT_MAX_SIDE)
@@ -158,6 +159,6 @@ object AssistCapture {
         val longest = maxOf(b.width, b.height)
         if (longest <= maxSide) return b
         val f = maxSide.toFloat() / longest
-        return Bitmap.createScaledBitmap(b, (b.width * f).toInt().coerceAtLeast(1), (b.height * f).toInt().coerceAtLeast(1), true)
+        return b.scale((b.width * f).toInt().coerceAtLeast(1), (b.height * f).toInt().coerceAtLeast(1))
     }
 }

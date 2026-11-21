@@ -69,6 +69,10 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("com.google.android.gms:play-services-wearable:20.0.1")
+    constraints {
+        // play-services-base pulls fragment 1.1.0; the permission request (ActivityResult API) needs 1.3+.
+        implementation("androidx.fragment:fragment:1.5.4")
+    }
 
     val composeBom = platform("androidx.compose:compose-bom:2026.09.00")
     implementation(composeBom)

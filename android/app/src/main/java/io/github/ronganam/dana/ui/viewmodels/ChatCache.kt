@@ -7,6 +7,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.core.content.edit
 
 /**
  * The on-device copy of the conversation ([ChatHistoryStore]): what is shown
@@ -34,7 +35,7 @@ internal class ChatCache(
     }
 
     fun markActive() {
-        prefs.edit().putLong(KEY_LAST_ACTIVE, System.currentTimeMillis()).apply()
+        prefs.edit { putLong(KEY_LAST_ACTIVE, System.currentTimeMillis()) }
     }
 
     /** Coalesce streaming updates into at most one write per second. */

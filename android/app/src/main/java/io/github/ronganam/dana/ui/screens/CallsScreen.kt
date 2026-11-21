@@ -206,7 +206,7 @@ fun CallsScreen(viewModel: MainViewModel) {
             }
         },
         topBar = {
-            if (compactDetail && selectedCall != null) {
+            if (compactDetail) {
                 ScreenTopBar(
                     title = selectedCall.contactName,
                     kicker = "Call",

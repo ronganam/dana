@@ -5,7 +5,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
@@ -111,13 +110,11 @@ class SnoozeReturnWorker(appContext: Context, params: WorkerParameters) : Corout
         val title = inputData.getString(KEY_TITLE)
 
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            nm.createNotificationChannel(
-                NotificationChannel(CHANNEL, "Snoozed notifications", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "A notification you snoozed in Dana is back"
-                }
-            )
-        }
+        nm.createNotificationChannel(
+            NotificationChannel(CHANNEL, "Snoozed notifications", NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "A notification you snoozed in Dana is back"
+            }
+        )
         val open = PendingIntent.getActivity(
             ctx, id.hashCode(),
             Intent(ctx, MainActivity::class.java).apply {

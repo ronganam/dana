@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.chat
 
+import io.github.ronganam.dana.ui.components.rememberCopyText
 import android.speech.tts.TextToSpeech
 import android.widget.Toast
 import androidx.compose.foundation.background
@@ -21,10 +22,8 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.ChatMessage
@@ -68,7 +67,7 @@ fun ChatBubble(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val clipboardManager = LocalClipboardManager.current
+    val copy = rememberCopyText()
     val isUser = msg.isUser
     val isHebrew = remember(msg.message) { msg.message.any { it in '\u0590'..'\u05FF' } }
     val layoutDirection = if (isHebrew) LayoutDirection.Rtl else LayoutDirection.Ltr
@@ -104,7 +103,7 @@ fun ChatBubble(
                             },
                             onLongPress = {
                                 if (!msg.isThinking) {
-                                    clipboardManager.setText(AnnotatedString(msg.message))
+                                    copy(msg.message)
                                     Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
                                 }
                             }

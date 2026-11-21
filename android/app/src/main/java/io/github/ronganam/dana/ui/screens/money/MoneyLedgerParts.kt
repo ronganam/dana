@@ -160,7 +160,7 @@ internal fun InkField(
                 visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = if (secret) KeyboardType.Password else keyboard,
-                    autoCorrect = !secret && keyboard == KeyboardType.Text && !ltr,
+                    autoCorrectEnabled = !secret && keyboard == KeyboardType.Text && !ltr,
                     imeAction = imeAction
                 ),
                 keyboardActions = KeyboardActions(onDone = { onDone() }, onSend = { onDone() }, onSearch = { onDone() }, onGo = { onDone() }),

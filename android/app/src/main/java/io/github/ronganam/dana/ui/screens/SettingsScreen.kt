@@ -38,6 +38,8 @@ import io.github.ronganam.dana.ui.components.InkChip
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.core.content.edit
+import androidx.core.net.toUri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -54,7 +56,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
     val wearVersionInfo by viewModel.wearVersionInfo.collectAsState()
     val wearUpdateInfo by viewModel.wearUpdateInfo.collectAsState()
 
-    var downloadProgress by remember { mutableStateOf(-1) }
+    var downloadProgress by remember { mutableIntStateOf(-1) }
     val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -165,7 +167,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                             checked = liveTranscription,
                             onCheckedChange = {
                                 liveTranscription = it
-                                prefs.edit().putBoolean(DeviceSpeech.PREF_KEY, it).apply()
+                                prefs.edit { putBoolean(DeviceSpeech.PREF_KEY, it) }
                             }
                         )
                     }
@@ -261,7 +263,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                     Text(
                         text = when {
                             wearVersion == null -> "Watch app: not connected (open the watch app once)"
-                            wearBehind -> "Watch app ${wearVersion.versionName} — update ${latestWear!!.versionName} available via deploy script"
+                            wearBehind -> "Watch app ${wearVersion.versionName} — update ${latestWear.versionName} available via deploy script"
                             else -> "Watch app ${wearVersion.versionName}: up to date"
                         },
                         style = MaterialTheme.typography.bodySmall,
@@ -515,7 +517,7 @@ private fun PopUpSettings() {
     val context = LocalContext.current
     var overlay by remember { mutableStateOf(io.github.ronganam.dana.SuggestionsReceiver.canPopUp(context)) }
     var fullScreen by remember { mutableStateOf(io.github.ronganam.dana.SuggestionsReceiver.canUseFullScreen(context)) }
-    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
             if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
@@ -541,7 +543,7 @@ private fun PopUpSettings() {
                 onClick = {
                     context.startActivity(
                         android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                            android.net.Uri.parse("package:${context.packageName}"))
+                            "package:${context.packageName}".toUri())
                             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                     )
                 },
@@ -555,7 +557,7 @@ private fun PopUpSettings() {
                 onClick = {
                     context.startActivity(
                         android.content.Intent(android.provider.Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT,
-                            android.net.Uri.parse("package:${context.packageName}"))
+                            "package:${context.packageName}".toUri())
                             .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
                     )
                 },
@@ -575,7 +577,7 @@ private fun CallerCardSettings() {
         androidx.activity.result.contract.ActivityResultContracts.RequestMultiplePermissions()
     ) { missing = io.github.ronganam.dana.callcard.CallerCards.missing(context) }
     // Re-check after coming back from the overlay settings screen.
-    val lifecycle = androidx.compose.ui.platform.LocalLifecycleOwner.current.lifecycle
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
             if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) missing = io.github.ronganam.dana.callcard.CallerCards.missing(context)
@@ -612,7 +614,7 @@ private fun CallerCardSettings() {
                 if ("display over other apps" in missing) {
                     OutlinedButton(onClick = {
                         runCatching {
-                            context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:${context.packageName}")))
+                            context.startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri()))
                         }
                     }, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) { Text("Allow display over other apps") }
                 }

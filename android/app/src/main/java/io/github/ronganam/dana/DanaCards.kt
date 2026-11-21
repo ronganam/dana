@@ -6,13 +6,13 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.github.ronganam.dana.data.models.Briefing
 import io.github.ronganam.dana.data.models.PersonCard
 import io.github.ronganam.dana.data.wear.WearCards
 import io.github.ronganam.dana.data.network.PeopleApi
+import androidx.core.content.edit
 
 /** Opens the person's page (People screen) from a card, widget or notification. */
 const val EXTRA_OPEN_PERSON_ID = "io.github.ronganam.dana.OPEN_PERSON_ID"
@@ -36,7 +36,7 @@ object DanaCards {
     private const val CH_REVIEW = "dana_review"
 
     private fun channel(nm: NotificationManager, id: String, name: String, importance: Int) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) nm.createNotificationChannel(NotificationChannel(id, name, importance))
+        nm.createNotificationChannel(NotificationChannel(id, name, importance))
     }
 
     private fun openApp(context: Context, code: Int, extras: Intent.() -> Unit): PendingIntent =
@@ -69,7 +69,7 @@ object DanaCards {
 
     /** Store without asking the widgets to refresh (used by the widget refresh itself). */
     fun storeBriefingQuietly(context: Context, b: Briefing) {
-        ServerConfig.prefs(context).edit().putString(KEY_BRIEFING, PeopleApi.briefingText(b)).apply()
+        ServerConfig.prefs(context).edit { putString(KEY_BRIEFING, PeopleApi.briefingText(b)) }
     }
 
     fun showBriefing(context: Context, b: Briefing) {

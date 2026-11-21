@@ -48,6 +48,7 @@ import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
 import io.github.ronganam.dana.ui.components.MonoLabel
 import io.github.ronganam.dana.ui.screens.common.isolatedParts
+import androidx.core.net.toUri
 
 /**
  * The sheet's "Screen" control, at the start of the dock (thumb reach, next
@@ -136,7 +137,7 @@ private fun IncludedLine(
     val accent = MaterialTheme.colorScheme.primary
     val screen = state.screen
     val where = remember(screen) {
-        val host = screen?.url?.let { runCatching { android.net.Uri.parse(it).host }.getOrNull() }?.removePrefix("www.")
+        val host = screen?.url?.let { runCatching { it.toUri().host }.getOrNull() }?.removePrefix("www.")
         listOfNotNull(screen?.app ?: screen?.packageName, host ?: screen?.title)
             .filter { it.isNotBlank() }.distinct().joinToString(" · ")
     }

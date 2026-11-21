@@ -18,6 +18,7 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
 import java.io.File
+import androidx.core.content.edit
 
 /**
  * What the phone sends to Dana's notification Inbox, and what it never sends.
@@ -45,14 +46,14 @@ object NotificationSettings {
     private val SENSITIVE_NAME = Regex("(?i)(bank|בנק|authenticator|password|bitwarden|1password|lastpass)")
 
     fun enabled(context: Context) = prefs(context).getBoolean(KEY_ENABLED, true)
-    fun setEnabled(context: Context, on: Boolean) = prefs(context).edit().putBoolean(KEY_ENABLED, on).apply()
+    fun setEnabled(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_ENABLED, on) }
 
     fun skipSensitive(context: Context) = prefs(context).getBoolean(KEY_SKIP_SENSITIVE, true)
-    fun setSkipSensitive(context: Context, on: Boolean) = prefs(context).edit().putBoolean(KEY_SKIP_SENSITIVE, on).apply()
+    fun setSkipSensitive(context: Context, on: Boolean) = prefs(context).edit { putBoolean(KEY_SKIP_SENSITIVE, on) }
 
     fun deniedPackages(context: Context): Set<String> = prefs(context).getStringSet(KEY_DENIED, emptySet())?.toSet() ?: emptySet()
-    fun deny(context: Context, pkg: String) = prefs(context).edit().putStringSet(KEY_DENIED, deniedPackages(context) + pkg).apply()
-    fun allow(context: Context, pkg: String) = prefs(context).edit().putStringSet(KEY_DENIED, deniedPackages(context) - pkg).apply()
+    fun deny(context: Context, pkg: String) = prefs(context).edit { putStringSet(KEY_DENIED, deniedPackages(context) + pkg) }
+    fun allow(context: Context, pkg: String) = prefs(context).edit { putStringSet(KEY_DENIED, deniedPackages(context) - pkg) }
 
     fun isDenied(context: Context, pkg: String, appName: String): Boolean {
         if (pkg in deniedPackages(context)) return true
