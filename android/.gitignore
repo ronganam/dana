@@ -20,7 +20,6 @@ local.properties
 *.jks
 *.keystore
 /keystore.properties
-.claude/
 
 # JVM crash logs and stray build output at the repo root
 hs_err_pid*.log

@@ -1,15 +1,13 @@
 # Your deployment's site folder (docs/site.md; start from site.example/): never committed here
 /site
-# Personal agent notes (e.g. CLAUDE.local.md -> site/AGENTS.md)
+# Personal agent notes (e.g. AGENTS.local.md -> site/AGENTS.md)
 AGENTS.local.md
-CLAUDE.local.md
 
 # Editors, OS, agent tools
 .DS_Store
 .idea/
 .vscode/
 .agents/
-.claude/settings.local.json
 
 # Python bytecode (the example addon is imported by the tests)
 __pycache__/
