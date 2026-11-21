@@ -8,7 +8,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * `GET /api/me`: who the token belongs to, the add-ons they have connected,
+ * `GET /api/me`: who the token belongs to, the addons they have connected,
  * their languages (codes, the first is theirs) and their currency (ISO 4217).
  */
 @Serializable

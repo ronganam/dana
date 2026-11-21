@@ -1,6 +1,6 @@
 # Projects (phone)
 
-Projects on the phone: a wedding, a trip, a flat hunt — decisions whose options are compared side by side, notes, links and the files people send. The server contract (projects, sections and their columns, entries, files, sharing, search) is the server repo's `docs/knowledge.md`; its web panel (`static/projects.js`, `projects-core.js`, `projects.css`) is the reference for look, rules and wording, and `test_fixtures/projects_web.json` holds real payloads.
+Projects on the phone: a wedding, a trip, a flat hunt — decisions whose options are compared side by side, notes, links and the files people send. The server contract (projects, sections and their columns, entries, files, sharing, search) is `server/docs/knowledge.md`; its web panel (`server/static/projects.js`, `projects-core.js`, `projects.css`) is the reference for look, rules and wording, and `server/tests/fixtures/projects_web.json` holds captured payloads.
 
 ## Pieces
 
@@ -9,7 +9,7 @@ Projects on the phone: a wedding, a trip, a flat hunt — decisions whose option
 | `data/projects/ProjectsModels.kt` | `Project` (with its list stats, `sharedBy`, `access`: null = own, `edit` / `read` through a share), `Section` (`options` / `notes`, `columns`, `summary`), `Column` (`key`, `type`, `role` `price`, `best`, select `options`), `Entry` (`decision`, `fields`, `files`), `EntryField`, `EntryFile`, `ProjectTask`, `ProjectItems` |
 | `ProjectsJson.kt` | org.json ↔ models; `fieldsJson` / `columnsJson` are what writes send (column keys kept) |
 | `ProjectsCore.kt` | The port of `projects-core.js`: `asNumber` (the server's rule: ranges and text are no number), money / short money, values by type (`shown`), best value per column (`bestIds`: money low, rating high unless the column says; rejected left out; only with two numbers that differ), option order (chosen, shortlist, option, rejected), section lines in English / Hebrew, countdown, budget (committed = the chosen options' price column), `setField` (typed by column), extra fields, phones (tel / wa.me 972…), file kind / size, the editor's column payload, Hebrew detection (`langOf`) |
-| `ProjectsApi.kt` | The calls (`/api/projects`, `/api/projects/{id}/items`, sections, entries, files), errors → `ProjectsApiError` with the server's words (`read_only`, `owner_only`, 413 too large); `not_connected` drops the `knowledge` kind (`Me.drop`) |
+| `ProjectsApi.kt` | The calls (`/api/projects`, `/api/projects/{id}/items`, sections, entries, files), errors → `ProjectsApiError` with the server's words (`read_only`, `owner_only`, 413 too large); `not_connected` drops the `knowledge` addon (`Me.drop`) |
 | `data/network/ApiService.kt` | `uploadEntryFile` (multipart `file` + `note`, streamed, the name percent-encoded) and `downloadTo` (with the Bearer token) |
 | `ui/viewmodels/ProjectsController.kt` | What is open (project, section, entry, the section's Compare / Cards pick, the summary being edited, the editor, the confirm), the loads, every write (optimistic decision), uploads, opening files, `focus` from search, `forget` |
 | `ui/screens/projects/ProjectList.kt` | The list: tile, countdown · decided, budget line, decided ring, shared by; archived behind Show archived; in the side pane the open project's sections hang under it |

@@ -69,7 +69,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** The Shopping screen (the list itself is shared with the widget and the watch: `ShoppingSync`). */
     val shoppingController = ShoppingController(ctx, appContext)
     val moneyController = MoneyController(ctx, appContext)
-    /** The add-ons the user has connected (`/api/me`), as they change: which places and More rows show. */
+    /** The addons the user has connected (`/api/me`), as they change: which places and More rows show. */
     val addons: kotlinx.coroutines.flow.StateFlow<Set<String>> = io.github.ronganam.dana.data.network.Me.addons(appContext)
     /** Navigation state of the new main screen (places, picks, thread sheet, on-screen context). */
     val shellController: ShellController = ShellController(

@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 import java.io.IOException
 
 /**
- * The Shopping screen (server repo `docs/shopping.md`; phone side
+ * The Shopping screen (server `server/docs/shopping.md`; phone side
  * `docs/shopping.md`). The list itself lives in [ShoppingSync] (the disk
  * cache, changes on their way, the offline queue), shared with the widget
  * and the watch; this controller holds what only the screen needs: the list
@@ -52,7 +52,7 @@ class ShoppingController(private val ctx: ControllerContext, private val appCont
     private val store: ShoppingStore = ShoppingSync.get(appContext)
 
     private val _enabled = MutableStateFlow(Me.cached(appContext)?.has(ADDON) == true)
-    /** The user has the `shopping` integration (`/api/me`): the place, its count and the shortcut. */
+    /** The user has the `shopping` addon (`/api/me`): the place, its count and the shortcut. */
     val enabled: StateFlow<Boolean> = _enabled.asStateFlow()
 
     private var me: Who? = Me.cached(appContext)?.let { Who(it.id, it.name) }
