@@ -5,10 +5,10 @@ organise them (decisions with their options side by side, notes) and the
 entries saved in them (notes, records, links, options), with files attached.
 Code: `addons/knowledge/`; the `/api/projects*`, `/api/sections*` and
 `/api/entries*` handlers and `GET /media/{name}` live in
-`addons/knowledge/api.py` and call into the package. Web panel:
-`static/projects.js` + `static/projects-core.js` (pure, tested by `bin/test
-test_web_projects` against `tests/fixtures/projects_web.json`) +
-`static/projects.css`. Tests: `bin/test test_knowledge_users` (per user,
+`addons/knowledge/api.py` and call into the package. Web panel, the addon's
+page (`web/`, registered with `Dana.panel`): `web/projects.js` +
+`web/projects-core.js` (pure, tested by `bin/test test_web_projects` against
+`tests/fixtures/projects_web.json`) + `web/projects.css`. Tests: `bin/test test_knowledge_users` (per user,
 sharing, media), `bin/test test_knowledge_sections` (sections, decisions,
 columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
 `bin/test test_db` (the addon's baseline migration), `bin/test test_addons`.

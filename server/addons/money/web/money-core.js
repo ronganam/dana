@@ -1,4 +1,4 @@
-/* Money — the pure part of the Money panel (static/money.js is the controller, static/money-dash.js draws
+/* Money — the pure part of the Money panel (money.js is the controller, money-dash.js draws
  * the dashboard views).
  *
  * DanaMoneyCore: no DOM, no network. Amounts arrive from the server in agorot (signed: money out is

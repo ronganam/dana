@@ -1,12 +1,9 @@
-/* Shopping panel (static/shopping.js). App tokens from styles.css. The app resets outlines on buttons and
+/* Shopping panel (shopping.js), the shopping addon's page. App tokens from styles.css. The app resets outlines on buttons and
    inputs, so every control here has its own :focus-visible ring. */
 #panel-shopping { position: relative; --shp-ring: 0 0 0 2px var(--canvas), 0 0 0 4px rgba(247, 245, 240, .7);
   --shp-soft: rgba(247, 245, 240, .06); --shp-softer: rgba(247, 245, 240, .1); }
 #panel-shopping button:focus-visible, #panel-shopping [tabindex]:focus-visible { box-shadow: var(--shp-ring); outline: none; }
 .shp-sheet button:focus-visible, .shp-sheet input:focus-visible { box-shadow: var(--shp-ring); outline: none; }
-
-/* The nav count: a quiet count, not an alert. */
-.shp-nav-badge { background: var(--body-strong); color: var(--on-primary); }
 
 /* Header */
 .shp-top .top-bar-actions { gap: 6px; }

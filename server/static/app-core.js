@@ -9,17 +9,33 @@
 // 1. GLOBAL STATE & UTILITIES
 // ══════════════════════════════════════════════════════════════════════
 
-let currentSessionId = localStorage.getItem("ganam_session_id");
+// Saved preferences were once kept under "ganam_*" keys: each moves to its "dana_*" name once, on the
+// first load of this version (the old key is deleted; a value already under the new name wins).
+(function moveOldStorageKeys() {
+    try {
+        const old = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith("ganam_")) old.push(key);
+        }
+        for (const key of old) {
+            const renamed = "dana_" + key.slice("ganam_".length);
+            if (localStorage.getItem(renamed) === null) localStorage.setItem(renamed, localStorage.getItem(key));
+            localStorage.removeItem(key);
+        }
+    } catch (e) { /* storage unavailable: nothing to move */ }
+})();
+
+let currentSessionId = localStorage.getItem("dana_session_id");
 if (!currentSessionId) {
     currentSessionId = "web_" + Math.random().toString(36).substring(2, 10);
-    localStorage.setItem("ganam_session_id", currentSessionId);
+    localStorage.setItem("dana_session_id", currentSessionId);
 }
 
 let activeTab = "chat";
 let tasks = [];
 let taskGroups = [];
 let zones = [];
-let memories = [];
 let calls = [];
 let selectedCallId = null;
 let reanalyzeTargetCall = null;

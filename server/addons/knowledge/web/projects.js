@@ -1,4 +1,5 @@
-/* Projects — the Projects panel (docs/knowledge.md). The pure part is static/projects-core.js.
+/* Projects — the Projects panel (docs/knowledge.md), the knowledge addon's page. The pure part is
+ * projects-core.js (loaded first, Dana.panel `scripts`).
  *
  *   GET    /api/projects                         the list (with date, budget, decisions made, committed)
  *   GET    /api/projects/{id}/items              {project, sections, entries (+ files), tasks}
@@ -10,12 +11,12 @@
  * Levels: the project list (the side column; the whole screen on a phone) → a project (its date, budget,
  * one card per decision, notes, loose items) → a section (its summary, then its options compared side by
  * side or as cards, or its notes). An item opens in the sheet: decision, call / WhatsApp, the column
- * values edited in place, details, files. window.DanaProjects = {show, hide}; app-nav.js calls them.
+ * values edited in place, details, files. Registered with Dana.panel (static/dana.js).
  */
 (() => {
   "use strict";
-  const C = window.DanaProjectsCore;
-  const { esc } = C;
+  let C = null;          // DanaProjectsCore (projects-core.js), once loaded
+  let esc = null;
   const $ = (id) => document.getElementById(id);
   const icons = () => { try { window.lucide?.createIcons(); } catch (_) { /* ignore */ } };
   const store = {
@@ -838,6 +839,29 @@
   }
   function hide() { S.visible = false; }
 
-  window.DanaProjects = { show, hide };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+  const TEMPLATE = `
+    <header class="top-bar prj-top">
+        <nav class="prj-crumbs" id="prj-crumbs" aria-label="Where you are"><span class="top-bar-title">Projects</span></nav>
+        <div class="top-bar-actions" id="prj-actions"></div>
+    </header>
+    <div class="prj-body">
+        <aside class="prj-side" id="prj-side" aria-label="Projects"></aside>
+        <main class="prj-main" id="prj-main"></main>
+    </div>
+    <div class="prj-sheet-backdrop hidden" id="prj-sheet-backdrop"></div>
+    <aside class="prj-sheet hidden" id="prj-sheet" role="dialog" aria-modal="true" aria-label="Details"></aside>
+    <div class="prj-toast hidden" id="prj-toast" role="status" aria-live="polite"></div>
+
+  `;
+
+  Dana.panel({
+    id: "projects", title: "Projects", icon: "folder",
+    scripts: ["projects-core.js"],
+    start() { C = window.DanaProjectsCore; esc = C.esc; },
+    mount(el) {
+      if (!el.firstChild) { el.dataset.level = "home"; el.innerHTML = TEMPLATE; init(); }
+      show();
+    },
+    unmount: hide,
+  });
 })();

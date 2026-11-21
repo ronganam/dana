@@ -1,4 +1,4 @@
-/* Shopping — the pure part of the Shopping panel (static/shopping.js is the controller).
+/* Shopping — the pure part of the Shopping panel (shopping.js is the controller).
  *
  * DanaShoppingCore: no DOM, no network. It turns the server's screen payload (GET /api/shopping,
  * docs/shopping.md "API") into what the panel shows, applies the user's pending changes on top of it

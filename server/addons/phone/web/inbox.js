@@ -7,7 +7,8 @@
  *   GET  /api/notifications/requests/{rid}         (did the phone do it?)
  *   GET  /api/notifications/summaries | /apps      (AI summaries, per-app rules)
  *   GET  /api/suggestions?source=all               (tasks / events to create)
- * Exposes window.DanaInbox = {show, hide}; app-nav.js calls them on tab switches.
+ * The phone addon's page (Dana.panel, static/dana.js): mounted when opened, the needs-you count on its
+ * navigation button kept fresh in the background.
  */
 (() => {
   "use strict";
@@ -54,6 +55,7 @@
   };
 
   let $ = {};
+  let A = null;          // the page's Dana api (static/dana.js)
   let pollTimer = null;
   let searchTimer = null;
   let toastTimer = null;
@@ -158,11 +160,7 @@
   }
 
   function setBadge(counts) {
-    const n = (counts.needs_you || 0) + (counts.pending_suggestions || 0);
-    document.querySelectorAll("[data-inbox-badge]").forEach((b) => {
-      b.textContent = n > 99 ? "99+" : String(n);
-      b.classList.toggle("hidden", n === 0);
-    });
+    A?.badge((counts.needs_you || 0) + (counts.pending_suggestions || 0));
   }
   async function pollBadge() {
     if (S.visible || document.hidden) return;
@@ -610,7 +608,7 @@
   async function askDana(kind, id) {
     try {
       const r = await api("/api/chat/context", { body: { kind, id } });
-      if (r && r.session_id && window.danaOpenSession) window.danaOpenSession(r.session_id);
+      if (r && r.session_id) A.openSession(r.session_id);
     } catch (e) { toast(`Couldn't start a chat: ${e.message}`); }
   }
 
@@ -908,9 +906,6 @@
     document.addEventListener("keydown", onKey);
     document.addEventListener("visibilitychange", () => { if (!document.hidden && S.visible) load({ quiet: true }); });
     renderViews();
-    pollBadge();
-    if (location.hash === "#inbox") setTimeout(() => window.danaSwitchTab?.("inbox"), 0);
-    setInterval(pollBadge, BADGE_MS);
   }
 
   function show() {
@@ -934,6 +929,46 @@
     closeMenus();
   }
 
-  window.DanaInbox = { show, hide };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+  const TEMPLATE = `
+    <header class="top-bar">
+        <div class="ibx-titles">
+            <span class="top-bar-title">Inbox</span>
+            <span class="ibx-kicker" id="ibx-kicker"></span>
+        </div>
+        <div class="top-bar-actions">
+            <button class="chip" id="ibx-group-toggle" title="Group by app (g)">
+                <i data-lucide="layers" style="width:14px;height:14px;"></i><span>By app</span>
+            </button>
+            <button class="icon-btn" id="ibx-help-btn" title="Keyboard shortcuts (?)"><i data-lucide="keyboard"></i></button>
+            <button class="icon-btn" id="ibx-refresh" title="Refresh (r)"><i data-lucide="refresh-cw"></i></button>
+        </div>
+    </header>
+    <div class="ibx" id="ibx-root">
+        <div class="ibx-list-pane">
+            <div class="ibx-toolbar">
+                <div class="ibx-views" id="ibx-views" role="tablist"></div>
+                <div class="ibx-search">
+                    <i data-lucide="search"></i>
+                    <input type="search" id="ibx-search" placeholder="Search app, person or text   /" autocomplete="off">
+                </div>
+            </div>
+            <div class="ibx-bulkbar hidden" id="ibx-bulkbar"></div>
+            <div class="ibx-scroll" id="ibx-list" tabindex="-1"></div>
+        </div>
+        <div class="ibx-detail-pane" id="ibx-detail"></div>
+    </div>
+    <div class="ibx-toast hidden" id="ibx-toast" role="status" aria-live="polite"></div>
+    <div class="ibx-modal hidden" id="ibx-modal"></div>
+
+  `;
+
+  Dana.panel({
+    id: "inbox", title: "Inbox", icon: "inbox",
+    start(api) { A = api; pollBadge(); setInterval(pollBadge, BADGE_MS); },
+    mount(el) {
+      if (!el.firstChild) { el.innerHTML = TEMPLATE; init(); }
+      show();
+    },
+    unmount: hide,
+  });
 })();
