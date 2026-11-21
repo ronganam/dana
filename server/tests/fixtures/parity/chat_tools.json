@@ -637,7 +637,7 @@
                 "type": "null"
               }
             ],
-            "description": "Optional total budget in NIS; chosen options' prices are counted against it."
+            "description": "Optional total budget in the user's currency; chosen options' prices are counted against it."
           }
         },
         "required": [
@@ -738,7 +738,7 @@
     "type": "function",
     "function": {
       "name": "save_knowledge_item",
-      "description": "Save a knowledge entry (note, record, or link) into a project and return its ID. The returned ID is used later with update_knowledge_item / delete_knowledge_item / save_whatsapp_file. In an 'options' section (a decision such as photographers or venues) the entry is one option: give `fields` exactly the section's column names (see `list_project_entries`), in the column's type. Follow these AUTHORING RULES: - title is a SHORT label (max ~8 words) in the user's language, with NO markdown and NO punctuation. Example: \"Photographer — Yanai Budget\". Never paste a whole paragraph into the title. - body holds the full details written as clean Markdown: '##' or '###' headings, **bold** for key figures and names, '-' bullet lists, and a blank line between paragraphs. Preserve the user's facts, numbers, dates and Hebrew/English wording exactly. Example body: ## Contact - Phone: **050-1234567** - Email: yanai@example.com ## Budget - Price: 4,500 NIS - Deposit paid: **yes** (12/06/2026) - kind: 'note' for free text (ideas, general notes), 'record' for structured data (contacts, vendors, prices, contracts) — pair with fields, 'link' when saving a URL (auto-processed for transcript, summary and media). - fields: capture the few facts you might want to query later as [{\"name\": \"<label>\", \"type\": \"<type>\", \"value\": <value>}] where type is one of text, number, money (a plain number in NIS), phone, checkbox, date, url, select, rating (1-5). Example: [{\"name\": \"Phone\", \"type\": \"text\", \"value\": \"050-1234567\"}, {\"name\": \"Price\", \"type\": \"number\", \"value\": 4500}, {\"name\": \"Paid\", \"type\": \"checkbox\", \"value\": true}] - tags: 2-4 short labels (words or short phrases) in the user's language to enable cross-project search, e.g. [\"צלם\", \"תקציב\"] or [\"vendor\"], [\"budget\"]. - status: 'open' (default) | 'in_progress' | 'done' | 'archived'. - priority: 'low' | 'medium' | 'high'. - due_at: ISO date 'YYYY-MM-DD' only when a deadline or timing matters. - url: full URL to attach and auto-process; typically combined with kind 'link'.",
+      "description": "Save a knowledge entry (note, record, or link) into a project and return its ID. The returned ID is used later with update_knowledge_item / delete_knowledge_item / save_whatsapp_file. In an 'options' section (a decision such as photographers or venues) the entry is one option: give `fields` exactly the section's column names (see `list_project_entries`), in the column's type. Follow these AUTHORING RULES: - title is a SHORT label (max ~8 words) in the user's language, with NO markdown and NO punctuation. Example: \"Photographer — Yanai Budget\". Never paste a whole paragraph into the title. - body holds the full details written as clean Markdown: '##' or '###' headings, **bold** for key figures and names, '-' bullet lists, and a blank line between paragraphs. Preserve the user's facts, numbers, dates and Hebrew/English wording exactly. Example body: ## Contact - Phone: **050-1234567** - Email: yanai@example.com ## Budget - Price: 4,500 - Deposit paid: **yes** (12/06/2026) - kind: 'note' for free text (ideas, general notes), 'record' for structured data (contacts, vendors, prices, contracts) — pair with fields, 'link' when saving a URL (auto-processed for transcript, summary and media). - fields: capture the few facts you might want to query later as [{\"name\": \"<label>\", \"type\": \"<type>\", \"value\": <value>}] where type is one of text, number, money (a plain number in the user's currency), phone, checkbox, date, url, select, rating (1-5). Example: [{\"name\": \"Phone\", \"type\": \"text\", \"value\": \"050-1234567\"}, {\"name\": \"Price\", \"type\": \"number\", \"value\": 4500}, {\"name\": \"Paid\", \"type\": \"checkbox\", \"value\": true}] - tags: 2-4 short labels (words or short phrases) in the user's language to enable cross-project search, e.g. [\"צלם\", \"תקציב\"] or [\"vendor\"], [\"budget\"]. - status: 'open' (default) | 'in_progress' | 'done' | 'archived'. - priority: 'low' | 'medium' | 'high'. - due_at: ISO date 'YYYY-MM-DD' only when a deadline or timing matters. - url: full URL to attach and auto-process; typically combined with kind 'link'.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -959,7 +959,7 @@
                 "type": "null"
               }
             ],
-            "description": "Optional total budget in NIS."
+            "description": "Optional total budget in the user's currency."
           }
         },
         "required": [
@@ -2050,7 +2050,7 @@
     "type": "function",
     "function": {
       "name": "control_android_tv",
-      "description": "Control an Android TV / Google TV device using the androidtv integration. Use this tool to launch apps, change TV channels, search/play YouTube/Netflix, send remote keys, or run arbitrary ADB shell commands and get the output back. It automatically detects if an app is already open to avoid redundant launch commands and delays. This tool is for ADB-based TV control only. For simple media_player operations (volume, pause, play), use call_ha_service with the media_player domain instead. Actions: - \"launch_app\": Launch any app using its package/app ID (e.g. 'com.netflix.ninja', 'com.google.android.youtube.tv'). - \"watch_channel\": Open the Yes+ app ('il.co.yes.yesplus') and tune to a numeric channel. Only works with the Yes+ Israeli TV provider. For other TV services, use launch_app or send_key. - \"play_youtube\": Play a specific video by ID/URL, or search for a video query on YouTube. - \"play_netflix\": Play a specific Netflix title by ID, or search for a title query on Netflix. - \"send_key\": Send a remote key press (e.g. 'HOME', 'BACK', 'UP', 'DOWN', 'ENTER', 'VOLUME_UP'). - \"run_command\": Run an arbitrary ADB shell command on the TV and return its output (e.g. 'top -n 1 -s 9 -m 5', 'dumpsys battery').",
+      "description": "Control an Android TV / Google TV device using the androidtv integration. Use this tool to launch apps, change TV channels, search/play YouTube/Netflix, send remote keys, or run arbitrary ADB shell commands and get the output back. It automatically detects if an app is already open to avoid redundant launch commands and delays. This tool is for ADB-based TV control only. For simple media_player operations (volume, pause, play), use call_ha_service with the media_player domain instead. Actions: - \"launch_app\": Launch any app using its package/app ID (e.g. 'com.netflix.ninja', 'com.google.android.youtube.tv'). - \"watch_channel\": Tune to a numeric channel with the TV provider command the user set up (their Home Assistant setting tv_channel_command); without one, use launch_app or send_key. - \"play_youtube\": Play a specific video by ID/URL, or search for a video query on YouTube. - \"play_netflix\": Play a specific Netflix title by ID, or search for a title query on Netflix. - \"send_key\": Send a remote key press (e.g. 'HOME', 'BACK', 'UP', 'DOWN', 'ENTER', 'VOLUME_UP'). - \"run_command\": Run an arbitrary ADB shell command on the TV and return its output (e.g. 'top -n 1 -s 9 -m 5', 'dumpsys battery').",
       "parameters": {
         "type": "object",
         "properties": {
@@ -2059,8 +2059,15 @@
             "description": "The action to perform: \"launch_app\", \"watch_channel\", \"play_youtube\", \"play_netflix\", \"send_key\", \"run_command\"."
           },
           "entity_id": {
-            "type": "string",
-            "description": "The Android TV media_player entity ID (defaults to \"media_player.75c7k_adb\")."
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The Android TV media_player entity ID (defaults to the user's TV, the tv_entity setting)."
           },
           "app_id": {
             "anyOf": [
@@ -2082,7 +2089,7 @@
                 "type": "null"
               }
             ],
-            "description": "The Yes+ channel number to tune to (required for \"watch_channel\")."
+            "description": "The channel number to tune to (required for \"watch_channel\")."
           },
           "query": {
             "anyOf": [
@@ -2729,7 +2736,7 @@
     "type": "function",
     "function": {
       "name": "run_python",
-      "description": "Execute Python code in a sandboxed subprocess and return its output. Use this for calculations, data processing, JSON manipulation, text parsing, format conversion, or file generation. Only use when no other specialized tool fits the task — prefer using dedicated tools for Home Assistant (call_ha_service), WhatsApp (send_whatsapp_message), Calendar (search_calendar), etc. instead of reimplementing their logic in Python. IMPORTANT: The provided code MUST use print() to produce any output that should be visible — only printed text is captured and returned. Do not use input() or interactive functions.",
+      "description": "Run Python code on the server (asks the user first) and return its output. Use this for calculations, data processing, JSON manipulation, text parsing, format conversion, or file generation. Only use when no other specialized tool fits the task — prefer using dedicated tools for Home Assistant (call_ha_service), WhatsApp (send_whatsapp_message), Calendar (search_calendar), etc. instead of reimplementing their logic in Python. IMPORTANT: The provided code MUST use print() to produce any output that should be visible — only printed text is captured and returned. Do not use input() or interactive functions.",
       "parameters": {
         "type": "object",
         "properties": {

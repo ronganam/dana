@@ -50,7 +50,9 @@ class Change:
     def bump(self, list_id: str) -> int:
         """Raise ``list_id``'s version (once per transaction); returns the new version."""
         if list_id not in self.versions:
+            # scoped: the list's version counter; callers checked access to the list
             self.conn.execute("UPDATE shopping_lists SET version = version + 1 WHERE id = ?", (list_id,))
+            # scoped: the list's version counter; callers checked access to the list
             row = self.conn.execute("SELECT version FROM shopping_lists WHERE id = ?", (list_id,)).fetchone()
             self.versions[list_id] = int(row["version"]) if row else 0
         return self.versions[list_id]
@@ -85,6 +87,7 @@ def change() -> Iterator[Change]:
 def version_of(list_id: str) -> int:
     """The list's current version (0: no such list)."""
     with get_db_connection() as conn:
+        # scoped: a version number only; callers checked access to the list
         row = conn.execute("SELECT version FROM shopping_lists WHERE id = ?", (list_id,)).fetchone()
     return int(row["version"]) if row else 0
 

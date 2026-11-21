@@ -26,7 +26,9 @@ columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
 ## Sections, decisions and files
 
 - **A project** has an optional `target_date` (the panel counts down to it)
-  and `budget` (₪). `GET /api/projects` adds per project `section_count`,
+  and `budget`, in the owner's currency (`users.currency`, else `CURRENCY`;
+  every project payload carries it as `currency`, also through a share, and
+  the panel and `list_project_entries` show money in it). `GET /api/projects` adds per project `section_count`,
   `decisions` (options sections), `decided` (those with a chosen option) and
   `committed` (the sum of the chosen options' price column).
 - **A section** (`project_sections`) is `notes` (free items) or `options` (a

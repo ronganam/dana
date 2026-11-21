@@ -8,7 +8,8 @@ nothing from ``core.db`` (the migrations package is loaded by ``core.db``
 itself).
 
 ``OWNER_NAME``, ``OWNER_CONTEXT``, ``OWNER_PRONOUN``, ``OWNER_OTHER_NAMES``,
-``ALLOWED_TELEGRAM_USER_IDS`` and ``TELEGRAM_CHAT_ID`` are read only here, when the first user is created or
+``OWNER_LANGUAGES``, ``OWNER_CURRENCY``, ``ALLOWED_TELEGRAM_USER_IDS`` and
+``TELEGRAM_CHAT_ID`` are read only here, when the first user is created or
 migrated; afterwards the user row is what counts (``bin/dana users update``).
 """
 
@@ -20,7 +21,7 @@ import uuid
 from dataclasses import dataclass
 from typing import Iterable, Optional, Tuple
 
-from core import access
+from core import access, user_locale
 
 logger = logging.getLogger(__name__)
 
@@ -41,11 +42,14 @@ class FirstUser:
 
 @dataclass(frozen=True)
 class Profile:
-    """What prompts know about a user (columns of ``users`` from ``m0016_user_profile``)."""
+    """What prompts know about a user (columns of ``users``: ``m0016_user_profile``;
+    ``languages`` / ``currency``: core ``m0004_user_locale``, ``""`` = the server's)."""
     context: str = ""
     pronoun: str = "they"
     other_names: str = ""
     prompt_name: str = ""
+    languages: str = ""
+    currency: str = ""
 
 
 def now_iso() -> str:
@@ -80,13 +84,25 @@ def first_user_profile() -> Profile:
     """The first admin's prompt profile from env: ``OWNER_CONTEXT`` (a few
     sentences about them and the people around them), ``OWNER_PRONOUN``
     (he / she / they, default they) and ``OWNER_OTHER_NAMES`` (their first
-    name in another script, e.g. Hebrew, for transcripts)."""
+    name in another script, e.g. Hebrew, for transcripts), ``OWNER_LANGUAGES``
+    and ``OWNER_CURRENCY`` (unset or malformed: the server's defaults)."""
     pronoun = (os.getenv("OWNER_PRONOUN") or "").strip().lower() or "they"
     if pronoun not in PRONOUNS:
         logger.warning(f"OWNER_PRONOUN={pronoun!r} is not one of {', '.join(PRONOUNS)}; using 'they'.")
         pronoun = "they"
+    try:
+        languages = ",".join(user_locale.parse_languages(os.getenv("OWNER_LANGUAGES", "")))
+    except ValueError as e:
+        logger.warning(f"OWNER_LANGUAGES: {e} Using the server's languages.")
+        languages = ""
+    try:
+        currency = user_locale.check_currency(os.getenv("OWNER_CURRENCY", ""))
+    except ValueError as e:
+        logger.warning(f"OWNER_CURRENCY: {e} Using the server's currency.")
+        currency = ""
     return Profile(context=(os.getenv("OWNER_CONTEXT") or "").strip(), pronoun=pronoun,
-                   other_names=(os.getenv("OWNER_OTHER_NAMES") or "").strip(), prompt_name=FIRST_USER_PROMPT_NAME)
+                   other_names=(os.getenv("OWNER_OTHER_NAMES") or "").strip(), prompt_name=FIRST_USER_PROMPT_NAME,
+                   languages=languages, currency=currency)
 
 
 def check_pronoun(pronoun: str) -> str:
@@ -104,11 +120,13 @@ def write_profile(conn: sqlite3.Connection, user_id: str, profile: Profile) -> N
     """Store ``profile`` on ``user_id``'s row on ``conn`` (no commit).
 
     Raises:
-        ValueError: an unknown pronoun.
+        ValueError: an unknown pronoun, a malformed language or currency code.
     """
-    conn.execute("UPDATE users SET context = ?, pronoun = ?, other_names = ?, prompt_name = ? WHERE id = ?",
+    languages = ",".join(user_locale.parse_languages(profile.languages))
+    conn.execute("UPDATE users SET context = ?, pronoun = ?, other_names = ?, prompt_name = ?, languages = ?, "
+                 "currency = ? WHERE id = ?",
                  (profile.context.strip(), check_pronoun(profile.pronoun), profile.other_names.strip(),
-                  profile.prompt_name.strip(), user_id))
+                  profile.prompt_name.strip(), languages, user_locale.check_currency(profile.currency), user_id))
 
 
 def insert_user(conn: sqlite3.Connection, name: str, access_level: str, telegram_ids: Iterable[int] = (),

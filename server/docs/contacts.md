@@ -27,8 +27,8 @@ test_contacts_users`.
 - A Google addon (`addons/google_account/oauth.py`): the credential is
   the `refresh_token` the Google sign-in stores, the scope is exactly
   `https://www.googleapis.com/auth/contacts`, the People API client is built
-  per call from `oauth.credentials(conn)`. No settings. It is never connected
-  by the env import: only by the sign-in (or a token typed by hand).
+  per call from `oauth.credentials(conn)`. No settings. It is connected by the
+  sign-in (or a token typed by hand).
 - `check` (`POST /api/addons/contacts/test`): one request for the first
   contact's name; a failure is a short reason without a token.
 - No HTTP endpoint of its own.

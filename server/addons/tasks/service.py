@@ -126,6 +126,7 @@ def check_still_writable(user: Optional[User], task_id: str) -> None:
         raise UndoConflict(NO_LONGER) from None
     except LookupError:
         with get_db_connection() as db:
+            # scoped: only whether the task exists, after the user's own lookup failed (nothing returned)
             if db.execute("SELECT 1 FROM tasks WHERE id = ?", (task_id,)).fetchone():
                 raise UndoConflict(NO_LONGER) from None
 
@@ -269,6 +270,7 @@ def save_task(user: User, task_id: str, fields: Dict[str, Any]) -> Dict[str, Any
     if not sets:
         return before
     with get_db_connection() as conn:
+        # scoped: writable_task(user, task_id) checked above
         conn.execute(f"UPDATE tasks SET {', '.join(c + ' = ?' for c in sets)}, updated_at = CURRENT_TIMESTAMP "
                      "WHERE id = ?", (*sets.values(), task_id))
         conn.commit()
@@ -294,6 +296,7 @@ def restore_task(user: User, task_id: str, before: Dict[str, Any], after: Dict[s
         raise UndoConflict(NO_LONGER) from None
     except LookupError:
         with get_db_connection() as db:
+            # scoped: only whether the task exists, after the user's own lookup failed (nothing returned)
             if db.execute("SELECT 1 FROM tasks WHERE id = ?", (task_id,)).fetchone():
                 raise UndoConflict(NO_LONGER) from None
         raise UndoConflict("It was deleted in the meantime, so there is nothing to restore.") from None
@@ -328,6 +331,7 @@ def remove_task_rows(task_id: str) -> None:
     """Delete a task and its links, no questions asked: for undoing a task the
     caller itself just created (access was checked when it was created)."""
     with get_db_connection() as conn:
+        # scoped: undo of a task the caller itself just created (docstring)
         conn.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
         conn.execute("DELETE FROM task_links WHERE task_id = ?", (task_id,))
         conn.commit()
@@ -353,6 +357,7 @@ def snooze_task(user: User, task_id: str, triggers: str) -> Dict[str, Any]:
     """
     before = writable_task(user, task_id)
     with get_db_connection() as conn:
+        # scoped: writable_task(user, task_id) checked above
         conn.execute("UPDATE tasks SET triggers = ?, status = 'needs_action', "
                      "snooze_count = COALESCE(snooze_count, 0) + 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                      (triggers, task_id))

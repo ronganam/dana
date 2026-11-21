@@ -13,8 +13,9 @@ Thanks for looking. Dana started as one household's assistant, so the bar for a 
 git config core.hooksPath .githooks          # pushing master runs the server tests
 cp -r site.example site                      # your deployment's folder (docs/site.md); optional for contributing
 cd server
-python3.14 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env
+python3 -m venv .venv                        # Python 3.12 or newer; the image and the tests run 3.14
+.venv/bin/pip install -r requirements.lock
+cp .env.example .env                         # ANTHROPIC_API_KEY and API_TOKEN (tests need neither)
 ```
 
 Android: JDK 21 and the Android SDK; open `android/` in Android Studio or use `./gradlew`.
@@ -24,7 +25,7 @@ Android: JDK 21 and the Android SDK; open `android/` in Android Studio or use `.
 ```bash
 cd server
 bin/test --changed      # while working: only what your change touches (seconds)
-bin/test                # before you open a pull request (about 2 minutes)
+bin/test                # before you open a pull request (about 75 s on 16 threads, a little longer the first time)
 bin/test --list         # what each test script covers
 
 cd android

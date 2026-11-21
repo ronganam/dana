@@ -340,7 +340,7 @@ async def test_disable(c: TestClient) -> None:
     check("disabled: the list says so for everyone, mkplus too",
           items["mk"]["state"] == "disabled-on-server" and items["mkplus"]["state"] == "disabled-on-server")
     status, me = await call(c, "GET", "/api/me", ADMIN_AUTH)
-    check("disabled: not in /api/me kinds", "mk" not in me["kinds"] and "essentials" in me["kinds"])
+    check("disabled: not in /api/me addons", "mk" not in me["addons"] and "essentials" in me["addons"])
     status, body = await call(c, "POST", "/api/addons/essentials/disable", ADMIN_AUTH)
     check("disable: essentials cannot be disabled (400)", status == 400 and body["error"] == "cannot_disable"
           and state.is_enabled("essentials"))

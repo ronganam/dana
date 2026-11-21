@@ -5,7 +5,7 @@ from core.addons import ADDRESS, Field, Addon
 from addons.cameras import client
 from addons.cameras.config import ADDON, URL
 
-# No default address: the first admin's comes from the env import (addons/bootstrap.py).
+# No default address: whose Frigate it is, an admin sets (Addons page, bin/dana).
 # Frigate has no authentication of its own, so whoever can set the address can
 # watch those cameras: only a user with manage_users connects or changes this
 # kind, for themselves or for someone else (docs/access.md, "Security rules").

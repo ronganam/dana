@@ -20,7 +20,7 @@ import os
 from aiohttp import web
 
 from core import (actions_api, addons_api, app_updates, assistant_api, briefing, briefing_api, debug_api, now_api,
-                  pages_api, sessions_api, sharing_api, usage, usage_api, wake, weekly_review)
+                  pages_api, profile_api, sessions_api, sharing_api, usage, usage_api, wake, weekly_review)
 from core.addons import loader, scheduler, state
 from core.auth import Handler, setup_auth
 
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # the static directory.
 ROUTE_MODULES = (
     pages_api, assistant_api, app_updates, debug_api, sessions_api, briefing_api, actions_api, now_api,
-    usage_api, sharing_api, addons_api,
+    usage_api, sharing_api, addons_api, profile_api,
 )
 
 
@@ -71,8 +71,9 @@ def setup_routes(app: web.Application) -> None:
     app.router.add_static("/static/", STATIC_DIR, name="static")
 
 
-async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
-    """Initialize and start the webhook & Web UI server."""
+async def start_webhook_listener(port: int = 8080, host: str = "0.0.0.0") -> web.AppRunner:
+    """Initialize and start the webhook & Web UI server on ``host``:``port``
+    (127.0.0.1 in insecure development: core/auth.py ``bind_host``)."""
     # Setup in-memory log handler
     root_logger = logging.getLogger()
     log_handler = None
@@ -96,9 +97,9 @@ async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
     runner = web.AppRunner(app)
     await runner.setup()
     
-    site = web.TCPSite(runner, "0.0.0.0", port)
+    site = web.TCPSite(runner, host, port)
     await site.start()
-    logger.info(f"Webhook & Web UI server listening on http://0.0.0.0:{port}")
+    logger.info(f"Webhook & Web UI server listening on http://{host}:{port}")
     
     # Usage and cost tracking: writes the queued records, folds old days (core/usage.py).
     app["usage_task"] = asyncio.create_task(usage.run_loop())

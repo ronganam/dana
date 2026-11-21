@@ -26,8 +26,6 @@
                         <span class="cam-label"><i data-lucide="video"></i> PTZ</span>
                         <span class="cam-live connecting" id="cam-live-badge"><span class="live-dot"></span><span id="cam-badge-text">CONNECTING</span></span>
                     </div>
-                    <!-- Time since the dog last moved (Frigate dog/bark events) -->
-                    <span class="cam-lastmove" id="cam-lastmove" hidden></span>
                     <div class="cam-frozen-overlay" id="cam-frozen-overlay">
                         <i data-lucide="triangle-alert"></i>
                         <span>Stream frozen &mdash; reconnecting&hellip;</span>
@@ -35,8 +33,6 @@
                     </div>
                 </div>
             </div>
-            <!-- Last 6 h of dog activity (Frigate detections, per 2 min), newest on the right -->
-            <div class="motion-strip" id="motion-strip" aria-label="Dog activity, last 6 hours"><canvas id="motion-canvas"></canvas></div>
         </div>
 
         <!-- Frigate events rail: latest detections with GIF + relative age -->

@@ -1,7 +1,7 @@
 """Home Assistant configuration of one user, read from their connection: the
 addon's name, the setting names and what each means, and the
-``/api/client-config`` payload. Nothing here reads env: the first admin's
-values are imported once by ``addons/bootstrap.py``."""
+``/api/client-config`` payload. Nothing here reads env: the values are set
+on the Addons page or with bin/dana."""
 
 from typing import Any, Dict, Optional
 
@@ -20,6 +20,8 @@ SCREEN_SENSOR = "phone_interactive_sensor"  # phone screen-on binary sensor: wak
 BATTERY_SENSOR = "phone_battery_sensor"     # phone battery sensor: the bedroom dashboard's tile
 NOTIFY_SERVICE = "phone_notify_service"     # mobile_app notify service suffix (only reported by /api/client-config)
 WEATHER = "weather_entity"                  # weather entity: the briefing and the Now lede
+TV = "tv_entity"                            # Android TV media_player: control_android_tv's default
+TV_CHANNEL = "tv_channel_command"           # ADB command with {channel}: control_android_tv's watch_channel
 
 # Generic default of the weather entity (Home Assistant's own home forecast).
 DEFAULT_WEATHER_ENTITY = "weather.forecast_home"

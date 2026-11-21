@@ -26,9 +26,10 @@
     <link rel="stylesheet" href="/static/money.css">
     <link rel="stylesheet" href="/static/projects.css">
     <!-- Third-Party Libraries -->
-    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Vendored, exact versions (THIRD_PARTY.md): no script comes from a CDN -->
+    <script src="/static/vendor/marked.min.js"></script>
+    <script src="/static/vendor/purify.min.js"></script>
+    <script src="/static/vendor/lucide.min.js"></script>
     <script src="/static/app-core.js" defer></script>
     <script src="/static/app-nav.js" defer></script>
     <script src="/static/app-stream.js" defer></script>
@@ -54,6 +55,7 @@
     <script src="/static/money.js" defer></script>
     <script src="/static/projects-core.js" defer></script>
     <script src="/static/projects.js" defer></script>
+    <script src="/static/profile.js" defer></script>
 </head>
 <body>
     <div class="app-container">
@@ -623,6 +625,22 @@
                     <span class="top-bar-title">Settings</span>
                 </header>
                 <div class="settings-container">
+                    <!-- static/profile.js: the signed-in user's languages and currency -->
+                    <div class="settings-card" id="profile-card">
+                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Profile</h2>
+                        <div class="settings-input-group">
+                            <label class="settings-label" for="profile-languages">Languages</label>
+                            <input type="text" class="settings-input" id="profile-languages" autocomplete="off" spellcheck="false">
+                            <span class="profile-hint" id="profile-languages-hint"></span>
+                        </div>
+                        <div class="settings-input-group">
+                            <label class="settings-label" for="profile-currency">Currency</label>
+                            <input type="text" class="settings-input" id="profile-currency" maxlength="3" autocomplete="off" spellcheck="false">
+                            <span class="profile-hint" id="profile-currency-hint"></span>
+                        </div>
+                        <button class="btn-primary" id="btn-save-profile">Save Profile</button>
+                        <span class="profile-hint" id="profile-status" role="status" aria-live="polite"></span>
+                    </div>
                     <div class="settings-card">
                         <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Dana</h2>
                         

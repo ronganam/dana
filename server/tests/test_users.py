@@ -21,12 +21,12 @@ os.environ["OWNER_NAME"] = "Robin"
 os.environ["ALLOWED_TELEGRAM_USER_IDS"] = "111, 222,abc"
 os.environ["TELEGRAM_CHAT_ID"] = "-1001"
 os.environ["API_TOKEN"] = "env-token"
-os.environ["INTERNAL_HOSTS"] = "ganam-assistant.ganam-assistant"
 
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 from core import access, db, users
+from core import auth  # noqa: E402
 from core.auth import SESSION_COOKIE, setup_auth
 from core.db import get_db_connection
 from core.models import list_profiles
@@ -121,7 +121,7 @@ def test_telegram():
     admin, member = users.first_admin(), STATE["member"]
     check("telegram: known id resolves", users.by_telegram_id(111) == admin and users.by_telegram_id(222) == admin)
     check("telegram: unknown id refused", users.by_telegram_id(999) is None)
-    check("telegram: not open while ids exist", not users.telegram_open())
+    check("telegram: not open while ids exist", not users.telegram_unlinked())
     users.add_telegram_id(member.id, 333)
     check("telegram: added id resolves to that user", users.by_telegram_id(333).id == member.id)
     try:
@@ -159,8 +159,10 @@ async def test_telegram_middleware():
     out, seen, _ = await run(333)
     check("telegram middleware: known id → handler gets the user", out == "handled" and seen["user"].id == member.id)
     out, seen, event = await run(999)
-    check("telegram middleware: unknown id refused as before",
-          out is None and not seen and event.reply.await_args.args[0] == "⛔ You are not authorized to use this bot.")
+    reply = event.reply.await_args.args[0]
+    check("telegram middleware: unknown id refused, told their id and how to be linked",
+          out is None and not seen and reply.startswith("⛔ You are not authorized to use this bot.")
+          and "999" in reply and "bin/dana users telegram add" in reply, reply)
     out, seen, _ = await run(None)
     check("telegram middleware: no sender → dropped", out is None and not seen)
 
@@ -170,10 +172,11 @@ async def test_telegram_middleware():
         conn.commit()
     users.invalidate()
     try:
-        out, seen, _ = await run(424242)
-        check("telegram open (no ids at all): anyone is the first admin", out == "handled" and seen["user"].id == admin.id)
+        out, seen, event = await run(424242)
+        check("telegram unlinked (no ids at all): every sender is refused, never the first admin",
+              out is None and not seen and users.telegram_unlinked() and "424242" in event.reply.await_args.args[0])
         out, seen, _ = await run(None)
-        check("telegram open: updates without a sender still pass", out == "handled")
+        check("telegram unlinked: updates without a sender are dropped", out is None and not seen)
     finally:
         with get_db_connection() as conn:
             conn.executemany("INSERT INTO user_telegram VALUES (?, ?, ?)", saved)
@@ -289,26 +292,37 @@ async def test_web_auth():
         check("web: a revoked token's cookie stops working", (await who(client))[0] == 401)
 
     async with TestClient(TestServer(app)) as client:
-        internal = {"Host": "ganam-assistant.ganam-assistant"}
-        check("web: internal host on /webhook (Home Assistant's old path) without credentials → 401",
+        internal = {"Host": "dana.dana"}  # an in-cluster Service name proves nothing
+        check("web: /webhook (Home Assistant's old path) without credentials → 401, whatever the Host",
               (await who(client, "/webhook", "post", headers=internal))[0] == 401)
-        check("web: internal host on /webhook/waha without credentials → accepted, no user",
-              await who(client, "/webhook/waha", "post", headers=internal) == (200, {"user": None}))
-        check("web: internal host on an API path without credentials → 401",
+        check("web: /webhook/waha without credentials → through with no user (its handler checks WAHA's signature)",
+              await who(client, "/webhook/waha", "post", headers=internal) == (200, {"user": None})
+              and await who(client, "/webhook/waha", "post") == (200, {"user": None}))
+        check("web: an internal Host on an API path without credentials → 401",
               (await who(client, headers=internal))[0] == 401)
-        check("web: internal host with a valid token → its user",
+        check("web: /webhook/waha with a valid token → its user",
               await who(client, "/webhook/waha", "post",
-                        headers={**internal, "Authorization": f"Bearer {raw}"}) == (200, {"user": member.id}))
-        check("web: public host on /webhook without credentials → 401",
-              (await who(client, "/webhook", "post"))[0] == 401)
+                        headers={"Authorization": f"Bearer {raw}"}) == (200, {"user": member.id}))
 
     os.environ["API_TOKEN"] = ""
     try:
         async with TestClient(TestServer(app)) as client:
-            check("web: no API_TOKEN (dev) → every request is the first admin",
+            status, body = await who(client)
+            check("web: no API_TOKEN and no DANA_INSECURE_DEV → every request refused (401)", status == 401, body)
+            check("web: no API_TOKEN → refused even with a member's DB token",
+                  (await who(client, headers={"Authorization": f"Bearer {raw}"}))[0] == 401)
+            check("startup: no API_TOKEN → the server refuses to start, saying how to fix it",
+                  "API_TOKEN" in (auth.startup_problem() or "") and "DANA_INSECURE_DEV" in (auth.startup_problem() or ""))
+            os.environ["DANA_INSECURE_DEV"] = "1"
+            check("web: DANA_INSECURE_DEV=1 (local development) → every request is the first admin",
                   await who(client) == (200, {"user": admin.id}))
+            check("startup: DANA_INSECURE_DEV=1 → starts, listening on 127.0.0.1 only",
+                  auth.startup_problem() is None and auth.bind_host() == "127.0.0.1")
     finally:
+        os.environ.pop("DANA_INSECURE_DEV", None)
         os.environ["API_TOKEN"] = "env-token"
+    check("startup: with API_TOKEN → starts, listening on every interface",
+          auth.startup_problem() is None and auth.bind_host() == "0.0.0.0")
 
 
 def test_bootstrap_default_name():

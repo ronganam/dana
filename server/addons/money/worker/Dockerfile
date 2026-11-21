@@ -2,13 +2,13 @@
 # The money addon's worker: built and pushed by bin/deploy as <DANA_IMAGE>-money:<release>, next to Dana's image.
 FROM node:22-slim
 
-# Chromium from Debian (puppeteer's own download is skipped); tzdata for Asia/Jerusalem dates.
+# Chromium from Debian (puppeteer's own download is skipped); tzdata for the dates of TZ, which the
+# deployment sets to Dana's TIMEZONE (compose.yaml does; unset: UTC).
 RUN apt-get update \
     && apt-get install -y --no-install-recommends chromium tzdata ca-certificates fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production \
-    TZ=Asia/Jerusalem \
     HOME=/tmp \
     PUPPETEER_SKIP_DOWNLOAD=1 \
     CHROMIUM_PATH=/usr/bin/chromium \

@@ -228,8 +228,6 @@
     // width (no empty bands above/below it), capped so the calendar keeps at
     // least CAL_MIN_SHARE of the height; the calendar takes the rest.
     const CAL_MIN_SHARE = 0.25;
-    // The motion strip under the camera (.motion-strip height + .cam-slot gap).
-    const STRIP_SPACE = 12 + 4;
     function fitMainRow(slot) {
         const root = document.documentElement.style;
         if (window.matchMedia('(max-width: 1000px)').matches) { root.removeProperty('--main-h'); return; }
@@ -237,7 +235,7 @@
         const cs = getComputedStyle(main);
         const padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
         const bodyH = document.body.clientHeight;
-        const want = slot.clientWidth / camAspect + padY + STRIP_SPACE;
+        const want = slot.clientWidth / camAspect + padY;
         root.setProperty('--main-h', Math.floor(Math.min(want, bodyH * (1 - CAL_MIN_SHARE))) + 'px');
     }
     function fitCamPanel() {
@@ -245,7 +243,7 @@
         if (!slot) return;
         fitMainRow(slot);
         const availW = slot.clientWidth;
-        const availH = slot.clientHeight - STRIP_SPACE;
+        const availH = slot.clientHeight;
         if (!availW || !availH) return;
         // Largest ratio-correct box that fits the slot.
         let w = availW;
@@ -1065,91 +1063,6 @@
         }
     }
 
-    // ── Activity strip (last 6 h under the camera) ──
-    // A slim heat map built from Frigate's dog detections (+ barks), not raw
-    // motion: one cell per 2 min, dark when the dog was still, amber brighter
-    // the longer it moved in that slot. People are a thin blue line along the
-    // bottom (so "the dog got up because I did" is visible). Thin dark tags
-    // mark the hours.
-    const MOTION_MS = 30000;
-    const ACT_FULL_SEC = 45;   // this much dog movement in a cell = full colour
-    const ACT_HOURS = (() => {   // ?acthours=6 (1-24)
-        const v = parseInt(new URLSearchParams(window.location.search).get('acthours'), 10);
-        return v >= 1 && v <= 24 ? v : 6;
-    })();
-    const motionCanvas = document.getElementById('motion-canvas');
-    let motionData = null;
-    function drawMotionStrip() {
-        if (!motionCanvas) return;
-        const w = motionCanvas.clientWidth, h = motionCanvas.clientHeight;
-        if (!w || !h) return;
-        const dpr = window.devicePixelRatio || 1;
-        const pw = Math.round(w * dpr), ph = Math.round(h * dpr);
-        if (motionCanvas.width !== pw || motionCanvas.height !== ph) { motionCanvas.width = pw; motionCanvas.height = ph; }
-        const ctx = motionCanvas.getContext('2d');
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        ctx.clearRect(0, 0, w, h);
-        if (!motionData) return;
-        const { start, end } = motionData;
-        const dog = motionData.series.dog || [], person = motionData.series.person || [];
-        const n = Math.max(dog.length, person.length, 1);
-        const span = end - start, bw = w / n;
-        dog.forEach((sec, i) => {
-            if (!sec) return;
-            const a = 0.3 + 0.7 * Math.min(1, sec / ACT_FULL_SEC);
-            ctx.fillStyle = `rgba(255, 179, 0, ${a.toFixed(3)})`;
-            ctx.fillRect(Math.floor(i * bw), 0, Math.ceil(bw), h);
-        });
-        ctx.fillStyle = 'rgba(90, 169, 255, 0.95)';
-        person.forEach((sec, i) => { if (sec) ctx.fillRect(Math.floor(i * bw), h - 2, Math.ceil(bw), 2); });
-        ctx.font = '600 8px ' + getComputedStyle(document.body).fontFamily;
-        ctx.textBaseline = 'middle';
-        for (let t = Math.ceil(start / 3600) * 3600; t < end; t += 3600) {
-            const x = Math.round((t - start) / span * w);
-            const label = String(new Date(t * 1000).getHours());
-            ctx.fillStyle = 'rgba(43, 38, 34, 0.92)';          // --canvas: hour mark + label tag
-            ctx.fillRect(x, 0, Math.ceil(ctx.measureText(label).width) + 5, h);
-            ctx.fillStyle = 'rgba(247, 245, 240, 0.7)';
-            ctx.fillText(label, x + 2.5, h / 2 + 0.5);
-        }
-    }
-    if (window.ResizeObserver && motionCanvas) new ResizeObserver(drawMotionStrip).observe(motionCanvas);
-    else window.addEventListener('resize', drawMotionStrip);
-    // "Dog moved 12m ago" on the video, from the same payload (server clock).
-    const lastMoveEl = document.getElementById('cam-lastmove');
-    let motionFetchedAt = 0;
-    function updateLastMove() {
-        if (!lastMoveEl || !motionData) return;
-        const last = motionData.last || {};
-        let text, recent = false;
-        if (!('dog' in last)) {
-            text = `Dog still \u00b7 ${ACT_HOURS}h+`;
-        } else if (last.dog == null) {
-            text = '\u25cf Dog moving now'; recent = true;
-        } else {
-            const nowSrv = motionData.server_time + (performance.now() - motionFetchedAt) / 1000;
-            const age = Math.max(0, nowSrv - last.dog);
-            text = age < 15 ? 'Dog moved just now' : `Dog moved ${fmtAgo(age)}`;
-            recent = age < 120;
-        }
-        lastMoveEl.textContent = text;
-        lastMoveEl.classList.toggle('recent', recent);
-        lastMoveEl.hidden = false;
-    }
-    async function refreshMotion() {
-        if (document.hidden || !motionCanvas) return;
-        try {
-            const r = await fetch(`/api/frigate/activity/${FRIGATE_CAMERA}?hours=${ACT_HOURS}`);
-            if (!r.ok) throw new Error(r.status);
-            motionData = await r.json();
-            motionFetchedAt = performance.now();
-            drawMotionStrip();
-            updateLastMove();
-        } catch (err) {
-            console.warn('Activity strip refresh failed:', err);
-        }
-    }
-
     // ── Ambient light -> night mode (kiosk app's light sensor) ──
     function refreshLight() {
         if (!USE_LIGHT_SENSOR) return;
@@ -1219,10 +1132,7 @@
     refreshEvents();
     setInterval(refreshEvents, EVENTS_MS);
     setInterval(updateEventAges, 10000);
-    refreshMotion();
-    setInterval(refreshMotion, MOTION_MS);
-    setInterval(updateLastMove, 10000);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) { refreshEvents(); refreshMotion(); } });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshEvents(); });
 
     // ── Ask Dana: the Dana Kiosk Android app exposes window.DanaKiosk ──
     if (window.DanaKiosk && typeof window.DanaKiosk.openAssistant === 'function') {

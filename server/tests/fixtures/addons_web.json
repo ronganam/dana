@@ -25,7 +25,7 @@
      "update_available": false
     }
    ],
-   "origin": "/tmp/dana-test-c1vbudxh/catalog.json",
+   "origin": "/tmp/dana-test-bbvd70ec/catalog.json",
    "problems": [
     "later: source.ref 'FILL-ME' is not a full commit hash"
    ],
@@ -401,7 +401,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38933",
+       "value": "http://127.0.0.1:46565",
        "why_not": null
       },
       {
@@ -491,6 +491,26 @@
        "rule": null,
        "type": "text",
        "value": "weather.forecast_home",
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "name": "tv_entity",
+       "rule": null,
+       "type": "text",
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "name": "tv_channel_command",
+       "rule": null,
+       "type": "text",
+       "value": null,
        "why_not": null
       }
      ],
@@ -795,9 +815,9 @@
      "check": false,
      "connect_label": null,
      "connect_url": null,
-     "connected": true,
+     "connected": false,
      "credentials": [],
-     "description": "kubectl and sandboxed Python",
+     "description": "Read-only kubectl and Python run on the server (asks first; not a sandbox)",
      "everyone": false,
      "name": "ops",
      "needs": [],
@@ -805,7 +825,7 @@
      "requires": "ops",
      "settings": [],
      "source": "official",
-     "state": "on",
+     "state": "available",
      "title": "Ops",
      "version": "",
      "web": null,
@@ -840,7 +860,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "75514ca19fdd"
+   "user_id": "f557213e526d"
   },
   "status": 200
  },
@@ -1036,7 +1056,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38623",
+       "value": "http://127.0.0.1:45967",
        "why_not": null
       },
       {
@@ -1127,6 +1147,26 @@
        "type": "text",
        "value": "weather.forecast_home",
        "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "name": "tv_entity",
+       "rule": null,
+       "type": "text",
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "name": "tv_channel_command",
+       "rule": null,
+       "type": "text",
+       "value": null,
+       "why_not": null
       }
      ],
      "source": "official",
@@ -1154,7 +1194,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:41575/api",
+       "value": "http://127.0.0.1:41781/api",
        "why_not": null
       },
       {
@@ -1412,7 +1452,7 @@
        "name": "url",
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "type": "address",
-       "value": "http://127.0.0.1:40531",
+       "value": "http://127.0.0.1:39533",
        "why_not": null
       }
      ],
@@ -1452,7 +1492,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "2b9a3760ed80"
+   "user_id": "ec264bf645ed"
   },
   "status": 200
  },
@@ -1739,6 +1779,26 @@
        "type": "text",
        "value": "weather.forecast_home",
        "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "name": "tv_entity",
+       "rule": null,
+       "type": "text",
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "name": "tv_channel_command",
+       "rule": null,
+       "type": "text",
+       "value": null,
+       "why_not": null
       }
      ],
      "source": "official",
@@ -1767,7 +1827,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:41575/api",
+       "value": "http://127.0.0.1:41781/api",
        "why_not": null
       },
       {
@@ -2065,7 +2125,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "02fac2e301bc"
+   "user_id": "d1b1b8b0a4ad"
   },
   "status": 200
  },
@@ -2261,7 +2321,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38623",
+       "value": "http://127.0.0.1:45967",
        "why_not": null
       },
       {
@@ -2352,6 +2412,26 @@
        "type": "text",
        "value": "weather.forecast_home",
        "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "name": "tv_entity",
+       "rule": null,
+       "type": "text",
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "name": "tv_channel_command",
+       "rule": null,
+       "type": "text",
+       "value": null,
+       "why_not": null
       }
      ],
      "source": "official",
@@ -2379,7 +2459,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:41575/api",
+       "value": "http://127.0.0.1:41781/api",
        "why_not": null
       },
       {
@@ -2637,7 +2717,7 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:40531",
+       "value": "http://127.0.0.1:39533",
        "why_not": "Set by an admin"
       }
      ],
@@ -2675,7 +2755,7 @@
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "2b9a3760ed80"
+   "user_id": "ec264bf645ed"
   },
   "status": 200
  },
@@ -2871,7 +2951,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38623",
+       "value": "http://127.0.0.1:45967",
        "why_not": null
       },
       {
@@ -2962,6 +3042,26 @@
        "type": "text",
        "value": "weather.forecast_home",
        "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "name": "tv_entity",
+       "rule": null,
+       "type": "text",
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "name": "tv_channel_command",
+       "rule": null,
+       "type": "text",
+       "value": null,
+       "why_not": null
       }
      ],
      "source": "official",
@@ -2989,7 +3089,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:41575/api",
+       "value": "http://127.0.0.1:41781/api",
        "why_not": null
       },
       {
@@ -3247,7 +3347,7 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:40531",
+       "value": "http://127.0.0.1:39533",
        "why_not": "Set by an admin"
       }
      ],
@@ -3285,21 +3385,14 @@
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "2b9a3760ed80"
+   "user_id": "ec264bf645ed"
   },
   "status": 200
  },
  "me_admin": {
   "body": {
    "access": "admin",
-   "capabilities": [
-    "ops",
-    "manage_users",
-    "see_everyone",
-    "manage_server"
-   ],
-   "id": "75514ca19fdd",
-   "kinds": [
+   "addons": [
     "essentials",
     "tasks",
     "shopping",
@@ -3307,8 +3400,19 @@
     "about",
     "people",
     "phone",
-    "homeassistant",
-    "ops"
+    "homeassistant"
+   ],
+   "capabilities": [
+    "ops",
+    "manage_users",
+    "see_everyone",
+    "manage_server"
+   ],
+   "currency": "ILS",
+   "id": "f557213e526d",
+   "languages": [
+    "he",
+    "en"
    ],
    "name": "Robin Levi"
   },
@@ -3317,14 +3421,18 @@
  "me_member": {
   "body": {
    "access": "member",
-   "capabilities": [],
-   "id": "2b9a3760ed80",
-   "kinds": [
+   "addons": [
     "essentials",
     "homeassistant",
     "whatsapp",
     "calendar",
     "cameras"
+   ],
+   "capabilities": [],
+   "currency": "USD",
+   "id": "ec264bf645ed",
+   "languages": [
+    "en"
    ],
    "name": "Bob Builder"
   },
@@ -3348,7 +3456,7 @@
      "secret": false,
      "set": true,
      "type": "address",
-     "value": "http://127.0.0.1:41575/api",
+     "value": "http://127.0.0.1:41781/api",
      "why_not": "Set by an admin"
     },
     {
@@ -3444,6 +3552,7 @@
       "value": "binary_sensor.b_interactive"
      }
     ],
+    "tv_entity": [],
     "weather_entity": [
      {
       "label": "Bob weather",
@@ -3477,17 +3586,17 @@
    "users": [
     {
      "access": "admin",
-     "id": "75514ca19fdd",
+     "id": "f557213e526d",
      "name": "Robin Levi"
     },
     {
      "access": "member",
-     "id": "2b9a3760ed80",
+     "id": "ec264bf645ed",
      "name": "Bob Builder"
     },
     {
      "access": "member",
-     "id": "02fac2e301bc",
+     "id": "d1b1b8b0a4ad",
      "name": "Carl"
     }
    ]

@@ -152,6 +152,7 @@ def learn(user: User, user_text: str, entries: Sequence[Dict[str, Any]], final_t
         if outcome is None:
             if row is None or (row["streak"] == 0 and not row["active"]):
                 return None
+            # scoped: the user's row (query above)
             conn.execute("UPDATE shortcuts SET streak = 0, active = 0, updated_at = ? WHERE id = ?", (now, row["id"]))
             conn.commit()
             logger.info(f"Shortcut '{row['phrase']}' cleared: the phrase did something else this time")
@@ -169,6 +170,7 @@ def learn(user: User, user_text: str, entries: Sequence[Dict[str, Any]], final_t
             streak = row["streak"] + 1
             activate = streak >= LEARN_AFTER and not row["active"]
             conn.execute(
+                # scoped: the user's row (query above)
                 "UPDATE shortcuts SET streak = ?, active = ?, reply = ?, phrase = ?, updated_at = ?, "
                 "learned_at = CASE WHEN ? THEN ? ELSE learned_at END WHERE id = ?",
                 (streak, 1 if streak >= LEARN_AFTER else 0, outcome["reply"], user_text.strip(), now,
@@ -178,6 +180,7 @@ def learn(user: User, user_text: str, entries: Sequence[Dict[str, Any]], final_t
                 logger.info(f"Shortcut learned: '{user_text.strip()}' → {outcome['tool']} {args}")
             return "activated" if activate else "counted"
         conn.execute(
+            # scoped: the user's row (query above)
             "UPDATE shortcuts SET tool = ?, args = ?, reply = ?, streak = 1, active = 0, phrase = ?, updated_at = ? "
             "WHERE id = ?", (outcome["tool"], args, outcome["reply"], user_text.strip(), now, row["id"]))
         conn.commit()
@@ -218,12 +221,14 @@ def match(user: User, user_text: str) -> Optional[Dict[str, Any]]:
 
 def mark_used(shortcut_id: str) -> None:
     with get_db_connection() as conn:
+        # scoped: the shortcut matched for this user (session_runner)
         conn.execute("UPDATE shortcuts SET uses = uses + 1, last_used = ? WHERE id = ?", (time.time(), shortcut_id))
         conn.commit()
 
 
 def deactivate(shortcut_id: str, reason: str = "") -> None:
     with get_db_connection() as conn:
+        # scoped: the shortcut matched for this user (session_runner)
         conn.execute("UPDATE shortcuts SET active = 0, streak = 0, updated_at = ? WHERE id = ?",
                      (time.time(), shortcut_id))
         conn.commit()

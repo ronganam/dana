@@ -42,12 +42,8 @@ import testenv  # first: clean env, temp DB removed at exit, no .env (see testen
 testenv.isolate("parity_test")
 os.environ["OWNER_NAME"] = "Robin"
 os.environ["TIMEZONE"] = "Asia/Jerusalem"
-os.environ["HOMEASSISTANT_TOKEN"] = "parity-token"  # never used: the home map is set directly
 # Fake values so the startup import connects every addon for the first admin (never called).
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway test key
-os.environ["WAHA_URL"] = "https://waha.example.com/api/"
-os.environ["WAHA_API_KEY"] = "parity-waha-key"
-os.environ["GOOGLE_REFRESH_TOKEN"] = "parity-refresh-token"
 
 import litellm
 from litellm.types.utils import Delta, ModelResponseStream, StreamingChoices
@@ -86,6 +82,12 @@ FACTS = [
 db.migrate()
 users.bootstrap()
 addons_bootstrap.bootstrap()
+testenv.connect_admin("homeassistant", credentials={"host": "http://homeassistant.local:8123",
+                                                    "token": "parity-token"})  # never used: the home map is set directly
+testenv.connect_admin("whatsapp", credentials={"url": "https://waha.example.com/api/", "api_key": "parity-waha-key",
+                                               "session": "default"})
+testenv.connect_admin("calendar", credentials={"refresh_token": "parity-refresh-token"})
+testenv.connect_admin("ops")  # opt-in, turned on here so the fixtures cover its tools
 FIRST_USER = users.first_admin()
 clock._timezone = TZ
 clock.now = lambda: FIXED_NOW

@@ -132,6 +132,8 @@ async def run_kubectl(
     if verb == "logs" and resource and not name:
         name = resource
         resource = "pods"
+    if verb == "describe" and resource in ("secret", "secrets"):
+        return "Error: describing a secret would show its values; only listing secret names is supported."
 
     effective_ns = ns_override or namespace or _load_namespace() or "default"
 
@@ -205,7 +207,7 @@ async def run_kubectl(
                     "apiVersion: rbac.authorization.k8s.io/v1\n"
                     "kind: ClusterRole\n"
                     "metadata:\n"
-                    "  name: ganam-assistant-reader\n"
+                    "  name: dana-reader\n"
                     "rules:\n"
                     "- apiGroups: [\"\"]\n"
                     "  resources: [\"pods\", \"services\", \"events\", \"nodes\", \"namespaces\",\n"
@@ -227,15 +229,15 @@ async def run_kubectl(
                     "apiVersion: rbac.authorization.k8s.io/v1\n"
                     "kind: ClusterRoleBinding\n"
                     "metadata:\n"
-                    "  name: ganam-assistant-reader-binding\n"
+                    "  name: dana-reader-binding\n"
                     "roleRef:\n"
                     "  apiGroup: rbac.authorization.k8s.io\n"
                     "  kind: ClusterRole\n"
-                    "  name: ganam-assistant-reader\n"
+                    "  name: dana-reader\n"
                     "subjects:\n"
                     "- kind: ServiceAccount\n"
                     "  name: default\n"
-                    "  namespace: ganam-assistant\n"
+                    "  namespace: <your namespace>\n"
                 )
             if r.status_code == 404:
                 return f"Error: Resource not found. Check the resource type and name."
@@ -404,7 +406,7 @@ async def run_kubectl(
             if r.status_code == 403:
                 return (
                     "Error: Forbidden — service account cannot access metrics API.\n"
-                    "The ClusterRole needs metrics.k8s.io access (see the 'ganam-assistant-reader' ClusterRole above)."
+                    "The ClusterRole needs metrics.k8s.io access (see the 'dana-reader' ClusterRole)."
                 )
             if r.status_code != 200:
                 return f"Error: HTTP {r.status_code}: {r.text[:500]}"
@@ -430,7 +432,7 @@ async def run_kubectl(
 
 
 # ---------------------------------------------------------------------------
-# Python: sandboxed subprocess
+# Python: a limited child process (not a sandbox)
 # ---------------------------------------------------------------------------
 
 MAX_MEMORY_BYTES = 256 * 1024 * 1024
@@ -444,9 +446,17 @@ def _set_limits(timeout: int):
     resource.setrlimit(resource.RLIMIT_AS, (MAX_MEMORY_BYTES, MAX_MEMORY_BYTES))
 
 
-@addon.tool(acts_outside=True)
+def child_environment(workdir: str) -> dict:
+    """The whole environment ``run_python``'s process gets: a fixed ``PATH``,
+    the working directory as ``HOME`` / ``TMPDIR``, UTF-8 — nothing of the
+    server's own environment (no API keys, tokens or ``CREDENTIALS_KEY``)."""
+    return {"PATH": "/usr/local/bin:/usr/bin:/bin", "HOME": workdir, "TMPDIR": workdir, "LANG": "C.UTF-8",
+            "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1"}
+
+
+@addon.tool(confirm=True, acts_outside=True)
 def run_python(conn: Connection, code: str, timeout: Optional[int] = None) -> str:
-    """Execute Python code in a sandboxed subprocess and return its output.
+    """Run Python code on the server (asks the user first) and return its output.
 
     Use this for calculations, data processing, JSON manipulation, text parsing,
     format conversion, or file generation. Only use when no other specialized tool
@@ -464,7 +474,7 @@ def run_python(conn: Connection, code: str, timeout: Optional[int] = None) -> st
     """
     effective_timeout = min(timeout or DEFAULT_TIMEOUT, MAX_TIMEOUT)
 
-    with tempfile.TemporaryDirectory(prefix="py_sandbox_") as tmpdir:
+    with tempfile.TemporaryDirectory(prefix="dana-python-") as tmpdir:
         script_path = os.path.join(tmpdir, "script.py")
         try:
             with open(script_path, "w") as f:
@@ -474,8 +484,10 @@ def run_python(conn: Connection, code: str, timeout: Optional[int] = None) -> st
 
         try:
             proc = subprocess.run(
-                [sys.executable, "-u", script_path],
+                [sys.executable, "-I", "-u", script_path],
                 capture_output=True,
+                env=child_environment(tmpdir),
+                stdin=subprocess.DEVNULL,
                 text=True,
                 timeout=effective_timeout,
                 preexec_fn=lambda: _set_limits(effective_timeout),

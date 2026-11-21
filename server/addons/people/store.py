@@ -65,6 +65,7 @@ def owns(user: Optional[User], person_id: str) -> bool:
 
 def phones_of(conn: sqlite3.Connection, person_id: str) -> List[str]:
     return [r["phone"] for r in conn.execute(
+        # scoped: callers pass a person they read for the user (rows / row)
         "SELECT phone FROM person_phones WHERE person_id = ? ORDER BY created_at", (person_id,))]
 
 
@@ -223,6 +224,7 @@ def update_person(user: User, person_id: str, changes: Dict[str, Any]) -> Dict[s
                 raise ValueError("not a phone number")
         if sets:
             sets["updated_at"] = now_iso()
+            # scoped: row(conn, user, person_id) checked above
             conn.execute(f"UPDATE people SET {', '.join(f'{k} = ?' for k in sets)} WHERE id = ?",
                          (*sets.values(), person_id))
         if "aliases" in sets or "name" in sets:
@@ -240,7 +242,9 @@ def delete_person(user: User, person_id: str) -> bool:
     with get_db_connection() as conn:
         if not row(conn, user, person_id):
             return False
+        # scoped: row(conn, user, person_id) checked above
         conn.execute("DELETE FROM people WHERE id = ?", (person_id,))
+        # scoped: row(conn, user, person_id) checked above
         conn.execute("DELETE FROM person_phones WHERE person_id = ?", (person_id,))
         activity.unlink_person(conn, person_id)
         task_links.forget_ref("person", person_id, conn=conn)

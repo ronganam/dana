@@ -23,11 +23,10 @@ from cryptography.fernet import Fernet
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("people_test")
-os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: the startup import encrypts env credentials
+os.environ["DEFAULT_COUNTRY_CODE"] = "972"  # local numbers (0…) in these tests are Israeli
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
-os.environ["HOMEASSISTANT_TOKEN"] = "test-ha"
-os.environ["PHONE_INTERACTIVE_SENSOR"] = "binary_sensor.phone_interactive"  # wake confirmation reads its history
-os.environ["GOOGLE_REFRESH_TOKEN"] = "test-refresh-token"  # calendar connected (Google is mocked)
 os.environ["FCM_SERVICE_ACCOUNT_JSON"] = '{"project_id": "dana-test"}'
 os.environ["WAKE_CONFIRM_SECONDS"] = "0"
 os.environ["WAKE_POLL_SECONDS"] = "3600"
@@ -43,7 +42,10 @@ from addons.tasks.groups import ensure_default_groups_for_everyone
 
 db.migrate()
 users.bootstrap()
-addons_bootstrap.bootstrap()  # the first admin's addons (built-ins + env)
+addons_bootstrap.bootstrap()  # the first admin's default addons
+testenv.connect_admin("homeassistant", credentials={"host": "http://homeassistant.local:8123", "token": "test-ha"},
+                      settings={"phone_interactive_sensor": "binary_sensor.phone_interactive"})  # wake reads its history
+testenv.connect_admin("calendar", credentials={"refresh_token": "test-refresh-token"})  # Google is mocked
 OWNER = users.first_admin()
 ensure_default_groups_for_everyone()
 from core import sessions_api

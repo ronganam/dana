@@ -268,7 +268,7 @@ async def main() -> None:
         out2 = await tool(EVE, "list_project_entries", project_id=pid)
         check("tool: list_project_entries shows sections, columns, decisions and values",
               "צלמים" in out2 and "Columns: מחיר כולל (money, price)" in out2 and "CHOSEN" in out2
-              and "13,400 NIS" in out2 and "Summary: written" in out2 and "DJ Noa" in out2, out2)
+              and "13,400 ILS" in out2 and "budget 150,000 ILS" in out2 and "Summary: written" in out2 and "DJ Noa" in out2, out2)
         out = await tool(EVE, "get_knowledge_item", item_id=ori)
         check("tool: get_knowledge_item lists the section, decision and files",
               "Section: צלמים" in out and "Decision: CHOSEN" in out and "הצעת מחיר.pdf" in out, out)

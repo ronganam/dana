@@ -124,7 +124,7 @@ async def find_last_chats(conn: Connection, limit: int = 10) -> str:
             return f"Error connecting to WAHA API: {err_msg}"
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def search_whatsapp_contact_or_chat(conn: Connection, query: str) -> str:
     """Search for a WhatsApp contact or group chat by name to find their chat ID.
 

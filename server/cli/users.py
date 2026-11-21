@@ -11,15 +11,16 @@ refresh (10 s). In the pod::
 Commands (``bin/dana users <command> --help`` for each)::
 
     users list                              users: access, Telegram ids, tokens, addons
-    users add NAME [--access] [--context] [--pronoun] [--telegram-chat]
-    users update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
+    users add NAME [--access] [--context] [--pronoun] [--languages] [--currency] [--telegram-chat]
+    users update USER [--name] [--access] [--context] [--pronoun] [--languages] [--currency] [--other-names]
+                      [--prompt-name] [--telegram-chat]
     users remove USER [--delete-data]       without the flag: says what would be deleted, removes nothing
     users tokens issue USER [--label]       prints the token once
     users tokens list [USER]
     users tokens revoke TOKEN_ID
     users telegram add USER TELEGRAM_ID
     users telegram move TELEGRAM_ID USER
-    users telegram remove TELEGRAM_ID [--allow-open-bot]
+    users telegram remove TELEGRAM_ID [--allow-no-ids]
     users sharing [USER]                    who has access to what
     addons show USER                        a user's connections (credential values never shown)
     addons connect USER ADDON [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
@@ -43,18 +44,16 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, TextIO
 
 import addons  # noqa: F401 — first: registers every addon (and the sharing item types)
-from core import access, user_rows, users
+from core import access, db, user_locale, user_rows, users
 from core.addons import sharing, state
 from core.db import get_db_connection
 from core.paths import IMAGES_DIR, RECORDINGS_DIR
 from core.users import User
 from core.addons import crypto, store
-from core.addons.addon import get_addon
+from core.addons.addon import get_addon, all_addons
 
-# Rows a removed user keeps: usage is the server's cost history, and
-# connection_imports records that the env import happened (so it never runs
-# again for whoever becomes the first admin).
-KEPT_TABLES = ("usage_events", "usage_daily", "connection_imports")
+# Rows a removed user keeps: usage is the server's cost history.
+KEPT_TABLES = ("usage_events", "usage_daily")
 
 
 class CliError(Exception):
@@ -226,6 +225,7 @@ def remove_user(user: User) -> List[str]:
     except ValueError as e:
         raise CliError(str(e)) from e
     with get_db_connection() as conn:
+        # scoped: admin CLI: every shared item, to drop the shares of the removed user's items
         rows = conn.execute("SELECT DISTINCT item_type, item_id FROM item_access").fetchall()
     for row in rows:
         try:
@@ -278,21 +278,28 @@ def cmd_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
         print(f"  telegram ids: {', '.join(map(str, u.telegram_ids)) or 'none'}"
               f"   proactive chat: {u.telegram_chat_id if u.telegram_chat_id is not None else 'none'}", file=out)
         print(f"  pronoun: {u.pronoun}   context: {_short(u.context) if u.context else 'none'}", file=out)
+        print(f"  languages: {','.join(user_locale.languages(u))}{'' if u.languages else ' (server default)'}"
+              f"   currency: {user_locale.currency(u)}{'' if u.currency else ' (server default)'}", file=out)
         tokens = ", ".join(f"{t.label or '(no label)'} ({t.id})" for t in users.list_tokens(u.id))
         print(f"  tokens: {tokens or 'none'}", file=out)
         names = [k for k in store.connected_addons(u) if not get_addon(k).everyone]
         print(f"  addons: {', '.join(names) or 'none'}", file=out)
-    if users.telegram_open():
-        print("Note: no user has a Telegram id, so the Telegram bot lets anyone in (as the first admin).", file=out)
+    if users.telegram_unlinked():
+        print("Note: no user has a Telegram id, so the Telegram bot refuses everyone "
+              "(link one: telegram add USER ID).", file=out)
 
 
 def _profile_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--context", help="who they are, family, work, the people they talk about (for prompts)")
     p.add_argument("--pronoun", choices=user_rows.PRONOUNS, help="how prompts refer to them")
+    p.add_argument("--languages", help="their languages, a comma list of codes, the first the default "
+                                       "(e.g. 'he,en'; '' = the server's DEFAULT_LANGUAGES)")
+    p.add_argument("--currency", help="their currency, ISO 4217 (e.g. EUR; '' = the server's CURRENCY)")
 
 
 def cmd_add(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
-    profile = user_rows.Profile(context=args.context or "", pronoun=args.pronoun or "they")
+    profile = user_rows.Profile(context=args.context or "", pronoun=args.pronoun or "they",
+                                languages=args.languages or "", currency=args.currency or "")
     try:
         user = users.create(args.name, args.access, telegram_chat_id=_chat_id(args.telegram_chat),  # type: ignore[arg-type]
                             profile=profile)
@@ -312,7 +319,7 @@ def cmd_update(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
         changes["name"] = args.name
     if args.access is not None:
         changes["access_level"] = args.access
-    for field in ("context", "pronoun", "other_names", "prompt_name"):
+    for field in ("context", "pronoun", "languages", "currency", "other_names", "prompt_name"):
         if getattr(args, field) is not None:
             changes[field] = getattr(args, field)
     if args.telegram_chat is not None:
@@ -399,9 +406,9 @@ def cmd_telegram_remove(args: argparse.Namespace, out: TextIO, stdin: TextIO) ->
     owners = [u for u in users.list_users() if args.telegram_id in u.telegram_ids]
     if not owners:
         raise CliError(f"No user has Telegram id {args.telegram_id}.")
-    if sum(len(u.telegram_ids) for u in users.list_users()) == 1 and not args.allow_open_bot:
-        raise CliError("That is the last Telegram id: without any, the Telegram bot lets anyone in. "
-                       "Add another first, or pass --allow-open-bot.")
+    if sum(len(u.telegram_ids) for u in users.list_users()) == 1 and not args.allow_no_ids:
+        raise CliError("That is the last Telegram id: without any, the Telegram bot refuses everyone. "
+                       "Add another first, or pass --allow-no-ids.")
     users.remove_telegram_id(args.telegram_id)
     print(f"Telegram id {args.telegram_id} removed from {owners[0].name}.", file=out)
 
@@ -502,7 +509,8 @@ def register(sub: Any) -> None:
     p.add_argument("--telegram-chat", help="Telegram chat id for proactive messages")
     p.set_defaults(func=cmd_add)
 
-    p = sub.add_parser("update", help="change a user's name, access, prompt profile or proactive chat")
+    p = sub.add_parser("update", help="change a user's name, access, prompt profile, languages, currency "
+                                      "or proactive chat")
     p.add_argument("user")
     p.add_argument("--name")
     p.add_argument("--access", choices=list(access.LEVELS))
@@ -543,7 +551,8 @@ def register(sub: Any) -> None:
     p.set_defaults(func=cmd_telegram_move)
     p = tg.add_parser("remove", help="forget a Telegram user id")
     p.add_argument("telegram_id", type=int)
-    p.add_argument("--allow-open-bot", action="store_true", help="allow removing the last id (the bot opens)")
+    p.add_argument("--allow-no-ids", action="store_true",
+                   help="allow removing the last id (the bot then refuses everyone)")
     p.set_defaults(func=cmd_telegram_remove)
 
     p = sub.add_parser("sharing", help="who has access to what")

@@ -25,7 +25,7 @@ from addons.phone.notifications.values import ESCALATION_PREFIX, MAX_BATCH, post
 logger = logging.getLogger(__name__)
 
 # Our own notifications and the escalation re-posts must never loop back in.
-_OWN_PACKAGES = ("app.ganam.assistant",)
+_OWN_PACKAGES = ("io.github.ronganam.dana",)  # the app and its .kiosk / .tv flavors (a prefix)
 
 _OTP_CONTEXT = re.compile(r"(code|otp|password|passcode|verification|verify|pin|קוד|סיסמ|אימות)", re.I)
 _OTP_NUMBER = re.compile(r"(?<!\d)(\d[\d\- ]{2,8}\d)(?!\d)")
@@ -109,9 +109,11 @@ def ingest(user: User, posted: Iterable[Dict[str, Any]], removed: Iterable[Dict[
             if existing:
                 duplicates += 1
                 if n["device_key"] and existing["device_key"] != n["device_key"]:
+                    # scoped: the row found by content_hash AND user_id above
                     conn.execute("UPDATE notifications SET device_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                                  (n["device_key"], existing["id"]))
                 if n["actions"]:
+                    # scoped: the row found by content_hash AND user_id above
                     conn.execute("UPDATE notifications SET actions = ? WHERE id = ?", (n["actions"], existing["id"]))
                 continue
             nid = str(uuid.uuid4())

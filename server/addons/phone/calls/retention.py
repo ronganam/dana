@@ -38,6 +38,7 @@ def purge_old_audio(user: User, days: int = AUDIO_RETENTION_DAYS) -> int:
             except OSError as e:
                 logger.warning(f"Could not delete {p}: {e}")
                 continue
+            # scoped: ids from this user's calls (query above)
             conn.execute("UPDATE phone_calls SET audio_deleted_at = ? WHERE id = ?",
                          (clock.now().isoformat(timespec="seconds"), r["id"]))
         conn.commit()

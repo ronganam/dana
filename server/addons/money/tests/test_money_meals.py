@@ -2,7 +2,7 @@
 Run: bin/test test_money_meals
 
 ``testfakes.FakeBankWorker`` plays the bank-worker with a made-up Pluxee result
-in the worker's real shape (bank-worker/README.md, "Pluxee"): every place,
+in the worker's real shape (addons/money/worker/README.md, "Pluxee"): every place,
 amount and number is invented. Robin (the first admin) and Bob have ``money``;
 Carl has not. Checked: the company (a phone, the SMS sender and a pattern
 that finds a 6-digit code); the code reaching the job; the account (kind

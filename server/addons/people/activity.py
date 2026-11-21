@@ -62,11 +62,13 @@ def unchecked_notifications(conn: sqlite3.Connection, user: User) -> List[sqlite
 
 def set_call_person(conn: sqlite3.Connection, call_id: str, person_id: str) -> None:
     """A call from :func:`unchecked_calls` checked: ``person_id`` or '' (no match)."""
+    # scoped: a call from unchecked_calls (the user's)
     conn.execute("UPDATE phone_calls SET person_id = ? WHERE id = ?", (person_id, call_id))
 
 
 def set_notification_person(conn: sqlite3.Connection, notification_id: str, person_id: str) -> None:
     """A notification from :func:`unchecked_notifications` checked: ``person_id`` or '' (no match)."""
+    # scoped: a notification from unchecked_notifications (the user's)
     conn.execute("UPDATE notifications SET person_id = ? WHERE id = ?", (person_id, notification_id))
 
 
@@ -80,23 +82,29 @@ def recheck_unmatched(conn: sqlite3.Connection, user: User) -> None:
 
 def recheck_calls_of(conn: sqlite3.Connection, person_id: str) -> None:
     """A number of theirs was removed: their calls are matched again."""
+    # scoped: a person id is one user's; the caller resolved it with store.row(user)
     conn.execute("UPDATE phone_calls SET person_id = NULL WHERE person_id = ?", (person_id,))
 
 
 def recheck_notifications_of(conn: sqlite3.Connection, person_id: str) -> None:
     """Their names changed: anything linked by name is matched again."""
+    # scoped: a person id is one user's; the caller resolved it with store.row(user)
     conn.execute("UPDATE notifications SET person_id = NULL WHERE person_id = ?", (person_id,))
 
 
 def unlink_person(conn: sqlite3.Connection, person_id: str) -> None:
     """They were deleted: leave their activity unmatched ('') so a call from them doesn't recreate them."""
+    # scoped: a person id is one user's; the caller resolved it with store.row(user)
     conn.execute("UPDATE phone_calls SET person_id = '' WHERE person_id = ?", (person_id,))
+    # scoped: a person id is one user's; the caller resolved it with store.row(user)
     conn.execute("UPDATE notifications SET person_id = '' WHERE person_id = ?", (person_id,))
 
 
 def move_person(conn: sqlite3.Connection, old_id: str, new_id: str) -> None:
     """Merged (both people are the same user's): ``old_id``'s activity becomes ``new_id``'s."""
+    # scoped: both person ids are the user's (merge_people checked them)
     conn.execute("UPDATE phone_calls SET person_id = ? WHERE person_id = ?", (new_id, old_id))
+    # scoped: both person ids are the user's (merge_people checked them)
     conn.execute("UPDATE notifications SET person_id = ? WHERE person_id = ?", (new_id, old_id))
 
 

@@ -96,7 +96,6 @@ a { color: inherit; text-decoration: none; }
 .cam-slot {
     display: flex;
     flex-direction: column;
-    gap: 4px;   /* STRIP_SPACE in dashboard.js = strip height + this gap */
     align-items: center;
     justify-content: center;
     min-width: 0;
@@ -117,16 +116,6 @@ a { color: inherit; text-decoration: none; }
     max-height: 100%;
     flex: 0 0 auto;
 }
-.motion-strip {
-    width: var(--cam-w, 100%);
-    max-width: 100%;
-    height: 12px;
-    flex: 0 0 auto;
-    border-radius: var(--radius-sm);
-    background: rgba(247, 245, 240, 0.05);
-    overflow: hidden;
-}
-.motion-strip canvas { width: 100%; height: 100%; display: block; }
 .cam-viewport {
     flex: 1;
     position: relative;
@@ -169,13 +158,6 @@ a { color: inherit; text-decoration: none; }
     border-radius: var(--radius-md);
 }
 .cam-overlay .cam-label svg, .cam-overlay .cam-label i { width: 11px; height: 11px; }
-.cam-lastmove {
-    position: absolute; left: 10px; bottom: 8px; z-index: 2; pointer-events: none;
-    font-size: 11px; font-weight: 600; color: rgba(247, 245, 240, 0.8);
-    background: rgba(0, 0, 0, 0.5); padding: 3px 8px; border-radius: var(--radius-md);
-    font-variant-numeric: tabular-nums;
-}
-.cam-lastmove.recent { color: var(--connecting-amber); }
 .cam-overlay .cam-live {
     display: flex; align-items: center; gap: 6px;
     font-size: 10px; font-weight: 600; letter-spacing: 0.05em;

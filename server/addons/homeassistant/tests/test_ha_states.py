@@ -5,11 +5,11 @@ network is used. The request is the first admin's (no API_TOKEN), who has Home
 Assistant connected (per-user isolation: test_homeassistant_users.py)."""
 
 import asyncio
+import os
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("ha_states_test")
-
-import os
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
 
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: the test connection's token is encrypted
