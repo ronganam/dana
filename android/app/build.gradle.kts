@@ -154,6 +154,13 @@ android {
         compose = true
         buildConfig = true
     }
+    // CI runs lintPhoneDebug; the baseline holds the issues lint found when it was
+    // added (regenerate only on purpose: ./gradlew :app:updateLintBaseline), so new
+    // errors fail the build.
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
+
     testOptions {
         unitTests.isReturnDefaultValues = true
     }
