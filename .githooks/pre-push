@@ -35,7 +35,10 @@ done
 changed="$(printf '%s\n' "$changed" | sed '/^$/d')"
 [ -z "$changed" ] && exit 0
 
-if ! printf '%s\n' "$changed" | grep -E '^(server/|examples/|\(everything\))' | grep -qvE '^(server/docs/.*|.*\.md)$'; then
+# Here-strings, not pipes: with pipefail, `grep -q` exiting at its first match makes the writer
+# die of SIGPIPE on a long list, and the whole test would read as "no match".
+server_code="$(grep -E '^(server/|examples/|\(everything\))' <<< "$changed" | grep -vE '^(server/docs/.*|.*\.md)$' || true)"
+if [ -z "$server_code" ]; then
   echo "pre-push: no server code changed, no server tests."
   exit 0
 fi
@@ -50,13 +53,13 @@ python="$root/server/.venv/bin/python"; [ -x "$python" ] || python=python3
 echo "pre-push: bin/test on ${tested:0:7} (skip once with git push --no-verify)"
 (cd "$checkout/server" && "$python" bin/test) || { echo "pre-push: tests failed; nothing pushed."; exit 1; }
 
-if printf '%s\n' "$changed" | grep -qE '^(server/Dockerfile|server/requirements\.(txt|lock)|\(everything\))$'; then
+if grep -qE '^(server/Dockerfile|server/requirements\.(txt|lock)|\(everything\))$' <<< "$changed"; then
   echo "pre-push: the image changed: running the suite in the image's test stage"
   docker build --target test -q -t dana:test "$checkout/server" >/dev/null \
     || { echo "pre-push: the image's test stage failed (docker build --target test server); nothing pushed."; exit 1; }
 fi
 
-if printf '%s\n' "$changed" | grep -qE '^(server/(core/|addons/|static/|cli/|main\.py$|requirements\.(txt|lock)$|Dockerfile$|VERSION$|bin/dana$)|\(everything\)$)'; then
+if grep -qE '^(server/(core/|addons/|static/|cli/|main\.py$|requirements\.(txt|lock)$|Dockerfile$|VERSION$|bin/dana$)|\(everything\)$)' <<< "$changed"; then
   if [ ! -r "${DANA_DEPLOY_CONFIG:-${DANA_SITE:-$root/site}/deploy.env}" ]; then
     echo "pre-push: no site/deploy.env: tested, not deploying."
   elif [ -n "${DANA_NO_DEPLOY:-}" ]; then
