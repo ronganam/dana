@@ -104,27 +104,27 @@ class TodayTileService : TileService() {
         val s = snapshot ?: DanaSnapshot()
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         val col = DanaTile.column()
-        col.addContent(DanaTile.text(getString(R.string.tile_today), COLOR_ORANGE, 11f, bold = true))
+        col.addContent(DanaTile.text(getString(R.string.tile_today), COLOR_AMBER, 11f, bold = true))
         col.addContent(DanaTile.gap(2f))
 
         val headline = s.briefingHeadline?.takeIf { it.isNotBlank() && s.briefingDate == today }
         if (headline != null) {
-            col.addContent(DanaTile.text(headline, COLOR_WHITE, 13f, bold = true, lines = 2))
+            col.addContent(DanaTile.text(headline, COLOR_INK, 13f, bold = true, lines = 2))
             col.addContent(DanaTile.gap(4f))
         }
 
         var shown = 0
         for (e in s.events.take(2)) {
-            col.addContent(DanaTile.text("${e.time}  ${e.title}", COLOR_TEAL, 12f))
+            col.addContent(DanaTile.text("${e.time}  ${e.title}", COLOR_SKY, 12f))
             shown++
         }
         for (t in s.tasks.take(if (headline != null) 2 else 3)) {
-            val color = if (t.due == "overdue") COLOR_RED else COLOR_LIGHT_GRAY
+            val color = if (t.due == "overdue") COLOR_EMBER else COLOR_INK_SOFT
             col.addContent(DanaTile.text("• ${t.title}", color, 12f))
             shown++
         }
         if (headline == null && shown == 0) {
-            col.addContent(DanaTile.text(getString(if (snapshot == null) R.string.open_dana_on_phone else R.string.tile_nothing_due), COLOR_LIGHT_GRAY, 12f, lines = 2))
+            col.addContent(DanaTile.text(getString(if (snapshot == null) R.string.open_dana_on_phone else R.string.tile_nothing_due), COLOR_INK_SOFT, 12f, lines = 2))
         }
         return DanaTile.screen(col.build(), DanaTile.launch("io.github.ronganam.dana.wear.tasks.TasksActivity", "open_tasks"))
     }
@@ -166,23 +166,23 @@ class WaitingTileService : TileService() {
         val count = s?.suggestionCount ?: 0
         val top = s?.suggestions?.firstOrNull()
         val col = DanaTile.column()
-        col.addContent(DanaTile.text(if (count > 0) getString(R.string.tile_waiting_count, count) else getString(R.string.tile_waiting), COLOR_ORANGE, 11f, bold = true))
+        col.addContent(DanaTile.text(if (count > 0) getString(R.string.tile_waiting_count, count) else getString(R.string.tile_waiting), COLOR_EMBER, 11f, bold = true))
         col.addContent(DanaTile.gap(4f))
         if (top == null) {
-            col.addContent(DanaTile.text(getString(R.string.tile_nothing_waiting), COLOR_LIGHT_GRAY, 13f))
+            col.addContent(DanaTile.text(getString(R.string.tile_nothing_waiting), COLOR_INK_SOFT, 13f))
             return DanaTile.screen(col.build(), null)
         }
         val id = top.id
-        col.addContent(DanaTile.text(top.title, COLOR_WHITE, 13f, bold = true, lines = 3))
+        col.addContent(DanaTile.text(top.title, COLOR_INK, 13f, bold = true, lines = 3))
         col.addContent(DanaTile.gap(2f))
-        col.addContent(DanaTile.text(getString(if (top.source == "notification") R.string.tile_from_notification else R.string.tile_from_call), COLOR_GRAY, 10f))
+        col.addContent(DanaTile.text(getString(if (top.source == "notification") R.string.tile_from_notification else R.string.tile_from_call), COLOR_MUTE, 10f))
         col.addContent(DanaTile.gap(8f))
         val cls = "io.github.ronganam.dana.wear.cards.SuggestionActionActivity"
         col.addContent(
             LayoutElementBuilders.Row.Builder()
-                .addContent(button("✓", COLOR_GREEN, DanaTile.launch(cls, "accept_$id", mapOf("id" to id, "action" to "accept"))))
+                .addContent(button("✓", COLOR_SAGE, DanaTile.launch(cls, "accept_$id", mapOf("id" to id, "action" to "accept"))))
                 .addContent(LayoutElementBuilders.Spacer.Builder().setWidth(DimensionBuilders.dp(10f)).build())
-                .addContent(button("✕", COLOR_LIGHT_GRAY, DanaTile.launch(cls, "dismiss_$id", mapOf("id" to id, "action" to "dismiss"))))
+                .addContent(button("✕", COLOR_INK_SOFT, DanaTile.launch(cls, "dismiss_$id", mapOf("id" to id, "action" to "dismiss"))))
                 .build()
         )
         return DanaTile.screen(col.build(), null)

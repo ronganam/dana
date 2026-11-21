@@ -10,7 +10,7 @@ import android.app.Application
 import androidx.annotation.StringRes
 import io.github.ronganam.dana.wear.R
 import androidx.lifecycle.viewModelScope
-import io.github.ronganam.dana.wear.data.WearPrefs
+import io.github.ronganam.dana.wear.debug.DebugSamples
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.Wearable
@@ -51,6 +51,7 @@ class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.On
 
     fun refreshTasks() {
         Log.d(TAG, "refreshTasks() — requesting phone node")
+        DebugSamples.tasks(appContext)?.let { showTasks(it); return }
         _isLoading.value = true
         _statusText.value = str(R.string.tasks_status_loading)
         getPhoneNodeId { phoneId ->
@@ -67,6 +68,7 @@ class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.On
 
     fun completeTask(taskId: String) {
         Log.d(TAG, "completeTask($taskId)")
+        DebugSamples.removeTask(appContext, taskId)
         val payload = TaskStatusRequest(taskId, "completed").encode()
         getPhoneNodeId { phoneId ->
             Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.UPDATE_TASK_STATUS, payload.toByteArray())
@@ -81,6 +83,7 @@ class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.On
 
     fun snoozeTask(taskId: String, minutes: Int) {
         Log.d(TAG, "snoozeTask($taskId, $minutes min)")
+        DebugSamples.removeTask(appContext, taskId)
         val payload = SnoozeRequest(taskId, "time", minutes = minutes).encode()
         getPhoneNodeId { phoneId ->
             Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.SNOOZE_TASK, payload.toByteArray())
@@ -101,26 +104,8 @@ class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.On
         viewModelScope.launch {
             try {
                 when (path) {
-                    WearPaths.response(WearPaths.GET_TASKS) -> {
-                        fun given(v: String?) = v?.takeIf { it.isNotEmpty() && it != "null" }
-                        val list = WearJson.decodeFromString(ListSerializer(WearTaskItem.serializer()), jsonString)
-                            .filter { it.status == "needs_action" }
-                            .map {
-                                WearTask(
-                                    id = it.id,
-                                    title = it.title,
-                                    description = given(it.description),
-                                    priority = it.priority,
-                                    dueDate = given(it.dueDate),
-                                    status = it.status,
-                                    groupName = given(it.groupName),
-                                    groupEmoji = given(it.groupEmoji)
-                                )
-                            }
-                        _tasks.value = list
-                        _isLoading.value = false
-                        _statusText.value = if (list.isEmpty()) str(R.string.tasks_status_none) else ""
-                    }
+                    WearPaths.response(WearPaths.GET_TASKS) ->
+                        showTasks(WearJson.decodeFromString(ListSerializer(WearTaskItem.serializer()), jsonString))
                     WearPaths.response(WearPaths.UPDATE_TASK_STATUS), WearPaths.response(WearPaths.SNOOZE_TASK) -> {
                         refreshTasks()
                     }
@@ -136,6 +121,27 @@ class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.On
                 _isLoading.value = false
             }
         }
+    }
+
+    private fun showTasks(items: List<WearTaskItem>) {
+        fun given(v: String?) = v?.takeIf { it.isNotEmpty() && it != "null" }
+        val list = items
+            .filter { it.status == "needs_action" }
+            .map {
+                WearTask(
+                    id = it.id,
+                    title = it.title,
+                    description = given(it.description),
+                    priority = it.priority,
+                    dueDate = given(it.dueDate),
+                    status = it.status,
+                    groupName = given(it.groupName),
+                    groupEmoji = given(it.groupEmoji)
+                )
+            }
+        _tasks.value = list
+        _isLoading.value = false
+        _statusText.value = if (list.isEmpty()) str(R.string.tasks_status_none) else ""
     }
 
     private fun getPhoneNodeId(action: (String) -> Unit) {

@@ -13,6 +13,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.github.ronganam.dana.wear.ui.theme.DanaWear
 import androidx.compose.ui.input.rotary.onRotaryScrollEvent
 import androidx.wear.compose.foundation.ExperimentalWearFoundationApi
 import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
@@ -47,9 +49,10 @@ fun SnoozeScreen(
         ) {
             item {
                 Text(
-                    text = stringResource(R.string.snooze),
-                    style = MaterialTheme.typography.caption1,
-                    color = MaterialTheme.colors.secondary
+                    text = stringResource(R.string.snooze).uppercase(),
+                    fontFamily = DanaWear.Mono,
+                    fontSize = 11.sp,
+                    color = DanaWear.Amber
                 )
             }
 
@@ -77,7 +80,12 @@ fun SnoozeScreen(
                     onClick = { onSnoozeSelected(minutes) },
                     label = { Text(stringResource(label)) },
                     icon = { Icon(Icons.Default.DateRange, contentDescription = null, modifier = Modifier.size(18.dp)) },
-                    colors = ChipDefaults.secondaryChipColors(),
+                    // Snoozing is a reminder's: amber-tinted chips.
+                    colors = ChipDefaults.chipColors(
+                        backgroundColor = DanaWear.tint(DanaWear.Amber),
+                        contentColor = DanaWear.Ink,
+                        iconColor = DanaWear.Amber
+                    ),
                     modifier = Modifier.fillMaxWidth()
                 )
             }

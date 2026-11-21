@@ -148,6 +148,10 @@
     <string name="nothing_to_buy">Nothing to buy.</string>
     <string name="add_by_voice_or_tell">Add by voice, or tell Dana.</string>
     <string name="mark_as_bought">Mark as bought</string>
+    <plurals name="tasks_open">
+        <item quantity="one">%1$d open</item>
+        <item quantity="other">%1$d open</item>
+    </plurals>
     <plurals name="ticked_off">
         <item quantity="one">%d ticked off</item>
         <item quantity="other">%d ticked off</item>

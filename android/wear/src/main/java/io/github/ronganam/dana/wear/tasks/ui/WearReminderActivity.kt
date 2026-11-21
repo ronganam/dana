@@ -327,15 +327,15 @@ private fun AlarmFace(
     onDismiss: () -> Unit
 ) {
     val priorityColor = when (priority.lowercase()) {
-        "high" -> DanaWear.Danger
+        "high" -> DanaWear.Ember
         "low" -> DanaWear.Mute
-        else -> DanaWear.Warning
+        else -> DanaWear.Amber
     }
     Box(Modifier.fillMaxSize()) {
         CurvedLayout(anchor = 270f, modifier = Modifier.padding(top = 6.dp)) {
             curvedText(
                 text = kicker.uppercase(),
-                fontSize = 10.sp, color = DanaWear.Accent, fontFamily = DanaWear.Mono
+                fontSize = 10.sp, color = DanaWear.Amber, fontFamily = DanaWear.Mono
             )
         }
         Column(
@@ -377,7 +377,7 @@ private fun AlarmFace(
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                RoundAction(Icons.Outlined.Snooze, stringResource(R.string.snooze), size = 42.dp, filled = false, onClick = onSnooze)
+                RoundAction(Icons.Outlined.Snooze, stringResource(R.string.snooze), size = 42.dp, filled = false, hue = DanaWear.Amber, onClick = onSnooze)
                 RoundAction(Icons.Filled.Check, stringResource(R.string.done), size = 52.dp, filled = true, onClick = onComplete)
                 RoundAction(Icons.Filled.Close, stringResource(R.string.dismiss), size = 42.dp, filled = false, onClick = onDismiss)
             }
@@ -391,7 +391,7 @@ private fun AlarmFace(
 }
 
 @Composable
-private fun RoundAction(icon: ImageVector, label: String, size: Dp, filled: Boolean, onClick: () -> Unit) {
+private fun RoundAction(icon: ImageVector, label: String, size: Dp, filled: Boolean, hue: Color? = null, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         Box(
             Modifier
@@ -399,6 +399,7 @@ private fun RoundAction(icon: ImageVector, label: String, size: Dp, filled: Bool
                 .clip(CircleShape)
                 .then(
                     if (filled) Modifier.background(DanaWear.Accent)
+                    else if (hue != null) Modifier.background(DanaWear.tint(hue)).border(1.dp, hue, CircleShape)
                     else Modifier.background(DanaWear.Surface).border(1.dp, DanaWear.Outline, CircleShape)
                 )
                 .clickable(onClick = onClick),
@@ -406,7 +407,7 @@ private fun RoundAction(icon: ImageVector, label: String, size: Dp, filled: Bool
         ) {
             Icon(
                 icon, contentDescription = label,
-                tint = if (filled) DanaWear.OnAccent else DanaWear.Ink,
+                tint = if (filled) DanaWear.OnAccent else hue ?: DanaWear.Ink,
                 modifier = Modifier.size(if (filled) 26.dp else 20.dp)
             )
         }

@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import io.github.ronganam.dana.wear.debug.DebugSamples
 import java.util.UUID
 
 data class WearToolApproval(
@@ -132,6 +133,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
 
         // Register message listener to receive phone replies
         Wearable.getMessageClient(appContext).addListener(this)
+        DebugSamples.attachThread(::onMessage)
         PhoneNode.prefetch(appContext)
 
         // Tell the phone which watch-app version we run (for update
@@ -495,11 +497,10 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
         sendAction(WearRunAction(sessionId, if (approved) "approve" else "deny"))
     }
 
-    override fun onMessageReceived(messageEvent: MessageEvent) {
-        val path = messageEvent.path
-        val data = messageEvent.data
-        val jsonString = String(data)
+    override fun onMessageReceived(messageEvent: MessageEvent) =
+        onMessage(messageEvent.path, String(messageEvent.data))
 
+    private fun onMessage(path: String, jsonString: String) {
         viewModelScope.launch {
             try {
                 when (path) {
@@ -676,6 +677,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
     override fun onCleared() {
         super.onCleared()
         if (initialized) Wearable.getMessageClient(appContext).removeListener(this)
+        DebugSamples.attachThread(null)
     }
 
     private fun pcmRms(buffer: ByteArray, length: Int): Double {

@@ -16,6 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.withStyle
+import io.github.ronganam.dana.wear.ui.theme.DanaWear
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.ui.focus.FocusRequester
@@ -57,10 +62,16 @@ fun SideMenuScreen(
             contentPadding = PaddingValues(top = 28.dp, bottom = 36.dp, start = 12.dp, end = 12.dp)
         ) {
         item {
+            // The name as on the icon: serif, with the ember full stop.
             Text(
-                text = stringResource(R.string.app_name),
-                style = MaterialTheme.typography.caption1,
-                color = MaterialTheme.colors.secondary
+                text = buildAnnotatedString {
+                    append(stringResource(R.string.app_name))
+                    withStyle(SpanStyle(color = DanaWear.Ember)) { append(".") }
+                },
+                fontFamily = DanaWear.Serif,
+                fontSize = 24.sp,
+                color = DanaWear.Ink,
+                modifier = Modifier.padding(bottom = 4.dp)
             )
         }
 
@@ -86,7 +97,7 @@ fun SideMenuScreen(
                 },
                 label = { Text(stringResource(R.string.clear_the_screen), maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 icon = { Icon(Icons.Default.Add, contentDescription = null) },
-                colors = ChipDefaults.secondaryChipColors(),
+                colors = ChipDefaults.secondaryChipColors(iconColor = DanaWear.Mute),
                 modifier = Modifier.fillMaxWidth()
             )
         }
@@ -99,7 +110,11 @@ fun SideMenuScreen(
                 },
                 label = { Text(stringResource(R.string.label_shopping), maxLines = 1) },
                 icon = { Icon(Icons.Default.ShoppingCart, contentDescription = null) },
-                colors = ChipDefaults.secondaryChipColors(),
+                colors = ChipDefaults.chipColors(
+                    backgroundColor = DanaWear.tint(DanaWear.Sage),
+                    contentColor = DanaWear.Ink,
+                    iconColor = DanaWear.Sage
+                ),
                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
             )
         }
@@ -110,7 +125,7 @@ fun SideMenuScreen(
                 onClick = onNavigateToSettings,
                 label = { Text(stringResource(R.string.settings_and_sync), maxLines = 1) },
                 icon = { Icon(Icons.Default.Settings, contentDescription = stringResource(R.string.settings)) },
-                colors = ChipDefaults.secondaryChipColors(),
+                colors = ChipDefaults.secondaryChipColors(iconColor = DanaWear.Mute),
                 modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
             )
         }

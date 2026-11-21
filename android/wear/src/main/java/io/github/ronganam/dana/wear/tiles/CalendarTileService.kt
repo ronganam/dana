@@ -88,36 +88,36 @@ class CalendarTileService : TileService() {
 
         var row = 0
 
-        column.addContent(buildDayHeader(getString(R.string.tile_today), COLOR_TEAL, row++, totalRows))
+        column.addContent(buildDayHeader(getString(R.string.tile_today), COLOR_SKY, row++, totalRows))
 
         if (todayList.isEmpty()) {
-            column.addContent(buildPaddedText(getString(R.string.tile_no_events), COLOR_LIGHT_GRAY, 11f, row++, totalRows))
+            column.addContent(buildPaddedText(getString(R.string.tile_no_events), COLOR_INK_SOFT, 11f, row++, totalRows))
         } else {
             todayList.forEach { event ->
-                column.addContent(buildEventRow(event, COLOR_TEAL, row++, totalRows))
+                column.addContent(buildEventRow(event, COLOR_SKY, row++, totalRows))
             }
             if (todayEvents.size > MAX_EVENTS_PER_DAY) {
                 column.addContent(buildPaddedText(
                     getString(R.string.tile_more_indented, todayEvents.size - MAX_EVENTS_PER_DAY),
-                    COLOR_LIGHT_GRAY, 10f, row++, totalRows
+                    COLOR_INK_SOFT, 10f, row++, totalRows
                 ))
             }
         }
 
         column.addContent(Spacer.Builder().setHeight(DimensionBuilders.dp(3f)).build())
 
-        column.addContent(buildDayHeader(getString(R.string.tile_tomorrow), COLOR_GRAY, row++, totalRows))
+        column.addContent(buildDayHeader(getString(R.string.tile_tomorrow), COLOR_MUTE, row++, totalRows))
 
         if (tomorrowList.isEmpty()) {
-            column.addContent(buildPaddedText(getString(R.string.tile_no_events), COLOR_LIGHT_GRAY, 11f, row++, totalRows))
+            column.addContent(buildPaddedText(getString(R.string.tile_no_events), COLOR_INK_SOFT, 11f, row++, totalRows))
         } else {
             tomorrowList.forEach { event ->
-                column.addContent(buildEventRow(event, COLOR_GRAY, row++, totalRows))
+                column.addContent(buildEventRow(event, COLOR_MUTE, row++, totalRows))
             }
             if (tomorrowEvents.size > MAX_EVENTS_PER_DAY) {
                 column.addContent(buildPaddedText(
                     getString(R.string.tile_more_indented, tomorrowEvents.size - MAX_EVENTS_PER_DAY),
-                    COLOR_LIGHT_GRAY, 10f, row++, totalRows
+                    COLOR_INK_SOFT, 10f, row++, totalRows
                 ))
             }
         }
@@ -209,7 +209,7 @@ class CalendarTileService : TileService() {
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
                             .setSize(DimensionBuilders.sp(12f))
-                            .setColor(ColorBuilders.argb(COLOR_WHITE))
+                            .setColor(ColorBuilders.argb(COLOR_INK))
                             .build()
                     )
                     .build()

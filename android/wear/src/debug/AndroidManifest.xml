@@ -1,9 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Debug builds only: a stand-in phone for the Shopping screen on an unpaired watch (shopping/DebugPhone.kt). -->
+<!-- Debug builds only: a stand-in phone for the Shopping screen (shopping/DebugPhone.kt) and sample tasks / replies (debug/DebugSamples.kt) on an unpaired watch. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <receiver
             android:name=".shopping.DebugShoppingReceiver"
+            android:exported="true" />
+        <receiver
+            android:name=".debug.DebugSampleReceiver"
             android:exported="true" />
     </application>
 </manifest>

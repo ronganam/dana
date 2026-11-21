@@ -4,7 +4,12 @@ import io.github.ronganam.dana.protocol.ShopItem
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.runtime.remember
 import android.view.HapticFeedbackConstants
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.graphicsLayer
+import io.github.ronganam.dana.wear.ui.theme.DanaMotion
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -93,9 +98,9 @@ fun ShoppingScreen(
             item(key = "title") { Title(Shop.subtitle(state, now)) }
             if (onAdd != null && canEdit) item(key = "add") { AddButton(onAdd) }
             if (state.unreachable && waiting > 0) item(key = "unreachable") {
-                Line(stringResource(R.string.phone_unreachable_waiting, waiting), DanaWear.Warning)
+                Line(stringResource(R.string.phone_unreachable_waiting, waiting), DanaWear.Amber)
             }
-            state.notice?.let { n -> item(key = "notice") { Line(n.text, if (n.error) DanaWear.Warning else DanaWear.InkSoft) } }
+            state.notice?.let { n -> item(key = "notice") { Line(n.text, if (n.error) DanaWear.Rose else DanaWear.InkSoft) } }
             when {
                 state.list == null -> item(key = "none") { Calm(stringResource(R.string.no_list_yet), stringResource(R.string.open_dana_on_your_phone)) }
                 Shop.allDone(state, now) -> item(key = "done") {
@@ -204,7 +209,7 @@ private fun ItemRow(row: ShopRow.Item, canEdit: Boolean, onTap: () -> Unit) {
             .fillMaxWidth()
             .heightIn(min = 52.dp)
             .clip(shape)
-            .background(if (row.ticked) DanaWear.AccentContainer else DanaWear.Surface)
+            .background(if (row.ticked) DanaWear.tint(DanaWear.Sage) else DanaWear.Surface)
             .clickable(enabled = canEdit, role = Role.Checkbox, onClickLabel = stringResource(if (row.ticked) R.string.put_back else R.string.mark_as_bought), onClick = onTap)
             .semantics {
                 stateDescription = stateText
@@ -244,16 +249,27 @@ private fun ItemRow(row: ShopRow.Item, canEdit: Boolean, onTap: () -> Unit) {
     }
 }
 
+/** Ticked, the ring fills with sage and the check scales in (read in draw / layer only: no recomposition per frame). */
 @Composable
 private fun Ring(ticked: Boolean) {
+    val fill = animateFloatAsState(if (ticked) 1f else 0f, tween(DanaMotion.BASE - 40, easing = DanaMotion.Standard), label = "tick")
     Box(
         Modifier
             .size(24.dp)
-            .clip(CircleShape)
-            .then(if (ticked) Modifier.background(DanaWear.Accent) else Modifier.border(2.dp, DanaWear.InkSoft, CircleShape)),
+            .border(2.dp, if (ticked) DanaWear.Sage else DanaWear.InkSoft, CircleShape)
+            .drawBehind { if (fill.value > 0f) drawCircle(DanaWear.Sage, alpha = fill.value) },
         contentAlignment = Alignment.Center
     ) {
-        if (ticked) Icon(Icons.Filled.Check, contentDescription = null, tint = DanaWear.OnAccent, modifier = Modifier.size(16.dp))
+        Icon(
+            Icons.Filled.Check,
+            contentDescription = null,
+            tint = DanaWear.OnAccent,
+            modifier = Modifier.size(16.dp).graphicsLayer {
+                alpha = fill.value
+                scaleX = 0.4f + 0.6f * fill.value
+                scaleY = 0.4f + 0.6f * fill.value
+            }
+        )
     }
 }
 

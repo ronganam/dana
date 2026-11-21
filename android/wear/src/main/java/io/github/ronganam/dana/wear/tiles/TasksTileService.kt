@@ -92,17 +92,17 @@ class TasksTileService : TileService() {
 
         var row = 0
 
-        column.addContent(buildPaddedText(getString(R.string.tile_tasks_count, tasks.size), COLOR_ORANGE, 12f, true, row++, totalRows))
+        column.addContent(buildPaddedText(getString(R.string.tile_tasks_count, tasks.size), COLOR_AMBER, 12f, true, row++, totalRows))
         column.addContent(Spacer.Builder().setHeight(DimensionBuilders.dp(3f)).build())
 
         if (tasks.isEmpty()) {
-            column.addContent(buildPaddedText(getString(R.string.tile_all_clear), COLOR_LIGHT_GRAY, 12f, false, row++, totalRows))
+            column.addContent(buildPaddedText(getString(R.string.tile_all_clear), COLOR_INK_SOFT, 12f, false, row++, totalRows))
         } else {
             var displayed = 0
             for ((group, groupTasks) in visibleGroups) {
                 if (group.isNotEmpty()) {
                     val emoji = groupTasks.first().groupEmoji?.let { "$it " } ?: ""
-                    column.addContent(buildPaddedText("$emoji$group", COLOR_LIGHT_GRAY, 10f, true, row++, totalRows))
+                    column.addContent(buildPaddedText("$emoji$group", COLOR_INK_SOFT, 10f, true, row++, totalRows))
                 }
                 for (task in groupTasks) {
                     column.addContent(buildTaskRow(task, row++, totalRows))
@@ -112,7 +112,7 @@ class TasksTileService : TileService() {
             if (tasks.size > MAX_TASKS) {
                 column.addContent(buildPaddedText(
                     getString(R.string.tile_more, tasks.size - MAX_TASKS),
-                    COLOR_LIGHT_GRAY, 10f, false, row++, totalRows
+                    COLOR_INK_SOFT, 10f, false, row++, totalRows
                 ))
             }
         }
@@ -208,7 +208,7 @@ class TasksTileService : TileService() {
                     .setFontStyle(
                         LayoutElementBuilders.FontStyle.Builder()
                             .setSize(DimensionBuilders.sp(12f))
-                            .setColor(ColorBuilders.argb(COLOR_WHITE))
+                            .setColor(ColorBuilders.argb(COLOR_INK))
                             .build()
                     )
                     .build()
@@ -278,10 +278,10 @@ class TasksTileService : TileService() {
 
     private fun priorityColor(priority: String): Int {
         return when (priority.lowercase()) {
-            "high", "urgent", "critical" -> COLOR_RED
-            "medium", "normal" -> COLOR_ORANGE
-            "low" -> COLOR_GREEN
-            else -> COLOR_ORANGE
+            "high", "urgent", "critical" -> COLOR_EMBER
+            "medium", "normal" -> COLOR_AMBER
+            "low" -> COLOR_SAGE
+            else -> COLOR_AMBER
         }
     }
 
