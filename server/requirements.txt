@@ -4,7 +4,7 @@
 aiohttp>=3.9
 yarl>=1.9
 aiogram>=3.0.0
-litellm>=1.108.3
+litellm>=1.110.0
 # litellm>=1.105 eagerly imports its MCP gateway on every tools= call and that
 # import chain needs the `mcp` package (upstream bug BerriAI/litellm#46045).
 # Remove once the upstream fix (BerriAI/litellm#46269) ships.
