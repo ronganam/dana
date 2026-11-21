@@ -219,7 +219,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
         val idleThresholdMs = 2 * 60 * 1000L // 2 minutes
 
         val isIdleTooLong = (now - lastActiveTime) > idleThresholdMs
-        val hasMessages = mainViewModel.chatMessages.value.isNotEmpty()
+        val hasMessages = mainViewModel.chatController.chatMessages.value.isNotEmpty()
 
         if (isIdleTooLong || !hasMessages) {
             mainViewModel.startNewSession(saveOld = true)
@@ -231,17 +231,17 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
         delayedVoiceRecordingJob?.cancel()
         delayedVoiceRecordingJob = CoroutineScope(Dispatchers.Main).launch {
             kotlinx.coroutines.delay(400)
-            mainViewModel.startVoiceRecording()
+            mainViewModel.chatController.startVoiceRecording()
         }
 
         // Speak replies as they finish. What is on screen when the sheet opens
         // was said before; later replies are spoken once each, by text (the
         // thread's stored copies replace the live bubbles when a run ends).
         spokenReplies.clear()
-        mainViewModel.chatMessages.value.filter { isSpeakable(it) }.forEach { rememberSpoken(it.message) }
-        var lastUserId = mainViewModel.chatMessages.value.lastOrNull { it.isUser }?.id
+        mainViewModel.chatController.chatMessages.value.filter { isSpeakable(it) }.forEach { rememberSpoken(it.message) }
+        var lastUserId = mainViewModel.chatController.chatMessages.value.lastOrNull { it.isUser }?.id
         voiceCollectionJob = CoroutineScope(Dispatchers.Main).launch {
-            mainViewModel.chatMessages.collect { messages ->
+            mainViewModel.chatController.chatMessages.collect { messages ->
                 val isMuted = prefs.getBoolean("is_muted", false)
                 // A new user turn supersedes anything still queued.
                 val userId = messages.lastOrNull { it.isUser }?.id
@@ -360,7 +360,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
             keyCode == android.view.KeyEvent.KEYCODE_VOICE_ASSIST ||
             keyCode == android.view.KeyEvent.KEYCODE_HEADSETHOOK ||
             keyCode == android.view.KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE) {
-            mainViewModel.stopVoiceRecording()
+            mainViewModel.chatController.stopVoiceRecording()
             return true
         }
         return super.onKeyUp(keyCode, event)
@@ -378,7 +378,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
 
         delayedVoiceRecordingJob?.cancel()
         delayedVoiceRecordingJob = null
-        mainViewModel.stopVoiceRecording()
+        mainViewModel.chatController.stopVoiceRecording()
         prefs.edit().putLong("last_active_timestamp", System.currentTimeMillis()).apply()
         voiceCollectionJob?.cancel()
         voiceCollectionJob = null

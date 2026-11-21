@@ -88,7 +88,7 @@ private fun takeOver(inner: Destination, toMore: () -> Unit) = Destination(
 @Composable
 private fun MoreList(viewModel: MainViewModel, selected: MoreItem?) {
     val shell = viewModel.shellController
-    val calls by viewModel.calls.collectAsState()
+    val calls by viewModel.callsController.calls.collectAsState()
     val people by viewModel.peopleController.people.collectAsState()
     val addons by viewModel.addons.collectAsState()
     val shoppingScreen by viewModel.shoppingController.screen.collectAsState()

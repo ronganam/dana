@@ -38,12 +38,12 @@ import io.github.ronganam.dana.ui.viewmodels.MainViewModel
  */
 @Composable
 fun MemoryScreen(viewModel: MainViewModel) {
-    LaunchedEffect(Unit) { viewModel.fetchMemories() }
+    LaunchedEffect(Unit) { viewModel.memoryController.fetchMemories() }
 
     val tier = windowTier()
     val wide = tier != WindowTier.COMPACT
-    val memories by viewModel.memories.collectAsState()
-    val isLoading by viewModel.isLoadingMemories.collectAsState()
+    val memories by viewModel.memoryController.memories.collectAsState()
+    val isLoading by viewModel.memoryController.isLoadingMemories.collectAsState()
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var categoryFilter by rememberSaveable { mutableStateOf("") } // "" = all types
@@ -142,7 +142,7 @@ fun MemoryScreen(viewModel: MainViewModel) {
                     memory = null,
                     availableCategories = categories,
                     onSave = { key, value, category ->
-                        viewModel.createMemory(key, value, category)
+                        viewModel.memoryController.createMemory(key, value, category)
                         creating = false
                         selectedKey = key
                     },
@@ -154,12 +154,12 @@ fun MemoryScreen(viewModel: MainViewModel) {
                     memory = selected,
                     availableCategories = categories,
                     onSave = { key, value, category ->
-                        viewModel.updateMemory(selected.key, key, value, category)
+                        viewModel.memoryController.updateMemory(selected.key, key, value, category)
                         editing = false
                         selectedKey = key
                     },
                     onDelete = {
-                        viewModel.deleteMemory(selected.key)
+                        viewModel.memoryController.deleteMemory(selected.key)
                         editing = false
                         selectedKey = null
                     },
@@ -171,7 +171,7 @@ fun MemoryScreen(viewModel: MainViewModel) {
                     memory = selected,
                     onEdit = { editing = true },
                     onDelete = {
-                        viewModel.deleteMemory(selected.key)
+                        viewModel.memoryController.deleteMemory(selected.key)
                         selectedKey = null
                     }
                 )
@@ -267,13 +267,13 @@ fun MemoryScreen(viewModel: MainViewModel) {
                         sheetOpen = false
                     },
                     onSave = { newKey, value, category ->
-                        if (creating) viewModel.createMemory(newKey, value, category)
-                        else selected?.let { viewModel.updateMemory(it.key, newKey, value, category) }
+                        if (creating) viewModel.memoryController.createMemory(newKey, value, category)
+                        else selected?.let { viewModel.memoryController.updateMemory(it.key, newKey, value, category) }
                         creating = false
                         sheetOpen = false
                     },
                     onDelete = {
-                        selected?.let { viewModel.deleteMemory(it.key) }
+                        selected?.let { viewModel.memoryController.deleteMemory(it.key) }
                         creating = false
                         sheetOpen = false
                         selectedKey = null

@@ -140,13 +140,13 @@ fun FloatingAssistantOverlay(
     val scope = rememberCoroutineScope()
     val clipboardManager = LocalClipboardManager.current
 
-    val messages by viewModel.chatMessages.collectAsState()
-    val isRecording by viewModel.isRecording.collectAsState()
-    val isStreaming by viewModel.isStreaming.collectAsState()
-    val statusText by viewModel.chatStatusText.collectAsState()
-    val currentSessionId by viewModel.currentSessionId.collectAsState()
-    val pendingImageUri by viewModel.pendingImageUri.collectAsState()
-    val selectionRequest by viewModel.selectionRequest.collectAsState()
+    val messages by viewModel.chatController.chatMessages.collectAsState()
+    val isRecording by viewModel.chatController.isRecording.collectAsState()
+    val isStreaming by viewModel.chatController.isStreaming.collectAsState()
+    val statusText by viewModel.chatController.chatStatusText.collectAsState()
+    val currentSessionId by viewModel.chatController.currentSessionId.collectAsState()
+    val pendingImageUri by viewModel.chatController.pendingImageUri.collectAsState()
+    val selectionRequest by viewModel.chatController.selectionRequest.collectAsState()
     val serverStatus by viewModel.serverStatus.collectAsState()
     val undos by viewModel.chatController.undos.collectAsState()
     val threadMode = viewModel.chatController.isThreadMode
@@ -196,7 +196,7 @@ fun FloatingAssistantOverlay(
             ActivityResultContracts.RequestPermission()
         ) { isGranted ->
             if (isGranted) {
-                viewModel.startVoiceRecording()
+                viewModel.chatController.startVoiceRecording()
             }
         }
     } else {
@@ -207,7 +207,7 @@ fun FloatingAssistantOverlay(
         contract = ActivityResultContracts.PickVisualMedia()
     ) { uri ->
         if (uri != null) {
-            viewModel.setPendingImage(uri)
+            viewModel.chatController.setPendingImage(uri)
         }
     }
 
@@ -238,7 +238,7 @@ fun FloatingAssistantOverlay(
     }
 
     // Scroll to reveal a prompt: a selection, or a tool that asks first (its card grows when it does).
-    val pendingApproval by viewModel.pendingApproval.collectAsState()
+    val pendingApproval by viewModel.chatController.pendingApproval.collectAsState()
     LaunchedEffect(selectionRequest, pendingApproval) {
         if ((selectionRequest != null || pendingApproval != null) && listState.layoutInfo.totalItemsCount > 0) {
             kotlinx.coroutines.delay(150)
@@ -261,9 +261,9 @@ fun FloatingAssistantOverlay(
         if (!hasPermission) {
             recordAudioPermissionLauncher?.launch(Manifest.permission.RECORD_AUDIO)
         } else if (isRecording) {
-            viewModel.stopVoiceRecording()
+            viewModel.chatController.stopVoiceRecording()
         } else {
-            viewModel.startVoiceRecording()
+            viewModel.chatController.startVoiceRecording()
         }
     }
 
@@ -480,8 +480,8 @@ fun FloatingAssistantOverlay(
                                                     ToolCallCard(
                                                         messageId = msg.id,
                                                         entry = msg.toolCall,
-                                                        onToggleCollapse = { id -> viewModel.toggleToolCallCollapse(id) },
-                                                        onApprove = { approved -> viewModel.approveAction(approved) },
+                                                        onToggleCollapse = { id -> viewModel.chatController.toggleToolCallCollapse(id) },
+                                                        onApprove = { approved -> viewModel.chatController.approveAction(approved) },
                                                         modifier = Modifier
                                                             .fillMaxWidth()
                                                             .padding(horizontal = 20.dp)
@@ -530,8 +530,8 @@ fun FloatingAssistantOverlay(
                                         item(key = "selection_request_card") {
                                             SelectionCard(
                                                 request = sel,
-                                                onSelect = { indices -> viewModel.sendSelection(indices) },
-                                                onCancel = { viewModel.cancelSelection() },
+                                                onSelect = { indices -> viewModel.chatController.sendSelection(indices) },
+                                                onCancel = { viewModel.chatController.cancelSelection() },
                                                 modifier = Modifier
                                                     .padding(horizontal = 20.dp)
                                                     .animateItem(fadeInSpec = null, fadeOutSpec = null)
@@ -547,7 +547,7 @@ fun FloatingAssistantOverlay(
                                         onAction = { action ->
                                             when {
                                                 action.prefill != null -> inputText = action.prefill
-                                                action.send != null -> viewModel.sendChatMessage(action.send)
+                                                action.send != null -> viewModel.chatController.sendChatMessage(action.send)
                                             }
                                         },
                                         modifier = Modifier.padding(top = 8.dp, bottom = 10.dp)
@@ -563,7 +563,7 @@ fun FloatingAssistantOverlay(
                                     pendingImageUri = pendingImageUri,
                                     onSend = {
                                         if (inputText.isNotBlank() || pendingImageUri != null) {
-                                            if (viewModel.sendChatMessage(inputText)) inputText = ""
+                                            if (viewModel.chatController.sendChatMessage(inputText)) inputText = ""
                                         }
                                     },
                                     onVoiceToggle = toggleVoice,
@@ -572,7 +572,7 @@ fun FloatingAssistantOverlay(
                                             PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
                                         )
                                     },
-                                    onClearImage = { viewModel.clearPendingImage() },
+                                    onClearImage = { viewModel.chatController.clearPendingImage() },
                                     modifier = Modifier.padding(bottom = 14.dp),
                                     leading = if (screenShare != null && screenState != null) {
                                         { ScreenDockControl(screenState, screenShare) }

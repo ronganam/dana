@@ -52,7 +52,7 @@ fun rememberNowDestination(viewModel: MainViewModel): Destination {
     val fresh by nc.fresh.collectAsState()
     val quietOpen by shell.quietOpen.collectAsState()
     val events by viewModel.dayController.events.collectAsState()
-    val tasks by viewModel.tasks.collectAsState()
+    val tasks by viewModel.tasksController.tasks.collectAsState()
     val now by rememberNow()
     val wide = LocalShellLayout.current != ShellLayout.STACKED
 

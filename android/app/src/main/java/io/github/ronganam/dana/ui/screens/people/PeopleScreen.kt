@@ -108,7 +108,7 @@ fun PeopleScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
             onAsk = { id -> viewModel.openContextChat("person", id) },
             onOpenCall = viewModel::openCall,
             onCall = call,
-            onCompleteTask = { id -> viewModel.updateTaskStatus(id, "completed"); selectedId?.let { c.reload(it) } },
+            onCompleteTask = { id -> viewModel.tasksController.updateTaskStatus(id, "completed"); selectedId?.let { c.reload(it) } },
             onSave = c::save,
             onHide = c::hide,
         )

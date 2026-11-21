@@ -242,7 +242,7 @@ class CallsController(private val ctx: ControllerContext) {
         _uploadFormState.value = null
     }
 
-    fun updateUploadField(caller: String?, receiver: String?, timestamp: String?, instructions: String?) {
+    fun updateUploadField(caller: String? = null, receiver: String? = null, timestamp: String? = null, instructions: String? = null) {
         val current = _uploadFormState.value ?: return
         _uploadFormState.value = current.copy(
             caller = caller ?: current.caller,

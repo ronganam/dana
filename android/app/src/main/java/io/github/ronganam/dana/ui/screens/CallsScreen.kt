@@ -44,9 +44,9 @@ private val THREE_PANE_MIN_WIDTH = 900.dp
 fun CallsScreen(viewModel: MainViewModel) {
     val context = LocalContext.current
     val tier = windowTier()
-    val calls by viewModel.calls.collectAsState()
-    val isLoading by viewModel.isLoadingCalls.collectAsState()
-    val isScanning by viewModel.isScanningRecordings.collectAsState()
+    val calls by viewModel.callsController.calls.collectAsState()
+    val isLoading by viewModel.callsController.isLoadingCalls.collectAsState()
+    val isScanning by viewModel.callsController.isScanningRecordings.collectAsState()
 
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var selectedCallId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -59,19 +59,19 @@ fun CallsScreen(viewModel: MainViewModel) {
     val audioPlayer = remember(server) { CallAudioPlayer(context, server.url, server.token) }
     DisposableEffect(audioPlayer) { onDispose { audioPlayer.stop() } }
 
-    LaunchedEffect(Unit) { viewModel.fetchCalls() }
+    LaunchedEffect(Unit) { viewModel.callsController.fetchCalls() }
 
-    val uploadFormState by viewModel.uploadFormState.collectAsState()
-    val sharedAudioUri by viewModel.sharedAudioUri.collectAsState()
-    val recordingSelectionList by viewModel.recordingSelectionList.collectAsState()
+    val uploadFormState by viewModel.callsController.uploadFormState.collectAsState()
+    val sharedAudioUri by viewModel.callsController.sharedAudioUri.collectAsState()
+    val recordingSelectionList by viewModel.callsController.recordingSelectionList.collectAsState()
 
     val audioPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
-        uri?.let { viewModel.showUploadForm(it, getDisplayName(context, it), context) }
+        uri?.let { viewModel.callsController.showUploadForm(it, getDisplayName(context, it), context) }
     }
     LaunchedEffect(sharedAudioUri) {
         sharedAudioUri?.let { uri ->
-            viewModel.showUploadForm(uri, getDisplayName(context, uri), context)
-            viewModel.clearSharedAudioUri()
+            viewModel.callsController.showUploadForm(uri, getDisplayName(context, uri), context)
+            viewModel.callsController.clearSharedAudioUri()
         }
     }
 
@@ -84,13 +84,13 @@ fun CallsScreen(viewModel: MainViewModel) {
         ) {
             UploadOptionsSheet(
                 onPickFile = { showUploadOptions = false; audioPickerLauncher.launch("audio/*") },
-                onSelectRecording = { showUploadOptions = false; viewModel.startRecordingSelection() }
+                onSelectRecording = { showUploadOptions = false; viewModel.callsController.startRecordingSelection() }
             )
         }
     }
     recordingSelectionList?.let { recordings ->
         ModalBottomSheet(
-            onDismissRequest = { viewModel.clearRecordingSelection() },
+            onDismissRequest = { viewModel.callsController.clearRecordingSelection() },
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
         ) {
@@ -98,34 +98,34 @@ fun CallsScreen(viewModel: MainViewModel) {
                 recordings = recordings,
                 isScanning = isScanning,
                 onSelect = { pending ->
-                    viewModel.showUploadFormForRecording(pending)
-                    viewModel.clearRecordingSelection()
+                    viewModel.callsController.showUploadFormForRecording(pending)
+                    viewModel.callsController.clearRecordingSelection()
                 }
             )
         }
     }
     uploadFormState?.let { formState ->
         ModalBottomSheet(
-            onDismissRequest = { viewModel.dismissUploadForm() },
+            onDismissRequest = { viewModel.callsController.dismissUploadForm() },
             containerColor = MaterialTheme.colorScheme.surface,
             shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)
         ) {
             UploadFormSheet(
                 formState = formState,
-                onCallerChange = { viewModel.updateUploadField(caller = it) },
-                onReceiverChange = { viewModel.updateUploadField(receiver = it) },
-                onTimestampChange = { viewModel.updateUploadField(timestamp = it) },
-                onInstructionsChange = { viewModel.updateUploadField(instructions = it) },
-                onSubmit = { viewModel.submitUploadForm(context) },
-                onDismiss = { viewModel.dismissUploadForm() }
+                onCallerChange = { viewModel.callsController.updateUploadField(caller = it) },
+                onReceiverChange = { viewModel.callsController.updateUploadField(receiver = it) },
+                onTimestampChange = { viewModel.callsController.updateUploadField(timestamp = it) },
+                onInstructionsChange = { viewModel.callsController.updateUploadField(instructions = it) },
+                onSubmit = { viewModel.callsController.submitUploadForm(context) },
+                onDismiss = { viewModel.callsController.dismissUploadForm() }
             )
         }
     }
 
     // ---- Data ----
-    val suggestions by viewModel.callSuggestions.collectAsState()
-    val busySuggestions by viewModel.busySuggestionIds.collectAsState()
-    val labelCatalog by viewModel.callLabelCatalog.collectAsState()
+    val suggestions by viewModel.callsController.suggestions.collectAsState()
+    val busySuggestions by viewModel.callsController.busySuggestionIds.collectAsState()
+    val labelCatalog by viewModel.callsController.labelCatalog.collectAsState()
     var labelFilter by rememberSaveable { mutableStateOf<String?>(null) }
     var showQuick by rememberSaveable { mutableStateOf(false) }
     var labelEditId by rememberSaveable { mutableStateOf<String?>(null) }
@@ -232,7 +232,7 @@ fun CallsScreen(viewModel: MainViewModel) {
                         IconButton(onClick = { viewModel.navigateTo("people") }) {
                             Icon(Icons.Filled.People, contentDescription = "People")
                         }
-                        IconButton(onClick = { viewModel.fetchCalls() }) {
+                        IconButton(onClick = { viewModel.callsController.fetchCalls() }) {
                             Icon(Icons.Filled.Refresh, contentDescription = "Refresh calls")
                         }
                     }
@@ -274,7 +274,7 @@ fun CallsScreen(viewModel: MainViewModel) {
                     suggestions = suggestions.filter { it.callId == call.id },
                     busySuggestions = busySuggestions,
                     onAccept = { viewModel.acceptSuggestion(it) },
-                    onDismiss = { viewModel.dismissSuggestion(it) },
+                    onDismiss = { viewModel.callsController.dismissSuggestion(it) },
                     onAskSuggestion = { viewModel.openContextChat("suggestion", it.id) },
                     onEditLabels = { labelEditId = call.id },
                     onOpenDebrief = { io.github.ronganam.dana.CallDebriefActivity.open(context, call.id) },
@@ -305,7 +305,7 @@ fun CallsScreen(viewModel: MainViewModel) {
                 call = call,
                 onDismiss = { reanalyzeTargetId = null },
                 onReanalyze = { instructions ->
-                    viewModel.reanalyzeCall(call.id, instructions)
+                    viewModel.callsController.reanalyzeCall(call.id, instructions)
                     reanalyzeTargetId = null
                 }
             )
@@ -313,12 +313,12 @@ fun CallsScreen(viewModel: MainViewModel) {
     }
     labelEditId?.let { id ->
         calls.find { it.id == id }?.let { call ->
-            LaunchedEffect(Unit) { if (labelCatalog.isEmpty()) viewModel.fetchLabelCatalog() }
+            LaunchedEffect(Unit) { if (labelCatalog.isEmpty()) viewModel.callsController.fetchLabelCatalog() }
             io.github.ronganam.dana.LabelEditorDialog(
                 catalog = labelCatalog,
                 selected = call.labels.map { it.id },
                 onDismiss = { labelEditId = null },
-                onSave = { viewModel.updateCallLabels(call.id, it); labelEditId = null }
+                onSave = { viewModel.callsController.updateCallLabels(call.id, it); labelEditId = null }
             )
         } ?: run { labelEditId = null }
     }
@@ -326,7 +326,7 @@ fun CallsScreen(viewModel: MainViewModel) {
         DeleteCallConfirmDialog(
             onConfirm = {
                 if (selectedCallId == id) audioPlayer.stop()
-                viewModel.deleteCall(id)
+                viewModel.callsController.deleteCall(id)
                 deleteTargetId = null
                 if (tier == WindowTier.COMPACT) detailOpen = false
             },
