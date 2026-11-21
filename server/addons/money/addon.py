@@ -55,7 +55,15 @@ def accounts_section(user: User) -> str:
 
 addon = Addon(
     ADDON, web=Web(panel="money.js", style="money.css", nav=Nav("Money", icon="wallet", order=20)), order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories")},
-    description="Bank and card transactions",
+    title="Money", icon="wallet",
+    description="Your bank and card spending, balances and ways to save",
+    features=("Spending, income and balances in chat and on the Money page",
+              "Subscriptions, card bills and your balance ahead",
+              "Ways to save and spending worth watching"),
+    setup=("Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the "
+           "Money page.",),
+    examples=("How much did I spend on food this month?", "What subscriptions do I pay for?"),
+    disconnect_warning="Your saved bank and card logins, accounts and transactions are deleted from Dana.",
     on_change=sources.on_change,
     prompt_section=accounts_section,
     prompt_parts=(

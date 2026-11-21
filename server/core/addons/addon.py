@@ -116,6 +116,26 @@ class InvalidValue(ValueError):
         self.field = field
 
 
+# Limits of the words a manifest gives the Addons page (checked when it is declared).
+MAX_LABEL = 40
+MAX_HELP = 200
+MAX_PLACEHOLDER = 80
+MAX_LINE = 200
+MAX_LINES = 8
+ICON = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+
+
+def _https_url(owner: str, url: str) -> None:
+    """Refuse a help link that is not a plain ``https://`` address."""
+    if url and (not url.startswith("https://") or len(url) <= len("https://") or any(c.isspace() for c in url)):
+        raise ValueError(f"{owner}: url {url!r} must be an https:// address")
+
+
+def _short(owner: str, what: str, text: str, limit: int) -> None:
+    if len(text) > limit:
+        raise ValueError(f"{owner}: {what} is {len(text)} characters; keep it to {limit}")
+
+
 @dataclass(frozen=True)
 class Field:
     """One credential or setting of an addon.
@@ -124,16 +144,38 @@ class Field:
     not set one. ``required`` (credentials only): connecting without it is
     refused. ``type``: one of :data:`FIELD_TYPES` (what the value must look
     like and who may set it).
+
+    What the Addons page shows beside the input, for someone setting it up:
+    ``label`` (its short name, "Access token"; default: the name in words),
+    ``help`` (where to find the value, one sentence of plain words: "In Home
+    Assistant: your profile → Security → Long-lived access tokens → Create
+    token"), ``url`` (an ``https://`` page where it is found or made, shown as
+    a link) and ``placeholder`` (an example value inside the empty input).
+    ``description`` stays what the value is for.
     """
     name: str
     description: str = ""
     default: Any = None
     required: bool = True
     type: str = TEXT
+    label: str = ""
+    help: str = ""
+    url: str = ""
+    placeholder: str = ""
 
     def __post_init__(self) -> None:
         if self.type not in FIELD_TYPES:
             raise ValueError(f"Field {self.name!r} has unknown type {self.type!r}")
+        owner = f"Field {self.name!r}"
+        _short(owner, "label", self.label, MAX_LABEL)
+        _short(owner, "help", self.help, MAX_HELP)
+        _short(owner, "placeholder", self.placeholder, MAX_PLACEHOLDER)
+        _https_url(owner, self.url)
+
+    @property
+    def title(self) -> str:
+        """Its name for people: ``label``, else the name in words ("api_key" → "Api key")."""
+        return self.label or self.name.replace("_", " ").capitalize()
 
     @property
     def secret(self) -> bool:
@@ -264,6 +306,17 @@ class Addon:
         realtime: False keeps the addon's tools out of realtime voice calls,
             which have no Approve card and no rule for untrusted content
             (``gmail``): there they are neither offered nor run.
+        icon: Its icon on the Addons page: a Lucide icon name (``"house"``).
+        features: What it adds for the user, a short line each in plain words
+            ("Turn lights and devices on and off"); empty: the first line of
+            each tool's docstring.
+        setup: Steps done outside Dana before connecting, in order, one
+            sentence each ("Install the WAHA server", "Scan its QR code with
+            WhatsApp"); the Addons page numbers them before its own steps.
+        examples: Things to say to Dana once it is on ("Turn off the living
+            room lights"): shown after connecting.
+        disconnect_warning: What disconnecting deletes, in one sentence
+            (``money``: the logins and transactions); empty: nothing is deleted.
 
     Hooks are declared with the decorators below (``@addon.job``,
     ``@addon.on``, ``@addon.now_cards``…); docs/writing-an-addon.md has an
@@ -283,9 +336,23 @@ class Addon:
                  test: Optional[ConnectionTest] = None, options: Optional[SettingOptions] = None,
                  change_requires: Optional[str] = None, validate: Optional[SettingsRule] = None,
                  blocked: Optional[ConnectionBlock] = None, connect_url: Optional[str] = None,
-                 connect_label: str = "", realtime: bool = True) -> None:
+                 connect_label: str = "", realtime: bool = True, icon: str = "", features: Sequence[str] = (),
+                 setup: Sequence[str] = (), examples: Sequence[str] = (), disconnect_warning: str = "") -> None:
         if not name.isidentifier():
             raise ValueError(f"Addon {name!r} must be an identifier")
+        owner = f"Addon {name!r}"
+        if icon and not ICON.match(icon):
+            raise ValueError(f"{owner}: icon {icon!r} must be a Lucide icon name (lower-case words joined by -)")
+        for what, lines in (("features", features), ("setup", setup), ("examples", examples)):
+            if isinstance(lines, str):
+                raise ValueError(f"{owner}: {what} must be a tuple of strings, not one string")
+            if len(lines) > MAX_LINES:
+                raise ValueError(f"{owner}: {what} has {len(lines)} lines; keep it to {MAX_LINES}")
+            for line in lines:
+                if not isinstance(line, str) or not line.strip():
+                    raise ValueError(f"{owner}: every line of {what} must be words")
+                _short(owner, f"a line of {what}", line, MAX_LINE)
+        _short(owner, "disconnect_warning", disconnect_warning, MAX_LINE)
         if name in _addons:
             raise ValueError(f"Addon {name!r} is declared twice")
         for capability in (requires, change_requires):
@@ -322,6 +389,11 @@ class Addon:
         self.connect_url = connect_url
         self.connect_label = connect_label
         self.realtime = realtime
+        self.icon = icon
+        self.features: Tuple[str, ...] = tuple(features)
+        self.setup: Tuple[str, ...] = tuple(setup)
+        self.examples: Tuple[str, ...] = tuple(examples)
+        self.disconnect_warning = disconnect_warning
         self.tools: List[Tool] = []
         self.jobs: List[Job] = []
         self.services: List[Service] = []
@@ -349,6 +421,13 @@ class Addon:
         """``actor`` may connect / update / disconnect this addon (for anyone);
         None = the server itself or an operator with shell access."""
         return actor is None or self.change_requires is None or actor.level.allows(self.change_requires)
+
+    def feature_lines(self) -> Tuple[str, ...]:
+        """What it adds, for people: ``features``, else the first docstring line of its first tools."""
+        if self.features:
+            return self.features
+        lines = ((inspect.getdoc(t.func) or "").strip().splitlines() for t in self.tools)
+        return tuple(dict.fromkeys(first[0].strip() for first in lines if first and first[0].strip()))[:MAX_LINES]
 
     def field(self, name: str) -> Optional[Field]:
         """The credential or setting called ``name``."""

@@ -5,6 +5,7 @@
    "name": "hello",
    "title": "Hello",
    "description": "Example addon: greets people in your words, and reminds you who to greet.",
+   "icon": "hand",
    "author": "Dana",
    "homepage": "https://github.com/ronganam/dana/tree/master/examples/addons/hello",
    "tags": ["example"],

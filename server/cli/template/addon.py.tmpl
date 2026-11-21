@@ -7,8 +7,14 @@ addon = Addon(
     title="{{title}}",
     description="{{title}}: describe what it does in one line (the Addons page shows it)",
     version="0.1.0",
+    icon="sparkles",                                   # a Lucide icon name for the Addons page
+    # What it adds and what to say to Dana once it's on, in plain words (the Addons page shows them).
+    features=("Greets people in your words",),
+    examples=("Say hello to Noa",),
+    # setup=("A step done outside Dana before connecting",), when there is one (an account, a server).
     # Per-user choices (plain JSON); credentials=(Field(...),) would be stored encrypted.
-    settings=(Field("greeting", "How {{name}} greets people", default="Hello"),),
+    settings=(Field("greeting", "How {{name}} greets people", default="Hello", label="Greeting",
+                    help="The word Dana starts a greeting with.", placeholder="Hello"),),
     # A piece of the agent's instructions, only for users who turned the addon on.
     prompt_parts=(PromptPart("guides", "When the user asks for {{name}}, use {{name}}_hello.", rank=90),),
 )

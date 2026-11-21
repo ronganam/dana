@@ -18,8 +18,14 @@ CONTACTS_GUIDE = (
 # the refresh token comes from the Google sign-in (addons/google_account).
 addon = Addon(
     ADDON, order=110,
-    credentials=(Field("refresh_token", "Google OAuth refresh token"),),
-    description="Google Contacts",
+    title="Google Contacts", icon="contact",
+    credentials=(Field("refresh_token", "Google OAuth refresh token", label=oauth.TOKEN_LABEL, help=oauth.TOKEN_HELP),),
+    description="Names, numbers and birthdays of the people you know",
+    features=("Look up names, phone numbers, emails and birthdays",
+              "Names the people Dana knows and the numbers that call you",
+              "Add or change a contact (asks you first)"),
+    setup=oauth.SETUP,
+    examples=("What's Yael's email address?", "Whose birthday is this week?"),
     test=client.check,
     connect_url=oauth.CONNECT_PATH,
     on_connect=sync.on_connect,
