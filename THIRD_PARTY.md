@@ -7,7 +7,6 @@ Dana's own code is under the [MIT license](LICENSE). These files in the reposito
 | `android/app/src/main/res/font/inter_*.ttf`, `server/static/vendor/fonts/inter-*.woff2` | [Inter](https://github.com/rsms/inter) | SIL Open Font License 1.1 |
 | `android/*/src/main/res/font/dm_mono_regular.ttf` | [DM Mono](https://github.com/googlefonts/dm-mono) | SIL Open Font License 1.1 |
 | `android/*/src/main/res/font/instrument_serif_*.ttf` | [Instrument Serif](https://github.com/Instrument/instrument-serif) | SIL Open Font License 1.1 |
-| `android/watchface/src/main/res/font/wfs_bebasneue_*.ttf` | [Bebas Neue](https://github.com/dharmatype/Bebas-Neue) | SIL Open Font License 1.1 |
 | `server/static/vendor/lucide.min.js` | [Lucide](https://github.com/lucide-icons/lucide) icons | ISC |
 | `android/app/src/wake/assets/wakeword/melspectrogram.onnx`, `embedding_model.onnx` | [openWakeWord](https://github.com/dscripka/openWakeWord) feature models | Apache License 2.0 |
 

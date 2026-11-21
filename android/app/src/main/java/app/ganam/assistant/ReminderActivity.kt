@@ -339,7 +339,11 @@ fun ReminderScreen(
 
     val now = remember { java.time.LocalTime.now() }
     val (emoji, cleanTitle) = remember(taskTitle) { extractLeadingEmoji(taskTitle) }
-    val pColor = app.ganam.assistant.ui.screens.tasks.priorityColor(priority)
+    val pColor = when (priority.lowercase()) {
+        "high" -> app.ganam.assistant.ui.theme.Danger
+        "medium" -> app.ganam.assistant.ui.theme.Warning
+        else -> app.ganam.assistant.ui.theme.Info
+    }
 
     // Dial state shared between the dock (gesture) and the overlay (drawing).
     var activePath by remember { mutableStateOf<List<MenuNode>>(emptyList()) }

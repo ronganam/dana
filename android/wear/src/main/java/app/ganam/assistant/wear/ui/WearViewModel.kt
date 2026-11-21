@@ -384,7 +384,8 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         } finally {
             try {
                 recorder?.stop()
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                android.util.Log.w("WearViewModel", "Recorder stop failed (nothing recorded?)", e)
             }
             recorder?.release()
             turn.chunks.close()
@@ -424,7 +425,8 @@ class WearViewModel : ViewModel(), MessageClient.OnMessageReceivedListener {
         try {
             appContext.getSystemService(android.os.Vibrator::class.java)
                 ?.vibrate(android.os.VibrationEffect.createPredefined(android.os.VibrationEffect.EFFECT_TICK))
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            android.util.Log.w("WearViewModel", "No haptic tick", e)
         }
     }
 

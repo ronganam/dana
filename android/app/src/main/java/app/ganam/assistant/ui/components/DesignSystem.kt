@@ -138,36 +138,6 @@ fun StatusPill(text: String, color: Color, modifier: Modifier = Modifier) {
     }
 }
 
-/** Slot-based variant of [ScreenTopBar] for screens whose title is custom (chat, project detail). */
-@Composable
-fun ScreenTopBarSlots(
-    title: @Composable () -> Unit,
-    modifier: Modifier = Modifier,
-    navigationIcon: @Composable () -> Unit = {},
-    actions: @Composable RowScope.() -> Unit = {}
-) {
-    val openSettings = LocalOpenSettings.current
-    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.onBackground) {
-    Row(
-        modifier = modifier
-            .fillMaxWidth()
-            .statusBarsPadding()
-            .heightIn(min = 64.dp)
-            .padding(horizontal = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        navigationIcon()
-        Box(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) { title() }
-        actions()
-        if (openSettings != null) {
-            IconButton(onClick = openSettings) {
-                Icon(Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-    }
-}
-
 /** Mono, uppercase micro-label for metadata (counts, timestamps, section kickers). */
 @Composable
 fun MonoLabel(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {

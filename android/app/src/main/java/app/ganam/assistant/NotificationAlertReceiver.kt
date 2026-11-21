@@ -78,7 +78,7 @@ object NotificationAlertReceiver {
                 // Background start blocked: the full-screen notification covers it.
                 if (popping) try {
                     nm.notify(alert.notificationId, build(context, alert, pending, quiet = false).setFullScreenIntent(pending, true).build())
-                } catch (_: SecurityException) {}
+                } catch (se: SecurityException) { android.util.Log.w("NotificationAlert", "No notification permission for the alert", se) }
             }
         }
     }

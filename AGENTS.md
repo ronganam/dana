@@ -5,7 +5,7 @@
 | Path | What | Guide |
 |---|---|---|
 | `server/` | aiohttp server: the ReAct agent over LiteLLM, integrations (each kind owns its tools), REST/SSE/WebSocket APIs, the web UI (`static/`), Telegram, background pipelines, the bank-worker sidecar (`bank-worker/`) | `server/AGENTS.md`, `server/docs/` |
-| `android/` | Gradle project: `:app` (flavors `phone`, `kiosk`, `tv`), `:wear` (watch), `:watchface` | `android/AGENTS.md`, `android/docs/` |
+| `android/` | Gradle project: `:app` (flavors `phone`, `kiosk`, `tv`), `:wear` (watch) | `android/AGENTS.md`, `android/docs/` |
 | `extensions/raycast-assistant/` | Raycast extension (macOS) | its `README.md` |
 | `site.example/` | The template of a deployment's **site** folder: `site/` (gitignored, often a link to a private repository) holds one deployment's config, plugins, app defaults and notes | `docs/site.md` |
 | `.githooks/pre-push` | Pushing master runs the server tests, then deploys when `site/deploy.env` exists (`server/docs/operations.md`) | |

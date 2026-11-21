@@ -161,6 +161,8 @@ object UpdateManager {
     fun clearDownloadedUpdates(context: Context) {
         try {
             File(context.cacheDir, "updates").listFiles()?.forEach { it.delete() }
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Log.w(TAG, "Couldn't clear downloaded updates", e)
+        }
     }
 }

@@ -308,7 +308,9 @@ class TasksTileService : TileService() {
                     )
                 )
             }
-        } catch (_: Exception) {}
+        } catch (e: org.json.JSONException) {
+            android.util.Log.w("TasksTile", "Cached tasks aren't valid JSON", e)
+        }
         return result
     }
 

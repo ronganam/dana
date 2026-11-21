@@ -217,7 +217,7 @@ object MicHub {
     }
 
     private fun sleepQuietly(ms: Long) {
-        try { Thread.sleep(ms) } catch (_: InterruptedException) { }
+        try { Thread.sleep(ms) } catch (_: InterruptedException) { Thread.currentThread().interrupt() }
     }
 
     private class HubStream : PcmStream {

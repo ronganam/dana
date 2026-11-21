@@ -64,7 +64,9 @@ class WearPrefs(context: Context) {
                 val sdf = SimpleDateFormat(fmt, Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
                 val parsed = sdf.parse(start)
                 if (parsed != null) return parsed
-            } catch (_: Exception) {}
+            } catch (_: java.text.ParseException) {
+                // Not this format: try the next one.
+            }
         }
         return null
     }
@@ -120,7 +122,9 @@ class WearPrefs(context: Context) {
                 val sdf = SimpleDateFormat(fmt, Locale.US).apply { timeZone = TimeZone.getTimeZone("UTC") }
                 val date = sdf.parse(s) ?: continue
                 return date.time
-            } catch (_: Exception) {}
+            } catch (_: java.text.ParseException) {
+                // Not this format: try the next one.
+            }
         }
         return null
     }
@@ -141,7 +145,9 @@ class WearPrefs(context: Context) {
                 }
                 result.put(obj)
             }
-        } catch (_: Exception) {}
+        } catch (e: org.json.JSONException) {
+            android.util.Log.w("WearPrefs", "Cached events aren't valid JSON", e)
+        }
         return result
     }
 

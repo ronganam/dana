@@ -65,7 +65,3 @@ val HairlineStrong = DarkOutline
 val Ink = DarkInk
 val BodyStrong = DarkInkSoft
 val Body = DarkInkSoft
-val Mute = DarkMute
-val Destructive = Danger
-val ListeningGreen = Success
-val ConnectingAmber = Warning
