@@ -70,7 +70,9 @@ assert ADMIN is not None
 BOB = users.create("Bob")
 CARL = users.create("Carl")
 connections.connect(ADMIN, "money")
+connections.connect(ADMIN, "money_il")
 connections.connect(BOB, "money")
+connections.connect(BOB, "money_il")
 TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ADMIN, BOB, CARL)}
 
 # Sources are added before the event loop runs, so no sync starts.

@@ -1,10 +1,10 @@
-"""Investment accounts (Psagot Trade): the sync with its device key, the portfolio ingest, the API, the tool and the web fixture.
-Run: bin/test test_money_portfolio
+"""money_il's investment account (Psagot Trade): the sync with its device key, the portfolio ingest, the API, the tool and the web fixture.
+Run: bin/test test_money_il_portfolio
 
 ``testfakes.FakeBankWorker`` plays the bank-worker with a made-up Psagot result
-in the worker's real shape (addons/money/worker/README.md, "Psagot"): every security,
-amount and name is invented. Robin (the first admin) and Bob have ``money``;
-Carl has not. Checked: the company and its SMS code request (sender and
+in the worker's real shape (addons/money_il/worker/README.md, "Psagot"): every security,
+amount and name is invented. Robin (the first admin) and Bob have ``money`` and
+``money_il``; Carl has neither. Checked: the company and its SMS code request (sender and
 pattern the phone reads, the code reaching the job); the device key the job
 registers kept only encrypted and passed to the next job, dropped when the
 site refused it; the account (kind ``investment``, its number masked, its
@@ -51,7 +51,8 @@ from core import clock  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import Connection, crypto, store as connections  # noqa: E402
-from addons.money import api as money_api, config, dashboard, portfolio, store, sync, tools  # noqa: E402
+from addons.money import api as money_api, dashboard, store, sync, tools  # noqa: E402
+from addons.money_il import config as il_config, convert  # noqa: E402
 from addons.phone import push  # noqa: E402
 from testfakes import FakeBankWorker  # noqa: E402
 
@@ -69,9 +70,11 @@ assert ROBIN is not None
 BOB = users.create("Bob")
 CARL = users.create("Carl")
 connections.connect(ROBIN, "money")
+connections.connect(ROBIN, "money_il")
 connections.connect(BOB, "money")
+connections.connect(BOB, "money_il")
 TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ROBIN, BOB, CARL)}
-WORKER = FakeBankWorker(config.token_file())
+WORKER = FakeBankWorker(il_config.token_file())
 CODE = "482913"
 SECRETS = ["robin.trade.user", "pw-trade-ROBIN", "bob.trade.user", "pw-trade-BOB"]
 DEVICE = {"user": "robin.trade.user", "udid": "0123456789abcdef0123456789abcdef",
@@ -186,31 +189,31 @@ async def idle(source_id: str) -> bool:
 
 
 def test_pure() -> None:
-    check("action kinds", [portfolio.action_kind(a) for a in (
+    check("action kinds", [convert.action_kind(a) for a in (
         "קניה בבורסה", "מכירה בבורסה", "קנ. מחוץ לבורסה-המ", "דיבידנד", "בטול דיבידנד", "קיעה דיבידנד", "זכוי ריבית זמני",
         "התקבל מח.בסניף", "הפקדה", "משיכה לחשבון", "חיוב מס", "אחוד/פצול הון מקבל", "פידיון", "תשלום הוני",
         "הטבה באחר,מתקבל", "פקיעה לקונה", "משהו אחר", None)]
         == ["buy", "sell", "buy", "dividend", "dividend", "dividend", "interest", "deposit", "deposit", "withdrawal",
             "tax", "split", "redemption", "redemption", "benefit", "expiry", "other", "other"])
-    check("security numbers lose their padding", [portfolio.security_id(v) for v in ("01100007", 1100007, " 99400001 ", "0", "", None)]
+    check("security numbers lose their padding", [convert.security_id(v) for v in ("01100007", 1100007, " 99400001 ", "0", "", None)]
           == ["1100007", "1100007", "99400001", "0", None, None])
-    check("the account's cash is told apart from securities", portfolio.is_cash_account("99400001", None)
-          and portfolio.is_cash_account(None, 'עו"ש מט"י') and portfolio.is_cash_account("1", "עו''ש")
-          and not portfolio.is_cash_account("1100007", "קרן") and not portfolio.is_cash_account("9940900", None))
-    check("the cash side of a trade is not activity", portfolio.is_cash_leg({"Action": "נע-קניה110000"})
-          and not portfolio.is_cash_leg({"Action": "קניה בבורסה"}) and not portfolio.is_cash_leg({}))
+    check("the account's cash is told apart from securities", convert.is_cash_account("99400001", None)
+          and convert.is_cash_account(None, 'עו"ש מט"י') and convert.is_cash_account("1", "עו''ש")
+          and not convert.is_cash_account("1100007", "קרן") and not convert.is_cash_account("9940900", None))
+    check("the cash side of a trade is not activity", convert.is_cash_leg({"Action": "נע-קניה110000"})
+          and not convert.is_cash_leg({"Action": "קניה בבורסה"}) and not convert.is_cash_leg({}))
     check("a name from the market table: Hebrew, else English, else the symbol; none for others",
-          portfolio.security_name({"1": {"heb": "א", "eng": "A"}, "2": {"heb": " ", "eng": "B"}, "3": {"symbol": "C"}}, "1") == "א"
-          and portfolio.security_name({"2": {"heb": " ", "eng": "B"}}, "2") == "B"
-          and portfolio.security_name({"3": {"symbol": "C"}}, "3") == "C" and portfolio.security_name({}, "4") is None
-          and portfolio.security_name({"5": "junk"}, "5") is None)
+          convert.security_name({"1": {"heb": "א", "eng": "A"}, "2": {"heb": " ", "eng": "B"}, "3": {"symbol": "C"}}, "1") == "א"
+          and convert.security_name({"2": {"heb": " ", "eng": "B"}}, "2") == "B"
+          and convert.security_name({"3": {"symbol": "C"}}, "3") == "C" and convert.security_name({}, "4") is None
+          and convert.security_name({"5": "junk"}, "5") is None)
     check("dates: ISO, d/m/Y, ddMMyyyy; junk is none",
-          [portfolio.parse_date(v) for v in ("2026-11-17T00:00:00", "17/11/2026", "17112026", "", "soon", None)]
+          [convert.parse_date(v) for v in ("2026-11-17T00:00:00", "17/11/2026", "17112026", "", "soon", None)]
           == [datetime.date(2026, 11, 17)] * 3 + [None] * 3)
-    h = portfolio.holding_row({"EquityNumber": "0001", "OnlineNV": 4, "OnlineVL": 10.0, "CurrencyCode": "ILS"})
+    h = convert.holding_row({"EquityNumber": "0001", "OnlineNV": 4, "OnlineVL": 10.0, "CurrencyCode": "ILS"})
     check("a holding without a shekel value uses its own value when it is in shekels",
           h["value"] == 1000 and h["price"] == 2.5 and h["profit"] is None and h["cost"] is None and h["security"] == "1", h)
-    check("a holding without a security number is skipped", portfolio.holding_row({"OnlineNV": 1}) is None)
+    check("a holding without a security number is skipped", convert.holding_row({"OnlineNV": 1}) is None)
 
 
 async def test_first_sync(client: TestClient) -> str:
@@ -433,7 +436,7 @@ async def main() -> None:
             stored = json.load(f)
         drift = [k for k in captured if shape(captured[k]) != shape(stored.get(k))]
         check("fixture: tests/fixtures/money_portfolio_web.json has the payloads' current shape "
-              "(regenerate with WRITE_WEB_FIXTURE=1 bin/test test_money_portfolio)", not drift, drift)
+              "(regenerate with WRITE_WEB_FIXTURE=1 bin/test test_money_il_portfolio)", not drift, drift)
 
 
 if __name__ == "__main__":

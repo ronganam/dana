@@ -1,5 +1,5 @@
-"""Money price checks: llm.search and its sources, the check pipeline, validation, rate limits and storage per user (docs/money.md, "Price checks").
-Run: bin/test test_money_market
+"""money_il price checks: llm.search and its sources, the check pipeline, validation, rate limits and storage per user (docs/money-il.md, "Price checks").
+Run: bin/test test_money_il_market
 
 No network and no real model: ``litellm.acompletion`` answers with built
 LiteLLM responses in each provider's grounding shape (Gemini's grounding
@@ -48,7 +48,8 @@ import litellm  # noqa: E402
 
 from core import clock, llm  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
-from addons.money import market, store  # noqa: E402
+from addons.money import providers, store  # noqa: E402
+from addons.money_il import market  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
 
@@ -526,7 +527,7 @@ async def test_checks() -> None:
         try:
             market.start(ADMIN, "telecom", dict(TELECOM))
             check("start while in flight → Running", False)
-        except market.Running:
+        except providers.PriceCheckRunning:
             check("start while in flight → Running", True)
         check("BOB has no check of ADMIN's while it runs", market.latest(BOB, "telecom", TELECOM) is None)
         await settle()
@@ -555,7 +556,7 @@ async def test_checks() -> None:
         try:
             market.start(ADMIN, "telecom", TELECOM)
             check("start again within 6 h → TooSoon", False)
-        except market.TooSoon as e:
+        except providers.PriceCheckTooSoon as e:
             check("start again within 6 h → TooSoon with retry_after ≈ 6 h", 6 * 3600 - 60 <= e.retry_after <= 6 * 3600,
                   e.retry_after)
 
@@ -581,7 +582,7 @@ async def test_checks() -> None:
         try:
             market.start(ADMIN, "telecom", TELECOM)
             check("after a failure: TooSoon for 5 minutes", False)
-        except market.TooSoon as e:
+        except providers.PriceCheckTooSoon as e:
             check("after a failure: TooSoon for 5 minutes", 0 < e.retry_after <= 300, e.retry_after)
         check("BOB's result untouched by ADMIN's failure", market.latest(BOB, "telecom", TELECOM)["state"] == "ok")
 
@@ -623,7 +624,7 @@ async def test_checks() -> None:
         try:
             market.start(BOB, "telecom", TELECOM)
             check("a fresh 'checking' row → Running", False)
-        except market.Running:
+        except providers.PriceCheckRunning:
             check("a fresh 'checking' row → Running", True)
         set_row(BOB, "telecom", TELECOM, state="checking", started_at=ago(minutes=6))
         extract.answers[None] = telecom_answer()
@@ -671,7 +672,7 @@ async def test_checks() -> None:
         try:
             market.start(CAROL, "electricity", {})
             check("start: no search model → Unavailable, nothing stored", False)
-        except market.Unavailable:
+        except providers.PriceCheckUnavailable:
             check("start: no search model → Unavailable, nothing stored", market.latest(CAROL, "electricity", {}) is None)
 
     store.delete_all(ADMIN)

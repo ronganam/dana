@@ -235,7 +235,8 @@ async def test_me_and_list(client: TestClient) -> None:
                       "settings", "account", "check", "options", "connect_url", "connect_label"}
           and isinstance(ha["title"], str) and ha["source"] == "official" and ha["state"] == "on"
           and ha["needs"] == [] and ha["everyone"] is False and ha["web"] is None and ha["worker"] is False
-          and addons["money"]["worker"] is True
+          and addons["money"]["worker"] is False and addons["money_il"]["worker"] is True
+          and addons["money_il"]["needs"] == ["money"]
           and ha["connect_url"] is None and addons["calendar"]["connect_url"] == "/api/google/connect"
           and ha["connect_label"] is None and addons["calendar"]["connect_label"] is None
           and addons["telegram_account"]["connect_label"] == "Connect Telegram"

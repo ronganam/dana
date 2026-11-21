@@ -193,7 +193,7 @@ def setup(app: web.Application) -> None:      # api.py; behind the same auth as 
 
 ## Web files and workers
 
-`web=Web(panel="panel.js", style="panel.css", nav=Nav("My addon", icon="star"))` serves the addon's `web/` folder at `/addons/<name>/web/<file>` (signed in, only while the addon is enabled on the server) and puts the URLs in `/api/addons` for users who have it on. `worker=Worker(port=8091, url_env="MY_ADDON_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained: the app image leaves it out); the addon reaches it at the URL in `url_env`. Deploying and running workers: `operations.md`, "Workers"; money's bank worker (`addons/money/worker/`) is the example.
+`web=Web(panel="panel.js", style="panel.css", nav=Nav("My addon", icon="star"))` serves the addon's `web/` folder at `/addons/<name>/web/<file>` (signed in, only while the addon is enabled on the server) and puts the URLs in `/api/addons` for users who have it on. `worker=Worker(port=8091, url_env="MY_ADDON_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained: the app image leaves it out); the addon reaches it at the URL in `url_env`. Deploying and running workers: `operations.md`, "Workers"; `money_il`'s bank worker (`addons/money_il/worker/`) is the example.
 
 ## Rules that save time
 

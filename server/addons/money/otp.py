@@ -18,7 +18,7 @@ from typing import Any, Dict, Mapping, Optional
 
 from core import notify
 from core.users import User
-from addons.money import companies, config, store
+from addons.money import config, providers, store
 from addons.phone import push
 
 logger = logging.getLogger(__name__)
@@ -40,7 +40,7 @@ def _create(user: User, source: Mapping[str, Any], sync_id: str) -> Dict[str, An
     now = store.utc_now()
     request = {"id": uuid.uuid4().hex, "company": source["company"], "created_at": store.iso(now),
                "expires_at": store.iso(now + datetime.timedelta(minutes=config.CODE_MINUTES))}
-    name = companies.name_of(source["company"])
+    name = providers.name_of(source["company"])
     with store.db() as conn:
         conn.execute("UPDATE money_code_requests SET status = 'cancelled' WHERE user_id = ? AND source_id = ? "
                      "AND status = 'pending'", (user.id, source["id"]))
@@ -64,7 +64,7 @@ def _finish(user: User, request_id: str, status: str) -> None:
 
 async def _announce(user: User, company: str, request_id: str) -> None:
     """Tell the user's phone and Telegram (each best-effort)."""
-    name = companies.name_of(company)
+    name = providers.name_of(company)
     try:
         await push.send(user, "otp_request", {"request_id": request_id})
     except Exception as e:
@@ -146,12 +146,12 @@ def telegram_reply(user: User, text: str) -> Optional[str]:
         recent = [r for r in store.code_requests(user) if (r.get("created_at") or "") >= since]
         if not recent:
             return None
-        name = companies.name_of(recent[0]["company"])
+        name = providers.name_of(recent[0]["company"])
         if recent[0]["status"] == "done":
             return f"Thanks — Dana already has the code for {name}."
         return f"That code came too late: the sign-in to {name} isn't waiting for it any more."
     request = pending[0]
-    name = companies.name_of(request["company"])
+    name = providers.name_of(request["company"])
     if submit(user, request["id"], code, "telegram"):
         return f"Thanks, signing in to {name}…"
     return f"That code came too late: the sign-in to {name} isn't waiting for it any more."
@@ -159,7 +159,7 @@ def telegram_reply(user: User, text: str) -> Optional[str]:
 
 async def signed_in(user: User, source: Mapping[str, Any]) -> None:
     """The quiet "Signed in" notice on the user's phone after a code worked (best-effort)."""
-    name = companies.name_of(source["company"])
+    name = providers.name_of(source["company"])
     try:
         await push.notify(user, f"Signed in to {name}", "Dana is reading your transactions.",
                           tag=f"money-{source['id']}", channel="digest")

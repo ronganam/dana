@@ -65,7 +65,9 @@ assert ROBIN is not None
 BOB = users.create("Bob")
 CARL = users.create("Carl")
 connections.connect(ROBIN, "money")
+connections.connect(ROBIN, "money_il")
 connections.connect(BOB, "money")
+connections.connect(BOB, "money_il")
 STAMP = "2026-11-01T00:00:00+00:00"
 _ADDED: List[str] = []
 
