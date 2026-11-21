@@ -5,7 +5,8 @@
     let PHONE_ENTITY = 'sensor.phone_battery_level';
     const WATCH_ENTITY = 'sensor.oneplus_watch_3_43mm_000d_battery_level';
 
-    fetch('/api/client-config').then(r => r.ok ? r.json() : null).then(cfg => {
+    // The first battery read waits for this, so it never asks for the placeholder sensor.
+    const configReady = fetch('/api/client-config').then(r => r.ok ? r.json() : null).then(cfg => {
         if (cfg && cfg.battery_sensor) PHONE_ENTITY = cfg.battery_sensor;
     }).catch(() => {});
 
@@ -1134,8 +1135,10 @@
     refreshClimate();
     setInterval(refreshClimate, STATE_MS);
 
-    refreshBatteries();
-    setInterval(refreshBatteries, STATE_MS);
+    configReady.then(() => {
+        refreshBatteries();
+        setInterval(refreshBatteries, STATE_MS);
+    });
 
     refreshTasks();
     setInterval(refreshTasks, TASKS_MS);
