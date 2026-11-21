@@ -1,4 +1,4 @@
-/* Money screen (static/money.js, static/money-dash.js). App tokens from styles.css. Group colours: the
+/* Money screen (money.js, money-dash.js), the money addon's page. App tokens from styles.css. Group colours: the
    data-viz palette's eight dark-surface slots in their validated order (checked against --canvas), one per
    group, plus cyan for People (transfers to people count as spending and are often large); the rest of the
    groups fold into a neutral "other". A group's colour never changes with rank or filters.

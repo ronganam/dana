@@ -1,5 +1,5 @@
 /**
- * Contract test for the web Shopping panel's pure part (static/shopping-core.js, DanaShoppingCore).
+ * Contract test for the web Shopping panel's pure part (addons/shopping/web/shopping-core.js, DanaShoppingCore).
  *
  * Loads it without a browser and feeds it the *actual payloads* the API answered, captured in
  * tests/fixtures/shopping_web.json by `WRITE_WEB_FIXTURE=1 bin/test test_shopping_users`: the owner alone
@@ -20,11 +20,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = path.join(here, "..", "..", "..");  // the server folder
 const FIXTURE = process.argv[2] || path.join(SERVER, "tests", "fixtures", "shopping_web.json");
 const F = JSON.parse(fs.readFileSync(FIXTURE, "utf8"));
-const src = fs.readFileSync(path.join(SERVER, "static/shopping-core.js"), "utf8");
+const src = fs.readFileSync(path.join(SERVER, "addons/shopping/web/shopping-core.js"), "utf8");
 
 const sandbox = { console, URL, Set, Map, JSON, Object, Array, String, Number, Boolean, RegExp, Math, Date, Error };
 vm.createContext(sandbox);
-vm.runInContext(src, sandbox, { filename: "static/shopping-core.js" });
+vm.runInContext(src, sandbox, { filename: "addons/shopping/web/shopping-core.js" });
 const C = sandbox.DanaShoppingCore;
 
 let pass = 0;

@@ -1,12 +1,12 @@
 /* Money — the dashboard views of the Money tab: Overview, Spending, Cash flow, Save, Investments and Meal card (docs/money.md "Money tab").
  *
- * window.DanaMoneyDash(ctx) → {overview(el), spending(el), cashflow(el), save(el), investments(el), meals(el), redraw()}: static/money.js (the
+ * window.DanaMoneyDash(ctx) → {overview(el), spending(el), cashflow(el), save(el), investments(el), meals(el), redraw()}: money.js (the
  * controller: state, loading, events, the Transactions view, sheets) makes one with its state and helpers
  * and calls a view's function to fill its container; redraw() re-measures the charts on screen (resize).
  * Rendering only: no network and no state of its own — clicks land on data attributes that money.js
  * handles (data-go, data-link-*, data-focus, data-bill, data-horizon, data-spend-mode, data-oneoff-no,
  * data-txn-go, data-merchant, data-month-bar, data-inv-range, and the Save view's data-save-*). Geometry, words and money formatting are DanaMoneyCore's
- * (static/money-core.js, tested by test_web_money.mjs). Loaded before money.js.
+ * (money-core.js, tested by test_web_money.mjs). Loaded before money.js.
  *
  *   Overview      overview?month (tiles, forecast), insights?month, balance?days= (coming up),
  *                 pace?month (everyday pace), cashflow?end= (the typical net)

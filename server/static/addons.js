@@ -695,6 +695,7 @@
       ui.status = { tone: "ok", text: r.status === 201 ? "Connected." : "Saved." };
       renderOne(addon);
       loadOptions(addon);
+      if (r.status === 201) changed();
       return;
     }
     const e = errorText(r.status, r.body);
@@ -761,6 +762,11 @@
 
   function closeConfirm() { S.confirm = null; $("itg-modal").classList.add("hidden"); $("itg-modal").innerHTML = ""; }
 
+  /** The shell builds its navigation again (static/app-panels.js): an addon's page comes or goes. */
+  function changed() {
+    document.dispatchEvent(new CustomEvent("dana:addons-changed"));
+  }
+
   async function disconnect(addon) {
     const ui = uiOf(addon);
     ui.busy = "disconnecting"; ui.status = null;
@@ -774,6 +780,7 @@
       ui.options = null; ui.optionsState = null;
       ui.status = { tone: "", text: disconnected ? "Disconnected. Nothing else was deleted." : "It wasn't connected." };
       renderOne(addon);
+      changed();
       return;
     }
     ui.status = { tone: "bad", text: `Not disconnected. ${errorText(r.status, r.body).message}` };
@@ -791,6 +798,7 @@
       await load();  // addons that need it change state too
       S.ui[addon] = ui;
       renderOne(addon);
+      changed();
       return;
     }
     ui.status = { tone: "bad", text: errorText(r.status, r.body).message };

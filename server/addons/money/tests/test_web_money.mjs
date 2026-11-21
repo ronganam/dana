@@ -1,5 +1,5 @@
 /**
- * Contract test for the web Money panel's pure part (static/money-core.js, DanaMoneyCore).
+ * Contract test for the web Money panel's pure part (addons/money/web/money-core.js, DanaMoneyCore).
  *
  * Loads it without a browser and feeds it the *actual payloads* the API answered, captured in
  * tests/fixtures/money_web.json by `WRITE_WEB_FIXTURE=1 bin/test test_money_page` (a synthetic two-user
@@ -30,11 +30,11 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const SERVER = path.join(here, "..", "..", "..");  // the server folder
 const FIXTURE = process.argv[2] || path.join(SERVER, "tests", "fixtures", "money_web.json");
 const F = JSON.parse(fs.readFileSync(FIXTURE, "utf8"));
-const src = fs.readFileSync(path.join(SERVER, "static/money-core.js"), "utf8");
+const src = fs.readFileSync(path.join(SERVER, "addons/money/web/money-core.js"), "utf8");
 
 const sandbox = { console, Set, Map, JSON, Object, Array, String, Number, Boolean, RegExp, Math, Date, Error, encodeURIComponent, decodeURIComponent, isFinite };
 vm.createContext(sandbox);
-vm.runInContext(src, sandbox, { filename: "static/money-core.js" });
+vm.runInContext(src, sandbox, { filename: "addons/money/web/money-core.js" });
 const C = sandbox.DanaMoneyCore;
 
 let pass = 0;

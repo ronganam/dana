@@ -25,7 +25,7 @@
      "update_available": false
     }
    ],
-   "origin": "/tmp/dana-test-bbvd70ec/catalog.json",
+   "origin": "/tmp/dana-test-rf1m390u/catalog.json",
    "problems": [
     "later: source.ref 'FILL-ME' is not a full commit hash"
    ],
@@ -181,7 +181,15 @@
    "state": "on",
    "title": "Shopping",
    "version": "",
-   "web": null,
+   "web": {
+    "nav": {
+     "icon": "shopping-cart",
+     "label": "Shopping",
+     "order": 10
+    },
+    "panel": "/addons/shopping/web/shopping.js",
+    "style": "/addons/shopping/web/shopping.css"
+   },
    "why_not": null,
    "worker": false
   },
@@ -288,7 +296,15 @@
      "state": "on",
      "title": "Shopping",
      "version": "",
-     "web": null,
+     "web": {
+      "nav": {
+       "icon": "shopping-cart",
+       "label": "Shopping",
+       "order": 10
+      },
+      "panel": "/addons/shopping/web/shopping.js",
+      "style": "/addons/shopping/web/shopping.css"
+     },
      "why_not": null,
      "worker": false
     },
@@ -311,7 +327,15 @@
      "state": "on",
      "title": "Knowledge",
      "version": "",
-     "web": null,
+     "web": {
+      "nav": {
+       "icon": "folder",
+       "label": "Projects",
+       "order": 50
+      },
+      "panel": "/addons/knowledge/web/projects.js",
+      "style": "/addons/knowledge/web/projects.css"
+     },
      "why_not": null,
      "worker": false
     },
@@ -334,7 +358,15 @@
      "state": "on",
      "title": "About",
      "version": "",
-     "web": null,
+     "web": {
+      "nav": {
+       "icon": "star",
+       "label": "Memory",
+       "order": 60
+      },
+      "panel": "/addons/about/web/memory.js",
+      "style": "/addons/about/web/memory.css"
+     },
      "why_not": null,
      "worker": false
     },
@@ -357,7 +389,15 @@
      "state": "on",
      "title": "People",
      "version": "",
-     "web": null,
+     "web": {
+      "nav": {
+       "icon": "users",
+       "label": "People",
+       "order": 40
+      },
+      "panel": "/addons/people/web/people.js",
+      "style": "/addons/people/web/people.css"
+     },
      "why_not": null,
      "worker": false
     },
@@ -380,7 +420,15 @@
      "state": "on",
      "title": "Phone",
      "version": "",
-     "web": null,
+     "web": {
+      "nav": {
+       "icon": "inbox",
+       "label": "Inbox",
+       "order": 30
+      },
+      "panel": "/addons/phone/web/inbox.js",
+      "style": "/addons/phone/web/inbox.css"
+     },
      "why_not": null,
      "worker": false
     },
@@ -401,7 +449,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:46565",
+       "value": "http://127.0.0.1:40397",
        "why_not": null
       },
       {
@@ -860,7 +908,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "f557213e526d"
+   "user_id": "4a2da8aea6d4"
   },
   "status": 200
  },
@@ -1056,7 +1104,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:45967",
+       "value": "http://127.0.0.1:38267",
        "why_not": null
       },
       {
@@ -1194,7 +1242,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:41781/api",
+       "value": "http://127.0.0.1:37301/api",
        "why_not": null
       },
       {
@@ -1298,7 +1346,15 @@
      "state": "on",
      "title": "Calendar",
      "version": "",
-     "web": null,
+     "web": {
+      "nav": {
+       "icon": "calendar",
+       "label": "Calendar",
+       "order": 70
+      },
+      "panel": "/addons/calendar/web/calendar.js",
+      "style": null
+     },
      "why_not": null,
      "worker": false
     },
@@ -1452,7 +1508,7 @@
        "name": "url",
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "type": "address",
-       "value": "http://127.0.0.1:39533",
+       "value": "http://127.0.0.1:36177",
        "why_not": null
       }
      ],
@@ -1492,7 +1548,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "ec264bf645ed"
+   "user_id": "99a555fde23f"
   },
   "status": 200
  },
@@ -1575,7 +1631,15 @@
      "state": "on",
      "title": "Shopping",
      "version": "",
-     "web": null,
+     "web": {
+      "nav": {
+       "icon": "shopping-cart",
+       "label": "Shopping",
+       "order": 10
+      },
+      "panel": "/addons/shopping/web/shopping.js",
+      "style": "/addons/shopping/web/shopping.css"
+     },
      "why_not": null,
      "worker": false
     },
@@ -1827,7 +1891,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:41781/api",
+       "value": "http://127.0.0.1:37301/api",
        "why_not": null
       },
       {
@@ -2125,7 +2189,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "d1b1b8b0a4ad"
+   "user_id": "5ca869748df4"
   },
   "status": 200
  },
@@ -2321,7 +2385,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:45967",
+       "value": "http://127.0.0.1:38267",
        "why_not": null
       },
       {
@@ -2459,7 +2523,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:41781/api",
+       "value": "http://127.0.0.1:37301/api",
        "why_not": null
       },
       {
@@ -2563,7 +2627,15 @@
      "state": "on",
      "title": "Calendar",
      "version": "",
-     "web": null,
+     "web": {
+      "nav": {
+       "icon": "calendar",
+       "label": "Calendar",
+       "order": 70
+      },
+      "panel": "/addons/calendar/web/calendar.js",
+      "style": null
+     },
      "why_not": null,
      "worker": false
     },
@@ -2717,7 +2789,7 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:39533",
+       "value": "http://127.0.0.1:36177",
        "why_not": "Set by an admin"
       }
      ],
@@ -2755,7 +2827,7 @@
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "ec264bf645ed"
+   "user_id": "99a555fde23f"
   },
   "status": 200
  },
@@ -2951,7 +3023,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:45967",
+       "value": "http://127.0.0.1:38267",
        "why_not": null
       },
       {
@@ -3089,7 +3161,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:41781/api",
+       "value": "http://127.0.0.1:37301/api",
        "why_not": null
       },
       {
@@ -3193,7 +3265,15 @@
      "state": "on",
      "title": "Calendar",
      "version": "",
-     "web": null,
+     "web": {
+      "nav": {
+       "icon": "calendar",
+       "label": "Calendar",
+       "order": 70
+      },
+      "panel": "/addons/calendar/web/calendar.js",
+      "style": null
+     },
      "why_not": null,
      "worker": false
     },
@@ -3347,7 +3427,7 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:39533",
+       "value": "http://127.0.0.1:36177",
        "why_not": "Set by an admin"
       }
      ],
@@ -3385,7 +3465,7 @@
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "ec264bf645ed"
+   "user_id": "99a555fde23f"
   },
   "status": 200
  },
@@ -3409,7 +3489,7 @@
     "manage_server"
    ],
    "currency": "ILS",
-   "id": "f557213e526d",
+   "id": "4a2da8aea6d4",
    "languages": [
     "he",
     "en"
@@ -3430,7 +3510,7 @@
    ],
    "capabilities": [],
    "currency": "USD",
-   "id": "ec264bf645ed",
+   "id": "99a555fde23f",
    "languages": [
     "en"
    ],
@@ -3456,7 +3536,7 @@
      "secret": false,
      "set": true,
      "type": "address",
-     "value": "http://127.0.0.1:41781/api",
+     "value": "http://127.0.0.1:37301/api",
      "why_not": "Set by an admin"
     },
     {
@@ -3586,17 +3666,17 @@
    "users": [
     {
      "access": "admin",
-     "id": "f557213e526d",
+     "id": "4a2da8aea6d4",
      "name": "Robin Levi"
     },
     {
      "access": "member",
-     "id": "ec264bf645ed",
+     "id": "99a555fde23f",
      "name": "Bob Builder"
     },
     {
      "access": "member",
-     "id": "d1b1b8b0a4ad",
+     "id": "5ca869748df4",
      "name": "Carl"
     }
    ]

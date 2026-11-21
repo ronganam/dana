@@ -1,4 +1,4 @@
-/* Projects — the pure part of the Projects panel (static/projects.js is the controller; docs/knowledge.md).
+/* Projects — the pure part of the Projects panel (projects.js is the controller; docs/knowledge.md).
  *
  * DanaProjectsCore: no DOM, no network. Turns the API's payloads (GET /api/projects, GET
  * /api/projects/{id}/items: {project, sections, entries, tasks}) into what the panel shows: values

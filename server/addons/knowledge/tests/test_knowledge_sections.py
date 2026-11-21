@@ -114,7 +114,7 @@ def shape(value: Any) -> Any:
 
 
 async def web_fixture(c: TestClient, pid: str) -> None:
-    """The payloads the web panel reads (static/projects-core.js, test_web_projects.mjs): the owner's
+    """The payloads the web panel reads (web/projects-core.js, test_web_projects.mjs): the owner's
     list and items, and a read share's items. Written with WRITE_WEB_FIXTURE=1, else checked for drift."""
     captured = {}
     r = await c.get("/api/projects", headers=auth(ROBIN))
