@@ -48,7 +48,7 @@
       "date": "2026-12-10",
       "estimated": false,
       "kind": "income",
-      "label": "משכורת אופק"
+      "label": "משכורת נוגה תעשיות"
      },
      {
       "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
@@ -129,7 +129,7 @@
       "date": "2027-01-10",
       "estimated": false,
       "kind": "income",
-      "label": "משכורת אופק"
+      "label": "משכורת נוגה תעשיות"
      },
      {
       "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
@@ -184,7 +184,7 @@
       "date": "2027-02-10",
       "estimated": false,
       "kind": "income",
-      "label": "משכורת אופק"
+      "label": "משכורת נוגה תעשיות"
      },
      {
       "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
@@ -3184,7 +3184,7 @@
       "date": "2026-12-10",
       "estimated": false,
       "kind": "income",
-      "label": "משכורת אופק"
+      "label": "משכורת נוגה תעשיות"
      }
     ],
     "soon_low": {
@@ -3869,10 +3869,10 @@
      "first_date": "2026-08-10",
      "flow": "income",
      "last_date": "2026-11-10",
-     "merchant": "משכורת אופק",
-     "merchant_key": "משכורת אופק",
+     "merchant": "משכורת נוגה תעשיות",
+     "merchant_key": "משכורת נוגה תעשיות",
      "merchant_keys": [
-      "משכורת אופק"
+      "משכורת נוגה תעשיות"
      ],
      "monthly_cost": 1500000,
      "next_date": "2026-12-10",
@@ -4466,15 +4466,15 @@
      "category_label": "Salary",
      "category_source": "bank",
      "charge_date": null,
-     "description": "משכורת אופק",
+     "description": "משכורת נוגה תעשיות",
      "flow": "income",
      "group": "income",
      "group_label": "Income",
      "id": "8d24f18e81cc4a23b5428cb2c6722438",
      "kind": null,
      "memo": null,
-     "merchant": "משכורת אופק",
-     "merchant_key": "משכורת אופק",
+     "merchant": "משכורת נוגה תעשיות",
+     "merchant_key": "משכורת נוגה תעשיות",
      "note": null,
      "occurred_at": null,
      "purchase_date": "2026-11-10",

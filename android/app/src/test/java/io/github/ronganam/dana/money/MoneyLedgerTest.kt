@@ -91,7 +91,7 @@ class MoneyLedgerTest {
     @Test
     fun tonesBadgesAndChips() {
         assertEquals("out", MoneyLedger.amountTone(by("סופר פארם")))
-        assertEquals("in", MoneyLedger.amountTone(by("משכורת אופק")))
+        assertEquals("in", MoneyLedger.amountTone(by("משכורת נוגה תעשיות")))
         assertEquals("in", MoneyLedger.amountTone(list.first { it.flow == "refund" }))
         listOf("כאל", "העברה לחיסכון", "משיכת מזומן").forEach { assertEquals(it, "muted", MoneyLedger.amountTone(by(it))) }
         assertEquals("muted", MoneyLedger.amountTone(list.first { it.status == "unmatched" }))

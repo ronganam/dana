@@ -489,7 +489,8 @@ def test_startup_report() -> None:
                          "WHERE user_id = ? AND addon = 'whatsapp'", (BOB.id,))
             conn.commit()
         store.invalidate()
-        wa_hooks.report_whatsapp_voice_chats()
+        for u in (ADMIN, BOB):
+            wa_hooks.report_voice_chat(u)
     finally:
         wa_hooks.logger.removeHandler(handler)
         wa_hooks.logger.setLevel(level)

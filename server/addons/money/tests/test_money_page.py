@@ -139,7 +139,7 @@ C2 = account(ROBIN, S_CAL, "visaCal", "card", "4580", label="Shared card", next_
 T: Dict[str, str] = {}
 # Monthly on the bank: salary, a benefit, the mortgage; the card bills.
 for m in ("2026-08", "2026-09", "2026-10", "2026-11"):
-    T[f"salary_{m}"] = txn(ROBIN, BANK, f"{m}-10", 1_500_000, "משכורת אופק", category="salary", flow="income")
+    T[f"salary_{m}"] = txn(ROBIN, BANK, f"{m}-10", 1_500_000, "משכורת נוגה תעשיות", category="salary", flow="income")
 for m in ("2026-08", "2026-09", "2026-10"):
     txn(ROBIN, BANK, f"{m}-20", 17_300, "קצבת ילדים", category="benefits", flow="income")
     txn(ROBIN, BANK, f"{m}-20", -450_000, "משכנתא לאומי", category="housing", flow="loan")
@@ -450,7 +450,7 @@ def test_overview() -> None:
           fc["balance"] == 1_234_567 and fc["as_of"] == "2026-11-18"
           and [(e["label"], e["amount"], e["date"]) for e in fc["next"][:4]]
           == [("קצבת ילדים", 17_300, "2026-11-20"), ("משכנתא לאומי", -450_000, "2026-11-20"),
-              ("Shared card", -120_000, "2026-11-25"), ("משכורת אופק", 1_500_000, "2026-12-10")]
+              ("Shared card", -120_000, "2026-11-25"), ("משכורת נוגה תעשיות", 1_500_000, "2026-12-10")]
           and fc["soon_low"] == {"date": "2026-11-25", "balance": 1_234_567 + 17_300 - 450_000 - 120_000, "days": 45},
           fc)
     check("overview: recurring monthly total, uncategorized count, sources and what needs attention",
@@ -596,7 +596,7 @@ def test_insights_db() -> None:
           and n["account_label"] == "Cal 8763" and n["category_label"] == "Subscriptions & software"
           and items["משכנתא לאומי"]["next_date"] == "2026-11-20" and items["NAMECHEAP"]["cadence"] == "yearly", n)
     check("recurring: income (salary, the benefit)", sorted(i["merchant"] for i in rec["income"])
-          == sorted(["משכורת אופק", "קצבת ילדים"]))
+          == sorted(["משכורת נוגה תעשיות", "קצבת ילדים"]))
     check("recurring: Bob has none", insights.recurring(BOB) == {"items": [], "income": [], "monthly_total": 0})
     unusual = insights.unusual(ROBIN, "2026-11-16")
     check("unusual (Robin, since 16 Nov): Super-Pharm 14×, the fuel charged twice, the first insurance charge",

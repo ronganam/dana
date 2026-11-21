@@ -1,6 +1,6 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
-  "name": "ganam-assistant",
+  "name": "dana",
   "title": "Dana",
   "description": "Chat with Dana, your personal assistant, and manage her tasks and shopping list.",
   "icon": "icon.png",
@@ -16,7 +16,6 @@
   "keywords": [
     "assistant",
     "dana",
-    "ganam",
     "tasks",
     "shopping"
   ],
@@ -120,7 +119,7 @@
     "instructions": "Dana is the user's self-hosted personal assistant. Prefer the dedicated task and shopping tools for tasks and the shopping list; fetch tasks with get-tasks before updating one so you have its id. Use ask-dana for everything else Dana knows about (smart home, calendar, WhatsApp, calls, notifications, memories) and pass the user's request in their own words. Due dates are local times in the form YYYY-MM-DDTHH:mm. Dana may answer in Hebrew; keep her wording when quoting her.",
     "evals": [
       {
-        "input": "@ganam-assistant what tasks do I have?",
+        "input": "@dana what tasks do I have?",
         "mocks": {
           "get-tasks": [
             {
@@ -143,7 +142,7 @@
         ]
       },
       {
-        "input": "@ganam-assistant remind me to renew the car insurance next Monday at 9am",
+        "input": "@dana remind me to renew the car insurance next Monday at 9am",
         "mocks": {
           "create-task": {
             "status": "created",
@@ -164,7 +163,7 @@
         ]
       },
       {
-        "input": "@ganam-assistant add milk and eggs to the shopping list",
+        "input": "@dana add milk and eggs to the shopping list",
         "mocks": {
           "add-shopping-items": {
             "results": [
@@ -187,7 +186,7 @@
         ]
       },
       {
-        "input": "@ganam-assistant is the living room light on?",
+        "input": "@dana is the living room light on?",
         "mocks": {
           "ask-dana": {
             "reply": "Yes, the living room light is on at 60%."

@@ -118,7 +118,7 @@ check("uncategorized filter: card bills and own transfers take no category, so t
       && uncat.filter((t) => t.spending).length === ov.uncategorized);
 const tone = (m) => C.amountTone(byMerchant(m)[0]);
 check("tones: out, in (salary, refund), muted (card bill, own transfer, unmatched, a bank line with no flow)",
-      tone("סופר פארם") === "out" && tone("משכורת אופק") === "in" && C.amountTone(monthList.find((t) => t.flow === "refund")) === "in"
+      tone("סופר פארם") === "out" && tone("משכורת נוגה תעשיות") === "in" && C.amountTone(monthList.find((t) => t.flow === "refund")) === "in"
       && tone("כאל") === "muted" && tone("העברה לחיסכון") === "muted" && tone("משיכת מזומן") === "muted"
       && C.amountTone(monthList.find((t) => t.status === "unmatched")) === "muted");
 const badgeOf = (t) => plain(C.badges(t, "Cal")).map((b) => [b.type, b.text]);
@@ -359,7 +359,7 @@ check("recurring: the price change in words (the year only when it differs)", C.
 check("kinds: the list's rows carry one; badges for one-off, yearly and fixed, none for everyday or what isn't spending",
       monthList.every((t) => "kind" in t) && C.kindBadge(byMerchant("ביטוח רכב ישיר")[0]).text === "Yearly" && C.kindBadge(byMerchant("NETFLIX.COM")[0]).type === "fixed"
       && C.kindBadge(body("patch_one_off").transaction).text === "One-off" && C.kindBadge(byMerchant("סופר פארם")[0]) === null
-      && C.kindBadge(byMerchant("משכורת אופק")[0]) === null && monthList.filter((t) => t.kind).every((t) => t.spending));
+      && C.kindBadge(byMerchant("משכורת נוגה תעשיות")[0]) === null && monthList.filter((t) => t.kind).every((t) => t.spending));
 const fc = plain(C.flowChoices(body("transaction_foreign")));
 check("counts as: money out offers spending, a transfer to a person, money set aside, my own money, a loan payment, a fee, cash",
       same(fc.map((x) => x.flow), ["purchase", "transfer_out", "investment", "own_transfer", "loan", "fee", "cash"]) && fc[2].label === "Money set aside"

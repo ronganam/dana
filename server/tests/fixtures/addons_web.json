@@ -6389,6 +6389,16 @@
    ],
    "currency": "ILS",
    "id": "user-robin",
+   "kinds": [
+    "essentials",
+    "tasks",
+    "shopping",
+    "knowledge",
+    "about",
+    "people",
+    "phone",
+    "homeassistant"
+   ],
    "languages": [
     "he",
     "en"
@@ -6410,6 +6420,13 @@
    "capabilities": [],
    "currency": "USD",
    "id": "user-bob",
+   "kinds": [
+    "essentials",
+    "homeassistant",
+    "whatsapp",
+    "calendar",
+    "cameras"
+   ],
    "languages": [
     "en"
    ],

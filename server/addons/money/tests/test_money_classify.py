@@ -113,7 +113,7 @@ def poalim_pull() -> List[Dict[str, Any]]:
         poalim("2026-11-07", 50.0, "בונוס פועלים", 122),
         poalim("2026-11-08", 700.0, "הפקדת שיק", 205),
         poalim("2026-11-10", -2500.0, "העברה לחשבון", 999),
-        poalim("2026-11-09", 15000.0, "משכורת אופק בע\"מ", 999, "משכורת נובמבר"),
+        poalim("2026-11-09", 15000.0, "משכורת נוגה תעשיות בע\"מ", 999, "משכורת נובמבר"),
         poalim("2026-11-11", -410.5, "חברת החשמל", 469),
         poalim("2026-11-12", -250.0, "העברה לחשבון", 999, "לדני כהן"),
     ]}, {"accountNumber": BANK_B, "txns": [poalim("2026-11-11", 2500.0, "העברה מחשבון", 999)]}]
@@ -148,7 +148,7 @@ ANSWERS: Dict[str, Tuple[str, str, Optional[str]]] = {
     "בגדי זוהר בע\"מ": ("בגדי זוהר", "clothing", None),
     "קפה הפינה": ("קפה הפינה", "restaurants", None),
     "סופר גן": ("Super Gan", "groceries", None),
-    "משכורת אופק בע\"מ": ("אופק", "salary", "income"),
+    "משכורת נוגה תעשיות בע\"מ": ("נוגה", "salary", "income"),
     "חברת החשמל": ("חברת החשמל", "utilities", "not_a_flow"),
     "העברה לחשבון": ("העברה", "transfers", "transfer_out"),
     # A stranger's transfer note led the model astray: a bank line never takes a model name.
@@ -287,9 +287,9 @@ async def test_deterministic_and_model() -> None:
     check("own transfers: a debit and an equal credit on the other bank account a day apart → own_transfer, "
           "no category", all(o["flow"] == "own_transfer" and o["category"] is None for o in own), own)
     check("own transfers: never sent to the model", "העברה מחשבון" not in model.descriptions())
-    salary, power, dani = one(ADMIN, "משכורת אופק בע\"מ"), one(ADMIN, "חברת החשמל"), one(ADMIN, "העברה לחשבון", -25000)
+    salary, power, dani = one(ADMIN, "משכורת נוגה תעשיות בע\"מ"), one(ADMIN, "חברת החשמל"), one(ADMIN, "העברה לחשבון", -25000)
     check("model: bank rows get flow and category (salary → income), but keep the bank's own name",
-          (salary["flow"], salary["category"], salary["merchant"]) == ("income", "salary", "משכורת אופק בע\"מ"),
+          (salary["flow"], salary["category"], salary["merchant"]) == ("income", "salary", "משכורת נוגה תעשיות בע\"מ"),
           salary)
     check("model: an invalid bank flow becomes other", power["flow"] == "other" and power["category"] == "utilities",
           power)

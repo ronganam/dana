@@ -300,11 +300,11 @@ txn(ROBIN, CARD, D(2026, 3, 15), -48_000, "תוכנת הדרום שנתי", "sub
 FX: List[Tuple[D, int, int, str]] = []   # (day, charged agorot, foreign cents, currency)
 for m in months(D(2026, 3, 1), D(2026, 11, 1)):
     charged = -7_630 if m < D(2026, 7, 1) else -7_420
-    txn(ROBIN, CARD, m.replace(day=5), charged, "PERPLEXITY PRO MONTHLY", "subscriptions", "purchase", orig=-2_000, currency="USD")
+    txn(ROBIN, CARD, m.replace(day=5), charged, "CLAUDE PRO MONTHLY", "subscriptions", "purchase", orig=-2_000, currency="USD")
     FX.append((m.replace(day=5), -charged, 2_000, "USD"))
 for m in months(D(2026, 6, 1), D(2026, 11, 1)):
     charged = -7_630 if m < D(2026, 7, 1) else -7_420
-    txn(ROBIN, CARD, m.replace(day=12), charged, "MIDJOURNEY BASIC PLAN", "subscriptions", "purchase", orig=-2_000, currency="USD")
+    txn(ROBIN, CARD, m.replace(day=12), charged, "CHATGPT PLUS PLAN", "subscriptions", "purchase", orig=-2_000, currency="USD")
     FX.append((m.replace(day=12), -charged, 2_000, "USD"))
 for d, euros, desc in ((D(2026, 8, 3), 200, "HOTEL MARE BLU"), (D(2026, 8, 4), 150, "TRATTORIA SOLE"),
                        (D(2026, 8, 5), 300, "MUSEO CITTA"), (D(2026, 8, 6), 350, "MERCATO CENTRO")):
@@ -514,7 +514,7 @@ def test_detectors(data: Dict[str, Any]) -> None:
     lines = {x["key"]: (x["amount"], x["cadence"], x["yearly"], x["choice"]) for x in s["subitems"]}
     check("subscriptions: 5 lines (monthly at the typical price, the yearly one), ₪3,219.60 a year",
           s["at_stake"] == 321_960 and lines == {
-              "perplexity pro monthly": (7_420, "monthly", 89_040, None), "midjourney basic plan": (7_420, "monthly", 89_040, None),
+              "claude pro monthly": (7_420, "monthly", 89_040, None), "chatgpt plus plan": (7_420, "monthly", 89_040, None),
               "ענן הצפון": (5_000, "monthly", 60_000, None), "תוכנת הדרום שנתי": (48_000, "yearly", 48_000, None),
               "סטרימינג הצפון": (2_990, "monthly", 35_880, None)} and s["saving"] is None, lines)
     mo = items["mortgage"]
@@ -533,10 +533,10 @@ def test_detectors(data: Dict[str, Any]) -> None:
     check("leak: the cloud bill rising (₪120 in 3 months vs ₪47): 12 months = ₪276",
           lk["at_stake"] == 27_600 and lk["title"] == "ענן הצפון is growing", (lk["at_stake"], lk["title"]))
     ov = items["overlap:ai"]
-    check("overlap: Perplexity and Midjourney both charged in 60 days, ₪1,780.80 a year, named as on the bill",
+    check("overlap: Claude and ChatGPT both charged in 60 days, ₪1,780.80 a year, named as on the bill",
           ov["at_stake"] == 178_080 and ov["title"] == "2 AI assistants at once"
-          and ov["summary"].startswith("MIDJOURNEY BASIC PLAN and PERPLEXITY PRO MONTHLY: ₪1,780.80 a year")
-          and ov["scope"] == {"merchants": ["midjourney basic plan", "perplexity pro monthly"]}, ov)
+          and ov["summary"].startswith("CHATGPT PLUS PLAN and CLAUDE PRO MONTHLY: ₪1,780.80 a year")
+          and ov["scope"] == {"merchants": ["chatgpt plus plan", "claude pro monthly"]}, ov)
     pe = items["penalties"]
     check("penalties: a parking fine and a late fee, ₪112.40", pe["at_stake"] == 11_240, pe["at_stake"])
     ln = items["late_night"]

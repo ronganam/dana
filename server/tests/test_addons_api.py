@@ -211,11 +211,11 @@ async def test_me_and_list(client: TestClient) -> None:
     check("me: the first admin", status == 200 and me["id"] == ADMIN.id and me["access"] == "admin"
           and me["capabilities"] == ["ops", "manage_users", "see_everyone", "manage_server"]
           and me["addons"][0] == "essentials" and "homeassistant" in me["addons"] and "ops" not in me["addons"]
-          and me["languages"] == ["he", "en"] and me["currency"] == "ILS" and "kinds" not in me, me)
+          and me["languages"] == ["he", "en"] and me["currency"] == "ILS" and me["kinds"] == me["addons"], me)
     status, me = await call(client, "GET", "/api/me", BOB_AUTH)
     check("me: a member with nothing connected (the server's languages and currency)", status == 200 and me == {
         "id": BOB.id, "name": "Bob Builder", "access": "member", "capabilities": [], "addons": ["essentials"],
-        "languages": ["en"], "currency": "USD"}, me)
+        "kinds": ["essentials"], "languages": ["en"], "currency": "USD"}, me)
     status, _ = await call(client, "GET", "/api/me", {})
     check("me: needs credentials", status == 401)
 

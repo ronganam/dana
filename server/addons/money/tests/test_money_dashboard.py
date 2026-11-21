@@ -134,7 +134,7 @@ SALARY = [2_300_000, 2_500_000, 2_350_000, 2_400_000, 2_550_000, 2_300_000, 2_45
           2_380_000, 2_410_000, 2_415_000]
 for i, m in enumerate(months):
     day = D(2026, 8, 2) if m == D(2026, 8, 1) else m  # 1 Aug 2026 was a Saturday
-    T[f"salary_{m:%Y-%m}"] = txn(ROBIN, BANK, day, SALARY[i], "משכורת אופק בע\"מ", "salary", "income")
+    T[f"salary_{m:%Y-%m}"] = txn(ROBIN, BANK, day, SALARY[i], "משכורת נוגה תעשיות בע\"מ", "salary", "income")
     T[f"mortgage_{m:%Y-%m}"] = txn(ROBIN, BANK, day, -(760_000 - 1_000 * i), "פועלים-משכנתא", "housing", "loan")
 
 # Card everyday: groceries every Friday, restaurants on the 8th and the 22nd.
@@ -218,7 +218,7 @@ def test_kinds_and_detection() -> None:
           [kind(k) for k in ("car", "laptop", "laptop_refund", "sofa_1", "sofa_2", "gift")] == ["one_off"] * 6)
     check("kinds: money set aside and income are not spending", kind("psagot") is None and kind("salary_2026-10") is None)
     rec = {i["merchant"]: i for i in BOOK.recurring}
-    sal = rec.get("משכורת אופק בע\"מ")
+    sal = rec.get("משכורת נוגה תעשיות בע\"מ")
     check("recurring: the salary is found though its amount varies (median of the last three), due on the 1st",
           sal and sal["direction"] == "in" and sal["variable"] and sal["amount"] == 2_410_000
           and sal["next_date"] == "2026-12-01", sal)

@@ -26,7 +26,9 @@ from addons.phone.notifications.values import ESCALATION_PREFIX, MAX_BATCH, post
 logger = logging.getLogger(__name__)
 
 # Our own notifications and the escalation re-posts must never loop back in.
-_OWN_PACKAGES = ("io.github.ronganam.dana",)  # the app and its .kiosk / .tv flavors (a prefix)
+# The app and its .kiosk / .tv flavors (a prefix), and the app built before the
+# rename, while a phone still has it installed beside the new one.
+_OWN_PACKAGES = ("io.github.ronganam.dana", "app.ganam.assistant")
 
 
 def content_hash(n: Dict[str, Any]) -> str:

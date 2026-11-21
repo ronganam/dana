@@ -75,4 +75,5 @@ def setup(app: web.Application) -> None:
     """Register the WAHA webhook."""
     app.router.add_post("/webhook/waha", handle_waha_webhook)
     if not os.getenv(SECRET_ENV, "").strip():
-        logger.info(f"{SECRET_ENV} is not set: WAHA webhooks are refused (docs/whatsapp.md)")
+        logger.info(f"{SECRET_ENV} is not set: every WAHA webhook is refused, so incoming WhatsApp messages and voice "
+            f"notes are not received. Set it to WAHA's WHATSAPP_HOOK_HMAC_KEY (docs/whatsapp.md)")
