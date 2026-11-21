@@ -5,7 +5,9 @@ from addons.tasks import groups
 
 # Connecting it gives the user the default task lists.
 addon = Addon(
-    "tasks", order=20, default_on=True, llm_jobs={"task_emoji": LlmJob("fast", "Task emoji"), "task_group": LlmJob("fast", "Task grouping")}, description="Task lists, tasks and their triggers", on_connect=groups.ensure_default_groups,
+    "tasks", order=20, default_on=True, llm_jobs={"task_emoji": LlmJob("fast", "Task emoji"), "task_group": LlmJob("fast", "Task grouping")}, title="Tasks", icon="list-checks", description="Task lists, reminders and their triggers",
+    features=("Tasks and lists, by chat or voice", "Reminders at a time, when you arrive somewhere or wake up"),
+    examples=("Remind me tomorrow at 9 to call the bank", "What's on my list today?"), on_connect=groups.ensure_default_groups,
     prompt_parts=(
         PromptPart("tools", "task list/todos", rank=30),
         PromptPart("undoable", "adding/completing/editing tasks", rank=10),

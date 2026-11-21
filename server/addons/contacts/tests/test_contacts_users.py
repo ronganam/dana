@@ -333,7 +333,7 @@ async def tool(user, tool_name: str, /, **args: Any) -> str:
 def test_kind() -> None:
     kind = registry.get_addon("contacts")
     check("kind: Google Contacts, one credential, the Google sign-in, exactly the contacts scope",
-          kind.description == "Google Contacts" and [f.name for f in kind.credentials] == ["refresh_token"]
+          kind.title == "Google Contacts" and [f.name for f in kind.credentials] == ["refresh_token"]
           and kind.connect_url == oauth.CONNECT_PATH and not kind.settings
           and oauth.scopes_of("contacts") == ("https://www.googleapis.com/auth/contacts",)
           and oauth.google_addons() == ["calendar", "contacts", "gmail"], (oauth.scopes_of("contacts"), oauth.google_addons()))

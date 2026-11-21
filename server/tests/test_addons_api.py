@@ -62,6 +62,7 @@ from core import agent, addons_api  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from addons.calendar import client as cal_client  # noqa: E402
 from core.addons import addresses, registry, store  # noqa: E402
+from core.addons.addon import get_addon  # noqa: E402
 from addons.homeassistant import watcher as ha_watcher  # noqa: E402
 from addons.shopping import lists as shopping_lists  # noqa: E402
 from addons.tasks import groups  # noqa: E402
@@ -232,7 +233,13 @@ async def test_me_and_list(client: TestClient) -> None:
     check("list: one connection's shape (credentials only as set / not set)",
           set(ha) == {"name", "title", "description", "version", "source", "state", "needs", "everyone", "web",
                       "worker", "connected", "requires", "can_change", "why_not", "credentials",
-                      "settings", "account", "check", "options", "connect_url", "connect_label"}
+                      "settings", "account", "check", "options", "connect_url", "connect_label",
+                      "icon", "features", "pages", "setup", "examples", "disconnect_warning"}
+          and ha["icon"] == "house" and ha["title"] == "Home Assistant" and ha["pages"] == []
+          and "Turn off the living room lights" in ha["examples"] and ha["disconnect_warning"] is None
+          and addons["shopping"]["pages"] == ["Shopping"]
+          and addons["money"]["disconnect_warning"].startswith("Your saved bank and card logins")
+          and addons["whatsapp"]["setup"][0].startswith("Run a WAHA server")
           and isinstance(ha["title"], str) and ha["source"] == "official" and ha["state"] == "on"
           and ha["needs"] == [] and ha["everyone"] is False and ha["web"] is None and ha["worker"] is False
           and addons["money"]["worker"] is False and addons["money_il"]["worker"] is True
@@ -243,13 +250,22 @@ async def test_me_and_list(client: TestClient) -> None:
           and ha["connected"] is True and ha["check"] is True and ha["options"] is True
           and ha["can_change"] is True and ha["why_not"] is None
           and ha["credentials"] == [
-              {"name": "host", "description": "Home Assistant base URL, e.g. https://home.example.com",
+              {"name": "host", "label": "Address",
+               "description": "Home Assistant base URL, e.g. https://home.example.com",
+               "help": get_addon("homeassistant").credentials[0].help, "url": None,
+               "placeholder": "https://home.example.com",
                "required": True, "set": True, "type": "address", "secret": False, "value": "http://127.0.0.1:9",
                "can_change": True, "why_not": None,
                "rule": "An http:// or https:// address, without a user name, ? or #."},
-              {"name": "token", "description": "Long-lived access token", "required": True, "set": True,
+              {"name": "token", "label": "Access token", "description": "Long-lived access token",
+               "help": get_addon("homeassistant").credentials[1].help,
+               "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile", "placeholder": "",
+               "required": True, "set": True,
                "type": "text", "secret": True, "can_change": True, "why_not": None, "rule": None}]
-          and {"name": "weather_entity", "description": "Weather entity for the wake briefing and the Now screen",
+          and {"name": "weather_entity", "label": "Weather",
+               "description": "Weather entity for the wake briefing and the Now screen",
+               "help": get_addon("homeassistant").field("weather_entity").help, "url": None,
+               "placeholder": "weather.forecast_home",
                "default": "weather.forecast_home", "value": "weather.forecast_home", "type": "text",
                "can_change": True, "why_not": None, "rule": None} in ha["settings"], ha)
     check("list: ops says what it requires", addons["ops"]["requires"] == "ops" and addons["tasks"]["requires"] is None)
@@ -259,7 +275,10 @@ async def test_me_and_list(client: TestClient) -> None:
           status == 200 and "ops" not in addons and [n for n, i in addons.items() if i["connected"]] == ["essentials"]
           and addons["tasks"]["state"] == "available" and addons["cameras"]["state"] == "off"
           and body["can_manage"] is False and "pending" not in body
-          and addons["calendar"]["settings"][0] == {"name": "calendar_id", "description": "Calendar new events go to",
+          and addons["calendar"]["settings"][0] == {"name": "calendar_id", "label": "Calendar for new events",
+                                                   "description": "Calendar new events go to",
+                                                   "help": get_addon("calendar").settings[0].help, "url": None,
+                                                   "placeholder": "primary",
                                                    "default": "primary", "value": "primary", "type": "text",
                                                    "can_change": True, "why_not": None, "rule": None}
           and all(not c["set"] for c in addons["homeassistant"]["credentials"]), addons.get("calendar"))
@@ -467,8 +486,10 @@ async def test_live_effects(client: TestClient) -> None:
           await until(lambda: (store.get(BOB, "whatsapp").account or "") == "972500000001@c.us"))
     status, body = await call(client, "GET", "/api/addons/whatsapp", BOB_AUTH)
     check("whatsapp: the account is in the payload, the key only as set",
-          body["account"] == "972500000001@c.us" and {"name": "api_key", "description": "WAHA API key",
-                                                      "required": False, "set": True, "type": "text", "secret": True,
+          body["account"] == "972500000001@c.us" and {"name": "api_key", "label": "WAHA API key",
+                                                      "description": "WAHA API key",
+                                                      "help": get_addon("whatsapp").credentials[1].help, "url": None,
+                                                      "placeholder": "", "required": False, "set": True, "type": "text", "secret": True,
                                                       "can_change": True, "why_not": None, "rule": None}
           in body["credentials"], body)
     status, body = await call(client, "POST", "/api/addons/whatsapp/test", BOB_AUTH)
@@ -604,7 +625,47 @@ async def test_rules_and_users(client: TestClient) -> None:
     check("users: needs credentials", status == 401)
 
 
-# --- 7. The web page's fixture: real payloads for test_web_addons.mjs ------------------------
+# --- 7. The first-run welcome -----------------------------------------------------------------------
+
+async def test_welcome(client: TestClient) -> None:
+    """Shown while a user has no optional addon on, per user; dismissing is theirs alone and can be undone."""
+    welcome = {}
+    for who, auth in (("admin", ADMIN_AUTH), ("bob", BOB_AUTH), ("carl", CARL_AUTH)):
+        status, body = await call(client, "GET", "/api/addons", auth)
+        welcome[who] = body["welcome"]
+    check("welcome: the admin has Home Assistant on → not shown",
+          welcome["admin"]["show"] is False and welcome["admin"]["dismissed"] is False, welcome["admin"])
+    bob = welcome["bob"]
+    check("welcome: a member with nothing on is welcomed, with the addons they can turn on",
+          bob["show"] is True and bob["dismissed"] is False and bob["suggested"][:3] == ["homeassistant", "whatsapp",
+                                                                                     "calendar"]
+          and len(bob["suggested"]) <= addons_api.WELCOME_SUGGESTIONS
+          and not {"cameras", "ops", "money_il", "tasks", "essentials"} & set(bob["suggested"]), bob)
+    check("welcome: Carl too", welcome["carl"]["show"] is True, welcome["carl"])
+    store.connect(CARL, "tasks")  # an addon every new user gets does not count
+    status, body = await call(client, "GET", "/api/addons", CARL_AUTH)
+    check("welcome: a default addon on still welcomes", body["welcome"]["show"] is True, body["welcome"])
+    store.disconnect(CARL, "tasks")
+    status, body = await call(client, "POST", "/api/addons/welcome", BOB_AUTH, {"dismissed": True})
+    check("welcome: Bob dismisses it", status == 200 and body["show"] is False and body["dismissed"] is True, body)
+    status, carl = await call(client, "GET", "/api/addons", CARL_AUTH)
+    status, bob_list = await call(client, "GET", "/api/addons", BOB_AUTH)
+    check("welcome: dismissed for Bob only; Carl still sees his, Bob's suggestions stay listed",
+          carl["welcome"]["show"] is True and bob_list["welcome"]["show"] is False
+          and bob_list["welcome"]["suggested"] == bob["suggested"]
+          and all(i["state"] == "available" for i in bob_list["addons"] if i["name"] in bob["suggested"]))
+    status, body = await call(client, "GET", f"/api/addons?user={CARL.id}", ADMIN_AUTH)
+    check("welcome: an admin acting for Carl gets none", body["welcome"] == {"show": False, "dismissed": False,
+                                                                           "suggested": []}, body["welcome"])
+    status, body = await call(client, "POST", "/api/addons/welcome", BOB_AUTH, {"dismissed": False})
+    check("welcome: Bob brings it back", status == 200 and body["show"] is True and body["dismissed"] is False, body)
+    status, body = await call(client, "POST", "/api/addons/welcome", BOB_AUTH, {"dismissed": "yes"})
+    check("welcome: a bad body is a 400 naming the field", status == 400 and body["field"] == "dismissed", body)
+    status, _ = await call(client, "POST", "/api/addons/welcome", {}, {"dismissed": True})
+    check("welcome: needs credentials", status == 401)
+
+
+# --- 8. The web page's fixture: real payloads for test_web_addons.mjs ------------------------
 
 WEB_FIXTURE = os.path.join(testenv.FIXTURES, "addons_web.json")
 
@@ -616,6 +677,20 @@ def shape(value: Any) -> Any:
     if isinstance(value, list):
         return [shape(v) for v in value]
     return type(value).__name__ if value is not None else None
+
+
+def run_ports() -> List[str]:
+    """The ports this run's fakes listen on (random)."""
+    return [str(fake.server.port) for fake in (HA_A, HA_B, WAHA, FRIGATE)]
+
+
+def deterministic(text: str) -> str:
+    """The fixture's text without what changes from run to run: the fakes' ports, the scratch folder, user ids."""
+    for fake, port in ((HA_A, 18123), (HA_B, 18124), (WAHA, 13000), (FRIGATE, 15000)):
+        text = text.replace(f"127.0.0.1:{fake.server.port}", f"127.0.0.1:{port}")
+    for user in users.list_users():
+        text = text.replace(user.id, f"user-{user.name.split()[0].lower()}")
+    return text.replace(testenv.scratch_dir(), "/scratch")
 
 
 async def test_web_fixture(client: TestClient) -> None:
@@ -647,6 +722,12 @@ async def test_web_fixture(client: TestClient) -> None:
     ]:
         status, payload = await call(client, method, path, auth, body)
         captured[key] = {"status": status, "body": payload}
+    # A new user, nothing on yet: the first-run welcome.
+    dee = users.create("Dee")
+    dee_token, _ = users.issue_token(dee.id, "dee")
+    status, payload = await call(client, "GET", "/api/addons", {"Authorization": f"Bearer {dee_token}"})
+    captured["list_new_user"] = {"status": status, "body": payload}
+    check("fixture: a new user is welcomed", payload["welcome"]["show"] is True, payload["welcome"])
     # A field the member may not change inside an addon they may: their WAHA address with no origin allowed.
     allowed = os.environ["MEMBER_ALLOWED_ORIGINS"]
     os.environ["MEMBER_ALLOWED_ORIGINS"] = f"homeassistant={addresses.origin(HA_B.url)}"
@@ -683,8 +764,11 @@ async def test_web_fixture(client: TestClient) -> None:
     check("fixture: a field-level error and a 403 captured",
           captured["error_field"]["status"] == 400 and captured["error_field"]["body"]["field"] == "host"
           and captured["error_forbidden"]["status"] == 403, captured["error_field"])
-    text = json.dumps(captured, indent=1, ensure_ascii=False, sort_keys=True)
+    text = deterministic(json.dumps(captured, indent=1, ensure_ascii=False, sort_keys=True))
     check("fixture: no credential value in it", not [s for s in SECRETS if s in text])
+    check("fixture: nothing of this machine or this run in it (paths, ports, user ids)",
+          testenv.scratch_dir() not in text and not any(f":{port}" in text for port in run_ports())
+          and not any(u.id in text for u in users.list_users()))
     if os.getenv("WRITE_WEB_FIXTURE"):
         with open(WEB_FIXTURE, "w", encoding="utf-8") as f:
             f.write(text + "\n")
@@ -705,6 +789,7 @@ async def main() -> None:
     os.environ["MEMBER_ALLOWED_ORIGINS"] = (f"homeassistant={addresses.origin(HA_B.url)},"
                                             f"whatsapp={addresses.origin(WAHA.url)}")
     async with TestClient(TestServer(build_app())) as client:
+        await test_welcome(client)
         await test_me_and_list(client)
         await test_put(client)
         await test_other_user(client)

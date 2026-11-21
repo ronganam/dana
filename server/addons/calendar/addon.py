@@ -11,10 +11,18 @@ SCOPES = ("https://www.googleapis.com/auth/calendar",)
 # the refresh token comes from the Google sign-in (addons/google_account).
 addon = Addon(
     ADDON, web=Web(panel="calendar.js", nav=Nav("Calendar", icon="calendar", order=70)), order=100,
-    credentials=(Field("refresh_token", "Google OAuth refresh token"),),
-    settings=(Field(DEFAULT_CALENDAR, "Calendar new events go to", "primary"),
-              Field(SELECTED, "Calendars shown and searched (ids); none chosen: the default calendar")),
-    description="Google Calendar",
+    title="Google Calendar", icon="calendar",
+    credentials=(Field("refresh_token", "Google OAuth refresh token", label=oauth.TOKEN_LABEL, help=oauth.TOKEN_HELP),),
+    settings=(Field(DEFAULT_CALENDAR, "Calendar new events go to", "primary", label="Calendar for new events",
+                    help="Where the events Dana adds go; \"primary\" is your main calendar.", placeholder="primary"),
+              Field(SELECTED, "Calendars shown and searched (ids); none chosen: the default calendar",
+                    label="Calendars Dana reads",
+                    help="Pick from the suggestions, separated by commas; empty: only your main calendar.")),
+    description="Your events in chat, on the Now screen and in the briefing",
+    features=("Your events in chat, on the Now screen, in the morning briefing and the weekly review",
+              "Add and move events, with Undo (asks first when it invites people)"),
+    setup=oauth.SETUP,
+    examples=("What's on my calendar tomorrow?", "Move my dentist appointment to Thursday at 10"),
     test=client.check,
     connect_url=oauth.CONNECT_PATH,
     prompt_parts=(

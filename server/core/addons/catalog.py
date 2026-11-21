@@ -1,8 +1,8 @@
 """The addon catalog: ``catalog.json`` at the repository root, read by the
 server and the CLI (../docs/addons.md, "The catalog").
 
-``{"addons": [{name, title, description, author, homepage, tags, min_dana,
-source: {repo, path, ref}}]}``; ``ref`` is a full commit hash, so an entry
+``{"addons": [{name, title, description, icon, author, homepage, tags, min_dana,
+source: {repo, path, ref}}]}`` (``icon``: optional, a Lucide icon name); ``ref`` is a full commit hash, so an entry
 always means exactly one version of the addon. Read from ``DANA_CATALOG_FILE``
 (a local file: tests, offline servers) or ``DANA_CATALOG_URL`` (default
 :data:`DEFAULT_URL`), with a short timeout, and kept for
@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from core.addons.addon import ICON
 from core.addons.install import FULL_COMMIT, InstallError, Source, check_path, check_repo
 
 logger = logging.getLogger(__name__)
@@ -47,9 +48,11 @@ class Entry:
     homepage: str = ""
     tags: Tuple[str, ...] = ()
     min_dana: str = ""
+    icon: str = ""
 
     def to_json(self) -> Dict[str, Any]:
-        return {"name": self.name, "title": self.title, "description": self.description, "author": self.author,
+        return {"name": self.name, "title": self.title, "description": self.description, "icon": self.icon,
+                "author": self.author,
                 "homepage": self.homepage, "tags": list(self.tags), "min_dana": self.min_dana,
                 "source": {"repo": self.source.repo, "path": self.source.path, "ref": self.source.ref}}
 
@@ -102,12 +105,15 @@ def _entry(raw: Any) -> Entry:
     tags = raw.get("tags") or []
     if not isinstance(tags, list) or not all(isinstance(t, str) for t in tags):
         raise ValueError("tags must be a list of strings")
+    icon = _text(raw.get("icon"))
+    if icon and not ICON.match(icon):
+        raise ValueError(f"icon {icon!r} is not a Lucide icon name")
     min_dana = _text(raw.get("min_dana"))
     if min_dana and not re.match(r"^\d+(\.\d+)*$", min_dana):
         raise ValueError(f"min_dana {min_dana!r} is not a version")
     return Entry(name=name, title=_text(raw.get("title")) or name.replace("_", " ").capitalize(),
                  description=_text(raw.get("description")), source=source, author=_text(raw.get("author")),
-                 homepage=_text(raw.get("homepage")), tags=tuple(tags), min_dana=min_dana)
+                 homepage=_text(raw.get("homepage")), tags=tuple(tags), min_dana=min_dana, icon=icon)
 
 
 def parse(data: Any, where: str = "") -> Catalog:

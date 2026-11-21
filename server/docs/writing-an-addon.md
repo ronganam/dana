@@ -9,7 +9,7 @@ bin/dana addons new my_addon        # from server/: writes site/addons/my_addon 
 bin/test my_addon                   # its test passes as written
 ```
 
-It writes a working addon (from `cli/template/`, shaped like the hello example): `addon.py` with a setting and a prompt line, `tools.py` with `my_addon_hello`, `api.py` with `GET /api/my_addon`, `tests/test_my_addon.py` (two users with it, one without) and a `README.md`. Restart Dana to load it and turn it on in Settings → Addons, or `bin/dana addons connect <user> my_addon`. Grow it from there: [`examples/addons/hello/`](../../examples/addons/hello/) adds a table, a job, an event handler and a Now card with an action; the `tasks` addon (`addons/tasks/`) uses every hook. To ship it to others, put it in a git repository and add an entry to `catalog.json` pinned to a full commit (`../../docs/addons.md`, "The catalog").
+It writes a working addon (from `cli/template/`, shaped like the hello example): `addon.py` with a setting and a prompt line, `tools.py` with `my_addon_hello`, `api.py` with `GET /api/my_addon`, `tests/test_my_addon.py` (two users with it, one without) and a `README.md`. Restart Dana to load it and turn it on in Settings → Addons (its setup steps come from the manifest: "Make your addon easy to set up" below), or `bin/dana addons connect <user> my_addon`. Grow it from there: [`examples/addons/hello/`](../../examples/addons/hello/) adds a table, a job, an event handler and a Now card with an action; the `tasks` addon (`addons/tasks/`) uses every hook. To ship it to others, put it in a git repository and add an entry to `catalog.json` pinned to a full commit (`../../docs/addons.md`, "The catalog").
 
 ## The folder
 
@@ -52,6 +52,31 @@ addon = Addon("my_addon", title="My addon", description="One line for the Addons
 ```
 
 Other fields (`default_on`, `everyone`, `requires`, `test=`, `options=`, `validate=`, `on_connect=`, `on_change=`, `connect_url=`, …): the `Addon` docstring in `core/addons/addon.py`.
+
+### Make your addon easy to set up
+
+The Addons page is a step-by-step setup built only from your manifest; it knows no addon by name. Give it the words once, in plain language for someone who is not technical:
+
+```python
+addon = Addon(
+    "weather", title="Weather", icon="cloud-sun",                     # a Lucide icon name
+    description="The weather where you are, in chat and the briefing",  # one line in the list
+    features=("Today's weather and the week ahead", "Rain alerts before you leave"),  # "What it adds"
+    setup=("Make a free account at openweathermap.org.",),            # steps outside Dana, before connecting
+    examples=("Will it rain tomorrow?",),                              # "Try asking Dana", once it's on
+    disconnect_warning="",                                             # what turning it off deletes ("" = nothing)
+    credentials=(Field("api_key", "OpenWeather API key", label="API key",
+                       help="On openweathermap.org: your name → My API keys → copy the Default key.",
+                       url="https://home.openweathermap.org/api_keys", placeholder="0123456789abcdef"),),
+    test=check,                                                        # run by itself right after Connect
+)
+```
+
+- `Field(label=, help=, url=, placeholder=)`: the field's short name, where to find the value (one sentence, at most 200 characters), an `https://` page where it is found or made (shown as "Where to find it"; anything else is refused when the addon loads), and an example inside the empty input. `description` stays what the value is for (shown when there is no `help`).
+- `features`, `setup`, `examples`: tuples of short sentences (at most 8, 200 characters each). Without `features`, the page lists the first docstring line of your tools. Pages your `web=` adds are named under "What it adds" by themselves.
+- The steps the page shows: your `setup` lines, then the sign-in button (`connect_url`, `connect_label`) or the fields (credentials, and settings that are addresses), then Connect. Connect runs your `test=` and shows its reason in plain words when it fails, so return a reason a person can act on ("The API key was refused") rather than an exception name. Other settings appear once the addon is on, with suggestions from `options=`.
+- A new user with no optional addon on sees a welcome suggesting the addons they can turn on (not `default_on` / `everyone` ones, nor ones that need a capability); yours is among them automatically.
+- `tests/test_addons.py` checks that every official addon has an icon and features and every field a label and help.
 
 **Prompt slots**: `PromptPart(slot, text, rank)`; the slots are the table `SLOTS` in `core/agent.py`, each with its joiner (`tools` lists "a, b, and c", `guides` are paragraphs, `send_via` keeps its leading space). `{user}` becomes the user's name, `{currency}` their currency (ISO 4217, `core/user_locale.py`). An unknown slot fails the load.
 

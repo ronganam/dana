@@ -33,7 +33,8 @@ ensure_default_groups_for_everyone()
 
 import addons
 from addons import bootstrap as addons_bootstrap
-from core.addons import Addon, crypto, loader, registry, store
+from core.addons import Addon, Field, crypto, loader, registry, store
+from core.addons.addon import MAX_HELP, MAX_LINES, forget
 from core.addons.crypto import CredentialsKeyError
 from core.addons.addon import all_tools, find_tool, get_addon, all_addons
 
@@ -354,6 +355,57 @@ def test_settings_and_cache():
           and not store.disconnect(MEMBER_USER, "whatsapp"))
 
 
+def test_onboarding_words():
+    """The manifest's words for the Addons page: typed, checked when declared, filled for every official addon."""
+    good = Field("token", "Access token", label="Access token", help="Profile → Security → Create token.",
+                 url="https://example.com/tokens", placeholder="abc123")
+    check("field: label, help, url and placeholder kept; the title falls back to the name in words",
+          (good.title, good.help, good.url, good.placeholder) == ("Access token", "Profile → Security → Create token.",
+                                                                  "https://example.com/tokens", "abc123")
+          and Field("api_key").title == "Api key")
+    check("field: a help link must be https",
+          raises(lambda: Field("x", url="http://example.com"), ValueError, "https")
+          and raises(lambda: Field("x", url="javascript:alert(1)"), ValueError, "https")
+          and raises(lambda: Field("x", url="https://"), ValueError, "https")
+          and raises(lambda: Field("x", url="https://exa mple.com"), ValueError, "https"))
+    check("field: help is one short sentence", raises(lambda: Field("x", help="a" * (MAX_HELP + 1)), ValueError, "help")
+          and Field("x", help="a" * MAX_HELP).help)
+    check("field: label and placeholder are short", raises(lambda: Field("x", label="a" * 41), ValueError, "label")
+          and raises(lambda: Field("x", placeholder="a" * 81), ValueError, "placeholder"))
+    demo = Addon("zz_onboard", icon="cloud-sun", features=("Tells the weather",), setup=("Get a key",),
+                 examples=("Will it rain?",), disconnect_warning="Your places are deleted.")
+    check("addon: icon, features, setup, examples and the disconnect warning kept",
+          (demo.icon, demo.features, demo.setup, demo.examples, demo.disconnect_warning)
+          == ("cloud-sun", ("Tells the weather",), ("Get a key",), ("Will it rain?",), "Your places are deleted."))
+    forget("zz_onboard")
+    check("addon: an icon must be a Lucide name", raises(lambda: Addon("zz_bad", icon="Cloud Sun"), ValueError, "icon"))
+    check("addon: lines are a tuple of short strings",
+          raises(lambda: Addon("zz_bad", examples="Will it rain?"), ValueError, "tuple")
+          and raises(lambda: Addon("zz_bad", setup=("",)), ValueError, "words")
+          and raises(lambda: Addon("zz_bad", features=("x",) * (MAX_LINES + 1)), ValueError, "features")
+          and raises(lambda: Addon("zz_bad", features=("a" * 201,)), ValueError, "features"))
+    plain = Addon("zz_plain")
+
+    @plain.tool()
+    def zz_plain_hello(conn) -> str:
+        """Say hello to someone.
+
+        More for the model.
+        """
+        return "hi"
+    check("addon: without features= the tools' first docstring lines say what it adds",
+          plain.feature_lines() == ("Say hello to someone.",), plain.feature_lines())
+    forget("zz_plain")
+    official = [a for a in all_addons() if a.name in loader.loaded()]
+    lacking = [f"{a.name}: {what}" for a in official if not a.everyone
+               for what, missing in (("icon", not a.icon), ("features", not a.features)) if missing]
+    lacking += [f"{a.name}.{f.name}: label/help" for a in official for f in (*a.credentials, *a.settings)
+                if not (f.label and f.help)]
+    check("official addons: each has an icon, features and every field a label and help", not lacking, lacking)
+    check("official addons: whatever is set up outside Dana is said in steps (WAHA, Google, Telegram, the bank worker)",
+          all(get_addon(n).setup for n in ("whatsapp", "calendar", "contacts", "gmail", "telegram_account", "money_il")))
+
+
 def test_key():
     source = open(addons_bootstrap.__file__).read()
     check("no env import: bootstrap reads no env name", "getenv(" not in source and "os.environ" not in source)
@@ -395,6 +447,7 @@ async def main():
     await test_needs()
     test_credentials()
     test_settings_and_cache()
+    test_onboarding_words()
     test_key()
 
 

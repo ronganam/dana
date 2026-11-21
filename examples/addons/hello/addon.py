@@ -7,7 +7,11 @@ addon = Addon(
     title="Hello",
     description="Example addon: greets people in your words, and reminds you who to greet",
     # Per-user choices (plain JSON); credentials=(Field(...),) would be stored encrypted.
-    settings=(Field("greeting", "How to greet people", default="Hello"),),
+    icon="hand",
+    features=("Greets people in your words", "Reminds you who to greet"),
+    examples=("Say hello to Noa",),
+    settings=(Field("greeting", "How to greet people", default="Hello", label="Greeting",
+                    help="The word Dana starts a greeting with.", placeholder="Hello"),),
     # A piece of the agent's instructions, only for users who connected the addon.
     prompt_parts=(PromptPart("guides", "When the user asks you to greet someone, use hello_greet.", rank=90),),
 )
