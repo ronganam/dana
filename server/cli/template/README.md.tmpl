@@ -1,9 +1,10 @@
 # {{title}}
 
-Made with `bin/dana addons new {{name}}`. Say here what it does, its settings, and the events it emits (the catalog shows this file).
+Made with `bin/dana addons new {{name}}`. Say here what it does, its settings and the events it emits (the catalog shows this file).
 
 - **Setting** `greeting`: how it greets people (default `Hello`).
 - **Tool** `{{name}}_hello`: says hello to someone in the user's words.
-- **Route** `GET /api/{{name}}`: the caller's greeting.
-
+{{#web}}- **Page** `{{page}}` (`web/{{name}}.js`), reading **route** `GET /api/{{name}}`: the user's greeting.
+{{/web}}{{#worker}}- **Worker** (`worker/`): a sidecar on port 8091 at `{{env}}`; **tool** `{{name}}_worker_ping` asks it whether it is up.
+{{/worker}}
 Test: `bin/test {{name}}` (from `server/`). Writing addons: `server/docs/writing-an-addon.md`.

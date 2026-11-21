@@ -35,8 +35,6 @@
     <script src="/static/app-thread.js" defer></script>
     <script src="/static/app-chat.js" defer></script>
     <script src="/static/app-voice.js" defer></script>
-    <script src="/static/app-tasks.js" defer></script>
-    <script src="/static/app-calls.js" defer></script>
     <script src="/static/app-settings.js" defer></script>
     <script src="/static/app-debug.js" defer></script>
     <script src="/static/app.js" defer></script>
@@ -55,16 +53,8 @@
                     <i data-lucide="message-square"></i>
                     <span>Chat</span>
                 </button>
-                <button class="rail-btn" data-tab="tasks" title="Tasks & Reminders">
-                    <i data-lucide="check-square"></i>
-                    <span>Tasks</span>
-                </button>
                 <!-- The user's addon pages (static/app-panels.js) -->
                 <div class="nav-addons" id="rail-addons"></div>
-                <button class="rail-btn" data-tab="calls" title="Calls & Memos">
-                    <i data-lucide="phone"></i>
-                    <span>Calls</span>
-                </button>
                 <button class="rail-btn" data-tab="settings" title="Settings">
                     <i data-lucide="settings"></i>
                     <span>Settings</span>
@@ -93,15 +83,7 @@
                 <i data-lucide="message-square"></i>
                 <span>Chat</span>
             </button>
-            <button class="bottom-nav-btn" data-tab="tasks">
-                <i data-lucide="check-square"></i>
-                <span>Tasks</span>
-            </button>
             <div class="nav-addons" id="bottom-addons"></div>
-            <button class="bottom-nav-btn" data-tab="calls">
-                <i data-lucide="phone"></i>
-                <span>Calls</span>
-            </button>
             <button class="bottom-nav-btn" data-tab="settings">
                 <i data-lucide="settings"></i>
                 <span>Settings</span>
@@ -111,7 +93,7 @@
         <!-- ── Main Viewport ── -->
         <main class="main-viewport" id="main-viewport">
 
-            <!-- ════ SCREEN 1: CHAT (First-Class View) ════ -->
+            <!-- ════ CHAT ════ -->
             <section class="screen-panel active" id="panel-chat">
                 <header class="top-bar">
                     <button class="icon-btn" id="btn-chat-history" title="Chats" aria-label="Show chats">
@@ -229,149 +211,10 @@
                 </div>
             </section>
 
-            <!-- ════ SCREEN 2: TASKS (Reminders) ════ -->
-            <section class="screen-panel" id="panel-tasks">
-                <header class="top-bar">
-                    <span class="top-bar-title">Reminders</span>
-                    <div class="top-bar-actions">
-                        <button class="btn-primary" id="btn-add-task-top">
-                            <i data-lucide="plus" style="width:16px;height:16px;"></i>
-                            <span>New Reminder</span>
-                        </button>
-                    </div>
-                </header>
-
-                <div class="today-strip hidden" id="today-strip"></div>
-                <div class="three-pane-container" id="tasks-three-pane">
-                    <!-- Pane 1: Filters Sidebar -->
-                    <div class="pane-filters" id="tasks-pane-filters">
-                        <!-- Sort Mode -->
-                        <div class="filter-sidebar-section">
-                            <span class="filter-sidebar-title">Sort By</span>
-                            <div class="filter-nav-item active" data-sort="group">
-                                <span>📁 Group</span>
-                            </div>
-                            <div class="filter-nav-item" data-sort="priority">
-                                <span>⚡ Priority</span>
-                            </div>
-                            <div class="filter-nav-item" data-sort="due">
-                                <span>📅 Due Date</span>
-                            </div>
-                        </div>
-
-                        <!-- Groups Filter -->
-                        <div class="filter-sidebar-section">
-                            <div style="display:flex;align-items:center;justify-content:space-between;">
-                                <span class="filter-sidebar-title">Groups</span>
-                                <button class="icon-btn" id="btn-manage-groups" title="Manage Groups" style="width:24px;height:24px;">
-                                    <i data-lucide="settings" style="width:13px;height:13px;"></i>
-                                </button>
-                            </div>
-                            <div id="tasks-group-filter-list">
-                                <div class="filter-nav-item active" data-group="all">
-                                    <span>All Reminders</span>
-                                    <span class="count-badge" id="tasks-count-all">0</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Triggers Filter -->
-                        <div class="filter-sidebar-section">
-                            <span class="filter-sidebar-title">Triggers</span>
-                            <div class="filter-nav-item" data-trigger="time">
-                                <span>⏰ Time</span>
-                                <span class="count-badge" id="tasks-count-time">0</span>
-                            </div>
-                            <div class="filter-nav-item" data-trigger="location">
-                                <span>📍 Location</span>
-                                <span class="count-badge" id="tasks-count-location">0</span>
-                            </div>
-                            <div class="filter-nav-item" data-trigger="car">
-                                <span>🚗 Car</span>
-                                <span class="count-badge" id="tasks-count-car">0</span>
-                            </div>
-                            <div class="filter-nav-item" data-trigger="wake">
-                                <span>☀️ Wake Up</span>
-                                <span class="count-badge" id="tasks-count-wake">0</span>
-                            </div>
-                        </div>
-
-                        <!-- Completed Tasks Option -->
-                        <div class="filter-sidebar-section" style="margin-top:auto;border-top:1px solid var(--hairline);padding-top:12px;">
-                            <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--body);cursor:pointer;padding:4px;">
-                                <input type="checkbox" id="task-toggle-completed" style="accent-color:var(--ink);">
-                                <span>Show completed</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <!-- Pane 2: Tasks List -->
-                    <div class="pane-list" id="tasks-pane-list">
-                        <div class="pane-master-header">
-                            <input type="text" class="form-control" id="tasks-search-input" placeholder="Search reminders...">
-                        </div>
-                        <div class="pane-master-list" id="tasks-scroll-list">
-                            <!-- Grouped collapsible tasks inserted here -->
-                        </div>
-                    </div>
-
-                    <!-- Pane 3: Selected Task Content / Detail -->
-                    <div class="pane-content" id="task-detail-pane">
-                        <div class="pane-empty-state">
-                            <i data-lucide="check-square" style="width:40px;height:40px;opacity:0.4;"></i>
-                            <span>Select a reminder to view its details</span>
-                        </div>
-                    </div>
-                </div>
-
-                <button class="fab-btn" id="btn-add-task-fab" title="New Reminder">
-                    <i data-lucide="plus"></i>
-                </button>
-            </section>
-
-            <!-- ════ SCREEN 5: CALLS (Call Assistant) ════ -->
-            <section class="screen-panel" id="panel-calls">
-                <header class="top-bar">
-                    <span class="top-bar-title">Call Assistant</span>
-                    <div class="top-bar-actions">
-                        <button class="icon-btn" id="btn-refresh-calls" title="Refresh">
-                            <i data-lucide="refresh-cw"></i>
-                        </button>
-                        <button class="btn-primary" id="btn-upload-call-top">
-                            <i data-lucide="upload" style="width:16px;height:16px;"></i>
-                            <span>Upload Audio</span>
-                        </button>
-                    </div>
-                </header>
-
-                <div class="two-pane-container" id="calls-two-pane">
-                    <!-- Left: Master Calls List -->
-                    <div class="pane-master">
-                        <div class="pane-master-header">
-                            <input type="text" class="form-control" id="calls-search-input" placeholder="Search calls, transcripts...">
-                        </div>
-                        <div class="pane-master-list" id="calls-master-list">
-                            <!-- Compact call rows inserted here -->
-                        </div>
-                    </div>
-                    <!-- Right: Call Detail Pane -->
-                    <div class="pane-detail" id="calls-detail-pane">
-                        <div class="pane-empty-state">
-                            <i data-lucide="phone" style="width:40px;height:40px;opacity:0.4;"></i>
-                            <span>Select a call to listen, read summary & transcript</span>
-                        </div>
-                    </div>
-                </div>
-
-                <button class="fab-btn" id="btn-upload-call-fab" title="Upload Audio">
-                    <i data-lucide="upload"></i>
-                </button>
-            </section>
-
-            <!-- ════ WEEKLY REVIEW (static/review.js) — opened from the Tasks banner or /#review ════ -->
+            <!-- ════ WEEKLY REVIEW (static/review.js) — opened from the Today strip or /#review ════ -->
             <section class="screen-panel" id="panel-review">
                 <header class="top-bar">
-                    <button class="icon-btn" id="rv-back" title="Back to reminders"><i data-lucide="arrow-left"></i></button>
+                    <button class="icon-btn" id="rv-back" title="Back"><i data-lucide="arrow-left"></i></button>
                     <div class="ibx-titles">
                         <span class="top-bar-title">Weekly review</span>
                         <span class="ibx-kicker" id="rv-kicker"></span>
@@ -385,7 +228,7 @@
                 <div class="ibx-toast hidden" id="rv-toast" role="status" aria-live="polite"></div>
             </section>
 
-            <!-- ════ SCREEN 6: SETTINGS ════ -->
+            <!-- ════ SETTINGS ════ -->
             <section class="screen-panel" id="panel-settings">
                 <header class="top-bar">
                     <span class="top-bar-title">Settings</span>
@@ -491,7 +334,7 @@
                 </div>
             </section>
 
-            <!-- ════ SCREEN 8: DEBUG & LOGS ════ -->
+            <!-- ════ DEBUG & LOGS ════ -->
             <section class="screen-panel" id="panel-debug">
                 <header class="top-bar">
                     <span class="top-bar-title">Debug & Logs</span>
@@ -543,163 +386,6 @@
             </section>
 
         </main>
-    </div>
-
-    <!-- ════ MODALS & BOTTOM SHEETS ════ -->
-
-    <!-- Task Editor Modal -->
-    <div class="modal-overlay" id="task-modal">
-        <div class="modal-sheet">
-            <div class="modal-header">
-                <h3 class="modal-title" id="task-modal-title">New Reminder</h3>
-                <button class="icon-btn" id="task-modal-close"><i data-lucide="x"></i></button>
-            </div>
-            <form id="task-form" class="modal-body">
-                <input type="hidden" id="task-id">
-                <div class="form-group">
-                    <label class="form-label" for="task-title">Title</label>
-                    <input type="text" class="form-control" id="task-title" required placeholder="What do you need to do?">
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="task-desc">Description (Optional)</label>
-                    <textarea class="form-control" id="task-desc" placeholder="Extra notes or instructions..."></textarea>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Priority</label>
-                    <div class="segmented-control" id="task-prio-control">
-                        <div class="segmented-btn" data-prio="low">Low</div>
-                        <div class="segmented-btn active" data-prio="medium">Medium</div>
-                        <div class="segmented-btn" data-prio="high">High</div>
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="task-group-select">Group</label>
-                    <select class="form-control" id="task-group-select"></select>
-                </div>
-                <div class="form-group">
-                    <label class="form-label">Triggers (Optional)</label>
-                    <div style="display:flex;flex-direction:column;gap:8px;">
-                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-                            <input type="checkbox" id="task-trig-time-enable"> Time Reminder
-                        </label>
-                        <input type="datetime-local" class="form-control hidden" id="task-trig-time-val">
-
-                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-                            <input type="checkbox" id="task-trig-loc-enable"> Location Trigger
-                        </label>
-                        <div class="hidden" id="task-trig-loc-group" style="display:flex;gap:6px;">
-                            <select class="form-control" id="task-trig-loc-zone" style="flex:2;"></select>
-                            <select class="form-control" id="task-trig-loc-event" style="flex:1;">
-                                <option value="arrive">Arrive</option>
-                                <option value="leave">Leave</option>
-                            </select>
-                        </div>
-
-                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-                            <input type="checkbox" id="task-trig-car-enable"> Car Status Trigger
-                        </label>
-                        <select class="form-control hidden" id="task-trig-car-val">
-                            <option value="enter">Enter Car</option>
-                            <option value="leave">Leave Car</option>
-                        </select>
-
-                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
-                            <input type="checkbox" id="task-trig-wake-enable"> Wake Up Trigger
-                        </label>
-                    </div>
-                </div>
-            </form>
-            <div class="modal-footer">
-                <button class="btn-destructive-outline hidden" id="btn-task-delete">Delete</button>
-                <button class="btn-secondary" id="btn-task-cancel">Cancel</button>
-                <button class="btn-primary" id="btn-task-save">Save Reminder</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Call Upload Modal -->
-    <div class="modal-overlay" id="call-upload-modal">
-        <div class="modal-sheet">
-            <div class="modal-header">
-                <h3 class="modal-title">Upload Call Audio</h3>
-                <button class="icon-btn" id="call-upload-close"><i data-lucide="x"></i></button>
-            </div>
-            <form id="call-upload-form" class="modal-body">
-                <div class="form-group">
-                    <label class="form-label" for="call-file">Audio File</label>
-                    <input type="file" class="form-control" id="call-file" accept="audio/*" required>
-                </div>
-                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                    <div class="form-group">
-                        <label class="form-label" for="call-caller">Caller</label>
-                        <input type="text" class="form-control" id="call-caller" placeholder="Name or number">
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label" for="call-receiver">Receiver</label>
-                        <input type="text" class="form-control" id="call-receiver" placeholder="Me">
-                    </div>
-                </div>
-                <div class="form-group">
-                    <label class="form-label" for="call-instructions">Custom Instructions (Optional)</label>
-                    <textarea class="form-control" id="call-instructions" rows="2" placeholder="e.g. summarize in Hebrew, focus on action items..."></textarea>
-                </div>
-            </form>
-            <div class="modal-footer">
-                <button class="btn-secondary" id="btn-call-upload-cancel">Cancel</button>
-                <button class="btn-primary" id="btn-call-upload-submit">Upload & Analyze</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Call Reanalyze Modal -->
-    <div class="modal-overlay" id="call-reanalyze-modal">
-        <div class="modal-sheet">
-            <div class="modal-header">
-                <h3 class="modal-title">Regenerate Call Summary</h3>
-                <button class="icon-btn" id="call-reanalyze-close"><i data-lucide="x"></i></button>
-            </div>
-            <div class="modal-body">
-                <p id="reanalyze-call-label" style="font-size:13px;color:var(--body);"></p>
-                <div class="form-group">
-                    <label class="form-label" for="reanalyze-instructions">Custom Instructions (Optional)</label>
-                    <textarea class="form-control" id="reanalyze-instructions" rows="3" placeholder="e.g. focus on dates and prices..."></textarea>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" id="btn-reanalyze-cancel">Cancel</button>
-                <button class="btn-primary" id="btn-reanalyze-submit">Regenerate</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Task Group Manager Modal -->
-    <div class="modal-overlay" id="group-modal">
-        <div class="modal-sheet">
-            <div class="modal-header">
-                <h3 class="modal-title">Manage Task Groups</h3>
-                <button class="icon-btn" id="group-modal-close"><i data-lucide="x"></i></button>
-            </div>
-            <div class="modal-body">
-                <span class="form-label">Existing Groups</span>
-                <div class="pane-master-list" id="group-manager-list" style="max-height:220px;gap:6px;"></div>
-
-                <div style="border-top:1px solid var(--hairline);margin:8px 0;padding-top:12px;">
-                    <span class="form-label" style="margin-bottom:8px;display:block;">Add New Group</span>
-                    <form id="group-form" style="display:flex;flex-direction:column;gap:10px;">
-                        <div style="display:flex;gap:8px;">
-                            <input type="text" class="form-control" id="new-group-emoji" value="📁" style="width:50px;text-align:center;">
-                            <input type="text" class="form-control" id="new-group-name" placeholder="Group Name (e.g. Travel)" required style="flex:1;">
-                            <input type="color" class="form-control" id="new-group-color" value="#6366f1" style="width:44px;padding:2px;cursor:pointer;">
-                        </div>
-                        <input type="text" class="form-control" id="new-group-desc" placeholder="Description (Optional)">
-                        <button type="submit" class="btn-primary" style="align-self:flex-end;">+ Add Group</button>
-                    </form>
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-secondary" id="btn-group-close">Close</button>
-            </div>
-        </div>
     </div>
 
     <div class="app-toast hidden" id="app-toast" role="status" aria-live="polite"></div>

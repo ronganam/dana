@@ -1,7 +1,7 @@
-"""The ``{{name}}`` HTTP route: ``GET /api/{{name}}`` → ``{"greeting": ...}`` for the caller.
+"""The ``{{name}}`` route its page reads: ``GET /api/{{name}}`` → ``{"greeting": ...}`` for the caller.
 
-Registered automatically (its ``setup(app)``), behind the same authentication;
-403 ``not_connected`` for a user who has not turned the addon on.
+Registered automatically (its ``setup(app)``), behind the same sign-in as every
+route; 403 ``not_connected`` for a user who has not turned the addon on.
 """
 
 from aiohttp import web

@@ -1,8 +1,7 @@
 /* The web app — shared state and helpers (static/app.js says how the app's scripts fit together).
  *
- * The state the screens share (the chat session id, the loaded lists, chat and voice state, task filters,
- * the calls audio player) and the helpers every screen uses: refreshIcons, isRtlText,
- * formatTime, formatDuration, escapeHtml.
+ * The state the screens share (the chat session id, chat and voice state) and the helpers every screen
+ * uses: refreshIcons, isRtlText, formatTime, escapeHtml.
  */
 
 // ══════════════════════════════════════════════════════════════════════
@@ -33,12 +32,6 @@ if (!currentSessionId) {
 }
 
 let activeTab = "chat";
-let tasks = [];
-let taskGroups = [];
-let zones = [];
-let calls = [];
-let selectedCallId = null;
-let reanalyzeTargetCall = null;
 
 // Chat & Voice state
 let chatMessages = [];
@@ -56,16 +49,6 @@ let isSpeakerOn = true;
 // server keeps running the task and persists the result.
 let assistantStreamAbort = null;
 
-
-// Filter & Sort state
-let taskSortMode = "group"; // "group" | "priority" | "due"
-let taskGroupFilter = null;
-let taskTriggerFilter = null;
-
-// Global Audio Player for Calls
-const callAudio = new Audio();
-let isCallAudioPlaying = false;
-let currentPlayingCallId = null;
 
 // ── Helper: Safe Lucide icon renderer ──
 function refreshIcons() {
@@ -90,13 +73,6 @@ function formatTime(isoString) {
     } catch (e) {
         return isoString;
     }
-}
-
-function formatDuration(sec) {
-    if (!sec || isNaN(sec)) return "0:00";
-    const m = Math.floor(sec / 60);
-    const s = Math.floor(sec % 60);
-    return `${m}:${s < 10 ? "0" : ""}${s}`;
 }
 
 // ── Helper: Escape HTML ──

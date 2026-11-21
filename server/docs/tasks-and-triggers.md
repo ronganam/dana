@@ -32,6 +32,7 @@ The `tasks` addon (`addons/tasks/`) owns lists, tasks, links and the trigger eng
 | `titles.py` | emoji and list picking for new tasks (model at `llm.complete`, purposes `task_emoji` / `task_group`) |
 | `triggers.py` | the trigger engine: `fire(user, type, action=, target=)`, the time checker, refire / flap / cooldown marks |
 | `tools.py` | the agent tools |
+| `web/tasks.js`, `web/tasks-core.js`, `web/tasks.css` | the web page `tasks` (Reminders: filters, the list by group / priority / due date, the detail pane, the new-reminder and group modals; above them the core Today strip through `api.piece("today", el)`); the pure part is tested by `tests/test_web_tasks.mjs` |
 
 ## Per user
 

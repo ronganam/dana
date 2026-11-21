@@ -12,7 +12,7 @@ means) and a section listing the user's accounts (:func:`accounts_section`).
 Tools: ``tools.py``."""
 
 from core.users import User
-from core.addons import Addon, PromptPart, LlmJob, Web, Nav
+from core.addons import Addon, PromptPart, LlmJob, Page, Nav
 from addons.money import after_sync, classify, dashboard, savings, signals, sources, store
 from addons.money.config import ADDON
 
@@ -54,7 +54,7 @@ def accounts_section(user: User) -> str:
 
 
 addon = Addon(
-    ADDON, web=Web(panel="money.js", style="money.css", nav=Nav("Money", icon="wallet", order=20)), order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories")},
+    ADDON, web=(Page("money", panel="money.js", style="money.css", nav=Nav("Money", icon="wallet", order=20)),), order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories")},
     description="Bank and card transactions",
     on_change=sources.on_change,
     prompt_section=accounts_section,

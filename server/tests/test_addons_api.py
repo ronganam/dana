@@ -229,12 +229,20 @@ async def test_me_and_list(client: TestClient) -> None:
     check("list: essentials is on for everyone and cannot be turned off",
           ess["everyone"] is True and ess["state"] == "on" and ess["connected"] is True
           and ess["can_change"] is False and ess["why_not"] == "Every user has it", ess)
+    phone_pages = addons["phone"]["web"]
+    check("list: an addon's pages, each with its id, file URLs and navigation entry (phone: Inbox and Calls)",
+          phone_pages == [
+              {"id": "inbox", "panel": "/addons/phone/web/inbox.js", "style": "/addons/phone/web/inbox.css",
+               "nav": {"label": "Inbox", "icon": "inbox", "order": 30}},
+              {"id": "calls", "panel": "/addons/phone/web/calls.js", "style": "/addons/phone/web/calls.css",
+               "nav": {"label": "Calls", "icon": "phone", "order": 90}}]
+          and [p["id"] for p in addons["tasks"]["web"]] == ["tasks"], phone_pages)
     check("list: one connection's shape (credentials only as set / not set)",
           set(ha) == {"name", "title", "description", "version", "source", "state", "needs", "everyone", "web",
                       "worker", "connected", "requires", "can_change", "why_not", "credentials",
                       "settings", "account", "check", "options", "connect_url", "connect_label"}
           and isinstance(ha["title"], str) and ha["source"] == "official" and ha["state"] == "on"
-          and ha["needs"] == [] and ha["everyone"] is False and ha["web"] is None and ha["worker"] is False
+          and ha["needs"] == [] and ha["everyone"] is False and ha["web"] == [] and ha["worker"] is False
           and addons["money"]["worker"] is False and addons["money_il"]["worker"] is True
           and addons["money_il"]["needs"] == ["money"]
           and ha["connect_url"] is None and addons["calendar"]["connect_url"] == "/api/google/connect"

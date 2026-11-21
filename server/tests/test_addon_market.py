@@ -1,4 +1,4 @@
-"""The addons of a server: /api/addons (sources, states, web, failed), the server-wide disable, addon web files, the catalog, install / update / remove from git, restart, the real server start, and bin/dana addons (new, install, remove, disable, enable, list).
+"""The addons of a server: /api/addons (sources, states, web, failed), the server-wide disable, addon web files, the catalog, install / update / remove from git, restart, the real server start, and bin/dana addons (install, remove, disable, enable, list).
 
 Run: bin/test test_addon_market
 
@@ -15,7 +15,6 @@ import asyncio
 import io
 import json
 import os
-import shutil
 import socket
 import subprocess
 import sys
@@ -40,10 +39,10 @@ def write(path: Path, text: str) -> None:
 
 # --- The site addons -------------------------------------------------------------------------------
 write(SITE / "mk" / "addon.py", '''\
-    from core.addons import Addon, Nav, PromptPart, Web
+    from core.addons import Addon, Nav, Page, PromptPart
     addon = Addon("mk", title="Market test", description="A site addon for the market test", version="1.2.3",
                   prompt_parts=(PromptPart("guides", "Use mk_ping to ping."),),
-                  web=Web(panel="panel.js", style="panel.css", nav=Nav("Market", icon="store", order=70)))
+                  web=(Page("mk", panel="panel.js", style="panel.css", nav=Nav("Market", icon="store", order=70)),))
     ''')
 write(SITE / "mk" / "tools.py", '''\
     from core.addons import Connection
@@ -106,7 +105,7 @@ write(SITE / "mk" / "api.py", '''\
     def setup(app):
         app.router.add_get("/api/mk", get_mk)
     ''')
-write(SITE / "mk" / "web" / "panel.js", "Dana.panel({id: 'mk'});\n")
+write(SITE / "mk" / "web" / "panel.js", "Dana.panel({mount() {}});\n")
 write(SITE / "mk" / "web" / "panel.css", ".mk { color: red; }\n")
 write(SITE / "mk" / "web" / ".hidden", "not served\n")
 write(SITE / "mk" / "web" / "sub" / "deep.js", "// deep\n")
@@ -232,8 +231,8 @@ async def test_list(c: TestClient) -> None:
           and greeter.get("source") == "installed" and broken.get("state") == "failed", list(items))
     check("list: mk's shape (title, version, state, needs, web URLs and nav while on, no worker)",
           mk["title"] == "Market test" and mk["version"] == "1.2.3" and mk["state"] == "on" and mk["needs"] == []
-          and mk["web"] == {"panel": "/addons/mk/web/panel.js", "style": "/addons/mk/web/panel.css",
-                            "nav": {"label": "Market", "icon": "store", "order": 70}} and mk["worker"] is False, mk)
+          and mk["web"] == [{"id": "mk", "panel": "/addons/mk/web/panel.js", "style": "/addons/mk/web/panel.css",
+                             "nav": {"label": "Market", "icon": "store", "order": 70}}] and mk["worker"] is False, mk)
     check("list: needs are listed", items["mkplus"]["needs"] == ["mk"])
     check("list: the admin sees where an installed addon came from",
           greeter["installed"] == {"repo": str(REPO), "path": "addons/greeter", "commit": COMMIT1}
@@ -243,7 +242,7 @@ async def test_list(c: TestClient) -> None:
     status, body = await call(c, "GET", "/api/addons", CARL_AUTH)
     items = by_name(body)
     check("list (member): mk can be turned on, no web while off, no error of the failed addon, no install record",
-          items["mk"]["state"] == "available" and items["mk"]["web"] is None and "error" not in items["mkbroken"]
+          items["mk"]["state"] == "available" and items["mk"]["web"] == [] and "error" not in items["mkbroken"]
           and items["mkbroken"]["state"] == "failed" and "installed" not in items["greeter"]
           and body["can_manage"] is False and "pending" not in body, items["mk"])
 
@@ -254,7 +253,7 @@ async def test_web_files(c: TestClient) -> None:
     r = await c.get("/addons/mk/web/panel.js", headers=CARL_AUTH)
     text = await r.text()
     check("web: a loaded addon's panel is served (any signed-in user)", r.status == 200
-          and text == "Dana.panel({id: 'mk'});\n" and "javascript" in r.headers.get("Content-Type", ""),
+          and text == "Dana.panel({mount() {}});\n" and "javascript" in r.headers.get("Content-Type", ""),
           (r.status, r.headers.get("Content-Type")))
     r = await c.get("/addons/mk/web/sub/deep.js", headers=ADMIN_AUTH)
     check("web: a file in a sub-folder", r.status == 200 and await r.text() == "// deep\n")
@@ -298,7 +297,7 @@ async def test_disable(c: TestClient) -> None:
     status, body = await call(c, "POST", "/api/addons/mk/disable", ADMIN_AUTH)
     check("disable: the admin disables it; the payload says so",
           status == 200 and body["state"] == "disabled-on-server" and body["can_change"] is False
-          and body["why_not"] == "Disabled on this server" and body["web"] is None and body["connected"] is True, body)
+          and body["why_not"] == "Disabled on this server" and body["web"] == [] and body["connected"] is True, body)
 
     check("disabled: no tool for anyone", not registry.has_tool(ADMIN, "mk_ping") and not registry.has_tool(BOB, "mk_ping")
           and all(t.name != "mk_ping" for t in registry.tools_for(ADMIN)))
@@ -485,26 +484,6 @@ def test_cli() -> None:
     check("cli enable", rc == 0 and state.is_enabled("mk"))
     rc, out, err = run("addons", "disable", "essentials")
     check("cli disable: essentials refused", rc == 1 and "every user has it" in err, err)
-
-    scaffolds = SCRATCH / "scaffolds"
-    rc, out, err = run("addons", "new", "weather", "--dir", str(scaffolds))
-    files = sorted(str(p.relative_to(scaffolds / "weather")) for p in (scaffolds / "weather").rglob("*") if p.is_file())
-    check("cli new: a working addon from the template", rc == 0 and files == [
-        "README.md", "__init__.py", "addon.py", "api.py", "tests/test_weather.py", "tools.py"], files)
-    check("cli new: the name is filled in everywhere", "{{" not in "".join(
-        (scaffolds / "weather" / f).read_text() for f in files) and 'Addon(\n    "weather"' in
-        (scaffolds / "weather" / "addon.py").read_text())
-    proc = subprocess.run([sys.executable, str(scaffolds / "weather" / "tests" / "test_weather.py")],
-                          cwd=str(testenv.SERVER), capture_output=True, text=True, timeout=180,
-                          env={**os.environ, "PYTHONPATH": os.pathsep.join([str(testenv.SERVER),
-                                                                         str(testenv.SERVER / "tests")])})
-    check("cli new: its generated test passes", proc.returncode == 0 and "All weather checks passed" in proc.stdout,
-          proc.stdout[-800:] + proc.stderr[-800:])
-    rc, out, err = run("addons", "new", "weather", "--dir", str(scaffolds))
-    check("cli new: an existing folder is refused", rc == 1 and "already exists" in err)
-    rc, out, err = run("addons", "new", "tasks", "--dir", str(scaffolds))
-    check("cli new: an official name is refused", rc == 1 and "official" in err)
-    shutil.rmtree(scaffolds)
 
 
 async def test_start_listener() -> None:

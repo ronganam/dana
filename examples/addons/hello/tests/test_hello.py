@@ -1,8 +1,8 @@
-"""The hello example addon: its table, tool and setting, prompt line, event handler, Now card and action, job and route, for its user only.
+"""The hello example addon: its tool and setting, prompt line, page and route, table, event handler, Now card and action, and job, for the users who have it only.
 
 Run from server/: PYTHONPATH=.:tests python ../examples/addons/hello/tests/test_hello.py
-(``tests/test_addon_loading.py`` runs it). Two users: the first admin connects
-hello, Maya does not.
+(``tests/test_addon_loading.py`` runs it). Robin (the first admin) and Gal
+turn hello on, Maya does not.
 """
 
 import asyncio
@@ -14,7 +14,8 @@ from pathlib import Path
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (server/tests/testenv.py)
 testenv.isolate("hello_example")
-os.environ["DANA_ADDON_DIRS"] = str(Path(__file__).resolve().parents[2])  # examples/addons: hello is a site addon
+HERE = Path(__file__).resolve().parents[1]  # this addon's folder
+os.environ["DANA_ADDON_DIRS"] = str(HERE.parent)  # examples/addons: hello is a site addon
 os.environ["API_TOKEN"] = "hello-test-env-token"  # a test value: with it set, Bearer tokens decide the user
 
 from aiohttp import web  # noqa: E402
@@ -29,6 +30,7 @@ from core import now as now_screen  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import loader, registry, scheduler, store  # noqa: E402
+from core.addons.addon import get_addon  # noqa: E402
 from core.addons.registry import ToolNotAvailable  # noqa: E402
 from addons.hello import store as hello_store  # noqa: E402
 from addons.tasks import service as tasks_service  # noqa: E402
@@ -42,11 +44,13 @@ def check(name: str, cond: object, detail: object = "") -> None:
     failures += 0 if cond else 1
 
 
-ADMIN = users.first_admin()
-assert ADMIN is not None
+ROBIN = users.first_admin()
+assert ROBIN is not None
+GAL = users.create("Gal")
 MAYA = users.create("Maya")
-store.connect(ADMIN, "hello")
-for u in (ADMIN, MAYA):
+store.connect(ROBIN, "hello")
+store.connect(GAL, "hello", settings={"greeting": "Shalom"})
+for u in (ROBIN, GAL, MAYA):
     if not store.is_connected(u, "tasks"):
         store.connect(u, "tasks")
 
@@ -57,36 +61,40 @@ async def main() -> None:
     check("migration: its table was created", "hello:0001_baseline" in APPLIED, APPLIED)
 
     # Tool and setting.
-    check("tool: the setting's default", await registry.execute(ADMIN, "hello_greet", {"name": "Noa"}) == "Hello, Noa!")
-    store.update(ADMIN, "hello", settings={"greeting": "Shalom"})
-    check("tool: the user's own setting", await registry.execute(ADMIN, "hello_greet", {"name": "Noa"}) == "Shalom, Noa!")
+    check("tool: the setting's default", await registry.execute(ROBIN, "hello_greet", {"name": "Noa"}) == "Hello, Noa!")
+    check("tool: each user's own setting", await registry.execute(GAL, "hello_greet", {"name": "Noa"}) == "Shalom, Noa!")
     try:
         await registry.execute(MAYA, "hello_greet", {"name": "Noa"})
         refused = False
     except ToolNotAvailable:
         refused = True
     check("tool: refused for a user without the addon", refused and not registry.has_tool(MAYA, "hello_greet"))
-    check("prompt: its line only for its user",
-          any("hello_greet" in p for p in registry.prompt_parts(ADMIN, "guides"))
+    check("prompt: its line only for its users",
+          all(any("hello_greet" in p for p in registry.prompt_parts(u, "guides")) for u in (ROBIN, GAL))
           and not any("hello_greet" in p for p in registry.prompt_parts(MAYA, "guides")))
+    page = (HERE / "web" / "hello.js").read_text(encoding="utf-8")
+    check("page: declared, its script registers with Dana.panel and reads its route",
+          [p.id for p in get_addon("hello").web] == ["hello"] and "Dana.panel(" in page and "/api/hello" in page)
 
     # Event: a task "Greet <name>" adds a greeting, only for a user who has hello.
-    tasks_service.create_task(ADMIN, title="Greet Dana")
-    tasks_service.create_task(ADMIN, title="Buy milk")
+    tasks_service.create_task(ROBIN, title="Greet Dana")
+    tasks_service.create_task(ROBIN, title="Buy milk")
     tasks_service.create_task(MAYA, title="Greet Omer")
+    tasks_service.create_task(GAL, title="Greet Lior")
     await events.drain()
-    check("event: the task titled 'Greet Dana' is a greeting to do", [g["name"] for g in hello_store.pending(ADMIN)]
-          == ["Dana"], hello_store.pending(ADMIN))
-    check("event: nothing for Maya (no hello)", hello_store.pending(MAYA) == [])
+    check("event: the task titled 'Greet Dana' is a greeting to do", [g["name"] for g in hello_store.pending(ROBIN)]
+          == ["Dana"], hello_store.pending(ROBIN))
+    check("event: each user's own greetings; nothing for Maya (no hello)",
+          [g["name"] for g in hello_store.pending(GAL)] == ["Lior"] and hello_store.pending(MAYA) == [])
 
     # Now card and its action.
-    board = await now_screen.build(ADMIN)
+    board = await now_screen.build(ROBIN)
     mine = [c for c in board["items"] if c["kind"] == "hello"]
     check("now: one card per greeting to do", [c["title"] for c in mine] == ["Greet Dana"], mine)
     theirs = await now_screen.build(MAYA)
     check("now: no card for Maya", not [c for c in theirs["items"] if c["kind"] == "hello"])
-    result = await now_screen.act(ADMIN, mine[0]["id"], "done")
-    check("now: 'done' marks it greeted", result.get("message") == "Greeted" and hello_store.pending(ADMIN) == [], result)
+    result = await now_screen.act(ROBIN, mine[0]["id"], "done")
+    check("now: 'done' marks it greeted", result.get("message") == "Greeted" and hello_store.pending(ROBIN) == [], result)
 
     # Job: a pass for every user who has hello; old done greetings go.
     with get_db_connection() as conn:
@@ -94,24 +102,23 @@ async def main() -> None:
                      ((datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=40)).isoformat(),))
         conn.commit()
     out = await scheduler.run_once(registry.job("hello.purge_old"))
-    check("job: ran for its user only and purged the old greeting", out == {ADMIN.id: 1}, out)
+    check("job: ran for its users only and purged the old greeting", out == {ROBIN.id: 1, GAL.id: 0}, out)
     check("job: wrote its heartbeat", scheduler.last_run("hello", "purge_old") is not None)
 
     # Route.
-    hello_store.add(ADMIN, "Gal")
+    hello_store.add(ROBIN, "Gal")
     app = web.Application()
     setup_auth(app)
-    for module in loader.route_modules():
-        if module.__name__ == "addons.hello.api":
-            module.setup(app)
+    dict(loader.apis())["hello"].setup(app)
     async with TestClient(TestServer(app)) as c:
-        mine_r = await c.get("/api/hello", headers={"Authorization": "Bearer " + users.issue_token(ADMIN.id, "t")[0]})
-        theirs_r = await c.get("/api/hello", headers={"Authorization": "Bearer " + users.issue_token(MAYA.id, "t")[0]})
-        body = await mine_r.json()
-        check("route: its user gets the greeting and who to greet",
-              mine_r.status == 200 and body == {"greeting": "Shalom", "pending": ["Gal"]}, json.dumps(body))
-        check("route: another user is refused (403 not_connected)", theirs_r.status == 403, theirs_r.status)
-
+        async def get(user: users.User) -> tuple:
+            r = await c.get("/api/hello", headers={"Authorization": "Bearer " + users.issue_token(user.id, "t")[0]})
+            return r.status, await r.json()
+        mine, gals, theirs = await get(ROBIN), await get(GAL), await get(MAYA)
+        check("route: each user gets their greeting and who they still greet",
+              mine == (200, {"greeting": "Hello", "pending": ["Gal"]})
+              and gals == (200, {"greeting": "Shalom", "pending": ["Lior"]}), json.dumps([mine, gals]))
+        check("route: a user without the addon is refused (403 not_connected)", theirs[0] == 403, theirs)
 
 asyncio.run(main())
 if failures:

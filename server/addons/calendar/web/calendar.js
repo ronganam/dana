@@ -53,7 +53,6 @@
   }
 
   Dana.panel({
-    id: "calendar", title: "Calendar", icon: "calendar",
     mount(el, api) {
       if (!el.firstChild) {
         el.innerHTML = TEMPLATE;

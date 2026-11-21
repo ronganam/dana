@@ -308,7 +308,6 @@
   }
 
   Dana.panel({
-    id: "memory", title: "Memory", icon: "star",
     mount(el, api) {
       A = api;
       if (!el.firstChild) { el.innerHTML = TEMPLATE; wire(); }

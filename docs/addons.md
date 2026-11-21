@@ -24,20 +24,20 @@ addons/weather/
   tools.py          tools Dana can call            (imported by the loader when present)
   api.py            HTTP routes: `setup(app)`      (registered automatically when present)
   migrations/       m0001_<name>.py, m0002_…        (its own tables, numbered per addon)
-  web/              panel.js, panel.css            (a page in the web app, when declared)
+  web/              weather.js, weather.css        (its pages in the web app, when declared)
   worker/           Dockerfile + code              (a sidecar process, when declared: e.g. scrapers)
   tests/            test_*.py, test_*.mjs          (found by bin/test)
   README.md         what it does, its settings, the events it emits (shown in the catalog)
   requirements.txt  extra Python packages, if any (installed into the image; missing = the addon fails to load, not the server)
 ```
 
-`bin/dana addons new weather` writes a working one with a test.
+`bin/dana addons new weather` writes a working one with a test (`--web` adds a page, `--worker` a sidecar).
 
 ## The manifest
 
 ```python
 # addons/weather/addon.py
-from core.addons import Addon, Field, PromptPart, Web, Nav, minutes
+from core.addons import Addon, Field, Nav, Page, PromptPart
 
 addon = Addon(
     "weather",
@@ -52,8 +52,8 @@ addon = Addon(
     requires=None,                              # an access capability needed to turn it on ("ops")
     prompt_parts=(PromptPart("guides", "When the user asks about weather, use weather_now."),),
     llm_jobs={"weather_summary": "fast"},       # its LLM purposes and their default model profile
-    web=Web(panel="panel.js", style="panel.css", nav=Nav("Weather", icon="cloud-sun", order=60)),
-)
+    web=(Page("weather", panel="weather.js", style="weather.css", nav=Nav("Weather", icon="cloud-sun", order=60)),),
+)                                               # web=: any number of pages; worker=Worker(...): a sidecar
 ```
 
 Everything an addon adds is declared on that one object, as a field or as `@addon.<hook>`:
@@ -68,17 +68,23 @@ Everything an addon adds is declared on that one object, as a field or as `@addo
 | `@addon.now_cards(order=...)` | `def f(user, ctx: NowContext) -> list[Card]` | Cards on the Now screen, ordered by `order` then addon order. |
 | `@addon.day_items` | `def f(user, ctx: NowContext) -> list[DayItem]` | Items in the Now screen's day strip. |
 | `@addon.now_action("prefix")` | `async def f(user, ref, action, args, now) -> dict` | Acting on its cards whose id is `prefix:ref` (`POST /api/now/act`); `core.cards.result(...)`, `ActError` to refuse. Connection enforced by `hook_for`. |
-| `@addon.briefing("key", counts=..., default=..., rank=...)` | `def f(user, ctx: BriefingContext) -> Section \| None` | A section of the morning briefing stored under unique `key` (reserved keys refused); `counts` names the push count keys it owns (unique across addons). |
+| `@addon.briefing("key", counts=..., default=..., rank=...)` | `def f(user, ctx: BriefingContext) -> Section \| None` or `async def` | A section of the morning briefing stored under unique `key` (reserved keys refused); `counts` names the push count keys it owns (unique across addons). |
 | `@addon.review("key")` | `def f(user, ctx: BriefingContext) -> Section \| None` | A section of the weekly review stored under unique `key`: `items` are decisions, `data` joins the review's facts. |
-| `@addon.review_action("type", actions)` | `async def f(user, item, action, decision, today) -> str` | Applying a weekly-review item of that type. Connection enforced by `hook_for`. |
+| `@addon.review_action("type", actions, primary=True)` | `async def f(user, item, action, decision, today) -> str` | Applying a weekly-review item of that type. Connection enforced by `hook_for`. |
 | `@addon.search` | `def f(user, query, limit) -> list[Hit]` | Results in the global search (`core.addons.helpers` provides time and search helpers). |
-| `@addon.selfcheck("key", "Label", server=False, after="")` | `def f(user, now) -> Check` | A line in the self-checks (`/api/checks`); a failing one is a Now card. |
-| `@addon.context("kind")` / `@addon.context_card("kind")` / `@addon.context_block("kind")` | `def f(user, ref_id, req) -> str \| None` / `def f(user, ref_id) -> dict` / `def f(user, ref_id) -> dict \| None` | Text about an item (a call, a task, a person) for context chats, the card shown with the chat, and extra context blocks linked from other items. Connection enforced by `hook_for`. |
-| `@addon.provide("key")` | `def f(user, ...)` or `async def` | A named capability a core composer or another addon can query through `registry.provider(key, user)` without importing the addon (weather, today's events, home zone, Telegram reply interceptors). |
-| `test=` (field) | `async def f(conn) -> str \| None` | "Test connection" for a stored connection (was `check`). |
-| `options=`, `validate=`, `blocked=`, `on_connect=`, `on_change=`, `connect_url=` | as today | Unchanged from the old `Integration`. |
+| `@addon.selfcheck("key", "Label", server=False, after="")` | `def f(user, now) -> Check` | A line in the self-checks (`/api/checks`); a failing one is a Now card. `server=True`: a check of the server itself (`user` is None), shown to users who may see everyone. |
+| `@addon.context("kind")` / `@addon.context_card("kind")` / `@addon.context_block("kind")` | `def f(user, ref_id, req: ContextRequest) -> str \| None` / `def f(user, ref_id) -> dict` / `def f(user, ref_id) -> str` | Text about an item (a call, a task, a person) for context chats; the card shown with the chat (raise `LookupError` when it is not theirs); a plain description of the item for another addon's context (`req.block(kind, ref_id)`). Connection enforced by `hook_for`. |
+| `@addon.provide("key")` | any arguments the caller and the provider agree on, plain or `async` | A named capability a core composer or another addon calls through `registry.provider(key, user)` (the hook, or None; its `func`) without importing the addon (weather, today's events, home zone, Telegram reply interceptors). |
+| `test=` | `async def f(conn) -> str \| None` | "Test connection" (`POST /api/addons/<name>/test`): None when the stored connection works, else a short reason. |
+| `options=` | `async def f(conn) -> {setting: [{value, label}]}` | Values a client offers for its settings, read from the user's own service (`GET /api/addons/<name>/options`). |
+| `validate=` | `def f(user, given, credentials, settings, by) -> None` | Its own rule over a connect / update (raise `InvalidValue(field, message)` to refuse; `by` is who makes the change, None for the server). |
+| `blocked=` | `def f(conn) -> str \| None` | Why its tools cannot run for this connection now; the reason becomes the tool's result. |
+| `on_connect=` / `on_change=` / `on_credentials_change=` | `def f(user)` | After it is turned on for a user / after any connect, update or disconnect / after its stored credentials changed (a failure is logged, the change stands). |
+| `prompt_section=` | `def f(user) -> str` | Its section of the system prompt, asked every turn while the user has it (cheap, cached; "" for nothing). |
+| `connect_url=`, `connect_label=` | a path of this server, its button's words | Connecting by a sign-in at the service instead of typed credentials (the Google addons). |
+| `change_requires=`, `realtime=`, `modules=`, `order=` | | Who may change anyone's connection (a capability); False keeps its tools out of realtime voice; more modules the loader imports; its place among the official addons. The `Addon` docstring (`core/addons/addon.py`) has each field. |
 
-Composer hooks are plain functions (the composers call them in a worker thread); jobs, services, handlers, channels and the action hooks are `async`. Keyed hooks (`now_action`, `briefing`, `review`, `review_action`, `selfcheck`, `context`, `context_card`, `context_block`, `provide`) and briefing `counts` keys are unique across addons (a second addon declaring the same key fails to load). `hook_for(kind, key, user)` enforces that the owning addon is active for `user` (connected, enabled on the server, and its `needs` connected too). The types (`Card`, `DayItem`, `NowContext`, `BriefingContext`, `Section`, `Hit`, `Check`, `ContextRequest`, `Approval`) are in `core/addons/hooks.py`; shared time/search helpers live in `core/addons/helpers.py`.
+Composer hooks are plain functions (the composers call them in a worker thread; `briefing` and `provide` may be either); jobs, services, handlers, channels and the action hooks are `async` (a wrong kind fails at import). Page ids, keyed hooks (`now_action`, `briefing`, `review`, `review_action`, `selfcheck`, `context`, `context_card`, `context_block`, `provide`) and briefing `counts` keys are unique across addons (a second addon declaring the same key fails to load). `hook_for(kind, key, user)` enforces that the owning addon is active for `user` (connected, enabled on the server, and its `needs` connected too). The types (`Card`, `DayItem`, `NowContext`, `BriefingContext`, `Section`, `Hit`, `Check`, `ContextRequest`, `Approval`) are in `core/addons/hooks.py`; shared time/search helpers live in `core/addons/helpers.py`.
 
 Core composers (Now, briefing, weekly review, wake, search, self-checks, context chats, approval text, shortcuts, Telegram) **only** collect these hooks; none of them imports an addon (enforced by `tests/test_addon_hooks.py::test_core_imports_no_addons`). `core/server.py` imports no addon either: routes, jobs and services come from the registry.
 
@@ -98,7 +104,7 @@ Per-user data: every query filters by the acting user. Addons can use `core.addo
 
 ### Web
 
-An addon with `web=` gets its files served at `/addons/<name>/web/<file>` (signed in like every page, only for a loaded addon enabled on the server, nothing outside its `web/` folder, no dot-files; `core/addons_api.py`), and `/api/addons` gives each user, for the addons on for them, `web: {panel, style, nav}` with those URLs. The web shell asks `GET /api/addons` for the user's addons, puts a navigation button for each `Nav`, loads each page's script (which registers itself with the small SDK in `static/dana.js`: `Dana.panel({id, title, icon, scripts, start(api), mount(el, api, arg), unmount()})`), its style on first open, and mounts it (`static/app-panels.js`; writing one: `server/docs/writing-an-addon.md`, "A web page"). The shell owns navigation, auth, the theme and the service worker, which keeps the shell and the pages' files in one cache per release (a digest of `static/` and every loaded addon's `web/`; `core/pages_api.py`). *(Still shell screens, to move:)* Tasks, which carries the core Today strip of the briefing and the weekly review, and Calls, phone's second page (`Web` declares one page per addon).
+`web=(Page(id, panel, style, nav), …)` declares the addon's pages, any number (phone has two: `inbox` and `calls`). The addon's `web/` folder is served at `/addons/<name>/web/<file>` (signed in like every page, only for a loaded addon enabled on the server, nothing outside its `web/` folder, no dot-files; `core/addons_api.py`), and `/api/addons` gives each user, for the addons on for them, `web: [{id, panel, style, nav}]` with those URLs (`[]` otherwise). A page id names the screen (`#panel-<id>`, `/<id>` and `#<id>` open it); it is unique across addons and never a core screen's (`chat`, `settings`, `addons`, `usage`, `debug`, `review`: `core/addons/hooks.py` `CORE_SCREENS`). The web shell puts a navigation button for each page with a `Nav`, loads each page's script, which registers itself with the small SDK in `static/dana.js` (`Dana.panel({scripts, start(api), mount(el, api, arg), unmount()})`: the SDK knows which page a script is from the URL it loaded), its style on first open, and mounts it (`static/app-panels.js`; writing one: `server/docs/writing-an-addon.md`, "Pages"). A page can host a **core piece** in an element of its own with `api.piece(name, el)`: `today`, the morning briefing and the weekly-review banner (`static/review.js`), which the tasks addon's page shows above its lists. The shell owns navigation, auth, the theme, the core screens and pieces, and the service worker, which keeps the shell and the pages' files in one cache per release (a digest of `static/` and every loaded addon's `web/`; `core/pages_api.py`); it names no addon page (`tests/test_web_shell.py`).
 
 ### Workers (sidecars)
 
@@ -129,7 +135,7 @@ Three levels of "on":
 
 The Addons page shows Installed, Official and Catalog. An admin installs from the catalog, or any git repository + full commit (+ folder), after a confirmation showing the repository, the commit and that **an installed addon runs with the server's full access**: the server fetches exactly that commit with git (`git init` + `git fetch --depth 1 <repo> <commit>`, no shell; `core/addons/install.py`) into `<data dir>/addons/<name>` with a `.installed.json` record, after checking the folder has an `addon.py` declaring that name (read, not imported), the name is not official, reserved or in another source, and there are no symbolic links. Branches, tags and short hashes are refused. Nothing runs until the restart the page asks for (`POST /api/server/restart`: the process exits and its supervisor starts it again; `server/docs/operations.md`, "Restarting"). Updating is installing a newer commit; removing deletes the folder (tables stay).
 
-`bin/dana addons install <name|repo@commit[:path]>` does the same without a server, into `site/addons/` by default (for images built by `bin/deploy`; `--data` for the data dir, `--dir` for any folder); `bin/dana addons new <name>` writes a working addon to start from (`server/docs/writing-an-addon.md`). The other commands: `list`, `remove`, `disable`, `enable`, and the per-user `show` / `connect` / `update` / `disconnect`.
+`bin/dana addons install <name|repo@commit[:path]>` does the same without a server, into `site/addons/` by default (for images built by `bin/deploy`; `--data` for the data dir, `--dir` for any folder); `bin/dana addons new <name> [--web] [--worker]` writes a working addon to start from (`server/docs/writing-an-addon.md`). The other commands: `list`, `remove`, `disable`, `enable`, and the per-user `show` / `connect` / `update` / `disconnect`.
 
 ## Core, not addons
 

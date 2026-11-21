@@ -1,7 +1,9 @@
 """``bin/dana addons …``: the server's addons (../docs/addons.md).
 
     addons list                             every addon: source, version, state, fields; the failed ones
-    addons new NAME [--dir DIR]             write a working addon from the template (default: site/addons/NAME)
+    addons new NAME [--web] [--worker] [--title T] [--dir DIR]
+                                            write a working addon from the template (default: site/addons/NAME):
+                                            a tool and its test; --web adds a page, --worker a sidecar
     addons install NAME|REPO@COMMIT[:PATH] [--dir DIR | --data]
                                             fetch one commit of an addon (a catalog entry, or any git repository)
                                             into the site's addons/ (default), DIR, or the data dir's addons/
@@ -21,11 +23,12 @@ import argparse
 import json
 import re
 from pathlib import Path
-from typing import Any, Dict, TextIO
+from typing import Any, TextIO
 
 from core import addon_dirs
 from core.addons import catalog, install, loader, state
 from core.addons.addon import all_addons, get_addon
+from core.addons.hooks import CORE_SCREENS
 from cli.users import CliError, register_connections
 
 TEMPLATE = Path(__file__).resolve().parent / "template"
@@ -71,26 +74,38 @@ def cmd_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
 
 # --- new -----------------------------------------------------------------------------------------
 
-def scaffold(name: str, root: Path, title: str = "") -> Path:
-    """Write a new addon ``root/<name>`` from the template (cli/template/); returns its folder.
+# Template files only some addons get: what decides it (the first part of the file's path).
+OPTIONAL_FILES = {"api.py.tmpl": "web", "web": "web", "worker": "worker"}
+BLOCK = re.compile(r"\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}", re.S)
+
+
+def scaffold(name: str, root: Path, title: str = "", web: bool = False, worker: bool = False) -> Path:
+    """Write a new addon ``root/<name>`` from the template (cli/template/): a
+    manifest with a setting and a prompt line, a tool, its test and a README;
+    ``web``: a page and the route it reads; ``worker``: a sidecar and a tool
+    that calls it. Returns its folder.
 
     Raises:
         CliError: a bad name, or the folder exists.
     """
-    if not name.isidentifier() or name != name.lower() or name in install.RESERVED:
-        raise CliError(f"{name!r} is not a usable addon name: a lower-case identifier (letters, digits, _).")
+    if not re.fullmatch(r"[a-z][a-z0-9_]*", name) or name in install.RESERVED or name in CORE_SCREENS:
+        raise CliError(f"{name!r} is not a usable addon name: lower-case letters, digits and _, starting with a letter.")
     if (addon_dirs.OFFICIAL_DIR / name).is_dir():
         raise CliError(f"{name!r} is an official addon's name; pick another.")
     target = root / name
     if target.exists():
         raise CliError(f"{target} already exists.")
-    words: Dict[str, str] = {"{{name}}": name, "{{title}}": title or name.replace("_", " ").capitalize()}
+    flags = {"web": web, "worker": worker}
+    words = {"{{name}}": name, "{{title}}": title or name.replace("_", " ").capitalize(),
+             "{{page}}": name.replace("_", "-"), "{{env}}": f"{name.upper()}_WORKER_URL"}
     for src in sorted(TEMPLATE.rglob("*.tmpl")):
-        rel = src.relative_to(TEMPLATE).with_suffix("")
-        dest = target / str(rel).replace("NAME", name)
-        text = src.read_text(encoding="utf-8")
+        rel = src.relative_to(TEMPLATE)
+        if not flags.get(OPTIONAL_FILES.get(rel.parts[0], ""), True):
+            continue
+        text = BLOCK.sub(lambda m: m.group(2) if flags[m.group(1)] else "", src.read_text(encoding="utf-8"))
         for key, value in words.items():
             text = text.replace(key, value)
+        dest = target / str(rel.with_suffix("")).replace("NAME", name)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text, encoding="utf-8")
     return target
@@ -98,11 +113,11 @@ def scaffold(name: str, root: Path, title: str = "") -> Path:
 
 def cmd_new(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     root = Path(args.dir).expanduser().resolve() if args.dir else _site_addons()
-    target = scaffold(args.name, root, args.title or "")
-    print(f"Wrote the {args.name} addon in {target}: addon.py (a setting, a prompt line), tools.py "
-          f"({args.name}_hello), api.py (GET /api/{args.name}), tests/test_{args.name}.py, README.md.\n"
+    target = scaffold(args.name, root, args.title or "", web=args.web, worker=args.worker)
+    files = sorted(str(p.relative_to(target)) for p in target.rglob("*") if p.is_file())
+    print(f"Wrote the {args.name} addon in {target}: {', '.join(files)}.\n"
           f"Test it: bin/test {args.name} (from server/). Restart Dana to load it, then turn it on in "
-          "Settings → Addons.", file=out)
+          f"Settings → Addons (or bin/dana addons connect <user> {args.name}).", file=out)
 
 
 # --- install / remove ----------------------------------------------------------------------------
@@ -189,9 +204,11 @@ def register(sub: Any) -> None:
     """Add the ``addons`` commands to ``sub`` (the ``bin/dana addons`` sub-parsers)."""
     p = sub.add_parser("list", help="every addon with its source, state and fields; the ones that failed")
     p.set_defaults(func=cmd_list, needs_db=True)
-    p = sub.add_parser("new", help="write a working addon (a setting, a tool, a route, a test) to start from")
+    p = sub.add_parser("new", help="write a working addon (a setting, a tool, its test, a README) to start from")
     p.add_argument("name")
     p.add_argument("--title", help="its name for people (default: from the name)")
+    p.add_argument("--web", action="store_true", help="also a page in the web app and the route it reads")
+    p.add_argument("--worker", action="store_true", help="also a sidecar (worker/: a Dockerfile) and a tool calling it")
     p.add_argument("--dir", help="the addons folder to write into (default: the site's addons/)")
     p.set_defaults(func=cmd_new, needs_db=False)
     p = sub.add_parser("install", help="fetch one commit of an addon: a catalog NAME or REPO@COMMIT[:PATH]")

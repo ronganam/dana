@@ -1,28 +1,33 @@
-"""The {{name}} addon: its tool and setting, its prompt line and its route, for its user only.
+"""The {{name}} addon: its tool and setting{{#web}}, its page and route{{/web}}{{#worker}}, its worker{{/worker}}, for the users who have it only.
 
-Run from server/: bin/test {{name}}. Two users: the first admin turns {{name}} on, Maya does not.
+Run from server/: bin/test {{name}}. Robin (the first admin) and Gal turn it on, Maya does not.
 """
 
 import asyncio
 import os
 import sys
 from pathlib import Path
-
-import testenv  # first: clean env, temp DB removed at exit, no .env (server/tests/testenv.py)
+{{#worker}}import socket
+import subprocess
+{{/worker}}
+import testenv  # first: a clean env and a temporary database (server/tests/testenv.py)
 testenv.isolate("{{name}}_test")
-os.environ["DANA_ADDON_DIRS"] = str(Path(__file__).resolve().parents[2])  # the folder holding this addon
-os.environ["API_TOKEN"] = "{{name}}-test-env-token"  # a test value: with it set, Bearer tokens decide the user
-
-from aiohttp import web  # noqa: E402
+HERE = Path(__file__).resolve().parents[1]  # this addon's folder
+os.environ["DANA_ADDON_DIRS"] = str(HERE.parent)  # the folder holding it: loaded as a site addon
+{{#web}}os.environ["API_TOKEN"] = "{{name}}-test-env-token"  # a test value: with it set, Bearer tokens decide the user
+{{/web}}
+{{#web}}from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from core import db, users  # noqa: E402
+{{/web}}from core import db, users  # noqa: E402
 
 db.migrate()
 users.bootstrap()
 
-from core.auth import setup_auth  # noqa: E402
-from core.addons import loader, registry, store  # noqa: E402
+{{#web}}from core.auth import setup_auth  # noqa: E402
+{{/web}}from core.addons import loader, registry, store  # noqa: E402
+{{#web}}from core.addons.addon import get_addon  # noqa: E402
+{{/web}}
 from core.addons.registry import ToolNotAvailable  # noqa: E402
 
 failures = 0
@@ -34,39 +39,63 @@ def check(name: str, cond: object, detail: object = "") -> None:
     failures += 0 if cond else 1
 
 
-loader.load()  # every addon, this one included (as a site addon)
-ADMIN = users.first_admin()
-assert ADMIN is not None
+loader.load()  # every addon, this one included
+ROBIN = users.first_admin()
+assert ROBIN is not None
+GAL = users.create("Gal")
 MAYA = users.create("Maya")
-store.connect(ADMIN, "{{name}}")
+store.connect(ROBIN, "{{name}}")
+store.connect(GAL, "{{name}}", settings={"greeting": "Shalom"})
 
 
 async def main() -> None:
     check("loaded", "{{name}}" in loader.loaded(), loader.failed())
-    check("tool: the setting's default", await registry.execute(ADMIN, "{{name}}_hello", {"who": "Noa"}) == "Hello, Noa!")
-    store.update(ADMIN, "{{name}}", settings={"greeting": "Shalom"})
-    check("tool: the user's own setting", await registry.execute(ADMIN, "{{name}}_hello", {"who": "Noa"}) == "Shalom, Noa!")
+    check("tool: the setting's default", await registry.execute(ROBIN, "{{name}}_hello", {"who": "Noa"}) == "Hello, Noa!")
+    check("tool: each user's own setting", await registry.execute(GAL, "{{name}}_hello", {"who": "Noa"}) == "Shalom, Noa!")
     try:
         await registry.execute(MAYA, "{{name}}_hello", {"who": "Noa"})
         refused = False
     except ToolNotAvailable:
         refused = True
     check("tool: refused for a user without the addon", refused and not registry.has_tool(MAYA, "{{name}}_hello"))
-    check("prompt: its line only for its user",
-          any("{{name}}_hello" in p for p in registry.prompt_parts(ADMIN, "guides"))
+    check("prompt: its line only for its users",
+          all(any("{{name}}_hello" in p for p in registry.prompt_parts(u, "guides")) for u in (ROBIN, GAL))
           and not any("{{name}}_hello" in p for p in registry.prompt_parts(MAYA, "guides")))
-
+{{#web}}
+    page = (HERE / "web" / "{{name}}.js").read_text(encoding="utf-8")
+    check("page: declared, its script registers with Dana.panel",
+          [p.id for p in get_addon("{{name}}").web] == ["{{page}}"] and "Dana.panel(" in page)
     app = web.Application()
     setup_auth(app)
-    for name, module in loader.apis():
-        if name == "{{name}}":
-            module.setup(app)
+    dict(loader.apis())["{{name}}"].setup(app)
     async with TestClient(TestServer(app)) as c:
-        mine = await c.get("/api/{{name}}", headers={"Authorization": "Bearer " + users.issue_token(ADMIN.id, "t")[0]})
-        theirs = await c.get("/api/{{name}}", headers={"Authorization": "Bearer " + users.issue_token(MAYA.id, "t")[0]})
-        check("route: its user gets their greeting", mine.status == 200 and await mine.json() == {"greeting": "Shalom"})
-        check("route: another user is refused (403 not_connected)", theirs.status == 403, theirs.status)
-
+        async def get(user: users.User) -> tuple:
+            r = await c.get("/api/{{name}}", headers={"Authorization": "Bearer " + users.issue_token(user.id, "t")[0]})
+            return r.status, await r.json()
+        check("route: each user gets their own greeting",
+              await get(ROBIN) == (200, {"greeting": "Hello"}) and await get(GAL) == (200, {"greeting": "Shalom"}))
+        status, body = await get(MAYA)
+        check("route: a user without the addon is refused (403 not_connected)", status == 403, body)
+{{/web}}{{#worker}}
+    sock = socket.socket()
+    sock.bind(("127.0.0.1", 0))
+    port = sock.getsockname()[1]
+    sock.close()
+    worker = subprocess.Popen([sys.executable, str(HERE / "worker" / "server.py")], env={**os.environ, "PORT": str(port)})
+    os.environ["{{env}}"] = f"http://127.0.0.1:{port}"
+    try:
+        answer = ""
+        for _ in range(50):  # until it listens
+            try:
+                answer = await registry.execute(ROBIN, "{{name}}_worker_ping", {})
+                break
+            except OSError:
+                await asyncio.sleep(0.1)
+        check("worker: the tool reaches it", answer == "The {{name}} worker is up", answer)
+    finally:
+        worker.terminate()
+        worker.wait(10)
+{{/worker}}
 
 asyncio.run(main())
 if failures:

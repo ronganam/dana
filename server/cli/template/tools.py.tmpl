@@ -1,6 +1,10 @@
 """The ``{{name}}`` tools. The schema the model sees comes from the type hints and
 the docstring; ``conn`` (the user's connection) is left out of it."""
+{{#worker}}
+import os
 
+from aiohttp import ClientSession, ClientTimeout
+{{/worker}}
 from core.addons import Connection
 from addons.{{name}}.addon import addon
 
@@ -13,3 +17,13 @@ def {{name}}_hello(conn: Connection, who: str) -> str:
         who: Who to greet.
     """
     return f"{conn.settings.get('greeting') or 'Hello'}, {who}!"
+{{#worker}}
+
+
+@addon.tool()
+async def {{name}}_worker_ping(conn: Connection) -> str:
+    """Ask the {{name}} worker whether it is up."""
+    url = os.getenv("{{env}}", "http://127.0.0.1:8091").rstrip("/")
+    async with ClientSession(timeout=ClientTimeout(total=5)) as session, session.get(f"{url}/ping") as r:
+        return (await r.json())["message"]
+{{/worker}}

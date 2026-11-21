@@ -290,7 +290,7 @@
     const i = ref.indexOf(":");
     const kind = ref.slice(0, i), id = ref.slice(i + 1);
     if (kind === "session") window.danaOpenSession?.(id);
-    else if (kind === "call") window.danaOpenCall?.(id);
+    else if (kind === "call") window.danaSwitchTab?.("calls", id);
     else if (kind === "person") window.danaSwitchTab?.("people", id);
   }
 

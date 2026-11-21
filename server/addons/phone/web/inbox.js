@@ -963,7 +963,6 @@
   `;
 
   Dana.panel({
-    id: "inbox", title: "Inbox", icon: "inbox",
     start(api) { A = api; pollBadge(); setInterval(pollBadge, BADGE_MS); },
     mount(el) {
       if (!el.firstChild) { el.innerHTML = TEMPLATE; init(); }

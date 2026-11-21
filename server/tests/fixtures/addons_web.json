@@ -25,7 +25,7 @@
      "update_available": false
     }
    ],
-   "origin": "/home/ronganam/.t3/userdata/antigravity-tmp/ac0a3dfd6ddd/run-31Wag7/dana-test-rza_rabj/catalog.json",
+   "origin": "/tmp/dana-test-sn8gbdlx/catalog.json",
    "problems": [
     "later: source.ref 'FILL-ME' is not a full commit hash"
    ],
@@ -71,7 +71,7 @@
    "state": "disabled-on-server",
    "title": "Shopping",
    "version": "",
-   "web": null,
+   "web": [],
    "why_not": "Disabled on this server",
    "worker": false
   },
@@ -144,7 +144,7 @@
    "state": "available",
    "title": "Whatsapp",
    "version": "",
-   "web": null,
+   "web": [],
    "why_not": null,
    "worker": false
   },
@@ -181,15 +181,18 @@
    "state": "on",
    "title": "Shopping",
    "version": "",
-   "web": {
-    "nav": {
-     "icon": "shopping-cart",
-     "label": "Shopping",
-     "order": 10
-    },
-    "panel": "/addons/shopping/web/shopping.js",
-    "style": "/addons/shopping/web/shopping.css"
-   },
+   "web": [
+    {
+     "id": "shopping",
+     "nav": {
+      "icon": "shopping-cart",
+      "label": "Shopping",
+      "order": 10
+     },
+     "panel": "/addons/shopping/web/shopping.js",
+     "style": "/addons/shopping/web/shopping.css"
+    }
+   ],
    "why_not": null,
    "worker": false
   },
@@ -239,7 +242,7 @@
      "state": "on",
      "title": "Essentials",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "Every user has it",
      "worker": false
     },
@@ -262,7 +265,18 @@
      "state": "on",
      "title": "Tasks",
      "version": "",
-     "web": null,
+     "web": [
+      {
+       "id": "tasks",
+       "nav": {
+        "icon": "check-square",
+        "label": "Tasks",
+        "order": 5
+       },
+       "panel": "/addons/tasks/web/tasks.js",
+       "style": "/addons/tasks/web/tasks.css"
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -296,15 +310,18 @@
      "state": "on",
      "title": "Shopping",
      "version": "",
-     "web": {
-      "nav": {
-       "icon": "shopping-cart",
-       "label": "Shopping",
-       "order": 10
-      },
-      "panel": "/addons/shopping/web/shopping.js",
-      "style": "/addons/shopping/web/shopping.css"
-     },
+     "web": [
+      {
+       "id": "shopping",
+       "nav": {
+        "icon": "shopping-cart",
+        "label": "Shopping",
+        "order": 10
+       },
+       "panel": "/addons/shopping/web/shopping.js",
+       "style": "/addons/shopping/web/shopping.css"
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -327,15 +344,18 @@
      "state": "on",
      "title": "Knowledge",
      "version": "",
-     "web": {
-      "nav": {
-       "icon": "folder",
-       "label": "Projects",
-       "order": 50
-      },
-      "panel": "/addons/knowledge/web/projects.js",
-      "style": "/addons/knowledge/web/projects.css"
-     },
+     "web": [
+      {
+       "id": "projects",
+       "nav": {
+        "icon": "folder",
+        "label": "Projects",
+        "order": 50
+       },
+       "panel": "/addons/knowledge/web/projects.js",
+       "style": "/addons/knowledge/web/projects.css"
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -358,15 +378,18 @@
      "state": "on",
      "title": "About",
      "version": "",
-     "web": {
-      "nav": {
-       "icon": "star",
-       "label": "Memory",
-       "order": 60
-      },
-      "panel": "/addons/about/web/memory.js",
-      "style": "/addons/about/web/memory.css"
-     },
+     "web": [
+      {
+       "id": "memory",
+       "nav": {
+        "icon": "star",
+        "label": "Memory",
+        "order": 60
+       },
+       "panel": "/addons/about/web/memory.js",
+       "style": "/addons/about/web/memory.css"
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -389,15 +412,18 @@
      "state": "on",
      "title": "People",
      "version": "",
-     "web": {
-      "nav": {
-       "icon": "users",
-       "label": "People",
-       "order": 40
-      },
-      "panel": "/addons/people/web/people.js",
-      "style": "/addons/people/web/people.css"
-     },
+     "web": [
+      {
+       "id": "people",
+       "nav": {
+        "icon": "users",
+        "label": "People",
+        "order": 40
+       },
+       "panel": "/addons/people/web/people.js",
+       "style": "/addons/people/web/people.css"
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -420,15 +446,28 @@
      "state": "on",
      "title": "Phone",
      "version": "",
-     "web": {
-      "nav": {
-       "icon": "inbox",
-       "label": "Inbox",
-       "order": 30
+     "web": [
+      {
+       "id": "inbox",
+       "nav": {
+        "icon": "inbox",
+        "label": "Inbox",
+        "order": 30
+       },
+       "panel": "/addons/phone/web/inbox.js",
+       "style": "/addons/phone/web/inbox.css"
       },
-      "panel": "/addons/phone/web/inbox.js",
-      "style": "/addons/phone/web/inbox.css"
-     },
+      {
+       "id": "calls",
+       "nav": {
+        "icon": "phone",
+        "label": "Calls",
+        "order": 90
+       },
+       "panel": "/addons/phone/web/calls.js",
+       "style": "/addons/phone/web/calls.css"
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -449,7 +488,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:45181",
+       "value": "http://127.0.0.1:34515",
        "why_not": null
       },
       {
@@ -566,7 +605,7 @@
      "state": "on",
      "title": "Homeassistant",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -635,7 +674,7 @@
      "state": "available",
      "title": "Whatsapp",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -691,7 +730,7 @@
      "state": "available",
      "title": "Calendar",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -726,7 +765,7 @@
      "state": "available",
      "title": "Contacts",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -761,7 +800,7 @@
      "state": "available",
      "title": "Gmail",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -796,7 +835,7 @@
      "state": "available",
      "title": "Telegram account",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -819,7 +858,7 @@
      "state": "available",
      "title": "Money",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -844,7 +883,7 @@
      "state": "available",
      "title": "Money (Israel)",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": true
     },
@@ -878,7 +917,7 @@
      "state": "available",
      "title": "Cameras",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -901,7 +940,7 @@
      "state": "available",
      "title": "Ops",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -925,7 +964,7 @@
      "state": "failed",
      "title": "Broken",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "It did not load",
      "worker": false
     }
@@ -933,7 +972,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "ca0b943bb8c6"
+   "user_id": "349485b6b23d"
   },
   "status": 200
  },
@@ -959,7 +998,7 @@
      "state": "on",
      "title": "Essentials",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "Every user has it",
      "worker": false
     },
@@ -982,7 +1021,7 @@
      "state": "available",
      "title": "Tasks",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1016,7 +1055,7 @@
      "state": "available",
      "title": "Shopping",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1039,7 +1078,7 @@
      "state": "available",
      "title": "Knowledge",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1062,7 +1101,7 @@
      "state": "available",
      "title": "About",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1085,7 +1124,7 @@
      "state": "available",
      "title": "People",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1108,7 +1147,7 @@
      "state": "available",
      "title": "Phone",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1129,7 +1168,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:46863",
+       "value": "http://127.0.0.1:32885",
        "why_not": null
       },
       {
@@ -1246,7 +1285,7 @@
      "state": "on",
      "title": "Homeassistant",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1267,7 +1306,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:34067/api",
+       "value": "http://127.0.0.1:38815/api",
        "why_not": null
       },
       {
@@ -1315,7 +1354,7 @@
      "state": "on",
      "title": "Whatsapp",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1371,15 +1410,18 @@
      "state": "on",
      "title": "Calendar",
      "version": "",
-     "web": {
-      "nav": {
-       "icon": "calendar",
-       "label": "Calendar",
-       "order": 70
-      },
-      "panel": "/addons/calendar/web/calendar.js",
-      "style": null
-     },
+     "web": [
+      {
+       "id": "calendar",
+       "nav": {
+        "icon": "calendar",
+        "label": "Calendar",
+        "order": 70
+       },
+       "panel": "/addons/calendar/web/calendar.js",
+       "style": null
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -1414,7 +1456,7 @@
      "state": "available",
      "title": "Contacts",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1449,7 +1491,7 @@
      "state": "available",
      "title": "Gmail",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1484,7 +1526,7 @@
      "state": "available",
      "title": "Telegram account",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1507,7 +1549,7 @@
      "state": "available",
      "title": "Money",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1532,7 +1574,7 @@
      "state": "available",
      "title": "Money (Israel)",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": true
     },
@@ -1558,7 +1600,7 @@
        "name": "url",
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "type": "address",
-       "value": "http://127.0.0.1:38209",
+       "value": "http://127.0.0.1:37157",
        "why_not": null
       }
      ],
@@ -1566,7 +1608,7 @@
      "state": "on",
      "title": "Cameras",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1590,7 +1632,7 @@
      "state": "failed",
      "title": "Broken",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "It did not load",
      "worker": false
     }
@@ -1598,7 +1640,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "7ecae0cc3c70"
+   "user_id": "d66f006eadc2"
   },
   "status": 200
  },
@@ -1624,7 +1666,7 @@
      "state": "on",
      "title": "Essentials",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "Every user has it",
      "worker": false
     },
@@ -1647,7 +1689,18 @@
      "state": "on",
      "title": "Tasks",
      "version": "",
-     "web": null,
+     "web": [
+      {
+       "id": "tasks",
+       "nav": {
+        "icon": "check-square",
+        "label": "Tasks",
+        "order": 5
+       },
+       "panel": "/addons/tasks/web/tasks.js",
+       "style": "/addons/tasks/web/tasks.css"
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -1681,15 +1734,18 @@
      "state": "on",
      "title": "Shopping",
      "version": "",
-     "web": {
-      "nav": {
-       "icon": "shopping-cart",
-       "label": "Shopping",
-       "order": 10
-      },
-      "panel": "/addons/shopping/web/shopping.js",
-      "style": "/addons/shopping/web/shopping.css"
-     },
+     "web": [
+      {
+       "id": "shopping",
+       "nav": {
+        "icon": "shopping-cart",
+        "label": "Shopping",
+        "order": 10
+       },
+       "panel": "/addons/shopping/web/shopping.js",
+       "style": "/addons/shopping/web/shopping.css"
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -1712,7 +1768,7 @@
      "state": "available",
      "title": "Knowledge",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1735,7 +1791,7 @@
      "state": "available",
      "title": "About",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1758,7 +1814,7 @@
      "state": "available",
      "title": "People",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1781,7 +1837,7 @@
      "state": "available",
      "title": "Phone",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1919,7 +1975,7 @@
      "state": "available",
      "title": "Homeassistant",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -1941,7 +1997,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:34067/api",
+       "value": "http://127.0.0.1:38815/api",
        "why_not": null
       },
       {
@@ -1989,7 +2045,7 @@
      "state": "on",
      "title": "Whatsapp",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2045,7 +2101,7 @@
      "state": "available",
      "title": "Calendar",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2080,7 +2136,7 @@
      "state": "available",
      "title": "Contacts",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2115,7 +2171,7 @@
      "state": "available",
      "title": "Gmail",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2150,7 +2206,7 @@
      "state": "available",
      "title": "Telegram account",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2173,7 +2229,7 @@
      "state": "available",
      "title": "Money",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2198,7 +2254,7 @@
      "state": "available",
      "title": "Money (Israel)",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": true
     },
@@ -2232,7 +2288,7 @@
      "state": "available",
      "title": "Cameras",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2256,7 +2312,7 @@
      "state": "failed",
      "title": "Broken",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "It did not load",
      "worker": false
     }
@@ -2264,7 +2320,7 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "45af809c220f"
+   "user_id": "ed0c99727e32"
   },
   "status": 200
  },
@@ -2290,7 +2346,7 @@
      "state": "on",
      "title": "Essentials",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "Every user has it",
      "worker": false
     },
@@ -2313,7 +2369,7 @@
      "state": "available",
      "title": "Tasks",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2347,7 +2403,7 @@
      "state": "available",
      "title": "Shopping",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2370,7 +2426,7 @@
      "state": "available",
      "title": "Knowledge",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2393,7 +2449,7 @@
      "state": "available",
      "title": "About",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2416,7 +2472,7 @@
      "state": "available",
      "title": "People",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2439,7 +2495,7 @@
      "state": "available",
      "title": "Phone",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2460,7 +2516,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:46863",
+       "value": "http://127.0.0.1:32885",
        "why_not": null
       },
       {
@@ -2577,7 +2633,7 @@
      "state": "on",
      "title": "Homeassistant",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2598,7 +2654,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:34067/api",
+       "value": "http://127.0.0.1:38815/api",
        "why_not": null
       },
       {
@@ -2646,7 +2702,7 @@
      "state": "on",
      "title": "Whatsapp",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2702,15 +2758,18 @@
      "state": "on",
      "title": "Calendar",
      "version": "",
-     "web": {
-      "nav": {
-       "icon": "calendar",
-       "label": "Calendar",
-       "order": 70
-      },
-      "panel": "/addons/calendar/web/calendar.js",
-      "style": null
-     },
+     "web": [
+      {
+       "id": "calendar",
+       "nav": {
+        "icon": "calendar",
+        "label": "Calendar",
+        "order": 70
+       },
+       "panel": "/addons/calendar/web/calendar.js",
+       "style": null
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -2745,7 +2804,7 @@
      "state": "available",
      "title": "Contacts",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2780,7 +2839,7 @@
      "state": "available",
      "title": "Gmail",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2815,7 +2874,7 @@
      "state": "available",
      "title": "Telegram account",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2838,7 +2897,7 @@
      "state": "available",
      "title": "Money",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -2863,7 +2922,7 @@
      "state": "available",
      "title": "Money (Israel)",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": true
     },
@@ -2889,7 +2948,7 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:38209",
+       "value": "http://127.0.0.1:37157",
        "why_not": "Set by an admin"
       }
      ],
@@ -2897,7 +2956,7 @@
      "state": "on",
      "title": "Cameras",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "Set by an admin",
      "worker": false
     },
@@ -2920,14 +2979,14 @@
      "state": "failed",
      "title": "Broken",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "It did not load",
      "worker": false
     }
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "7ecae0cc3c70"
+   "user_id": "d66f006eadc2"
   },
   "status": 200
  },
@@ -2953,7 +3012,7 @@
      "state": "on",
      "title": "Essentials",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "Every user has it",
      "worker": false
     },
@@ -2976,7 +3035,7 @@
      "state": "available",
      "title": "Tasks",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3010,7 +3069,7 @@
      "state": "disabled-on-server",
      "title": "Shopping",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "Disabled on this server",
      "worker": false
     },
@@ -3033,7 +3092,7 @@
      "state": "available",
      "title": "Knowledge",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3056,7 +3115,7 @@
      "state": "available",
      "title": "About",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3079,7 +3138,7 @@
      "state": "available",
      "title": "People",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3102,7 +3161,7 @@
      "state": "available",
      "title": "Phone",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3123,7 +3182,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:46863",
+       "value": "http://127.0.0.1:32885",
        "why_not": null
       },
       {
@@ -3240,7 +3299,7 @@
      "state": "on",
      "title": "Homeassistant",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3261,7 +3320,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:34067/api",
+       "value": "http://127.0.0.1:38815/api",
        "why_not": null
       },
       {
@@ -3309,7 +3368,7 @@
      "state": "on",
      "title": "Whatsapp",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3365,15 +3424,18 @@
      "state": "on",
      "title": "Calendar",
      "version": "",
-     "web": {
-      "nav": {
-       "icon": "calendar",
-       "label": "Calendar",
-       "order": 70
-      },
-      "panel": "/addons/calendar/web/calendar.js",
-      "style": null
-     },
+     "web": [
+      {
+       "id": "calendar",
+       "nav": {
+        "icon": "calendar",
+        "label": "Calendar",
+        "order": 70
+       },
+       "panel": "/addons/calendar/web/calendar.js",
+       "style": null
+      }
+     ],
      "why_not": null,
      "worker": false
     },
@@ -3408,7 +3470,7 @@
      "state": "available",
      "title": "Contacts",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3443,7 +3505,7 @@
      "state": "available",
      "title": "Gmail",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3478,7 +3540,7 @@
      "state": "available",
      "title": "Telegram account",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3501,7 +3563,7 @@
      "state": "available",
      "title": "Money",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": false
     },
@@ -3526,7 +3588,7 @@
      "state": "available",
      "title": "Money (Israel)",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": null,
      "worker": true
     },
@@ -3552,7 +3614,7 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:38209",
+       "value": "http://127.0.0.1:37157",
        "why_not": "Set by an admin"
       }
      ],
@@ -3560,7 +3622,7 @@
      "state": "on",
      "title": "Cameras",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "Set by an admin",
      "worker": false
     },
@@ -3583,14 +3645,14 @@
      "state": "failed",
      "title": "Broken",
      "version": "",
-     "web": null,
+     "web": [],
      "why_not": "It did not load",
      "worker": false
     }
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "7ecae0cc3c70"
+   "user_id": "d66f006eadc2"
   },
   "status": 200
  },
@@ -3614,7 +3676,7 @@
     "manage_server"
    ],
    "currency": "ILS",
-   "id": "ca0b943bb8c6",
+   "id": "349485b6b23d",
    "languages": [
     "he",
     "en"
@@ -3635,7 +3697,7 @@
    ],
    "capabilities": [],
    "currency": "USD",
-   "id": "7ecae0cc3c70",
+   "id": "d66f006eadc2",
    "languages": [
     "en"
    ],
@@ -3661,7 +3723,7 @@
      "secret": false,
      "set": true,
      "type": "address",
-     "value": "http://127.0.0.1:34067/api",
+     "value": "http://127.0.0.1:38815/api",
      "why_not": "Set by an admin"
     },
     {
@@ -3709,7 +3771,7 @@
    "state": "on",
    "title": "Whatsapp",
    "version": "",
-   "web": null,
+   "web": [],
    "why_not": null,
    "worker": false
   },
@@ -3791,17 +3853,17 @@
    "users": [
     {
      "access": "admin",
-     "id": "ca0b943bb8c6",
+     "id": "349485b6b23d",
      "name": "Robin Levi"
     },
     {
      "access": "member",
-     "id": "7ecae0cc3c70",
+     "id": "d66f006eadc2",
      "name": "Bob Builder"
     },
     {
      "access": "member",
-     "id": "45af809c220f",
+     "id": "ed0c99727e32",
      "name": "Carl"
     }
    ]

@@ -16,9 +16,9 @@ name. That order is the order of every tool list and hook result.
 
 Each addon is checked on its own, after its modules are imported: its prompt
 slots exist, every ``needs`` of its tools and prompt parts names a loaded
-addon, its keyed hooks (``core.addons.addon.KEYED_HOOKS``: card prefixes,
-section, check and count keys, item types, context kinds) are not another
-addon's, its LLM purposes are not taken, and it declared exactly one addon,
+addon, its page ids and keyed hooks (``core.addons.addon.KEYED_HOOKS``: card
+prefixes, section, check and count keys, item types, context kinds, provider
+keys) are not another addon's, its LLM purposes are not taken, and it declared exactly one addon,
 its folder's. :func:`migrate` then applies the database migrations; an addon
 whose migrations fail is taken out again (:func:`unload`), and so is one whose
 routes core/server.py refuses.
@@ -408,11 +408,6 @@ def folder(name: str) -> AddonFolder:
     """
     load()
     return _folders[name]
-
-
-def route_modules() -> Tuple[ModuleType, ...]:
-    """The ``api`` module (with ``setup(app)``) of every loaded addon that has one, in order."""
-    return tuple(_apis[n] for n in load() if n in _apis)
 
 
 def apis() -> Tuple[Tuple[str, ModuleType], ...]:

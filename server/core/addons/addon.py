@@ -20,13 +20,13 @@ import datetime
 import inspect
 import logging
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import (Any, Awaitable, Callable, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, TypeVar,
                     Union)
 
 from core.access import CAPABILITIES
 from core.users import User
-from core.addons.hooks import Channel, Handler, Hook, Job, LlmJob, Service, Web, Worker
+from core.addons.hooks import Channel, Handler, Hook, Job, LlmJob, Page, Service, Worker
 from core.addons.schema import generate_schema
 
 logger = logging.getLogger(__name__)
@@ -162,7 +162,6 @@ class Tool:
     shortcut: ConfirmRule = False
     shortcut_prep: bool = False
     shortcut_describe: Optional[Callable[[Optional[User], Dict[str, Any]], str]] = None
-    extra: Dict[str, Any] = field(default_factory=dict)
 
     @property
     def addons(self) -> Tuple[str, ...]:
@@ -172,8 +171,8 @@ class Tool:
 
 _addons: Dict[str, "Addon"] = {}
 _tools: Dict[str, Tool] = {}
-# The fixed addon order (set once by addons/__init__.py); addons declared
-# later (tests) follow in declaration order.
+# The fixed addon order (set by the loader); addons declared later (tests)
+# follow in declaration order.
 _order: Tuple[str, ...] = ()
 # Bumped whenever an addon or tool is registered (tool list caches key on it).
 _version = 0
@@ -215,7 +214,9 @@ class Addon:
         llm_jobs: Its LLM purposes and their default model profile
             (``{"task_emoji": "fast"}``, or an :class:`~core.addons.hooks.LlmJob`
             with a label): ``core.llm`` accepts them as ``purpose=``.
-        web: Its page in the web app (:class:`~core.addons.hooks.Web`): files served from its ``web/``.
+        web: Its pages in the web app, any number: a tuple of
+            :class:`~core.addons.hooks.Page` (files served from its ``web/``;
+            page ids unique across addons).
         worker: Its sidecar (:class:`~core.addons.hooks.Worker`), built from its ``worker/``.
         modules: More modules of its folder the loader imports after
             ``addon.py`` and ``tools.py`` (dotted, relative: ``"calls.tools"``):
@@ -274,7 +275,7 @@ class Addon:
                  needs: Sequence[str] = (), credentials: Sequence[Field] = (), settings: Sequence[Field] = (),
                  default_on: bool = False, everyone: bool = False, requires: Optional[str] = None,
                  prompt_parts: Sequence[PromptPart] = (), llm_jobs: Optional[Mapping[str, Union[str, LlmJob]]] = None,
-                 web: Optional[Web] = None, worker: Optional[Worker] = None, modules: Sequence[str] = (),
+                 web: Sequence[Page] = (), worker: Optional[Worker] = None, modules: Sequence[str] = (),
                  order: Optional[int] = None,
                  on_connect: Optional[Callable[[User], None]] = None,
                  on_credentials_change: Optional[Callable[[User], None]] = None,
@@ -293,6 +294,11 @@ class Addon:
                 raise ValueError(f"Addon {name!r} requires unknown capability {capability!r}")
         if default_on and any(f.required for f in credentials):
             raise ValueError(f"Addon {name!r} is default_on but needs credentials")
+        if isinstance(web, Page) or not all(isinstance(p, Page) for p in web):
+            raise TypeError(f"Addon {name!r}: web= takes a tuple of Page: web=(Page(...),)")
+        page_ids = [p.id for p in web]
+        if len(set(page_ids)) != len(page_ids):
+            raise ValueError(f"Addon {name!r} declares a page id twice: {page_ids}")
         self.name = name
         self.title = title or name.replace("_", " ").capitalize()
         self.description = description
@@ -310,7 +316,7 @@ class Addon:
         self.prompt_parts: Tuple[PromptPart, ...] = tuple(prompt_parts)
         self.llm_jobs: Dict[str, LlmJob] = {k: v if isinstance(v, LlmJob) else LlmJob(v)
                                             for k, v in (llm_jobs or {}).items()}
-        self.web = web
+        self.web: Tuple[Page, ...] = tuple(web)
         self.worker = worker
         self.modules: Tuple[str, ...] = tuple(modules)
         self.order = order
@@ -334,10 +340,6 @@ class Addon:
     def __repr__(self) -> str:
         return f"Addon({self.name!r})"
 
-    @property
-    def has_credentials(self) -> bool:
-        return bool(self.credentials)
-
     def setting_defaults(self) -> Dict[str, Any]:
         return {f.name: f.default for f in self.settings}
 
@@ -358,8 +360,8 @@ class Addon:
              acts_outside: bool = False, needs: Sequence[str] = (), available: Optional[AvailabilityRule] = None,
              untrusted_result: bool = False, describe: Optional[DescribeRule] = None,
              shortcut: ConfirmRule = False, shortcut_prep: bool = False,
-             shortcut_describe: Optional[Callable[[Optional[User], Dict[str, Any]], str]] = None,
-             **extra: Any) -> Callable[[F], F]:
+             shortcut_describe: Optional[Callable[[Optional[User], Dict[str, Any]], str]] = None
+             ) -> Callable[[F], F]:
         """Register a function as a tool of this addon. The function's first
         parameter is ``conn`` (the user's connection), never in the schema.
 
@@ -396,6 +398,13 @@ class Addon:
                 args)`` returning a :class:`~core.addons.hooks.Approval`
                 (``core/approval_text.py`` uses it before its own
                 descriptions; when it raises, the default card is shown).
+            shortcut: Calls of this tool may become learned phrases
+                (core/shortcuts.py): a bool, or a function of the call's
+                arguments saying whether this call may.
+            shortcut_prep: A read-only lookup allowed before the shortcut's call
+                in a turn that teaches a phrase.
+            shortcut_describe: ``f(user, args) -> str``: what a learned phrase
+                for this call does, in words (default: the name and arguments).
 
         Re-registering a name in the same addon replaces that tool in place
         (tests swap a tool for a fake this way); a name owned by another addon
@@ -408,14 +417,11 @@ class Addon:
             existing = _tools.get(tool_name)
             if existing is not None and existing.addon != self.name:
                 raise ValueError(f"Tool {tool_name!r} already belongs to the {existing.addon!r} addon")
-            for key, value in extra.items():
-                # Unknown flags are kept (and logged) instead of breaking the import.
-                logger.warning(f"Tool {tool_name}: unknown tool() flag {key}={value!r}")
             registered = Tool(name=tool_name, addon=self.name, func=func, schema=generate_schema(tool_name, func),
                               is_write=bool(is_write or confirm), confirm=confirm, acts_outside=bool(acts_outside),
                               needs=needs_t, available=available, untrusted_result=bool(untrusted_result),
                               describe=describe, shortcut=shortcut, shortcut_prep=bool(shortcut_prep),
-                              shortcut_describe=shortcut_describe, extra=dict(extra))
+                              shortcut_describe=shortcut_describe)
             if existing is not None:
                 self.tools[self.tools.index(existing)] = registered
                 logger.info(f"Replaced tool: {tool_name} ({self.name})")
@@ -664,8 +670,12 @@ def needs_problem(addon: Addon, known: Collection[str]) -> Optional[str]:
 
 def key_clash(addon: Addon, others: Sequence[Addon]) -> Optional[str]:
     """Why ``addon`` cannot load next to ``others`` (the addons already loaded):
-    it declares a keyed hook (:data:`KEYED_HOOKS`) for a key another addon has,
-    or a briefing count key another addon has; None when every key is its own."""
+    it declares a page id, a keyed hook (:data:`KEYED_HOOKS`) key or a briefing
+    count key another addon has; None when every key is its own."""
+    pages = {p.id: o.name for o in others for p in o.web}
+    for p in addon.web:
+        if p.id in pages:
+            return f"the page id {p.id!r} is already the {pages[p.id]} addon's"
     taken = {(h.kind, h.key): o.name for o in others for h in o.hooks if h.kind in KEYED_HOOKS}
     counts = {c: o.name for o in others for h in o.hooks if h.kind == "briefing" for c in h.option("counts", ())}
     for h in addon.hooks:

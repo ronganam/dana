@@ -2,12 +2,12 @@
 manifest"; docs/writing-an-addon.md). Plain data: nothing here imports the
 rest of the app.
 
-Manifest values: :class:`Web` / :class:`Nav` (a page in the web app),
+Manifest values: :class:`Page` / :class:`Nav` (a page in the web app),
 :class:`Worker` (a sidecar), :class:`LlmJob` (an LLM purpose), and the
 schedule helpers :func:`minutes` / :func:`hours` for ``@addon.job(every=)``.
 
-What hooks return, each with ``to_json()`` giving the exact payload the core
-composers have always produced:
+What hooks get besides the user: :class:`NowContext`, :class:`BriefingContext`,
+:class:`ContextRequest`. What they return (``to_json()`` gives a payload):
 
 - :class:`Card` — a card on the Now screen (``@addon.now_cards``);
 - :class:`DayItem` — an item in the Now screen's day strip (``@addon.day_items``);
@@ -37,14 +37,32 @@ class Nav:
     order: int = 100
 
 
+# The web app's own screens: no addon page may take one of these ids (static/app-nav.js, CORE_SCREENS).
+CORE_SCREENS = ("chat", "settings", "addons", "usage", "debug", "review")
+PAGE_ID = re.compile(r"^[a-z][a-z0-9_-]*$")
+
+
 @dataclass(frozen=True)
-class Web:
-    """A page in the web app: ``panel`` (JavaScript) and ``style`` (CSS) are
-    paths inside the addon's ``web/`` folder, served at ``/addons/<name>/web/``
-    and listed by ``GET /api/addons`` (core/addons_api.py)."""
-    panel: str = ""
+class Page:
+    """A page of the addon in the web app: ``id`` names the screen (its
+    ``#panel-<id>`` element, ``/<id>`` and ``#<id>`` open it; unique across
+    addons, not a core screen's), ``panel`` (JavaScript) and ``style`` (CSS)
+    are paths inside the addon's ``web/`` folder, served at
+    ``/addons/<name>/web/`` and listed by ``GET /api/addons``
+    (core/addons_api.py); ``nav`` puts a button in the navigation (None: the
+    page opens only from a link or another page)."""
+    id: str
+    panel: str
     style: str = ""
     nav: Optional[Nav] = None
+
+    def __post_init__(self) -> None:
+        if not PAGE_ID.match(self.id):
+            raise ValueError(f"Page id {self.id!r}: lowercase letters, digits, _ or -, starting with a letter")
+        if self.id in CORE_SCREENS:
+            raise ValueError(f"Page id {self.id!r} is a core screen's")
+        if not self.panel:
+            raise ValueError(f"Page {self.id!r} needs its panel script")
 
 
 @dataclass(frozen=True)
@@ -130,11 +148,13 @@ class Channel:
 
 @dataclass(frozen=True)
 class Hook:
-    """A composer hook (``now_cards``, ``day_items``, ``now_action``, ``briefing``,
-    ``review``, ``review_action``, ``search``, ``selfcheck``, ``context``,
-    ``context_card``): ``key`` names what it is for when the hook has one (the
-    card prefix it acts on, the section key, the item type, the context kind,
-    the check key; unique across addons), ``options`` its decorator's other values."""
+    """A hook declared with ``@addon.<kind>`` (``now_cards``, ``day_items``,
+    ``now_action``, ``briefing``, ``review``, ``review_action``, ``search``,
+    ``selfcheck``, ``context``, ``context_card``, ``context_block``,
+    ``provide``): ``key`` names what it is for when the hook has one (the card
+    prefix it acts on, the section key, the item type, the context kind, the
+    check or provider key; unique across addons), ``options`` its decorator's
+    other values."""
     addon: str
     kind: str
     func: Callable[..., Any]

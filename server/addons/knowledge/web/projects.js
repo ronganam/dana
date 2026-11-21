@@ -855,7 +855,6 @@
   `;
 
   Dana.panel({
-    id: "projects", title: "Projects", icon: "folder",
     scripts: ["projects-core.js"],
     start() { C = window.DanaProjectsCore; esc = C.esc; },
     mount(el) {

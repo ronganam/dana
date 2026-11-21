@@ -1533,7 +1533,6 @@
   `;
 
   Dana.panel({
-    id: "money", title: "Money", icon: "wallet",
     scripts: ["money-core.js", "money-dash.js"],
     start(api) {
       A = api;
