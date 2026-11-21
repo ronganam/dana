@@ -20,10 +20,11 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends ffmpeg curl \
     && rm -rf /var/lib/apt/lists/*
 
-# Install standard dependencies first to optimize Docker build caching
-COPY requirements.txt .
+# Install the pinned dependencies first to optimize Docker build caching
+# (requirements.lock, generated from requirements.txt: docs/operations.md → Dependencies)
+COPY requirements.lock .
 RUN pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir -r requirements.txt
+    && pip install --no-cache-dir --require-hashes -r requirements.lock
 
 # The test suite on the container's Python. The pre-push hook builds this stage when
 # the Dockerfile or requirements change (.githooks/pre-push): a failure stops the deploy.
