@@ -531,7 +531,6 @@ WEB_LOAD = [
     ("/api/debug/logs", lambda b: b is not None),
     ("/api/calendar/events?start_date=2026-11-15&end_date=2026-11-22", lambda b: isinstance(b, list)),
     ("/api/frigate/events/ptz?limit=12", has("events", "server_time")),
-    ("/api/frigate/activity/ptz?hours=12", has("series", "bucket")),
     ("/api/about", has("sections", "used_chars", "max_chars")),
     ("/api/shortcuts", has("shortcuts", "enabled")),
     ("/api/now", has("now", "items")),

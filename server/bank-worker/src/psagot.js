@@ -61,7 +61,7 @@ function list(value) {
   return value === undefined || value === null ? [] : [value];
 }
 
-/** `ddMMyyyy` of a date in the worker's zone (TZ=Asia/Jerusalem in the image). */
+/** `ddMMyyyy` of a date in the worker's zone (TZ: the server's TIMEZONE). */
 function ddmmyyyy(date) {
   const two = n => String(n).padStart(2, '0');
   return `${two(date.getDate())}${two(date.getMonth() + 1)}${date.getFullYear()}`;

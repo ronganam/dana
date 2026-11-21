@@ -315,7 +315,7 @@ async def main():
             note("k3", "Courier is at the door", title="Wolt", package="com.wolt", app="Wolt"),
             note("k4", "Headline about something", title="News", package="com.news", app="News"),
             note("k1", "Gal: can you buy milk on the way?", title="Gal", sender="Gal"),  # duplicate
-            note("k5", "self", package="app.ganam.assistant"),  # own app
+            note("k5", "self", package="io.github.ronganam.dana"),  # own app
             note("k6", "loop", title=f"{values.ESCALATION_PREFIX} Wolt", package="io.homeassistant.companion.android"),
             note("k7", "Your login code is 123456", title="Bank", package="com.bank", app="Bank"),
             note("k8", "BROKEN payload", title="Odd", package="com.odd", app="Odd"),

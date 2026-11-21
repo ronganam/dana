@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional
 from core.addons import Connection
 from addons.homeassistant import client as ha_api
 from addons.homeassistant.addon import addon
+from addons.homeassistant.config import TV, TV_CHANNEL, setting
 
 logger = logging.getLogger(__name__)
 
@@ -351,7 +352,7 @@ async def _wait_for_adb_ready(conn: Connection, entity_id: str, timeout: float =
 async def control_android_tv(
     conn: Connection,
     action: str,
-    entity_id: str = "media_player.75c7k_adb",
+    entity_id: Optional[str] = None,
     app_id: Optional[str] = None,
     channel: Optional[str] = None,
     query: Optional[str] = None,
@@ -370,8 +371,8 @@ async def control_android_tv(
 
     Actions:
       - "launch_app": Launch any app using its package/app ID (e.g. 'com.netflix.ninja', 'com.google.android.youtube.tv').
-      - "watch_channel": Open the Yes+ app ('il.co.yes.yesplus') and tune to a numeric channel.
-        Only works with the Yes+ Israeli TV provider. For other TV services, use launch_app or send_key.
+      - "watch_channel": Tune to a numeric channel with the TV provider command the user set up
+        (their Home Assistant setting tv_channel_command); without one, use launch_app or send_key.
       - "play_youtube": Play a specific video by ID/URL, or search for a video query on YouTube.
       - "play_netflix": Play a specific Netflix title by ID, or search for a title query on Netflix.
       - "send_key": Send a remote key press (e.g. 'HOME', 'BACK', 'UP', 'DOWN', 'ENTER', 'VOLUME_UP').
@@ -379,16 +380,27 @@ async def control_android_tv(
 
     Args:
         action: The action to perform: "launch_app", "watch_channel", "play_youtube", "play_netflix", "send_key", "run_command".
-        entity_id: The Android TV media_player entity ID (defaults to "media_player.75c7k_adb").
+        entity_id: The Android TV media_player entity ID (defaults to the user's TV, the tv_entity setting).
         app_id: The package/app ID to launch (required for "launch_app").
-        channel: The Yes+ channel number to tune to (required for "watch_channel").
+        channel: The channel number to tune to (required for "watch_channel").
         query: Search query for YouTube or Netflix.
         video_id: The YouTube video ID or full YouTube video URL.
         title_id: The Netflix title ID (numeric).
         command: The remote key command (e.g., 'HOME', 'BACK') for "send_key", or the ADB shell command for "run_command".
     """
     action = action.lower()
-    
+    entity_id = entity_id or setting(conn, TV)
+    if not entity_id:
+        return ("Error: no TV given and none set up: pass entity_id (a media_player entity) or set "
+                "the TV entity in the Home Assistant addon's settings.")
+    channel_command = setting(conn, TV_CHANNEL)
+    if action == "watch_channel":
+        if not channel_command:
+            return ("Error: no channel command is set up (the Home Assistant addon's TV channel command "
+                    "setting); use launch_app or send_key instead.")
+        if not channel or not re.fullmatch(r"\d{1,5}", str(channel).strip()):
+            return "Error: 'channel' must be a channel number for action 'watch_channel'."
+
     # Ensure TV is powered on first
     try:
         await _ensure_tv_on(conn, entity_id)
@@ -430,15 +442,9 @@ async def control_android_tv(
         status_msg = " (detected active)" if polled_active else " (sent launch command, state unverified)"
         return f"Successfully launched app '{app_id}' on '{entity_id}'{status_msg}."
 
-    elif action == "watch_channel":
-        if not channel:
-            return "Error: 'channel' is required for action 'watch_channel'."
-
-        adb_cmd = (
-            f"am start -n il.co.yes.yesplus/com.onoapps.yestv.ui.activities.splash.SplashActivity "
-            f"-d \"https://yesplus.tv/dl/channel?p1={channel}\""
-        )
-        logger.info(f"Opening Yes+ on channel {channel} via deep link: {adb_cmd}")
+    elif action == "watch_channel" and channel and channel_command:
+        adb_cmd = channel_command.replace("{channel}", str(channel).strip())
+        logger.info(f"Tuning '{entity_id}' to channel {channel}: {adb_cmd}")
         res = await call_ha_service(conn, "androidtv", "adb_command", entity_id, {"command": adb_cmd})
         if "Error" in res:
             return res

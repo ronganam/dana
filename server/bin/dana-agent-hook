@@ -7,6 +7,9 @@
 # Config: ~/.config/dana/agent-hook.env (chmod 600) with
 #   DANA_URL=https://dana.example.com
 #   DANA_TOKEN=<a user token: bin/users.py tokens issue USER --label agent-hooks>
+#   DANA_OPEN_URL=<optional: where a tap on the phone opens a T3 Code thread, with
+#     {environment} and {thread}, e.g. https://t3.example.com/threads/{environment}/{thread};
+#     unset: no link>
 # Never slows the agent: the event is trimmed to the fields the server reads and
 # sent in the background; it always exits 0 and prints nothing.
 agent="${1:-claude}"
@@ -18,7 +21,7 @@ conf="${DANA_AGENT_HOOK_CONF:-$HOME/.config/dana/agent-hook.env}"
 command -v python3 >/dev/null 2>&1 && command -v curl >/dev/null 2>&1 || exit 0
 
 # Prints two lines: the query string, then the trimmed event.
-out=$(printf '%s' "$payload" | T3_HOME="${T3CODE_HOME:-$HOME/.t3}" python3 -I -c '
+out=$(printf '%s' "$payload" | T3_HOME="${T3CODE_HOME:-$HOME/.t3}" OPEN_URL="${DANA_OPEN_URL:-}" python3 -I -c '
 import json, os, re, sqlite3, sys, urllib.parse
 try:
     e = json.load(sys.stdin)
@@ -39,8 +42,8 @@ if isinstance(args, dict):
                               if k in ("command", "description", "file_path", "notebook_path", "path", "subagent_type")}
 query = {"agent": sys.argv[1], "host": sys.argv[2]}
 # Run by T3 Code: its thread, the root thread when this is a delegated child
-# (the phone shows it inside the parent), the thread title, and the link that
-# opens the root thread in the T3 Code app.
+# (the phone shows it inside the parent), the thread title, and, with
+# DANA_OPEN_URL, the link that opens the root thread.
 thread, home = os.environ.get("T3CODE_THREAD_ID", ""), os.environ["T3_HOME"]
 if thread:
     root, title = thread, ""
@@ -60,8 +63,9 @@ if thread:
         env = open(os.path.join(home, "userdata", "environment-id")).read().strip()
     except OSError:
         env = ""
-    if re.fullmatch(r"[A-Za-z0-9-]+", env) and re.fullmatch(r"[A-Za-z0-9-]+", root):
-        query["open_url"] = f"https://app.t3.codes/threads/{env}/{root}"
+    template = os.environ.get("OPEN_URL", "")
+    if template and re.fullmatch(r"[A-Za-z0-9-]+", env) and re.fullmatch(r"[A-Za-z0-9-]+", root):
+        query["open_url"] = template.replace("{environment}", env).replace("{thread}", root)
 print(urllib.parse.urlencode(query))
 print(json.dumps(keep))
 ' "$agent" "$(hostname 2>/dev/null || uname -n)") || exit 0

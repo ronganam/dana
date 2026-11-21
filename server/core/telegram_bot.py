@@ -311,7 +311,7 @@ class TelegramBot:
                 return
             
             # Sub-parse the key and value from parts[2]
-            # E.g. "girlfriend_chat_id 972500000301@c.us -c contact"
+            # E.g. "favorite_coffee oat flat white -c preference"
             rem_parts = parts[2].split(maxsplit=1)
             if len(rem_parts) < 2:
                 await message.reply("⚠️ *Usage:* `/memory remember <key> <value> [-c <category>]`", reply_markup=self.get_keyboard(), parse_mode="Markdown")
@@ -1023,8 +1023,8 @@ class TelegramBot:
                 "➕ *Add Memory*\n\nPlease type the information you want to save using the format:\n"
                 "`key: value`   or   `key: value | category`\n\n"
                 "*Example:*\n"
-                "`girlfriend_chat_id: 972500000301@c.us`  or\n"
-                "`girlfriend_chat_id: 972500000301@c.us | contact`",
+                "`favorite_coffee: oat flat white`  or\n"
+                "`favorite_coffee: oat flat white | preference`",
                 reply_markup=keyboard,
                 parse_mode="Markdown"
             )
