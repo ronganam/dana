@@ -1,42 +1,19 @@
 package io.github.ronganam.dana.data.money
 
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.doubleOrNull
 
 // The payloads of the Money dashboards (server docs/money.md → "Page API and
 // insights", "Dashboards", "Investment accounts", "Meal cards"; the routes in
 // server/addons/money/api.py). Amounts are agorot, dates ISO `YYYY-MM-DD`.
 // Each parser reads one route's answer and never throws on a missing field.
 
-internal fun JSONObject.str(key: String): String? = if (!has(key) || isNull(key)) null else optString(key).ifBlank { null }
-
-/** A number that may come as an int or a float (medians): rounded to agorot. */
-internal fun JSONObject.long(key: String): Long? = when (val v = if (has(key)) opt(key) else null) {
-    is Number -> Math.round(v.toDouble())
-    else -> null
-}
-
-internal fun JSONObject.dbl(key: String): Double? = when (val v = if (has(key)) opt(key) else null) {
-    is Number -> v.toDouble()
-    else -> null
-}
-
-internal fun JSONObject.bool(key: String): Boolean? = if (!has(key) || isNull(key)) null else optBoolean(key)
-
-internal inline fun <T : Any> JSONArray?.objects(f: (JSONObject) -> T?): List<T> =
-    if (this == null) emptyList() else (0 until length()).mapNotNull { optJSONObject(it)?.let(f) }
-
-/** `[1200, null, 3400]` → longs with nulls kept; null when the key is missing or null. */
-internal fun JSONObject.longs(key: String): List<Long?>? {
-    val a = (if (has(key) && !isNull(key)) optJSONArray(key) else null) ?: return null
-    return (0 until a.length()).map { i -> (a.opt(i) as? Number)?.let { Math.round(it.toDouble()) } }
-}
-
 // ---------------------------------------------------------------- overview
 
 data class DatedBalance(val date: String, val balance: Long, val days: Int? = null)
 
-internal fun datedBalance(o: JSONObject?): DatedBalance? =
+internal fun datedBalance(o: JsonObject?): DatedBalance? =
     o?.str("date")?.let { DatedBalance(it, o.long("balance") ?: 0, o.long("days")?.toInt()) }
 
 /** `overview.forecast`: the tile's part (the month in progress only). */
@@ -51,7 +28,7 @@ data class ForecastTile(
 
 data class Everyday(val total: Long, val onTrack: Long?, val typical: Long?)
 
-internal fun everyday(o: JSONObject?) = Everyday(o?.long("total") ?: 0, o?.long("on_track"), o?.long("typical"))
+internal fun everyday(o: JsonObject?) = Everyday(o?.long("total") ?: 0, o?.long("on_track"), o?.long("typical"))
 
 /** `GET overview?month=`: what the dashboards read of it (the tiles). */
 data class MoneyOverview(
@@ -69,15 +46,15 @@ data class MoneyOverview(
     val forecast: ForecastTile?
 ) {
     companion object {
-        fun parse(o: JSONObject): MoneyOverview {
-            val f = o.optJSONObject("forecast")
+        fun parse(o: JsonObject): MoneyOverview {
+            val f = o.obj("forecast")
             return MoneyOverview(
-                month = o.optString("month"),
-                inProgress = o.optJSONObject("period")?.optBoolean("in_progress") == true,
+                month = o.string("month"),
+                inProgress = o.obj("period")?.flag("in_progress") == true,
                 incomeMonth = o.long("income_month") ?: 0,
                 incomeTypical = o.long("income_typical"),
                 net = o.long("net") ?: 0,
-                everyday = everyday(o.optJSONObject("everyday")),
+                everyday = everyday(o.obj("everyday")),
                 oneOff = o.long("one_off") ?: 0,
                 setAside = o.long("set_aside") ?: 0,
                 fixedMonthly = o.long("fixed_monthly") ?: 0,
@@ -86,9 +63,9 @@ data class MoneyOverview(
                 forecast = f?.let {
                     ForecastTile(
                         balance = it.long("balance") ?: 0,
-                        asOf = it.optString("as_of"),
-                        soonLow = datedBalance(it.optJSONObject("soon_low")),
-                        lowPoint = datedBalance(it.optJSONObject("low_point")),
+                        asOf = it.string("as_of"),
+                        soonLow = datedBalance(it.obj("soon_low")),
+                        lowPoint = datedBalance(it.obj("low_point")),
                         end = it.str("end"),
                         endBalance = it.long("end_balance")
                     )
@@ -106,14 +83,14 @@ data class Insight(val kind: String, val tone: String, val title: String, val de
 
 /** `GET insights?month=` → the month's cards, ranked. */
 object MoneyInsights {
-    fun parse(o: JSONObject): List<Insight> = o.optJSONArray("items").objects { i ->
+    fun parse(o: JsonObject): List<Insight> = o.arr("items").objects { i ->
         Insight(
-            kind = i.optString("kind"),
+            kind = i.string("kind"),
             tone = i.str("tone") ?: "info",
-            title = i.optString("title"),
+            title = i.string("title"),
             detail = i.str("detail"),
             amount = i.long("amount"),
-            link = i.optJSONObject("link")?.let { l -> l.str("view")?.let { InsightLink(it, l.str("category"), l.str("id")) } }
+            link = i.obj("link")?.let { l -> l.str("view")?.let { InsightLink(it, l.str("category"), l.str("id")) } }
         )
     }
 }
@@ -133,9 +110,9 @@ data class MoneyPace(
     val months: Int
 ) {
     companion object {
-        fun parse(o: JSONObject) = MoneyPace(
-            month = o.optString("month"),
-            label = o.optString("label"),
+        fun parse(o: JsonObject) = MoneyPace(
+            month = o.string("month"),
+            label = o.string("label"),
             days = (o.long("days") ?: 0).toInt(),
             today = o.long("today")?.toInt()?.takeIf { it > 0 },
             thisMonth = o.longs("this_month") ?: emptyList(),
@@ -192,42 +169,45 @@ data class MoneyForecast(
 /** `GET balance?days=` → the bank balance history and the forecast. */
 data class MoneyBalance(val history: List<BalancePoint>, val forecast: MoneyForecast?) {
     companion object {
-        fun parse(o: JSONObject): MoneyBalance {
-            val f = o.optJSONObject("forecast")
+        fun parse(o: JsonObject): MoneyBalance {
+            val f = o.obj("forecast")
             return MoneyBalance(
-                history = o.optJSONArray("history").objects { BalancePoint(it.optString("date"), it.long("balance") ?: 0) },
+                history = o.arr("history").objects { BalancePoint(it.string("date"), it.long("balance") ?: 0) },
                 forecast = f?.let { fc ->
                     MoneyForecast(
-                        asOf = fc.optString("as_of"),
+                        asOf = fc.string("as_of"),
                         balance = fc.long("balance") ?: 0,
-                        end = fc.optString("end"),
-                        series = fc.optJSONArray("series").objects {
+                        end = fc.string("end"),
+                        series = fc.arr("series").objects {
                             val b = it.long("balance") ?: 0
-                            BalancePoint(it.optString("date"), b, it.long("low") ?: b, it.long("high") ?: b)
+                            BalancePoint(it.string("date"), b, it.long("low") ?: b, it.long("high") ?: b)
                         },
-                        events = fc.optJSONArray("events").objects { e ->
-                            val parts = e.optJSONObject("parts")
-                            val r = e.optJSONArray("range")
+                        events = fc.arr("events").objects { e ->
+                            val parts = e.obj("parts")
+                            val r = e.arr("range")
                             ForecastEvent(
-                                date = e.optString("date"),
-                                kind = e.optString("kind"),
-                                label = e.optString("label"),
+                                date = e.string("date"),
+                                kind = e.string("kind"),
+                                label = e.string("label"),
                                 amount = e.long("amount") ?: 0,
-                                estimated = e.optBoolean("estimated"),
-                                parts = parts?.keys()?.asSequence()?.associateWith { k -> parts.long(k) ?: 0 } ?: emptyMap(),
-                                items = e.optJSONArray("items").objects { BillItem(it.optString("label"), it.optString("kind"), it.long("amount") ?: 0) },
-                                range = if (r != null && r.length() == 2) Math.round(r.optDouble(0)) to Math.round(r.optDouble(1)) else null,
+                                estimated = e.flag("estimated"),
+                                parts = parts?.keys?.associateWith { k -> parts.long(k) ?: 0 } ?: emptyMap(),
+                                items = e.arr("items").objects { BillItem(it.string("label"), it.string("kind"), it.long("amount") ?: 0) },
+                                range = if (r != null && r.size == 2) {
+                                    val a = (r[0] as? JsonPrimitive)?.doubleOrNull ?: Double.NaN
+                                    val b = (r[1] as? JsonPrimitive)?.doubleOrNull ?: Double.NaN
+                                    Math.round(a) to Math.round(b)
+                                } else null,
                                 accountId = e.str("account_id")
                             )
                         },
-                        soonLow = datedBalance(fc.optJSONObject("soon_low")),
-                        lowPoint = datedBalance(fc.optJSONObject("low_point")),
-                        plans = fc.optJSONArray("plans").objects { p ->
-                            val d = p.optJSONArray("dates")
+                        soonLow = datedBalance(fc.obj("soon_low")),
+                        lowPoint = datedBalance(fc.obj("low_point")),
+                        plans = fc.arr("plans").objects { p ->
                             InstallmentPlan(
-                                merchant = p.optString("merchant"),
+                                merchant = p.string("merchant"),
                                 amount = p.long("amount") ?: 0,
-                                dates = (0 until (d?.length() ?: 0)).map { d!!.optString(it) },
+                                dates = p.arr("dates").texts(),
                                 total = p.long("total") ?: 0,
                                 left = p.long("left") ?: 0,
                                 number = (p.long("number") ?: 0).toInt(),
@@ -274,14 +254,14 @@ data class CashflowTotals(val income: Long, val spent: Long, val setAside: Long,
 /** `GET cashflow?n=12&end=`. */
 data class MoneyCashflow(val months: List<CashflowMonth>, val totals: CashflowTotals, val typicalIncome: Long, val typicalNet: Long) {
     companion object {
-        fun parse(o: JSONObject): MoneyCashflow {
-            val t = o.optJSONObject("totals") ?: JSONObject()
-            val ty = o.optJSONObject("typical") ?: JSONObject()
+        fun parse(o: JsonObject): MoneyCashflow {
+            val t = o.obj("totals") ?: EmptyJson
+            val ty = o.obj("typical") ?: EmptyJson
             return MoneyCashflow(
-                months = o.optJSONArray("months").objects { m ->
+                months = o.arr("months").objects { m ->
                     CashflowMonth(
-                        month = m.optString("month"),
-                        label = m.optString("label"),
+                        month = m.string("month"),
+                        label = m.string("label"),
                         complete = m.bool("complete") != false,
                         income = m.long("income") ?: 0,
                         fixed = m.long("fixed") ?: 0,
@@ -333,37 +313,34 @@ data class MoneyTrends(
     val oneOffs: List<OneOff>
 ) {
     companion object {
-        private fun line(o: JSONObject): TrendLine = TrendLine(
-            key = o.optString("key"),
-            label = o.optString("label"),
+        private fun line(o: JsonObject): TrendLine = TrendLine(
+            key = o.string("key"),
+            label = o.string("label"),
             total = o.long("total") ?: 0,
             typical = o.long("typical") ?: 0,
             onTrack = o.long("on_track"),
             months = o.longs("months")?.map { it ?: 0 } ?: emptyList(),
-            categories = o.optJSONArray("categories").objects { line(it) }
+            categories = o.arr("categories").objects { line(it) }
         )
 
-        fun parse(o: JSONObject): MoneyTrends {
-            val labels = o.optJSONArray("months")
-            return MoneyTrends(
-                month = o.optString("month"),
-                label = o.optString("label"),
-                inProgress = o.optBoolean("in_progress"),
-                elapsed = (o.long("elapsed") ?: 0).toInt(),
-                days = (o.long("days") ?: 0).toInt(),
-                monthLabels = (0 until (labels?.length() ?: 0)).map { labels!!.optString(it) },
-                everyday = everyday(o.optJSONObject("everyday")),
-                groups = o.optJSONArray("groups").objects { line(it) },
-                movers = o.optJSONArray("movers").objects {
-                    Mover(it.optString("key"), it.optString("label"), it.str("group"), it.optString("direction"),
-                        it.long("delta") ?: 0, it.long("value") ?: 0, it.long("typical") ?: 0)
-                },
-                oneOffs = o.optJSONArray("one_offs").objects {
-                    OneOff(it.optString("id"), it.str("merchant"), it.str("description"), it.optString("purchase_date"),
-                        it.str("category_label"), it.long("amount") ?: 0)
-                }
-            )
-        }
+        fun parse(o: JsonObject): MoneyTrends = MoneyTrends(
+            month = o.string("month"),
+            label = o.string("label"),
+            inProgress = o.flag("in_progress"),
+            elapsed = (o.long("elapsed") ?: 0).toInt(),
+            days = (o.long("days") ?: 0).toInt(),
+            monthLabels = o.arr("months").texts(),
+            everyday = everyday(o.obj("everyday")),
+            groups = o.arr("groups").objects { line(it) },
+            movers = o.arr("movers").objects {
+                Mover(it.string("key"), it.string("label"), it.str("group"), it.string("direction"),
+                    it.long("delta") ?: 0, it.long("value") ?: 0, it.long("typical") ?: 0)
+            },
+            oneOffs = o.arr("one_offs").objects {
+                OneOff(it.string("id"), it.str("merchant"), it.str("description"), it.string("purchase_date"),
+                    it.str("category_label"), it.long("amount") ?: 0)
+            }
+        )
     }
 }
 
@@ -376,13 +353,13 @@ data class GroupLabel(val key: String, val label: String)
 /** `GET months?n=12&end=` (and trends folded into the same shape: [MoneyDashGeometry.trendsAsMonths]). */
 data class MoneyMonths(val groups: List<GroupLabel>, val months: List<MonthTotal>) {
     companion object {
-        fun parse(o: JSONObject) = MoneyMonths(
-            groups = o.optJSONArray("groups").objects { GroupLabel(it.optString("key"), it.optString("label")) },
-            months = o.optJSONArray("months").objects { m ->
-                val g = m.optJSONObject("groups")
+        fun parse(o: JsonObject) = MoneyMonths(
+            groups = o.arr("groups").objects { GroupLabel(it.string("key"), it.string("label")) },
+            months = o.arr("months").objects { m ->
+                val g = m.obj("groups")
                 MonthTotal(
-                    m.optString("month"), m.optString("label"), m.long("total") ?: 0,
-                    g?.keys()?.asSequence()?.associateWith { k -> g.long(k) ?: 0 } ?: emptyMap()
+                    m.string("month"), m.string("label"), m.long("total") ?: 0,
+                    g?.keys?.associateWith { k -> g.long(k) ?: 0 } ?: emptyMap()
                 )
             }
         )
@@ -404,16 +381,16 @@ data class TopMerchant(
 
 /** `GET merchants?period=YYYY-MM&limit=`. */
 object MoneyMerchants {
-    fun parse(o: JSONObject): List<TopMerchant> = o.optJSONArray("merchants").objects {
+    fun parse(o: JsonObject): List<TopMerchant> = o.arr("merchants").objects {
         TopMerchant(
-            merchant = it.optString("merchant"),
+            merchant = it.string("merchant"),
             category = it.str("category"),
             categoryLabel = it.str("category_label"),
             count = (it.long("count") ?: 0).toInt(),
             average = it.long("average") ?: 0,
             total = it.long("total") ?: 0,
             months = it.longs("months")?.map { v -> v ?: 0 } ?: emptyList(),
-            oneOff = it.optBoolean("one_off")
+            oneOff = it.flag("one_off")
         )
     }
 }
@@ -448,24 +425,24 @@ data class YearlyItem(
 /** `GET recurring`: money out, money in, the yearly charges. */
 data class MoneyRecurring(val items: List<RecurringItem>, val income: List<RecurringItem>, val yearly: List<YearlyItem>) {
     companion object {
-        private fun item(o: JSONObject) = RecurringItem(
-            merchant = o.optString("merchant"),
-            merchantKey = o.optString("merchant_key"),
+        private fun item(o: JsonObject) = RecurringItem(
+            merchant = o.string("merchant"),
+            merchantKey = o.string("merchant_key"),
             cadence = o.str("cadence") ?: "monthly",
             amount = o.long("amount") ?: 0,
             monthlyCost = o.long("monthly_cost"),
             nextDate = o.str("next_date"),
-            priceChange = o.optJSONObject("price_change")?.let { PriceChange(it.long("from") ?: 0, it.long("to") ?: 0, it.optString("since")) },
+            priceChange = o.obj("price_change")?.let { PriceChange(it.long("from") ?: 0, it.long("to") ?: 0, it.string("since")) },
             accountId = o.str("account_id"),
             accountLabel = o.str("account_label"),
             direction = o.str("direction") ?: "out"
         )
 
-        fun parse(o: JSONObject) = MoneyRecurring(
-            items = o.optJSONArray("items").objects { item(it) },
-            income = o.optJSONArray("income").objects { item(it) },
-            yearly = o.optJSONArray("yearly").objects {
-                YearlyItem(it.optString("merchant"), it.optString("merchant_key"), it.long("amount") ?: 0, it.long("monthly_cost"),
+        fun parse(o: JsonObject) = MoneyRecurring(
+            items = o.arr("items").objects { item(it) },
+            income = o.arr("income").objects { item(it) },
+            yearly = o.arr("yearly").objects {
+                YearlyItem(it.string("merchant"), it.string("merchant_key"), it.long("amount") ?: 0, it.long("monthly_cost"),
                     it.str("next_date"), (it.long("payments") ?: 1).toInt(), it.str("category_label"))
             }
         )
@@ -525,29 +502,29 @@ data class MoneyPortfolio(
     val trades: List<Trade>
 ) {
     companion object {
-        fun parse(o: JSONObject): MoneyPortfolio {
-            val t = o.optJSONObject("total") ?: JSONObject()
+        fun parse(o: JsonObject): MoneyPortfolio {
+            val t = o.obj("total") ?: EmptyJson
             return MoneyPortfolio(
                 total = PortfolioTotal(t.long("value") ?: 0, t.long("cash"), t.long("day_change"), t.long("profit"), t.long("cost"), t.str("as_of")),
-                accounts = o.optJSONArray("accounts").objects { a ->
+                accounts = o.arr("accounts").objects { a ->
                     InvestmentAccount(
-                        id = a.optString("id"),
+                        id = a.string("id"),
                         label = a.str("label"),
-                        number = a.optString("number"),
-                        companyName = a.optString("company_name"),
+                        number = a.string("number"),
+                        companyName = a.string("company_name"),
                         value = a.long("value") ?: 0,
                         profitPct = a.dbl("profit_pct"),
-                        holdings = a.optJSONArray("holdings").objects { h ->
+                        holdings = a.arr("holdings").objects { h ->
                             Holding(h.str("security"), h.str("name"), h.dbl("quantity"), h.dbl("price"), h.str("currency"),
                                 h.long("value"), h.long("profit"), h.dbl("profit_pct"))
                         }
                     )
                 },
-                allocation = o.optJSONArray("allocation").objects { AllocationRow(it.optString("name"), it.long("value") ?: 0) },
-                flows = o.optJSONArray("flows").objects { Flow(it.optString("date"), it.long("amount") ?: 0) },
-                history = o.optJSONArray("history").objects { h -> h.long("value")?.let { DatedValue(h.optString("date"), it) } },
-                trades = o.optJSONArray("trades").objects {
-                    Trade(it.str("kind"), it.str("action"), it.str("name"), it.optString("date"), it.dbl("quantity"), it.str("security"),
+                allocation = o.arr("allocation").objects { AllocationRow(it.string("name"), it.long("value") ?: 0) },
+                flows = o.arr("flows").objects { Flow(it.string("date"), it.long("amount") ?: 0) },
+                history = o.arr("history").objects { h -> h.long("value")?.let { DatedValue(h.string("date"), it) } },
+                trades = o.arr("trades").objects {
+                    Trade(it.str("kind"), it.str("action"), it.str("name"), it.string("date"), it.dbl("quantity"), it.str("security"),
                         it.long("commission"), it.long("tax"), it.long("amount") ?: 0)
                 }
             )
@@ -606,14 +583,14 @@ data class MoneyMeals(
     val meals: List<Meal>
 ) {
     companion object {
-        fun parse(o: JSONObject): MoneyMeals {
-            val a = o.optJSONArray("accounts")?.optJSONObject(0)
-            val c = a?.optJSONObject("current")
+        fun parse(o: JsonObject): MoneyMeals {
+            val a = o.arr("accounts").objects().firstOrNull()
+            val c = a?.obj("current")
             return MoneyMeals(
                 current = c?.let {
                     MealCycleNow(
-                        start = it.optString("start"),
-                        end = it.optString("end"),
+                        start = it.string("start"),
+                        end = it.string("end"),
                         daysLeft = (it.long("days_left") ?: 0).toInt(),
                         budget = it.long("budget"),
                         left = it.long("left") ?: 0,
@@ -625,21 +602,21 @@ data class MoneyMeals(
                     )
                 },
                 hasAccount = a != null,
-                cycles = o.optJSONArray("cycles").objects { cy ->
+                cycles = o.arr("cycles").objects { cy ->
                     MealCycle(
-                        start = cy.optString("start"),
-                        end = cy.optString("end"),
+                        start = cy.string("start"),
+                        end = cy.string("end"),
                         total = cy.long("total") ?: 0,
                         budgetPaid = cy.long("budget_paid") ?: 0,
                         cardPaid = cy.long("card_paid") ?: 0,
                         count = (cy.long("count") ?: 0).toInt(),
-                        billed = cy.optJSONObject("billed")?.let { b -> b.str("date")?.let { it to b.str("txn_id") } }
+                        billed = cy.obj("billed")?.let { b -> b.str("date")?.let { it to b.str("txn_id") } }
                     )
                 },
-                kinds = o.optJSONArray("kinds").objects { MealKind(it.optString("label"), (it.long("count") ?: 0).toInt(), it.long("total") ?: 0) },
-                places = o.optJSONArray("places").objects { MealPlace(it.optString("place"), (it.long("count") ?: 0).toInt(), it.long("total") ?: 0) },
-                meals = o.optJSONArray("meals").objects {
-                    Meal(it.optString("id"), it.str("place"), it.optString("date"), it.str("occurred_at"), it.str("order_type"),
+                kinds = o.arr("kinds").objects { MealKind(it.string("label"), (it.long("count") ?: 0).toInt(), it.long("total") ?: 0) },
+                places = o.arr("places").objects { MealPlace(it.string("place"), (it.long("count") ?: 0).toInt(), it.long("total") ?: 0) },
+                meals = o.arr("meals").objects {
+                    Meal(it.string("id"), it.str("place"), it.string("date"), it.str("occurred_at"), it.str("order_type"),
                         it.long("card_paid") ?: 0, it.bool("active") != false, it.long("total") ?: 0)
                 }
             )
