@@ -10,10 +10,10 @@ import androidx.wear.protolayout.TimelineBuilders
 import androidx.wear.tiles.RequestBuilders
 import androidx.wear.tiles.TileBuilders.Tile
 import androidx.wear.tiles.TileService
-import io.github.ronganam.dana.wear.cards.DanaSnapshot
+import io.github.ronganam.dana.protocol.DanaSnapshot
+import io.github.ronganam.dana.wear.cards.SnapshotStore
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
-import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -94,45 +94,37 @@ internal object DanaTile {
 class TodayTileService : TileService() {
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<Tile> =
-        Futures.immediateFuture(DanaTile.tile(build(DanaSnapshot.load(applicationContext))))
+        Futures.immediateFuture(DanaTile.tile(build(SnapshotStore.load(applicationContext))))
 
     override fun onTileResourcesRequest(requestParams: RequestBuilders.ResourcesRequest): ListenableFuture<ResourceBuilders.Resources> =
         DanaTile.resources()
 
-    private fun build(s: JSONObject): LayoutElementBuilders.LayoutElement {
+    /** [snapshot]: null before the phone sent one. */
+    private fun build(snapshot: DanaSnapshot?): LayoutElementBuilders.LayoutElement {
+        val s = snapshot ?: DanaSnapshot()
         val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
         val col = DanaTile.column()
         col.addContent(DanaTile.text(getString(R.string.tile_today), COLOR_ORANGE, 11f, bold = true))
         col.addContent(DanaTile.gap(2f))
 
-        val headline = s.optString("briefing_headline").takeIf { it.isNotBlank() && s.optString("briefing_date") == today }
+        val headline = s.briefingHeadline?.takeIf { it.isNotBlank() && s.briefingDate == today }
         if (headline != null) {
             col.addContent(DanaTile.text(headline, COLOR_WHITE, 13f, bold = true, lines = 2))
             col.addContent(DanaTile.gap(4f))
         }
 
-        val events = s.optJSONArray("events")
         var shown = 0
-        if (events != null) {
-            for (i in 0 until minOf(2, events.length())) {
-                val e = events.optJSONObject(i) ?: continue
-                col.addContent(DanaTile.text("${e.optString("time")}  ${e.optString("title")}", COLOR_TEAL, 12f))
-                shown++
-            }
+        for (e in s.events.take(2)) {
+            col.addContent(DanaTile.text("${e.time}  ${e.title}", COLOR_TEAL, 12f))
+            shown++
         }
-        val tasks = s.optJSONArray("tasks")
-        if (tasks != null) {
-            val max = if (headline != null) 2 else 3
-            for (i in 0 until minOf(max, tasks.length())) {
-                val t = tasks.optJSONObject(i) ?: continue
-                val due = t.optString("due")
-                val color = if (due == "overdue") COLOR_RED else COLOR_LIGHT_GRAY
-                col.addContent(DanaTile.text("• ${t.optString("title")}", color, 12f))
-                shown++
-            }
+        for (t in s.tasks.take(if (headline != null) 2 else 3)) {
+            val color = if (t.due == "overdue") COLOR_RED else COLOR_LIGHT_GRAY
+            col.addContent(DanaTile.text("• ${t.title}", color, 12f))
+            shown++
         }
         if (headline == null && shown == 0) {
-            col.addContent(DanaTile.text(getString(if (s.length() == 0) R.string.open_dana_on_phone else R.string.tile_nothing_due), COLOR_LIGHT_GRAY, 12f, lines = 2))
+            col.addContent(DanaTile.text(getString(if (snapshot == null) R.string.open_dana_on_phone else R.string.tile_nothing_due), COLOR_LIGHT_GRAY, 12f, lines = 2))
         }
         return DanaTile.screen(col.build(), DanaTile.launch("io.github.ronganam.dana.wear.tasks.TasksActivity", "open_tasks"))
     }
@@ -145,7 +137,7 @@ class TodayTileService : TileService() {
 class WaitingTileService : TileService() {
 
     override fun onTileRequest(requestParams: RequestBuilders.TileRequest): ListenableFuture<Tile> =
-        Futures.immediateFuture(DanaTile.tile(build(DanaSnapshot.load(applicationContext))))
+        Futures.immediateFuture(DanaTile.tile(build(SnapshotStore.load(applicationContext))))
 
     override fun onTileResourcesRequest(requestParams: RequestBuilders.ResourcesRequest): ListenableFuture<ResourceBuilders.Resources> =
         DanaTile.resources()
@@ -170,9 +162,9 @@ class WaitingTileService : TileService() {
             .addContent(DanaTile.text(label, 0xFF13100E.toInt(), 13f, bold = true))
             .build()
 
-    private fun build(s: JSONObject): LayoutElementBuilders.LayoutElement {
-        val count = s.optInt("suggestion_count")
-        val top = s.optJSONArray("suggestions")?.optJSONObject(0)
+    private fun build(s: DanaSnapshot?): LayoutElementBuilders.LayoutElement {
+        val count = s?.suggestionCount ?: 0
+        val top = s?.suggestions?.firstOrNull()
         val col = DanaTile.column()
         col.addContent(DanaTile.text(if (count > 0) getString(R.string.tile_waiting_count, count) else getString(R.string.tile_waiting), COLOR_ORANGE, 11f, bold = true))
         col.addContent(DanaTile.gap(4f))
@@ -180,10 +172,10 @@ class WaitingTileService : TileService() {
             col.addContent(DanaTile.text(getString(R.string.tile_nothing_waiting), COLOR_LIGHT_GRAY, 13f))
             return DanaTile.screen(col.build(), null)
         }
-        val id = top.optString("id")
-        col.addContent(DanaTile.text(top.optString("title"), COLOR_WHITE, 13f, bold = true, lines = 3))
+        val id = top.id
+        col.addContent(DanaTile.text(top.title, COLOR_WHITE, 13f, bold = true, lines = 3))
         col.addContent(DanaTile.gap(2f))
-        col.addContent(DanaTile.text(getString(if (top.optString("source") == "notification") R.string.tile_from_notification else R.string.tile_from_call), COLOR_GRAY, 10f))
+        col.addContent(DanaTile.text(getString(if (top.source == "notification") R.string.tile_from_notification else R.string.tile_from_call), COLOR_GRAY, 10f))
         col.addContent(DanaTile.gap(8f))
         val cls = "io.github.ronganam.dana.wear.cards.SuggestionActionActivity"
         col.addContent(

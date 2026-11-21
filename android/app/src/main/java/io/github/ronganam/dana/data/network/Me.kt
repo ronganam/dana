@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.asStateFlow
 import androidx.core.content.edit
 
 /**
- * Who the app's token belongs to (`GET /api/me`): id, name, the add-ons
+ * Who the app's token belongs to (`GET /api/me`): id, name, the addons
  * they have connected (`addons`), their languages and their currency (ISO
  * 4217, which [MoneyFormat] writes amounts in). Kept in `DanaPrefs` so places
- * that depend on an add-on (Shopping) show the right thing at start and
+ * that depend on an addon (Shopping) show the right thing at start and
  * offline. [addons] follows every save, so a place can appear or go as soon
  * as `/api/me` (or a 403 `not_connected`) says so.
  */
@@ -35,7 +35,7 @@ object Me {
 
     private var live: MutableStateFlow<Set<String>>? = null
 
-    /** The connected add-ons as they change (starts from the cached answer). */
+    /** The connected addons as they change (starts from the cached answer). */
     @Synchronized
     fun addons(context: Context): StateFlow<Set<String>> =
         (live ?: MutableStateFlow(cached(context)?.addons ?: emptySet()).also { live = it }).asStateFlow()
@@ -82,7 +82,7 @@ object Me {
     }
 
     /**
-     * A 403 answer: when it is `not_connected`, forget the add-on it names
+     * A 403 answer: when it is `not_connected`, forget the addon it names
      * (`addon`, else [fallback]) and say so.
      */
     fun dropIfNotConnected(context: Context, result: HttpResult, fallback: String): Boolean {

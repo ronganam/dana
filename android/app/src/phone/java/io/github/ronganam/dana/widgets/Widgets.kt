@@ -1,6 +1,5 @@
 package io.github.ronganam.dana.widgets
 
-import androidx.core.content.edit
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
@@ -46,8 +45,6 @@ import io.github.ronganam.dana.EXTRA_OPEN_PERSON_ID
 import io.github.ronganam.dana.EXTRA_OPEN_SCREEN
 import io.github.ronganam.dana.MainActivity
 import io.github.ronganam.dana.data.sync.TaskActionQueue
-import org.json.JSONArray
-import org.json.JSONObject
 import androidx.core.net.toUri
 
 // ---- Ink & Paper colours (day / night) ----
@@ -175,7 +172,7 @@ class TodayWidget : GlanceAppWidget() {
 class CompleteTaskAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val id = parameters[KeyId] ?: return
-        Snapshot.removeFrom(context, "tasks", id)
+        Snapshot.removeTask(context, id)
         TodayWidget().updateAll(context)
         runCatching { TaskActionQueue.complete(context, id) }.onFailure { Log.w("Widgets", "Complete failed", it) }
         WidgetRefreshWorker.refreshNow(context)
@@ -214,7 +211,7 @@ class SuggestionAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val id = parameters[KeyId] ?: return
         val accept = parameters[KeyFlag] == "accept"
-        Snapshot.removeFrom(context, "suggestions", id, countKey = "suggestion_count")
+        Snapshot.removeSuggestion(context, id)
         WaitingWidget().updateAll(context)
         runCatching {
             val api = ServerConfig.load(context).api()
@@ -289,19 +286,17 @@ class InboxWidget : GlanceAppWidget() {
 
 private object Snapshot {
     @Synchronized
-    fun removeFrom(context: Context, key: String, id: String, countKey: String? = null) {
-        val prefs = ServerConfig.prefs(context)
-        val o = runCatching { JSONObject(prefs.getString("widget_snapshot", "{}") ?: "{}") }.getOrDefault(JSONObject())
-        val arr = o.optJSONArray(key) ?: JSONArray()
-        val kept = JSONArray()
-        var removed = false
-        for (i in 0 until arr.length()) {
-            val item = arr.optJSONObject(i) ?: continue
-            if (item.optString("id") == id) removed = true else kept.put(item)
-        }
-        o.put(key, kept)
-        if (removed && countKey != null) o.put(countKey, (o.optInt(countKey) - 1).coerceAtLeast(0))
-        prefs.edit(commit = true) { putString("widget_snapshot", o.toString()) }
+    fun removeTask(context: Context, id: String) {
+        val o = WidgetSnapshot.stored(context)
+        WidgetSnapshot.save(context, o.copy(tasks = o.tasks.filter { it.id != id }), commit = true)
+    }
+
+    @Synchronized
+    fun removeSuggestion(context: Context, id: String) {
+        val o = WidgetSnapshot.stored(context)
+        val kept = o.suggestions.filter { it.id != id }
+        val count = if (kept.size < o.suggestions.size) (o.suggestionCount - 1).coerceAtLeast(0) else o.suggestionCount
+        WidgetSnapshot.save(context, o.copy(suggestions = kept, suggestionCount = count), commit = true)
     }
 }
 

@@ -2,7 +2,8 @@ package io.github.ronganam.dana.data.money
 
 import io.github.ronganam.dana.data.money.MoneyLedger.isolate
 import io.github.ronganam.dana.data.money.MoneyLedger.shortDate
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.YearMonth
@@ -42,7 +43,7 @@ data class Market(
     val state: String,
     val checkedAt: String?,
     val stale: Boolean,
-    val items: List<JSONObject>,
+    val items: List<JsonObject>,
     val sources: List<SourceLink>,
     val error: String?,
     val needsAnswer: String?
@@ -82,72 +83,72 @@ data class SavingItem(
     val watch: Boolean get() = group == "watch"
 
     companion object {
-        fun parse(o: JSONObject): SavingItem {
-            val ev = o.optJSONObject("evidence")
+        fun parse(o: JsonObject): SavingItem {
+            val ev = o.obj("evidence")
             return SavingItem(
-                key = o.optString("key"),
-                type = o.optString("type"),
-                group = o.optString("group"),
-                status = o.optString("status"),
+                key = o.string("key"),
+                type = o.string("type"),
+                group = o.string("group"),
+                status = o.string("status"),
                 statusAt = o.str("status_at"),
                 snoozeUntil = o.str("snooze_until"),
-                isNew = o.optBoolean("new"),
-                active = o.optBoolean("active", true),
-                title = o.optString("title"),
+                isNew = o.flag("new"),
+                active = o.flag("active", true),
+                title = o.string("title"),
                 summary = o.str("summary") ?: "",
-                saving = o.optJSONObject("saving")?.let { Saving(it.optLong("low"), it.optLong("high"), it.optString("basis")) },
+                saving = o.obj("saving")?.let { Saving(it.longValue("low"), it.longValue("high"), it.string("basis")) },
                 atStake = o.long("at_stake"),
-                effort = o.optJSONObject("effort")?.let { Effort(it.optInt("minutes"), it.optString("how")) },
-                timing = o.optJSONObject("timing")?.let { Timing(it.str("from"), it.str("until"), it.str("label")) },
+                effort = o.obj("effort")?.let { Effort(it.intValue("minutes"), it.string("how")) },
+                timing = o.obj("timing")?.let { Timing(it.str("from"), it.str("until"), it.str("label")) },
                 evidence = Evidence(
-                    lines = ev?.optJSONArray("lines").strings(),
-                    series = ev?.optJSONArray("series").objects().mapNotNull { p ->
+                    lines = ev?.arr("lines").strings(),
+                    series = ev?.arr("series").objects().mapNotNull { p ->
                         val d = p.str("date") ?: return@mapNotNull null
-                        if (p.isNull("amount") || !p.has("amount")) null else SeriesPoint(d, p.optLong("amount"))
+                        if (p.absent("amount")) null else SeriesPoint(d, p.longValue("amount"))
                     },
-                    link = ev?.optJSONObject("link")?.let { l -> l.str("view")?.let { EvidenceLink(it, l.str("q"), l.str("category")) } }
+                    link = ev?.obj("link")?.let { l -> l.str("view")?.let { EvidenceLink(it, l.str("q"), l.str("category")) } }
                 ),
-                math = o.optJSONArray("math").strings(),
-                steps = o.optJSONArray("steps").objects().map { Step(it.optString("text"), it.str("url")) },
-                script = o.optJSONObject("script")?.let { s -> s.str("text")?.let { Script(s.str("lang") ?: "he", it) } },
-                questions = o.optJSONArray("questions").objects().map { parseQuestion(it) },
-                market = o.optJSONObject("market")?.let { m ->
+                math = o.arr("math").strings(),
+                steps = o.arr("steps").objects().map { Step(it.string("text"), it.str("url")) },
+                script = o.obj("script")?.let { s -> s.str("text")?.let { Script(s.str("lang") ?: "he", it) } },
+                questions = o.arr("questions").objects().map { parseQuestion(it) },
+                market = o.obj("market")?.let { m ->
                     Market(
-                        topic = m.optString("topic"),
+                        topic = m.string("topic"),
                         state = m.str("state") ?: "none",
                         checkedAt = m.str("checked_at"),
-                        stale = m.optBoolean("stale"),
-                        items = m.optJSONArray("items").objects(),
-                        sources = m.optJSONArray("sources").objects().mapNotNull { MoneySave.safeSource(it) },
+                        stale = m.flag("stale"),
+                        items = m.arr("items").objects(),
+                        sources = m.arr("sources").objects().mapNotNull { MoneySave.safeSource(it) },
                         error = m.str("error"),
                         needsAnswer = m.str("needs_answer")
                     )
                 },
-                subitems = o.optJSONArray("subitems").objects().map {
+                subitems = o.arr("subitems").objects().map {
                     SubItem(
-                        key = it.optString("key"), merchant = it.optString("merchant"), amount = it.optLong("amount"),
+                        key = it.string("key"), merchant = it.string("merchant"), amount = it.longValue("amount"),
                         cadence = it.str("cadence"), yearly = it.long("yearly"), nextDate = it.str("next_date"),
-                        choice = it.str("choice"), active = it.optBoolean("active", true)
+                        choice = it.str("choice"), active = it.flag("active", true)
                     )
                 },
-                target = o.optJSONObject("target")?.let { t ->
+                target = o.obj("target")?.let { t ->
                     Target(
-                        monthly = t.optLong("monthly"), thisMonth = t.optLong("this_month"), onTrack = t.bool("on_track"),
-                        daysLeft = if (t.isNull("days_left") || !t.has("days_left")) null else t.optInt("days_left"),
-                        months = t.optJSONArray("months").objects().map { TargetMonth(it.optString("month"), it.optLong("spent"), it.optLong("target"), it.optBoolean("under")) },
-                        saved = t.optLong("saved")
+                        monthly = t.longValue("monthly"), thisMonth = t.longValue("this_month"), onTrack = t.bool("on_track"),
+                        daysLeft = if (t.absent("days_left")) null else t.intValue("days_left"),
+                        months = t.arr("months").objects().map { TargetMonth(it.string("month"), it.longValue("spent"), it.longValue("target"), it.flag("under")) },
+                        saved = t.longValue("saved")
                     )
                 },
                 suggestedTarget = o.long("suggested_target"),
-                outcome = o.optJSONObject("outcome")?.let { Outcome(it.optString("state"), it.optLong("saved"), it.optLong("saved_yearly"), it.str("detail") ?: "") }
+                outcome = o.obj("outcome")?.let { Outcome(it.string("state"), it.longValue("saved"), it.longValue("saved_yearly"), it.str("detail") ?: "") }
             )
         }
 
-        fun parseQuestion(q: JSONObject) = Question(
-            id = q.optString("id"),
-            text = q.optString("text"),
-            options = q.optJSONArray("options").objects().map { QOption(it.opt("value") ?: "", it.optString("label")) },
-            answer = if (q.isNull("answer") || !q.has("answer")) null else q.opt("answer")
+        fun parseQuestion(q: JsonObject) = Question(
+            id = q.string("id"),
+            text = q.string("text"),
+            options = q.arr("options").objects().map { QOption(it.anyValue("value") ?: "", it.string("label")) },
+            answer = q.anyValue("answer")
         )
     }
 }
@@ -161,13 +162,13 @@ data class SavingsOverview(val asOf: String?, val rate: SaveRate?, val totals: S
     fun with(item: SavingItem) = copy(items = items.map { if (it.key == item.key) item else it })
 
     companion object {
-        fun parse(o: JSONObject): SavingsOverview {
-            val t = o.optJSONObject("totals") ?: JSONObject()
+        fun parse(o: JsonObject): SavingsOverview {
+            val t = o.obj("totals") ?: EmptyJson
             return SavingsOverview(
                 asOf = o.str("as_of"),
-                rate = o.optJSONObject("rate")?.let { SaveRate(if (it.isNull("policy") || !it.has("policy")) null else it.optDouble("policy"), it.str("date")) },
-                totals = SaveTotals(t.optLong("low"), t.optLong("high"), t.optInt("count"), t.optLong("saved"), t.optLong("saved_yearly")),
-                items = o.optJSONArray("items").objects().map { SavingItem.parse(it) }
+                rate = o.obj("rate")?.let { SaveRate(if (it.absent("policy")) null else it.doubleValue("policy"), it.str("date")) },
+                totals = SaveTotals(t.longValue("low"), t.longValue("high"), t.intValue("count"), t.longValue("saved"), t.longValue("saved_yearly")),
+                items = o.arr("items").objects().map { SavingItem.parse(it) }
             )
         }
     }
@@ -178,7 +179,7 @@ data class SavePart(val group: String, val label: String, val count: Int, val se
 data class SaveTiles(val could: String, val couldSub: String, val saved: Long, val savedSub: String, val source: String)
 data class Chip(val kind: String, val text: String)
 /** A button of an item's status: [body] the PATCH (null for [input]: the target field). */
-data class SaveAction(val key: String, val label: String, val body: JSONObject?, val primary: Boolean = false, val input: Boolean = false)
+data class SaveAction(val key: String, val label: String, val body: JsonObject?, val primary: Boolean = false, val input: Boolean = false)
 data class LinkTarget(val view: String, val q: String, val category: String?, val label: String)
 data class Spark(val points: List<Pair<Float, Float>>, val base: Float, val range: String, val count: Int)
 data class MarketView(val state: String, val text: String, val button: String?, val offers: Boolean, val question: String?, val checked: String, val stale: String)
@@ -215,7 +216,7 @@ object MoneySave {
         Regex("^https?://([^/?#:]+)", RegexOption.IGNORE_CASE).find(url ?: "")?.groupValues?.get(1)?.lowercase()?.removePrefix("www.") ?: ""
 
     /** A link the page may open: http(s) only. */
-    fun safeSource(o: JSONObject?): SourceLink? {
+    fun safeSource(o: JsonObject?): SourceLink? {
         val url = o?.str("url") ?: return null
         val host = hostOf(url)
         if (host.isEmpty()) return null
@@ -309,7 +310,7 @@ object MoneySave {
         }
     }
 
-    private fun body(vararg kv: Pair<String, Any?>) = JSONObject().apply { kv.forEach { (k, v) -> put(k, v ?: JSONObject.NULL) } }
+    private fun body(vararg kv: Pair<String, Any?>) = buildJsonObject { kv.forEach { (k, v) -> put(k, jsonValue(v)) } }
 
     /** The buttons of an item's status; every status has a way back (`{status: "open"}` gives it back to Dana). */
     fun actions(item: SavingItem): List<SaveAction> = when (item.status) {
@@ -331,17 +332,17 @@ object MoneySave {
     }
 
     /** The Undo line after a PATCH: what changed, then the item ([item] is the answer's). */
-    fun toast(item: SavingItem?, body: JSONObject, today: LocalDate? = LocalDate.now()): String {
+    fun toast(item: SavingItem?, body: JsonObject, today: LocalDate? = LocalDate.now()): String {
         val name = isolateHebrew(item?.title ?: "")
-        body.optJSONObject("subitem")?.let { sub ->
-            val key = sub.optString("key")
+        body.obj("subitem")?.let { sub ->
+            val key = sub.string("key")
             val line = item?.subitems?.firstOrNull { it.key == key }
             val choice = sub.str("choice")
             val said = when (choice) { "keep" -> "keeping it"; "cancel" -> "marked to cancel"; else -> "no choice" }
             return "${isolate(line?.merchant ?: key)}: $said"
         }
-        if (body.has("answers")) return "Answer saved · $name"
-        if (body.has("target")) return if (body.isNull("target")) "Stopped tracking · $name" else "Target ${MoneyFormat.whole(body.optLong("target"))} a month · $name"
+        if ("answers" in body) return "Answer saved · $name"
+        if ("target" in body) return if (body.absent("target")) "Stopped tracking · $name" else "Target ${MoneyFormat.whole(body.longValue("target"))} a month · $name"
         val words = when (body.str("status")) {
             "doing" -> "On it"
             "done" -> "Done"
@@ -431,14 +432,14 @@ object MoneySave {
     }
 
     /** `POST …/check`'s answer: checking (202, or 409: one already runs) | question | wait (429) | error. */
-    fun checkReply(code: Int, body: JSONObject?): CheckReply {
-        val b = body ?: JSONObject()
+    fun checkReply(code: Int, body: JsonObject?): CheckReply {
+        val b = body ?: EmptyJson
         val error = b.str("error")
         return when {
             code == 202 || code == 409 -> CheckReply("checking", "")
-            code == 400 && error == "needs_answer" -> CheckReply("question", "Answer this first, then check prices.", b.optJSONObject("question")?.let { SavingItem.parseQuestion(it) })
+            code == 400 && error == "needs_answer" -> CheckReply("question", "Answer this first, then check prices.", b.obj("question")?.let { SavingItem.parseQuestion(it) })
             code == 429 -> {
-                val s = max(60, if (b.has("retry_after")) b.optInt("retry_after") else 0)
+                val s = max(60, if (b.absent("retry_after")) 0 else b.intValue("retry_after"))
                 CheckReply("wait", "Prices were checked a short while ago. Try again in ${if (s < 3600) "${ceil(s / 60.0).toInt()} min" else "${ceil(s / 3600.0).toInt()} h"}.")
             }
             code == 503 -> CheckReply("error", "Price checks aren't available right now.")
@@ -473,17 +474,17 @@ object MoneySave {
         if (m == null) return null
         fun mo(v: Long) = "${MoneyFormat.amount(v)} a month"
         fun pctOff(p: Double?) = "${pctText(p, signed = false, digits = 1)} off"
-        fun row(name: String?, plan: String?, cells: List<OfferCell>, it: JSONObject) = OfferRow(name ?: "", plan ?: "", cells, safeSource(it.optJSONObject("source")))
-        fun d(o: JSONObject, k: String): Double? = if (o.isNull(k) || !o.has(k)) null else o.optDouble(k)
+        fun row(name: String?, plan: String?, cells: List<OfferCell>, it: JsonObject) = OfferRow(name ?: "", plan ?: "", cells, safeSource(it.obj("source")))
+        fun d(o: JsonObject, k: String): Double? = if (o.absent(k)) null else o.doubleValue(k)
         val items = m.items
         return when (m.topic) {
             "telecom" -> OfferTable(m.topic, listOf("Provider", "Plan", "12-month average", "After the promo", "Conditions", "Source"), true, items.map { it ->
                 val promo = it.long("promo_price")
-                val months = if (it.isNull("promo_months") || !it.has("promo_months")) 0 else it.optInt("promo_months")
+                val months = if (it.absent("promo_months")) 0 else it.intValue("promo_months")
                 row(it.str("provider"), it.str("plan"), listOf(
-                    OfferCell("12-month average", mo(it.optLong("avg_12")), strong = true),
-                    if (promo != null && months > 0) OfferCell("After the promo", "${mo(it.optLong("price"))} after ${plural(months, "month")}", sub = "${mo(promo)} until then")
-                    else OfferCell("After the promo", "No promo", sub = mo(it.optLong("price")), muted = true),
+                    OfferCell("12-month average", mo(it.longValue("avg_12")), strong = true),
+                    if (promo != null && months > 0) OfferCell("After the promo", "${mo(it.longValue("price"))} after ${plural(months, "month")}", sub = "${mo(promo)} until then")
+                    else OfferCell("After the promo", "No promo", sub = mo(it.longValue("price")), muted = true),
                     OfferCell("Conditions", it.str("conditions") ?: "")
                 ), it)
             }, m.sources)
@@ -491,7 +492,7 @@ object MoneySave {
                 row(it.str("supplier"), it.str("plan"), listOf(
                     OfferCell("Discount", pctOff(d(it, "discount_pct")), strong = true),
                     OfferCell("Hours", listOfNotNull(it.str("hours"), it.str("days")).joinToString(" · ")),
-                    OfferCell("Meter", if (it.optBoolean("smart_meter")) "Smart meter needed" else "Any meter")
+                    OfferCell("Meter", if (it.flag("smart_meter")) "Smart meter needed" else "Any meter")
                 ), it)
             }, m.sources)
             "fx_card" -> OfferTable(m.topic, listOf("Card or wallet", "Kind", "Conversion fee", "Monthly fee", "Conditions", "Source"), false, items.map {
@@ -504,7 +505,7 @@ object MoneySave {
                 ), it)
             }, m.sources)
             "arnona" -> OfferTable(m.topic, listOf("Result", "Discount", "Deadline", "How", "Source"), false, items.map {
-                val found = it.optBoolean("found")
+                val found = it.flag("found")
                 val pct = d(it, "discount_pct")
                 row(if (found) "A discount for paying the year at once" else "No discount found for paying at once", "", listOf(
                     OfferCell("Discount", if (found && pct != null) pctOff(pct) else "—", strong = found),
@@ -557,5 +558,3 @@ object MoneySave {
         }
     )
 }
-
-internal fun org.json.JSONArray?.strings(): List<String> = if (this == null) emptyList() else (0 until length()).mapNotNull { optString(it).takeIf { s -> s.isNotEmpty() } }

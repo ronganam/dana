@@ -43,7 +43,7 @@ import io.github.ronganam.dana.ui.screens.calls.parseMarkdownToAnnotatedString
 import io.github.ronganam.dana.ui.theme.Danger
 import io.github.ronganam.dana.ui.theme.DanaTheme
 import io.github.ronganam.dana.ui.theme.ThemeSettings
-import io.github.ronganam.dana.ui.viewmodels.describeError
+import io.github.ronganam.dana.ui.viewmodels.Texts
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -162,7 +162,7 @@ class DebriefViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (_detail.value == null) _error.value = describeError(e)
+            if (_detail.value == null) _error.value = Texts.of(getApplication()).reason(e)
         }
     }
 
@@ -178,7 +178,7 @@ class DebriefViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _toast.value = describeError(e)
+                _toast.value = Texts.of(getApplication()).reason(e)
             } finally {
                 _busy.value = _busy.value - id
             }

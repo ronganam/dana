@@ -41,7 +41,7 @@ private data class FileAnswer(val file: JsonObject? = null)
 /**
  * The `/api/projects*`, `/api/sections*`, `/api/entries*` routes (server
  * addons/knowledge/api.py). Non-2xx throws [ProjectsApiError], an
- * unreachable server `IOException`. A 403 `not_connected` forgets the add-on.
+ * unreachable server `IOException`. A 403 `not_connected` forgets the addon.
  */
 class ProjectsApi(private val context: Context, private val api: () -> ApiService) {
 

@@ -20,8 +20,8 @@ import io.github.ronganam.dana.wear.tiles.TodayTileService
 import io.github.ronganam.dana.wear.tiles.WaitingTileService
 import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.DanaSnapshot
+import io.github.ronganam.dana.protocol.WearCard
 import io.github.ronganam.dana.wear.R
 
 /**
@@ -35,13 +35,12 @@ class DanaCardListenerService : WearableListenerService() {
 
     override fun onMessageReceived(event: MessageEvent) {
         super.onMessageReceived(event)
-        val json = runCatching { JSONObject(String(event.data)) }.getOrElse {
-            Log.w(TAG, "Bad payload on ${event.path}", it); return
-        }
+        val text = String(event.data)
         when (event.path) {
-            WearPaths.CARD -> showCard(this, json)
-            WearPaths.CARD_CLEAR -> notificationManager(this).cancel(notificationId(json.optString("kind")))
-            WearPaths.SNAPSHOT -> DanaSnapshot.save(this, json)
+            WearPaths.CARD -> WearCard.decode(text)?.let { showCard(this, it) } ?: Log.w(TAG, "Bad payload on ${event.path}")
+            WearPaths.CARD_CLEAR -> WearCard.decode(text)?.let { notificationManager(this).cancel(notificationId(it.kind)) }
+                ?: Log.w(TAG, "Bad payload on ${event.path}")
+            WearPaths.SNAPSHOT -> DanaSnapshot.decode(text)?.let { SnapshotStore.save(this, it) } ?: Log.w(TAG, "Bad payload on ${event.path}")
         }
     }
 
@@ -70,13 +69,12 @@ class DanaCardListenerService : WearableListenerService() {
             )
         }
 
-        fun showCard(context: Context, json: JSONObject) {
-            val kind = json.optString("kind")
-            val title = json.optString("title")
+        fun showCard(context: Context, card: WearCard) {
+            val kind = card.kind
+            val title = card.title
             if (kind.isBlank() || title.isBlank()) return
-            val subtitle = json.optString("subtitle")
-            val lines = json.optJSONArray("lines")?.let { a -> (0 until a.length()).map { a.optString(it) } }.orEmpty()
-                .filter { it.isNotBlank() }
+            val subtitle = card.subtitle
+            val lines = card.lines.filter { it.isNotBlank() }
 
             val nm = notificationManager(context)
             ensureChannels(context, nm)
@@ -112,35 +110,32 @@ class DanaCardListenerService : WearableListenerService() {
     }
 }
 
-/** The phone's last widget snapshot, kept for the tiles and complications. */
-object DanaSnapshot {
+/** The phone's last widget snapshot ([DanaSnapshot]), kept for the tiles and complications. */
+object SnapshotStore {
     private const val PREFS = "DanaWearPrefs"
     private const val KEY = "dana_snapshot"
 
-    fun load(context: Context): JSONObject = runCatching {
-        JSONObject(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, "{}") ?: "{}")
-    }.getOrDefault(JSONObject())
+    /** The last snapshot; null before the phone sent one. */
+    fun load(context: Context): DanaSnapshot? =
+        DanaSnapshot.decode(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, null))
 
     /** A new snapshot from the phone: stored, then the shopping list and the tiles / complications follow it. */
-    fun save(context: Context, o: JSONObject) {
-        store(context, o)
-        WatchShopping.onSnapshot(context, o)
+    fun save(context: Context, snapshot: DanaSnapshot) {
+        store(context, snapshot)
+        WatchShopping.onSnapshot(context, snapshot)
         refreshSurfaces(context)
     }
 
-    private fun store(context: Context, o: JSONObject) {
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, o.toString()).apply()
+    private fun store(context: Context, snapshot: DanaSnapshot) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putString(KEY, snapshot.encode()).apply()
     }
 
     /** Drop one suggestion locally right after Accept / Dismiss, before the phone's next snapshot. */
     fun removeSuggestion(context: Context, id: String) {
-        val o = load(context)
-        val list = o.optJSONArray("suggestions") ?: return
-        val kept = JSONArray()
-        for (i in 0 until list.length()) list.optJSONObject(i)?.takeIf { it.optString("id") != id }?.let { kept.put(it) }
-        if (kept.length() == list.length()) return
-        o.put("suggestions", kept).put("suggestion_count", (o.optInt("suggestion_count") - 1).coerceAtLeast(0))
-        store(context, o)
+        val o = load(context) ?: return
+        val kept = o.suggestions.filter { it.id != id }
+        if (kept.size == o.suggestions.size) return
+        store(context, o.copy(suggestions = kept, suggestionCount = (o.suggestionCount - 1).coerceAtLeast(0)))
         refreshSurfaces(context)
     }
 
@@ -150,11 +145,11 @@ object DanaSnapshot {
             updater.requestUpdate(TodayTileService::class.java)
             updater.requestUpdate(WaitingTileService::class.java)
             updater.requestUpdate(ShoppingTileService::class.java)
-        }.onFailure { Log.d("DanaSnapshot", "Tile update request failed: ${it.message}") }
+        }.onFailure { Log.d("SnapshotStore", "Tile update request failed: ${it.message}") }
         for (cls in listOf(InboxComplicationService::class.java, ShoppingComplicationService::class.java)) {
             runCatching {
                 ComplicationDataSourceUpdateRequester.create(context, ComponentName(context, cls)).requestUpdateAll()
-            }.onFailure { Log.d("DanaSnapshot", "Complication update request failed: ${it.message}") }
+            }.onFailure { Log.d("SnapshotStore", "Complication update request failed: ${it.message}") }
         }
     }
 }

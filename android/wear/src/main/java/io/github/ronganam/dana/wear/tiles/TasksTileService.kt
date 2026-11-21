@@ -17,7 +17,7 @@ import androidx.wear.tiles.TileService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.ronganam.dana.wear.data.WearPrefs
-import org.json.JSONArray
+import io.github.ronganam.dana.protocol.WearTaskItem
 import kotlin.math.sqrt
 import io.github.ronganam.dana.wear.R
 
@@ -286,33 +286,10 @@ class TasksTileService : TileService() {
     }
 
     private fun parseTasks(json: String): List<TaskItem> {
-        val result = mutableListOf<TaskItem>()
-        try {
-            val array = JSONArray(json)
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                val status = obj.optString("status", "needs_action")
-                if (status != "needs_action") continue
-                result.add(
-                    TaskItem(
-                        title = obj.optString("title", ""),
-                        dueDate = obj.optString("due_date").takeIf {
-                            it.isNotEmpty() && it != "null"
-                        },
-                        priority = obj.optString("priority", "medium"),
-                        groupName = obj.optString("group_name").takeIf {
-                            it.isNotEmpty() && it != "null"
-                        },
-                        groupEmoji = obj.optString("group_emoji").takeIf {
-                            it.isNotEmpty() && it != "null"
-                        }
-                    )
-                )
-            }
-        } catch (e: org.json.JSONException) {
-            android.util.Log.w("TasksTile", "Cached tasks aren't valid JSON", e)
+        fun given(v: String?) = v?.takeIf { it.isNotEmpty() && it != "null" }
+        return WearTaskItem.decodeList(json).filter { it.status == "needs_action" }.map {
+            TaskItem(title = it.title, dueDate = given(it.dueDate), priority = it.priority, groupName = given(it.groupName), groupEmoji = given(it.groupEmoji))
         }
-        return result
     }
 
     private data class TaskItem(

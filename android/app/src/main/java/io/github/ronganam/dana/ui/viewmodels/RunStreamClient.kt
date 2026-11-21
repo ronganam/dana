@@ -95,7 +95,7 @@ internal class RunStreamClient(private val chat: () -> ChatApi) {
                 val busyRun = e.runId
                 request = { onEvent -> chat().attach(sessionId, busyRun, 0, onEvent) }
             } catch (e: Exception) {
-                Log.w(TAG, "Assistant stream failed: ${describeError(e)}")
+                Log.w(TAG, "Assistant stream failed: $e")
                 // A stream that dies mid-read never reaches the interceptor.
                 if (e is IOException) ServerStatusMonitor.checkNow()
                 val runId = run.runId

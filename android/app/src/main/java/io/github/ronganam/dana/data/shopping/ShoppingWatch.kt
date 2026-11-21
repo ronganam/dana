@@ -2,7 +2,8 @@ package io.github.ronganam.dana.data.shopping
 
 import android.content.Context
 import kotlinx.coroutines.CancellationException
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.ShopAnswer
+import io.github.ronganam.dana.protocol.ShopRequest
 
 /**
  * What the watch asks of the shopping list (`/shopping_action`, handled in
@@ -18,45 +19,44 @@ import org.json.JSONObject
  * own id for the request, sent back as it came.
  */
 object ShoppingWatch {
-    suspend fun handle(context: Context, json: JSONObject): JSONObject =
-        answer(ShoppingSync.get(context), json) { ShoppingSync.submit(context, it) }
+    suspend fun handle(context: Context, request: ShopRequest): ShopAnswer =
+        answer(ShoppingSync.get(context), request) { ShoppingSync.submit(context, it) }
 
     /** The answer to one watch request on [store]; [submit] makes the change (the process's store in the app). */
     suspend fun answer(
         store: ShoppingStore,
-        json: JSONObject,
+        request: ShopRequest,
         submit: suspend (ShoppingOp) -> ShoppingStore.Outcome = { store.submit(it) }
-    ): JSONObject {
-        val ref = json.optString("ref")
+    ): ShopAnswer {
         val out = try {
-            outcome(store, json, submit)
+            outcome(store, request, submit)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             refused("Couldn't do that on the phone.")
         }
-        return if (ref.isEmpty()) out else out.put("ref", ref)
+        return if (request.ref.isEmpty()) out else out.copy(ref = request.ref)
     }
 
-    private suspend fun outcome(store: ShoppingStore, json: JSONObject, submit: suspend (ShoppingOp) -> ShoppingStore.Outcome): JSONObject {
+    private suspend fun outcome(store: ShoppingStore, request: ShopRequest, submit: suspend (ShoppingOp) -> ShoppingStore.Outcome): ShopAnswer {
         store.load()
         val shown = store.shown()
-        val listId = json.optString("list_id").ifEmpty { shown?.list?.id.orEmpty() }
+        val listId = request.listId.ifEmpty { shown?.list?.id.orEmpty() }
         if (listId.isEmpty()) return refused("The list hasn't loaded yet.")
-        val id = json.optString("id")
+        val id = request.id.orEmpty()
         val name = shown?.items?.firstOrNull { it.id == id }?.name.orEmpty()
-        val op: ShoppingOp = when (json.optString("action")) {
+        val op: ShoppingOp = when (request.action) {
             "check" -> ShoppingOp.Check(ShoppingOp.newId(), listId, id, true, name)
             "uncheck" -> ShoppingOp.Check(ShoppingOp.newId(), listId, id, false, name)
-            "add" -> ShoppingOps.addTyped(listId, json.optString("text")) ?: return refused("Nothing to add.")
+            "add" -> ShoppingOps.addTyped(listId, request.text.orEmpty()) ?: return refused("Nothing to add.")
             else -> return refused("Unknown action.")
         }
         return when (val outcome = submit(op)) {
-            is ShoppingStore.Outcome.Sent -> JSONObject().put("ok", true).put("queued", false)
-            ShoppingStore.Outcome.Queued -> JSONObject().put("ok", true).put("queued", true)
+            is ShoppingStore.Outcome.Sent -> ShopAnswer(ok = true, queued = false)
+            ShoppingStore.Outcome.Queued -> ShopAnswer(ok = true, queued = true)
             is ShoppingStore.Outcome.Rejected -> refused(ShoppingView.errorText(outcome.status, outcome.body))
         }
     }
 
-    private fun refused(sentence: String): JSONObject = JSONObject().put("ok", false).put("error", sentence)
+    private fun refused(sentence: String) = ShopAnswer(ok = false, error = sentence)
 }

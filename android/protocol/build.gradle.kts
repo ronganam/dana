@@ -4,6 +4,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 // :wear read and write (docs/wear.md, "Phone bridge"). No UI, no resources.
 plugins {
     id("com.android.library")
+    id("org.jetbrains.kotlin.plugin.serialization")
 }
 
 android {
@@ -31,8 +32,8 @@ kotlin {
 dependencies {
     // DataMap for the /dana_config and /dana/version data items.
     implementation("com.google.android.gms:play-services-wearable:20.0.1")
+    // The JSON payloads (WearJson), the same version as :app and :wear.
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.13.0")
 
     testImplementation("junit:junit:4.13.2")
-    // Android's org.json is a stub off-device.
-    testImplementation("org.json:json:20260814")
 }

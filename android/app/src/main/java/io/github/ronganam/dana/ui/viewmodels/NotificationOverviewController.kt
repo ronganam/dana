@@ -223,7 +223,7 @@ class NotificationOverviewController(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ctx.messages.post("$failure: ${describeError(e)}")
+                ctx.messages.post("$failure: ${ctx.texts.reason(e)}")
             }
             onChanged()
             fetch()
@@ -238,7 +238,7 @@ class NotificationOverviewController(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ctx.messages.post("Couldn't undo: ${e.message ?: describeError(e)}")
+                ctx.messages.post("Couldn't undo: ${e.message ?: ctx.texts.reason(e)}")
             }
             onChanged()
             fetch()
@@ -286,7 +286,7 @@ class NotificationOverviewController(
                 throw e
             } catch (e: Exception) {
                 _overview.value = before
-                ctx.messages.post("Couldn't save the rule: ${e.message ?: describeError(e)}")
+                ctx.messages.post("Couldn't save the rule: ${e.message ?: ctx.texts.reason(e)}")
             }
             onChanged()
             fetch()
@@ -308,7 +308,7 @@ class NotificationOverviewController(
                 throw e
             } catch (e: Exception) {
                 _overview.value = before
-                ctx.messages.post("Couldn't save that: ${e.message ?: describeError(e)}")
+                ctx.messages.post("Couldn't save that: ${e.message ?: ctx.texts.reason(e)}")
             }
             onChanged()
             fetch()

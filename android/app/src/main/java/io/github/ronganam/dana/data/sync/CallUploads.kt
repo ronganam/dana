@@ -22,7 +22,7 @@ import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
 import io.github.ronganam.dana.data.network.ApiException
-import io.github.ronganam.dana.ui.viewmodels.describeError
+import io.github.ronganam.dana.ui.viewmodels.Texts
 import kotlinx.coroutines.CancellationException
 import org.json.JSONObject
 import java.io.File
@@ -249,12 +249,12 @@ class CallUploadWorker(appContext: Context, params: WorkerParameters) : Coroutin
         } catch (e: CancellationException) {
             throw e
         } catch (e: IOException) {
-            describeError(e)
+            Texts.of(ctx).reason(e)
         } catch (e: ApiException) {
-            describeError(e)
+            Texts.of(ctx).reason(e)
         } catch (e: Exception) {
             Log.e(TAG, "Unexpected upload error", e)
-            return failed(file, contact, timestamp, describeError(e))
+            return failed(file, contact, timestamp, Texts.of(ctx).reason(e))
         }
 
         // Unreachable or a server error: retry with backoff, then give up.

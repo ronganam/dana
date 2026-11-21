@@ -13,12 +13,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import java.io.File
 
 /**
- * Bank sign-in codes for the server's `money` add-on. When Dana's server signs
+ * Bank sign-in codes for the server's `money` addon. When Dana's server signs
  * in to a bank that texts a one-time code, it pushes `otp_request` with only
  * a request id. [handle] fetches the request (`GET
  * /api/money/code-requests/{id}`) and, while it is pending, **arms** it:
@@ -119,14 +122,12 @@ object MoneyCodes {
      * The server's request → what to arm, or null when there is nothing to
      * wait for: not pending, no senders, a regex that doesn't compile, expired.
      */
-    fun parse(id: String, o: JSONObject, now: Long): Request? {
-        if (o.optString("status") != "pending") return null
-        val senders = o.optJSONArray("senders")?.let { a ->
-            (0 until a.length()).map { a.optString(it) }.filter { clean(it).isNotEmpty() }
-        }.orEmpty()
-        val regex = o.optString("code_regex")
+    fun parse(id: String, o: JsonObject, now: Long): Request? {
+        if (o.string("status") != "pending") return null
+        val senders = o.arr("senders").texts().filter { clean(it).isNotEmpty() }
+        val regex = o.string("code_regex")
         if (senders.isEmpty() || compile(regex) == null) return null
-        val expires = parseInstant(o.optString("expires_at")) ?: (now + DEFAULT_LIFETIME_MS)
+        val expires = parseInstant(o.string("expires_at")) ?: (now + DEFAULT_LIFETIME_MS)
         val expiresAt = minOf(expires, now + MAX_ARMED_MS)
         if (expiresAt <= now) return null
         return Request(id, senders, regex, now - LOOKBACK_MS, expiresAt)
@@ -160,7 +161,7 @@ object MoneyCodes {
         val now = System.currentTimeMillis()
         val req = parse(rid, o, now)
         if (req == null) {
-            val why = if (o.optString("status") != "pending") "status ${o.optString("status")}" else "no senders, a bad regex or expired"
+            val why = if (o.string("status") != "pending") "status ${o.string("status")}" else "no senders, a bad regex or expired"
             Log.i(TAG, "Not waiting for a code for $rid ($why)")
             return
         }
@@ -299,21 +300,22 @@ object MoneyCodes {
         }
     }
 
-    fun encode(list: List<Request>): String = JSONArray().apply {
+    fun encode(list: List<Request>): String = buildJsonArray {
         list.forEach { r ->
-            put(JSONObject().put("id", r.id).put("senders", JSONArray(r.senders)).put("code_regex", r.regex)
-                .put("since", r.since).put("expires_at", r.expiresAt))
+            add(buildJsonObject {
+                put("id", r.id)
+                put("senders", buildJsonArray { r.senders.forEach { add(it) } })
+                put("code_regex", r.regex)
+                put("since", r.since)
+                put("expires_at", r.expiresAt)
+            })
         }
     }.toString()
 
-    fun decode(text: String): List<Request> {
-        val a = JSONArray(text)
-        return (0 until a.length()).mapNotNull { i ->
-            val o = a.optJSONObject(i) ?: return@mapNotNull null
-            val senders = o.optJSONArray("senders")?.let { s -> (0 until s.length()).map { s.optString(it) } }.orEmpty()
-            val id = o.optString("id")
-            if (id.isEmpty() || senders.isEmpty()) null
-            else Request(id, senders, o.optString("code_regex"), o.optLong("since"), o.optLong("expires_at"))
-        }
+    fun decode(text: String): List<Request> = jsonArrayOf(text).objects { o ->
+        val senders = o.arr("senders").texts()
+        val id = o.string("id")
+        if (id.isEmpty() || senders.isEmpty()) null
+        else Request(id, senders, o.string("code_regex"), o.longValue("since"), o.longValue("expires_at"))
     }
 }

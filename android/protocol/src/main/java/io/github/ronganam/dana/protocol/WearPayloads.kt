@@ -1,8 +1,28 @@
 package io.github.ronganam.dana.protocol
 
 import com.google.android.gms.wearable.DataMap
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.ExperimentalSerializationApi
+import kotlinx.serialization.KSerializer
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
+
+/**
+ * The JSON the phone and the watch exchange, and the watch keeps in its own
+ * files: unknown keys are ignored, a missing or null field takes the
+ * property's default, nulls are left out of what is written.
+ */
+@OptIn(ExperimentalSerializationApi::class)
+val WearJson: Json = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    coerceInputValues = true
+    explicitNulls = false
+    encodeDefaults = true
+}
+
+/** Decode [text] with [WearJson]; null when it isn't [T] (a frame from another version). */
+fun <T> KSerializer<T>.decodeOrNull(text: String): T? = runCatching { WearJson.decodeFromString(this, text) }.getOrNull()
 
 /** The phone's settings for the watch, as the [WearPaths.CONFIG] data item. */
 data class WearConfig(
@@ -63,82 +83,68 @@ data class WearVersion(val versionCode: Int, val versionName: String) {
 }
 
 /** [WearPaths.REMINDER_ALARM]: a reminder rings on the phone. [zones]: the place snoozes to offer (null: keep the last). */
+@Serializable
 data class ReminderAlarm(
-    val taskId: String,
-    val title: String,
-    val priority: String,
-    val triggerType: String,
+    @SerialName("task_id") val taskId: String = "",
+    @SerialName("task_title") val title: String = "Reminder",
+    val priority: String = "medium",
+    @SerialName("trigger_type") val triggerType: String = "time",
     val zones: List<String>? = null,
 ) {
-    fun toJson(): JSONObject = JSONObject()
-        .put("task_id", taskId).put("task_title", title).put("priority", priority).put("trigger_type", triggerType)
-        .apply { zones?.let { put("zones", JSONArray(it)) } }
+    fun encode(): String = WearJson.encodeToString(serializer(), this)
 
     companion object {
-        fun fromJson(o: JSONObject) = ReminderAlarm(
-            taskId = o.optString("task_id", ""),
-            title = o.optString("task_title", "Reminder"),
-            priority = o.optString("priority", "medium"),
-            triggerType = o.optString("trigger_type", "time"),
-            zones = o.optJSONArray("zones")?.let { a -> List(a.length()) { a.optString(it) } },
-        )
+        fun decode(text: String): ReminderAlarm? = serializer().decodeOrNull(text)
     }
 }
 
 /** [WearPaths.REMINDER_HANDLED_ON_PHONE] / [WearPaths.REMINDER_HANDLED_ON_WATCH]. */
-data class ReminderHandled(val taskId: String) {
-    fun toJson(): JSONObject = JSONObject().put("task_id", taskId)
+@Serializable
+data class ReminderHandled(@SerialName("task_id") val taskId: String = "") {
+    fun encode(): String = WearJson.encodeToString(serializer(), this)
 
     companion object {
-        fun fromJson(o: JSONObject) = ReminderHandled(o.optString("task_id"))
+        fun decode(text: String): ReminderHandled? = serializer().decodeOrNull(text)
     }
 }
 
-/** [WearPaths.UPDATE_TASK_STATUS]: e.g. "completed". */
-data class TaskStatusRequest(val taskId: String, val status: String) {
-    fun toJson(): JSONObject = JSONObject().put("task_id", taskId).put("status", status)
+/** [WearPaths.UPDATE_TASK_STATUS]: e.g. "completed". Both fields are required. */
+@Serializable
+data class TaskStatusRequest(@SerialName("task_id") val taskId: String, val status: String) {
+    fun encode(): String = WearJson.encodeToString(serializer(), this)
 
     companion object {
-        fun fromJson(o: JSONObject) = TaskStatusRequest(o.getString("task_id"), o.getString("status"))
+        fun decode(text: String): TaskStatusRequest? = serializer().decodeOrNull(text)
     }
 }
 
 /**
  * [WearPaths.SNOOZE_TASK]: any snooze the watch offers — time ([minutes]),
  * place ([location] + [event] arrive / leave), car ([action] enter / leave) or wake.
+ * Only the fields of its kind are written; [taskId] is required.
  */
+@Serializable
 data class SnoozeRequest(
-    val taskId: String,
-    val type: String,
+    @SerialName("task_id") val taskId: String,
+    val type: String = "time",
     val minutes: Int? = null,
     val location: String? = null,
     val event: String? = null,
     val action: String? = null,
 ) {
-    fun toJson(): JSONObject = JSONObject().put("task_id", taskId).put("type", type).apply {
-        minutes?.let { put("minutes", it) }
-        location?.let { put("location", it) }
-        event?.let { put("event", it) }
-        action?.let { put("action", it) }
-    }
+    fun encode(): String = WearJson.encodeToString(serializer(), this)
 
     companion object {
-        fun fromJson(o: JSONObject) = SnoozeRequest(
-            taskId = o.getString("task_id"),
-            type = o.optString("type", "time"),
-            minutes = if (o.has("minutes")) o.getInt("minutes") else null,
-            location = if (o.has("location")) o.getString("location") else null,
-            event = if (o.has("event")) o.getString("event") else null,
-            action = if (o.has("action")) o.getString("action") else null,
-        )
+        fun decode(text: String): SnoozeRequest? = serializer().decodeOrNull(text)
     }
 }
 
 /** The phone's answer to [TaskStatusRequest] / [SnoozeRequest]: [queued] = will be sent when the server is back. */
-data class TaskActionReply(val success: Boolean, val queued: Boolean) {
-    fun toJson(): JSONObject = JSONObject().put("success", success).put("queued", queued)
+@Serializable
+data class TaskActionReply(val success: Boolean = false, val queued: Boolean = false) {
+    fun encode(): String = WearJson.encodeToString(serializer(), this)
 
     companion object {
-        fun fromJson(o: JSONObject) = TaskActionReply(o.optBoolean("success"), o.optBoolean("queued"))
+        fun decode(text: String): TaskActionReply? = serializer().decodeOrNull(text)
     }
 }

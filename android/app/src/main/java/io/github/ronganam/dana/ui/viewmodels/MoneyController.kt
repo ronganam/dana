@@ -4,12 +4,20 @@ import android.content.Context
 import io.github.ronganam.dana.data.money.MoneyApi
 import io.github.ronganam.dana.data.money.MoneyApiError
 import io.github.ronganam.dana.data.money.MoneyText
+import io.github.ronganam.dana.data.money.absent
+import io.github.ronganam.dana.data.money.arr
+import io.github.ronganam.dana.data.money.flag
+import io.github.ronganam.dana.data.money.longValue
+import io.github.ronganam.dana.data.money.obj
+import io.github.ronganam.dana.data.money.objects
+import io.github.ronganam.dana.data.money.str
+import io.github.ronganam.dana.data.money.string
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
 
 /** The Money views (server docs/money.md → Money tab). [monthly]: tied to the month switcher. */
 enum class MoneyView(val label: String, val monthly: Boolean) {
@@ -68,24 +76,23 @@ data class MoneySource(
     val busy: Boolean get() = state == "syncing" || state == "needs_code"
 
     companion object {
-        fun parse(o: JSONObject): MoneySource {
-            val accounts = o.optJSONArray("accounts")
-            val code = o.optJSONObject("code_request")
+        fun parse(o: JsonObject): MoneySource {
+            val code = o.obj("code_request")
             return MoneySource(
-                id = o.optString("id"),
-                company = o.optString("company"),
-                companyName = o.optString("company_name"),
-                label = o.optString("label").takeIf { !o.isNull("label") && it.isNotBlank() },
-                state = o.optString("state"),
-                stateReason = o.optString("state_reason").takeIf { !o.isNull("state_reason") && it.isNotBlank() },
-                errorType = o.optString("error_type").takeIf { !o.isNull("error_type") && it.isNotBlank() },
-                lastSyncAt = o.optString("last_sync_at").takeIf { !o.isNull("last_sync_at") && it.isNotBlank() },
-                lastOkAt = o.optString("last_ok_at").takeIf { !o.isNull("last_ok_at") && it.isNotBlank() },
-                nextSyncAt = o.optString("next_sync_at").takeIf { !o.isNull("next_sync_at") && it.isNotBlank() },
-                credentialsSet = o.optBoolean("credentials_set"),
-                canSync = o.optBoolean("can_sync", true),
-                accounts = (0 until (accounts?.length() ?: 0)).map { MoneyAccount.parse(accounts!!.getJSONObject(it)) },
-                codeRequest = code?.let { it.optString("id") to it.optString("expires_at") }
+                id = o.string("id"),
+                company = o.string("company"),
+                companyName = o.string("company_name"),
+                label = o.str("label"),
+                state = o.string("state"),
+                stateReason = o.str("state_reason"),
+                errorType = o.str("error_type"),
+                lastSyncAt = o.str("last_sync_at"),
+                lastOkAt = o.str("last_ok_at"),
+                nextSyncAt = o.str("next_sync_at"),
+                credentialsSet = o.flag("credentials_set"),
+                canSync = o.flag("can_sync", true),
+                accounts = o.arr("accounts").objects().map { MoneyAccount.parse(it) },
+                codeRequest = code?.let { it.string("id") to it.string("expires_at") }
             )
         }
     }
@@ -103,15 +110,15 @@ data class MoneyAccount(
     val nextChargeDate: String?
 ) {
     companion object {
-        fun parse(o: JSONObject) = MoneyAccount(
-            id = o.optString("id"),
-            kind = o.optString("kind"),
-            number = o.optString("number"),
-            label = o.optString("label").takeIf { !o.isNull("label") && it.isNotBlank() },
-            balance = if (o.isNull("balance") || !o.has("balance")) null else o.optLong("balance"),
-            balanceAt = o.optString("balance_at").takeIf { !o.isNull("balance_at") && it.isNotBlank() },
-            nextCharge = if (o.isNull("next_charge") || !o.has("next_charge")) null else o.optLong("next_charge"),
-            nextChargeDate = o.optString("next_charge_date").takeIf { !o.isNull("next_charge_date") && it.isNotBlank() }
+        fun parse(o: JsonObject) = MoneyAccount(
+            id = o.string("id"),
+            kind = o.string("kind"),
+            number = o.string("number"),
+            label = o.str("label"),
+            balance = if (o.absent("balance")) null else o.longValue("balance"),
+            balanceAt = o.str("balance_at"),
+            nextCharge = if (o.absent("next_charge")) null else o.longValue("next_charge"),
+            nextChargeDate = o.str("next_charge_date")
         )
     }
 }
@@ -142,16 +149,16 @@ class MoneyController(val ctx: ControllerContext, appContext: Context) {
     private val _filter = MutableStateFlow(TxnFilter())
     val filter: StateFlow<TxnFilter> = _filter.asStateFlow()
 
-    private val _overview = MutableStateFlow<JSONObject?>(null)
+    private val _overview = MutableStateFlow<JsonObject?>(null)
     /** `GET overview?month=` of [month] (null while it loads: show skeletons, never another month's numbers). */
-    val overview: StateFlow<JSONObject?> = _overview.asStateFlow()
+    val overview: StateFlow<JsonObject?> = _overview.asStateFlow()
 
     private val _sources = MutableStateFlow<List<MoneySource>?>(null)
     val sources: StateFlow<List<MoneySource>?> = _sources.asStateFlow()
 
-    private val _categories = MutableStateFlow<JSONObject?>(null)
+    private val _categories = MutableStateFlow<JsonObject?>(null)
     /** `GET categories?period=<month>`: the month's groups and the `taxonomy` (category keys and labels). */
-    val categories: StateFlow<JSONObject?> = _categories.asStateFlow()
+    val categories: StateFlow<JsonObject?> = _categories.asStateFlow()
 
     private val _revision = MutableStateFlow(0)
     /** Bumped when the server's money data changed (or Refresh): views reload what they show. */
@@ -218,7 +225,7 @@ class MoneyController(val ctx: ControllerContext, appContext: Context) {
                 _loadError.value = null
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _loadError.value = (e as? MoneyApiError)?.message ?: describeError(e)
+                _loadError.value = (e as? MoneyApiError)?.message ?: ctx.texts.reason(e)
             }
         }
         ctx.scope.launch { loadSources() }
@@ -229,8 +236,7 @@ class MoneyController(val ctx: ControllerContext, appContext: Context) {
 
     suspend fun loadSources() {
         ctx.load("Money") { api.get("/sources") }?.let { o ->
-            val a = o.optJSONArray("sources")
-            _sources.value = (0 until (a?.length() ?: 0)).map { MoneySource.parse(a!!.getJSONObject(it)) }
+            _sources.value = o.arr("sources").objects().map { MoneySource.parse(it) }
         }
     }
 
@@ -251,8 +257,8 @@ class MoneyController(val ctx: ControllerContext, appContext: Context) {
             delay(if (busy) 5_000 else 30_000)
             val o = ctx.load("Money") { api.get("/changes", mapOf("since" to changesCursor)) } ?: continue
             val first = changesCursor == null
-            changesCursor = o.optString("cursor").ifBlank { null }
-            if (!first && o.optBoolean("changed")) refresh()
+            changesCursor = o.str("cursor")
+            if (!first && o.flag("changed")) refresh()
         }
     }
 
@@ -274,17 +280,17 @@ class MoneyController(val ctx: ControllerContext, appContext: Context) {
      * Run a write, show its failure as a message, and offer Undo when it
      * answers an `undo_id` ([undoText] is the snackbar's line). Refreshes after.
      */
-    fun write(failure: String, undoText: String? = null, block: suspend () -> JSONObject?): kotlinx.coroutines.Job = ctx.scope.launch {
+    fun write(failure: String, undoText: String? = null, block: suspend () -> JsonObject?): kotlinx.coroutines.Job = ctx.scope.launch {
         try {
             val answer = block()
-            val undoId = answer?.optString("undo_id")?.ifBlank { null }
+            val undoId = answer?.str("undo_id")
             if (undoText != null && undoId != null) {
                 ctx.messages.postUndoable(undoText, onUndo = { undo(undoId) })
             }
             refresh()
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            ctx.messages.post("$failure: ${(e as? MoneyApiError)?.message ?: describeError(e)}")
+            ctx.messages.post("$failure: ${(e as? MoneyApiError)?.message ?: ctx.texts.reason(e)}")
         }
     }
 

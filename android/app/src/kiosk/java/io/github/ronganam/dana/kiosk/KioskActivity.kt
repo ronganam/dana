@@ -371,7 +371,7 @@ class KioskActivity : ComponentActivity() {
     private fun loadDashboard(view: WebView, forceLogin: Boolean = false) {
         val (server, token) = ServerConfig.load(this)
         val path = KioskPrefs.dashboardPath(this)
-        val hasSession = CookieManager.getInstance().getCookie(server)?.contains("ganam_session=") == true
+        val hasSession = CookieManager.getInstance().getCookie(server)?.contains("$SESSION_COOKIE=") == true
         if (token.isNotEmpty() && (forceLogin || !hasSession)) {
             // Exchange the API token for the dashboard's long-lived session cookie.
             val body = "token=" + URLEncoder.encode(token, "UTF-8") + "&next=" + URLEncoder.encode(path, "UTF-8")
@@ -405,5 +405,7 @@ class KioskActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "KioskActivity"
+        /** The web session cookie `/login` sets (server `server/core/auth.py`); without it the kiosk signs in with its token. */
+        private const val SESSION_COOKIE = "dana_session"
     }
 }

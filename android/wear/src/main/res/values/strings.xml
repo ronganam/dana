@@ -16,6 +16,8 @@
     <string name="label_today">Today</string>
     <string name="label_waiting">Waiting on you</string>
     <string name="label_inbox">Dana Inbox</string>
+    <string name="complication_inbox">Inbox</string>
+    <string name="complication_shop">Shop</string>
     <string name="label_shopping_list">Shopping list</string>
 
     <!-- Common -->
