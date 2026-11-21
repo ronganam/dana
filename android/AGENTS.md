@@ -17,13 +17,15 @@ Android clients of **Dana** (the assistant). The server is `../server` (its `AGE
 
 ## Build, test, publish
 
+**Setup**: the Android SDK (`ANDROID_HOME=~/Android/Sdk`, or `sdk.dir=/path/to/sdk` in a gitignored `local.properties` here) and a JDK 21 for the Gradle daemon; without one, Gradle downloads it (foojay). Details: `docs/release.md` → Setup.
+
 > [!WARNING]
 > Never run bare `./gradlew installDebug`: it runs for every module and can put the Wear APK on the phone. Always name the module and flavor.
 
 **Fast loop** (edit → build → run, emulators only — the script refuses any serial that isn't `emulator-*`):
 
 ```bash
-bin/dev-install.sh phone --boot    # :app phone debug → emulator-5554 (AVD "ganam"); --boot starts the AVD if needed
+bin/dev-install.sh phone --boot    # :app phone debug → emulator-5554 (AVD $PHONE_AVD, default "dana_phone"; set it in ../site/android.env); --boot starts the AVD if needed
 bin/dev-install.sh watch --boot    # :wear debug → emulator-5556 (AVD "dana_watch"; booted alone by other means it is emulator-5554: pass -s)
 bin/dev-install.sh kiosk|tv        # the other flavors, same emulator-5554
 # by hand: ./gradlew :app:assemblePhoneDebug && adb -s emulator-5554 install -r -t app/build/outputs/apk/phone/debug/app-phone-debug.apk \
@@ -49,8 +51,9 @@ The phone also offers published versions in Settings → App Update. Commit the 
 **Critical rules** (details in `docs/release.md`):
 - `:app` and `:wear` must be signed with the **same key**, or every watch→phone message is silently dropped.
 - Release builds run R8 (phone flavor: pass-through via `proguard-phone.pro`); kiosk/TV deploy scripts also force AOT compilation.
-- The Gradle daemon runs on JDK 21 (`gradle/gradle-daemon-jvm.properties`; a JDK outside the usual places: `org.gradle.java.installations.paths` in `~/.gradle/gradle.properties`); `gradle.properties` turns on the build cache, configuration cache and parallel builds; keep build logic configuration-cache safe (no `project` access at execution time).
-- A deployment's setup lives in its site, which the build reads when present: `../site/android.env` (`SERVER_URL`, `LAN_DNS_SERVERS`), `tv-defaults.json`, `google-services.json` (direct push). Release signing stays in the gitignored `keystore.properties` — `docs/release.md` → Your site.
+- The Gradle daemon runs on JDK 21 (`gradle/gradle-daemon-jvm.properties`, downloaded through its `toolchainUrl.*` entries when the machine has none; regenerate them with `./gradlew updateDaemonJvm --jvm-version=21`); `gradle.properties` turns on the build cache, configuration cache and parallel builds; keep build logic configuration-cache safe (no `project` access at execution time).
+- Release builds reach the server over **HTTPS only**; debug builds also allow plain http (`src/debug`). A LAN server without TLS: `ALLOW_CLEARTEXT=true` in your site's `android.env` (`docs/release.md` → HTTPS).
+- A deployment's setup lives in its site, which the build reads when present: `../site/android.env` (`SERVER_URL`, `LAN_DNS_SERVERS`, `ALLOW_CLEARTEXT`), `tv-defaults.json`, `google-services.json` (direct push). Release signing stays in the gitignored `keystore.properties` — `docs/release.md` → Your site.
 
 ## Architecture (shared)
 
@@ -110,7 +113,7 @@ The phone also offers published versions in Settings → App Update. Commit the 
 | `docs/wear.md` | Watch app: performance rules, hands-free turns, phone bridge, alarm, tiles / complications, the Shopping screen (and its debug fake phone) |
 | `docs/kiosk.md` | Wall-tablet kiosk, wake word, voice turn tuning |
 | `docs/tv.md` | Dana TV: home override, key service, camera PiP, TCL/MTK quirks |
-| `docs/release.md` | Signing, in-app updates, R8/AOT, JDK, local defaults (Firebase config, server URL, TV defaults) |
+| `docs/release.md` | Setup (SDK, JDK), HTTPS / cleartext, signing, in-app updates, R8/AOT, local defaults (Firebase config, server URL, TV defaults) |
 | `DESIGN.md` | "Ink & Paper" design system |
 
 Keep docs current in the same commit as the code; add new areas as a doc + one line here rather than growing this file.

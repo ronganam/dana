@@ -35,6 +35,7 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.Dana"
+        android:usesCleartextTraffic="${usesCleartextTraffic}"
         tools:targetApi="36">
 
         <!-- WorkManager starts on demand from DanaApp (Configuration.Provider),

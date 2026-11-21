@@ -40,9 +40,17 @@ bin/deploy-app.sh --watch-ip <watch-ip>:5555    # wear APK; uses adb wireless de
 - **Timing a wake**: `adb logcat -s DanaPerf` (`wake/OpenTimer.kt`) logs each open from "Hey Dana" or a button to: activity created, session open, mic stream opened, sheet first frame, transcript shown, reply text shown.
 - Sheet performance rules: read infinite-animation values only in draw/layer lambdas (`Canvas`, `graphicsLayer`), never in composition (`VoiceDial`, the header's live dot), and don't bind services when the sheet opens (`TapToSpeech` binds TTS on the first tap). An empty conversation is reused on the next open, not replaced with a new server session.
 
-## JDK requirement
+## Setup
 
-The Gradle daemon runs on JDK 21 (`gradle/gradle-daemon-jvm.properties`); Gradle finds it in the usual places (`/usr/lib/jvm`, SDKMAN, Android Studio's JBR…). A JDK elsewhere: add `org.gradle.java.installations.paths=/path/to/jdk21` to `~/.gradle/gradle.properties`.
+- **Android SDK**: Gradle needs to know where it is — `export ANDROID_HOME=~/Android/Sdk` (Android Studio's default location on Linux; `~/Library/Android/sdk` on macOS), or a gitignored `local.properties` in `android/` with the single line `sdk.dir=/path/to/Android/Sdk` (Android Studio writes it when it opens the project). The build installs missing SDK platforms / build tools itself when the SDK licenses are accepted (`sdkmanager --licenses`).
+- **JDK 21**: the Gradle daemon runs on it (`gradle/gradle-daemon-jvm.properties`). Gradle finds an installed one in the usual places (`/usr/lib/jvm`, SDKMAN, Android Studio's JBR…); a JDK elsewhere: `org.gradle.java.installations.paths=/path/to/jdk21` in `~/.gradle/gradle.properties`. With none, Gradle downloads one through the file's `toolchainUrl.*` entries (the foojay resolver in `settings.gradle.kts` does the same for compile toolchains). Regenerate the entries with `./gradlew updateDaemonJvm --jvm-version=21`.
+- Any JDK can start `./gradlew`; only the daemon needs 21.
+
+## HTTPS
+
+Release builds talk to the server over HTTPS only (Android's default: cleartext traffic is refused). Debug builds also allow plain http (`app/src/debug/res/xml/network_security_config.xml`), for emulators and local servers (`http://10.0.2.2:8080`).
+
+A self-hosted server on a LAN without TLS: set `ALLOW_CLEARTEXT=true` in your site's `android.env`; your release build of `:app` then sets `android:usesCleartextTraffic="true"` (the `usesCleartextTraffic` manifest placeholder in `app/build.gradle.kts`). The token travels in the clear on that network — prefer TLS (a reverse proxy with a certificate, or a VPN such as Tailscale with HTTPS). The watch reaches the server through the phone, so it needs nothing.
 
 ## Your site
 
@@ -50,7 +58,7 @@ What belongs to one deployment lives in its site folder (`../site/` at the repos
 
 | Site file | What |
 |---|---|
-| `android.env` | `SERVER_URL`: the server a fresh app / kiosk / TV starts with (`BuildConfig.DEFAULT_SERVER_URL`), and where `bin/deploy-app.sh` publishes. `LAN_DNS_SERVERS`: comma-separated LAN resolvers for the TV (`docs/tv.md` → LanDns). For `bin/deploy-*.sh`: `APP_PUBLISH_TOKEN` or `APP_PUBLISH_TOKEN_CMD`, `TV_SERIAL`, `KIOSK_SERIAL`, `WATCH_IP`. |
+| `android.env` | `SERVER_URL`: the server a fresh app / kiosk / TV starts with (`BuildConfig.DEFAULT_SERVER_URL`), and where `bin/deploy-app.sh` publishes. `LAN_DNS_SERVERS`: comma-separated LAN resolvers for the TV (`docs/tv.md` → LanDns). `ALLOW_CLEARTEXT=true`: release builds may reach a plain-http server (above, HTTPS). `PHONE_AVD` / `WATCH_AVD`: the emulators `bin/dev-install.sh` boots. For `bin/deploy-*.sh`: `APP_PUBLISH_TOKEN` or `APP_PUBLISH_TOKEN_CMD`, `TV_SERIAL`, `KIOSK_SERIAL`, `WATCH_IP`. |
 | `tv-defaults.json` | The TV's first-run home screen (apps, Home Assistant entities, cameras, remote bindings) in `TvConfig`'s JSON shape (`BuildConfig.TV_DEFAULTS_JSON`). |
 | `google-services.json` | Your Firebase project's Android config (package `io.github.ronganam.dana`), for direct push (FCM; the server's side: `server/docs/notifications.md`). `app/src/phone/google-services.json` is read when the site has none. Without either, the phone builds and works, with no direct push. |
 
