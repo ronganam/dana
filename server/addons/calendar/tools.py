@@ -8,8 +8,9 @@ from typing import Optional, Any, Dict
 from core import clock
 from core.undoable import UndoConflict, safe_record
 from core.users import User
-from core.addons import Connection, store
-from addons.calendar import client
+from core.addons import Approval, Connection, helpers, store
+from core.addons.hooks import clean
+from addons.calendar import client, today as calendar_today
 from addons.calendar.config import ADDON
 from addons.calendar.addon import addon
 
@@ -204,7 +205,70 @@ def _undo_update_event(user: User, calendar_id: str, event_id: str, previous: Di
     return _undo
 
 
-@addon.tool(is_write=True, confirm=_invites_people)
+def _when(value: Any) -> str:
+    raw = clean(value, 40)
+    if not raw:
+        return ""
+    try:
+        dt = datetime.datetime.fromisoformat(raw.replace("Z", "+00:00").replace(" ", "T", 1))
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=clock.get_timezone())
+        return helpers.when_phrase(dt)
+    except Exception:
+        return raw
+
+
+def _span(start: Any, end: Any) -> str:
+    a, b = _when(start), _when(end)
+    if a and b:
+        head, _, a_hm = a.rpartition(" ")
+        b_head, _, b_hm = b.rpartition(" ")
+        if head == b_head and a_hm and b_hm:
+            return f"{a}–{b_hm}"
+        return f"{a} – {b}"
+    return a or b
+
+
+def _event_title(user: Optional[User], event_id: Any) -> str:
+    try:
+        for e in calendar_today.cached_events(user):
+            if e.get("id") == event_id:
+                return e.get("title") or ""
+    except Exception:
+        pass
+    return ""
+
+
+def _describe_add_event(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    name = a.get("summary") or ""
+    invites = clean(a.get("attendees"), 300)
+    q = f"“{clean(name or 'an event', 80)}”"
+    title = f"Invite {invites} to {q}" if invites else f"Add {q} to the calendar"
+    return Approval(title, "Calendar event", "📅", "Add this event?", body_label="Description",
+                    body=a.get("description"),
+                    facts=[("When", _span(a.get("start_time"), a.get("end_time"))), ("Where", a.get("location"))])
+
+
+def _describe_update_event(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    name = a.get("summary") or _event_title(user, a.get("event_id")) or ""
+    invites = clean(a.get("attendees") or a.get("add_attendees"), 300)
+    title = f"Change “{clean(name, 80)}” in the calendar" if name else "Change a calendar event"
+    if invites:
+        title += f" and invite {invites}"
+    return Approval(title, "Change calendar event", "📅", "Make this change?", body_label="Description",
+                    body=a.get("description"),
+                    facts=[("When", _span(a.get("start_time"), a.get("end_time"))), ("Where", a.get("location")),
+                           ("New title", a.get("summary"))])
+
+
+def _describe_delete_event(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    name = _event_title(user, a.get("event_id"))
+    return Approval(f"Delete “{clean(name, 80)}” from the calendar" if name else "Delete an event from the calendar",
+                    "Delete calendar event", "❌", "Delete this event?",
+                    facts=[] if name else [("Event", a.get("event_id"))])
+
+
+@addon.tool(is_write=True, confirm=_invites_people, describe=_describe_add_event)
 def add_event(
     conn: Connection,
     summary: str,
@@ -273,7 +337,7 @@ def add_event(
         return f"Error adding event to Google Calendar: {e}"
 
 
-@addon.tool(is_write=True, confirm=_invites_people)
+@addon.tool(is_write=True, confirm=_invites_people, describe=_describe_update_event)
 def update_event(
     conn: Connection,
     event_id: str,
@@ -384,7 +448,7 @@ def update_event(
         return f"Error updating Google Calendar event with ID '{event_id}': {e}"
 
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=_describe_delete_event)
 def delete_event(conn: Connection, event_id: str) -> str:
     """Delete an existing event from your personal calendar by its event ID.
 

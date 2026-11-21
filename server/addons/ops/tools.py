@@ -5,10 +5,11 @@ import resource
 import subprocess
 import sys
 import tempfile
-from typing import Optional
+from typing import Any, Dict, Optional
 
 import httpx
-from core.addons import Connection
+from core.addons import Approval, Connection
+from core.users import User
 from addons.ops.addon import addon
 
 logger = logging.getLogger(__name__)
@@ -60,7 +61,12 @@ def _verify() -> bool:
     return API_BASE is not None and _load_sa_token() is not None
 
 
-@addon.tool(acts_outside=True)
+def _describe_kubectl(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    return Approval("Run kubectl on the cluster", "Cluster", "⚙️", "Run this command?",
+                    body_label="Command", body=a.get("command"), facts=[("Namespace", a.get("namespace"))])
+
+
+@addon.tool(acts_outside=True, describe=_describe_kubectl)
 async def run_kubectl(
     conn: Connection,
     command: str,
@@ -454,7 +460,11 @@ def child_environment(workdir: str) -> dict:
             "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1"}
 
 
-@addon.tool(confirm=True, acts_outside=True)
+def _describe_python(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    return Approval("Run Python code", "Code", "🐍", "Run this code?", body_label="Code", body=a.get("code"))
+
+
+@addon.tool(confirm=True, acts_outside=True, describe=_describe_python)
 def run_python(conn: Connection, code: str, timeout: Optional[int] = None) -> str:
     """Run Python code on the server (asks the user first) and return its output.
 

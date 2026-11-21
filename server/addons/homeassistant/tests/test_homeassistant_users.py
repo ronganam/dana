@@ -500,15 +500,16 @@ async def test_watcher() -> None:
         await HA_A.set_state("person.robin", "Work")
         check("B down: the admin's watcher still fires", await until(
             lambda: fired(ADMIN) == [("location", "leave", "Gym"), ("location", "arrive", "Work")]), FIRED)
-        saved = checks.HA_WATCHER_MINUTES
-        checks.HA_WATCHER_MINUTES = 0
+        from addons.homeassistant import hooks as ha_hooks
+        saved = ha_hooks.HA_WATCHER_MINUTES
+        ha_hooks.HA_WATCHER_MINUTES = 0
         try:
             cs = checks_of(BOB)
             check("checks: a disconnected watcher → not ok", not cs["ha_watcher"]["ok"]
                   and cs["ha_watcher"]["detail"].startswith("disconnected for"), cs["ha_watcher"])
             check("checks: the admin's watcher unaffected", checks_of(ADMIN)["ha_watcher"]["ok"])
         finally:
-            checks.HA_WATCHER_MINUTES = saved
+            ha_hooks.HA_WATCHER_MINUTES = saved
         HA_B.down = False
         check("B back: Bob's watcher reconnects by itself", await until(lambda: ha_status.read(BOB.id).connected, 5))
 

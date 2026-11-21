@@ -8,7 +8,9 @@ from typing import Any, Dict, List, Optional
 
 from addons.contacts import client, enrich, store
 from addons.contacts.addon import addon
-from core.addons import Connection
+from core.addons import Approval, Connection
+from core.addons.hooks import clean
+from core.users import User
 from addons.people.values import norm_phone, shown_phone, valid_birthday
 
 logger = logging.getLogger(__name__)
@@ -155,7 +157,33 @@ def _changes(contact: store.Contact, *, name: Optional[str], add_phone: Optional
     return fields
 
 
-@addon.tool(is_write=True, confirm=True)
+def _contact_name(user: Optional[User], contact_id: Any) -> str:
+    try:
+        contact = store.get(user, contact_id) if user is not None else None
+        return (contact or {}).get("name") or ""
+    except Exception:
+        return ""
+
+
+def _describe_update_contact(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    name = _contact_name(user, a.get("contact_id"))
+    return Approval(f"Change {name} in Google Contacts" if name else "Change a Google contact", "Change contact",
+                    "👤", "Make this change?",
+                    facts=[("Contact", "" if name else a.get("contact_id")), ("New name", a.get("name")),
+                           ("Add number", a.get("add_phone")), ("Remove number", a.get("remove_phone")),
+                           ("Add email", a.get("add_email")), ("Remove email", a.get("remove_email")),
+                           ("Birthday", "remove" if a.get("birthday") == "" else a.get("birthday")),
+                           ("Organisation", "remove" if a.get("organisation") == "" else a.get("organisation"))])
+
+
+def _describe_add_contact(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    return Approval(f"Add {clean(a.get('name'), 80) or 'a contact'} to Google Contacts", "New contact", "👤",
+                    "Add this contact?",
+                    facts=[("Phone", a.get("phone")), ("Email", a.get("email")), ("Birthday", a.get("birthday")),
+                           ("Organisation", a.get("organisation"))])
+
+
+@addon.tool(is_write=True, confirm=True, describe=_describe_update_contact)
 async def update_contact(conn: Connection, contact_id: str, name: Optional[str] = None,
                          add_phone: Optional[str] = None, remove_phone: Optional[str] = None,
                          add_email: Optional[str] = None, remove_email: Optional[str] = None,
@@ -207,7 +235,7 @@ async def update_contact(conn: Connection, contact_id: str, name: Optional[str] 
     return f"Updated in Google Contacts:\n{_full(saved)}"
 
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=_describe_add_contact)
 async def add_contact(conn: Connection, name: str, phone: Optional[str] = None, email: Optional[str] = None,
                       birthday: Optional[str] = None, organisation: Optional[str] = None) -> str:
     """Add a new contact to the user's Google Contacts (the user approves it first). Search first: change an existing contact with update_contact instead of adding a second one.

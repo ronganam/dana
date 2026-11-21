@@ -11,7 +11,7 @@ from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Sequ
 
 from core.undoable import UndoConflict, safe_record
 from core.users import User
-from core.addons import Connection, NotConnected, store
+from core.addons import Approval, Connection, NotConnected, store
 from addons.gmail import client, compose, content, seen
 from addons.gmail.client import ME
 from addons.gmail.config import (BODY_MAX_CHARS, ADDON, MAX_BATCH, MAX_RESULTS, RESULT_MAX_CHARS,
@@ -252,7 +252,44 @@ def _went_to(message: compose.Outgoing) -> str:
     return out
 
 
-@addon.tool(is_write=True, confirm=True)
+_RECIPIENTS_LIMIT = 4000
+
+
+def _recipients(value: Any, field: str) -> str:
+    if value in (None, "", []):
+        return ""
+    return compose.shown(value, field) or f"{content.one_line(value, 300)} (not a valid address)"
+
+
+def _describe_send_email(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    to = _recipients(a.get("to"), "to")
+    return Approval(f"Send an email to {to or 'nobody'}", "Email", "✉️", "Send this email?",
+                    body_label="Message", body=a.get("body"),
+                    facts=[("Subject", content.one_line(a.get("subject")) or "(no subject)"),
+                           ("Cc", _recipients(a.get("cc"), "cc")), ("Bcc", _recipients(a.get("bcc"), "bcc"))],
+                    fact_limit=_RECIPIENTS_LIMIT)
+
+
+def _describe_reply_to_email(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    everyone = compose.flag(a.get("reply_all"))
+    try:
+        original = seen.get(user, a.get("message_id"))
+        conn = store.get(user, ADDON) if user is not None and original else None
+        reply = compose.reply(original, (conn.account if conn else "") or "", a.get("body"), everyone) \
+            if original else None
+    except Exception:
+        reply = None
+    if reply is None:
+        return Approval("Reply to an email" + (" (to everyone on it)" if everyone else ""), "Email reply", "✉️",
+                        "Send this reply?", body_label="Reply", body=a.get("body"),
+                        facts=[("Message", a.get("message_id"))])
+    return Approval(f"Reply to {content.show_all(reply.to, limit=len(reply.to))}", "Email reply", "✉️",
+                    "Send this reply?", body_label="Reply", body=a.get("body"),
+                    facts=[("Subject", reply.subject), ("Cc", content.show_all(reply.cc, limit=len(reply.cc)))],
+                    fact_limit=_RECIPIENTS_LIMIT)
+
+
+@addon.tool(is_write=True, confirm=True, describe=_describe_send_email)
 @_guarded("sending the email")
 async def send_email(conn: Connection, to: str, subject: str, body: str, cc: Optional[str] = None,
                      bcc: Optional[str] = None) -> str:
@@ -281,7 +318,7 @@ def _reply(conn: Connection, message_id: str, body: str, reply_all: bool) -> Tup
     return message, svc.users().messages().send(userId=ME, body=compose.body_for(message)).execute()
 
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=_describe_reply_to_email)
 @_guarded("sending the reply")
 async def reply_to_email(conn: Connection, message_id: str, body: str, reply_all: bool = False) -> str:
     """Reply to an email the user received, in the same conversation (the subject and the threading

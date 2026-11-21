@@ -201,11 +201,11 @@ def test_composers() -> None:
           and context_chats.context_prompt(ROBIN, {"kind": "hk", "ref_id": "9"}) == f"About hk 9 for {ROBIN.name}.")
     try:
         context_chats.build_chat_context(MAYA, "hk", "9")
-        hidden = False
-    except LookupError:
-        hidden = True
-    check("context card: not found for a user without the addon; no prompt either",
-          hidden and context_chats.context_prompt(MAYA, {"kind": "hk", "ref_id": "9"}) is None)
+        refused = False
+    except store.NotConnected:
+        refused = True
+    check("context card: NotConnected for a user without the addon; no prompt either",
+          refused and context_chats.context_prompt(MAYA, {"kind": "hk", "ref_id": "9"}) is None)
     check("self-check: listed with its label, applies only to users who have it",
           "hk_check" in checks.keys_for(ROBIN) and "hk_check" not in checks.keys_for(MAYA)
           and checks.label_of("hk_check") == "Hk check")

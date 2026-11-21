@@ -48,6 +48,16 @@ def parse_time(value: Any) -> Optional[datetime.datetime]:
     return dt.astimezone(clock.get_timezone())
 
 
+def span(seconds: float) -> str:
+    """'4 min' / '14 h' / '3 days'."""
+    seconds = max(0.0, seconds)
+    if seconds < 3600:
+        return f"{max(1, int(seconds // 60))} min"
+    if seconds < 48 * 3600:
+        return f"{int(seconds // 3600)} h"
+    return f"{int(seconds // 86400)} days"
+
+
 def ago(dt: Optional[datetime.datetime], now: Optional[datetime.datetime] = None) -> str:
     """'just now' / '3h ago' / 'yesterday' / '12 days ago' / '3 months ago' ("" without a time)."""
     if not dt:
@@ -143,6 +153,11 @@ def like_pattern(q: str) -> str:
 def search_terms(q: str) -> List[str]:
     """The words of a query (at most 8), Hebrew and English."""
     return [t for t in re.findall(r"\w+", q or "", flags=re.UNICODE) if t][:8]
+
+
+def fts_query(q: str) -> str:
+    """FTS5 prefix query for the words in ``q``."""
+    return " ".join(f'"{t}"*' for t in search_terms(q))
 
 
 def match_score(title: str, q: str) -> float:

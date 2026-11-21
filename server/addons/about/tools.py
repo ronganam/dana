@@ -1,12 +1,14 @@
 import logging
-from typing import Callable, Literal, Optional
+from typing import Any, Callable, Dict, Literal, Optional
 
 from core import undo
 from core.text import escape_markdown
+from core.users import User
 from addons.about import facts, legacy
 from addons.about.addon import addon
 from addons.about.values import FACT_MAX_CHARS, SECTIONS, clean_text, looks_sensitive, section_for_category
-from core.addons import Connection
+from core.addons import Approval, Connection
+from core.addons.hooks import clean
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +40,18 @@ def _fmt_fact(f: dict) -> str:
 # acts_outside: a remembered fact is put into every later prompt, so in a turn
 # that carries untrusted content (a shared phone screen) saving one asks first;
 # text on a page must not be able to plant something Dana then "knows".
-@addon.tool(acts_outside=True)
+def _describe_remember(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    what = a.get("fact") or a.get("key")
+    return Approval(f"Remember “{clean(what, 80)}”", "Memory", "🧠", "Save this?",
+                    body_label="Value", body=a.get("value"))
+
+
+def _describe_forget(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    what = a.get("fact") or a.get("key")
+    return Approval(f"Forget “{clean(what, 80)}”", "Memory", "🧠", "Forget this?")
+
+
+@addon.tool(acts_outside=True, describe=_describe_remember)
 async def remember_info(conn: Connection, fact: str = "", section: Optional[Section] = None, replaces: Optional[str] = None,
                         **kwargs) -> str:
     """Save a durable fact about the owner in "About you". It is kept at once (no approval) and the owner gets an Undo button.
@@ -115,7 +128,7 @@ async def recall_info(conn: Connection, query: str) -> str:
         return f"Error recalling facts: {e}"
 
 
-@addon.tool()
+@addon.tool(describe=_describe_forget)
 async def forget_info(conn: Connection, fact: str = "", **kwargs) -> str:
     """Remove a fact from "About you" when the owner asks you to forget it or says it is wrong. It is removed at once (Undo is offered) and will not be learned again.
 

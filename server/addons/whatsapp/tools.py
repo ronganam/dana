@@ -5,16 +5,76 @@ on a project item (``save_whatsapp_file``, docs/knowledge.md "Files").
 ``get_latest_messages`` is in :mod:`addons.whatsapp.latest`."""
 
 import logging
-from typing import Optional
+import re
+from typing import Any, Dict, Optional
 
 import httpx
 
 from core import clock
-from core.addons import Connection
+from core.addons import Approval, Connection
+from core.addons.hooks import clean
+from core.users import User
 from addons.whatsapp import client as waha, contacts as saved_contacts, messages as messages_fmt, resolve
 from addons.whatsapp.addon import addon
 
 logger = logging.getLogger(__name__)
+
+
+def _whatsapp_who(user: Optional[User], chat_id: Any) -> str:
+    """A WhatsApp chat id as a person: a name as given, a known number as the
+    person's name, else the number; groups by id → 'a WhatsApp group'."""
+    raw = clean(chat_id, 120)
+    if not raw:
+        return "someone"
+    if raw.endswith("@g.us"):
+        return "a WhatsApp group"
+    if "@" not in raw and not re.fullmatch(r"[\d\s+\-()]+", raw):
+        return raw
+    digits = re.sub(r"\D", "", raw.split("@")[0])
+    if user is not None and digits:
+        try:
+            from addons.people import store as people_store
+            pid = people_store.find_by_phone(user, digits)
+            name = people_store.name_of(user, pid) if pid else None
+            if name:
+                return name
+        except Exception:
+            pass
+    return f"+{digits}" if digits else raw
+
+
+def _whatsapp_source(user: Optional[User], message_id: Any) -> str:
+    parts = clean(message_id, 200).split("_")
+    if len(parts) < 3 or "@" not in parts[1] or parts[1].endswith("@lid"):
+        return ""
+    return _whatsapp_who(user, parts[1])
+
+
+def _describe_send(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    return Approval(f"Send a WhatsApp message to {_whatsapp_who(user, a.get('chat_id'))}", "WhatsApp message", "💬",
+                    "Send this WhatsApp message?", body_label="Message", body=a.get("text"))
+
+
+def _describe_file(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    return Approval(f"Send a file on WhatsApp to {_whatsapp_who(user, a.get('chat_id'))}", "WhatsApp file", "💬",
+                    "Send this file?", body_label="Caption", body=a.get("caption"),
+                    facts=[("File", a.get("filename") or a.get("file_url")), ("Type", a.get("mimetype"))])
+
+
+def _describe_forward(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    return Approval(f"Forward a WhatsApp message to {_whatsapp_who(user, a.get('chat_id'))}", "Forward on WhatsApp", "💬",
+                    "Forward this message?", body_label="What", body=a.get("what"),
+                    facts=[("From", _whatsapp_source(user, a.get("message_id")))])
+
+
+def _describe_edit(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    return Approval(f"Edit your WhatsApp message to {_whatsapp_who(user, a.get('chat_id'))}", "Edit WhatsApp message",
+                    "💬", "Edit this message?", body_label="New text", body=a.get("new_text"))
+
+
+def _describe_delete(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    return Approval(f"Delete your WhatsApp message to {_whatsapp_who(user, a.get('chat_id'))}",
+                    "Delete WhatsApp message", "💬", "Delete this message for everyone?")
 
 
 @addon.tool(untrusted_result=True)
@@ -263,7 +323,7 @@ async def read_chat_messages(conn: Connection, chat_id: str, limit: int = 10) ->
             return f"Error connecting to WAHA API: {err_msg}"
 
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=_describe_send)
 async def send_whatsapp_message(conn: Connection, chat_id: str, text: str, reply_to: Optional[str] = None) -> str:
     """Send a WhatsApp text message to a chat by contact/group name or chat ID.
 
@@ -370,7 +430,7 @@ async def check_whatsapp_number(conn: Connection, phone: str) -> str:
             return f"Error connecting to WAHA API: {err_msg}"
 
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=_describe_file)
 async def send_whatsapp_file(
     conn: Connection,
     chat_id: str,
@@ -438,7 +498,7 @@ async def send_whatsapp_file(
             return f"Error connecting to WAHA API: {err_msg}"
 
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=_describe_forward)
 async def forward_whatsapp_message(conn: Connection, chat_id: str, message_id: str,
                                    what: Optional[str] = None) -> str:
     """Forward a WhatsApp message to another chat exactly as it is: a file (PDF, document),
@@ -488,7 +548,7 @@ async def forward_whatsapp_message(conn: Connection, chat_id: str, message_id: s
             return f"Error connecting to WAHA API: {err_msg}"
 
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=_describe_edit)
 async def edit_whatsapp_message(conn: Connection, chat_id: str, message_id: str, new_text: str) -> str:
     """Edit a WhatsApp text message previously sent.
 
@@ -527,7 +587,7 @@ async def edit_whatsapp_message(conn: Connection, chat_id: str, message_id: str,
             return f"Error connecting to WAHA API: {err_msg}"
 
 
-@addon.tool(is_write=True, confirm=True)
+@addon.tool(is_write=True, confirm=True, describe=_describe_delete)
 async def delete_whatsapp_message(conn: Connection, chat_id: str, message_id: str) -> str:
     """Delete (revoke) a sent message from a WhatsApp chat.
 

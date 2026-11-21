@@ -5,13 +5,14 @@ docs/access.md, "Sharing"). Data access lives in :mod:`.projects` and
 """
 
 import logging
-from typing import Callable, Optional
+from typing import Any, Callable, Dict, Optional
 
 from core import outbound, undoable
 from core.db import get_db_connection
 from core.text import escape_markdown
 from core.users import User
-from core.addons import Connection, sharing
+from core.addons import Approval, Connection, sharing
+from core.addons.hooks import clean
 from addons.knowledge import entries, files, projects, sections
 from addons.knowledge.entries import ENTRY_COLUMNS
 from addons.knowledge.addon import addon
@@ -453,7 +454,14 @@ async def update_project(conn: Connection, project_id: str, title: Optional[str]
         return f"Error updating project: {e}"
 
 
-@addon.tool(is_write=True, confirm=True)
+def _describe_delete_project(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    project = projects.get_project(user, clean(a.get("project_id"), 200))
+    name = (project.get("title") or "") if project else ""
+    return Approval(f"Delete the project “{clean(name, 80)}” and everything in it" if name else "Delete a project",
+                    "Delete project", "❌", "Delete this project?")
+
+
+@addon.tool(is_write=True, confirm=True, describe=_describe_delete_project)
 async def delete_project(conn: Connection, project_id: str) -> str:
     """Delete a project and its associated entries and tasks.
 
@@ -528,7 +536,14 @@ async def update_knowledge_item(conn: Connection, item_id: str, title: Optional[
         return f"Error updating knowledge item: {e}"
 
 
-@addon.tool(is_write=True, confirm=True)
+def _describe_delete_item(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    entry = entries.entry_row(user, clean(a.get("item_id"), 200))
+    name = (entry.get("title") or "") if entry else ""
+    return Approval(f"Delete the note “{clean(name, 80)}”" if name else "Delete a note", "Delete note", "❌",
+                    "Delete this note?")
+
+
+@addon.tool(is_write=True, confirm=True, describe=_describe_delete_item)
 async def delete_knowledge_item(conn: Connection, item_id: str) -> str:
     """Delete a specific knowledge entry.
 
