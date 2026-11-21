@@ -7,11 +7,12 @@ How to iterate on Dana quickly without losing quality. It covers the inner loop,
 | Step | Command | Time |
 |---|---|---|
 | While editing | `bin/test --changed` (only the scripts touched by, or importing, what changed) or `bin/test <word>` | seconds |
-| Before a commit | `bin/test` (everything, side by side; prints only failures) | ~1.5 min |
+| Before a commit | `bin/test` (everything, side by side; prints only failures) | ~75 s (16 threads) |
 | On push to master | the pre-push hook runs `bin/test` (and the image's test stage when the Dockerfile or requirements change), then `bin/deploy` builds and deploys (when the site has a `deploy.env`), all on your machine | ~2.5 min + rollout |
 
 - Don't run the suite "to see where we are" at the start of a task. The last commit passed the suite, so a failure you see is yours.
 - A script that fails once in parallel and passes alone is reported as **flaky**, not failed. Look at it when it happens often, but it doesn't block.
+- Measured on 2026-11-21 on 16 threads: 72 scripts in 74-75 s, longest `test_composers_users` (~45 s), `test_addon_loading` (~40 s) and `test_imports` (~30 s: fork servers that load LiteLLM, aiogram and Telethon once, then fork a child per module). The first run after installing is a few seconds slower (78 s measured) because Python compiles the libraries' bytecode once; fewer cores take longer.
 - `bin/test` runs one script per CPU, fewer when free memory is short (about 400 MB each). With emulators, Gradle or a Docker build running, don't start a second suite (a local `bin/test` and `docker build --target test` at once); run them one after the other.
 - `bin/test --list` says what each script covers. Read it to find the script for an area instead of searching the code.
 - **Running the real server:**

@@ -12,7 +12,7 @@ Clients of this server's payloads: the Android app / tablet / TV / watch (`../an
 python3 -m venv .venv            # Python 3.12+ (3.14 is what the image and the tests run)
 .venv/bin/pip install -r requirements.lock   # then always use .venv/bin/python (system python lacks deps)
 cp .env.example .env  # required: ANTHROPIC_API_KEY and API_TOKEN; optional: GEMINI_API_KEY (transcription), TELEGRAM_BOT_TOKEN
-bin/test                       # the whole suite in parallel (~1.5 min)
+bin/test                       # the whole suite in parallel (~75 s on 16 threads; docs/development.md)
 python main.py                 # run Telegram bot + web UI on :8080
 ```
 

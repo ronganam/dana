@@ -6,8 +6,16 @@ the pod starts, where it kills the process with a NameError at import time.
 
 This walks the same import sequence in a throwaway subprocess so any module that
 cannot even be imported is caught here instead of in production.
+
+Each check still starts from an interpreter where none of the app's modules is
+loaded: a few fork servers (subprocesses) import the heavy third-party
+libraries once (LiteLLM, aiogram, Telethon… several seconds each) and fork a
+child per check. A preloaded library binds no name in an app module, so a
+missing import fails exactly as before. Without ``os.fork`` every check is its
+own subprocess (slower).
 """
 
+import json
 import os
 import pathlib
 import re
@@ -43,31 +51,83 @@ failures = []
 # first time a tool schema, pydantic or get_type_hints() reads that annotation —
 # in the pod, at an unlucky moment. Calling get_type_hints() on everything here
 # makes that failure happen in the test instead.
-RESOLVE = """
-import importlib, inspect, typing, sys
-mod = importlib.import_module(sys.argv[1])
-bad = []
-for name, obj in list(vars(mod).items()):
-    targets = []
-    if inspect.isfunction(obj) and obj.__module__ == mod.__name__:
-        targets.append(obj)
-    elif inspect.isclass(obj) and obj.__module__ == mod.__name__:
-        targets.append(obj)
-        targets.extend(m for m in vars(obj).values()
-                       if inspect.isfunction(m))
-    for t in targets:
-        try:
-            typing.get_type_hints(t)
-        except Exception as e:
-            bad.append('%s:%s -> %s: %s' % (mod.__name__,
-                                           getattr(t, '__qualname__', t),
-                                           type(e).__name__, e))
+RESOLVE_FN = """
+import importlib, inspect, typing
+def resolve(module):
+  mod = importlib.import_module(module)
+  bad = []
+  for name, obj in list(vars(mod).items()):
+      targets = []
+      if inspect.isfunction(obj) and obj.__module__ == mod.__name__:
+          targets.append(obj)
+      elif inspect.isclass(obj) and obj.__module__ == mod.__name__:
+          targets.append(obj)
+          targets.extend(m for m in vars(obj).values()
+                         if inspect.isfunction(m))
+      for t in targets:
+          try:
+              typing.get_type_hints(t)
+          except Exception as e:
+              bad.append('%s:%s -> %s: %s' % (mod.__name__,
+                                             getattr(t, '__qualname__', t),
+                                             type(e).__name__, e))
+  return bad
+"""
+
+RESOLVE = RESOLVE_FN + """
+import sys
+bad = resolve(sys.argv[1])
 if bad:
     print('ANNOTATION_ERRORS')
     print(chr(10).join(bad))
     sys.exit(2)
 print('OK')
 """
+
+# The fork server: preloads the third-party libraries, then for each check (a JSON
+# line on stdin: [kind, name, db path]) forks a child that runs it and prints one
+# JSON line [name, error or null]; the server waits for each child in turn.
+PRELOAD = ("litellm", "aiogram", "telethon", "aiohttp", "httpx", "pydantic", "googleapiclient.discovery",
+           "google.oauth2.credentials", "cryptography.fernet")
+FORK_SERVER = RESOLVE_FN + """
+import importlib, json, os, sys
+for lib in %r:
+    try:
+        importlib.import_module(lib)
+    except Exception:
+        pass  # not installed: the check that needs it fails as it would have
+for line in sys.stdin:
+    kind, name, db = json.loads(line)
+    r, w = os.pipe()
+    pid = os.fork()
+    if pid == 0:
+        os.close(r)
+        os.environ['DATABASE_PATH'] = db
+        try:
+            if kind == 'module':
+                bad = resolve(name)
+                error = bad[-1] if bad else None
+            else:
+                for m in name.split(' '):
+                    importlib.import_module(m)
+                error = None
+        except BaseException as e:
+            error = '%%s: %%s' %% (type(e).__name__, e)
+        os.write(w, json.dumps(error).encode())
+        os._exit(0)
+    os.close(w)
+    chunks = []
+    while True:
+        chunk = os.read(r, 65536)
+        if not chunk:
+            break
+        chunks.append(chunk)
+    os.close(r)
+    _, status = os.waitpid(pid, 0)
+    raw = b''.join(chunks)
+    error = json.loads(raw) if raw else 'child died (status %%d)' %% status
+    print(json.dumps([name, error]), flush=True)
+""" % (PRELOAD,)
 
 def _run(argv: list[str], db_name: str) -> subprocess.CompletedProcess:
     env = dict(os.environ)
@@ -126,9 +186,40 @@ def _workers() -> int:
     return max(2, min((os.cpu_count() or 4) // 2, available_mb // 800))
 
 
-# Each check is its own fresh interpreter, so they run side by side; results print in order.
-with ThreadPoolExecutor(max_workers=_workers()) as pool:
-    results = list(pool.map(_check_module, CHECKS)) + list(pool.map(_check_order, ORDER_PAIRS))
+def _fork_server(jobs: list[tuple[str, str, str]]) -> dict[str, str | None]:
+    """Run ``jobs`` ([kind, name, db path]) in one fork server; name → error (None: passed)."""
+    proc = subprocess.run([sys.executable, "-B", "-c", FORK_SERVER], capture_output=True, text=True,
+                          input="".join(json.dumps(j) + "\n" for j in jobs), env=dict(os.environ))
+    out: dict[str, str | None] = {}
+    for line in proc.stdout.splitlines():
+        try:
+            name, error = json.loads(line)
+        except ValueError:
+            continue
+        out[name] = error
+    for _, name, _ in jobs:
+        if name not in out:
+            out[name] = "fork server: " + ((proc.stderr or "").strip().splitlines() or ["no output"])[-1]
+    return out
+
+
+def _forked() -> list[tuple[str, str | None]]:
+    jobs = [("module", m, testenv.scratch_path(f"smoke_{m}.sqlite3")) for m in CHECKS]
+    jobs += [("order", f"{a} {b}", testenv.scratch_path(f"smoke_order_{a}_{b}.sqlite3")) for a, b in ORDER_PAIRS]
+    n = _workers()
+    with ThreadPoolExecutor(max_workers=n) as pool:
+        found: dict[str, str | None] = {}
+        for part in pool.map(_fork_server, [jobs[i::n] for i in range(n)]):
+            found.update(part)
+    return ([(m, found[m]) for m in CHECKS]
+            + [(f"order: {a} then {b}", found[f"{a} {b}"]) for a, b in ORDER_PAIRS])
+
+
+if hasattr(os, "fork"):
+    results = _forked()
+else:  # each check its own interpreter, side by side
+    with ThreadPoolExecutor(max_workers=_workers()) as pool:
+        results = list(pool.map(_check_module, CHECKS)) + list(pool.map(_check_order, ORDER_PAIRS))
 for name, error in results:
     if error is None:
         print(f"[PASS] {name}")
