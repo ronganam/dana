@@ -9,13 +9,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** The places of the main screen. PROJECTS only for a user with the `knowledge` integration. */
+/** The places of the main screen. PROJECTS only for a user with the `knowledge` addon. */
 enum class Place(val label: String) {
     NOW("Now"), REMINDERS("Reminders"), NOTIFICATIONS("Notifications"), PROJECTS("Projects"), MORE("More")
 }
 
 /**
- * What More can open. SHOPPING (the `shopping` integration) and MONEY (`money`)
+ * What More can open. SHOPPING (the `shopping` addon) and MONEY (`money`)
  * take over the whole place with their own list and stage, with a way back to
  * More. SETTINGS opens from About you, MEMORY only from the old Settings link
  * (previous layout), REVIEW from its notification; none of them are rows of

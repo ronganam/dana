@@ -161,5 +161,5 @@ class AboutController(private val ctx: ControllerContext) {
     }
 
     private fun reason(e: Exception): String =
-        if (e is ApiException && e.code != 401 && e.code != 403) (e.message ?: describeError(e)).removePrefix("Undo failed: ") else describeError(e)
+        if (e is ApiException && e.code != 401 && e.code != 403) (e.message ?: ctx.texts.reason(e)).removePrefix("Undo failed: ") else ctx.texts.reason(e)
 }

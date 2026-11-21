@@ -39,7 +39,7 @@ import io.github.ronganam.dana.data.notifications.AppIcons
 import io.github.ronganam.dana.ui.components.*
 import io.github.ronganam.dana.ui.theme.DanaTheme
 import io.github.ronganam.dana.ui.theme.ThemeSettings
-import io.github.ronganam.dana.ui.viewmodels.describeError
+import io.github.ronganam.dana.ui.viewmodels.Texts
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -160,7 +160,7 @@ class SuggestionsPopupViewModel(app: Application) : AndroidViewModel(app) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (_items.value == null) _error.value = describeError(e)
+            if (_items.value == null) _error.value = Texts.of(getApplication()).reason(e)
         }
     }
 
@@ -176,7 +176,7 @@ class SuggestionsPopupViewModel(app: Application) : AndroidViewModel(app) {
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _toast.value = describeError(e)
+                _toast.value = Texts.of(getApplication()).reason(e)
             } finally {
                 _busy.value = _busy.value - id
             }

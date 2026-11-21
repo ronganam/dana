@@ -47,7 +47,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var apiService = serverConfig.api()
 
     private val userMessages = UserMessages()
-    private val ctx = ControllerContext(viewModelScope, userMessages) { apiService }
+    private val ctx = ControllerContext(viewModelScope, userMessages, Texts.of(appContext)) { apiService }
 
     /** One-shot error/info messages for a Snackbar. */
     val messages: SharedFlow<String> = userMessages.messages
@@ -69,7 +69,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** The Shopping screen (the list itself is shared with the widget and the watch: `ShoppingSync`). */
     val shoppingController = ShoppingController(ctx, appContext)
     val moneyController = MoneyController(ctx, appContext)
-    /** The add-ons the user has connected (`/api/me`), as they change: which places and More rows show. */
+    /** The addons the user has connected (`/api/me`), as they change: which places and More rows show. */
     val addons: kotlinx.coroutines.flow.StateFlow<Set<String>> = io.github.ronganam.dana.data.network.Me.addons(appContext)
     /** Navigation state of the new main screen (places, picks, thread sheet, on-screen context). */
     val shellController: ShellController = ShellController(
@@ -282,7 +282,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _wearUpdateInfo.value = UpdateManager.checkForUpdate(serverConfig.url, "wear")
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                android.util.Log.w("MainViewModel", "Update check failed: ${describeError(e)}")
+                android.util.Log.w("MainViewModel", "Update check failed: $e")
             } finally {
                 _updateCheckDone.value = true
             }

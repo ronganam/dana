@@ -1,10 +1,18 @@
 package io.github.ronganam.dana.money
 
+import io.github.ronganam.dana.data.money.EmptyJsonArray
 import io.github.ronganam.dana.data.money.MoneyCodes
 import io.github.ronganam.dana.data.money.MoneyCodes.Message
 import io.github.ronganam.dana.data.money.MoneySignals
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.data.money.longValue
+import io.github.ronganam.dana.data.money.string
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -52,7 +60,7 @@ class MoneyCodesTest {
         val bad = req.copy(regex = "(?P<code>\\d{6})")  // Python syntax: no compile on the JVM
         assertNull(MoneyCodes.compile(bad.regex))
         assertNull(MoneyCodes.match("BHapoalim", sms, bad, now))
-        val o = request().put("code_regex", "(?P<code>\\d{6})")
+        val o = request("code_regex" to JsonPrimitive("(?P<code>\\d{6})"))
         assertNull(MoneyCodes.parse("abc123def456", o, now))
     }
 
@@ -104,17 +112,17 @@ class MoneyCodesTest {
 
     @Test
     fun requestsNotToArm() {
-        assertNull(MoneyCodes.parse("x1234567", request().put("status", "done"), now))
-        assertNull(MoneyCodes.parse("x1234567", request().put("status", "expired"), now))
-        assertNull(MoneyCodes.parse("x1234567", request().put("senders", JSONArray()), now))
-        assertNull(MoneyCodes.parse("x1234567", request().put("expires_at", iso(now - 1_000)), now))
+        assertNull(MoneyCodes.parse("x1234567", request("status" to JsonPrimitive("done")), now))
+        assertNull(MoneyCodes.parse("x1234567", request("status" to JsonPrimitive("expired")), now))
+        assertNull(MoneyCodes.parse("x1234567", request("senders" to EmptyJsonArray), now))
+        assertNull(MoneyCodes.parse("x1234567", request("expires_at" to JsonPrimitive(iso(now - 1_000))), now))
     }
 
     @Test
     fun farOrMissingExpiryIsCapped() {
-        val far = MoneyCodes.parse("x1234567", request().put("expires_at", iso(now + 3_600_000)), now)
+        val far = MoneyCodes.parse("x1234567", request("expires_at" to JsonPrimitive(iso(now + 3_600_000))), now)
         assertEquals(now + MoneyCodes.MAX_ARMED_MS, far!!.expiresAt)
-        val none = MoneyCodes.parse("x1234567", request().put("expires_at", "garbage"), now)
+        val none = MoneyCodes.parse("x1234567", request("expires_at" to JsonPrimitive("garbage")), now)
         assertEquals(now + MoneyCodes.DEFAULT_LIFETIME_MS, none!!.expiresAt)
     }
 
@@ -139,17 +147,25 @@ class MoneyCodesTest {
     fun moneySignalHidesCodes() {
         val o = MoneySignals.build("0|com.onoapps.cal4u|1|null|10", "com.onoapps.cal4u", "Cal",
             "חיוב בכרטיס", "קוד אימות 482913 לעסקה של 120 ₪", now)!!
-        assertEquals("Cal", o.getString("app_name"))
-        assertEquals("קוד אימות [code] לעסקה של 120 ₪", o.getString("text"))
-        assertEquals(now, o.getLong("posted_at"))
-        assertEquals(setOf("key", "package", "app_name", "title", "text", "posted_at"), o.keys().asSequence().toSet())
+        assertEquals("Cal", o.string("app_name"))
+        assertEquals("קוד אימות [code] לעסקה של 120 ₪", o.string("text"))
+        assertEquals(now, o.longValue("posted_at"))
+        assertEquals(setOf("key", "package", "app_name", "title", "text", "posted_at"), o.keys)
         assertNull(MoneySignals.build("k", "com.max.android", "Max", " ", "", now))
         assertTrue("com.ideomobile.hapoalim" in MoneySignals.PACKAGES)
     }
 
-    private fun request() = JSONObject()
-        .put("id", "abc123def456").put("status", "pending").put("company", "hapoalim").put("company_name", "Bank Hapoalim")
-        .put("senders", JSONArray(listOf("BHapoalim"))).put("code_regex", hapoalimRegex).put("expires_at", iso(now + 200_000))
+    private fun request(vararg overrides: Pair<String, JsonElement>): JsonObject = JsonObject(
+        buildJsonObject {
+            put("id", "abc123def456")
+            put("status", "pending")
+            put("company", "hapoalim")
+            put("company_name", "Bank Hapoalim")
+            put("senders", buildJsonArray { add("BHapoalim") })
+            put("code_regex", hapoalimRegex)
+            put("expires_at", iso(now + 200_000))
+        } + overrides.toMap()
+    )
 
     /** The server's format: Python isoformat with an offset. */
     private fun iso(ms: Long) = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SSSxxx")

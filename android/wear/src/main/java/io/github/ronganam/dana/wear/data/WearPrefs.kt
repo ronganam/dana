@@ -2,7 +2,8 @@ package io.github.ronganam.dana.wear.data
 
 import android.content.Context
 import android.content.SharedPreferences
-import org.json.JSONArray
+import io.github.ronganam.dana.protocol.WearEvent
+import io.github.ronganam.dana.protocol.WearTaskItem
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -129,26 +130,14 @@ class WearPrefs(context: Context) {
         return null
     }
 
-    private fun getFilteredEvents(): JSONArray {
-        val result = JSONArray()
-        try {
-            val array = JSONArray(cachedEvents)
-            val now = Date().time
-            val graceMs = 30 * 60 * 1000L
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                if (obj.optBoolean("all_day", false)) continue
-                val endStr = obj.optString("end", "")
-                if (endStr.isNotEmpty()) {
-                    val endMs = parseIsoTime(endStr)
-                    if (endMs != null && now > endMs + graceMs) continue
-                }
-                result.put(obj)
-            }
-        } catch (e: org.json.JSONException) {
-            android.util.Log.w("WearPrefs", "Cached events aren't valid JSON", e)
+    private fun getFilteredEvents(): List<WearEvent> {
+        val now = Date().time
+        val graceMs = 30 * 60 * 1000L
+        return WearEvent.decodeList(cachedEvents).filter { event ->
+            if (event.allDay) return@filter false
+            val endMs = event.end.takeIf { it.isNotEmpty() }?.let(::parseIsoTime)
+            endMs == null || now <= endMs + graceMs
         }
-        return result
     }
 
     private fun formatTaskDate(dueDate: String): String {
@@ -161,66 +150,36 @@ class WearPrefs(context: Context) {
     }
 
     fun getEventTitle(index: Int): String {
-        return try {
-            val array = getFilteredEvents()
-            if (index < array.length()) {
-                val obj = array.getJSONObject(index)
-                val summary = obj.optString("summary", "")
-                val cleaned = summary
-                    .replace("Canceled: ", "")
-                    .replace("Daily Vikings / Core / SRE", "Vikings")
-                    .replace("SRE Overview", "SRE")
-                    .trim()
-                if (cleaned.length > 18) cleaned.substring(0, 16) + ".." else cleaned
-            } else "--"
-        } catch (_: Exception) { "--" }
+        val summary = getFilteredEvents().getOrNull(index)?.summary ?: return "--"
+        val cleaned = summary
+            .replace("Canceled: ", "")
+            .replace("Daily Vikings / Core / SRE", "Vikings")
+            .replace("SRE Overview", "SRE")
+            .trim()
+        return if (cleaned.length > 18) cleaned.substring(0, 16) + ".." else cleaned
     }
 
-    fun getEventTime(index: Int): String {
-        return try {
-            val array = getFilteredEvents()
-            if (index < array.length()) {
-                val obj = array.getJSONObject(index)
-                formatEventTime(obj.optString("start", ""))
-            } else "--"
-        } catch (_: Exception) { "--" }
-    }
+    fun getEventTime(index: Int): String =
+        getFilteredEvents().getOrNull(index)?.let { formatEventTime(it.start) } ?: "--"
 
     fun getEventDayDiff(index: Int): Int {
-        return try {
-            val array = getFilteredEvents()
-            if (index < array.length()) {
-                val obj = array.getJSONObject(index)
-                val start = obj.optString("start", "")
-                val parsed = parseIsoDate(start) ?: return 0
-                getDayDiffFromNow(parsed.time)
-            } else 0
-        } catch (_: Exception) { 0 }
+        val start = getFilteredEvents().getOrNull(index)?.start ?: return 0
+        val parsed = parseIsoDate(start) ?: return 0
+        return getDayDiffFromNow(parsed.time)
     }
 
     fun getTaskTitle(index: Int): String {
-        return try {
-            val array = JSONArray(cachedTasks)
-            if (index < array.length()) {
-                val obj = array.getJSONObject(index)
-                val title = obj.optString("title", "")
-                if (title.length > 18) title.substring(0, 16) + ".." else title
-            } else "--"
-        } catch (_: Exception) { "--" }
+        val title = WearTaskItem.decodeList(cachedTasks).getOrNull(index)?.title ?: return "--"
+        return if (title.length > 18) title.substring(0, 16) + ".." else title
     }
 
     fun getTaskDue(index: Int): String {
-        return try {
-            val array = JSONArray(cachedTasks)
-            if (index < array.length()) {
-                val obj = array.getJSONObject(index)
-                val dueDate = obj.optString("due_date", "")
-                if (dueDate.isNotEmpty() && dueDate.contains("-")) {
-                    val parts = dueDate.split("-")
-                    if (parts.size == 3) "${parts[1]}/${parts[2]}" else dueDate
-                } else "--"
-            } else "--"
-        } catch (_: Exception) { "--" }
+        val task = WearTaskItem.decodeList(cachedTasks).getOrNull(index) ?: return "--"
+        val dueDate = task.dueDate.orEmpty()
+        return if (dueDate.isNotEmpty() && dueDate.contains("-")) {
+            val parts = dueDate.split("-")
+            if (parts.size == 3) "${parts[1]}/${parts[2]}" else dueDate
+        } else "--"
     }
 
     fun isConfigured(): Boolean {

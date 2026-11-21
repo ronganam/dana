@@ -6,7 +6,12 @@ import io.github.ronganam.dana.data.shopping.ShoppingStore
 import io.github.ronganam.dana.data.shopping.ShoppingWatch
 import io.github.ronganam.dana.data.shopping.Who
 import kotlinx.coroutines.runBlocking
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.ShopRequest
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -29,13 +34,13 @@ class ShoppingWatchTest {
             else -> 200 to ShoppingFixture.raw("check")
         }
     }
-    private val sent = mutableListOf<Triple<String, String, JSONObject?>>()
+    private val sent = mutableListOf<Triple<String, String, JsonObject?>>()
 
     private fun store() = ShoppingStore(
         dir,
         ShoppingStore.Transport { m, p, b ->
             if (!online) throw IOException("unreachable")
-            sent += Triple(m, p, b?.let { JSONObject(it.toString()) })
+            sent += Triple(m, p, b as? JsonObject)
             reply(m, p).let { (code, text) -> HttpResult(code, text) }
         },
         me = { ShoppingFixture.noa },
@@ -52,34 +57,34 @@ class ShoppingWatchTest {
     fun aTickGoesThroughTheStoreAndTheRefComesBack() = runBlocking {
         val s = store().also { it.refresh() }
         val bananas = s.shown()!!.items.first { it.name == "bananas" }
-        val answer = ShoppingWatch.answer(s, JSONObject().put("action", "check").put("id", bananas.id).put("list_id", list).put("ref", "w-1"))
-        assertTrue(answer.getBoolean("ok"))
-        assertFalse(answer.getBoolean("queued"))
-        assertEquals("w-1", answer.getString("ref"))
+        val answer = ShoppingWatch.answer(s, ShopRequest(action = "check", id = bananas.id, listId = list, ref = "w-1"))
+        assertTrue(answer.ok)
+        assertFalse(answer.queued)
+        assertEquals("w-1", answer.ref)
         val (method, path, body) = writes().single()
         assertEquals("PATCH", method)
         assertEquals("/api/shopping/items/${bananas.id}?list=$list", path)
-        assertEquals(true, body!!.getBoolean("checked"))
+        assertEquals(true, body!!["checked"]!!.jsonPrimitive.boolean)
     }
 
     @Test
     fun anUncheckSendsCheckedFalse() = runBlocking {
         val s = store().also { it.refresh() }
         val id = s.shown()!!.items.first().id
-        ShoppingWatch.answer(s, JSONObject().put("action", "uncheck").put("id", id).put("list_id", list))
-        assertEquals(false, writes().single().third!!.getBoolean("checked"))
+        ShoppingWatch.answer(s, ShopRequest(action = "uncheck", id = id, listId = list))
+        assertEquals(false, writes().single().third!!["checked"]!!.jsonPrimitive.boolean)
     }
 
     @Test
     fun anAddIsSplitLikeThePhonesAddField() = runBlocking {
         val s = store().also { it.refresh() }
-        val answer = ShoppingWatch.answer(s, JSONObject().put("action", "add").put("text", "2 חלב, eggs").put("list_id", list).put("ref", "w-2"))
-        assertTrue(answer.getBoolean("ok"))
-        val items = writes().single().third!!.getJSONArray("items")
-        assertEquals(2, items.length())
-        assertEquals("חלב", items.getJSONObject(0).getString("name"))
-        assertEquals("2", items.getJSONObject(0).getString("quantity"))
-        assertEquals("eggs", items.getJSONObject(1).getString("name"))
+        val answer = ShoppingWatch.answer(s, ShopRequest(action = "add", text = "2 חלב, eggs", listId = list, ref = "w-2"))
+        assertTrue(answer.ok)
+        val items = writes().single().third!!["items"]!!.jsonArray
+        assertEquals(2, items.size)
+        assertEquals("חלב", items[0].jsonObject["name"]!!.jsonPrimitive.content)
+        assertEquals("2", items[0].jsonObject["quantity"]!!.jsonPrimitive.content)
+        assertEquals("eggs", items[1].jsonObject["name"]!!.jsonPrimitive.content)
     }
 
     @Test
@@ -87,10 +92,10 @@ class ShoppingWatchTest {
         val s = store().also { it.refresh() }
         online = false
         val id = s.shown()!!.items.first().id
-        val answer = ShoppingWatch.answer(s, JSONObject().put("action", "check").put("id", id).put("list_id", list).put("ref", "w-3"))
-        assertTrue(answer.getBoolean("ok"))
-        assertTrue(answer.getBoolean("queued"))
-        assertEquals("w-3", answer.getString("ref"))
+        val answer = ShoppingWatch.answer(s, ShopRequest(action = "check", id = id, listId = list, ref = "w-3"))
+        assertTrue(answer.ok)
+        assertTrue(answer.queued)
+        assertEquals("w-3", answer.ref)
         assertEquals(1, s.state.value.queued.size)
         assertFalse("shown ticked at once", s.shown()!!.items.first { it.id == id }.let { !it.checked })
     }
@@ -99,32 +104,32 @@ class ShoppingWatchTest {
     fun aRefusalIsASentenceToShow() = runBlocking {
         val s = store().also { it.refresh() }
         reply = { m, _ -> if (m == "GET") 200 to ShoppingFixture.raw("owner_shared") else 403 to ShoppingFixture.raw("error_read_only") }
-        val answer = ShoppingWatch.answer(s, JSONObject().put("action", "check").put("id", s.shown()!!.items.first().id).put("list_id", list).put("ref", "w-4"))
-        assertFalse(answer.getBoolean("ok"))
-        assertEquals("This list is view only.", answer.getString("error"))
-        assertEquals("w-4", answer.getString("ref"))
+        val answer = ShoppingWatch.answer(s, ShopRequest(action = "check", id = s.shown()!!.items.first().id, listId = list, ref = "w-4"))
+        assertFalse(answer.ok)
+        assertEquals("This list is view only.", answer.error)
+        assertEquals("w-4", answer.ref)
     }
 
     @Test
     fun badRequestsAreRefusedWithoutAnyWrite() = runBlocking {
         val s = store().also { it.refresh() }
-        assertEquals("Nothing to add.", ShoppingWatch.answer(s, JSONObject().put("action", "add").put("text", " , ").put("list_id", list)).getString("error"))
-        assertEquals("Unknown action.", ShoppingWatch.answer(s, JSONObject().put("action", "explode").put("list_id", list)).getString("error"))
+        assertEquals("Nothing to add.", ShoppingWatch.answer(s, ShopRequest(action = "add", text = " , ", listId = list)).error)
+        assertEquals("Unknown action.", ShoppingWatch.answer(s, ShopRequest(action = "explode", listId = list)).error)
         assertTrue(writes().isEmpty())
         val empty = store()
         dir.listFiles()?.forEach { it.delete() }
-        assertEquals("The list hasn't loaded yet.", ShoppingWatch.answer(empty, JSONObject().put("action", "check").put("id", "x")).getString("error"))
+        assertEquals("The list hasn't loaded yet.", ShoppingWatch.answer(empty, ShopRequest(action = "check", id = "x")).error)
     }
 
     @Test
     fun aFailingChangeStillAnswersWithItsRef() = runBlocking {
         val s = store().also { it.refresh() }
-        val answer = ShoppingWatch.answer(s, JSONObject().put("action", "check").put("id", "x").put("list_id", list).put("ref", "w-5")) {
+        val answer = ShoppingWatch.answer(s, ShopRequest(action = "check", id = "x", listId = list, ref = "w-5")) {
             throw IllegalStateException("boom")
         }
-        assertFalse(answer.getBoolean("ok"))
-        assertEquals("Couldn't do that on the phone.", answer.getString("error"))
-        assertEquals("w-5", answer.getString("ref"))
+        assertFalse(answer.ok)
+        assertEquals("Couldn't do that on the phone.", answer.error)
+        assertEquals("w-5", answer.ref)
     }
 
     @Test
@@ -132,7 +137,7 @@ class ShoppingWatchTest {
         val s = store().also { it.refresh() }
         var made: ShoppingOp? = null
         val id = s.shown()!!.items.first().id
-        ShoppingWatch.answer(s, JSONObject().put("action", "check").put("id", id).put("list_id", list)) { made = it; ShoppingStore.Outcome.Queued }
+        ShoppingWatch.answer(s, ShopRequest(action = "check", id = id, listId = list)) { made = it; ShoppingStore.Outcome.Queued }
         val check = made as ShoppingOp.Check
         assertEquals(list, check.listId)
         assertEquals(id, check.itemId)

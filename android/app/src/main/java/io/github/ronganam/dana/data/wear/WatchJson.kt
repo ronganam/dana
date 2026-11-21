@@ -2,31 +2,23 @@ package io.github.ronganam.dana.data.wear
 
 import io.github.ronganam.dana.data.models.CalendarEvent
 import io.github.ronganam.dana.data.models.Task
-import io.github.ronganam.dana.data.network.ApiJson
-import kotlinx.serialization.Serializable
-import kotlinx.serialization.builtins.ListSerializer
+import io.github.ronganam.dana.protocol.WearEvent
+import io.github.ronganam.dana.protocol.WearTaskItem
 
 /**
  * The calendar events and due tasks in the watch's config item
- * (`WearConfig.calendarEventsJson` / `dueTasksJson`), in the server's shape
- * the watch reads: events `{id, summary, start, end, all_day, location}`,
- * tasks as `GET /api/tasks` sends them.
+ * (`WearConfig.calendarEventsJson` / `dueTasksJson`), as the shared
+ * [WearEvent] / [WearTaskItem] the watch reads.
  */
 object WatchJson {
-    @Serializable
-    private data class WatchEvent(
-        val id: String,
-        val summary: String,
-        val start: String? = null,
-        val end: String? = null,
-        val allDay: Boolean = false,
-        val location: String? = null
-    )
+    fun events(events: List<CalendarEvent>): String =
+        WearEvent.encodeList(events.map { WearEvent(it.id, it.title, it.start.orEmpty(), it.end.orEmpty(), it.allDay, it.location) })
 
-    fun events(events: List<CalendarEvent>): String = ApiJson.encodeToString(
-        ListSerializer(WatchEvent.serializer()),
-        events.map { WatchEvent(it.id, it.title, it.start, it.end, it.allDay, it.location) }
-    )
+    fun tasks(tasks: List<Task>): String = WearTaskItem.encodeList(tasks.map { it.forWatch() })
 
-    fun tasks(tasks: List<Task>): String = ApiJson.encodeToString(ListSerializer(Task.serializer()), tasks)
+    /** A task as the watch shows it. */
+    fun Task.forWatch(): WearTaskItem = WearTaskItem(
+        id = id, title = title, description = description, priority = priority, dueDate = dueDate,
+        status = status, groupName = groupName, groupEmoji = groupEmoji
+    )
 }

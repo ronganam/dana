@@ -11,6 +11,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import io.github.ronganam.dana.data.money.MoneySignals
+import io.github.ronganam.dana.data.money.string
 
 /**
  * Sees every notification the phone shows (once the user grants notification
@@ -99,7 +100,7 @@ class DanaNotificationListener : NotificationListenerService() {
 
     /** Queue [sbn] when it is new content; true if something was queued. */
     private fun capture(sbn: StatusBarNotification): Boolean {
-        // Bank / card apps go to the money add-on instead, never to the Inbox
+        // Bank / card apps go to the money addon instead, never to the Inbox
         // (whatever "skip banking apps" says), while the user has it.
         if (MoneySignals.routes(this, sbn.packageName)) return captureMoney(sbn)
         val item = try {
@@ -127,7 +128,7 @@ class DanaNotificationListener : NotificationListenerService() {
             Log.w(TAG, "Couldn't read a notification from ${sbn.packageName}", e)
             null
         } ?: return false
-        val fingerprint = "money\u0000${sbn.key}\u0000${item.optString("title")}\u0000${item.optString("text")}"
+        val fingerprint = "money\u0000${sbn.key}\u0000${item.string("title")}\u0000${item.string("text")}"
         synchronized(recent) {
             if (recent.containsKey(fingerprint)) return false
             recent[fingerprint] = System.currentTimeMillis()

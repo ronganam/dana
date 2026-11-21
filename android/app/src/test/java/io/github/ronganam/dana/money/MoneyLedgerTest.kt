@@ -4,7 +4,19 @@ import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.money.MoneyLedger
 import io.github.ronganam.dana.data.money.MoneyLedger.MINUS
 import io.github.ronganam.dana.data.money.Txn
-import org.json.JSONObject
+import io.github.ronganam.dana.data.money.arr
+import io.github.ronganam.dana.data.money.flag
+import io.github.ronganam.dana.data.money.intValue
+import io.github.ronganam.dana.data.money.jsonObjectOf
+import io.github.ronganam.dana.data.money.longValue
+import io.github.ronganam.dana.data.money.obj
+import io.github.ronganam.dana.data.money.objects
+import io.github.ronganam.dana.data.money.str
+import io.github.ronganam.dana.data.money.string
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
@@ -18,15 +30,14 @@ import java.time.LocalDate
  * today 18 Nov 2026), the same assertions as its `test_web_money.mjs`.
  */
 class MoneyLedgerTest {
-    private val f = JSONObject(MoneyLedgerTest::class.java.classLoader!!.getResource("money_web.json")!!.readText())
-    private fun body(k: String) = f.getJSONObject(k).getJSONObject("body")
+    private val f = jsonObjectOf(MoneyLedgerTest::class.java.classLoader!!.getResource("money_web.json")!!.readText())
+    private fun body(k: String) = f.obj(k)!!.obj("body")!!
     private val today = LocalDate.parse("2026-11-18")
     private val now = Instant.parse("2026-11-18T07:01:00Z")
     private val list = MoneyLedger.merge(Txn.parseList(body("transactions")), Txn.parseList(body("transactions_next")))
     private fun by(m: String) = list.first { it.merchant == m }
     private val taxonomy = MoneyLedger.taxonomy(body("categories"))
     private fun iso(s: String) = "⁨$s⁩"
-    private fun JSONObject.s(k: String): String? = if (isNull(k)) null else optString(k).ifBlank { null }
 
     @Test
     fun moneyAndDates() {
@@ -70,11 +81,11 @@ class MoneyLedgerTest {
         listOf("2026-11-15", "2026-11-02", "2026-11-04", "2026-11-11").forEach { assertEquals(it, 0L, day(it).spent) }
         assertEquals(1500000L, day("2026-11-10").income)
         val ov = body("overview")
-        assertEquals(ov.getJSONObject("spent").getLong("total"), days.sumOf { it.spent })
-        assertEquals(ov.getJSONObject("income").getLong("total"), days.sumOf { it.income })
+        assertEquals(ov.obj("spent")!!.longValue("total"), days.sumOf { it.spent })
+        assertEquals(ov.obj("income")!!.longValue("total"), days.sumOf { it.income })
         val uncat = list.filter(MoneyLedger::needsCategory)
         assertEquals(3, uncat.size)
-        assertEquals(ov.getInt("uncategorized"), uncat.count { it.spending })
+        assertEquals(ov.intValue("uncategorized"), uncat.count { it.spending })
     }
 
     @Test
@@ -120,22 +131,22 @@ class MoneyLedgerTest {
         assertEquals("${iso("ONLINE COURSE CO")}: a one-off", MoneyLedger.markText(body("patch_one_off"), "one_off", true))
         assertEquals(
             "${iso("ONLINE COURSE CO")}: not a yearly charge (3 charges)",
-            MoneyLedger.markText(JSONObject(body("patch_one_off").toString()).put("changed", 3), "yearly", false)
+            MoneyLedger.markText(JsonObject(body("patch_one_off") + ("changed" to JsonPrimitive(3))), "yearly", false)
         )
         assertEquals("${iso("ONLINE COURSE CO")}: Dana decides if it's a one-off", MoneyLedger.markText(body("patch_one_off"), "one_off", null))
         val pc = body("patch_category")
         assertEquals("${iso("קפה קפה")} → Restaurants & cafés, now and from now on",
-            MoneyLedger.undoText(pc, pc.getJSONObject("transaction").getString("category_label"), true))
-        assertTrue(MoneyLedger.undoText(JSONObject(pc.toString()).put("changed", 3), "Food", true).endsWith("(3 charges)"))
+            MoneyLedger.undoText(pc, pc.obj("transaction")!!.string("category_label"), true))
+        assertTrue(MoneyLedger.undoText(JsonObject(pc + ("changed" to JsonPrimitive(3))), "Food", true).endsWith("(3 charges)"))
         assertEquals("${iso("קפה קפה")} → Groceries", MoneyLedger.undoText(pc, "Groceries", false))
         assertEquals("Note saved", MoneyLedger.undoText(body("patch_note"), null))
-        assertEquals("Note removed", MoneyLedger.undoText(JSONObject().put("transaction", JSONObject().put("note", "")), null))
+        assertEquals("Note removed", MoneyLedger.undoText(buildJsonObject { put("transaction", buildJsonObject { put("note", "") }) }, null))
     }
 
     @Test
     fun errorsInWords() {
         val inv = body("error_invalid")
-        assertEquals(inv.getString("message"), MoneyLedger.errorText(400, inv.optString("error"), inv.optString("message")))
+        assertEquals(inv.string("message"), MoneyLedger.errorText(400, inv.string("error"), inv.string("message")))
         assertTrue(MoneyLedger.errorText(403, "not_connected").contains("turned off"))
         assertEquals("Synced a moment ago. Try again in 7 min.", MoneyLedger.errorText(429, "too_soon", retryAfter = 420))
         assertEquals("Cal wants a new password", MoneyLedger.errorText(409, "needs_attention", reason = "Cal wants a new password"))
@@ -172,16 +183,16 @@ class MoneyLedgerTest {
     @Test
     fun accountsAndSources() {
         val ov = body("overview")
-        val cards = (0 until ov.getJSONArray("cards").length()).map { ov.getJSONArray("cards").getJSONObject(it) }
+        val cards = ov.arr("cards").objects()
         assertEquals(listOf("Shared card ••4580", "Cal ••8763"), cards.map {
-            MoneyLedger.accountName("card", it.s("number"), it.s("label"), it.s("company_name"))
+            MoneyLedger.accountName("card", it.str("number"), it.str("label"), it.str("company_name"))
         })
-        val bank = ov.getJSONArray("banks").getJSONObject(0)
-        assertEquals("Hapoalim ••901", MoneyLedger.accountName("bank", bank.s("number"), bank.s("label"), bank.s("company_name")))
-        val src = ov.getJSONArray("sources")
-        val ok = src.getJSONObject(0)
-        val fail = src.getJSONObject(1)
-        fun st(o: JSONObject) = MoneyLedger.sourceStatus(o.getString("state"), o.s("state_reason"), o.s("last_ok_at"), o.optBoolean("can_sync"), now)
+        val bank = ov.arr("banks").objects()[0]
+        assertEquals("Hapoalim ••901", MoneyLedger.accountName("bank", bank.str("number"), bank.str("label"), bank.str("company_name")))
+        val src = ov.arr("sources").objects()
+        val ok = src[0]
+        val fail = src[1]
+        fun st(o: JsonObject) = MoneyLedger.sourceStatus(o.string("state"), o.str("state_reason"), o.str("last_ok_at"), o.flag("can_sync"), now)
         assertEquals(Triple("ok", "Synced 2 h ago", ""), st(ok).let { Triple(it.tone, it.label, it.detail) })
         assertEquals("warn", st(fail).tone)
         assertEquals("Last sync failed", st(fail).label)

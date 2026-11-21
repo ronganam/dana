@@ -153,7 +153,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
             _listError.value = e.message
         } catch (e: Exception) {
             Log.w(TAG, "projects", e)
-            if (_list.value == null) _listError.value = "Can't reach Dana: ${describeError(e)}"
+            if (_list.value == null) _listError.value = "Can't reach Dana: ${ctx.texts.reason(e)}"
         }
     }
 
@@ -178,7 +178,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
             if (e.code == 404) closeProject() else _itemsError.value = e.message
         } catch (e: Exception) {
             Log.w(TAG, "items", e)
-            if (_items.value?.project?.id != id) _itemsError.value = "Can't reach Dana: ${describeError(e)}"
+            if (_items.value?.project?.id != id) _itemsError.value = "Can't reach Dana: ${ctx.texts.reason(e)}"
         }
     }
 
@@ -293,7 +293,7 @@ class ProjectsController(private val ctx: ControllerContext, private val appCont
             ctx.messages.post(e.message)
         } catch (e: Exception) {
             Log.w(TAG, failure, e)
-            ctx.messages.post("$failure: ${describeError(e)}")
+            ctx.messages.post("$failure: ${ctx.texts.reason(e)}")
         }
     }
 

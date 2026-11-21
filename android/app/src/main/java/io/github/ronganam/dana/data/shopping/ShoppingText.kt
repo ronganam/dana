@@ -4,8 +4,8 @@ import java.text.Normalizer
 import java.util.Locale
 
 /**
- * Item names exactly as the server reads them (server repo
- * `server/addons/shopping/names.py`): the comparison key, and typed text split
+ * Item names exactly as the server reads them
+ * (`server/addons/shopping/names.py`): the comparison key, and typed text split
  * into items with their quantities. The phone splits typed text itself so
  * every item can carry a client id (a retried add never adds twice); this has
  * to stay in step with the server's parser.

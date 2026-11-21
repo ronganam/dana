@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.ui.viewmodels
 
+import io.github.ronganam.dana.R
+
 import io.github.ronganam.dana.data.chat.ThreadModel
 import io.github.ronganam.dana.data.chat.UndoAction
 import io.github.ronganam.dana.data.chat.UndoItem
@@ -54,7 +56,7 @@ internal class ChatUndos(private val ctx: ControllerContext, private val onUndon
                 set(item) { it.copy(status = UndoItem.Status.FAILED, error = e.message?.removePrefix("Undo failed: "), at = at) }
             } catch (e: Exception) {
                 set(item) { it.copy(status = UndoItem.Status.READY) }
-                ctx.messages.post("Couldn't undo: ${describeError(e)}")
+                ctx.say(R.string.chat_couldnt_undo, ctx.texts.reason(e))
             }
         }
     }

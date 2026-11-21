@@ -1,6 +1,6 @@
 # Shopping (phone, widget, watch data)
 
-The shopping list on the phone: Shopping under More in the shell (it takes over More with its own list and stage), the home-screen widget and its quick-add window, the watch's data and actions. The server contract (screen payload, add rules, aisles, undo, the event stream, the `shopping` push, sharing and invitations) is the server repo's `docs/shopping.md`. The web panel (`static/shopping.js`) is the reference for look and wording.
+The shopping list on the phone: Shopping under More in the shell (it takes over More with its own list and stage), the home-screen widget and its quick-add window, the watch's data and actions. The server contract (screen payload, add rules, aisles, undo, the event stream, the `shopping` push, sharing and invitations) is `server/docs/shopping.md`. The web panel (`server/static/shopping.js`) is the reference for look and wording.
 
 ## Pieces
 
@@ -23,7 +23,7 @@ The shopping list on the phone: Shopping under More in the shell (it takes over 
 
 ## The place
 
-- Shown only when `/api/me` `addons` has `shopping` (`ShoppingController.enabled`, from the cached `Me` at start, refreshed on start / foreground). A 403 `not_connected` drops the add-on it names (`addon`). Without it: no nav entry, no shortcut, and a shell on Shopping goes back to Now. The previous (tabbed) layout has no Shopping screen.
+- Shown only when `/api/me` `addons` has `shopping` (`ShoppingController.enabled`, from the cached `Me` at start, refreshed on start / foreground). A 403 `not_connected` drops the addon it names (`addon`). Without it: no nav entry, no shortcut, and a shell on Shopping goes back to Now. The previous (tabbed) layout has no Shopping screen.
 - Nav label "Shopping" + the count to buy of the active list. Route `"shopping"` (`EXTRA_OPEN_SCREEN`) from the launcher shortcut, the widget header, a shopping search result and the invitation notification (tag `shopping-invite-…`).
 - Keeps the screen on while visible (`view.keepScreenOn`).
 - **Touch**: tap a row = tick (light haptic); the row stays a moment (`LINGER_MS` 900, ticked look), then moves to Bought; the snackbar has Undo (`POST /api/undo/{id}` with the write's `undo.id`). Swipe either way = remove with Undo. Long press or the pencil = the editor sheet (name, quantity −/+, note, aisle chips, Remove); it saves on close, a 409 `duplicate` stays in the sheet ("Pita is already on the list."), and closing again with the refusal standing discards the change. **One column**: the check sits at the start and the pencil at the end, and every name, quantity chip and note starts next to the check whatever its language (an absolute `TextAlign` from the layout direction); each text still runs in its own direction (`byScript`), so Hebrew reads right to left inside its line. The same in Bought; only the editor's fields take their text's direction.

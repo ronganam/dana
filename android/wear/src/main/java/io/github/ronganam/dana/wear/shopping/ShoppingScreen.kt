@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.wear.shopping
 
+import io.github.ronganam.dana.protocol.ShopItem
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.runtime.remember
 import android.view.HapticFeedbackConstants

@@ -36,7 +36,7 @@ import io.github.ronganam.dana.ui.screens.money.charts.MoneyPalette
 import io.github.ronganam.dana.ui.viewmodels.MoneyController
 import io.github.ronganam.dana.ui.viewmodels.MoneyDashState
 import io.github.ronganam.dana.ui.viewmodels.MoneyView
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonObject
 
 // The dashboard views. Each fills the space it gets, scrolls itself, and lays
 // out in columns from the width it is given (two from 600dp: the unfolded
@@ -76,10 +76,10 @@ class Dash(
     val today = MoneyDashText.today()
     val current: Boolean get() = month == io.github.ronganam.dana.data.money.MoneyText.thisMonth()
 
-    fun got(name: String): JSONObject? = dash.got(data, name, month)
+    fun got(name: String): JsonObject? = dash.got(data, name, month)
 
     /** A payload parsed, null while it loads (or if it can't be read). */
-    fun <T> parsed(name: String, parse: (JSONObject) -> T): T? = got(name)?.let { runCatching { parse(it) }.getOrNull() }
+    fun <T> parsed(name: String, parse: (JsonObject) -> T): T? = got(name)?.let { runCatching { parse(it) }.getOrNull() }
 
     /** "Cal ••8763" for an account id, from the logins. */
     fun accountName(id: String?): String {

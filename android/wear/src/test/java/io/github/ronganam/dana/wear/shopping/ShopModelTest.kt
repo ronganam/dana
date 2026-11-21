@@ -1,7 +1,11 @@
 package io.github.ronganam.dana.wear.shopping
 
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.DanaSnapshot
+import io.github.ronganam.dana.protocol.ShopAnswer
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -13,20 +17,27 @@ import org.junit.Test
 class ShopModelTest {
     private val list = "a142b3bd0785"
 
-    private fun item(id: String, name: String, aisleKey: String, aisle: String, qty: String = "") =
-        JSONObject().put("id", id).put("name", name).put("quantity", qty).put("aisle", aisle).put("aisle_key", aisleKey)
+    private fun item(id: String, name: String, aisleKey: String, aisle: String, qty: String = "") = buildJsonObject {
+        put("id", id); put("name", name); put("quantity", qty); put("aisle", aisle); put("aisle_key", aisleKey)
+    }
 
-    /** A snapshot as the phone sends it (`ShoppingSnapshot.fields` + `WearCards.sendSnapshot`). */
-    private fun snapshot(vararg items: JSONObject, count: Int = items.size, canEdit: Boolean = true, version: Long = 7): JSONObject =
-        JSONObject().put("inbox_needs", 2).put("shopping_count", count).put("shopping", JSONArray(items.toList()))
-            .put("shopping_list_id", list).put("shopping_version", version).put("shopping_can_edit", canEdit)
+    /** The snapshot JSON as the watch receives it, read the way the watch reads it. */
+    private fun read(json: JsonObject): DanaSnapshot = DanaSnapshot.decode(json.toString())!!
+
+    /** A snapshot as the phone sends it (`ShoppingSnapshot.apply` + `WearCards.sendSnapshot`). */
+    private fun snapshot(vararg items: JsonObject, count: Int = items.size, canEdit: Boolean = true, version: Long = 7): DanaSnapshot = read(
+        buildJsonObject {
+            put("inbox_needs", 2); put("shopping_count", count); put("shopping", JsonArray(items.toList()))
+            put("shopping_list_id", list); put("shopping_version", version); put("shopping_can_edit", canEdit)
+        }
+    )
 
     private val tomatoes = item("t1", "עגבניות שרי", "produce", "Fruit & vegetables")
     private val bananas = item("b1", "bananas", "produce", "Fruit & vegetables", "1 kg")
     private val bread = item("p1", "לחם מחמצת", "bakery", "Bread & bakery")
     private val milk = item("m1", "Milk", "dairy", "Dairy & eggs", "2")
 
-    private fun state(vararg items: JSONObject, count: Int = items.size, canEdit: Boolean = true) =
+    private fun state(vararg items: JsonObject, count: Int = items.size, canEdit: Boolean = true) =
         ShopState(list = ShopList.parse(snapshot(*items, count = count, canEdit = canEdit)))
 
     private fun names(s: ShopState, now: Long) = Shop.items(s, now).map { it.item.name + if (it.ticked) " ✓" else "" }
@@ -51,10 +62,14 @@ class ShopModelTest {
 
     @Test
     fun noShoppingPartMeansNoListAndBadItemsAreSkipped() {
-        assertNull(ShopList.parse(JSONObject().put("inbox_needs", 3)))
-        val odd = snapshot(tomatoes, JSONObject().put("name", "no id"), JSONObject().put("id", "x"))
+        assertNull(ShopList.parse(read(buildJsonObject { put("inbox_needs", 3) })))
+        assertNull(ShopList.parse(null))
+        val odd = snapshot(tomatoes, buildJsonObject { put("name", "no id") }, buildJsonObject { put("id", "x") })
         assertEquals(listOf("t1"), ShopList.parse(odd)!!.items.map { it.id })
-        assertTrue("an older phone without can_edit can still tick", ShopList.parse(JSONObject().put("shopping", JSONArray()))!!.canEdit)
+        val bare = ShopList.parse(read(buildJsonObject { put("shopping", JsonArray(emptyList())) }))!!
+        assertTrue("an older phone without can_edit can still tick", bare.canEdit)
+        assertEquals("", bare.listId)
+        assertEquals(0, bare.count)
         assertEquals(0, Shop.toBuy(ShopState(), 0))
     }
 
@@ -93,13 +108,13 @@ class ShopModelTest {
         assertEquals("r1", Shop.next(s)!!.ref)
         s = Shop.sent(s, "r1", 20)
         assertNull("one on its way at a time", Shop.next(s))
-        s = Shop.answered(s, JSONObject().put("ok", true).put("queued", false).put("ref", "r1"), 200)
+        s = Shop.answered(s, ShopAnswer(ok = true, queued = false, ref = "r1"), 200)
         assertEquals("r2", Shop.next(s)!!.ref)
         val payload = Shop.next(s)!!.payload()
-        assertEquals("check", payload.getString("action"))
-        assertEquals("b1", payload.getString("id"))
-        assertEquals(list, payload.getString("list_id"))
-        assertEquals("r2", payload.getString("ref"))
+        assertEquals("check", payload.action)
+        assertEquals("b1", payload.id)
+        assertEquals(list, payload.listId)
+        assertEquals("r2", payload.ref)
     }
 
     @Test
@@ -107,7 +122,7 @@ class ShopModelTest {
         var s = state(tomatoes, bananas, bread)
         s = Shop.tick(s, s.item("b1"), "r1", 0)
         s = Shop.sent(s, "r1", 10)
-        s = Shop.answered(s, JSONObject().put("ok", true).put("queued", true).put("ref", "r1"), 300)
+        s = Shop.answered(s, ShopAnswer(ok = true, queued = true, ref = "r1"), 300)
         // The phone's next snapshot no longer has bananas.
         s = Shop.onSnapshot(s, ShopList.parse(snapshot(tomatoes, bread, version = 8)))
         assertTrue("answered requests leave with the snapshot", s.pending.isEmpty())
@@ -116,8 +131,8 @@ class ShopModelTest {
         s = Shop.untick(s, s.undo!!.itemId, "r2", 2_500)
         assertEquals(listOf("עגבניות שרי", "bananas", "לחם מחמצת"), names(s, 2_500))
         val p = Shop.next(s)!!
-        assertEquals("uncheck", p.payload().getString("action"))
-        assertEquals("b1", p.payload().getString("id"))
+        assertEquals("uncheck", p.payload().action)
+        assertEquals("b1", p.payload().id)
         assertNull(s.undo)
     }
 
@@ -138,7 +153,7 @@ class ShopModelTest {
         var s = state(tomatoes, bananas)
         s = Shop.tick(s, s.item("b1"), "r1", 0)
         s = Shop.sent(s, "r1", 10)
-        s = Shop.answered(s, JSONObject().put("ok", false).put("error", "This list is view only.").put("ref", "r1"), 200)
+        s = Shop.answered(s, ShopAnswer(ok = false, error = "This list is view only.", ref = "r1"), 200)
         assertEquals(listOf("עגבניות שרי", "bananas"), names(s, 300))
         assertEquals("This list is view only.", s.notice!!.text)
         assertTrue(s.notice!!.error)
@@ -150,8 +165,8 @@ class ShopModelTest {
     @Test
     fun anAnswerForSomethingElseChangesNothing() {
         val s = Shop.sent(Shop.tick(state(bananas), state(bananas).item("b1"), "r1", 0), "r1", 1)
-        assertEquals(s, Shop.answered(s, JSONObject().put("ok", false).put("ref", "other"), 5))
-        assertEquals(s, Shop.answered(s, JSONObject().put("ok", true), 5))
+        assertEquals(s, Shop.answered(s, ShopAnswer(ok = false, ref = "other"), 5))
+        assertEquals(s, Shop.answered(s, ShopAnswer(ok = true), 5))
     }
 
     @Test
@@ -206,11 +221,11 @@ class ShopModelTest {
     fun addingByVoiceSaysWhatWasAddedOrWhatTheyDo() {
         var s = state(bananas)
         s = Shop.add(s, "  milk, eggs ", "r1", 0)
-        assertEquals("add", Shop.next(s)!!.payload().getString("action"))
-        assertEquals("milk, eggs", Shop.next(s)!!.payload().getString("text"))
+        assertEquals("add", Shop.next(s)!!.payload().action)
+        assertEquals("milk, eggs", Shop.next(s)!!.payload().text)
         val offline = Shop.unreachable(s, 1)
         assertEquals("Phone not reachable. Will add “milk, eggs” when it's back.", offline.notice!!.text)
-        s = Shop.answered(Shop.sent(s, "r1", 2), JSONObject().put("ok", true).put("queued", false).put("ref", "r1"), 300)
+        s = Shop.answered(Shop.sent(s, "r1", 2), ShopAnswer(ok = true, queued = false, ref = "r1"), 300)
         assertEquals("Added: milk, eggs", s.notice!!.text)
         assertFalse(s.notice!!.error)
         assertNull(Shop.expire(s, 300 + Shop.NOTICE_MS).notice)
@@ -244,7 +259,7 @@ class ShopModelTest {
     fun aRowPutBackGoesNearWhereItWasEvenWhenTheListChanged() {
         var s = state(tomatoes, bananas, bread, milk)
         s = Shop.tick(s, s.item("p1"), "r1", 0)
-        s = Shop.answered(Shop.sent(s, "r1", 1), JSONObject().put("ok", true).put("ref", "r1"), 2)
+        s = Shop.answered(Shop.sent(s, "r1", 1), ShopAnswer(ok = true, ref = "r1"), 2)
         s = Shop.onSnapshot(s, ShopList.parse(snapshot(tomatoes, milk)))
         s = Shop.expire(s, 5_000)
         s = Shop.untick(s, "p1", "r2", 5_100)

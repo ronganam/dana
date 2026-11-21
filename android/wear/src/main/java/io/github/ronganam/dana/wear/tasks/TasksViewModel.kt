@@ -18,8 +18,10 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.WearReply
+import io.github.ronganam.dana.protocol.WearJson
+import io.github.ronganam.dana.protocol.WearTaskItem
+import kotlinx.serialization.builtins.ListSerializer
 
 class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnMessageReceivedListener {
     private fun str(@StringRes id: Int): String = getApplication<Application>().getString(id)
@@ -65,9 +67,9 @@ class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.On
 
     fun completeTask(taskId: String) {
         Log.d(TAG, "completeTask($taskId)")
-        val payload = TaskStatusRequest(taskId, "completed").toJson()
+        val payload = TaskStatusRequest(taskId, "completed").encode()
         getPhoneNodeId { phoneId ->
-            Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.UPDATE_TASK_STATUS, payload.toString().toByteArray())
+            Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.UPDATE_TASK_STATUS, payload.toByteArray())
         }
         // Optimistically remove from list, then refresh for server confirmation
         _tasks.value = _tasks.value.filter { it.id != taskId }
@@ -79,9 +81,9 @@ class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.On
 
     fun snoozeTask(taskId: String, minutes: Int) {
         Log.d(TAG, "snoozeTask($taskId, $minutes min)")
-        val payload = SnoozeRequest(taskId, "time", minutes = minutes).toJson()
+        val payload = SnoozeRequest(taskId, "time", minutes = minutes).encode()
         getPhoneNodeId { phoneId ->
-            Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.SNOOZE_TASK, payload.toString().toByteArray())
+            Wearable.getMessageClient(appContext).sendMessage(phoneId, WearPaths.SNOOZE_TASK, payload.toByteArray())
         }
         // Optimistically remove, then refresh
         _tasks.value = _tasks.value.filter { it.id != taskId }
@@ -100,25 +102,21 @@ class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.On
             try {
                 when (path) {
                     WearPaths.response(WearPaths.GET_TASKS) -> {
-                        val array = JSONArray(jsonString)
-                        val list = mutableListOf<WearTask>()
-                        for (i in 0 until array.length()) {
-                            val obj = array.getJSONObject(i)
-                            val status = obj.optString("status", "needs_action")
-                            if (status != "needs_action") continue
-                            list.add(
+                        fun given(v: String?) = v?.takeIf { it.isNotEmpty() && it != "null" }
+                        val list = WearJson.decodeFromString(ListSerializer(WearTaskItem.serializer()), jsonString)
+                            .filter { it.status == "needs_action" }
+                            .map {
                                 WearTask(
-                                    id = obj.optString("id", ""),
-                                    title = obj.optString("title", ""),
-                                    description = obj.optString("description").takeIf { it.isNotEmpty() && it != "null" },
-                                    priority = obj.optString("priority", "medium"),
-                                    dueDate = obj.optString("due_date").takeIf { it.isNotEmpty() && it != "null" },
-                                    status = status,
-                                    groupName = obj.optString("group_name").takeIf { it.isNotEmpty() && it != "null" },
-                                    groupEmoji = obj.optString("group_emoji").takeIf { it.isNotEmpty() && it != "null" }
+                                    id = it.id,
+                                    title = it.title,
+                                    description = given(it.description),
+                                    priority = it.priority,
+                                    dueDate = given(it.dueDate),
+                                    status = it.status,
+                                    groupName = given(it.groupName),
+                                    groupEmoji = given(it.groupEmoji)
                                 )
-                            )
-                        }
+                            }
                         _tasks.value = list
                         _isLoading.value = false
                         _statusText.value = if (list.isEmpty()) str(R.string.tasks_status_none) else ""
@@ -127,8 +125,8 @@ class TasksViewModel(app: Application) : AndroidViewModel(app), MessageClient.On
                         refreshTasks()
                     }
                     WearPaths.RESPONSE_ERROR -> {
-                        val json = JSONObject(jsonString)
-                        _statusText.value = getApplication<Application>().getString(R.string.error_detail, json.optString("error", str(R.string.failed)))
+                        val error = WearReply.decode(jsonString)?.error ?: str(R.string.failed)
+                        _statusText.value = getApplication<Application>().getString(R.string.error_detail, error)
                         _isLoading.value = false
                     }
                 }

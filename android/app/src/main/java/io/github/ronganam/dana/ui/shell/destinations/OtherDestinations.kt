@@ -34,7 +34,7 @@ import io.github.ronganam.dana.ui.viewmodels.MoreItem
 import io.github.ronganam.dana.ui.viewmodels.Place
 
 /**
- * More: Shopping and Money (each only with its integration), Calls, People and
+ * More: Shopping and Money (each only with its addon), Calls, People and
  * About you. Shopping and Money take over the place with their own list and
  * stage, under a "← More" link; the others open their screen in the stage
  * (full screen with "← More" on the cover). Settings opens from About you, the
@@ -47,7 +47,7 @@ fun rememberMoreDestination(viewModel: MainViewModel): Destination {
     val item by shell.more.collectAsState()
     val addons by viewModel.addons.collectAsState()
     val toMore = { shell.selectMore(null) }
-    // Its integration went away (disconnected): back to More's list.
+    // Its addon went away (turned off): back to More's list.
     LaunchedEffect(item, addons) {
         if ((item == MoreItem.SHOPPING && "shopping" !in addons) || (item == MoreItem.MONEY && "money" !in addons)) toMore()
     }

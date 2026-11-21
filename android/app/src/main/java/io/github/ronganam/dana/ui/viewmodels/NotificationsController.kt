@@ -180,7 +180,7 @@ class NotificationsController(
             } catch (e: Exception) {
                 _items.value = (_items.value.filterNot { it.id in ids } + list).sortedByDescending { it.postedAt }
                 _counts.value = recount(_items.value, _counts.value).let { it.copy(snoozed = (it.snoozed - list.size).coerceAtLeast(0)) }
-                ctx.messages.post("Couldn't snooze: ${describeError(e)}")
+                ctx.messages.post("Couldn't snooze: ${ctx.texts.reason(e)}")
             }
         }
         return { wake(list) }
@@ -249,7 +249,7 @@ class NotificationsController(
                 _items.value = (_items.value + removed).sortedByDescending { it.postedAt }
                 _suggestions.value = suggestionsBefore
                 _counts.value = recount(_items.value, _counts.value)
-                ctx.messages.post("Couldn't dismiss: ${describeError(e)}")
+                ctx.messages.post("Couldn't dismiss: ${ctx.texts.reason(e)}")
             }
         }
         return { restore(removed) }
@@ -302,7 +302,7 @@ class NotificationsController(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ctx.messages.post("Couldn't save the rule: ${describeError(e)}")
+                ctx.messages.post("Couldn't save the rule: ${ctx.texts.reason(e)}")
             }
         }
     }
@@ -326,7 +326,7 @@ class NotificationsController(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ctx.messages.post("Couldn't save the rule: ${describeError(e)}")
+                ctx.messages.post("Couldn't save the rule: ${ctx.texts.reason(e)}")
             }
         }
     }
@@ -371,7 +371,7 @@ class NotificationsController(
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ctx.messages.post(describeError(e))
+                ctx.messages.post(ctx.texts.reason(e))
             } finally {
                 setBusy(s.id, false)
             }
@@ -396,7 +396,7 @@ class NotificationsController(
                 throw e
             } catch (e: Exception) {
                 _suggestions.value = before
-                ctx.messages.post("Couldn't dismiss: ${describeError(e)}")
+                ctx.messages.post("Couldn't dismiss: ${ctx.texts.reason(e)}")
             }
         }
     }

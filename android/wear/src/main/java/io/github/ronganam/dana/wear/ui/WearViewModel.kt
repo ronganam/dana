@@ -1,6 +1,9 @@
 package io.github.ronganam.dana.wear.ui
 
 import io.github.ronganam.dana.protocol.WearPaths
+import io.github.ronganam.dana.protocol.WearReply
+import io.github.ronganam.dana.protocol.WearRunAction
+import io.github.ronganam.dana.protocol.WearSendMessage
 import android.annotation.SuppressLint
 import android.content.Context
 import android.media.AudioFormat
@@ -27,8 +30,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
 import java.util.UUID
 
 data class WearToolApproval(
@@ -482,12 +483,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
         val userMsg = WearChatMessage(UUID.randomUUID().toString(), text, true)
         _chatMessages.value = _chatMessages.value + userMsg
 
-        val payload = JSONObject().apply {
-            put("session_id", sessionId)
-            put("message", text)
-        }
-
-        sendToPhone(WearPaths.SEND_MESSAGE, payload.toString().toByteArray())
+        sendToPhone(WearPaths.SEND_MESSAGE, WearSendMessage(sessionId, text).encode().toByteArray())
     }
 
     fun approveAction(approved: Boolean) {
@@ -496,12 +492,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
         awaitingReply = true
         markActivity()
 
-        val payload = JSONObject().apply {
-            put("session_id", sessionId)
-            put("action", if (approved) "approve" else "deny")
-        }
-
-        sendToPhone(WearPaths.APPROVE_ACTION, payload.toString().toByteArray())
+        sendAction(WearRunAction(sessionId, if (approved) "approve" else "deny"))
     }
 
     override fun onMessageReceived(messageEvent: MessageEvent) {
@@ -513,7 +504,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
             try {
                 when (path) {
                     WearPaths.response(WearPaths.GET_SESSION_DETAIL) -> {
-                        parseResponseJson(JSONObject(jsonString))
+                        showReply(reply(jsonString) ?: return@launch)
                         _statusText.value = str(R.string.status_ready)
                     }
                     WearPaths.response(WearPaths.CREATE_SESSION) -> {
@@ -525,26 +516,26 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
                         }
                     }
                     WearPaths.response(WearPaths.SEND_MESSAGE), WearPaths.response(WearPaths.APPROVE_ACTION), WearPaths.RESPONSE_VOICE_STREAM -> {
-                        val json = JSONObject(jsonString)
-                        if (json.has("error")) {
+                        val json = reply(jsonString) ?: return@launch
+                        if (json.error != null) {
                             awaitingReply = false
-                            _statusText.value = getApplication<Application>().getString(R.string.error_detail, json.optString("error"))
+                            _statusText.value = getApplication<Application>().getString(R.string.error_detail, json.error)
                             return@launch
                         }
                         // Live frames from the phone bridge: the transcript as
                         // soon as the server has it, then the reply as it streams.
-                        if (json.has("partial_response")) {
-                            if (awaitingReply) showPartialReply(json.optString("partial_response"))
+                        json.partialResponse?.let {
+                            if (awaitingReply) showPartialReply(it)
                             return@launch
                         }
-                        parseResponseJson(json)
+                        showReply(json)
                         // A bare transcription frame can precede the answer.
-                        val isFinal = json.has("status") || json.has("response") || json.has("messages")
-                        if (!isFinal && json.optString("transcription").isNotEmpty()) {
+                        val isFinal = json.status != null || json.response != null || json.messages != null
+                        if (!isFinal && !json.transcription.isNullOrEmpty()) {
                             _statusText.value = str(R.string.status_thinking)
                         }
                         if (isFinal) {
-                            if (json.optString("response").isNotEmpty()) WearPerf.mark("reply text shown")
+                            if (!json.response.isNullOrEmpty()) WearPerf.mark("reply text shown")
                             awaitingReply = false
                             markActivity()
                             _statusText.value = str(R.string.status_ready)
@@ -552,8 +543,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
                     }
                     WearPaths.RESPONSE_ERROR -> {
                         awaitingReply = false
-                        val json = JSONObject(jsonString)
-                        _statusText.value = getApplication<Application>().getString(R.string.error_detail, json.optString("error", str(R.string.failed)))
+                        val error = WearReply.decode(jsonString)?.error ?: str(R.string.failed)
+                        _statusText.value = getApplication<Application>().getString(R.string.error_detail, error)
                     }
                 }
             } catch (e: Exception) {
@@ -562,39 +553,24 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
         }
     }
 
-    private fun parseResponseJson(json: JSONObject) {
-        val messagesArr = json.optJSONArray("messages")
-        if (messagesArr != null && messagesArr.length() > 0) {
-            val list = mutableListOf<WearChatMessage>()
-            for (i in 0 until messagesArr.length()) {
-                val obj = messagesArr.getJSONObject(i)
-                val text = obj.optString("message", "")
-                val isUser = obj.optBoolean("isUser", false)
-                val id = obj.optString("id", UUID.randomUUID().toString())
-                val toolCallObj = obj.optJSONObject("toolCall")
-                if (toolCallObj != null) {
-                    val name = toolCallObj.optString("toolName", toolCallObj.optString("tool_name", toolCallObj.optString("name", str(R.string.tool))))
-                    val summary = toolCallObj.optString("toolSummary", toolCallObj.optString("tool_summary", toolCallObj.optString("summary", name)))
-                    val args = toolCallObj.optString("toolArgs", toolCallObj.optString("tool_args", toolCallObj.optString("parameters", "")))
-                    list.add(WearChatMessage(
-                        id = id,
-                        text = name,
-                        isUser = false,
-                        isToolCall = true,
-                        toolName = name,
-                        toolArgs = summary
-                    ))
-                } else if (text.isNotEmpty()) {
-                    list.add(WearChatMessage(id = id, text = text, isUser = isUser))
-                }
-            }
-            if (list.isNotEmpty()) {
-                _chatMessages.value = list
+    /** The frame in [text]; null (logged) when it doesn't read. */
+    private fun reply(text: String): WearReply? =
+        WearReply.decode(text) ?: null.also { Log.e("WearViewModel", "Unreadable reply") }
+
+    private fun showReply(reply: WearReply) {
+        val thread = reply.messages.orEmpty().mapNotNull { m ->
+            val id = m.id ?: UUID.randomUUID().toString()
+            val toolCall = m.toolCall
+            when {
+                toolCall != null -> toolCard(id, toolCall.toolName ?: str(R.string.tool))
+                m.message.isNotEmpty() -> WearChatMessage(id = id, text = m.message, isUser = m.isUser)
+                else -> null
             }
         }
+        if (thread.isNotEmpty()) _chatMessages.value = thread
 
-        // Parse live transcription (Voice WebSocket)
-        val transcription = json.optString("transcription", "")
+        // The live transcription (voice)
+        val transcription = reply.transcription.orEmpty()
         if (transcription.isNotEmpty()) {
             val currentList = _chatMessages.value
             // Only add if user's last message is not already matching this transcription
@@ -608,9 +584,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
             }
         }
 
-        // Parse assistant's text response
-        val respText = json.optString("response", "").takeIf { it.isNotEmpty() }
-            ?: json.optString("message", "")
+        // The assistant's reply
+        val respText = reply.response.orEmpty()
         if (respText.isNotEmpty()) {
             _lastAssistantResponse.value = respText
             val currentList = _chatMessages.value.filter { it.id != STREAMING_ID }
@@ -623,77 +598,36 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
             }
         }
 
-        // Parse tool calls
-        val toolCalls = json.optJSONArray("tool_calls")
-        if (toolCalls != null && toolCalls.length() > 0) {
-            val currentList = _chatMessages.value
-            val newList = currentList.toMutableList()
-            var approvalFound = false
-
-            for (i in 0 until toolCalls.length()) {
-                val tc = toolCalls.getJSONObject(i)
-                val name = tc.optString("toolName", tc.optString("tool_name", tc.optString("name", str(R.string.tool))))
-                val summary = tc.optString("toolSummary", tc.optString("tool_summary", tc.optString("summary", name)))
-                val args = tc.optString("toolArgs", tc.optString("tool_args", tc.optString("parameters", tc.optString("args", ""))))
-                val toolCallId = tc.optString("toolCallId", tc.optString("tool_call_id", tc.optString("id", "")))
-                val tcId = if (toolCallId.isNotEmpty()) toolCallId else UUID.randomUUID().toString()
-
-                if (newList.none { it.id == tcId }) {
-                    newList.add(WearChatMessage(
-                        id = tcId,
-                        text = name,
-                        isUser = false,
-                        isToolCall = true,
-                        toolName = name,
-                        toolArgs = summary
-                    ))
-                }
-
-                val requiresApproval = tc.optBoolean("requiresApproval", false) || tc.optBoolean("requires_approval", false)
-                if (requiresApproval && !approvalFound) {
-                    _pendingApproval.value = WearToolApproval(name, summary, args)
-                    approvalFound = true
-                }
-            }
-            _chatMessages.value = newList
-            if (!approvalFound) {
-                _pendingApproval.value = null
-            }
-        } else {
-            _pendingApproval.value = null
+        // The tools the run used
+        val toolCalls = reply.toolCalls.orEmpty()
+        if (toolCalls.isNotEmpty()) {
+            _chatMessages.value = _chatMessages.value + toolCalls.map { toolCard(UUID.randomUUID().toString(), it.toolName ?: str(R.string.tool)) }
         }
 
-        // The phone bridge forwards prompts the run is blocked on. Tool cards
-        // carry no approval flag, so the dedicated block is authoritative.
-        json.optJSONObject("pending_approval")?.let { pa ->
-            val name = pa.optString("tool_name", pa.optString("name", str(R.string.action)))
-            _pendingApproval.value = WearToolApproval(name, "", "")
-        }
-        json.optJSONObject("selection_request")?.let { sel ->
-            val optionsArr = sel.optJSONArray("options") ?: JSONArray()
-            val options = (0 until optionsArr.length()).mapNotNull { i ->
-                val opt = optionsArr.optJSONObject(i) ?: return@mapNotNull null
-                WearSelectionOption(
-                    label = opt.optString("label"),
-                    value = opt.optString("value")
-                )
-            }
+        // The phone bridge forwards prompts the run is blocked on; tool cards carry no approval.
+        _pendingApproval.value = reply.pendingApproval?.let { WearToolApproval(it.toolName ?: str(R.string.action), "", "") }
+        reply.selection?.let { sel ->
             _pendingSelection.value = WearSelectionRequest(
-                prompt = sel.optString("prompt", "Choose an option"),
-                options = options,
-                multiple = sel.optBoolean("multiple", false)
+                prompt = sel.prompt ?: str(R.string.choose_an_option),
+                options = sel.options.map { WearSelectionOption(label = it.label, value = it.value) },
+                multiple = sel.multiple
             )
         } ?: run {
-            if (json.has("status")) _pendingSelection.value = null
+            if (reply.status != null) _pendingSelection.value = null
         }
 
-        json.optJSONObject("extend_summary")?.let { ext ->
-            _pendingExtension.value = WearPendingExtension(
-                summary = ext.optString("summary")
-            )
+        reply.extension?.let { ext ->
+            _pendingExtension.value = WearPendingExtension(summary = ext.summary)
         } ?: run {
-            if (json.has("status")) _pendingExtension.value = null
+            if (reply.status != null) _pendingExtension.value = null
         }
+    }
+
+    private fun toolCard(id: String, name: String) =
+        WearChatMessage(id = id, text = name, isUser = false, isToolCall = true, toolName = name, toolArgs = name)
+
+    private fun sendAction(action: WearRunAction) {
+        sendToPhone(WearPaths.APPROVE_ACTION, action.encode().toByteArray())
     }
 
     /**
@@ -706,11 +640,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
         markActivity()
         _statusText.value = str(R.string.status_continuing)
 
-        val payload = JSONObject().apply {
-            put("session_id", sessionId)
-            put("action", "extend_iterations")
-        }
-        sendToPhone(WearPaths.APPROVE_ACTION, payload.toString().toByteArray())
+        sendAction(WearRunAction(sessionId, "extend_iterations"))
     }
 
     /** Stop an over-budget run and settle the session. */
@@ -720,11 +650,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
         markActivity()
         _statusText.value = str(R.string.status_wrapping_up)
 
-        val payload = JSONObject().apply {
-            put("session_id", sessionId)
-            put("action", "decline_iterations")
-        }
-        sendToPhone(WearPaths.APPROVE_ACTION, payload.toString().toByteArray())
+        sendAction(WearRunAction(sessionId, "decline_iterations"))
     }
 
     fun submitSelection(indices: List<Int>) {
@@ -734,14 +660,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
         awaitingReply = true
         markActivity()
 
-        val selected = JSONArray()
-        indices.forEach { selected.put(it) }
-        val payload = JSONObject().apply {
-            put("session_id", sessionId)
-            put("action", "select")
-            put("selection", selected)
-        }
-        sendToPhone(WearPaths.APPROVE_ACTION, payload.toString().toByteArray())
+        sendAction(WearRunAction(sessionId, "select", selection = indices))
     }
 
     /** Grows (or starts) the reply bubble while the answer streams in. */

@@ -5,6 +5,7 @@ import android.content.ContextWrapper
 import android.content.SharedPreferences
 import io.github.ronganam.dana.data.network.ApiService
 import io.github.ronganam.dana.data.network.ChatApi
+import io.github.ronganam.dana.testing.ResourceTexts
 import io.github.ronganam.dana.ui.viewmodels.ChatController
 import io.github.ronganam.dana.ui.viewmodels.ControllerContext
 import io.github.ronganam.dana.ui.viewmodels.UserMessages
@@ -123,7 +124,7 @@ class ChatControllerStreamTest {
         val api = ApiService(server.url("").toString().trimEnd('/'), "token")
         val context = FakeContext(tmp.newFolder("files"))
         chat = ChatController(
-            ControllerContext(scope, UserMessages()) { api },
+            ControllerContext(scope, UserMessages(), ResourceTexts) { api },
             context,
             FakePrefs(),
             serverUrl = { server.url("").toString() },

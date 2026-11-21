@@ -7,9 +7,11 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Base64
 import android.util.Log
-import io.github.ronganam.dana.wear.cards.DanaSnapshot
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.DanaSnapshot
+import io.github.ronganam.dana.protocol.ShopAnswer
+import io.github.ronganam.dana.protocol.ShopItem
+import io.github.ronganam.dana.protocol.ShopRequest
+import io.github.ronganam.dana.wear.cards.SnapshotStore
 import java.util.UUID
 
 /**
@@ -29,7 +31,7 @@ object DebugPhone {
     private const val PREFS = "debug_phone"
     private val main = Handler(Looper.getMainLooper())
     /** Items ticked through the fake phone, to put back on an untick. */
-    private val removed = HashMap<String, Pair<JSONObject, Int>>()
+    private val removed = HashMap<String, Pair<ShopItem, Int>>()
 
     fun mode(context: Context): String =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("mode", "off") ?: "off"
@@ -45,34 +47,33 @@ object DebugPhone {
         else -> null
     }
 
-    private fun answerLater(context: Context, payload: JSONObject, ok: Boolean) {
+    private fun answerLater(context: Context, payload: ShopRequest, ok: Boolean) {
         val app = context.applicationContext
         main.postDelayed({
-            val answer = JSONObject().put("ok", ok).put("ref", payload.optString("ref"))
-            if (ok) answer.put("queued", false) else answer.put("error", "This list is view only.")
+            val answer = if (ok) ShopAnswer(ok = true, queued = false, ref = payload.ref)
+            else ShopAnswer(ok = false, error = "This list is view only.", ref = payload.ref)
             WatchShopping.onAnswer(answer)
-            if (ok) main.postDelayed({ DanaSnapshot.save(app, applied(DanaSnapshot.load(app), payload)) }, 1_500)
+            if (ok) main.postDelayed({ SnapshotStore.save(app, applied(SnapshotStore.load(app) ?: DanaSnapshot(), payload)) }, 1_500)
         }, 300)
     }
 
     /** [snapshot] with the request applied, as the phone's next snapshot would have it. */
-    private fun applied(snapshot: JSONObject, payload: JSONObject): JSONObject {
-        val items = snapshot.optJSONArray("shopping") ?: JSONArray()
-        val list = (0 until items.length()).mapNotNull { items.optJSONObject(it) }.toMutableList()
-        when (payload.optString("action")) {
+    private fun applied(snapshot: DanaSnapshot, payload: ShopRequest): DanaSnapshot {
+        val items = snapshot.shopping.orEmpty()
+        val list = items.toMutableList()
+        val id = payload.id.orEmpty()
+        when (payload.action) {
             "check" -> {
-                val i = list.indexOfFirst { it.optString("id") == payload.optString("id") }
-                if (i >= 0) removed[payload.optString("id")] = list.removeAt(i) to i
+                val i = list.indexOfFirst { it.id == id }
+                if (i >= 0) removed[id] = list.removeAt(i) to i
             }
-            "uncheck" -> removed.remove(payload.optString("id"))?.let { (o, i) -> list.add(i.coerceIn(0, list.size), o) }
-            "add" -> payload.optString("text").split(',', '\n').map { it.trim() }.filter { it.isNotEmpty() }.forEach {
-                list.add(JSONObject().put("id", UUID.randomUUID().toString().take(12)).put("name", it).put("quantity", "")
-                    .put("aisle", "Other").put("aisle_key", "other"))
+            "uncheck" -> removed.remove(id)?.let { (o, i) -> list.add(i.coerceIn(0, list.size), o) }
+            "add" -> payload.text.orEmpty().split(',', '\n').map { it.trim() }.filter { it.isNotEmpty() }.forEach {
+                list.add(ShopItem(id = UUID.randomUUID().toString().take(12), name = it, aisle = "Other", aisleKey = "other"))
             }
         }
-        val count = snapshot.optInt("shopping_count", items.length()) + (list.size - items.length())
-        return snapshot.put("shopping", JSONArray(list)).put("shopping_count", count.coerceAtLeast(0))
-            .put("shopping_version", snapshot.optLong("shopping_version") + 1)
+        val count = (snapshot.shoppingCount ?: items.size) + (list.size - items.size)
+        return snapshot.copy(shopping = list, shoppingCount = count.coerceAtLeast(0), shoppingVersion = snapshot.shoppingVersion + 1)
     }
 }
 
@@ -82,8 +83,8 @@ class DebugShoppingReceiver : BroadcastReceiver() {
         val app = context.applicationContext
         intent.getStringExtra("phone")?.let { DebugPhone.setMode(app, it) }
         intent.getStringExtra("snapshot_b64")?.let { b64 ->
-            val json = runCatching { JSONObject(String(Base64.decode(b64, Base64.DEFAULT))) }.getOrNull()
-            if (json == null) Log.w("DebugPhone", "Bad snapshot") else DanaSnapshot.save(app, json)
+            val snapshot = DanaSnapshot.decode(String(Base64.decode(b64, Base64.DEFAULT)))
+            if (snapshot == null) Log.w("DebugPhone", "Bad snapshot") else SnapshotStore.save(app, snapshot)
         }
         intent.getStringExtra("say_b64")?.let { WatchShopping.add(app, String(Base64.decode(it, Base64.DEFAULT))) }
         Log.i("DebugPhone", "phone=${DebugPhone.mode(app)}")

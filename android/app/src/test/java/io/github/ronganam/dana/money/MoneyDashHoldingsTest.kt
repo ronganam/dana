@@ -10,6 +10,9 @@ import io.github.ronganam.dana.data.money.MoneyDashText
 import io.github.ronganam.dana.data.money.MoneyDashText.MINUS
 import io.github.ronganam.dana.data.money.MoneyMeals
 import io.github.ronganam.dana.data.money.MoneyPortfolio
+import io.github.ronganam.dana.data.money.arr
+import io.github.ronganam.dana.data.money.objects
+import io.github.ronganam.dana.data.money.string
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -29,15 +32,15 @@ class MoneyDashHoldingsTest {
     @Test fun accountNames() {
         val a = pf.accounts[0]
         assertEquals("Psagot Trade ••456", MoneyDashText.accountName(a.label, a.number, "investment", a.companyName))
-        val src = MoneyDashFixture.portfolio("sources").getJSONArray("sources").getJSONObject(0).getJSONArray("accounts").getJSONObject(0)
-        assertEquals("Psagot Trade ••456", MoneyDashText.accountName(null, src.getString("number"), "investment", "Psagot Trade"))
+        val src = MoneyDashFixture.portfolio("sources").arr("sources").objects()[0].arr("accounts").objects()[0]
+        assertEquals("Psagot Trade ••456", MoneyDashText.accountName(null, src.string("number"), "investment", "Psagot Trade"))
         val ov = MoneyDashFixture.web("overview")
-        val cards = ov.getJSONArray("cards")
-        assertEquals(listOf("Shared card ••4580", "Cal ••8763"), (0 until cards.length()).map {
-            val c = cards.getJSONObject(it); MoneyDashText.accountName(c.getString("label"), c.getString("number"), "card", c.getString("company_name"))
+        val cards = ov.arr("cards").objects()
+        assertEquals(listOf("Shared card ••4580", "Cal ••8763"), cards.map { c ->
+            MoneyDashText.accountName(c.string("label"), c.string("number"), "card", c.string("company_name"))
         })
-        val bank = ov.getJSONArray("banks").getJSONObject(0)
-        assertEquals("Hapoalim ••901", MoneyDashText.accountName(bank.getString("label"), bank.getString("number"), "bank", bank.getString("company_name")))
+        val bank = ov.arr("banks").objects()[0]
+        assertEquals("Hapoalim ••901", MoneyDashText.accountName(bank.string("label"), bank.string("number"), "bank", bank.string("company_name")))
     }
 
     @Test fun portfolioTiles() {
