@@ -9,7 +9,6 @@ import android.content.Intent
 import android.util.Log
 import com.google.android.gms.wearable.Wearable
 import io.github.ronganam.dana.data.network.Zones
-import org.json.JSONObject
 
 /**
  * Keeps the phone and watch reminder alarms in step.
@@ -32,13 +31,13 @@ object WearReminderBridge {
         // Send right away with the zones we know, so the watch never rings late;
         // refresh the cache for next time in the background.
         val alarm = ReminderAlarm(taskId, title, priority, triggerType, Zones.cached(app))
-        sendToWatches(app, WearPaths.REMINDER_ALARM, alarm.toJson())
+        sendToWatches(app, WearPaths.REMINDER_ALARM, alarm.encode())
         Zones.refresh(app)
     }
 
     fun dismissOnWatch(context: Context, taskId: String) {
         if (taskId.isEmpty()) return
-        sendToWatches(context, WearPaths.REMINDER_HANDLED_ON_PHONE, ReminderHandled(taskId).toJson())
+        sendToWatches(context, WearPaths.REMINDER_HANDLED_ON_PHONE, ReminderHandled(taskId).encode())
     }
 
     /** The watch handled the alarm: stop ringing here and clear the notification. */
@@ -51,9 +50,9 @@ object WearReminderBridge {
         )
     }
 
-    private fun sendToWatches(context: Context, path: String, payload: JSONObject) {
+    private fun sendToWatches(context: Context, path: String, payload: String) {
         val app = context.applicationContext
-        val bytes = payload.toString().toByteArray()
+        val bytes = payload.toByteArray()
         Wearable.getNodeClient(app).connectedNodes
             .addOnSuccessListener { nodes ->
                 if (nodes.isEmpty()) Log.d(TAG, "No watch connected for $path")

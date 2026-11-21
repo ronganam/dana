@@ -4,8 +4,8 @@ import io.github.ronganam.dana.protocol.WearPaths
 import android.content.Context
 import android.util.Log
 import com.google.android.gms.wearable.Wearable
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.DanaSnapshot
+import io.github.ronganam.dana.protocol.WearCard
 
 /**
  * Phone → watch cards: the caller card, a person before a meeting, the
@@ -26,34 +26,18 @@ object WearCards {
     private const val TAG = "WearCards"
 
     fun send(context: Context, kind: String, title: String, subtitle: String, lines: List<String>, ref: String = "") {
-        val payload = JSONObject().put("kind", kind).put("title", title).put("subtitle", subtitle)
-            .put("lines", JSONArray(lines.take(6))).put("ref", ref)
-        sendToWatches(context, WearPaths.CARD, payload)
+        sendToWatches(context, WearPaths.CARD, WearCard(kind, title, subtitle, lines.take(6), ref).encode())
     }
 
+    /** The parts of the phone's widget snapshot the watch shows ([DanaSnapshot.forWatch]). */
+    fun sendSnapshot(context: Context, snapshot: DanaSnapshot) = sendToWatches(context, WearPaths.SNAPSHOT, snapshot.forWatch().encode())
 
-    /** The parts of the phone's widget snapshot the watch shows (kept well under the message size limit). */
-    fun sendSnapshot(context: Context, snapshot: JSONObject) {
-        val o = JSONObject()
-        for (k in listOf("briefing_headline", "briefing_date", "suggestion_count", "inbox_needs", "inbox_active", "updated_at") +
-            io.github.ronganam.dana.data.shopping.ShoppingSnapshot.KEYS.filter { it != "shopping" }) {
-            if (snapshot.has(k)) o.put(k, snapshot.get(k))
-        }
-        fun firstN(key: String, n: Int) = snapshot.optJSONArray(key)?.let { a -> JSONArray((0 until minOf(n, a.length())).map { a.get(it) }) }
-        firstN("briefing_points", 4)?.let { o.put("briefing_points", it) }
-        firstN("events", 3)?.let { o.put("events", it) }
-        firstN("tasks", 4)?.let { o.put("tasks", it) }
-        firstN("suggestions", 3)?.let { o.put("suggestions", it) }
-        firstN("shopping", 40)?.let { o.put("shopping", it) }
-        sendToWatches(context, WearPaths.SNAPSHOT, o)
-    }
+    fun clear(context: Context, kind: String) = sendToWatches(context, WearPaths.CARD_CLEAR, WearCard(kind = kind).encode())
 
-    fun clear(context: Context, kind: String) = sendToWatches(context, WearPaths.CARD_CLEAR, JSONObject().put("kind", kind))
-
-    private fun sendToWatches(context: Context, path: String, payload: JSONObject) {
+    private fun sendToWatches(context: Context, path: String, payload: String) {
         if (io.github.ronganam.dana.BuildConfig.KIOSK || io.github.ronganam.dana.BuildConfig.TV) return
         val app = context.applicationContext
-        val bytes = payload.toString().toByteArray()
+        val bytes = payload.toByteArray()
         Wearable.getNodeClient(app).connectedNodes
             .addOnSuccessListener { nodes ->
                 nodes.forEach { node ->

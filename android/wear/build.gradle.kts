@@ -97,7 +97,6 @@ dependencies {
     implementation("androidx.wear.protolayout:protolayout-material:1.4.2")
     implementation("com.google.guava:guava:33.8.0-android")
 
-    // JVM tests of the pure shopping model (same versions as :app; org.json because Android's is a stub off-device)
+    // JVM tests of the pure shopping model (same version as :app)
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20260814")
 }

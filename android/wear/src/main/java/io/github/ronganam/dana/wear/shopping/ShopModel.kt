@@ -1,22 +1,14 @@
 package io.github.ronganam.dana.wear.shopping
 
-import org.json.JSONArray
-import org.json.JSONObject
-
-/** One item to buy, as the phone's snapshot sends it. */
-data class ShopItem(val id: String, val name: String, val quantity: String, val aisle: String, val aisleKey: String) {
-    fun toJson(): JSONObject = JSONObject().put("id", id).put("name", name).put("quantity", quantity)
-        .put("aisle", aisle).put("aisle_key", aisleKey)
-
-    companion object {
-        fun parse(o: JSONObject): ShopItem? {
-            val id = o.optString("id")
-            val name = o.optString("name")
-            if (id.isEmpty() || name.isEmpty()) return null
-            return ShopItem(id, name, o.optString("quantity"), o.optString("aisle"), o.optString("aisle_key"))
-        }
-    }
-}
+import io.github.ronganam.dana.protocol.DanaSnapshot
+import io.github.ronganam.dana.protocol.ShopAnswer
+import io.github.ronganam.dana.protocol.ShopItem
+import io.github.ronganam.dana.protocol.ShopRequest
+import io.github.ronganam.dana.protocol.WearJson
+import io.github.ronganam.dana.protocol.decodeOrNull
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.builtins.ListSerializer
 
 /**
  * The shopping part of the phone's snapshot (`/wear/dana_snapshot`, phone side
@@ -26,14 +18,14 @@ data class ShopItem(val id: String, val name: String, val quantity: String, val 
 data class ShopList(val listId: String, val version: Long, val canEdit: Boolean, val count: Int, val items: List<ShopItem>) {
     companion object {
         /** Null when the snapshot has no shopping part (an older phone, nothing loaded yet). */
-        fun parse(snapshot: JSONObject): ShopList? {
-            val arr = snapshot.optJSONArray("shopping") ?: return null
-            val items = (0 until arr.length()).mapNotNull { arr.optJSONObject(it)?.let(ShopItem::parse) }
+        fun parse(snapshot: DanaSnapshot?): ShopList? {
+            val shopping = snapshot?.shopping ?: return null
+            val items = shopping.filter { it.id.isNotEmpty() && it.name.isNotEmpty() }
             return ShopList(
-                listId = snapshot.optString("shopping_list_id"),
-                version = snapshot.optLong("shopping_version"),
-                canEdit = snapshot.optBoolean("shopping_can_edit", true),
-                count = maxOf(snapshot.optInt("shopping_count", items.size), items.size),
+                listId = snapshot.shoppingListId,
+                version = snapshot.shoppingVersion,
+                canEdit = snapshot.shoppingCanEdit,
+                count = maxOf(snapshot.shoppingCount ?: items.size, items.size),
                 items = items
             )
         }
@@ -57,12 +49,9 @@ data class Pending(val ref: String, val listId: String, val action: ShopAction, 
     enum class Stage { WAITING, SENT, ANSWERED }
 
     /** The message to the phone. */
-    fun payload(): JSONObject {
-        val o = JSONObject().put("ref", ref).put("list_id", listId)
-        return when (action) {
-            is ShopAction.Tick -> o.put("action", if (action.checked) "check" else "uncheck").put("id", action.item.id)
-            is ShopAction.Add -> o.put("action", "add").put("text", action.text)
-        }
+    fun payload(): ShopRequest = when (action) {
+        is ShopAction.Tick -> ShopRequest(action = if (action.checked) "check" else "uncheck", id = action.item.id, listId = listId, ref = ref)
+        is ShopAction.Add -> ShopRequest(action = "add", listId = listId, text = action.text, ref = ref)
     }
 }
 
@@ -248,10 +237,10 @@ object Shop {
     }
 
     /** The phone's answer `{ok, queued, error?, ref}` (`queued` counts as done). */
-    fun answered(state: ShopState, answer: JSONObject, now: Long): ShopState {
-        val ref = answer.optString("ref")
+    fun answered(state: ShopState, answer: ShopAnswer, now: Long): ShopState {
+        val ref = answer.ref.orEmpty()
         val p = state.pending.firstOrNull { it.ref == ref } ?: return state
-        if (answer.optBoolean("ok")) {
+        if (answer.ok) {
             val notice = (p.action as? ShopAction.Add)?.let { Notice("Added: ${it.text}", now + NOTICE_MS) } ?: state.notice
             return state.copy(
                 pending = state.pending.map { if (it.ref == ref) it.copy(stage = Pending.Stage.ANSWERED, at = now) else it },
@@ -259,7 +248,7 @@ object Shop {
             )
         }
         // Refused: drop it, so the row comes back where it was, and say why.
-        val error = answer.optString("error").ifBlank { "The phone couldn't do that." }
+        val error = answer.error.orEmpty().ifBlank { "The phone couldn't do that." }
         val tick = p.action as? ShopAction.Tick
         return state.copy(
             pending = state.pending.filter { it.ref != ref },
@@ -305,27 +294,28 @@ object Shop {
     // ---------- the queue on disk ----------
 
     /** Requests not yet answered, for the prefs (a sent one counts as answered after a restart). */
-    fun queueJson(pending: List<Pending>): String = JSONArray(pending.filter { it.stage != Pending.Stage.ANSWERED }.map { p ->
-        val o = JSONObject().put("ref", p.ref).put("list_id", p.listId).put("stage", p.stage.name).put("at", p.at)
-        when (val a = p.action) {
-            is ShopAction.Tick -> o.put("item", a.item.toJson()).put("checked", a.checked).put("index", a.index)
-            is ShopAction.Add -> o.put("text", a.text)
+    fun queueJson(pending: List<Pending>): String = WearJson.encodeToString(
+        QUEUE,
+        pending.filter { it.stage != Pending.Stage.ANSWERED }.map { p ->
+            when (val a = p.action) {
+                is ShopAction.Tick -> QueuedRequest(p.ref, p.listId, p.stage.name, p.at, item = a.item, checked = a.checked, index = a.index)
+                is ShopAction.Add -> QueuedRequest(p.ref, p.listId, p.stage.name, p.at, text = a.text)
+            }
         }
-    }).toString()
+    )
 
-    fun parseQueue(text: String?): List<Pending> {
-        val arr = runCatching { JSONArray(text ?: "[]") }.getOrNull() ?: return emptyList()
-        return (0 until arr.length()).mapNotNull { i ->
-            val o = arr.optJSONObject(i) ?: return@mapNotNull null
-            val ref = o.optString("ref").ifEmpty { return@mapNotNull null }
-            val action = o.optJSONObject("item")?.let { ShopItem.parse(it) }?.let { ShopAction.Tick(it, o.optBoolean("checked", true), o.optInt("index")) }
-                ?: o.optString("text").takeIf { it.isNotBlank() }?.let { ShopAction.Add(it) }
+    fun parseQueue(text: String?): List<Pending> =
+        QUEUE.decodeOrNull(text ?: "[]").orEmpty().mapNotNull { q ->
+            if (q.ref.isEmpty()) return@mapNotNull null
+            val action = q.item?.takeIf { it.id.isNotEmpty() && it.name.isNotEmpty() }?.let { ShopAction.Tick(it, q.checked, q.index) }
+                ?: q.text?.takeIf { it.isNotBlank() }?.let { ShopAction.Add(it) }
                 ?: return@mapNotNull null
             // A request sent before the app stopped reached the phone: treat it as answered.
-            val stage = if (o.optString("stage") == Pending.Stage.WAITING.name) Pending.Stage.WAITING else Pending.Stage.ANSWERED
-            Pending(ref, o.optString("list_id"), action, stage, o.optLong("at"))
+            val stage = if (q.stage == Pending.Stage.WAITING.name) Pending.Stage.WAITING else Pending.Stage.ANSWERED
+            Pending(q.ref, q.listId, action, stage, q.at)
         }
-    }
+
+    private val QUEUE = ListSerializer(QueuedRequest.serializer())
 
     // ---------- text ----------
 
@@ -349,3 +339,16 @@ object Shop {
         return if (state.list?.canEdit == false) listOf("View only", count).filter { it.isNotEmpty() }.joinToString(" · ") else count
     }
 }
+
+/** One request of the queue in the prefs: a tick ([item], [checked], [index]) or an add ([text]). */
+@Serializable
+private data class QueuedRequest(
+    val ref: String = "",
+    @SerialName("list_id") val listId: String = "",
+    val stage: String = "",
+    val at: Long = 0,
+    val item: ShopItem? = null,
+    val checked: Boolean = true,
+    val index: Int = 0,
+    val text: String? = null,
+)

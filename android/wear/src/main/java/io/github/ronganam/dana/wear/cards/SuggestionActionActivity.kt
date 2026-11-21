@@ -6,7 +6,7 @@ import android.os.Bundle
 import android.util.Log
 import android.widget.Toast
 import com.google.android.gms.wearable.Wearable
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.SuggestionAction
 import io.github.ronganam.dana.wear.R
 
 /**
@@ -22,7 +22,7 @@ class SuggestionActionActivity : Activity() {
         if (id.isBlank() || action !in setOf("accept", "dismiss")) { finish(); return }
 
         val app = applicationContext
-        val bytes = JSONObject().put("id", id).put("action", action).toString().toByteArray()
+        val bytes = SuggestionAction(id, action).encode().toByteArray()
         Wearable.getNodeClient(app).connectedNodes
             .addOnSuccessListener { nodes ->
                 if (nodes.isEmpty()) {
@@ -30,7 +30,7 @@ class SuggestionActionActivity : Activity() {
                     return@addOnSuccessListener
                 }
                 nodes.forEach { Wearable.getMessageClient(app).sendMessage(it.id, WearPaths.SUGGESTION_ACTION, bytes) }
-                DanaSnapshot.removeSuggestion(app, id)
+                SnapshotStore.removeSuggestion(app, id)
                 Toast.makeText(app, if (action == "accept") R.string.accepted else R.string.dismissed, Toast.LENGTH_SHORT).show()
             }
             .addOnFailureListener { e ->

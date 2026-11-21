@@ -14,18 +14,20 @@ import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.github.ronganam.dana.wear.R
 import com.google.android.gms.wearable.Wearable
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.WearJson
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 
 class WearReminderListenerService : com.google.android.gms.wearable.WearableListenerService() {
 
     override fun onMessageReceived(messageEvent: com.google.android.gms.wearable.MessageEvent) {
         super.onMessageReceived(messageEvent)
         if (messageEvent.path == WearPaths.REMINDER_HANDLED_ON_PHONE) {
-            WearReminderSync.closeLocally(this, ReminderHandled.fromJson(JSONObject(String(messageEvent.data))).taskId)
+            ReminderHandled.decode(String(messageEvent.data))?.let { WearReminderSync.closeLocally(this, it.taskId) }
             return
         }
         if (messageEvent.path == WearPaths.REMINDER_ALARM) {
-            val alarm = ReminderAlarm.fromJson(JSONObject(String(messageEvent.data)))
+            val alarm = ReminderAlarm.decode(String(messageEvent.data)) ?: return
             val taskId = alarm.taskId
             val taskTitle = alarm.title
             val priority = alarm.priority
@@ -33,7 +35,7 @@ class WearReminderListenerService : com.google.android.gms.wearable.WearableList
             // The phone's Home Assistant zones, for the alarm's place snoozes.
             alarm.zones?.let { zones ->
                 getSharedPreferences(WearReminderSync.PREFS, MODE_PRIVATE).edit()
-                    .putString(WearReminderSync.KEY_ZONES, org.json.JSONArray(zones).toString()).apply()
+                    .putString(WearReminderSync.KEY_ZONES, WearJson.encodeToString(ListSerializer(String.serializer()), zones)).apply()
             }
 
             // Launch full-screen alarm
