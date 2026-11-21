@@ -1,52 +1,43 @@
 """One sync of one source (docs/money.md, "Sync").
 
 :func:`start` writes a ``money_syncs`` row, marks the source ``syncing`` and
-runs the sync in the background as the user: decrypt the credentials, start
-a worker job (from the last good sync minus :data:`config.OVERLAP_DAYS`, or
-:data:`config.FIRST_SYNC_DAYS` back), follow it with long polls, hand
-``needs_code`` to ``otp.py``, store the result (``ingest.apply`` in a
-thread), run the after-sync hooks (``after_sync.py``) and mark the source ``ok``. One sync per source at a
+runs the sync in the background as the user: decrypt the credentials, call
+the company's provider (``providers.Company.sync``) with a
+:class:`~addons.money.providers.SyncJob` (from the last good sync minus
+:data:`config.OVERLAP_DAYS`, or :data:`config.FIRST_SYNC_DAYS` back; its
+``ask_code`` goes through ``otp.py``), keep the device key it returns, store
+the result (``ingest.apply`` in a thread), run the after-sync hooks
+(``after_sync.py``) and mark the source ``ok``. One sync per source at a
 time: starting another returns the running one's id.
 
-Failures: a login problem (``INVALID_PASSWORD``, ``CHANGE_PASSWORD``,
-``ACCOUNT_BLOCKED``, ``CODE_REJECTED``, ``LOGIN_UNKNOWN``) marks the source
-``needs_attention`` and Dana never runs it again on its own (new credentials
-or, for some, the user's "Sync now" do: ``store.HAND_RETRY_ERRORS``); no code
-in time marks it ``failing`` until the next regular slot, and a second one in
-a row ``needs_attention``; anything else marks it ``failing`` and retries
-after 30 minutes, then 2 hours, then at the regular slots."""
+Failures (``providers.SyncError``): a login problem (``INVALID_PASSWORD``,
+``CHANGE_PASSWORD``, ``ACCOUNT_BLOCKED``, ``CODE_REJECTED``, ``LOGIN_UNKNOWN``)
+marks the source ``needs_attention`` and Dana never runs it again on its own
+(new credentials or, for some, the user's "Sync now" do:
+``store.HAND_RETRY_ERRORS``); no code in time marks it ``failing`` until the
+next regular slot, and a second one in a row ``needs_attention``; anything
+else marks it ``failing`` and retries after 30 minutes, then 2 hours, then at
+the regular slots."""
 
 import asyncio
 import datetime
 import logging
 import uuid
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Tuple
+from typing import Any, Dict, List, Mapping, Optional
 
 from core import clock, users
 from core.users import User
-from core.addons import crypto
-from addons.money import after_sync, companies, config, ingest, otp, slots, store, worker_client
+from core.addons import NotConnected, crypto
+from addons.money import after_sync, config, ingest, otp, providers, slots, store
+from addons.money.providers import CODE_TIMEOUT, LOGIN_ERRORS
 
 logger = logging.getLogger(__name__)
-
-# Login problems the worker reports: never retried (repeating them can lock the login).
-# LOGIN_UNKNOWN: the password went out and the site neither let the worker in nor said why.
-LOGIN_ERRORS = ("INVALID_PASSWORD", "CHANGE_PASSWORD", "ACCOUNT_BLOCKED", "CODE_REJECTED", "LOGIN_UNKNOWN")
-CODE_TIMEOUT = "CODE_TIMEOUT"
-POLL_SECONDS = 25
-# A profile still busy from before a restart: its old job is cancelled, then the start is tried this
-# many times, a second apart (the worker frees the profile once the old browser has closed).
-BUSY_TRIES = 10
-# A bank asking again after a code was given (a wrong code): ask at most this many times per sync.
-MAX_CODE_ROUNDS = 3
-# Jobs Dana runs on the worker at once (its browser limit).
-MAX_PARALLEL = 2
 
 
 def login_reason(error_type: str, company: str) -> str:
     """What the user must do about a login problem, in plain words."""
-    name = companies.name_of(company)
+    name = providers.name_of(company)
     if error_type == "CHANGE_PASSWORD":
         return f"{name} wants a new password: change it on {name}'s site, then update it here"
     if error_type == "ACCOUNT_BLOCKED":
@@ -64,34 +55,19 @@ def login_reason(error_type: str, company: str) -> str:
     return f"{name} refused the login details: check them and update them here"
 
 
-class _Failed(Exception):
-    def __init__(self, error_type: str, message: str) -> None:
-        super().__init__(message)
-        self.error_type = error_type
-
-
 @dataclass
 class _Run:
     sync_id: str
     user_id: str
     started_at: str
     task: Optional["asyncio.Task[None]"] = None
-    job_id: Optional[str] = None
-    token: Optional[str] = None  # the encrypted credentials the job was started with
+    token: Optional[str] = None  # the encrypted credentials the sync was started with
+    told: bool = False  # the "Signed in" notice went out
     done: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 # Source id → its running sync.
 _running: Dict[str, _Run] = {}
-_parallel: Optional[Tuple[asyncio.AbstractEventLoop, asyncio.Semaphore]] = None
-
-
-def _slot_limit() -> asyncio.Semaphore:
-    global _parallel
-    loop = asyncio.get_running_loop()
-    if _parallel is None or _parallel[0] is not loop:
-        _parallel = (loop, asyncio.Semaphore(MAX_PARALLEL))
-    return _parallel[1]
 
 
 def running(source_id: str) -> Optional[str]:
@@ -142,7 +118,7 @@ async def run(user: User, source_id: str, trigger: str) -> str:
 
 
 async def cancel(source_id: str) -> None:
-    """Stop the source's running sync (its worker job is cancelled too)."""
+    """Stop the source's running sync (the provider's work is cancelled too)."""
     run_ = _running.get(source_id)
     if run_ is None or run_.task is None:
         return
@@ -158,74 +134,58 @@ def _start_date(source: Mapping[str, Any]) -> datetime.date:
     return last_ok.astimezone(clock.get_timezone()).date() - datetime.timedelta(days=config.OVERLAP_DAYS)
 
 
-async def _start_job(source: Mapping[str, Any], credentials: Mapping[str, str],
-                     device: Optional[Mapping[str, str]] = None) -> str:
-    start = _start_date(source)
-    for attempt in range(BUSY_TRIES):
-        try:
-            return await worker_client.start_job(source["company"], source["id"], start, credentials, device)
-        except worker_client.Busy as e:  # a job left over from before a restart: cancel it, wait for its browser
-            if attempt == BUSY_TRIES - 1:
-                raise
-            if e.job:
-                await worker_client.cancel_job(e.job)
-            await asyncio.sleep(1)
-    raise AssertionError("unreachable")
+async def _ask_code(user: User, source: Dict[str, Any], run_: _Run) -> str:
+    """``SyncJob.ask_code``: the SMS code from the user (``otp.ask``); the source is ``syncing`` again once it came.
+
+    Raises:
+        providers.SyncError: ``CODE_TIMEOUT``, no code in time.
+    """
+    code = await otp.ask(user, source, run_.sync_id)
+    if code is None:
+        raise providers.SyncError(CODE_TIMEOUT, "no sign-in code arrived")
+    with store.db() as conn:
+        conn.execute("UPDATE money_sources SET state = 'syncing', state_reason = NULL, updated_at = ? "
+                     "WHERE id = ? AND user_id = ?", (store.now_iso(), source["id"], user.id))
+        # scoped: this source's own sync run (created for the user's source)
+        conn.execute("UPDATE money_syncs SET state = 'running' WHERE id = ?", (run_.sync_id,))
+    return code
 
 
-async def _scrape(user: User, source: Dict[str, Any], run_: _Run) -> List[Dict[str, Any]]:
-    """Run the worker job to its end; returns its accounts."""
+async def _signed_in(user: User, source: Dict[str, Any], run_: _Run) -> None:
+    """``SyncJob.signed_in``: the quiet notice, once per sync."""
+    if not run_.told:
+        run_.told = True
+        await otp.signed_in(user, source)
+
+
+async def _fetch(user: User, source: Dict[str, Any], run_: _Run) -> List[Dict[str, Any]]:
+    """Run the company's provider for the source; returns its accounts (money's ingest format)."""
+    try:
+        company = providers.get(user, source["company"])
+    except providers.UnknownCompany:
+        raise providers.SyncError("GENERIC", f"no addon reads {source['company']} any more") from None
+    except NotConnected as e:
+        raise providers.SyncError("GENERIC", f"the {e.addon} addon is off") from None
     token = run_.token = store.credentials_token(user, source["id"])
     if not token:
-        raise _Failed("GENERIC", "no login details saved")
+        raise providers.SyncError("GENERIC", "no login details saved")
     device_token = store.device_token(user, source["id"])
-    device = crypto.decrypt(device_token) if device_token else None
-    job_id = run_.job_id = await _start_job(source, crypto.decrypt(token), device)
-    seen: Optional[str] = None
-    code_rounds = 0
-    code_given = told = False
-    while True:
-        job = await worker_client.get_job(job_id, wait=POLL_SECONDS, seen=seen)
-        previous, state = seen, str(job.get("state") or "")
-        seen = state
-        if state == "needs_code" and previous == "needs_code":
-            continue  # the long poll ran out: the worker still has the code we gave it, or will time out itself
-        if state == "needs_code":
-            code_rounds += 1
-            if code_rounds > MAX_CODE_ROUNDS:
-                await worker_client.cancel_job(job_id)
-                raise _Failed("GENERIC", "the bank kept asking for a sign-in code")
-            code = await otp.ask(user, source, run_.sync_id)
-            if code is None:
-                await worker_client.cancel_job(job_id)
-                raise _Failed(CODE_TIMEOUT, "no sign-in code arrived")
-            with store.db() as conn:
-                conn.execute("UPDATE money_sources SET state = 'syncing', state_reason = NULL, updated_at = ? "
-                             "WHERE id = ? AND user_id = ?", (store.now_iso(), source["id"], user.id))
-                # scoped: this source's own sync run (created for the user's source)
-                conn.execute("UPDATE money_syncs SET state = 'running' WHERE id = ?", (run_.sync_id,))
-            code_given = await worker_client.post_code(job_id, code) or code_given
-            continue
-        if code_given and not told and state in ("scraping", "done"):
-            told = True
-            await otp.signed_in(user, source)
-        if state == "done":
-            _keep_device(user, source, job)
-            accounts = job.get("accounts")
-            return list(accounts) if isinstance(accounts, list) else []
-        if state == "failed":
-            raise _Failed(str(job.get("error_type") or "GENERIC"), str(job.get("error") or "the sign-in failed"))
-        if state == "cancelled":
-            raise _Failed("GENERIC", "the bank worker cancelled the sync")
+    job = providers.SyncJob(
+        user=user, source_id=source["id"], company=company.id, credentials=crypto.decrypt(token),
+        device=crypto.decrypt(device_token) if device_token else None, start_date=_start_date(source),
+        ask_code=lambda: _ask_code(user, source, run_), signed_in=lambda: _signed_in(user, source, run_))
+    result = await company.sync(job)
+    _keep_device(user, source, result)
+    return list(result.accounts or [])
 
 
-def _keep_device(user: User, source: Mapping[str, Any], job: Mapping[str, Any]) -> None:
-    """A device key the job registered is kept (encrypted); one the site refused is forgotten."""
-    device = job.get("device")
-    if isinstance(device, dict) and all(isinstance(device.get(k), str) and device.get(k) for k in ("user", "udid", "key")):
-        store.set_device(user, source["id"], crypto.encrypt({k: device[k] for k in ("user", "udid", "key")}))
+def _keep_device(user: User, source: Mapping[str, Any], result: providers.SyncResult) -> None:
+    """A device key the provider asked to keep is kept (encrypted); one the site refused is forgotten."""
+    device = result.device
+    if device and all(isinstance(k, str) and isinstance(v, str) and v for k, v in device.items()):
+        store.set_device(user, source["id"], crypto.encrypt(dict(device)))
         logger.info(f"Money source {source['id']}: a device key was registered")
-    elif job.get("device_dropped"):
+    elif result.device_dropped:
         store.set_device(user, source["id"], None)
         logger.info(f"Money source {source['id']}: the site refused the device key; it is forgotten")
 
@@ -233,25 +193,18 @@ def _keep_device(user: User, source: Mapping[str, Any], job: Mapping[str, Any]) 
 async def _follow(user: User, source: Dict[str, Any], run_: _Run) -> None:
     source_id = source["id"]
     try:
-        async with _slot_limit():
-            accounts = await asyncio.wait_for(_scrape(user, source, run_),
-                                              timeout=config.SYNC_TIMEOUT_MINUTES * 60)
+        # A provider's own wait (for a free browser) counts: the timeout cancels it, and it cleans up.
+        accounts = await asyncio.wait_for(_fetch(user, source, run_), timeout=config.SYNC_TIMEOUT_MINUTES * 60)
         result = await asyncio.to_thread(ingest.apply, user, source, accounts)
         await after_sync.run(user, source_id, result["new"], result["changed"])
         _succeeded(user, source, run_, result)
     except asyncio.CancelledError:
-        if run_.job_id:
-            await worker_client.cancel_job(run_.job_id)
         _ended(user, source_id, run_.sync_id, "cancelled", None, "cancelled")
         raise
     except asyncio.TimeoutError:
-        if run_.job_id:
-            await worker_client.cancel_job(run_.job_id)
         _failed(user, source, run_, "TIMEOUT", "the sync took too long")
-    except _Failed as e:
+    except providers.SyncError as e:
         _failed(user, source, run_, e.error_type, str(e))
-    except worker_client.WorkerError as e:
-        _failed(user, source, run_, e.error_type if e.error_type else "GENERIC", str(e))
     except crypto.CredentialsKeyError:
         _failed(user, source, run_, "GENERIC", "the saved login details can't be read (CREDENTIALS_KEY)")
     except Exception as e:
@@ -307,7 +260,7 @@ def _retry_at(source_id: str, failures: int, now: datetime.datetime) -> datetime
 
 
 def _failed(user: User, source: Dict[str, Any], run_: _Run, error_type: str, message: str) -> None:
-    # The worker's text may quote the site (an error page, a URL): no ID, card or account numbers kept.
+    # A provider's text may quote the site (an error page, a URL): no ID, card or account numbers kept.
     message = ingest.scrub(message or "")[:300]
     now = store.utc_now()
     replaced = False

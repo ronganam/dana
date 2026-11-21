@@ -1,9 +1,9 @@
 /**
- * The bank-worker sidecar's job table and HTTP API (addons/money/worker/src/jobs.js, server.js) without a browser.
+ * The bank-worker sidecar's job table and HTTP API (addons/money_il/worker/src/jobs.js, server.js) without a browser.
  *
  * A scripted scrape stands in for Chromium: states, the SMS-code hand-off (code, timeout, cancel), the
  * job timeout, busy profiles and the browser limit, error types and blanked credentials; then the API of
- * addons/money/worker/README.md over HTTP: the token file, long polls, codes, cancelling, deleting profiles.
+ * addons/money_il/worker/README.md over HTTP: the token file, long polls, codes, cancelling, deleting profiles.
  *
  * Run: bin/test test_bank_worker
  */

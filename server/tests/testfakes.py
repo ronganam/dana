@@ -6,7 +6,7 @@
   entities; it records every request. Used by test_homeassistant_users.py
   and test_addons_api.py.
 - :class:`FakeWAHA`: one WAHA instance.
-- :class:`FakeBankWorker`: the bank-worker sidecar (addons/money/worker/README.md)
+- :class:`FakeBankWorker`: the bank-worker sidecar (addons/money_il/worker/README.md)
   with scripted outcomes per profile. Used by test_money.py.
 """
 

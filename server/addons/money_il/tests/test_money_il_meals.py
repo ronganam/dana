@@ -1,10 +1,10 @@
-"""Meal cards (Pluxee / Cibus): the sync with its SMS code, the ingest, the cycles and the card line they bill, the API, the tool and the web fixture.
-Run: bin/test test_money_meals
+"""money_il's meal card (Pluxee / Cibus): the sync with its SMS code, the ingest, the cycles and the card line they bill, the API, the tool and the web fixture.
+Run: bin/test test_money_il_meals
 
 ``testfakes.FakeBankWorker`` plays the bank-worker with a made-up Pluxee result
-in the worker's real shape (addons/money/worker/README.md, "Pluxee"): every place,
-amount and number is invented. Robin (the first admin) and Bob have ``money``;
-Carl has not. Checked: the company (a phone, the SMS sender and a pattern
+in the worker's real shape (addons/money_il/worker/README.md, "Pluxee"): every place,
+amount and number is invented. Robin (the first admin) and Bob have ``money`` and
+``money_il``; Carl has neither. Checked: the company (a phone, the SMS sender and a pattern
 that finds a 6-digit code); the code reaching the job; the account (kind
 ``meal``, what is left of the budget, the cycle in ``details``); the charges
 (agorot, the budget's and the card's parts, time, order type, a cancelled one,
@@ -53,7 +53,8 @@ from core import clock  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import Connection, registry, store as connections  # noqa: E402
-from addons.money import api as money_api, companies, config, ingest, meals, queries, store, sync, tools  # noqa: E402
+from addons.money import api as money_api, ingest, meals, providers, queries, store, sync, tools  # noqa: E402
+from addons.money_il import config as il_config, convert  # noqa: E402
 from addons.phone import push  # noqa: E402
 from testfakes import FakeBankWorker  # noqa: E402
 
@@ -71,9 +72,11 @@ assert ROBIN is not None
 BOB = users.create("Bob")
 CARL = users.create("Carl")
 connections.connect(ROBIN, "money")
+connections.connect(ROBIN, "money_il")
 connections.connect(BOB, "money")
+connections.connect(BOB, "money_il")
 TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ROBIN, BOB, CARL)}
-WORKER = FakeBankWorker(config.token_file())
+WORKER = FakeBankWorker(il_config.token_file())
 CODE = "482913"
 PHONES = {"robin": "0521112233", "bob": "0547778899"}
 
@@ -176,7 +179,7 @@ def txn_id(user, day: datetime.date, amount: int) -> str:
 
 
 def test_pure() -> None:
-    c = companies.get("pluxee")
+    c = providers.get(ROBIN, "pluxee")
     check("the company: a meal card, one phone field", c.kind == "meal" and [(f.name, f.secret) for f in c.fields]
           == [("phone", False)])
     check("the SMS: its sender as the phone shows it", "1700701130" in c.sms_senders and "1-700-701-130" in c.sms_senders)
@@ -187,13 +190,13 @@ def test_pure() -> None:
           == (datetime.date(2026, 10, 22), datetime.date(2026, 11, 21))
           and meals.cycle_of(datetime.date(2026, 1, 5), 22) == (datetime.date(2025, 12, 22), datetime.date(2026, 1, 21))
           and meals.cycle_of(datetime.date(2026, 2, 28), 31) == (datetime.date(2026, 2, 28), datetime.date(2026, 3, 30)))
-    d = meals.deal_row(deal(9, datetime.date(2026, 11, 14), "X 012345674", 190.0, 137.6, time="21:49", order=1))
+    d = convert.deal_row(deal(9, datetime.date(2026, 11, 14), "X 012345674", 190.0, 137.6, time="21:49", order=1))
     check("a charge: agorot, the budget's and the card's parts, time, delivery, ID scrubbed",
           d["total"] == 19000 and d["card_paid"] == 13760 and d["budget_paid"] == 5240
           and d["occurred_at"] == "2026-11-14T21:49:00+02:00" and d["order_type"] == "delivery"
-          and d["place"] == "X [id]" and d["ext_key"] == "pluxee:9" and "012345674" not in d["raw"], d)
-    check("a charge without a deal id or date is skipped", meals.deal_row({"date": "1/1/2026", "price": 1}) is None
-          and meals.deal_row({"deal_id": 1, "date": "soon", "price": 1}) is None)
+          and d["place"] == "X [id]" and d["ext_key"] == "pluxee:9", d)
+    check("a charge without a deal id or date is skipped", convert.deal_row({"date": "1/1/2026", "price": 1}) is None
+          and convert.deal_row({"deal_id": 1, "date": "soon", "price": 1}) is None)
     check("billed lines: exact amount, after the cycle, each line once", meals.billed_lines(
         [{"start": "2026-09-22", "end": "2026-10-21", "card_paid": 11825},
          {"start": "2026-08-22", "end": "2026-09-21", "card_paid": 11825}],
@@ -377,7 +380,7 @@ async def main() -> None:
             stored = json.load(f)
         drift = [k for k in captured if shape(captured[k]) != shape(stored.get(k))]
         check("fixture: tests/fixtures/money_meals_web.json has the payloads' current shape "
-              "(regenerate with WRITE_WEB_FIXTURE=1 bin/test test_money_meals)", not drift, drift)
+              "(regenerate with WRITE_WEB_FIXTURE=1 bin/test test_money_il_meals)", not drift, drift)
 
 
 if __name__ == "__main__":

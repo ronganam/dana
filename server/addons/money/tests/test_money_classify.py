@@ -59,7 +59,9 @@ ADMIN = users.first_admin()
 assert ADMIN is not None
 BOB = users.create("Bob")
 connections.connect(ADMIN, "money")
+connections.connect(ADMIN, "money_il")
 connections.connect(BOB, "money")
+connections.connect(BOB, "money_il")
 
 # Sources are added before the event loop runs, so no sync starts.
 POALIM = sources.add(ADMIN, "hapoalim", {"userCode": "AB12345", "password": "pw-poalim-1"})
@@ -67,6 +69,7 @@ CAL = sources.add(ADMIN, "visaCal", {"username": "robin.cal", "password": "pw-ca
 BOB_CAL = sources.add(BOB, "visaCal", {"username": "bob.cal", "password": "pw-cal-bob"})
 CAROL = users.create("Carol")
 connections.connect(CAROL, "money")
+connections.connect(CAROL, "money_il")
 CAROL_BANK = sources.add(CAROL, "hapoalim", {"userCode": "CD12345", "password": "pw-poalim-c"})
 CAROL_CAL = sources.add(CAROL, "visaCal", {"username": "carol.cal", "password": "pw-cal-c"})
 
@@ -376,6 +379,7 @@ async def test_no_key_and_retry() -> None:
 async def test_names_and_disconnect() -> None:
     dee = users.create("Dee")
     connections.connect(dee, "money")
+    connections.connect(dee, "money_il")
     bank = sources.add(dee, "hapoalim", {"userCode": "DE12345", "password": "pw-dee"})
     card = sources.add(dee, "visaCal", {"username": "dee.cal", "password": "pw-dee-cal"})
     out = ingest.apply(dee, bank, [{"accountNumber": "12-345-55555", "balance": 10.0, "txns": [

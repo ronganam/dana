@@ -1,20 +1,20 @@
 """Money: ingest of scraper results, scrubbing, categories, rules with Undo and the sync slots (docs/money.md).
 Run: bin/test test_money
 
-Synthetic fixtures shaped exactly like the bank-worker's real output
-(``israeli-bank-scrapers`` accounts: Hapoalim and Cal), every value made up.
+Synthetic fixtures in money's ingest format (the ``israeli-bank-scrapers``
+accounts money_il's Hapoalim and Cal hand over), every value made up.
 Covers: transaction keys (Cal identifier + installment, Hapoalim's hash with
 an occurrence count so identical rows stay two) and re-ingest idempotency;
 pending rows replaced on every pull (provisional ones left alone); changed
 rows updated without touching a user's category / note; local dates and
-exact times from the scrapers' UTC instants; the Cal installment purchase
+exact times from the scrapers' UTC instants; an installment's purchase
 date; currencies; bank balance and the card's next bill; scrubbing of ID,
 card and account numbers (text and raw); merchant keys; rules applied at
 ingest; per-user accounts; the category taxonomy and ``resolve``;
 ``set_category`` / ``set_note`` with Undo, scoped to the user; transaction
 reads; the slots (jitter, MONEY_SYNC_TIMES, quiet hours), ``request_soon``'s
 daily limit and ``sync_now``'s refusals. Sync flows with the fake worker and
-the API are in test_money_sync.py.
+the API are in addons/money_il/tests/test_money_il_sync.py.
 """
 
 import asyncio
@@ -59,7 +59,9 @@ ADMIN = users.first_admin()
 assert ADMIN is not None
 BOB = users.create("Bob")
 connections.connect(ADMIN, "money")
+connections.connect(ADMIN, "money_il")
 connections.connect(BOB, "money")
+connections.connect(BOB, "money_il")
 
 # --- Fixtures (made-up values, real shapes) ------------------------------------------------------
 
@@ -108,8 +110,9 @@ def cal_txn(identifier: Any, date: str, processed: str, charged: float, descript
          "rawTransaction": {"trnPurchaseDate": purchase or date[:19], "debCrdDate": processed[:10] + "T00:00:00",
                             "branchCodeDesc": category, "isAbroadTransaction": currency != "₪",
                             "walletProviderCode": 5}}
-    if installments:
+    if installments:  # money_il's convert adds purchaseDate (Cal's trnPurchaseDate) to an installment
         t["installments"] = installments
+        t["purchaseDate"] = purchase
     return t
 
 
@@ -217,7 +220,7 @@ def test_keys_and_dates() -> None:
     check("Cal: 10:58:17Z is 12:58:17 local", rami["occurred_at"] == "2026-11-17T12:58:17+02:00"
           and rami["purchase_date"] == "2026-11-17", rami)
     inst = [r for r in rows(ADMIN, card["id"]) if r["installment_number"] == 3][0]
-    check("installments: the purchase date from trnPurchaseDate (not the payment month), n/total kept",
+    check("installments: the purchase date from purchaseDate (not the payment month), n/total kept",
           inst["purchase_date"] == "2026-08-24" and inst["occurred_at"] == "2026-08-24T15:00:00+03:00"
           and inst["installment_total"] == 4 and inst["charge_date"] == "2026-12-15", inst)
     check("Cal: the next bill is the balance (positive agorot) on the first charge date from today",

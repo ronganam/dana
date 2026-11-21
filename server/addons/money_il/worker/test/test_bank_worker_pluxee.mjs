@@ -1,5 +1,5 @@
 /**
- * The bank-worker's Pluxee (Cibus) meal card client (addons/money/worker/src/pluxee.js) on a fake browser page.
+ * The bank-worker's Pluxee (Cibus) meal card client (addons/money_il/worker/src/pluxee.js) on a fake browser page.
  *
  * A session left in the profile (no SMS), the code sign-in (the phone once, `logging_in` only once the SMS is
  * out, the code once), the refusals (reCAPTCHA → GENERIC before the SMS, an unknown phone, a wrong code with

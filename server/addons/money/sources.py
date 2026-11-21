@@ -1,19 +1,22 @@
 """Adding, fixing and removing a user's bank / card logins (docs/money.md, "Sources").
 
-A source is one login at one company. Its credentials are checked against
-the company's form, stored encrypted (``CREDENTIALS_KEY``) and decrypted only
-by ``sync.py``; nothing returns or logs them. A new source, and a source
-given new credentials, syncs at once (``trigger="connect"``); new
-credentials also clear ``needs_attention``."""
+A source is one login at one company of a provider addon the user has
+(``providers.py``). Its credentials are checked against the company's form,
+stored encrypted (``CREDENTIALS_KEY``) and decrypted only by ``sync.py``;
+nothing returns or logs them. A new source, and a source given new
+credentials, syncs at once (``trigger="connect"``); new credentials also clear
+``needs_attention``. Removing a source asks its provider to forget what it
+keeps for it (``Company.forget``: browser profiles)."""
 
 import asyncio
 import logging
 import uuid
-from typing import Any, Dict, List, Mapping, Optional, Set
+from collections import defaultdict
+from typing import Any, Dict, Iterable, List, Mapping, Optional, Set
 
 from core.users import User
 from core.addons import crypto, store as connections
-from addons.money import companies, config, otp, schedule, store, sync, worker_client
+from addons.money import config, otp, providers, schedule, store, sync
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +34,7 @@ class InvalidCredentials(ValueError):
         self.field = field
 
 
-def _checked(company: companies.Company, credentials: Any) -> Dict[str, str]:
+def _checked(company: providers.Company, credentials: Any) -> Dict[str, str]:
     if not isinstance(credentials, Mapping):
         raise InvalidCredentials("credentials", "credentials must be an object")
     names = {f.name for f in company.fields}
@@ -70,11 +73,12 @@ def add(user: User, company: str, credentials: Mapping[str, Any], label: Optiona
     """Add a login for the user and start its first sync; returns its payload.
 
     Raises:
-        UnknownCompany: not a supported company.
+        UnknownCompany: no loaded provider brings the company.
+        NotConnected: the company's provider addon is not on for the user.
         InvalidCredentials: a field missing or malformed.
         CredentialsKeyError: no usable ``CREDENTIALS_KEY``.
     """
-    c = companies.get(company)
+    c = providers.get(user, company)
     token = crypto.encrypt(_checked(c, credentials))
     source_id = uuid.uuid4().hex
     now = store.now_iso()
@@ -95,6 +99,7 @@ def update(user: User, source_id: str, *, label: Optional[str] = None,
 
     Raises:
         LookupError: no such source of the user.
+        UnknownCompany / NotConnected: new credentials for a company the user cannot use now.
         InvalidCredentials: a field missing or malformed.
         CredentialsKeyError: no usable ``CREDENTIALS_KEY``.
     """
@@ -107,7 +112,7 @@ def update(user: User, source_id: str, *, label: Optional[str] = None,
             conn.execute("UPDATE money_sources SET label = ?, updated_at = ? WHERE id = ? AND user_id = ?",
                          (_label(label), now, source_id, user.id))
         if credentials is not None:
-            token = crypto.encrypt(_checked(companies.get(source["company"]), credentials))
+            token = crypto.encrypt(_checked(providers.get(user, source["company"]), credentials))
             conn.execute("UPDATE money_sources SET credentials = ?, state = 'new', state_reason = NULL, "
                          "error_type = NULL, failures = 0, next_sync_at = ?, updated_at = ? "
                          "WHERE id = ? AND user_id = ?", (token, now, now, source_id, user.id))
@@ -118,11 +123,12 @@ def update(user: User, source_id: str, *, label: Optional[str] = None,
 
 
 async def remove(user: User, source_id: str, delete_transactions: bool = False) -> bool:
-    """Remove a source: its running sync stops, its browser profile is deleted
-    (best-effort) and, with ``delete_transactions``, its accounts and their
-    transactions; otherwise its accounts stay (without a source). False when
-    no such source of the user."""
-    if store.get_source(user, source_id) is None:
+    """Remove a source: its running sync stops, its provider forgets it (its
+    browser profile, best-effort) and, with ``delete_transactions``, its
+    accounts and their transactions go; otherwise its accounts stay (without a
+    source). False when no such source of the user."""
+    source = store.get_source(user, source_id)
+    if source is None:
         return False
     await sync.cancel(source_id)
     otp.cancel_for_source(user, source_id)
@@ -132,14 +138,45 @@ async def remove(user: User, source_id: str, delete_transactions: bool = False) 
         conn.execute("DELETE FROM money_sources WHERE id = ? AND user_id = ?", (source_id, user.id))
     logger.info(f"Money source {source_id} of user {user.id} removed"
                 + (" with its transactions" if delete_transactions else ""))
-    await worker_client.delete_profile(source_id)
+    await _provider_forget({source["company"]: [source_id]})
     return True
 
 
-async def _forget(source_ids: List[str]) -> None:
-    for source_id in source_ids:
-        await sync.cancel(source_id)
-    await worker_client.delete_profiles(source_ids)
+async def _provider_forget(by_company: Mapping[str, List[str]]) -> None:
+    """Ask each company's provider to forget its removed sources (best-effort)."""
+    for company_id, source_ids in by_company.items():
+        company = providers.company(company_id)
+        if company is None or company.forget is None:
+            continue
+        try:
+            await company.forget(list(source_ids))
+        except Exception as e:
+            logger.warning(f"Money: {company_id} could not forget {len(source_ids)} source(s): {e}")
+
+
+async def _forget(by_company: Mapping[str, List[str]]) -> None:
+    for source_ids in by_company.values():
+        for source_id in source_ids:
+            await sync.cancel(source_id)
+    await _provider_forget(by_company)
+
+
+def _in_background(by_company: Mapping[str, List[str]]) -> None:
+    """Stop the sources' syncs and let their providers forget them, when an event loop runs."""
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    task = loop.create_task(_forget(by_company))
+    _tasks.add(task)
+    task.add_done_callback(_tasks.discard)
+
+
+def _grouped(sources: Iterable[Mapping[str, Any]]) -> Dict[str, List[str]]:
+    out: Dict[str, List[str]] = defaultdict(list)
+    for s in sources:
+        out[s["company"]].append(s["id"])
+    return dict(out)
 
 
 def on_change(user: User) -> None:
@@ -147,14 +184,27 @@ def on_change(user: User) -> None:
     the user's money data and ask the worker to delete their browser profiles."""
     if connections.is_connected(user, config.ADDON):
         return
-    source_ids = store.delete_all(user)
-    logger.info(f"Money disconnected for user {user.id}: {len(source_ids)} source(s) and their data deleted")
-    if not source_ids:
+    removed = store.delete_all(user)
+    logger.info(f"Money disconnected for user {user.id}: {len(removed)} source(s) and their data deleted")
+    if removed:
+        _in_background(_grouped(removed))
+
+
+def provider_changed(user: User, addon: str) -> None:
+    """For a provider's ``Addon(on_change=)``: once ``addon`` is off for the
+    user, their logins at its companies are removed (credentials, device keys,
+    code requests; their running syncs stop and the provider forgets them).
+    Their accounts and transactions stay, without a source."""
+    if connections.is_connected(user, addon):
         return
-    try:
-        loop = asyncio.get_running_loop()
-    except RuntimeError:
+    gone = [s for s in store.list_sources(user)
+            if (c := providers.company(s["company"])) is not None and c.addon == addon]
+    if not gone:
         return
-    task = loop.create_task(_forget(source_ids))
-    _tasks.add(task)
-    task.add_done_callback(_tasks.discard)
+    with store.db() as conn:
+        for s in gone:
+            conn.execute("UPDATE money_code_requests SET status = 'cancelled' WHERE user_id = ? AND source_id = ? "
+                         "AND status = 'pending'", (user.id, s["id"]))
+            conn.execute("DELETE FROM money_sources WHERE id = ? AND user_id = ?", (s["id"], user.id))
+    logger.info(f"{addon} turned off for user {user.id}: {len(gone)} money source(s) removed")
+    _in_background(_grouped(gone))

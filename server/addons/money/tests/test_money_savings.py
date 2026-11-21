@@ -38,7 +38,8 @@ import os
 import re
 import sys
 import uuid
-from typing import Any, Dict, List, Optional, Tuple
+from contextlib import contextmanager
+from typing import Any, Dict, Iterator, List, Optional, Tuple
 from unittest.mock import patch
 from urllib.parse import parse_qs, quote, urlparse
 
@@ -68,8 +69,8 @@ from core.auth import setup_auth  # noqa: E402
 from core.addons import store as connections  # noqa: E402
 from core.addons import registry  # noqa: E402
 from core.addons.store import NotConnected  # noqa: E402
-from addons.money import (api as money_api, dashboard, ingest, market, queries, reference, savings,  # noqa: E402
-                                store, tools)
+from addons.money import api as money_api, dashboard, ingest, providers, queries, savings, store, tools  # noqa: E402
+from addons.money_il import market, reference  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
 
@@ -95,7 +96,9 @@ assert ROBIN is not None
 BOB = users.create("Bob")
 CARL = users.create("Carl")
 connections.connect(ROBIN, "money")
+connections.connect(ROBIN, "money_il")
 connections.connect(BOB, "money")
+connections.connect(BOB, "money_il")
 TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ROBIN, BOB, CARL)}
 STAMP = "2026-11-01T00:00:00+00:00"
 WEB_FIXTURE = os.path.join(testenv.FIXTURES, "money_savings_web.json")
@@ -167,11 +170,22 @@ def set_check(user, topic: str, params: Dict[str, Any], items: List[Dict[str, An
         "sources": [{"title": "השוואת מחירים לדוגמה", "url": "https://example.com/prices"}], "error": None}
 
 
-REAL_START, REAL_LATEST = market.start, market.latest
-_latest = patch.object(market, "latest", fake_latest)
-_start = patch.object(market, "start", fake_start)
-_latest.start()
-_start.start()
+# money_il's price checks and rates, as registered; the fakes replace them (the same addon re-registers).
+IL_CHECKS, IL_RATES = providers.price_checks(ROBIN), providers.rates(ROBIN)
+assert IL_CHECKS is not None and IL_RATES is not None
+
+
+@contextmanager
+def price_checks(latest: Any, start: Any) -> Iterator[None]:
+    """money_il's price checks with ``latest`` / ``start`` in place of the fakes for a while."""
+    providers.register_price_checks(dataclasses.replace(IL_CHECKS, latest=latest, start=start))
+    try:
+        yield
+    finally:
+        providers.register_price_checks(dataclasses.replace(IL_CHECKS, latest=fake_latest, start=fake_start))
+
+
+providers.register_price_checks(dataclasses.replace(IL_CHECKS, latest=fake_latest, start=fake_start))
 
 SOURCE = {"title": "דוגמה", "url": "https://example.com/offer"}
 TELECOM = [
@@ -405,7 +419,7 @@ def test_reference() -> None:
     usd = reference.fx_rates("usd", D(2026, 7, 1), D(2026, 7, 6))
     check("reference: FX rates per business day (BOM, extra columns), a weekend uses Friday's",
           usd == {"2026-07-01": 3.6, "2026-07-02": 3.6, "2026-07-03": 3.6, "2026-07-06": 3.6}
-          and reference.rate_on(usd, "2026-07-05") == 3.6 and reference.rate_on(usd, "2026-06-20") is None, usd)
+          and providers.rate_on(usd, "2026-07-05") == 3.6 and providers.rate_on(usd, "2026-06-20") is None, usd)
     check("reference: an unsupported currency is left out (the yen is quoted per 100)",
           reference.fx_rates("JPY", D(2026, 7, 1), D(2026, 7, 6)) == {})
     reference.clear_cache()
@@ -559,7 +573,8 @@ async def test_checks(client: TestClient) -> None:
     check("check: 202 checking, the telecom params carry only service, lines and the current price",
           s == 202 and body["state"] == "checking"
           and STARTS == [(ROBIN.id, "telecom", {"service": "mobile", "lines": 1, "current_price": 109})], (s, STARTS))
-    for exc, status in ((market.Running(), 409), (market.TooSoon(120), 429), (market.Unavailable("no model"), 503)):
+    for exc, status in ((providers.PriceCheckRunning(), 409), (providers.PriceCheckTooSoon(120), 429),
+                        (providers.PriceCheckUnavailable("no model"), 503)):
         START_MODE["raise"] = exc
         s, body = await call(client, "POST", url(PHONE, "/check"), ROBIN)
         check(f"check: {type(exc).__name__} → {status}", s == status and (status != 429 or body["retry_after"] == 120), body)
@@ -604,8 +619,7 @@ async def test_check_route(client: TestClient) -> None:
     async def fake_find(topic: str, params: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, str]]]:
         return [dict(i) for i in ELECTRICITY], [dict(SOURCE)]
 
-    with patch.object(market, "start", REAL_START), patch.object(market, "latest", REAL_LATEST), \
-            patch.object(market, "_find", fake_find), patch.object(market.llm, "can_search", lambda: True):
+    with price_checks(market.latest, market.start), patch.object(market, "_find", fake_find), patch.object(market.llm, "can_search", lambda: True):
         s, body = await call(client, "POST", url("electricity", "/check"), ROBIN)
         await asyncio.gather(*list(market._running.values()))  # (often done already)
         stored = market.latest(ROBIN, "electricity", {})
@@ -625,7 +639,7 @@ async def test_check_route(client: TestClient) -> None:
             raise ValueError("a town the checks don't take (test)")
         return fake_latest(user, topic, params)
 
-    with patch.object(market, "latest", refuse_arnona):
+    with price_checks(refuse_arnona, fake_start):
         s, data = await call(client, "GET", "/api/money/savings", ROBIN)
         s2, body = await call(client, "POST", url(ARNONA, "/check"), ROBIN)
     found = items_of(data) if s == 200 else {}
@@ -755,10 +769,13 @@ def test_fixes() -> None:
         seen.append(currency)
         return real_fx(currency, start, end)
 
-    with patch.object(reference, "fx_rates", recording):
+    providers.register_rates(dataclasses.replace(IL_RATES, fx_rates=recording))
+    try:
         robin_fx = savings.context(ROBIN).fx
         robin_seen, seen[:] = sorted(seen), []
         bob_fx = savings.context(BOB).fx
+    finally:
+        providers.register_rates(IL_RATES)
     check("fx rates: spent abroad → every supported currency fetched (not only the ones used); never abroad → none",
           robin_seen == sorted(reference.FX_CURRENCIES) and set(robin_fx) == set(reference.FX_CURRENCIES)
           and seen == [] and bob_fx == {}, (robin_seen, seen))
