@@ -3,9 +3,9 @@
 ## Running it
 
 - **Locally**: `python main.py` (README). The web UI and API on `:8080`, Telegram if `TELEGRAM_BOT_TOKEN` is set. It needs `API_TOKEN` (or `DANA_INSECURE_DEV=1`: no authentication, `127.0.0.1` only) and an LLM key.
-- **Docker Compose**: `docker compose up -d` in `server/` builds the image and keeps the data in the `data` volume (`compose.yaml`; the bank-worker sidecar of the `money` addon: `docker compose --profile money up -d`). The port is published on `127.0.0.1:8080` only: to reach Dana from other machines, put a reverse proxy with HTTPS in front of it (Caddy, Traefik, nginx) or change the mapping knowingly. The healthcheck polls `/api/health`.
+- **Docker Compose**: `docker compose up -d` in `server/` builds the image and keeps the data in the `data` volume (`compose.yaml`; the bank-worker sidecar of the `money_il` addon: `docker compose --profile money_il up -d`). The port is published on `127.0.0.1:8080` only: to reach Dana from other machines, put a reverse proxy with HTTPS in front of it (Caddy, Traefik, nginx) or change the mapping knowingly. The healthcheck polls `/api/health`.
 - **Data to back up**: the database directory (`DATABASE_PATH`'s folder: the database, `recordings/`, `media/`, `uploads/`…) including `credentials.key` when `CREDENTIALS_KEY` is not set (the generated key: without it the stored addon credentials are lost).
-- **Kubernetes** (one replica: SQLite): the image (`Dockerfile`, `app` stage) runs as UID 1001 and keeps everything it writes in the directory holding the database (`DATABASE_PATH`, default `/app/db/db.sqlite3`; `core/paths.py`), so mount one volume there. Secrets come in as env vars (`docs/configuration.md`). Probes: TCP on 8080. The bank worker (`addons/money/worker/README.md`) runs as a sidecar on `127.0.0.1:8090` mounting only `<data dir>/money`. Backups: copy `<data dir>/snapshots/db.sqlite3` after `python3 -m core.db_snapshot` (a consistent copy; a raw copy of a live SQLite file can catch it mid-write), e.g. from a Velero pre-backup hook.
+- **Kubernetes** (one replica: SQLite): the image (`Dockerfile`, `app` stage) runs as UID 1001 and keeps everything it writes in the directory holding the database (`DATABASE_PATH`, default `/app/db/db.sqlite3`; `core/paths.py`), so mount one volume there. Secrets come in as env vars (`docs/configuration.md`). Probes: TCP on 8080. The bank worker (`addons/money_il/worker/README.md`) runs as a sidecar on `127.0.0.1:8090` mounting only `<data dir>/money`. Backups: copy `<data dir>/snapshots/db.sqlite3` after `python3 -m core.db_snapshot` (a consistent copy; a raw copy of a live SQLite file can catch it mid-write), e.g. from a Velero pre-backup hook.
 
 ## Dependencies
 
@@ -35,7 +35,7 @@ A failure stops the push. `DANA_NO_DEPLOY=1 git push …` pushes without deployi
 
 ### Workers
 
-An addon that declares `worker=Worker(port, url_env)` (`core/addons/addon.py`) has a sidecar built from its own `worker/` folder (`worker/Dockerfile`, self-contained: the app image leaves `addons/*/worker` out). Today: money's bank worker, `addons/money/worker/` (Node + Chromium; `docs/money.md`).
+An addon that declares `worker=Worker(port, url_env)` (`core/addons/addon.py`) has a sidecar built from its own `worker/` folder (`worker/Dockerfile`, self-contained: the app image leaves `addons/*/worker` out). Today: `money_il`'s bank worker, `addons/money_il/worker/` (Node + Chromium; `docs/money-il.md`).
 
 - **`bin/deploy`** builds every worker of the commit's official addons and of the site's addons as `$DANA_IMAGE-<addon>:<release>` (the same release as the app) and pushes it. `DANA_WORKERS` in `deploy.env`: `all` (default), `none`, or addon names (space or comma separated).
 - **GitOps values**: besides every `tag:` line, `bin/deploy` rewrites any `image: "<DANA_IMAGE>-<addon>:<old tag>"` to the new release, so name each worker's image in full under one key per addon; the convention is `workers.<addon>.image`:
@@ -45,13 +45,13 @@ An addon that declares `worker=Worker(port, url_env)` (`core/addons/addon.py`) h
     repository: registry.example/dana
     tag: "9.0.0-abc1234"
   workers:
-    money:
-      image: "registry.example/dana-money:9.0.0-abc1234"   # the sidecar / init container
+    money_il:
+      image: "registry.example/dana-money_il:9.0.0-abc1234"   # the sidecar / init container
       port: 8090
   ```
 
   The chart (yours) runs it in the pod next to the app, sharing its network namespace and data volume, and the app reaches it at the addon's `url_env` (`MONEY_WORKER_URL`, default `http://127.0.0.1:8090`).
-- **Compose** (`compose.yaml`): each worker is a service under a profile named after its addon: `docker compose --profile money up -d` adds `money-worker` (image `dana-money`, built from `addons/money/worker/`).
+- **Compose** (`compose.yaml`): each worker is a service under a profile named after its addon: `docker compose --profile money_il up -d` adds `money-il-worker` (image `dana-money_il`, built from `addons/money_il/worker/`).
 - Tests: a worker's own (`addons/<name>/worker/test/test_*.mjs`) run in `bin/test` with the rest.
 
 ### Restarting

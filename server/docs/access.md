@@ -47,9 +47,8 @@ first user's values), tables from migrations `m0002_users` and
   token (Bearer lookups), `session_hash` = SHA-256 of the session cookie made
   from it (cookie lookups). `last_used_at` is written at most once an hour per
   token.
-- **Web login** keeps its cookie: `ganam_session` = HMAC-SHA256 of the token
-  with the constant `ganam-web-session` (`users.session_cookie_value`), so
-  existing browser, tablet and TV logins made with `API_TOKEN` stay valid.
+- **Web login** uses the cookie `dana_session` = HMAC-SHA256 of the token
+  with the constant `ganam-web-session` (`users.session_cookie_value`).
   `/login` accepts any valid token; revoking a token also ends the web logins
   made with it.
 - **Requests** (`core/auth.py`): a Bearer token or the session cookie resolves
