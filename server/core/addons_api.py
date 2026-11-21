@@ -1,6 +1,8 @@
 """Who the caller is, and their addons (docs/access.md, "Managing users").
 
-    GET    /api/me                       → {id, name, access, capabilities: [..], kinds: [..]} (``kinds``: the addons they have)
+    GET    /api/me                       → {id, name, access, capabilities: [..], addons: [..], languages: [..], currency}
+                                           (``addons``: the ones they have; ``languages`` / ``currency``: theirs,
+                                           else the server's: core/user_locale.py; changed with PUT /api/profile)
     GET    /api/users                    → {users: [{id, name, access}]} (``manage_users`` only)
     GET    /api/addons                   → {user_id, addons: [<addon>, ...]}
     GET    /api/addons/{name}            → <addon>
@@ -57,7 +59,7 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from aiohttp import web
 
-from core import users
+from core import user_locale, users
 from core.access import CAPABILITIES
 from core.auth import request_user, requires
 from core.users import User
@@ -92,7 +94,9 @@ def me_payload(user: User) -> Dict[str, Any]:
         "name": user.name,
         "access": user.access,
         "capabilities": [c for c in CAPABILITIES if user.level.allows(c)],
-        "kinds": list(store.connected_addons(user)),
+        "addons": list(store.connected_addons(user)),
+        "languages": list(user_locale.languages(user)),
+        "currency": user_locale.currency(user),
     }
 
 

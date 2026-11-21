@@ -55,6 +55,7 @@
     <script src="/static/money.js" defer></script>
     <script src="/static/projects-core.js" defer></script>
     <script src="/static/projects.js" defer></script>
+    <script src="/static/profile.js" defer></script>
 </head>
 <body>
     <div class="app-container">
@@ -624,6 +625,22 @@
                     <span class="top-bar-title">Settings</span>
                 </header>
                 <div class="settings-container">
+                    <!-- static/profile.js: the signed-in user's languages and currency -->
+                    <div class="settings-card" id="profile-card">
+                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Profile</h2>
+                        <div class="settings-input-group">
+                            <label class="settings-label" for="profile-languages">Languages</label>
+                            <input type="text" class="settings-input" id="profile-languages" autocomplete="off" spellcheck="false">
+                            <span class="profile-hint" id="profile-languages-hint"></span>
+                        </div>
+                        <div class="settings-input-group">
+                            <label class="settings-label" for="profile-currency">Currency</label>
+                            <input type="text" class="settings-input" id="profile-currency" maxlength="3" autocomplete="off" spellcheck="false">
+                            <span class="profile-hint" id="profile-currency-hint"></span>
+                        </div>
+                        <button class="btn-primary" id="btn-save-profile">Save Profile</button>
+                        <span class="profile-hint" id="profile-status" role="status" aria-live="polite"></span>
+                    </div>
                     <div class="settings-card">
                         <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Dana</h2>
                         

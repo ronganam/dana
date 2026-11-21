@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 /**
  * Who the app's token belongs to (`GET /api/me`): id, name and the
- * integrations they have connected (`kinds`). Kept in `DanaPrefs` (three
+ * addons they have connected (`addons`, kept as [kinds]). Kept in `DanaPrefs` (three
  * small values) so places that depend on a kind (Shopping) show the right
  * thing at start and offline. [kinds] follows every save, so a place can
  * appear or go as soon as `/api/me` (or a 403 `not_connected`) says so.
@@ -40,7 +40,7 @@ object Me {
     fun parse(o: JSONObject): Info? {
         val id = o.optString("id")
         if (id.isEmpty()) return null
-        val a = o.optJSONArray("kinds")
+        val a = o.optJSONArray("addons")
         val kinds = if (a == null) emptySet() else (0 until a.length()).map { a.optString(it) }.filter { it.isNotBlank() }.toSet()
         return Info(id, o.optString("name"), kinds)
     }

@@ -110,6 +110,7 @@
     if (seq !== loadSeq) return;
     if (r.status === 200 && r.body) {
       S.data = r.body;
+      C.setCurrency(S.data.project?.currency);
       if (S.sectionId && !section()) S.sectionId = null;
     } else { S.data = null; S.projectId = null; }
   }
@@ -488,6 +489,8 @@
 
   function projectSheet(d) {
     const isNew = !d.id;
+    // An existing project's budget is in its owner's currency; a new one's in mine (that of a project of my own).
+    const sym = C.currencySymbol(isNew ? (S.list || []).find((p) => !p.shared_by)?.currency : d.currency).trim();
     return `
       <header class="prj-sheet-head"><div class="prj-sheet-title"><h2>${isNew ? "New project" : "Edit project"}</h2></div>
         <button class="icon-btn" data-act="close-sheet" aria-label="Close"><i data-lucide="x"></i></button></header>
@@ -499,7 +502,7 @@
         <label class="prj-field"><span>Description</span><input class="settings-input" name="description" value="${esc(d.description || "")}" dir="auto" maxlength="200" placeholder="One line"></label>
         <div class="prj-form-row">
           <label class="prj-field grow"><span>Date <em>(optional — shows a countdown)</em></span><input class="settings-input" type="date" name="target_date" value="${esc(d.target_date || "")}"></label>
-          <label class="prj-field grow"><span>Budget ₪ <em>(optional)</em></span><input class="settings-input" name="budget" inputmode="decimal" value="${d.budget ? esc(d.budget) : ""}" placeholder="150000"></label>
+          <label class="prj-field grow"><span>Budget${sym ? ` ${esc(sym)}` : ""} <em>(optional)</em></span><input class="settings-input" name="budget" inputmode="decimal" value="${d.budget ? esc(d.budget) : ""}" placeholder="150000"></label>
         </div>
         <div class="prj-row-end">
           ${!isNew ? `<button type="button" class="btn-secondary" data-act="archive-project">${d.status === "archived" ? "Restore" : "Archive"}</button>

@@ -1,7 +1,7 @@
 """The caller and their addons over HTTP (docs/access.md, "Managing users").
 Run: bin/test test_addons_api
 
-``GET /api/me``, ``GET /api/addons``, ``GET`` / ``PUT`` / ``DELETE
+``GET /api/me`` (``addons``, ``languages``, ``currency``), ``GET /api/addons``, ``GET`` / ``PUT`` / ``DELETE
 /api/addons/{name}``, ``POST /api/addons/{name}/test`` and ``GET
 /api/addons/{name}/options`` for the first admin (``API_TOKEN``) and two
 members (DB tokens): payload shapes, the access level (``ops`` 403 for a
@@ -195,10 +195,12 @@ async def test_me_and_list(client: TestClient) -> None:
     status, me = await call(client, "GET", "/api/me", ADMIN_AUTH)
     check("me: the first admin", status == 200 and me["id"] == ADMIN.id and me["access"] == "admin"
           and me["capabilities"] == ["ops", "manage_users", "see_everyone", "manage_server"]
-          and me["kinds"][0] == "essentials" and "homeassistant" in me["kinds"] and "ops" not in me["kinds"], me)
+          and me["addons"][0] == "essentials" and "homeassistant" in me["addons"] and "ops" not in me["addons"]
+          and me["languages"] == ["he", "en"] and me["currency"] == "ILS" and "kinds" not in me, me)
     status, me = await call(client, "GET", "/api/me", BOB_AUTH)
-    check("me: a member with nothing connected", status == 200 and me == {
-        "id": BOB.id, "name": "Bob Builder", "access": "member", "capabilities": [], "kinds": ["essentials"]}, me)
+    check("me: a member with nothing connected (the server's languages and currency)", status == 200 and me == {
+        "id": BOB.id, "name": "Bob Builder", "access": "member", "capabilities": [], "addons": ["essentials"],
+        "languages": ["en"], "currency": "USD"}, me)
     status, _ = await call(client, "GET", "/api/me", {})
     check("me: needs credentials", status == 401)
 

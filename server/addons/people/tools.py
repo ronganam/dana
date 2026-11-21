@@ -7,6 +7,7 @@ from addons.people.addon import addon
 from core.undoable import UndoConflict, safe_record
 from core.users import User
 from addons.people import cadence, detail, store
+from addons.people.values import shown_phone
 from addons.tasks import links as task_links, service as tasks_service
 
 # What update_person can change, as returned by detail.get_person / store.to_api.
@@ -86,7 +87,7 @@ async def get_person(conn: Connection, person: str) -> str:
     if p["aliases"]:
         out.append("Also known as: " + ", ".join(p["aliases"]))
     if p["phones"]:
-        out.append("Phones: " + ", ".join("+" + x for x in p["phones"]))
+        out.append("Phones: " + ", ".join(shown_phone(x) for x in p["phones"]))
     if p["emails"]:
         out.append("Emails: " + ", ".join(p["emails"]))
     if p["birthday"]:

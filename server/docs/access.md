@@ -23,6 +23,8 @@ first user's values), tables from migrations `m0002_users` and
 | `pronoun` | `he` / `she` / `they` (default `they`): how prompts refer to them, verbs agreeing ("she does", "they do"). |
 | `other_names` | Other spellings of their first name (another script), shown in brackets where a prompt reads a transcript: "Robin (רובין)". |
 | `prompt_name` | What Dana's own instructions call them (the agent prompt, the shared phone screen); '' = their first name. The first admin's is `the owner`. |
+| `languages` | Comma list of language codes (`he,en`), the first their default reply language: the agent's language rule and the transcription prompt are worded for them (`core/user_locale.py`, core migration `m0004_user_locale`). '' = the server's `DEFAULT_LANGUAGES` (default `en`). |
+| `currency` | ISO 4217 code (`ILS`): what money values mean where an addon does not know better (knowledge's budgets and prices; `{currency}` in a prompt part). '' = the server's `CURRENCY` (default `USD`). Changed by the user on the web Settings → Profile card (`PUT /api/profile`) or with `bin/users.py update --languages / --currency`. |
 | identities | Telegram user ids (`user_telegram`) and API tokens (`user_tokens`, one per device, with a label, created / last-used) that resolve to this user. |
 
 - **First user.** `users.bootstrap()` runs at startup (`main.py`, after
@@ -30,7 +32,8 @@ first user's values), tables from migrations `m0002_users` and
   (default `Owner`), access `admin`, Telegram ids from
   `ALLOWED_TELEGRAM_USER_IDS` (non-numeric entries skipped), proactive chat
   `TELEGRAM_CHAT_ID`, and a profile from `OWNER_CONTEXT`, `OWNER_PRONOUN`
-  (default `they`), `OWNER_OTHER_NAMES` and the prompt name `the owner`
+  (default `they`), `OWNER_OTHER_NAMES`, `OWNER_LANGUAGES`, `OWNER_CURRENCY`
+  (unset: the server's) and the prompt name `the owner`
   (`user_rows.first_user_profile()`; migration `m0016_user_profile` gives the
   same values to an existing first admin). Those env values are read only
   then; later changes are not applied (startup warns when
@@ -901,8 +904,8 @@ once). The running server sees a change within its 10 s cache refresh. Tests:
 
 ```
 list                                    users: access, Telegram ids, tokens, addons
-add NAME [--access] [--context] [--pronoun] [--telegram-chat]
-update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
+add NAME [--access] [--context] [--pronoun] [--languages] [--currency] [--telegram-chat]
+update USER [--name] [--access] [--context] [--pronoun] [--languages] [--currency] [--other-names] [--prompt-name] [--telegram-chat]
 remove USER [--delete-data]             without the flag: says what would be deleted, removes nothing
 tokens issue USER [--label]             prints the token once
 tokens list [USER]
@@ -995,7 +998,8 @@ page" section of `tests/local_env/e2e.py`.
 
 | | |
 |---|---|
-| `GET /api/me` | `{id, name, access, capabilities: [...], kinds: [...]}` — the caller, their level's capabilities, their connected addons (`essentials` first) |
+| `GET /api/me` | `{id, name, access, capabilities: [...], addons: [...], languages: [...], currency}` — the caller, their level's capabilities, their connected addons (`essentials` first), their languages (the first is the default reply language) and currency (their own, else the server's: `core/user_locale.py`) |
+| `GET` / `PUT /api/profile` | the caller's languages and currency: what counts, what they chose (`own`), the server's `defaults`; `PUT {languages, currency}` changes them (`[]` / `""`: back to the server's; a malformed code 400 `invalid` with `field`) (`core/profile_api.py`; the web Settings → Profile card) |
 | `GET /api/users` | `{users: [{id, name, access}]}` — every user, for a caller with `manage_users` (the Addons page's picker); nothing else about them; 403 `forbidden` without the capability |
 | `GET /api/addons` | `{user_id, addons: [<addon>, ...]}` — every addon the user may connect (not `essentials`; `ops` only with the `ops` capability) |
 | `GET /api/addons/{name}` | `<addon>` |

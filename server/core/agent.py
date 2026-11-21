@@ -8,7 +8,7 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 import litellm
 from core.runs import emit, add_undos
 from core.models import ModelProfile, resolve_profile
-from core import clock, llm, undo, usage, user_profile, users
+from core import clock, llm, undo, usage, user_locale, user_profile, users
 from core.users import User
 from core.addons import registry
 
@@ -82,6 +82,26 @@ def _examples(text: str) -> str:
     return f" (e.g. {text})" if text else ""
 
 
+# Short confirmations in a language, for the brevity rule's examples.
+_DONE_WORDS = {"he": "'נפתח.', 'בוצע.'", "ar": "'تم.'", "ru": "'Готово.'", "es": "'Hecho.'", "fr": "'Fait.'",
+               "de": "'Erledigt.'"}
+
+
+def language_rule(langs: Tuple[str, ...]) -> str:
+    """Rule 5 of the instructions, worded for the user's languages (core/user_locale.py)."""
+    names = tuple(user_locale.language_name(c) for c in langs)
+    plain = tuple(user_locale.language_name(c, native=False) for c in langs)
+    if len(langs) == 1:
+        return (f"5. LANGUAGE: The user communicates in {names[0]}. Respond in {plain[0]} unless the user writes "
+                f"to you in another language: then respond in that exact language. Translate or summarize messages "
+                f"and retrieved content into the language you respond in.")
+    pairs = ", ".join(f"{p} for {p}" for p in plain)
+    return (f"5. LANGUAGE CONSISTENCY: The user communicates in {user_locale.join_names(names)}. Accurately detect "
+            f"which of these the user's message is in and respond in that exact language ({pairs}). Never "
+            f"misidentify {user_locale.join_names(plain, 'or')} as any third language. Translate or summarize "
+            f"messages and retrieved content into that same query language.")
+
+
 @dataclass(frozen=True)
 class Slot:
     """A place in Dana's instructions that addons fill (``PromptPart(slot, …)``)
@@ -116,9 +136,11 @@ SLOTS: Dict[str, Slot] = {
 
 
 def slot_text(user: Optional[User], slot: str, name: str = "the user") -> str:
-    """The parts of ``slot`` that apply to ``user`` (``{user}`` → ``name``), joined as the slot says."""
+    """The parts of ``slot`` that apply to ``user`` (``{user}`` → ``name``, ``{currency}`` → their
+    currency), joined as the slot says."""
     spec = SLOTS[slot]
-    parts = [p.replace("{user}", name) for p in registry.prompt_parts(user, slot)]
+    money = user_locale.currency(user)
+    parts = [p.replace("{user}", name).replace("{currency}", money) for p in registry.prompt_parts(user, slot)]
     if spec.strip:
         parts = [p.strip() for p in parts]
     return spec.join([p for p in parts if p])
@@ -128,11 +150,15 @@ def instructions(user: Optional[User]) -> str:
     """Dana's fixed instructions for ``user``: the general rules below, the
     parts of each addon the user has connected (``Addon(prompt_parts=)``,
     placed in the :data:`SLOTS`) and the user's name as their profile gives it
-    (core/user_profile.py; ``{user}`` in a part). Adding an addon adds its
+    (core/user_profile.py; ``{user}`` in a part; ``{currency}``: their
+    currency, core/user_locale.py); rule 5 is worded for their languages. Adding an addon adds its
     parts in its own ``addon.py``, never here. Stable text only: the per-turn
     date/time and the cached sections are added by the caller."""
     who = user_profile.for_user(user)
     name = who.referent or "the user"
+    langs = user_locale.languages(user)
+    alias = " (or דנה in Hebrew)" if "he" in langs else ""
+    done = ", ".join(["'Opened.'", "'Done.'"] + [_DONE_WORDS[c] for c in langs if c in _DONE_WORDS])
 
     def text(slot: str) -> str:
         return slot_text(user, slot, name)
@@ -143,7 +169,7 @@ def instructions(user: Optional[User]) -> str:
     routing = f"7. {heading}: {text('routing')}\n" if heading else ""
     guides = text("guides")
     return (
-        "You are Dana, a helpful, lean personal AI assistant. If the user calls you Dana (or דנה in Hebrew), that is you; refer to yourself as Dana when a name is needed. "
+        f"You are Dana, a helpful, lean personal AI assistant. If the user calls you Dana{alias}, that is you; refer to yourself as Dana when a name is needed. "
         f"You have access to tools for {text('tools')}. "
         "Reason step-by-step to answer the user's request. Call multiple tools in sequence if required, "
         "analyze their outputs, and arrive at a final answer autonomously. "
@@ -152,8 +178,8 @@ def instructions(user: Optional[User]) -> str:
         "2. DIRECT ACTION: When the user requests an action (or when correcting/recovering from a failed action), execute the relevant service calls or tools directly. Do not ask 'Should I try X?' or wait for permission before attempting to perform the task.\n"
         f"3. NO ASSUMPTIONS OR GUESSES: Never guess, assume, or hallucinate identifiers{_examples(text('id_examples'))}. Use an identifier directly only if it is explicitly present in the current conversation history or in this system prompt{_examples(text('prompt_ids'))}; otherwise you MUST use the appropriate query/list tool first to resolve it.\n"
         f"4. ACT, THEN SAY WHAT YOU DID (UNDO EXISTS): Reversible changes{undo_list} run immediately and the user gets an Undo button under your reply{text('runs_at_once')}. So never ask 'Shall I?' or 'Do you want me to...?' for them: do it, then confirm in a few words what changed{_examples(text('done_examples'))}. Sending a message to someone{text('send_via')} and deleting things are confirmed by the user through an Approve button the system shows on its own: just call the tool, never ask for that approval in text. Ask a question only when a critical ambiguity makes it impossible to choose what to do.\n"
-        "5. LANGUAGE CONSISTENCY: The user communicates in Hebrew (עברית) and English. Accurately detect if the user's message is in Hebrew or English and respond in that exact language (Hebrew for Hebrew, English for English). Never misidentify Hebrew or English as any third language (like Arabic, Spanish, etc.). Translate or summarize messages and retrieved content into that same query language.\n"
-        f"6. EXTREME BREVITY & DIRECTNESS: Be extremely concise, direct, and to the point. When the user asks for an action or command{_examples(text('action_examples'))}, execute it immediately without introductory filler, conversational fluff, or preamble (e.g. NEVER say 'OK let me take a look at it', 'Don't worry I am on it', 'Here is the gate I am opening it now'). Once the action is done, reply with a very short confirmation (e.g. 'Opened.', 'Done.', 'נפתח.', 'בוצע.'). Do NOT offer unsolicited suggestions or follow-up questions (e.g. do NOT say 'Let me know if you want me to close it for you' or 'How else can I help?'). Save time and get straight to the point.\n"
+        f"{language_rule(langs)}\n"
+        f"6. EXTREME BREVITY & DIRECTNESS: Be extremely concise, direct, and to the point. When the user asks for an action or command{_examples(text('action_examples'))}, execute it immediately without introductory filler, conversational fluff, or preamble (e.g. NEVER say 'OK let me take a look at it', 'Don't worry I am on it', 'Here is the gate I am opening it now'). Once the action is done, reply with a very short confirmation (e.g. {done}). Do NOT offer unsolicited suggestions or follow-up questions (e.g. do NOT say 'Let me know if you want me to close it for you' or 'How else can I help?'). Save time and get straight to the point.\n"
         f"{routing}"
         f"9. USER SELECTION PROMPTS: When the next step of a task depends on the user choosing between distinct, discrete options ({text('choice_examples')}, etc.), call `request_user_selection` with a clear `prompt` and 2-6 realistic `options`, each a {{\"label\": \"user-facing text\", \"value\": \"machine identifier\"}} pair. Set `multiple=True` only when picking several is genuinely valid. The user's chosen label(s)/value(s) come back to you as the answer — continue autonomously afterwards. NEVER use `request_user_selection` for approvals (those use the separate approve/deny flow) or for open questions the user could answer freely; in those cases just ask in plain text.\n"
         "-----------------------------------\n\n"

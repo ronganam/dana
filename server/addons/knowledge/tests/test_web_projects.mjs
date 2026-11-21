@@ -23,7 +23,7 @@ const FIXTURE = process.argv[2] || path.join(SERVER, "tests", "fixtures", "proje
 const F = JSON.parse(fs.readFileSync(FIXTURE, "utf8"));
 const src = fs.readFileSync(path.join(SERVER, "static/projects-core.js"), "utf8");
 
-const sandbox = { console, URL, Set, Map, JSON, Object, Array, String, Number, Boolean, RegExp, Math, Date, Error };
+const sandbox = { console, URL, Set, Map, JSON, Object, Array, String, Number, Boolean, RegExp, Math, Date, Error, Intl };
 sandbox.window = sandbox;
 vm.createContext(sandbox);
 vm.runInContext(src, sandbox, { filename: "static/projects-core.js" });
@@ -50,7 +50,18 @@ check("asNumber: a range, text, a boolean and nothing are not numbers", eq([C.as
 // formatting by type
 const money = photographers.columns.find((c) => c.type === "money");
 const phone = photographers.columns.find((c) => c.type === "phone");
-check("valueHtml: money as ₪ with thousands", C.valueHtml(money, 13400).includes("₪13,400"));
+check("the project carries its owner's currency", items.project.currency === "ILS", items.project.currency);
+C.setCurrency(items.project.currency);
+check("valueHtml: money in the project's currency (₪ for ILS) with thousands", C.valueHtml(money, 13400).includes("₪13,400")
+  && C.TYPE_LABELS.money === "Price (₪)");
+check("currency: $ for USD, a code and a space without a narrow symbol, nothing for a bad code",
+  C.currencySymbol("USD") === "$" && C.currencySymbol("CHF") === "CHF " && C.currencySymbol("shekel") === "" && C.currencySymbol(undefined) === "");
+C.setCurrency("USD");
+check("setCurrency: money and the column label follow", C.money(13400) === "$13,400" && C.shortMoney(150000) === "$150k"
+  && C.TYPE_LABELS.money === "Price ($)");
+C.setCurrency("bad");
+check("setCurrency: a bad code keeps the last one", C.money(5) === "$5");
+C.setCurrency(items.project.currency);
 check("valueHtml: a money range stays as written", C.valueHtml(money, "10500-16500").includes("10500-16500"));
 check("valueHtml: empty is a dash", C.valueHtml(money, null).includes("—") && C.valueHtml(money, "").includes("—"));
 check("valueHtml: phone links to tel:", C.valueHtml(phone, "052-0000000").includes('href="tel:0520000000"'));

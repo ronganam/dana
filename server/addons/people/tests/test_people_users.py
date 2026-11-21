@@ -34,6 +34,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("people_users_test")
+os.environ["DEFAULT_COUNTRY_CODE"] = "972"  # local numbers (0…) in these tests are Israeli
 ROOT = str(testenv.SERVER)
 os.environ["API_TOKEN"] = "people-users-test-env-token"  # a test value: with it set, DB tokens are honoured
 os.environ["ANTHROPIC_API_KEY"] = "test-key"  # a test value: LiteLLM only ever runs its offline mock here

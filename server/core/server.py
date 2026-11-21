@@ -15,7 +15,7 @@ import os
 from aiohttp import web
 
 from core import (actions_api, addons_api, app_updates, assistant_api, briefing, briefing_api, debug_api, now_api,
-                  pages_api, sessions_api, sharing_api, usage, usage_api, wake, weekly_review)
+                  pages_api, profile_api, sessions_api, sharing_api, usage, usage_api, wake, weekly_review)
 from core.addons import loader, scheduler
 from core.auth import setup_auth
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 # the static directory.
 ROUTE_MODULES = (
     pages_api, assistant_api, app_updates, debug_api, sessions_api, briefing_api, actions_api, now_api,
-    usage_api, sharing_api, addons_api,
+    usage_api, sharing_api, addons_api, profile_api,
 )
 
 

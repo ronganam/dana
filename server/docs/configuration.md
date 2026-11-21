@@ -66,6 +66,9 @@ Two values: an LLM key (`ANTHROPIC_API_KEY` with the default models) and `API_TO
 | `ASSISTANT_MODELS` | optional JSON list overriding the chat model catalog (`core/models.py`) |
 | `CALL_AUDIO_RETENTION_DAYS` | days call audio is kept (default 90) |
 | `OWNER_NAME` / `OWNER_CONTEXT` / `OWNER_PRONOUN` / `OWNER_OTHER_NAMES` | the first user's name (default `Owner`) and profile: context (who they are and who the people they talk about are), pronoun (`he` / `she` / `they`, default `they`) and their first name in another script for transcripts; read once: when that user is created, or by migration `m0016_user_profile` for an existing first admin. Later: `bin/users.py update` |
+| `OWNER_LANGUAGES` / `OWNER_CURRENCY` | the first user's languages (comma list of codes, the first is the default reply language, e.g. `he,en`) and currency (ISO 4217, e.g. `ILS`); read once when that user is created, a malformed value is skipped with a warning. Unset: the server's `DEFAULT_LANGUAGES` / `CURRENCY` apply. Later: the web Profile card or `bin/users.py update --languages / --currency` |
+| `DEFAULT_LANGUAGES` | the languages of a user who chose none (default `en`; a comma list, e.g. `he,en`): they word the agent's language rule and the transcription prompt (`core/user_locale.py`) |
+| `CURRENCY` | the currency of a user who chose none (default `USD`; ISO 4217): what money values mean in Projects (budgets, prices). The money addon keeps its banks' own currency |
 | `TYPESAFE_API_KEY` | TypeSafe (Jev) key for notification triage (`addons/phone/notifications/triage.py`), server-wide (every user's triage uses it); unset = notifications stay untriaged |
 | `TYPESAFE_MODEL` | TypeSafe model (default `jev-latest`) |
 | `TYPESAFE_COST_PER_MTOK` | USD per million TypeSafe input tokens for the Usage screen (`core/usage.py`); default 0.042 (Jev's published price) |
@@ -77,7 +80,7 @@ Two values: an LLM key (`ANTHROPIC_API_KEY` with the default models) and `API_TO
 | `FCM_SERVICE_ACCOUNT_JSON` / `FCM_PROJECT_ID` | direct push to the phone (`addons/phone/push.py`), server-wide (each event still reaches only its user's devices): service-account key allowed only to send FCM messages; unset = events are only queued |
 | `NOTIFICATION_SUMMARY_MIN_ITEMS` / `NOTIFICATION_SUMMARY_MIN_SECONDS` | Inbox AI summaries: min notifications per app (2), min seconds between rewrites (45) |
 | `ASSISTANT_DEFAULT_MODEL` | catalog id used when a chat request names no model (default: first entry, `fast`) |
-| `DEFAULT_COUNTRY_CODE` | country code for local phone numbers in People and the WhatsApp tools (default `972`; server-wide) |
+| `DEFAULT_COUNTRY_CODE` | calling code (e.g. `972`, `44`) that replaces the leading 0 of a local phone number in People, Contacts and the WhatsApp tools; server-wide, no default (unset: a number stays as typed) |
 | `CONTACTS_SYNC_MINUTES` | minutes between two syncs of every user's Google Contacts copy (60; `docs/contacts.md`) |
 | `MONEY_WORKER_URL` | the bank-worker sidecar (default `http://127.0.0.1:8090`: the same pod; `docs/money.md`). Its token is a file Dana creates, `money/worker-token` next to the DB, not an env value |
 | `MONEY_SYNC_TIMES` | comma-separated local `HH:MM` slots when every money source syncs (default `07:00,19:00`; each source moved by a stable ±20 min) |

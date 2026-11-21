@@ -149,7 +149,7 @@ def notes(who, q: str) -> List[Dict[str, Any]]:
 
 PROJECT_KEYS = {"id", "title", "description", "icon", "color", "tags", "status", "created_at", "updated_at",
                 "entry_count", "task_count", "target_date", "budget", "section_count", "decisions", "decided",
-                "committed"}
+                "committed", "currency"}
 ENTRY_KEYS = {"id", "project_id", "kind", "title", "body", "fields", "status", "priority", "due_at", "tags", "url",
               "media_path", "transcript", "summary", "comments", "source_author", "created_at", "updated_at",
               "section_id", "decision", "files"}
@@ -338,6 +338,14 @@ def test_sharing_read() -> None:
           shared["p1"].get("shared_by") == ADMIN.name and shared["p1"].get("access") == "read"
           and set(shared["p1"]) == PROJECT_KEYS | {"shared_by", "access"})
     check("payloads: Bob's own project doesn't", set(shared[IDS["bob_garden"]]) == PROJECT_KEYS)
+    users.update(ADMIN.id, currency="EUR")
+    users.update(BOB.id, currency="GBP")
+    shared = {p["id"]: p for p in projects.list_projects(BOB)}
+    check("payloads: a project's currency is its owner's, also through a share",
+          shared["p1"]["currency"] == "EUR" and shared[IDS["bob_garden"]]["currency"] == "GBP",
+          [shared["p1"]["currency"], shared[IDS["bob_garden"]]["currency"]])
+    users.update(ADMIN.id, currency="")
+    users.update(BOB.id, currency="")
     check("payloads: the shared project's entries carry them too",
           all(e.get("shared_by") == ADMIN.name and e.get("access") == "read" for e in entries.list_entries(BOB, "p1")))
     check("payloads: the first admin's are unchanged", [set(x) for x in projects.list_projects(ADMIN)] == [PROJECT_KEYS]

@@ -23,6 +23,7 @@ from cryptography.fernet import Fernet
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("people_test")
+os.environ["DEFAULT_COUNTRY_CODE"] = "972"  # local numbers (0…) in these tests are Israeli
 os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")

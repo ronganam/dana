@@ -33,7 +33,7 @@
  *   POST   /api/chat/context {kind: "transaction", id}   "Ask Dana"
  *
  * window.DanaMoney = {show, hide}; app-nav.js calls them on tab switches. The rail / bottom-nav buttons
- * ([data-money-nav]) appear only for a user with `money` connected (GET /api/me → kinds). The page's
+ * ([data-money-nav]) appear only for a user with `money` connected (GET /api/me → addons). The page's
  * state (view, month, filters, the accounts view) lives in the hash: #money/spending?month=2026-10&category=food.
  * Login details go only into the add / update request bodies: never the URL, the console or storage.
  */
@@ -1524,7 +1524,7 @@
     }
     const r = await request("GET", "/api/me");
     if (r.status !== 200) { if (S.visible) { S.error = C.errorText(r.status, r.body); render(); } return; }
-    setEnabled((r.body.kinds || []).includes("money"));
+    setEnabled((r.body.addons || []).includes("money"));
     if (S.enabled && S.visible) loadAll();
   }
   // After the app's scripts (static/app.js; they load before this one), which wire the tabs and open Chat.
