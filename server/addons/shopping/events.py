@@ -24,11 +24,9 @@ import time
 from dataclasses import dataclass, field
 from typing import Dict, Iterator, List, Optional, Set, Tuple
 
-from core import users
+from core import notify, users
 from core.db import get_db_connection
-from core.addons import sharing, store
-from addons.phone import push
-from addons.phone.config import ADDON as PHONE
+from core.addons import registry, sharing
 from addons.shopping.values import ITEM_TYPE
 
 logger = logging.getLogger(__name__)
@@ -187,7 +185,7 @@ def _queue_push(user_id: str, list_id: str, version: int) -> None:
     """Push ``{list_id, version}`` to ``user_id``'s phone now, or when their
     :data:`PUSH_EVERY` window ends (then with the newest version)."""
     user = users.get(user_id)
-    if user is None or not store.is_connected(user, PHONE):
+    if user is None or not registry.channels(user):
         return
     try:
         loop = asyncio.get_running_loop()
@@ -211,7 +209,7 @@ async def _push_loop(user_id: str, state: _PushState) -> None:
         if user is None:
             return
         try:
-            await push.send(user, "shopping", {"list_id": list_id, "version": version})
+            await notify.send(user, notify.Message(kind="shopping", data={"list_id": list_id, "version": version}))
         except Exception:
             logger.warning(f"Shopping push to user {user_id} failed", exc_info=True)
 

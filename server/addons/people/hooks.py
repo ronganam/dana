@@ -118,3 +118,44 @@ def person_cards_for_text(user: User, texts: Sequence[str], limit: int = 2) -> L
         if c and (c["last_call"] or c["points"] or c["open"]):
             out.append(c)
     return out
+
+
+@addon.provide("people_fill_from_contacts")
+def fill_from_contacts(user: User) -> int:
+    """Fill ``user``'s people from their Google Contacts copy (0 without ``contacts``)."""
+    from addons.contacts import store as contacts_store
+    from addons.people import activity as people_activity
+    if not people_store.has_people(user) or not contacts_store.has_contacts(user):
+        return 0
+    linked = 0
+    recheck = False
+    with get_db_connection() as conn:
+        contacts = {c["id"]: c for c in contacts_store.all_contacts(user, conn)}
+        by_number = contacts_store.by_number(user, conn)
+        numbers = people_store.phones_by_person(conn, user)
+        for person in people_store.rows(conn, user):
+            matches: List[str] = []
+            for number in numbers.get(person["id"], []):
+                matches += [rid for rid in by_number.get(number, []) if rid not in matches]
+            current = person["contact_resource"]
+            chosen = current if current in matches else matches[0] if len(matches) == 1 else ""
+            if not chosen:
+                if current and current not in contacts:
+                    people_store.unlink_contact(conn, user, person["id"])
+                linked += 1 if current in contacts else 0
+                continue
+            contact = contacts[chosen]
+            recheck = people_store.fill_from_contact(
+                conn, user, person, resource=chosen, name=contact["name"],
+                phones=contacts_store.numbers_of(contact),
+                birthday=contact["birthday"], emails=[e["value"] for e in contact["emails"]]) or recheck
+            linked += 1
+        if recheck:
+            people_activity.recheck_unmatched(conn, user)
+        conn.commit()
+    return linked
+
+
+@addon.provide("people_forget_contacts")
+def forget_contacts(user: User) -> None:
+    people_store.unlink_contacts(user)

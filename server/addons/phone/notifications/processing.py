@@ -21,14 +21,14 @@ from typing import Any, Dict, Iterable, List, Optional, Set
 
 import httpx
 
-from core import clock, llm, user_profile, users
+from core import clock, events, llm, user_profile, users
 from core.db import get_db_connection
 from core.users import User
 from addons.phone import popups, suggestions
 from addons.phone.calls.analysis import analysis_schema, normalize_analysis
 from addons.phone.calls.context import feedback_prompt, gather_context
 from addons.phone.calls.suggest import replace_pending_suggestions, suggestions_from_analysis
-from addons.phone.notifications import escalation, observers, rules, triage
+from addons.phone.notifications import escalation, rules, triage
 from addons.phone.notifications.values import (CONCURRENCY, ESCALATE_MAX_AGE_SECONDS, EXTRACT_MAX_AGE_HOURS,
                                                      age_seconds, row)
 
@@ -61,11 +61,11 @@ def _start(user: User, coro) -> Optional[asyncio.Task]:
 
 
 def schedule(user: User, ids: Iterable[str]) -> int:
-    """Hand ``user``'s stored notifications to the other addons' observers
-    (:mod:`.observers`), then queue their background triage (no-op without a
-    running loop, e.g. in scripts)."""
-    ids = list(ids)
-    observers.notify(user, ids)
+    """Emit ``phone.notification.ingested`` for other addons (e.g. money's
+    payment signals), then queue background triage."""
+    ids = [i for i in dict.fromkeys(ids or []) if isinstance(i, str) and i]
+    if ids:
+        events.emit("phone.notification.ingested", user, ids=ids)
     try:
         asyncio.get_running_loop()
     except RuntimeError:

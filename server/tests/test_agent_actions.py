@@ -85,7 +85,8 @@ async def fake_call_ha_service(conn, domain: str, service: str, entity_id: str, 
 # The fake replaces the real tool, with the real tool's flags.
 _real = find_tool("call_ha_service")
 homeassistant_addon.tool(name="call_ha_service", is_write=_real.is_write, confirm=_real.confirm,
-                   acts_outside=_real.acts_outside)(fake_call_ha_service)
+                         acts_outside=_real.acts_outside, describe=_real.describe, shortcut=_real.shortcut,
+                         shortcut_prep=_real.shortcut_prep, shortcut_describe=_real.shortcut_describe)(fake_call_ha_service)
 if not store.is_connected(OWNER, "homeassistant"):  # not in env: connect it with fake credentials
     store.connect(OWNER, "homeassistant", credentials={"host": "http://ha.invalid", "token": "fake"})
 

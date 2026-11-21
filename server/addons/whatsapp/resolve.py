@@ -10,6 +10,7 @@ import httpx
 
 from core import clock, llm
 from core.addons import Connection
+from core.text import transliterate_he_to_en
 from addons.whatsapp import contacts as saved_contacts
 from addons.whatsapp.client import api_url, config, get_chat_id_to_name_map, normalize_to_international
 
@@ -22,17 +23,6 @@ _HE_EN: Dict[str, str] = {
     'ך': 'k', 'ם': 'm', 'ן': 'n', 'ף': 'p', 'ץ': 'ts',
 }
 _EN_HE: Dict[str, str] = {v: k for k, v in _HE_EN.items()}
-
-
-def transliterate_he_to_en(text: str) -> str:
-    """Convert Hebrew characters to English phonetic equivalent."""
-    result = []
-    for ch in text:
-        if ch in _HE_EN:
-            result.append(_HE_EN[ch])
-        else:
-            result.append(ch)
-    return "".join(result).lower()
 
 
 def _transliterate_en_to_he(text: str) -> str:

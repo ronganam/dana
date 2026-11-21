@@ -50,12 +50,12 @@ addons_bootstrap.bootstrap()
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from core import clock, llm  # noqa: E402
+from core import clock, events, llm  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import store as connections  # noqa: E402
 from addons.money import api as money_api, after_sync, classify, ingest, schedule, signals, sources, store  # noqa: E402
-from addons.phone.notifications import ingest as notification_ingest, observers, processing  # noqa: E402
+from addons.phone.notifications import ingest as notification_ingest, processing  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
 
@@ -199,7 +199,6 @@ def spy(user, ids: List[str]) -> None:
 
 
 async def test_wallet_observer() -> Tuple[str, str]:
-    observers.register(spy)
     posted = NOW - datetime.timedelta(minutes=3)
     admin_ids = wallet(ADMIN, "RAMI LEVI", "₪350.30 with Mastercard Gold business ••8763", posted, "w-1")
     carl_ids = wallet(CARL, "RAMI LEVI", "₪350.30 with Mastercard Gold business ••8763", posted, "w-c")
@@ -210,9 +209,7 @@ async def test_wallet_observer() -> Tuple[str, str]:
     with patch.object(processing, "_run", no_triage):
         processing.schedule(ADMIN, admin_ids)
         processing.schedule(CARL, carl_ids)
-        await observers.idle()
-    check("observers: called from processing.schedule for every user with their new ids",
-          (ADMIN.id, admin_ids) in SEEN and (CARL.id, carl_ids) in SEEN, SEEN)
+        await events.drain()
     check("observer: nothing recorded for a user without money", not sigs(CARL))
     mine = sigs(ADMIN)
     check("observer: the Wallet notification recorded as a parsed signal",

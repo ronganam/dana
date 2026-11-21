@@ -8,9 +8,21 @@
 
 import datetime
 
+from typing import List, Optional
+
 from core.users import User
 from addons.about import facts, learner, legacy
 from addons.about.addon import addon
+
+
+@addon.provide("legacy_memory_categories")
+def legacy_categories(user: Optional[User]) -> List[str]:
+    return legacy.memory_categories(user)
+
+
+@addon.provide("legacy_memory_keys")
+def legacy_keys(user: Optional[User]) -> List[str]:
+    return legacy.memory_keys(user)
 
 
 @addon.job(at_start=True)

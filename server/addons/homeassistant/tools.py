@@ -20,7 +20,7 @@ from typing import Any, Dict, List, Optional
 from core.addons import Approval, Connection
 from core.addons.hooks import clean
 from core.users import User
-from addons.homeassistant import client as ha_api
+from addons.homeassistant import client as ha_api, home_map
 from addons.homeassistant.addon import addon
 from addons.homeassistant.config import TV, TV_CHANNEL, setting
 
@@ -120,7 +120,7 @@ def _build_entity_line(eid: str, name: str, aliases: List[str],
 # Tool 1 — get_ha_exposed_entities
 # ---------------------------------------------------------------------------
 
-@addon.tool()
+@addon.tool(shortcut_prep=True)
 async def get_ha_exposed_entities(conn: Connection) -> str:
     """Retrieve all Home Assistant entities exposed to the voice assistant, with live state.
 
@@ -175,13 +175,31 @@ async def get_ha_exposed_entities(conn: Connection) -> str:
 # Tool 2 — call_ha_service
 # ---------------------------------------------------------------------------
 
+def _entity_name(user: Optional[User], entity_id: str) -> str:
+    for line in home_map.cached_text(user).splitlines():
+        eid, _, rest = line.partition("|")
+        if eid.strip() == entity_id and rest.strip():
+            return rest.strip().split("  ")[0].strip()
+    return entity_id
+
+
+def _shortcut_ha_service(user: Optional[User], args: Dict[str, Any]) -> str:
+    service = str(args.get("service") or "").replace("_", " ")
+    what = _entity_name(user, str(args.get("entity_id") or ""))
+    extra = args.get("service_data")
+    text = f"{service.capitalize()} {what}".strip()
+    if extra:
+        text += " (" + ", ".join(f"{k} {v}" for k, v in dict(extra).items()) + ")"
+    return text
+
+
 def _describe_ha_service(user: Optional[User], a: Dict[str, Any]) -> Approval:
     what = f"{a.get('domain') or '?'}.{a.get('service') or '?'}"
     return Approval(f"Home: {what} on {a.get('entity_id') or 'a device'}", "Home", "🏠", "Go ahead?",
                     facts=[("Data", a.get("service_data"))])
 
 
-@addon.tool(acts_outside=True, describe=_describe_ha_service)
+@addon.tool(acts_outside=True, describe=_describe_ha_service, shortcut=True, shortcut_describe=_shortcut_ha_service)
 async def call_ha_service(
     conn: Connection,
     domain: str,
@@ -356,6 +374,17 @@ async def _wait_for_adb_ready(conn: Connection, entity_id: str, timeout: float =
         await asyncio.sleep(1.5)
 
 
+def _shortcut_tv_allowed(args: Dict[str, Any]) -> bool:
+    return str(args.get("action") or "").lower() != "run_command"
+
+
+def _shortcut_tv_describe(user: Optional[User], args: Dict[str, Any]) -> str:
+    action = str(args.get("action") or "").replace("_", " ")
+    detail = next((str(args[k]) for k in ("app_id", "channel", "query", "video_id", "title_id", "command")
+                   if args.get(k)), "")
+    return f"TV: {action} {detail}".strip()
+
+
 def _describe_tv(user: Optional[User], a: Dict[str, Any]) -> Approval:
     detail = a.get("app_id") or a.get("channel") or a.get("query") or a.get("video_id") \
         or a.get("title_id") or a.get("command") or ""
@@ -364,7 +393,8 @@ def _describe_tv(user: Optional[User], a: Dict[str, Any]) -> Approval:
                     facts=[("Device", a.get("entity_id"))])
 
 
-@addon.tool(acts_outside=True, describe=_describe_tv)
+@addon.tool(acts_outside=True, describe=_describe_tv, shortcut=_shortcut_tv_allowed,
+            shortcut_describe=_shortcut_tv_describe)
 async def control_android_tv(
     conn: Connection,
     action: str,

@@ -19,7 +19,6 @@ from typing import Any, Dict, Mapping, Optional
 from core import notify
 from core.users import User
 from addons.money import config, providers, store
-from addons.phone import push
 
 logger = logging.getLogger(__name__)
 
@@ -66,14 +65,11 @@ async def _announce(user: User, company: str, request_id: str) -> None:
     """Tell the user's phone and Telegram (each best-effort)."""
     name = providers.name_of(company)
     try:
-        await push.send(user, "otp_request", {"request_id": request_id})
+        await notify.send(user, notify.Message(
+            text=f"{name} sent you a sign-in code for Dana. Reply here with the code within {_minutes_text()}.",
+            kind="otp_request", data={"request_id": request_id}))
     except Exception as e:
-        logger.warning(f"Money code request {request_id}: push failed: {e}")
-    try:
-        await notify.notify(user, f"{name} sent you a sign-in code for Dana. Reply here with the code within "
-                                  f"{_minutes_text()}.")
-    except Exception as e:
-        logger.warning(f"Money code request {request_id}: Telegram message failed: {e}")
+        logger.warning(f"Money code request {request_id}: announcement failed: {e}")
 
 
 async def ask(user: User, source: Mapping[str, Any], sync_id: str) -> Optional[str]:
@@ -161,8 +157,8 @@ async def signed_in(user: User, source: Mapping[str, Any]) -> None:
     """The quiet "Signed in" notice on the user's phone after a code worked (best-effort)."""
     name = providers.name_of(source["company"])
     try:
-        await push.notify(user, f"Signed in to {name}", "Dana is reading your transactions.",
-                          tag=f"money-{source['id']}", channel="digest")
+        await notify.push_notify(user, f"Signed in to {name}", "Dana is reading your transactions.",
+                                 tag=f"money-{source['id']}", channel="digest")
     except Exception as e:
         logger.warning(f"Money: the signed-in notice for source {source['id']} failed: {e}")
 

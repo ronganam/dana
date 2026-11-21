@@ -20,12 +20,18 @@ import re
 import sqlite3
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from core import clock
+from core.cards import loads
 from core.db import get_db_connection
+from core.text import (HEBREW, clean_list, looks_like_number, norm_name, norm_phone,
+                       transliterate_he_to_en as translit, valid_birthday)
 from core.users import User
 from addons.contacts.config import ADDON
 from core.addons import store as connections
-from addons.people.values import (HEBREW, clean_list, loads, looks_like_number, norm_name, norm_phone,
-                                        now_iso, translit, valid_birthday)
+
+
+def now_iso() -> str:
+    return clock.now().isoformat(timespec="seconds")
 
 Contact = Dict[str, Any]
 

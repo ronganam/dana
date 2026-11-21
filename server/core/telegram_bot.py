@@ -26,9 +26,6 @@ from core.runs import SessionBusyError, live_undos
 from core import undo
 from core.images import save_image
 from core.addons import registry, store
-from addons.about import legacy as about_legacy
-from addons.money import otp as money_otp
-from addons.whatsapp import config as whatsapp_config
 import asyncio
 import os
 
@@ -38,22 +35,6 @@ logger = logging.getLogger(__name__)
 # well under Telegram's 4096-char message limit.
 _WA_VOICE_MAX_TEXT = 3000
 _WA_VOICE_CACHE_MAX = 200
-
-
-def report_whatsapp_voice_chats() -> None:
-    """Log, per user with WhatsApp, where their voice transcripts go (their
-    ``voice_telegram_chat_id`` setting) — loudly when nowhere. Startup only."""
-    for uid in store.users_with(whatsapp_config.ADDON):
-        user = users.get(uid)
-        conn = store.get(user, whatsapp_config.ADDON) if user else None
-        if conn is None:
-            continue
-        chat_id = whatsapp_config.voice_chat_id(conn)
-        if chat_id is None:
-            logger.warning(f"WhatsApp voice transcripts of user {uid} will NOT be sent to Telegram: their "
-                           f"{whatsapp_config.ADDON} setting {whatsapp_config.VOICE_CHAT} is not a chat id.")
-        else:
-            logger.info(f"WhatsApp voice transcripts of user {uid} go to Telegram chat {chat_id}")
 
 
 UNAUTHORIZED_TEXT = "⛔ You are not authorized to use this bot."
@@ -141,10 +122,6 @@ class TelegramBot:
         # people in one group each have their own prompt and choices).
         self.selection_toggles: Dict[Tuple[str, str], Set[int]] = {}
         self.selection_messages: Dict[Tuple[str, str], int] = {}
-
-        # Where each user's inbound WhatsApp voice transcripts go (their
-        # whatsapp setting, read per message; reported here once).
-        report_whatsapp_voice_chats()
 
         # Recent inbound WhatsApp voice transcripts with the user they belong to,
         # keyed by a short hash used as the callback_data of the "Summarize"
@@ -368,9 +345,10 @@ class TelegramBot:
             return
         user_id = message.from_user.id
         user_text = message.text or ""
-        # A bank's SMS sign-in code a money sync waits for: handed over, never
-        # logged, never shown to the agent or kept in history.
-        code_reply = money_otp.telegram_reply(user, user_text) if user_text else None
+        # Addon-level direct reply (e.g. a bank's SMS sign-in code a money sync waits for):
+        # handed over, never logged, never shown to the agent or kept in history.
+        reply_hook = registry.provider("telegram_reply", user) if user_text else None
+        code_reply = reply_hook.func(user, user_text) if reply_hook is not None else None
         if code_reply is not None:
             await message.reply(code_reply)
             return
@@ -963,7 +941,9 @@ class TelegramBot:
         elif action == "mem_list_cats":
             categories = ["all", "general", "contact", "credential", "preference"]
             try:
-                db_cats = [c for c in about_legacy.memory_categories(users.current()) if c not in categories]
+                cat_hook = registry.provider("legacy_memory_categories", users.current())
+                db_cats = [c for c in (cat_hook.func(users.current()) if cat_hook is not None else [])
+                           if c not in categories]
                 categories.extend(db_cats)
             except Exception as e:
                 logger.warning(f"Failed to fetch dynamic categories: {e}")
@@ -1031,7 +1011,8 @@ class TelegramBot:
  
         elif action == "mem_forget_select":
             try:
-                keys = about_legacy.memory_keys(users.current())
+                key_hook = registry.provider("legacy_memory_keys", users.current())
+                keys = key_hook.func(users.current()) if key_hook is not None else []
             except Exception as e:
                 logger.error(f"Error fetching keys to forget: {e}", exc_info=True)
                 await message.edit_text(f"❌ Error fetching keys: {e}", reply_markup=types.InlineKeyboardMarkup(inline_keyboard=[

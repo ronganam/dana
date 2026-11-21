@@ -22,7 +22,6 @@ import httpx
 
 from core import llm, notify, users
 from core.addons import Connection
-from addons.phone import push as phone_push
 from addons.whatsapp import accounts
 from addons.whatsapp.client import (api_url, config, download_media_bytes, get_chat_id_to_name_map,
                                           get_message_sender_name, signature)
@@ -121,9 +120,9 @@ async def _notify_phone(conn: Connection, sender: str, transcript: str, message_
     phone app (direct push, addons/phone/push.py); nothing without the
     ``phone`` addon."""
     # Tag so a redelivery replaces the notification instead of stacking.
-    ok = await phone_push.notify(conn.user, f"🎙️ WhatsApp voice — {sender}",
-                                 transcript.strip() or "(no speech detected)",
-                                 tag=f"wa_voice_{message_id}", channel="messages")
+    ok = await notify.push_notify(conn.user, f"🎙️ WhatsApp voice — {sender}",
+                                  transcript.strip() or "(no speech detected)",
+                                  tag=f"wa_voice_{message_id}", channel="messages")
     if ok:
         logger.info(f"Sent WhatsApp voice notification for message {message_id} from '{sender}'")
     else:

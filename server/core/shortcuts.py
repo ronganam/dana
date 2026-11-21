@@ -1,9 +1,9 @@
-"""Learned phrases: short home commands Dana has seen work run without the model.
+"""Learned phrases: short commands Dana has seen work run without the model.
 
 **Learn** (after every finished model turn, :func:`learn`): a short text or voice
 message (no images, no on-screen item, no shared phone screen, at most ``MAX_WORDS`` words) that led to
-exactly one successful call of an allow-listed tool (``call_ha_service``,
-``control_android_tv``), optionally preceded by ``get_ha_exposed_entities``,
+exactly one successful call of a tool declared with ``@addon.tool(shortcut=...)``,
+optionally preceded by ``@addon.tool(shortcut_prep=True)`` lookups,
 and a short final reply, counts one outcome for the pair
 *normalised phrase → tool + exact arguments*. After ``LEARN_AFTER`` (3)
 identical outcomes in a row the phrase is **active**. A different outcome for
@@ -14,16 +14,6 @@ text message whose normalised phrase is active, in a session with no pending
 approval/selection, runs the tool directly, replies with the stored
 confirmation and is stored as a normal tool call. If the tool fails, the
 phrase is deactivated and the model answers instead.
-
-Normalisation is conservative: Unicode NFKC, case-folded, Hebrew points
-removed, surrounding punctuation and extra whitespace dropped. Nothing else —
-"open the gate" and "open the gate please" are different phrases.
-
-Learned phrases belong to a user: learned from, matched, listed and deleted
-per user (table ``shortcuts``, phrase unique per user). A phrase is learned
-for, and runs, only a tool the user has now (docs/access.md, "Enforcement"):
-when its addon is gone the message goes to the model as if no phrase
-matched (and the model's answer then counts as a different outcome).
 
 ``SHORTCUTS=0`` turns learning and use off. Routes: core/actions_api.py.
 """
@@ -37,24 +27,33 @@ import uuid
 from typing import Any, Dict, List, Optional, Sequence
 
 from core import users
+from core.addons import registry
+from core.addons.addon import find_tool
 from core.db import get_db_connection
 from core.users import User
-from core.addons import registry
-from addons.homeassistant import home_map
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_TOOLS = ("call_ha_service", "control_android_tv")
-PREP_TOOLS = ("get_ha_exposed_entities",)
 LEARN_AFTER = 3
 MAX_WORDS = 8
 MAX_REPLY_CHARS = 120
-# control_android_tv actions that are not "the same command every time".
-_UNLEARNABLE_TV_ACTIONS = ("run_command",)
 _LLM_ERROR_PREFIX = "Sorry, I encountered an error communicating with the AI model"
+
 
 def enabled() -> bool:
     return os.getenv("SHORTCUTS", "1").strip().lower() not in ("0", "false", "off", "no")
+
+
+def _is_learnable(tool_name: str, args: Dict[str, Any]) -> bool:
+    tool = find_tool(tool_name)
+    if tool is None or not tool.shortcut:
+        return False
+    return bool(tool.shortcut(args)) if callable(tool.shortcut) else True
+
+
+def _is_prep(tool_name: str) -> bool:
+    tool = find_tool(tool_name)
+    return bool(tool and tool.shortcut_prep)
 
 
 # --- Normalisation --------------------------------------------------------------
@@ -117,11 +116,9 @@ def outcome_of(entries: Sequence[Dict[str, Any]], final_text: str) -> Optional[D
     if not calls:
         return None
     *prep, main = calls
-    if any(c["name"] not in PREP_TOOLS for c in prep):
+    if any(not _is_prep(c["name"]) for c in prep):
         return None
-    if main["name"] not in ALLOWED_TOOLS or main["result"] is None or looks_failed(main["result"]):
-        return None
-    if main["name"] == "control_android_tv" and str(main["args"].get("action", "")).lower() in _UNLEARNABLE_TV_ACTIONS:
+    if main["result"] is None or looks_failed(main["result"]) or not _is_learnable(main["name"], main["args"]):
         return None
     reply = (final_text or "").strip()
     if not reply or len(reply) > MAX_REPLY_CHARS or reply.startswith(_LLM_ERROR_PREFIX):
@@ -135,8 +132,7 @@ def _args_key(args: Dict[str, Any]) -> str:
 
 def learn(user: User, user_text: str, entries: Sequence[Dict[str, Any]], final_text: str) -> Optional[str]:
     """Count one finished turn of ``user``. Returns what happened (for logs/tests):
-    ``counted`` / ``activated`` / ``reset`` / ``cleared`` / None (ignored).
-    An outcome whose tool the user does not have now counts as no outcome."""
+    ``counted`` / ``activated`` / ``reset`` / ``cleared`` / None (ignored)."""
     if not enabled() or not is_short(user_text):
         return None
     if (final_text or "").startswith(_LLM_ERROR_PREFIX):
@@ -204,8 +200,7 @@ def _row_to_shortcut(row) -> Dict[str, Any]:
 
 
 def match(user: User, user_text: str) -> Optional[Dict[str, Any]]:
-    """The user's active shortcut for this message, if any (none when its tool
-    is not one the user has now: the message goes to the model)."""
+    """The user's active shortcut for this message, if any."""
     if not enabled() or not is_short(user_text):
         return None
     with get_db_connection() as conn:
@@ -214,7 +209,7 @@ def match(user: User, user_text: str) -> Optional[Dict[str, Any]]:
     if row is None:
         return None
     sc = _row_to_shortcut(row)
-    if sc["tool"] not in ALLOWED_TOOLS or not sc["reply"] or not registry.has_tool(user, sc["tool"]):
+    if not _is_learnable(sc["tool"], sc["args"]) or not sc["reply"] or not registry.has_tool(user, sc["tool"]):
         return None
     return sc
 
@@ -237,30 +232,14 @@ def deactivate(shortcut_id: str, reason: str = "") -> None:
 
 # --- Listing (API) ------------------------------------------------------------------
 
-def _entity_name(user: Optional[User], entity_id: str) -> str:
-    """Friendly name from ``user``'s cached HA home map, else the entity id."""
-    for line in home_map.cached_text(user).splitlines():
-        eid, _, rest = line.partition("|")
-        if eid.strip() == entity_id and rest.strip():
-            return rest.strip().split("  ")[0].strip()
-    return entity_id
-
-
 def describe(tool: str, args: Dict[str, Any], user: Optional[User]) -> str:
-    """What the shortcut does, in words (entity names from ``user``'s home map)."""
-    if tool == "call_ha_service":
-        service = str(args.get("service") or "").replace("_", " ")
-        what = _entity_name(user, str(args.get("entity_id") or ""))
-        extra = args.get("service_data")
-        text = f"{service.capitalize()} {what}".strip()
-        if extra:
-            text += " (" + ", ".join(f"{k} {v}" for k, v in dict(extra).items()) + ")"
-        return text
-    if tool == "control_android_tv":
-        action = str(args.get("action") or "").replace("_", " ")
-        detail = next((str(args[k]) for k in ("app_id", "channel", "query", "video_id", "title_id", "command")
-                       if args.get(k)), "")
-        return f"TV: {action} {detail}".strip()
+    """What the shortcut does, in words."""
+    t = find_tool(tool)
+    if t is not None and t.shortcut_describe is not None:
+        try:
+            return t.shortcut_describe(user, args)
+        except Exception:
+            pass
     return f"{tool} {_args_key(args)}"
 
 

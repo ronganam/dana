@@ -269,7 +269,7 @@ async def test_media_url_refetched_when_absent():
 
 async def test_notify_pushes_to_phone():
     push = AsyncMock(return_value=True)
-    with patch.object(wa.phone_push, "notify", new=push):
+    with patch.object(wa.notify, "push_notify", new=push):
         ok = await wa._notify_phone(CONN, "דנה", "שלום עולם", "false_1@lid_ABC")
     assert ok is True
     push.assert_awaited_once()

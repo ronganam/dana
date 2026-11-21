@@ -76,6 +76,10 @@ async def push_channel(user: User, message: Message) -> bool:
     """A message with a ``kind`` goes to ``user``'s phone as that push event."""
     if not message.kind:
         return False
+    if message.kind == "notify":
+        d = message.data
+        return await push.notify(user, str(d.get("title") or ""), str(d.get("text") or ""),
+                                 tag=str(d.get("tag") or ""), channel=str(d.get("channel") or "messages"))
     return await push.send(user, message.kind, dict(message.data))
 
 
