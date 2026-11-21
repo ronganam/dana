@@ -1,8 +1,8 @@
-# Opt-in (DANA_LOCAL_MONEY=1, bin/local-env.sh): the bank-worker sidecar next to the app,
+# Opt-in (DANA_LOCAL_MONEY=1, bin/local-env.sh): money_il's bank-worker sidecar next to the app,
 # as in the pod: it shares the app's network namespace (Dana reaches it on 127.0.0.1:8090)
 # and only the money/ folder of the data volume (the token file and the browser profiles,
 # never Dana's database); money-dir creates that folder first, like the pod's init container.
-# Reaching the real bank sites also needs DANA_LOCAL_EGRESS=1 (docs/money.md).
+# Reaching the real bank sites also needs DANA_LOCAL_EGRESS=1 (docs/money-il.md).
 services:
   money-dir:
     image: ${DANA_LOCAL_WORKER_IMAGE:-dana-local/bank-worker:latest}

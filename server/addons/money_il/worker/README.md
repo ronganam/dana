@@ -1,6 +1,6 @@
 # bank-worker
 
-A small Node service that logs in to Israeli bank and card sites with a real Chromium and returns their transactions, reads Psagot Trade portfolios over plain HTTPS, and reads the Pluxee (Cibus) meal card with its own code on the browser. It runs as a sidecar container in Dana's pod. Dana (`addons/money/`) decides when to sync, holds the credentials (encrypted) and stores the results; the worker is a browser with no memory beyond its saved browser profiles.
+A small Node service that logs in to Israeli bank and card sites with a real Chromium and returns their transactions, reads Psagot Trade portfolios over plain HTTPS, and reads the Pluxee (Cibus) meal card with its own code on the browser. It runs as a sidecar container in Dana's pod: the `money_il` addon's worker. Dana (`addons/money/` runs the sources, schedule and storage; `addons/money_il/` drives this worker for them) decides when to sync, holds the credentials (encrypted) and stores the results; the worker is a browser with no memory beyond its saved browser profiles.
 
 Built on [`israeli-bank-scrapers`](https://github.com/eshaham/israeli-bank-scrapers) (pinned in `package.json`), with our own handling for what the library misses: Hapoalim's SMS-code page (the bank asks when it decides to: a new device or address, not every new profile), Hapoalim's wrong-password message on its new login page, and Cal's forced password change. A login waits for the bank's redirect instead of the library's fixed 20 s, so a code can be entered.
 
@@ -78,7 +78,7 @@ Deletes that profile's folder (a removed source) → `200 {"ok": true}`; `409` w
 ## Running locally
 
 ```bash
-cd server/addons/money/worker && PUPPETEER_SKIP_DOWNLOAD=1 npm ci     # uses the system Chromium
+cd server/addons/money_il/worker && PUPPETEER_SKIP_DOWNLOAD=1 npm ci     # uses the system Chromium
 BANK_WORKER_TOKEN_FILE=/tmp/token BANK_WORKER_PROFILES=/tmp/profiles \
   CHROMIUM_PATH=/usr/bin/chromium TZ="$TIMEZONE" node src/main.js
 ```
@@ -88,4 +88,4 @@ Debugging a site change: `BANK_WORKER_HEADFUL=1` shows the browser, `BANK_WORKER
 
 ## Image
 
-`Dockerfile`: Debian's Chromium on `node:22-slim` with tzdata (the deployment sets `TZ` to Dana's `TIMEZONE`: `compose.yaml` does, a k8s sidecar sets it in its env; unset: UTC), user 1001 (Dana's, both write `/app/db/money`), `BANK_WORKER_NO_SANDBOX=1` (a pod has no user namespaces for Chromium's sandbox). It is the `money` addon's worker (`Worker(port=8090, url_env="MONEY_WORKER_URL")` in `../addon.py`; this folder is self-contained so it can move with the addon): `bin/deploy` builds it as `$DANA_IMAGE-money:<release>`, the same tag as Dana's image, and writes that image into the GitOps values (`docs/operations.md`, "Workers"), where the deployment's `initContainers` and `extraContainers` entries use it. The sidecar mounts only the `money/` folder of Dana's volume (subPath, at `/app/db/money`): it never sees Dana's database. An init container (the same image) creates that folder as uid 1001 first, since a subPath kubelet creates itself would belong to root. The sidecar runs without privilege escalation, with every capability dropped and the runtime's seccomp profile, and needs no secrets (only `TZ`).
+`Dockerfile`: Debian's Chromium on `node:22-slim` with tzdata (the deployment sets `TZ` to Dana's `TIMEZONE`: `compose.yaml` does, a k8s sidecar sets it in its env; unset: UTC), user 1001 (Dana's, both write `/app/db/money`), `BANK_WORKER_NO_SANDBOX=1` (a pod has no user namespaces for Chromium's sandbox). It is the `money_il` addon's worker (`Worker(port=8090, url_env="MONEY_WORKER_URL")` in `../addon.py`; this folder is self-contained so it can move with the addon): `bin/deploy` builds it as `$DANA_IMAGE-money_il:<release>`, the same tag as Dana's image, and writes that image into the GitOps values (`docs/operations.md`, "Workers"), where the deployment's `initContainers` and `extraContainers` entries use it. The sidecar mounts only the `money/` folder of Dana's volume (subPath, at `/app/db/money`): it never sees Dana's database. An init container (the same image) creates that folder as uid 1001 first, since a subPath kubelet creates itself would belong to root. The sidecar runs without privilege escalation, with every capability dropped and the runtime's seccomp profile, and needs no secrets (only `TZ`).

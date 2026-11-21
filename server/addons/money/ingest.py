@@ -1,14 +1,16 @@
 """Storing a sync's result: accounts and transactions (docs/money.md, "Ingest"); an investment
 account's portfolio goes to ``portfolio.py``, a meal card's charges to ``meals.py``.
 
-The worker returns ``israeli-bank-scrapers`` accounts (``accountNumber``,
-``balance``, ``txns``). :func:`apply` stores them for one source in one
-transaction: accounts upserted by ``(user, company, number)``, transactions
-by ``(account, ext_key)``, the account's ``pending`` rows not in this pull
-removed. Text is scrubbed before it is stored (ID numbers, card and account
-numbers); amounts become signed agorot; the scrapers' dates (UTC instants of
-local midnight) become local dates. A category comes only from the user's
-rules here; classification runs later, from a hook."""
+A provider returns accounts in money's ingest format (docs/money.md, "Ingest
+format"): ``accountNumber``, ``balance`` and ``txns`` (the shape of
+``israeli-bank-scrapers``, which any provider can produce). :func:`apply`
+stores them for one source in one transaction: accounts upserted by
+``(user, company, number)``, transactions by ``(account, ext_key)``, the
+account's ``pending`` rows not in this pull removed. Text is scrubbed before
+it is stored (ID numbers, card and account numbers); amounts become signed
+agorot; dates (instants; a scraper's UTC instant of local midnight) become
+local dates. A category comes only from the user's rules here;
+classification runs later, from a hook."""
 
 import datetime
 import hashlib
@@ -23,7 +25,7 @@ from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from core import clock
 from core.users import User
-from addons.money import companies, meals, portfolio, store
+from addons.money import meals, portfolio, providers, store
 
 logger = logging.getLogger(__name__)
 
@@ -159,7 +161,7 @@ def _instant(value: Any) -> Optional[datetime.datetime]:
 
 
 def _local_naive(value: Any) -> Optional[datetime.datetime]:
-    """A naive local time (Cal's ``trnPurchaseDate``) in the server's zone."""
+    """A local time (``purchaseDate``; naive = the server's zone) in the server's zone."""
     if not value:
         return None
     try:
@@ -181,7 +183,11 @@ def _int(value: Any) -> Optional[int]:
         return None
 
 
-def _row(company: str, txn: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+# Format fields that are not the site's: left out of the stored ``raw``.
+_NOT_RAW = ("purchaseDate",)
+
+
+def _row(txn: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
     """The stored fields of one scraped transaction (no ext_key yet); None when it has no date or amount."""
     when = _instant(txn.get("date"))
     amount = agorot(txn.get("chargedAmount"))
@@ -189,13 +195,11 @@ def _row(company: str, txn: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
         amount = agorot(txn.get("originalAmount"))
     if when is None or amount is None:
         return None
-    raw = txn.get("rawTransaction") if isinstance(txn.get("rawTransaction"), dict) else {}
     installments = txn.get("installments") if isinstance(txn.get("installments"), dict) else {}
     purchase, occurred = when.date(), _when(when)
-    if company == "visaCal" and txn.get("type") == "installments":
-        bought = _local_naive(raw.get("trnPurchaseDate"))
-        if bought is not None:  # the library moves ``date`` to the payment's month
-            purchase, occurred = bought.date(), _when(bought)
+    bought = _local_naive(txn.get("purchaseDate"))
+    if bought is not None:  # the provider knows the purchase when ``date`` is another day (an installment's month)
+        purchase, occurred = bought.date(), _when(bought)
     charged = _instant(txn.get("processedDate"))
     description = scrub(str(txn.get("description") or "")).strip()
     memo = scrub(str(txn.get("memo") or "")).strip()
@@ -211,7 +215,8 @@ def _row(company: str, txn: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
         "orig_currency": currency(txn.get("originalCurrency")),
         "description": description, "merchant_key": key, "memo": memo or None, "payee": payee[0] if payee else None,
         "installment_number": _int(installments.get("number")), "installment_total": _int(installments.get("total")),
-        "raw": json.dumps(scrub_value(dict(txn)), ensure_ascii=False, sort_keys=True),
+        "raw": json.dumps(scrub_value({k: v for k, v in txn.items() if k not in _NOT_RAW}), ensure_ascii=False,
+                          sort_keys=True),
         "_identifier": txn.get("identifier"),
     }
 
@@ -222,17 +227,17 @@ def _hash(row: Mapping[str, Any]) -> str:
     return hashlib.sha1("|".join(parts).encode()).hexdigest()[:16]
 
 
-def _assign_keys(company: str, rows: Sequence[Dict[str, Any]]) -> None:
-    """Give each row of one account's pull its ``ext_key`` (unique within the pull)."""
+def _assign_keys(company: providers.Company, rows: Sequence[Dict[str, Any]]) -> None:
+    """Give each row of one account's pull its ``ext_key`` (unique within the pull): from the site's
+    ``identifier`` when the company's are stable (``id_key``), else from a hash of the row."""
     occurrences: Counter = Counter()
     used = set()
     for row in rows:
         identifier = row.pop("_identifier", None)
-        if company == "visaCal" and identifier not in (None, ""):
-            key = f"cal:{identifier}:{row['installment_number'] or 0}"
+        if company.id_key and identifier not in (None, ""):
+            key = f"{company.id_key}:{identifier}:{row['installment_number'] or 0}"
         else:
-            prefix = "poalim" if company == "hapoalim" else "x"
-            base = f"{prefix}:{_hash(row)}"
+            base = f"{company.hash_key}:{_hash(row)}"
             key = f"{base}:{occurrences[base]}"
             occurrences[base] += 1
         if key in used:  # a site repeating an id within one pull: keep both rows
@@ -246,7 +251,7 @@ def _assign_keys(company: str, rows: Sequence[Dict[str, Any]]) -> None:
 
 # --- Storing --------------------------------------------------------------------------------
 
-def _upsert_account(conn, user: User, source_id: str, company: companies.Company, number: str,
+def _upsert_account(conn, user: User, source_id: str, company: providers.Company, number: str,
                     balance: Optional[int], next_charge: Optional[int], next_charge_date: Optional[str],
                     has_balance: bool, now: str) -> str:
     row = conn.execute("SELECT id FROM money_accounts WHERE user_id = ? AND company = ? AND number = ?",
@@ -277,9 +282,11 @@ def apply(user: User, source: Mapping[str, Any], accounts: Sequence[Mapping[str,
         ``{"new": [transaction ids], "changed": [transaction ids], "accounts": [account ids]}``.
 
     Raises:
-        UnknownCompany: the source's company is not supported.
+        UnknownCompany: no loaded provider brings the source's company.
     """
-    company = companies.get(str(source["company"]))
+    company = providers.company(str(source["company"]))
+    if company is None:
+        raise providers.UnknownCompany(f"Unknown company {source['company']!r}")
     today = clock.now().date().isoformat()
     now = store.now_iso()
     out: Dict[str, List[str]] = {"new": [], "changed": [], "accounts": []}
@@ -301,11 +308,11 @@ def apply(user: User, source: Mapping[str, Any], accounts: Sequence[Mapping[str,
             if not number:
                 logger.warning(f"Money ingest for source {source['id']}: an account without a number was skipped")
                 continue
-            rows = [r for r in (_row(company.id, t) for t in account.get("txns") or []) if r is not None]
+            rows = [r for r in (_row(t) for t in account.get("txns") or []) if r is not None]
             skipped = len(account.get("txns") or []) - len(rows)
             if skipped:
                 logger.warning(f"Money ingest for source {source['id']}: {skipped} row(s) without a date or amount")
-            _assign_keys(company.id, rows)
+            _assign_keys(company, rows)
             raw_balance = agorot(account.get("balance"))
             has_balance = raw_balance is not None
             balance = next_charge = None

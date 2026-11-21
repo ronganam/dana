@@ -103,7 +103,7 @@ An addon with `web=` gets its files served at `/addons/<name>/web/<file>` (signe
 
 ### Workers (sidecars)
 
-An addon with a `worker/` folder (a self-contained `Dockerfile` context) declares `worker=Worker(port=8090, url_env="MONEY_WORKER_URL")`. `bin/deploy` builds one image per worker (`<DANA_IMAGE>-<addon>`, same tag as Dana's; `DANA_WORKERS` picks them) and writes it to your GitOps values (`workers.<addon>.image`); `compose.yaml` runs it under a profile with the addon's name (`--profile money`); the app image leaves `worker/` folders out. Details: `server/docs/operations.md`, "Workers". Today the bank scrapers are the `money` addon's worker (`server/addons/money/worker/`); the money split (wave 3) makes them `money_il`'s.
+An addon with a `worker/` folder (a self-contained `Dockerfile` context) declares `worker=Worker(port=8090, url_env="MONEY_WORKER_URL")`. `bin/deploy` builds one image per worker (`<DANA_IMAGE>-<addon>`, same tag as Dana's; `DANA_WORKERS` picks them) and writes it to your GitOps values (`workers.<addon>.image`); `compose.yaml` runs it under a profile with the addon's name (`--profile money_il`); the app image leaves `worker/` folders out. Details: `server/docs/operations.md`, "Workers". The bank scrapers are the `money_il` provider addon's worker (`server/addons/money_il/worker/`).
 
 ### LLM jobs
 

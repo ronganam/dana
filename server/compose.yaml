@@ -2,7 +2,7 @@
 #
 #   cp .env.example .env            # fill in the LLM key and API_TOKEN (both required)
 #   docker compose up -d            # http://localhost:8080 (this machine only, see ports below)
-#   docker compose --profile money up -d   # also the money addon's worker: the bank syncs (docs/money.md)
+#   docker compose --profile money_il up -d   # also money_il's worker: the Israeli bank syncs (docs/money-il.md)
 #
 # An addon's worker (its worker/ folder: docs/operations.md, "Workers") runs as a service under a
 # profile named after the addon.
@@ -33,20 +33,20 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # The money addon's worker (addons/money/worker/): shares the app's network (Dana reaches it on
-  # 127.0.0.1:8090, MONEY_WORKER_URL) and only the money/ folder of the data, which money-dir creates first.
-  money-dir:
-    profiles: [money]
-    image: dana-money
-    build: ./addons/money/worker
+  # The money_il addon's worker (addons/money_il/worker/): shares the app's network (Dana reaches it on
+  # 127.0.0.1:8090, MONEY_WORKER_URL) and only the money/ folder of the data, which money-il-dir creates first.
+  money-il-dir:
+    profiles: [money_il]
+    image: dana-money_il
+    build: ./addons/money_il/worker
     command: ["mkdir", "-p", "/data/money/profiles"]
     volumes:
       - data:/data
     depends_on: [app]   # the app creates the volume first, owned by its user
     restart: "no"
-  money-worker:
-    profiles: [money]
-    image: dana-money
+  money-il-worker:
+    profiles: [money_il]
+    image: dana-money_il
     network_mode: "service:app"
     environment:
       TZ: ${TIMEZONE:-UTC}   # the server's zone (from .env): the dates the sites are asked for
@@ -59,7 +59,7 @@ services:
     depends_on:
       app:
         condition: service_started
-      money-dir:
+      money-il-dir:
         condition: service_completed_successfully
     restart: unless-stopped
 

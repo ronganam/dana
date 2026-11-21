@@ -1,7 +1,7 @@
 """HTTP routes of the money addon: companies, sources, syncs and sign-in code
 requests (docs/money.md, "API").
 
-- ``GET /api/money/companies``
+- ``GET /api/money/companies`` (those of the user's provider addons)
 - ``GET|POST /api/money/sources``, ``PATCH|DELETE /api/money/sources/{id}``
   (``?transactions=1`` also deletes its accounts and transactions)
 - ``POST /api/money/sources/{id}/sync`` → 202 ``{sync_id}`` | 429 ``too_soon`` | 409 ``needs_attention``
@@ -13,7 +13,7 @@ requests (docs/money.md, "API").
   ``GET /api/money/recurring``, ``GET /api/money/changes?since=``
 - The dashboards (dashboard.py): ``GET /api/money/cashflow?n=&end=``, ``GET /api/money/balance?days=``,
   ``GET /api/money/trends|insights?month=``, ``GET /api/money/merchants?period=|start=&end=``
-- Investments (portfolio.py): ``GET /api/money/portfolio?days=&trades=``
+- Investments (portfolio.py): ``GET /api/money/portfolio?days=&trades=``; meal cards (meals.py): ``GET /api/money/meals?months=``
 - Savings (savings.py): ``GET /api/money/savings``, ``GET|PATCH /api/money/savings/{key}``,
   ``POST /api/money/savings/{key}/check`` (keys contain ":"; clients URL-encode them)
 
@@ -34,8 +34,8 @@ from core import undo, users
 from core.auth import request_user
 from core.users import User
 from core.addons import crypto, store as connections
-from addons.money import (categories, companies, config, dashboard, insights, market, meals, otp, periods, portfolio,
-                                queries, rules, savings, schedule, signals, sources, store)
+from addons.money import (categories, config, dashboard, insights, meals, otp, periods, portfolio, providers, queries,
+                          rules, savings, schedule, signals, sources, store)
 
 logger = logging.getLogger(__name__)
 
@@ -71,9 +71,10 @@ def _source_or_404(user: User, request: web.Request) -> Dict[str, Any]:
 
 
 async def get_companies(request: web.Request) -> web.Response:
-    """GET /api/money/companies → ``{companies: [{id, name, kind, fields: [{name, label, secret}]}]}``"""
-    _money_user(request)
-    return web.json_response({"companies": [c.payload() for c in companies.COMPANIES.values()]})
+    """GET /api/money/companies → ``{companies: [{id, name, kind, fields: [{name, label, secret}]}]}``: those of
+    the provider addons the user has on (``providers.companies``)."""
+    user = _money_user(request)
+    return web.json_response({"companies": [c.payload() for c in providers.companies(user)]})
 
 
 async def get_sources(request: web.Request) -> web.Response:
@@ -83,12 +84,13 @@ async def get_sources(request: web.Request) -> web.Response:
 
 
 async def post_source(request: web.Request) -> web.Response:
-    """POST /api/money/sources ``{company, label?, credentials}`` → 201 payload (its first sync starts)."""
+    """POST /api/money/sources ``{company, label?, credentials}`` → 201 payload (its first sync starts); 400
+    ``unknown_company`` when no provider brings it, 403 ``not_connected`` when its provider addon is off."""
     user = _money_user(request)
     body = await _body(request)
     try:
         payload = sources.add(user, str(body.get("company") or ""), body.get("credentials"), body.get("label"))
-    except companies.UnknownCompany as e:
+    except providers.UnknownCompany as e:
         return _error(400, "unknown_company", message=str(e))
     except sources.InvalidCredentials as e:
         return _error(400, "invalid", field=e.field, message=str(e))
@@ -108,6 +110,8 @@ async def patch_source(request: web.Request) -> web.Response:
         return _error(400, "invalid", field="label", message="label must be text")
     try:
         payload = sources.update(user, request.match_info["id"], label=label, credentials=body.get("credentials"))
+    except providers.UnknownCompany as e:
+        return _error(400, "unknown_company", message=str(e))
     except LookupError:
         return _error(404, "not_found")
     except sources.InvalidCredentials as e:
@@ -128,11 +132,14 @@ async def delete_source(request: web.Request) -> web.Response:
 
 
 async def post_sync(request: web.Request) -> web.Response:
-    """POST /api/money/sources/{id}/sync → 202 ``{sync_id}``."""
+    """POST /api/money/sources/{id}/sync → 202 ``{sync_id}`` (403 ``not_connected`` while its provider addon is off;
+    409 ``unavailable`` when no provider reads its company any more)."""
     user = _money_user(request)
     _source_or_404(user, request)
     try:
         sync_id = schedule.sync_now(user, request.match_info["id"], "manual")
+    except providers.UnknownCompany as e:
+        return _error(409, "unavailable", reason=str(e))
     except LookupError:
         return _error(404, "not_found")
     except schedule.TooSoon as e:
@@ -154,7 +161,7 @@ async def get_syncs(request: web.Request) -> web.Response:
 
 def _request_payload(r: Dict[str, Any]) -> Dict[str, Any]:
     return {"id": r["id"], "source_id": r["source_id"], "company": r["company"],
-            "company_name": companies.name_of(r["company"]), "status": r["status"], "expires_at": r["expires_at"]}
+            "company_name": providers.name_of(r["company"]), "status": r["status"], "expires_at": r["expires_at"]}
 
 
 async def get_code_requests(request: web.Request) -> web.Response:
@@ -171,9 +178,9 @@ async def get_code_request(request: web.Request) -> web.Response:
     r = store.get_code_request(user, request.match_info["id"])
     if r is None:
         return _error(404, "not_found")
-    company = companies.COMPANIES.get(r["company"])
+    company = providers.company(r["company"])
     return web.json_response({"id": r["id"], "status": r["status"], "company": r["company"],
-                              "company_name": companies.name_of(r["company"]),
+                              "company_name": providers.name_of(r["company"]),
                               "senders": list(company.sms_senders) if company else [],
                               "code_regex": company.code_regex if company else "", "expires_at": r["expires_at"]})
 
@@ -479,7 +486,7 @@ async def patch_saving(request: web.Request) -> web.Response:
 
 
 async def post_saving_check(request: web.Request) -> web.Response:
-    """POST /api/money/savings/{key}/check → 202 ``{state: "checking"}`` (``market.start``); 400
+    """POST /api/money/savings/{key}/check → 202 ``{state: "checking"}`` (the user's price checks); 400
     ``needs_answer`` ``{question}`` | 400 ``no_check`` | 409 ``running`` | 429 ``too_soon`` ``{retry_after}`` |
     503 ``unavailable``."""
     user = _money_user(request)
@@ -493,15 +500,15 @@ async def post_saving_check(request: web.Request) -> web.Response:
     except savings.NeedsAnswer as e:
         return _error(400, "needs_answer", question=e.question, message=str(e))
     try:
-        # On the event loop: market.start starts the check as a task.
+        # On the event loop: the price checks start the check as a task.
         result = savings.start_check(user, topic, params)
     except ValueError as e:
         return _error(400, "invalid", message=str(e))
-    except market.Running:
+    except providers.PriceCheckRunning:
         return _error(409, "running", message="this price check is already running")
-    except market.TooSoon as e:
+    except providers.PriceCheckTooSoon as e:
         return _error(429, "too_soon", retry_after=e.retry_after)
-    except market.Unavailable:
+    except providers.PriceCheckUnavailable:
         return _error(503, "unavailable", message="price checks are not available")
     return web.json_response({**result, "state": result.get("state") or "checking"}, status=202)
 

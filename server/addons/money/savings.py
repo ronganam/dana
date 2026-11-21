@@ -10,8 +10,11 @@ spree at one merchant, small charges that add up, two services of one niche,
 fines and late fees, late-night shopping — each with an optional monthly
 target.
 
-Every number is computed here from the rows, the Bank of Israel's public data
-(``reference.py``) and the price checks the user asked for (``market.py``);
+Every number is computed here from the rows, the reference rates of the
+user's provider (``providers.rates``: the Bank of Israel's with money_il) and
+the price checks the user asked for (``providers.price_checks``); without
+rates the items that need them (``cash``, ``cushion``, the arnona's net) are
+left out, without price checks an item's check reads ``unavailable``;
 each saving says its basis: ``measured``, ``increase`` or ``market``. Without
 a credible saving an item has ``at_stake`` (money a year) and ``saving: None``.
 
@@ -38,7 +41,7 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set,
 
 from core import clock, undo, users
 from core.users import User
-from addons.money import dashboard, ingest, insights, market, periods, portfolio, reference, store
+from addons.money import dashboard, ingest, insights, periods, portfolio, providers, store
 
 logger = logging.getLogger(__name__)
 
@@ -156,10 +159,10 @@ class Context:
     accounts: List[Dict[str, Any]]                    # store.list_accounts, with ``label``
     investments: List[Dict[str, Any]]                 # portfolio accounts with their holdings
     trades: List[Dict[str, Any]]                      # their recent activity
-    rate: Optional[Dict[str, Any]]                    # reference.policy_rate
+    rate: Optional[Dict[str, Any]]                    # providers.Rates.policy_rate
     fx: Dict[str, Dict[str, float]]                   # currency → {date: shekels a unit}
     answers: Dict[str, Dict[str, Any]]                # item key → the user's answers
-    market: Callable[[str, Dict[str, Any]], Optional[Dict[str, Any]]]
+    market: Optional[Callable[[str, Dict[str, Any]], Optional[Dict[str, Any]]]]  # None: no price checks
     unavailable: Set[str] = field(default_factory=set)  # price-check topics that said "unavailable"
 
     @property
@@ -316,6 +319,9 @@ def _effort(minutes: int, how: str) -> Dict[str, Any]:
 
 def _market(ctx: Context, topic: str, params: Dict[str, Any], needs_answer: Optional[str] = None) -> Dict[str, Any]:
     """The item's price-check state: the newest check with these params (none while a question is unanswered)."""
+    if ctx.market is None:
+        return {"topic": topic, "params": params, "state": "unavailable", "checked_at": None, "stale": False,
+                "items": [], "sources": [], "error": None, "needs_answer": needs_answer}
     try:
         found = None if needs_answer else ctx.market(topic, params)
     except ValueError:
@@ -614,7 +620,7 @@ def _fx_lines(ctx: Context, rows: Iterable[Dict[str, Any]]) -> List[Tuple[Dict[s
     """``(row, base, markup)`` for foreign purchases with a known rate (base: the BoI rate's shekels, agorot)."""
     out = []
     for r in rows:
-        rate = reference.rate_on(ctx.fx.get((r.get("orig_currency") or "").upper(), {}), r["purchase_date"])
+        rate = providers.rate_on(ctx.fx.get((r.get("orig_currency") or "").upper(), {}), r["purchase_date"])
         if rate is None:
             continue
         base = abs(r["orig_amount"]) * rate
@@ -1185,8 +1191,8 @@ def _json(value: Optional[str]) -> Dict[str, Any]:
 
 def context(user: User, today: Optional[datetime.date] = None, book: Optional[dashboard.Book] = None,
             rows: Optional[Dict[str, Dict[str, Any]]] = None) -> Context:
-    """The user's :class:`Context`: their book, accounts, investments, the Bank of Israel rates the
-    detectors need, their answers and their price checks."""
+    """The user's :class:`Context`: their book, accounts, investments, the reference rates the
+    detectors need (their provider's), their answers and their price checks."""
     today = today or periods.today()
     book = book or dashboard.load(user, today)
     accounts = [{**a, "label": store.account_label(a["company"], a["kind"], a["number"], a.get("label"))}
@@ -1195,14 +1201,18 @@ def context(user: User, today: Optional[datetime.date] = None, book: Optional[da
     year_ago = (today - datetime.timedelta(days=365)).isoformat()
     # Every supported currency or none: which ones are fetched must say nothing about where the user spent.
     spent_abroad = any(_foreign(r) and r.get("account_kind") == "card" and r["purchase_date"] >= year_ago for r in book.rows)
-    fx = ({c: reference.fx_rates(c, today - datetime.timedelta(days=372), today) for c in sorted(reference.FX_CURRENCIES)}
-          if spent_abroad else {})
+    rates = providers.rates(user)
+    fx = ({c: rates.fx_rates(c, today - datetime.timedelta(days=372), today) for c in sorted(rates.currencies)}
+          if spent_abroad and rates else {})
+    checks = providers.price_checks(user)
     rows = rows if rows is not None else _rows(user)
     now = time.time()
     unavailable = {topic for (uid, topic), at in _unavailable.items() if uid == user.id and now - at < UNAVAILABLE_SECONDS}
     return Context(today=today, book=book, accounts=accounts, investments=folio["accounts"], trades=folio["trades"],
-                   rate=reference.policy_rate(today), fx=fx, answers={k: _answers(r) for k, r in rows.items()},
-                   market=lambda topic, params: market.latest(user, topic, params), unavailable=unavailable)
+                   rate=rates.policy_rate(today) if rates else None, fx=fx,
+                   answers={k: _answers(r) for k, r in rows.items()},
+                   market=(lambda topic, params: checks.latest(user, topic, params)) if checks else None,
+                   unavailable=unavailable)
 
 
 def _snapshot(item: Dict[str, Any]) -> str:
@@ -1826,15 +1836,19 @@ def check_request(user: User, key: str) -> Tuple[str, Dict[str, Any]]:
 
 
 def start_check(user: User, topic: str, params: Dict[str, Any]) -> Dict[str, Any]:
-    """``market.start`` for a check from :func:`check_request`; call it on the event loop (it starts a task).
-    Remembers a topic the model cannot search for an hour.
+    """Start a check from :func:`check_request` (``providers.PriceChecks.start``); call it on the event loop (it
+    starts a task). Remembers a topic the model cannot search for an hour.
 
     Raises:
-        market.Unavailable / market.Running / market.TooSoon / ValueError: from the price checks.
+        providers.PriceCheckUnavailable (also without price checks) / PriceCheckRunning / PriceCheckTooSoon /
+        ValueError: from the price checks.
     """
+    checks = providers.price_checks(user)
     try:
-        return market.start(user, topic, params)
-    except market.Unavailable:
+        if checks is None:
+            raise providers.PriceCheckUnavailable("no price checks for this user")
+        return checks.start(user, topic, params)
+    except providers.PriceCheckUnavailable:
         _unavailable[(user.id, topic)] = time.time()
         raise
 

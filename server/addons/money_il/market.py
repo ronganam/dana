@@ -1,4 +1,5 @@
-"""Price checks of the Money Save view: one web-grounded search turned into sourced offers (docs/money.md, "Price checks").
+"""Price checks in Israel for the Money Save view: one web-grounded search turned into sourced offers
+(docs/money-il.md, "Price checks"); money's price checks provider (docs/money.md, "Providers").
 
 A check runs only when the user asks (:func:`start`, from the API) and never in
 the background. What goes out is built from the topic and its params alone:
@@ -23,6 +24,7 @@ import httpx
 from core import clock, llm, users
 from core.users import User
 from addons.money import store
+from addons.money.providers import PriceCheckRunning, PriceCheckTooSoon, PriceCheckUnavailable
 
 logger = logging.getLogger(__name__)
 
@@ -64,22 +66,6 @@ ERRORS = {
     "failed": "The web search did not answer. Try again in a few minutes.",
     "stopped": "The check was stopped. Try again.",
 }
-
-
-class Unavailable(Exception):
-    """No model with web search is configured."""
-
-
-class Running(Exception):
-    """A check of this topic and params is already running."""
-
-
-class TooSoon(Exception):
-    """The same check ran recently; ``retry_after`` is the seconds until it may run again."""
-
-    def __init__(self, retry_after: int) -> None:
-        super().__init__(f"checked recently, again in {retry_after} s")
-        self.retry_after = retry_after
 
 
 class _NothingFound(Exception):
@@ -476,28 +462,28 @@ def start(user: User, topic: str, params: Optional[Mapping[str, Any]]) -> Dict[s
 
     Raises:
         ValueError: unknown topic or bad params.
-        Unavailable: no model with web search is configured.
-        Running: this check is already running.
-        TooSoon: it ran less than 6 hours ago (5 minutes after a failed one).
+        PriceCheckUnavailable: no model with web search is configured.
+        PriceCheckRunning: this check is already running.
+        PriceCheckTooSoon: it ran less than 6 hours ago (5 minutes after a failed one).
     """
     clean = normalize(topic, params)
     if not llm.can_search():
-        raise Unavailable("no model with web search is configured")
+        raise PriceCheckUnavailable("no model with web search is configured")
     key = params_key(clean)
     slot = (user.id, topic, key)
     if slot in _running:
-        raise Running(f"a {topic} check is already running")
+        raise PriceCheckRunning(f"a {topic} check is already running")
     now = store.utc_now()
     row = _row(user.id, topic, key)
     if row is not None:
         current = _payload(row, now)
         if current["state"] == "checking":
-            raise Running(f"a {topic} check is already running")
+            raise PriceCheckRunning(f"a {topic} check is already running")
         started = store.parse(row["started_at"])
         gap = RETRY_SECONDS if current["state"] == "failed" else RATE_SECONDS
         wait = gap - (now - started).total_seconds() if started else 0
         if wait > 0:
-            raise TooSoon(math.ceil(wait))
+            raise PriceCheckTooSoon(math.ceil(wait))
     loop = asyncio.get_running_loop()
     started_at = store.iso(now)
     with store.db() as conn:

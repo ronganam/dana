@@ -15,7 +15,7 @@ from typing import Any, Dict, Iterator, List, Mapping, Optional, Sequence
 from core import clock
 from core.db import get_db_connection
 from core.users import User
-from addons.money import categories, companies
+from addons.money import categories, providers
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +129,7 @@ def credentials_token(user: User, source_id: str) -> Optional[str]:
 
 
 def device_token(user: User, source_id: str) -> Optional[str]:
-    """The encrypted device key of one of the user's sources (Psagot's quick view; ``sync.py`` only)."""
+    """The encrypted device key a provider keeps for one of the user's sources (``sync.py`` only)."""
     with db() as conn:
         row = conn.execute("SELECT device FROM money_sources WHERE id = ? AND user_id = ?",
                            (source_id, user.id)).fetchone()
@@ -144,7 +144,7 @@ def set_device(user: User, source_id: str, token: Optional[str]) -> None:
 
 def source_name(source: Dict[str, Any]) -> str:
     """What to call a source in messages: its label, else the company's name."""
-    return (source.get("label") or "").strip() or companies.name_of(source.get("company") or "")
+    return (source.get("label") or "").strip() or providers.name_of(source.get("company") or "")
 
 
 # --- Accounts -----------------------------------------------------------------------------
@@ -223,13 +223,15 @@ def hand_sync_allowed(source: Mapping[str, Any]) -> bool:
 
 def source_payload(user: User, source: Dict[str, Any]) -> Dict[str, Any]:
     """The API's view of a source: its state, sync times, accounts, the pending
-    code request and ``can_sync`` (the user's "Sync now" is allowed by its state)."""
+    code request and ``can_sync`` (the user's "Sync now" is allowed by its state
+    and its provider addon is on for them)."""
     pending = code_requests(user, status="pending", source_id=source["id"])
-    return {"id": source["id"], "company": source["company"], "company_name": companies.name_of(source["company"]),
+    can_sync = hand_sync_allowed(source) and providers.available(user, source["company"])
+    return {"id": source["id"], "company": source["company"], "company_name": providers.name_of(source["company"]),
             "label": source.get("label"), "state": source["state"], "state_reason": source.get("state_reason"),
             "error_type": source.get("error_type"), "last_sync_at": source.get("last_sync_at"),
             "last_ok_at": source.get("last_ok_at"), "next_sync_at": source.get("next_sync_at"),
-            "credentials_set": bool(source.get("credentials_set")), "can_sync": hand_sync_allowed(source),
+            "credentials_set": bool(source.get("credentials_set")), "can_sync": can_sync,
             "accounts": [account_payload(a) for a in list_accounts(user, source["id"])],
             "code_request": {"id": pending[0]["id"], "expires_at": pending[0]["expires_at"]} if pending else None}
 
@@ -297,12 +299,13 @@ def get_transaction(user: User, txn_id: str) -> Optional[Dict[str, Any]]:
 
 # --- Removing everything ------------------------------------------------------------------
 
-def delete_all(user: User) -> List[str]:
+def delete_all(user: User) -> List[Dict[str, Any]]:
     """Delete every money row of the user (sources, accounts, transactions,
     rules, aliases, phone signals, syncs, code requests, saving choices, price checks, meal card charges) and the
-    Money section of their weekly reviews. Returns the removed source ids."""
+    Money section of their weekly reviews. Returns the removed sources (``{id, company}``)."""
     with db() as conn:
-        ids = [r["id"] for r in conn.execute("SELECT id FROM money_sources WHERE user_id = ?", (user.id,))]
+        removed = [{"id": r["id"], "company": r["company"]}
+                   for r in conn.execute("SELECT id, company FROM money_sources WHERE user_id = ?", (user.id,))]
         for table in ("money_code_requests", "money_syncs", "money_signals", "money_transactions", "money_holdings",
                       "money_account_values", "money_trades", "money_meals", "money_accounts", "money_rules", "money_aliases",
                       "money_savings", "money_market_checks", "money_sources"):
@@ -310,7 +313,7 @@ def delete_all(user: User) -> List[str]:
         # The weekly reviews' Money sections go too (the rest of a review stays).
         conn.execute("UPDATE weekly_reviews SET data = json_remove(data, '$.money') WHERE user_id = ? "
                      "AND json_valid(data) AND json_extract(data, '$.money') IS NOT NULL", (user.id,))
-    return ids
+    return removed
 
 
 # --- Page and insight reads (queries.py, insights.py) -------------------------------------
@@ -345,7 +348,7 @@ def account_label(company: Optional[str], kind: Optional[str], number: Optional[
     if not company:
         return "Unknown account"
     shown = mask_number(number or "") if kind in ("bank", "investment") else (number or "")
-    return f"{companies.name_of(company)} {shown}".strip()
+    return f"{providers.name_of(company)} {shown}".strip()
 
 
 def local_date(value: Any) -> Optional[datetime.date]:

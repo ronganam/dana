@@ -1,9 +1,10 @@
-"""Money syncs end to end against a fake bank worker: the code broker, the schedule, the API per user and the check.
-Run: bin/test test_money_sync
+"""Money syncs through money_il's bank worker end to end: the code broker, the schedule, the API per user and the check.
+Run: bin/test test_money_il_sync
 
-``testfakes.FakeBankWorker`` plays the bank-worker sidecar (addons/money/worker/README.md)
+``testfakes.FakeBankWorker`` plays the bank-worker sidecar (addons/money_il/worker/README.md)
 with scripted outcomes; Dana's token file is the one it checks. The first
-admin and Bob have ``money`` (each with a Telegram chat); Carl has not. Phone
+admin and Bob have ``money`` and ``money_il`` (each with a Telegram chat); Dee has ``money``
+only; Carl has neither. Phone
 push and Telegram are recorded, not sent. Checked: a sync that succeeds
 (credentials decrypted for the worker only, start dates, accounts, hooks run
 as the user, a failing hook ignored, the health mark); a sign-in code given
@@ -20,7 +21,9 @@ restart; an unreachable worker; the loop (due sources only, as each user, signal
 per user (403 ``not_connected`` without the addon, another user's source /
 request / syncs answer 404 or nothing, refused bodies); removing a source
 with and without its transactions; recovery after a restart; the ``money``
-check; disconnecting the addon. Credentials and codes appear in no response,
+check; Dee: no companies, 403 ``money_il`` for a Cal login; turning ``money_il``
+off (logins removed and their profiles deleted, accounts and transactions
+kept); disconnecting money; ``convert`` (Cal's installment purchase date). Credentials and codes appear in no response,
 log line or database value (codes) / only encrypted (credentials).
 """
 
@@ -81,8 +84,9 @@ from core import telegram_bot as tb  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import store as connections  # noqa: E402
-from addons.money import after_sync, api as money_api, config, otp, schedule, slots, sources, store, sync, worker_client  # noqa: E402
-from addons.money.addon import addon as money_addon  # noqa: E402
+from addons.money import after_sync, api as money_api, config, otp, providers, schedule, slots, sources, store, sync  # noqa: E402
+from addons.money_il import config as il_config, convert, worker_client  # noqa: E402
+from addons.money_il.addon import addon as money_il_addon  # noqa: E402
 from addons.phone import push  # noqa: E402
 from testfakes import FakeBankWorker  # noqa: E402
 
@@ -98,16 +102,19 @@ ADMIN = users.first_admin()
 assert ADMIN is not None and ADMIN.telegram_ids == (111,)
 BOB = users.create("Bob", telegram_ids=[222], telegram_chat_id=222)
 CARL = users.create("Carl")
-connections.connect(ADMIN, "money")
-connections.connect(BOB, "money")
-TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ADMIN, BOB, CARL)}
+DEE = users.create("Dee")
+for _user in (ADMIN, BOB):
+    connections.connect(_user, "money")
+    connections.connect(_user, "money_il")
+connections.connect(DEE, "money")
+TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ADMIN, BOB, CARL, DEE)}
 
 SECRETS = ["robin.cal.user", "pw-cal-ROBIN-1", "pw-cal-ROBIN-2", "AB77123", "pw-poalim-ROBIN", "bob.code", "pw-poalim-BOB",
            "pw-poalim-BOB-2"]
 CODES = ["482913", "771144", "906512"]
 RESPONSES: List[str] = []
 
-WORKER = FakeBankWorker(config.token_file())
+WORKER = FakeBankWorker(il_config.token_file())
 
 # --- Fixtures (made-up values in the worker's real shapes) ----------------------------------------
 
@@ -296,7 +303,7 @@ async def test_success(client: TestClient) -> None:
           job["company"] == "visaCal" and job["profile"] == sid and job["start_date"] == first_year
           and job["credentials"] == {"username": "robin.cal.user", "password": "pw-cal-ROBIN-1"}, job)
     check("worker: Dana created the token file (mode 0600) and every call carried it",
-          WORKER.unauthorized == 0 and (config.token_file().stat().st_mode & 0o777) == 0o600)
+          WORKER.unauthorized == 0 and (il_config.token_file().stat().st_mode & 0o777) == 0o600)
     runs = syncs_of(sid)
     check("syncs: one 'connect' run, done, 1 new", [(r["trigger"], r["state"], r["added"], r["updated"])
                                                      for r in runs] == [("connect", "done", 1, 0)], runs)
@@ -640,10 +647,10 @@ async def test_backoff_and_unreachable() -> None:
               row["state_reason"] == "bank worker not reachable" and syncs_of(sid)[-1]["error"]
               == "bank worker not reachable", row)
         check("kind check: the addons Test says so",
-              await money_addon.test(connections.require(BOB, "money")) == "bank worker not reachable")
+              await money_il_addon.test(connections.require(BOB, "money_il")) == "bank worker not reachable")
     finally:
         os.environ["MONEY_WORKER_URL"] = url
-    check("kind check: the worker answers", await money_addon.test(connections.require(BOB, "money")) is None)
+    check("kind check: the worker answers", await money_il_addon.test(connections.require(BOB, "money_il")) is None)
     await sync.run(BOB, sid, "schedule")
     row = source_row(sid)
     check("backoff: a good sync resets the failures", row["state"] == "ok" and row["failures"] == 0
@@ -823,6 +830,43 @@ def test_check() -> None:
     set_source(IDS["cal"], state="ok", state_reason=None, last_ok_at=store.now_iso())
 
 
+async def test_money_only(client: TestClient) -> None:
+    status, body = await call(client, "GET", "/api/money/companies", DEE)
+    check("money only: no companies to add", status == 200 and body == {"companies": []}, body)
+    status, body = await call(client, "POST", "/api/money/sources", DEE,
+                              {"company": "visaCal", "credentials": {"username": "dee.cal", "password": "pw-dee"}})
+    check("money only: adding a Cal login → 403 not_connected money_il",
+          status == 403 and body == {"error": "not_connected", "addon": "money_il"}, (status, body))
+    status, body = await call(client, "GET", "/api/money/sources", DEE)
+    check("money only: the rest of money works (no sources)", status == 200 and body["sources"] == [], body)
+
+
+async def test_disconnect_il() -> None:
+    sources_before = [s["id"] for s in store.list_sources(ADMIN)]
+    accounts_before = {a["id"] for a in store.list_accounts(ADMIN)}
+    txns_before = len(store.list_transactions(ADMIN))
+    with get_db_connection() as conn:
+        conn.execute("INSERT INTO money_code_requests (id, user_id, source_id, sync_id, company, status, created_at, "
+                     "expires_at) VALUES ('il-off-req', ?, ?, NULL, 'visaCal', 'pending', ?, ?)",
+                     (ADMIN.id, IDS["cal"], store.now_iso(), store.iso(store.utc_now() + datetime.timedelta(minutes=3))))
+        conn.commit()
+    connections.disconnect(ADMIN, "money_il")
+    check("money_il off: the admin's logins at its companies are removed",
+          sources_before and store.list_sources(ADMIN) == [], sources_before)
+    check("money_il off: accounts and transactions stay, without a source",
+          {a["id"] for a in store.list_accounts(ADMIN)} == accounts_before
+          and all(a["source_id"] is None for a in store.list_accounts(ADMIN))
+          and len(store.list_transactions(ADMIN)) == txns_before)
+    with get_db_connection() as conn:
+        pending = conn.execute("SELECT id FROM money_code_requests WHERE user_id = ? AND status = 'pending'",
+                               (ADMIN.id,)).fetchall()
+    check("money_il off: no pending code request is left", not pending, [r[0] for r in pending])
+    check("money_il off: the worker deletes the browser profiles",
+          await until(lambda: set(sources_before) <= set(WORKER.deleted_profiles)), WORKER.deleted_profiles)
+    check("money_il off: money stays connected, with no companies to add",
+          connections.is_connected(ADMIN, "money") and providers.companies(ADMIN) == [])
+
+
 async def test_disconnect() -> None:
     bob_sources = [s["id"] for s in store.list_sources(BOB)]
     admin_before = len(store.list_transactions(ADMIN))
@@ -835,6 +879,20 @@ async def test_disconnect() -> None:
     check("disconnect: the worker deletes his browser profiles",
           await until(lambda: set(bob_sources) <= set(WORKER.deleted_profiles)), WORKER.deleted_profiles)
     check("disconnect: the admin's data stays", len(store.list_transactions(ADMIN)) == admin_before)
+
+
+def test_convert() -> None:
+    plan = {"identifier": "40000000001", "type": "installments", "installments": {"number": 3, "total": 4},
+            "date": "2026-11-24T13:00:00.000Z", "chargedAmount": -709,
+            "rawTransaction": {"trnPurchaseDate": "2026-08-24T15:00:00"}}
+    plain = {"identifier": "32580593500", "type": "normal", "date": "2026-11-17T10:58:17.000Z", "chargedAmount": -35,
+             "rawTransaction": {"trnPurchaseDate": "2026-11-17T12:58:17"}}
+    cal = convert.accounts(providers.company("visaCal"), [{"accountNumber": "8763", "txns": [plan, plain]}, "junk"])
+    check("convert: a Cal installment gets its purchaseDate (trnPurchaseDate), a plain charge none",
+          len(cal) == 1 and cal[0]["txns"][0]["purchaseDate"] == "2026-08-24T15:00:00"
+          and "purchaseDate" not in cal[0]["txns"][1], cal)
+    poalim = convert.accounts(providers.company("hapoalim"), [{"accountNumber": "1", "txns": [plan]}])
+    check("convert: Hapoalim's accounts pass as they are", poalim == [{"accountNumber": "1", "txns": [plan]}], poalim)
 
 
 def test_secrets() -> None:
@@ -869,10 +927,13 @@ async def main() -> None:
             await test_backoff_and_unreachable()
             await test_schedule()
             await test_api_per_user(client)
+            await test_money_only(client)
             await test_remove(client)
             test_recover()
             test_check()
             await test_disconnect()
+            await test_disconnect_il()
+    test_convert()
     test_secrets()
     await WORKER.close()
 

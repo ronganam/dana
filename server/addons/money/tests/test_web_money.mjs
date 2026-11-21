@@ -11,9 +11,9 @@
  * never "/ month" —, installment plans, the forecast note), filters and the view ↔ the API's query string
  * and the #money hash, the category picker, "counts as" choices and the one-off / yearly marks, source
  * states, undo and error words; the Investments view from tests/fixtures/money_portfolio_web.json
- * (`WRITE_WEB_FIXTURE=1 bin/test test_money_portfolio`): the tab only with an investment account, tiles,
+ * (`WRITE_WEB_FIXTURE=1 bin/test test_money_il_portfolio`): the tab only with an investment account, tiles,
  * the value chart, allocation, holdings and activity words; the Meal card view from tests/fixtures/money_meals_web.json
- * (test_money_meals.py: tiles, pace, cycle bars, the tab); the Save view from tests/fixtures/money_savings_web.json
+ * (test_money_il_meals.py: tiles, pace, cycle bars, the tab); the Save view from tests/fixtures/money_savings_web.json
  * (`WRITE_WEB_FIXTURE=1 bin/test test_money_savings`): the tab and its hash, sections (the user's choices always
  * listed), tiles, chips, the actions of each status and their PATCH bodies, the toasts, price check states and
  * offer rows, check answers, outcomes, target progress, subscription lines, links and the sparkline.
@@ -479,7 +479,7 @@ check("save: the tab sits between Cash flow and Investments, #money/save, not ti
       && C.stateToHash({ month: "2026-11", view: "page", tab: "save", f: {} }, "2026-11") === "#money/save" && C.stateFromHash("#money/save").tab === "save"
       && !C.usesMonth("save") && !C.usesMonth("investments") && ["overview", "spending", "cashflow", "transactions"].every(C.usesMonth));
 
-// ---- Meal card (tests/fixtures/money_meals_web.json, from test_money_meals.py) ----
+// ---- Meal card (tests/fixtures/money_meals_web.json, from test_money_il_meals.py) ----
 const ML = JSON.parse(fs.readFileSync(path.join(SERVER, "tests", "fixtures", "money_meals_web.json"), "utf8"));
 const ml = ML.meals.body;
 const mcur = ml.accounts[0].current;

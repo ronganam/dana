@@ -55,7 +55,7 @@ from core.addons import helpers, registry, store
 from core.addons.helpers import parse_time
 from core.addons.hooks import Check, Hook
 from addons.homeassistant import config as ha_config, status as ha_status, watcher as ha_watcher
-from addons.money import companies as money_companies, config as money_config
+from addons.money import config as money_config, providers as money_providers
 from addons.phone import push as phone_push
 from addons.phone.config import ADDON as PHONE, mark_key as phone_mark_key
 
@@ -446,7 +446,7 @@ def _check_money(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str
         return _result("money", True, "no bank or card added", None)
     problems: List[Tuple[str, str]] = []  # (title, fact)
     for r in rows:
-        name = (r.get("label") or "").strip() or money_companies.name_of(r["company"])
+        name = (r.get("label") or "").strip() or money_providers.name_of(r["company"])
         last_ok = parse_time(r.get("last_ok_at"))
         if r["state"] == "needs_code":
             problems.append((f"{name} is waiting for a sign-in code",
