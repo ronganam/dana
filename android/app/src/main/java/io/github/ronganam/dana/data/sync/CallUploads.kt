@@ -28,6 +28,7 @@ import org.json.JSONObject
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.TimeUnit
+import io.github.ronganam.dana.R
 
 /**
  * Call-recording uploads.
@@ -55,8 +56,8 @@ object CallUploads {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         if (nm.getNotificationChannel(CHANNEL_ID) != null) return
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_ID, "Call recordings", NotificationManager.IMPORTANCE_DEFAULT)
-                .apply { description = "Handles call recording detection and upload progress" }
+            NotificationChannel(CHANNEL_ID, context.getString(R.string.channel_call_recordings), NotificationManager.IMPORTANCE_DEFAULT)
+                .apply { description = context.getString(R.string.channel_call_recordings_description) }
         )
     }
 

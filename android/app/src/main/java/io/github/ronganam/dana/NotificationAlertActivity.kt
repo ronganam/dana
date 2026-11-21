@@ -53,6 +53,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import io.github.ronganam.dana.R
 
 /**
  * Full-screen alert for an urgent phone notification (see
@@ -142,7 +143,7 @@ class NotificationAlertActivity : ComponentActivity() {
                 val launch = a.packageName?.let { packageManager.getLaunchIntentForPackage(it) }
                 if (launch != null) { startActivity(launch.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); true } else false
             }
-            if (!opened) Toast.makeText(this, "Couldn't open ${a.app}", Toast.LENGTH_SHORT).show()
+            if (!opened) Toast.makeText(this, getString(R.string.toast_couldnt_open_app, a.app), Toast.LENGTH_SHORT).show()
             finish()
         }
     }
@@ -169,7 +170,7 @@ class NotificationAlertActivity : ComponentActivity() {
                 val keys = ServerConfig.load(applicationContext).api().notifications.setStatus(listOf(a.id), "dismissed")
                 DanaNotificationListener.cancel(keys.ifEmpty { listOfNotNull(a.key) })
             } catch (e: Exception) {
-                Toast.makeText(applicationContext, "Couldn't dismiss: ${e.message ?: "server unreachable"}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(applicationContext, getString(R.string.toast_couldnt_dismiss, e.message ?: getString(R.string.server_unreachable)), Toast.LENGTH_SHORT).show()
             }
             finish()
         }

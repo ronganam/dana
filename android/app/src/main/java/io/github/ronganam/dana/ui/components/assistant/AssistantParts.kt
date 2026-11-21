@@ -74,6 +74,7 @@ import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import io.github.ronganam.dana.R
 
 /** Header: live state kicker on the left, four sheet actions on the right. */
 @Composable
@@ -213,7 +214,7 @@ internal fun AssistantTurn(
                         onLongPress = {
                             if (!msg.isThinking) {
                                 copy(msg.message)
-                                Toast.makeText(context, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+                                Toast.makeText(context, R.string.toast_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                             }
                         }
                     )

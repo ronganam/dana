@@ -22,6 +22,7 @@ import io.github.ronganam.dana.data.wear.WearReminderBridge
 import io.github.ronganam.dana.ui.theme.DanaTheme
 import io.github.ronganam.dana.ui.theme.ThemeSettings
 import kotlinx.coroutines.launch
+import io.github.ronganam.dana.R
 
 class ReminderActivity : ComponentActivity() {
 
@@ -92,7 +93,7 @@ class ReminderActivity : ComponentActivity() {
                     stopAlerts()
                     onHandled()
                     lifecycleScope.launch {
-                        Toast.makeText(this@ReminderActivity, "Snoozing · ${snoozeSentence(leaf)}",Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@ReminderActivity, getString(R.string.toast_snoozing, snoozeSentence(leaf)), Toast.LENGTH_SHORT).show()
                         val message = ReminderActions.snooze(this@ReminderActivity, taskId, leaf)
                         Toast.makeText(this@ReminderActivity, message, Toast.LENGTH_LONG).show()
                         finish()

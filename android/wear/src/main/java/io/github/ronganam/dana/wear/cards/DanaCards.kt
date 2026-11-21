@@ -22,6 +22,7 @@ import com.google.android.gms.wearable.MessageEvent
 import com.google.android.gms.wearable.WearableListenerService
 import org.json.JSONArray
 import org.json.JSONObject
+import io.github.ronganam.dana.wear.R
 
 /**
  * Phone → watch Dana cards (see the phone's `data/wear/WearCards.kt`):
@@ -55,16 +56,16 @@ class DanaCardListenerService : WearableListenerService() {
         private fun notificationManager(context: Context) =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        private fun ensureChannels(nm: NotificationManager) {
+        private fun ensureChannels(context: Context, nm: NotificationManager) {
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_CALLER, "Who's calling", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "What's going on with the person calling you"
+                NotificationChannel(CHANNEL_CALLER, context.getString(R.string.channel_caller), NotificationManager.IMPORTANCE_HIGH).apply {
+                    description = context.getString(R.string.channel_caller_description)
                     enableVibration(false) // the ringing phone already buzzes the watch
                 }
             )
             nm.createNotificationChannel(
-                NotificationChannel(CHANNEL_CARDS, "Briefing & meetings", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                    description = "Morning briefing and who you're about to meet"
+                NotificationChannel(CHANNEL_CARDS, context.getString(R.string.channel_cards), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                    description = context.getString(R.string.channel_cards_description)
                 }
             )
         }
@@ -78,7 +79,7 @@ class DanaCardListenerService : WearableListenerService() {
                 .filter { it.isNotBlank() }
 
             val nm = notificationManager(context)
-            ensureChannels(nm)
+            ensureChannels(context, nm)
             val open = PendingIntent.getActivity(
                 context, notificationId(kind),
                 Intent(context, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),

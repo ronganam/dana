@@ -20,6 +20,7 @@ import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import io.github.ronganam.dana.R
 
 /**
  * Snoozing phone notifications, shared by the Inbox and the alert screen.
@@ -111,8 +112,8 @@ class SnoozeReturnWorker(appContext: Context, params: WorkerParameters) : Corout
 
         val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Snoozed notifications", NotificationManager.IMPORTANCE_DEFAULT).apply {
-                description = "A notification you snoozed in Dana is back"
+            NotificationChannel(CHANNEL, ctx.getString(R.string.channel_snoozed), NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = ctx.getString(R.string.channel_snoozed_description)
             }
         )
         val open = PendingIntent.getActivity(

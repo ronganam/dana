@@ -64,10 +64,10 @@ class WearReminderListenerService : com.google.android.gms.wearable.WearableList
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 channelId,
-                "Task Reminders",
+                getString(R.string.channel_reminders),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "Urgent task reminders forwarded from phone"
+                description = getString(R.string.channel_reminders_description)
                 enableVibration(true)
             }
             nm.createNotificationChannel(channel)
@@ -108,13 +108,13 @@ class WearReminderListenerService : com.google.android.gms.wearable.WearableList
         val notification = NotificationCompat.Builder(this, channelId)
             .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
             .setContentTitle(taskTitle)
-            .setContentText("Task Reminder")
+            .setContentText(getString(R.string.reminder_notification_text))
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setFullScreenIntent(alarmPending, true)
             .setContentIntent(alarmPending)
-            .addAction(0, "Done", completePending)
-            .addAction(0, "Snooze 1hr", snoozePending)
+            .addAction(0, getString(R.string.done), completePending)
+            .addAction(0, getString(R.string.reminder_snooze_hour), snoozePending)
             .setAutoCancel(false)
             .build()
 

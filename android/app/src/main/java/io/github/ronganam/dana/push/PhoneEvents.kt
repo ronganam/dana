@@ -23,6 +23,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
 import java.util.UUID
 import androidx.core.content.edit
+import io.github.ronganam.dana.R
 
 /**
  * Direct push from the server (replaces the Home Assistant companion route).
@@ -163,16 +164,16 @@ object PhoneEvents {
     }
 
     private val channels = mapOf(
-        "messages" to Triple("dana_messages", "Messages from Dana", NotificationManager.IMPORTANCE_HIGH),
-        "important" to Triple("dana_important", "Important (from Dana)", NotificationManager.IMPORTANCE_HIGH),
-        "digest" to Triple("dana_digest", "Notification digest", NotificationManager.IMPORTANCE_DEFAULT),
+        "messages" to Triple("dana_messages", R.string.channel_messages, NotificationManager.IMPORTANCE_HIGH),
+        "important" to Triple("dana_important", R.string.channel_important, NotificationManager.IMPORTANCE_HIGH),
+        "digest" to Triple("dana_digest", R.string.channel_digest, NotificationManager.IMPORTANCE_DEFAULT),
     )
 
     /** A plain notification from the server (voice transcripts, the digest, …). */
     private fun notify(context: Context, title: String, text: String, tag: String?, channel: String) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val (id, name, importance) = channels[channel] ?: channels.getValue("messages")
-        nm.createNotificationChannel(NotificationChannel(id, name, importance))
+        nm.createNotificationChannel(NotificationChannel(id, context.getString(name), importance))
         // "Robin shared their shopping list with you" opens Shopping (under More).
         val open = if (tag?.startsWith("shopping-invite-") == true) {
             android.content.Intent(context, io.github.ronganam.dana.MainActivity::class.java)

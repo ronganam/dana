@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import io.github.ronganam.dana.R
 
 /**
  * A task reminder from the server (`reminder` push event, see
@@ -35,10 +36,10 @@ object ReminderReceiver {
 
         val channel = NotificationChannel(
             channelId,
-            "Reminders & Alarms",
+            context.getString(R.string.channel_reminders),
             NotificationManager.IMPORTANCE_HIGH
         ).apply {
-            description = "Used for urgent task reminders and alarms"
+            description = context.getString(R.string.channel_reminders_description)
             enableVibration(true)
             setShowBadge(true)
         }
@@ -62,8 +63,8 @@ object ReminderReceiver {
         )
 
         notificationManager.createNotificationChannel(
-            NotificationChannel(QUIET_CHANNEL, "Reminders (screen open)", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Kept while the reminder screen is showing (the screen rings itself)"
+            NotificationChannel(QUIET_CHANNEL, context.getString(R.string.channel_reminders_quiet), NotificationManager.IMPORTANCE_LOW).apply {
+                description = context.getString(R.string.channel_reminders_quiet_description)
             }
         )
         // The reminder screen opens by itself and plays the alarm on its own,

@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.content.edit
+import io.github.ronganam.dana.R
 
 /**
  * The server's `suggestions` push event (see [io.github.ronganam.dana.push.PhoneEvents])
@@ -31,8 +32,8 @@ object SuggestionsReceiver {
     fun show(context: Context, ids: List<String>, heading: String?, sourceKey: String, callId: String? = null) {
         val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL, "Suggestions to review", NotificationManager.IMPORTANCE_HIGH).apply {
-                description = "Reminders and events Dana suggests after a call or a message"
+            NotificationChannel(CHANNEL, context.getString(R.string.channel_suggestions), NotificationManager.IMPORTANCE_HIGH).apply {
+                description = context.getString(R.string.channel_suggestions_description)
             }
         )
         val screen = SuggestionsPopupActivity.intent(context, ids, heading, callId, notificationKey = sourceKey)
@@ -41,8 +42,8 @@ object SuggestionsReceiver {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         nm.createNotificationChannel(
-            NotificationChannel(CHANNEL_QUIET, "Suggestions to review (screen open)", NotificationManager.IMPORTANCE_LOW).apply {
-                description = "Kept while the review screen is already showing"
+            NotificationChannel(CHANNEL_QUIET, context.getString(R.string.channel_suggestions_quiet), NotificationManager.IMPORTANCE_LOW).apply {
+                description = context.getString(R.string.channel_suggestions_quiet_description)
             }
         )
         val n = ids.size

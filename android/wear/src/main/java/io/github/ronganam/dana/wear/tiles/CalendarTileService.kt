@@ -24,6 +24,7 @@ import java.util.Date
 import java.util.Locale
 import java.util.TimeZone
 import kotlin.math.sqrt
+import io.github.ronganam.dana.wear.R
 
 class CalendarTileService : TileService() {
 
@@ -87,17 +88,17 @@ class CalendarTileService : TileService() {
 
         var row = 0
 
-        column.addContent(buildDayHeader("TODAY", COLOR_TEAL, row++, totalRows))
+        column.addContent(buildDayHeader(getString(R.string.tile_today), COLOR_TEAL, row++, totalRows))
 
         if (todayList.isEmpty()) {
-            column.addContent(buildPaddedText("  No events", COLOR_LIGHT_GRAY, 11f, row++, totalRows))
+            column.addContent(buildPaddedText(getString(R.string.tile_no_events), COLOR_LIGHT_GRAY, 11f, row++, totalRows))
         } else {
             todayList.forEach { event ->
                 column.addContent(buildEventRow(event, COLOR_TEAL, row++, totalRows))
             }
             if (todayEvents.size > MAX_EVENTS_PER_DAY) {
                 column.addContent(buildPaddedText(
-                    "  +${todayEvents.size - MAX_EVENTS_PER_DAY} more",
+                    getString(R.string.tile_more_indented, todayEvents.size - MAX_EVENTS_PER_DAY),
                     COLOR_LIGHT_GRAY, 10f, row++, totalRows
                 ))
             }
@@ -105,17 +106,17 @@ class CalendarTileService : TileService() {
 
         column.addContent(Spacer.Builder().setHeight(DimensionBuilders.dp(3f)).build())
 
-        column.addContent(buildDayHeader("TOMORROW", COLOR_GRAY, row++, totalRows))
+        column.addContent(buildDayHeader(getString(R.string.tile_tomorrow), COLOR_GRAY, row++, totalRows))
 
         if (tomorrowList.isEmpty()) {
-            column.addContent(buildPaddedText("  No events", COLOR_LIGHT_GRAY, 11f, row++, totalRows))
+            column.addContent(buildPaddedText(getString(R.string.tile_no_events), COLOR_LIGHT_GRAY, 11f, row++, totalRows))
         } else {
             tomorrowList.forEach { event ->
                 column.addContent(buildEventRow(event, COLOR_GRAY, row++, totalRows))
             }
             if (tomorrowEvents.size > MAX_EVENTS_PER_DAY) {
                 column.addContent(buildPaddedText(
-                    "  +${tomorrowEvents.size - MAX_EVENTS_PER_DAY} more",
+                    getString(R.string.tile_more_indented, tomorrowEvents.size - MAX_EVENTS_PER_DAY),
                     COLOR_LIGHT_GRAY, 10f, row++, totalRows
                 ))
             }
