@@ -72,6 +72,7 @@ def get_request(user: User, rid: str) -> Optional[Dict[str, Any]]:
                 created = created.replace(tzinfo=datetime.timezone.utc)
             age = (datetime.datetime.now(datetime.timezone.utc) - created).total_seconds()
             if age > ACTION_REQUEST_TTL_SECONDS:
+                # scoped: the user's request (query above)
                 conn.execute("UPDATE notification_action_requests SET status = 'expired', done_at = ? "
                              "WHERE id = ? AND status = 'pending'", (utc_now_iso(), rid))
                 conn.commit()
@@ -89,6 +90,7 @@ def finish_request(user: User, rid: str, ok: bool, error: str = "") -> Optional[
         if not row:
             return None
         if row["status"] == "pending":
+            # scoped: the user's request (query above)
             conn.execute("UPDATE notification_action_requests SET status = ?, error = ?, done_at = ? WHERE id = ?",
                          ("done" if ok else "failed", (error or None) if not ok else None, utc_now_iso(), rid))
             if ok:

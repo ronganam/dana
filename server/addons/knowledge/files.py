@@ -92,6 +92,7 @@ def add_file(user: User, entry_id: str, name: str, mime: str, data: bytes, *, so
             (file_id, entry_id, name, mime, len(data), stored, clean_str(note), transcript or None,
              source if source in SOURCES else "upload", user.id),
         )
+        # scoped: writable_entry(user, entry_id) checked above
         conn.execute("UPDATE entries SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (entry_id,))
         conn.commit()
         saved = conn.execute("SELECT * FROM entry_files WHERE id = ?", (file_id,)).fetchone()

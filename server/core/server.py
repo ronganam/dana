@@ -35,8 +35,9 @@ def route_modules() -> tuple:
     return ROUTE_MODULES + loader.route_modules()
 
 
-async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
-    """Initialize and start the webhook & Web UI server."""
+async def start_webhook_listener(port: int = 8080, host: str = "0.0.0.0") -> web.AppRunner:
+    """Initialize and start the webhook & Web UI server on ``host``:``port``
+    (127.0.0.1 in insecure development: core/auth.py ``bind_host``)."""
     # Setup in-memory log handler
     root_logger = logging.getLogger()
     log_handler = None
@@ -68,9 +69,9 @@ async def start_webhook_listener(port: int = 8080) -> web.AppRunner:
     runner = web.AppRunner(app)
     await runner.setup()
     
-    site = web.TCPSite(runner, "0.0.0.0", port)
+    site = web.TCPSite(runner, host, port)
     await site.start()
-    logger.info(f"Webhook & Web UI server listening on http://0.0.0.0:{port}")
+    logger.info(f"Webhook & Web UI server listening on http://{host}:{port}")
     
     # Usage and cost tracking: writes the queued records, folds old days (core/usage.py).
     app["usage_task"] = asyncio.create_task(usage.run_loop())

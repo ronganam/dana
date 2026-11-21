@@ -25,6 +25,12 @@ from core.db import convert, migrations
 FIXTURE = os.path.join(testenv.FIXTURES, "db_9_0.sql")
 OFFICIAL = migrations.official_with_migrations()
 BASELINES = ["core:0001_baseline"] + [f"{a}:0001_baseline" for a in sorted(OFFICIAL)]
+# Core's migrations after its baseline: applied on a fresh database and after converting 9.0.
+CORE_LATER = dict(migrations.all_migrations())[migrations.CORE][1:]
+CORE_LABELS = [m.label for m in CORE_LATER]
+CORE_ROWS = [("core", m.version, m.name) for m in CORE_LATER]
+# Tables a later core migration drops (m0003: the env import is gone).
+DROPPED = {"connection_imports", "connection_import_settings"}
 # Old migration 34 renames these 9.0 tables (and the column ``kind`` → ``addon``).
 RENAMED = {"integrations": "connections", "integration_imports": "connection_imports",
            "integration_import_settings": "connection_import_settings"}
@@ -147,7 +153,9 @@ def test_connection():
     finally:
         conn.close()
     core = dict(migrations.all_migrations())[migrations.CORE]
-    check("migrations: core has only its baseline", [m.label for m in core] == ["core:0001_baseline"])
+    check("migrations: core's baseline first, then its later migrations (m0003 drops the env import tables)",
+          [m.label for m in core][0] == "core:0001_baseline" and "core:0003_drop_env_imports" in CORE_LABELS,
+          [m.label for m in core])
     check("migrations: the official addons with tables have a baseline",
           {"tasks", "phone", "people", "knowledge", "about", "shopping", "whatsapp", "contacts", "money"} == set(OFFICIAL),
           str(OFFICIAL))
@@ -159,9 +167,10 @@ def test_fresh():
     path = new_path("fresh.sqlite3")
     applied = db.migrate(path)
     check("fresh: core first, then every official addon's baseline", applied[0] == "core:0001_baseline"
-          and sorted(applied) == sorted(BASELINES), str(applied))
+          and sorted(applied) == sorted(BASELINES + CORE_LABELS), str(applied))
     check("fresh: recorded per addon in schema_migrations",
-          sorted(db.applied_migrations(path)) == sorted([("core", 1)] + [(a, 1) for a in OFFICIAL]))
+          sorted(db.applied_migrations(path))
+          == sorted([("core", 1)] + [(a, 1) for a in OFFICIAL] + [(a, v) for a, v, _ in CORE_ROWS]))
     check("fresh: schema_migrations has (addon, version, name, applied_at)",
           [r[1] for r in sql(path, "PRAGMA table_info(schema_migrations)")] == ["addon", "version", "name", "applied_at"])
     check("fresh: no snapshot of an empty database", snapshots(path) == [], str(snapshots(path)))
@@ -198,26 +207,28 @@ def test_convert_9_0():
     load_fixture(path)
     before = dump_data(path)
     check("9.0 fixture: at version 33", max(r[0] for r in sql(path, "SELECT version FROM schema_migrations")) == 33)
-    check("9.0 fixture: pending = every migration but the baselines it is marked with",
-          [m.label for m in db.pending_migrations(path)] == [], str(db.pending_migrations(path)))
+    check("9.0 fixture: pending = every migration but the baselines it is marked with (core's later ones)",
+          [m.label for m in db.pending_migrations(path)] == CORE_LABELS, str(db.pending_migrations(path)))
     applied = db.migrate(path)
-    check("9.0: nothing is applied besides the conversion (the baselines are marked, not run)", applied == [],
-          str(applied))
-    check("9.0: schema_migrations marks core's and every official addon's baseline",
+    check("9.0: only core's later migrations run after the conversion (the baselines are marked, not run)",
+          applied == CORE_LABELS, str(applied))
+    check("9.0: schema_migrations marks core's and every official addon's baseline, and core's later ones",
           sorted(sql(path, "SELECT addon, version, name FROM schema_migrations"))
-          == sorted([("core", 1, "baseline")] + [(a, 1, "baseline") for a in OFFICIAL]))
+          == sorted([("core", 1, "baseline")] + [(a, 1, "baseline") for a in OFFICIAL] + CORE_ROWS))
     a, b = shape(fresh), shape(path)
     diff = sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
     check("9.0: same schema as a fresh database (tables, ordered columns, indexes, FKs, triggers)", not diff, str(diff))
     check("9.0: the same sqlite_master SQL as a fresh database (whitespace aside)",
           normalized(fresh) == normalized(path), str(sorted(normalized(fresh) ^ normalized(path))[:4]))
     after = dump_data(path)
-    expected = _renamed(before)
+    expected = {t: rows for t, rows in _renamed(before).items() if t not in DROPPED}
+    expected["sqlite_sequence"] = [r for r in expected["sqlite_sequence"] if r[0] not in DROPPED]
     changed = sorted(t for t in set(expected) | set(after) if expected.get(t) != after.get(t))
     check("9.0: every row kept with every value (FTS and sqlite_sequence included)", not changed, str(changed))
     check("9.0: the fixture's rows are there", after["users"] and after["tasks"] and after["phone_calls"])
     snaps = snapshots(path)
-    check("9.0: a snapshot was taken before converting", snaps == ["prod-before-addons-from-0033.sqlite3"], str(snaps))
+    check("9.0: a snapshot was taken before converting (and one before core's later migrations)",
+          snaps[:1] == ["prod-before-addons-from-0033.sqlite3"] and len(snaps) == 2, str(snaps))
     if snaps:
         snap = os.path.join(os.path.dirname(path), "snapshots", snaps[0])
         check("9.0: the snapshot is the database as it was", dump_data(snap) == before
@@ -234,7 +245,8 @@ def test_convert_9_0():
     conn.execute("INSERT INTO schema_migrations (version, name, applied_at) VALUES (34, 'connections', 'x')")
     conn.commit()
     conn.close()
-    check("9.0 at 34: converts", db.migrate(p34) == [] and snapshots(p34) == ["at34-before-addons-from-0034.sqlite3"],
+    check("9.0 at 34: converts", db.migrate(p34) == CORE_LABELS
+          and snapshots(p34)[:1] == ["at34-before-addons-from-0034.sqlite3"],
           str(snapshots(p34)))
     check("9.0 at 34: same schema and rows", shape(p34) == shape(path) and dump_data(p34) == after)
 

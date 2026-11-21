@@ -93,6 +93,7 @@ async def _run(user: User, apply: bool, redo: bool, limit: int | None) -> dict:
             report["duplicates"] += 1
             if apply:
                 with get_db_connection() as conn:
+                    # scoped: ids from this user's calls (query above)
                     conn.execute("UPDATE phone_calls SET status = 'duplicate' WHERE id = ?", (r["id"],))
                     conn.commit()
             report["calls"].append(entry)
@@ -102,6 +103,7 @@ async def _run(user: User, apply: bool, redo: bool, limit: int | None) -> dict:
             report["failed"] += 1
             if apply:
                 with get_db_connection() as conn:
+                    # scoped: ids from this user's calls (query above)
                     conn.execute("UPDATE phone_calls SET status = 'failed', error = 'No usable transcript' WHERE id = ?",
                                  (r["id"],))
                     conn.commit()

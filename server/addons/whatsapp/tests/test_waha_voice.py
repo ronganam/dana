@@ -18,13 +18,6 @@ import sys
 # core.paths reads DATABASE_PATH at import time -> isolate before any import.
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("waha_test")
-os.environ["HOMEASSISTANT_HOST"] = "https://ha.test/"
-os.environ["HOMEASSISTANT_TOKEN"] = "test-token"
-os.environ["WAHA_URL"] = "https://waha.test/api/"
-os.environ["WAHA_API_KEY"] = "test-waha-key"
-os.environ["WAHA_SESSION"] = "default"
-os.environ["PHONE_NOTIFY_SERVICE"] = "mobile_app_test"
-os.environ["WHATSAPP_VOICE_TELEGRAM_CHAT_ID"] = "555"
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
 
@@ -40,6 +33,11 @@ from addons.whatsapp import config as wa_config, events as wa
 db.migrate()
 users.bootstrap()
 addons_bootstrap.bootstrap()
+testenv.connect_admin("homeassistant", credentials={"host": "https://ha.test/", "token": "test-token"},
+                      settings={"phone_notify_service": "mobile_app_test"})
+testenv.connect_admin("whatsapp", credentials={"url": "https://waha.test/api/", "api_key": "test-waha-key",
+                                               "session": "default"},
+                      settings={"voice_telegram_chat_id": 555})
 USER = users.first_admin()
 CONN = store.require(USER, "whatsapp")
 

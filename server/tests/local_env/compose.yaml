@@ -17,10 +17,7 @@ services:
     volumes:
       - data:/app/db
     networks:
-      internal:
-        aliases:
-          # The production Service's DNS name (INTERNAL_HOSTS in the env file).
-          - ganam-assistant.ganam-assistant
+      - internal
     depends_on:
       stubs:
         condition: service_healthy

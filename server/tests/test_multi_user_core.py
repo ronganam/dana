@@ -283,8 +283,8 @@ def owners(table):
 
 
 async def test_migration(client):
-    check("migration: the 9.0 database was converted (nothing left to apply)",
-          MIGRATED == [] and db.pending_migrations() == [], str(MIGRATED))
+    check("migration: the 9.0 database was converted, then core's later migrations ran (nothing left to apply)",
+          MIGRATED and all(m.startswith("core:") for m in MIGRATED) and db.pending_migrations() == [], str(MIGRATED))
     check("migration: the first admin keeps their Telegram identity and the existing rows",
           ADMIN is not None and ADMIN.level.see_everyone and ADMIN.telegram_chat_id == 1111
           and users.by_telegram_id(111).id == ADMIN.id)

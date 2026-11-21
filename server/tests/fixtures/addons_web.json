@@ -200,7 +200,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:39955",
+       "value": "http://127.0.0.1:43993",
        "why_not": null
       },
       {
@@ -530,9 +530,9 @@
      "check": false,
      "connect_label": null,
      "connect_url": null,
-     "connected": true,
+     "connected": false,
      "credentials": [],
-     "description": "kubectl and sandboxed Python",
+     "description": "Read-only kubectl and Python run on the server (asks first; not a sandbox)",
      "name": "ops",
      "options": false,
      "requires": "ops",
@@ -540,7 +540,7 @@
      "why_not": null
     }
    ],
-   "user_id": "e04a2e672e9d"
+   "user_id": "a5de1b9e0b8d"
   },
   "status": 200
  },
@@ -665,7 +665,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:46869",
+       "value": "http://127.0.0.1:32883",
        "why_not": null
       },
       {
@@ -775,7 +775,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:43189/api",
+       "value": "http://127.0.0.1:40577/api",
        "why_not": null
       },
       {
@@ -983,14 +983,14 @@
        "name": "url",
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "type": "address",
-       "value": "http://127.0.0.1:35677",
+       "value": "http://127.0.0.1:45823",
        "why_not": null
       }
      ],
      "why_not": null
     }
    ],
-   "user_id": "285042b14a7d"
+   "user_id": "18ee2b81342a"
   },
   "status": 200
  },
@@ -1226,7 +1226,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:43189/api",
+       "value": "http://127.0.0.1:40577/api",
        "why_not": null
       },
       {
@@ -1441,7 +1441,7 @@
      "why_not": null
     }
    ],
-   "user_id": "b7fb88581ad4"
+   "user_id": "9e41775506d7"
   },
   "status": 200
  },
@@ -1566,7 +1566,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:46869",
+       "value": "http://127.0.0.1:32883",
        "why_not": null
       },
       {
@@ -1676,7 +1676,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:43189/api",
+       "value": "http://127.0.0.1:40577/api",
        "why_not": null
       },
       {
@@ -1884,14 +1884,14 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:35677",
+       "value": "http://127.0.0.1:45823",
        "why_not": "Set by an admin"
       }
      ],
      "why_not": "Set by an admin"
     }
    ],
-   "user_id": "285042b14a7d"
+   "user_id": "18ee2b81342a"
   },
   "status": 200
  },
@@ -1904,7 +1904,7 @@
     "see_everyone",
     "manage_server"
    ],
-   "id": "e04a2e672e9d",
+   "id": "a5de1b9e0b8d",
    "kinds": [
     "essentials",
     "tasks",
@@ -1913,8 +1913,7 @@
     "about",
     "people",
     "phone",
-    "homeassistant",
-    "ops"
+    "homeassistant"
    ],
    "name": "Robin Levi"
   },
@@ -1924,7 +1923,7 @@
   "body": {
    "access": "member",
    "capabilities": [],
-   "id": "285042b14a7d",
+   "id": "18ee2b81342a",
    "kinds": [
     "essentials",
     "homeassistant",
@@ -1954,7 +1953,7 @@
      "secret": false,
      "set": true,
      "type": "address",
-     "value": "http://127.0.0.1:43189/api",
+     "value": "http://127.0.0.1:40577/api",
      "why_not": "Set by an admin"
     },
     {
@@ -2075,17 +2074,17 @@
    "users": [
     {
      "access": "admin",
-     "id": "e04a2e672e9d",
+     "id": "a5de1b9e0b8d",
      "name": "Robin Levi"
     },
     {
      "access": "member",
-     "id": "285042b14a7d",
+     "id": "18ee2b81342a",
      "name": "Bob Builder"
     },
     {
      "access": "member",
-     "id": "b7fb88581ad4",
+     "id": "9e41775506d7",
      "name": "Carl"
     }
    ]

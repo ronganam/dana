@@ -1,8 +1,9 @@
 """Checks for the addons framework (docs/access.md, "Addon"). Run: bin/test test_addons
 
 Discovery, schema parsing and execution of every addon's tools, listed and run
-for a user; connections with encrypted credentials; the startup key check and
-the first admin's env import. Nothing calls Home Assistant, WAHA, Google or
+for a user; connections with encrypted credentials; the startup key check
+(``CREDENTIALS_KEY``, else the generated key file) and the first admin's default
+addons (nothing is read from env). Nothing calls Home Assistant, WAHA, Google or
 the web: only tools that stay inside Dana are executed.
 """
 
@@ -15,7 +16,8 @@ import sys
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 # Every addon / identity env name is unset: this test decides what the environment configures.
 testenv.isolate("addons_test")
-os.environ["FRIGATE_URL"] = "https://frigate.example.com"  # the first admin's Frigate (env import)
+os.environ["HOMEASSISTANT_TOKEN"] = "ha-env-token"  # the old env import's names connect nothing any more
+os.environ["FRIGATE_URL"] = "https://frigate.example.com"
 os.environ["OWNER_NAME"] = "Robin"
 
 from cryptography.fernet import Fernet
@@ -68,19 +70,30 @@ def names(schemas):
 
 # --- 1. Startup with nothing to protect -------------------------------------------------
 
+DEFAULTS = ["tasks", "shopping", "knowledge", "about", "people", "phone"]
+
+
 def test_startup_without_key():
-    imported = addons_bootstrap.bootstrap()
-    check("startup: no key and nothing to protect -> starts", True)
-    check("startup: official addons imported for the first admin",
-          imported == ["tasks", "shopping", "knowledge", "about", "people", "phone", "cameras", "ops"],
-          str(imported))
-    check("startup: credentialed addons without env values are not connected",
-          not any(store.is_connected(ADMIN, k) for k in ("homeassistant", "whatsapp", "calendar")))
-    check("startup: imported settings: FRIGATE_URL for cameras, the defaults otherwise",
-          store.require(ADMIN, "cameras").settings["url"] == "https://frigate.example.com"
-          and dict(store.require(ADMIN, "shopping").settings) == {"active_list": None},
+    key_file = crypto.key_file()
+    check("startup: no key file before the first start", not key_file.exists() and not crypto.key_configured())
+    turned_on = addons_bootstrap.bootstrap()
+    check("startup: no CREDENTIALS_KEY and nothing encrypted -> a key file is generated (0600) and used",
+          key_file.exists() and (key_file.stat().st_mode & 0o777) == 0o600 and crypto.key_source() == "file"
+          and Fernet(key_file.read_text().strip().encode()) is not None, oct(key_file.stat().st_mode))
+    check("startup: the first admin gets the default addons (default_on), not ops", turned_on == DEFAULTS
+          and all(get_addon(k).default_on for k in DEFAULTS) and not store.is_connected(ADMIN, "ops"), str(turned_on))
+    check("startup: nothing comes from env (HOMEASSISTANT_TOKEN, FRIGATE_URL set: not connected)",
+          not any(store.is_connected(ADMIN, k) for k in ("homeassistant", "whatsapp", "calendar", "cameras")))
+    check("startup: the defaults' settings are the declared defaults",
+          dict(store.require(ADMIN, "shopping").settings) == {"active_list": None},
           str(dict(store.require(ADMIN, "shopping").settings)))
-    check("startup: second run imports nothing", addons_bootstrap.bootstrap() == [])
+    check("startup: second run turns nothing on, keeps the key file",
+          addons_bootstrap.bootstrap() == [] and crypto.key_source() == "file")
+    store.disconnect(ADMIN, "shopping")
+    check("startup: a default addon the admin turned off stays off at the next start",
+          addons_bootstrap.bootstrap() == [] and not store.is_connected(ADMIN, "shopping"))
+    store.connect(ADMIN, "shopping")
+    testenv.connect_admin("cameras", settings={"url": "https://frigate.example.com"})
 
 
 # --- 2. Discovery and schemas -----------------------------------------------------------
@@ -168,7 +181,7 @@ def test_per_user_lists():
     check("tools: the admin's list is the tools of their addons, in addon then definition order",
           # two users: core has share_item (the admin has tasks, an addon with shareable items) and shopping
           # has choose_shopping_list
-          admin_tools == expected and len(admin_tools) == 4 + 7 + 5 + 13 + 4 + 4 + 11 + 2, str(len(admin_tools)))
+          admin_tools == expected and len(admin_tools) == 4 + 7 + 5 + 13 + 4 + 4 + 11, str(len(admin_tools)))
     check("tools: no HA / WhatsApp / calendar tools without those addons",
           not {"call_ha_service", "send_whatsapp_message", "add_event"} & set(admin_tools))
     check("tools: the order is deterministic (same list every time, realtime too)",
@@ -266,7 +279,7 @@ async def test_needs():
           and "link_task_to_person" not in names(registry.tool_schemas(user)))
 
 
-# --- 4. Credentials, key, env import ----------------------------------------------------
+# --- 4. Credentials and the key ----------------------------------------------------
 
 def raw_db_bytes() -> bytes:
     data = b""
@@ -279,12 +292,6 @@ def raw_db_bytes() -> bytes:
 
 
 def test_credentials():
-    check("credentials: connecting with credentials needs a key",
-          raises(lambda: store.connect(MEMBER_USER, "whatsapp",
-                                       credentials={"url": "http://waha.test", "session": "s1"}),
-                 CredentialsKeyError, "CREDENTIALS_KEY is not set"))
-    check("credentials: the failed connect left nothing", not store.is_connected(MEMBER_USER, "whatsapp"))
-    os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
     secret = "waha-secret-" + Fernet.generate_key().decode()[:16]
     conn = store.connect(MEMBER_USER, "whatsapp", credentials={"url": "http://waha.test", "api_key": secret,
                                                                "session": "s1"},
@@ -346,85 +353,35 @@ def test_settings_and_cache():
           and not store.disconnect(MEMBER_USER, "whatsapp"))
 
 
-def test_env_import():
-    with open(addons_bootstrap.__file__, encoding="utf-8") as f:
-        read = set(re.findall(r'"([A-Z][A-Z0-9_]+)"', f.read()))
-    check("env import: every env name it reads is blanked for tests (testenv.ADDON_ENV)",
-          read and read <= set(testenv.ADDON_ENV), str(sorted(read - set(testenv.ADDON_ENV))))
-    key = os.environ["CREDENTIALS_KEY"]
-    os.environ["HOMEASSISTANT_TOKEN"] = "ha-env-token"
-    os.environ["PHONE_INTERACTIVE_SENSOR"] = "binary_sensor.new_phone_interactive"
-    os.environ["CREDENTIALS_KEY"] = ""
-    msg = ""
-    try:
-        addons_bootstrap.bootstrap()
-    except CredentialsKeyError as e:
-        msg = str(e)
-    check("key: env credentials waiting to be imported and no key -> startup refused, saying what to do",
-          "waiting to be imported" in msg and "Fernet.generate_key()" in msg and "CREDENTIALS_KEY" in msg, msg)
-    check("key: nothing imported while refused", not store.is_connected(ADMIN, "homeassistant"))
-    os.environ["CREDENTIALS_KEY"] = "not-a-key"
-    check("key: a malformed key is refused", raises(addons_bootstrap.bootstrap, CredentialsKeyError, "not a valid"))
-    os.environ["CREDENTIALS_KEY"] = key
-    os.environ["WAHA_URL"] = "https://waha.example.com/api/"
-    os.environ["WAHA_API_KEY"] = "waha-env-key"
-    os.environ["GOOGLE_REFRESH_TOKEN"] = "google-env-refresh"
-    imported = addons_bootstrap.bootstrap()
-    check("import: the credentialed addons now in env are imported", imported == ["homeassistant", "whatsapp", "calendar"],
-          str(imported))
-    ha = store.require(ADMIN, "homeassistant")
-    check("import: HA credentials, host from today's default",
-          dict(ha.credentials) == {"host": "http://homeassistant.local:8123", "token": "ha-env-token"},
-          str(dict(ha.credentials)))
-    check("import: HA settings: env value where set, the addon's default (weather) or nothing otherwise",
-          ha.settings["phone_interactive_sensor"] == "binary_sensor.new_phone_interactive"
-          and ha.settings["person"] is None
-          and ha.settings["phone_battery_sensor"] is None
-          and ha.settings["phone_notify_service"] is None
-          and ha.settings["weather_entity"] == "weather.forecast_home", str(dict(ha.settings)))
-    with sqlite3.connect(str(DATABASE_PATH)) as raw:
-        stored = raw.execute("SELECT settings FROM connections WHERE user_id = ? AND addon = 'homeassistant'",
-                             (ADMIN.id,)).fetchone()[0]
-    check("import: defaults are stored as values (a later default change does not move them)",
-          '"weather_entity": "weather.forecast_home"' in stored, stored)
-    wa = store.require(ADMIN, "whatsapp")
-    # the address is stored normalised (no trailing slash; core/addons/addresses.py)
-    check("import: WhatsApp url and key from env, session default",
-          dict(wa.credentials) == {"url": "https://waha.example.com/api", "api_key": "waha-env-key", "session": "default"},
-          str(dict(wa.credentials)))
-    cal = store.require(ADMIN, "calendar")
-    check("import: calendar refresh token, calendar id default",
-          cal.credentials["refresh_token"] == "google-env-refresh" and cal.settings["calendar_id"] == "primary")
-    check("import: the admin now has every addon the env import knows (contacts and gmail come only from the Google "
-          "sign-in, telegram_account only from the QR sign-in; money is turned on by hand)",
-          store.connected_addons(ADMIN) == tuple(k for k in EXPECTED_ORDER
-                                                if k not in ("contacts", "gmail", "telegram_account", "money")),
-          str(store.connected_addons(ADMIN)))
-    check("import: the env values are not in the database file",
-          b"ha-env-token" not in raw_db_bytes() and b"google-env-refresh" not in raw_db_bytes())
-
-    check("import: done once (a second start imports nothing)", addons_bootstrap.bootstrap() == [])
-    store.disconnect(ADMIN, "homeassistant")
-    check("import: an addon the admin disconnected is not re-created at the next start",
-          addons_bootstrap.bootstrap() == [] and not store.is_connected(ADMIN, "homeassistant"))
-
-    os.environ["CREDENTIALS_KEY"] = ""
-    msg = ""
-    try:
-        addons_bootstrap.bootstrap()
-    except CredentialsKeyError as e:
-        msg = str(e)
-    check("key: stored credentials and no key -> startup refused", "stored credentials" in msg
-          and "Fernet.generate_key()" in msg, msg)
+def test_key():
+    source = open(addons_bootstrap.__file__).read()
+    check("no env import: bootstrap reads no env name", "getenv(" not in source and "os.environ" not in source)
+    store.connect(ADMIN, "calendar", credentials={"refresh_token": "google-refresh-" + Fernet.generate_key().decode()[:8]})
+    file_key = crypto.key_file().read_text().strip()
     os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
     msg = ""
     try:
         addons_bootstrap.bootstrap()
     except CredentialsKeyError as e:
         msg = str(e)
-    check("key: stored credentials and the wrong key -> startup refused", "not the key" in msg, msg)
-    os.environ["CREDENTIALS_KEY"] = key
-    check("key: the right key starts again", addons_bootstrap.bootstrap() == [])
+    check("key: CREDENTIALS_KEY wins over the file: another key -> startup refused, saying what to do",
+          "CREDENTIALS_KEY is not the key" in msg and "Fernet.generate_key()" in msg, msg)
+    os.environ["CREDENTIALS_KEY"] = "not-a-key"
+    check("key: a malformed key is refused", raises(addons_bootstrap.bootstrap, CredentialsKeyError, "not a valid"))
+    os.environ["CREDENTIALS_KEY"] = file_key
+    check("key: the file's key given in env starts", addons_bootstrap.bootstrap() == [] and crypto.key_source() == "env")
+    os.environ["CREDENTIALS_KEY"] = ""
+    saved = crypto.key_file().read_bytes()
+    crypto.key_file().unlink()
+    msg = ""
+    try:
+        addons_bootstrap.bootstrap()
+    except CredentialsKeyError as e:
+        msg = str(e)
+    check("key: stored credentials, no env key and no file -> refused, and no new key is generated",
+          "stored credentials" in msg and not crypto.key_file().exists(), msg)
+    crypto.key_file().write_bytes(saved)
+    check("key: the key file put back starts again", addons_bootstrap.bootstrap() == [])
     check("crypto: generate_key makes a usable key", Fernet(crypto.generate_key().encode()) is not None)
 
 
@@ -437,7 +394,7 @@ async def main():
     await test_needs()
     test_credentials()
     test_settings_and_cache()
-    test_env_import()
+    test_key()
 
 
 asyncio.run(main())

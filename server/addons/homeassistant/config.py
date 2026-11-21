@@ -1,7 +1,7 @@
 """Home Assistant configuration of one user, read from their connection: the
 addon's name, the setting names and what each means, and the
-``/api/client-config`` payload. Nothing here reads env: the first admin's
-values are imported once by ``addons/bootstrap.py``."""
+``/api/client-config`` payload. Nothing here reads env: the values are set
+on the Addons page or with bin/users.py."""
 
 from typing import Any, Dict, Optional
 

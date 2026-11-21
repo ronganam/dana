@@ -27,6 +27,8 @@ MONEY_DIR = DATA_DIR / "money"
 KNOWLEDGE_FILES_DIR = DATA_DIR / "knowledge"
 # Addons installed from the catalog, one folder each (core/addon_dirs.py).
 ADDONS_DIR = DATA_DIR / "addons"
+# The credentials key generated at the first start when CREDENTIALS_KEY is not set (core/addons/crypto.py).
+CREDENTIALS_KEY_FILE = DATA_DIR / "credentials.key"
 
 
 def ensure_data_dirs() -> None:

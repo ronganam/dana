@@ -22,6 +22,7 @@ from cryptography.fernet import Fernet
 # A throwaway database: the relay stores the call's transcript in the caller's session.
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("realtime_relay_test")
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
 # A throwaway key: the startup import stores any addon credentials it finds in env encrypted.
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 

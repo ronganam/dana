@@ -260,9 +260,11 @@ def _upsert_account(conn, user: User, source_id: str, company: companies.Company
              next_charge, next_charge_date, now, now))
         return account_id
     account_id = row["id"]
+    # scoped: the account found by user_id above
     conn.execute("UPDATE money_accounts SET source_id = ?, kind = ?, updated_at = ? WHERE id = ?",
                  (source_id, company.kind, now, account_id))
     if has_balance:
+        # scoped: the account found by user_id above
         conn.execute("UPDATE money_accounts SET balance = ?, balance_at = ?, next_charge = ?, next_charge_date = ? "
                      "WHERE id = ?", (balance, now, next_charge, next_charge_date, account_id))
     return account_id
@@ -357,8 +359,10 @@ def _store_rows(conn, user: User, account_id: str, rows: Sequence[Dict[str, Any]
         changes = {k: row[k] for k in _SCRAPED if old.get(k) != row[k]}
         if changes:
             sets = ", ".join(f"{k} = ?" for k in changes)
+            # scoped: rows read by account_id AND user_id above
             conn.execute(f"UPDATE money_transactions SET {sets}, raw = ?, updated_at = ? WHERE id = ?",
                          (*changes.values(), row["raw"], now, old["id"]))
             out["changed"].append(old["id"])
         elif old.get("raw") != row["raw"]:
+            # scoped: rows read by account_id AND user_id above
             conn.execute("UPDATE money_transactions SET raw = ? WHERE id = ?", (row["raw"], old["id"]))

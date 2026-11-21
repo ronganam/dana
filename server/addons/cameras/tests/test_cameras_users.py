@@ -4,10 +4,9 @@ Run: bin/test test_cameras_users
 Two in-process fake Frigates (aiohttp: events, motion activity, previews,
 clips, go2rtc WebRTC; every request recorded, anything else answered 404 and
 recorded too) and a fake Home Assistant for the two proxies that go through
-it. The first admin's addon comes from the env import (today's default
-address) and is then pointed at Frigate A; Bob has Frigate B; Carl has no
-cameras; Erin has Home Assistant but no cameras. Checked: the import and that
-nothing else reads ``FRIGATE_URL`` or holds the owner's address; every camera
+it. The first admin connects an address and is then pointed at Frigate A; Bob has
+Frigate B; Carl has no cameras; Erin has Home Assistant but no cameras.
+Checked: nothing reads ``FRIGATE_URL`` or holds the owner's address; every camera
 endpoint reaches only the caller's own Frigate, with the first admin's
 payloads as before; caches (events, activity, clips) per connection; no addon
 → 403 on every camera route (streaming and WebRTC included); the two Home
@@ -30,7 +29,7 @@ testenv.isolate("cameras_users_test")
 os.environ["API_TOKEN"] = "cam-users-test-env-token"  # a test value: with it set, DB tokens are honoured
 from cryptography.fernet import Fernet  # noqa: E402
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key (Erin's Home Assistant token)
-os.environ["FRIGATE_URL"] = "https://frigate.example.com/"  # the first admin's Frigate, from the env import
+os.environ["FRIGATE_URL"] = "https://frigate.example.com/"  # the old env import's name: read by nothing now
 os.environ["FRIGATE_MOTION_THRESHOLD"] = "5"  # a tuning value (env): motion cards on, to cover that path
 
 from aiohttp import web  # noqa: E402
@@ -41,7 +40,8 @@ from core import db, users  # noqa: E402
 db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
-IMPORTED = addons_bootstrap.bootstrap()
+addons_bootstrap.bootstrap()
+testenv.connect_admin("cameras", settings={"url": "https://frigate.example.com"})
 
 from addons.cameras import api as cameras_api  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
@@ -171,27 +171,24 @@ def not_connected(addon: str) -> Dict[str, str]:
     return {"error": "not_connected", "addon": addon}
 
 
-# --- 1. The env import and the old env name -----------------------------------------------------
+# --- 1. No env import: the old env name ---------------------------------------------------------
 
 def test_import() -> None:
     cams = store.require(ADMIN, "cameras")
-    check("import: the first admin's Frigate address from FRIGATE_URL (no trailing slash)",
-          "cameras" in IMPORTED and dict(cams.settings) == {"url": "https://frigate.example.com"}, dict(cams.settings))
+    check("connection: the address the admin connected (FRIGATE_URL ignored)",
+          dict(cams.settings) == {"url": "https://frigate.example.com"}, dict(cams.settings))
     os.environ.pop("FRIGATE_URL")
-    check("import: no FRIGATE_URL, no cameras import", addons_bootstrap._cameras() is None)
     check("addon: no default address", all(f.default is None for f in store.get_addon("cameras").settings))
     root = testenv.SERVER
     readers, holders = [], []
     for path in list((root / "core").rglob("*.py")) + [p for p in (root / "addons").rglob("*.py") if "tests" not in p.parts] + [root / "main.py"]:
-        if path.name == "bootstrap.py" and path.parent.name == "addons":
-            continue
         text = path.read_text(encoding="utf-8")
         if re.search(r'["\']FRIGATE_URL["\']', text):
             readers.append(str(path.relative_to(root)))
         if "frigate.example.com" in text:
             holders.append(str(path.relative_to(root)))
-    check("old env name: FRIGATE_URL read only by the env import", not readers, readers)
-    check("the owner's Frigate address: only in the env import", not holders, holders)
+    check("old env name: FRIGATE_URL read by nothing", not readers, readers)
+    check("the owner's Frigate address: in no source file", not holders, holders)
 
 
 # --- 2. Endpoints -------------------------------------------------------------------------------

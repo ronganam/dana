@@ -132,6 +132,7 @@ def set_status(call_id: str, status: str, error: Optional[str] = None, **fields:
     """The pipeline's progress on a call it is processing (for its owner)."""
     sets = ["status = ?", "error = ?"] + [f"{k} = ?" for k in fields]
     with get_db_connection() as conn:
+        # scoped: the pipeline's own call, read for its owner (processing._process)
         conn.execute(f"UPDATE phone_calls SET {', '.join(sets)} WHERE id = ?",
                      [status, error, *fields.values(), call_id])
         conn.commit()
@@ -146,7 +147,9 @@ def delete_call(user: User, call_id: str) -> bool:
         if not row:
             return False
         filename = row["filename"]
+        # scoped: the user's call, checked above (id AND user_id)
         conn.execute("DELETE FROM phone_calls WHERE id = ?", (call_id,))
+        # scoped: the user's call, checked above (id AND user_id)
         conn.execute("DELETE FROM call_suggestions WHERE call_id = ? AND source_type = 'call'", (call_id,))
         task_links.forget_ref("call", call_id, conn=conn)
         conn.commit()

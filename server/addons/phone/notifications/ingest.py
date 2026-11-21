@@ -109,9 +109,11 @@ def ingest(user: User, posted: Iterable[Dict[str, Any]], removed: Iterable[Dict[
             if existing:
                 duplicates += 1
                 if n["device_key"] and existing["device_key"] != n["device_key"]:
+                    # scoped: the row found by content_hash AND user_id above
                     conn.execute("UPDATE notifications SET device_key = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                                  (n["device_key"], existing["id"]))
                 if n["actions"]:
+                    # scoped: the row found by content_hash AND user_id above
                     conn.execute("UPDATE notifications SET actions = ? WHERE id = ?", (n["actions"], existing["id"]))
                 continue
             nid = str(uuid.uuid4())

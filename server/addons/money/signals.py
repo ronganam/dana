@@ -347,6 +347,7 @@ def _reattach(conn: sqlite3.Connection, user: User) -> int:
         account = _card_account(conn, user, s["card_last4"])
         when = store.parse(s["posted_at"])
         if account is None or when is None or s["amount"] is None:
+            # scoped: a signal from the user's orphans (query above)
             conn.execute("UPDATE money_signals SET transaction_id = NULL WHERE id = ?", (s["id"],))
             continue
         local = when.astimezone(clock.get_timezone())
@@ -363,6 +364,7 @@ def _reattach(conn: sqlite3.Connection, user: User) -> int:
             sets = ", ".join(f"{k} = ?" for k in changes)
             conn.execute(f"UPDATE money_transactions SET {sets} WHERE id = ? AND user_id = ?",
                          (*changes.values(), match["id"], user.id))
+        # scoped: a signal from the user's orphans (query above)
         conn.execute("UPDATE money_signals SET transaction_id = ? WHERE id = ?", (match["id"], s["id"]))
         n += 1
     return n
@@ -442,8 +444,10 @@ def _provisional(conn: sqlite3.Connection, user: User, signal_id: str, payment: 
                             (user.id, account["id"], payment.amount)).fetchall():
         when = store.parse(row["occurred_at"])
         if when is not None and abs(when - posted) <= window:  # the same payment from another app
+            # scoped: the user's signal and provisional row (query above)
             conn.execute("UPDATE money_signals SET transaction_id = ? WHERE id = ?", (row["id"], signal_id))
             if notification_id and not row["notification_id"]:
+                # scoped: the user's provisional row (query above)
                 conn.execute("UPDATE money_transactions SET notification_id = ? WHERE id = ?",
                              (notification_id, row["id"]))
             return None
@@ -455,6 +459,7 @@ def _provisional(conn: sqlite3.Connection, user: User, signal_id: str, payment: 
             sets = ", ".join(f"{k} = ?" for k in changes)
             conn.execute(f"UPDATE money_transactions SET {sets}, updated_at = ? WHERE id = ? AND user_id = ?",
                          (*changes.values(), store.now_iso(), scraped["id"], user.id))
+        # scoped: the user's signal, stored for them before this call
         conn.execute("UPDATE money_signals SET transaction_id = ? WHERE id = ?", (scraped["id"], signal_id))
         _learn(conn, user, key, scraped)
         return None
@@ -473,6 +478,7 @@ def _provisional(conn: sqlite3.Connection, user: User, signal_id: str, payment: 
         (txn_id, user.id, account["id"], f"n:{signal_id}", occurred, day, payment.amount, payment.amount,
          description or None, known["merchant"] or description or None, key or None, category,
          "memory" if category else None, notification_id, now, now))
+    # scoped: the user's signal, stored for them before this call
     conn.execute("UPDATE money_signals SET transaction_id = ? WHERE id = ?", (txn_id, signal_id))
     return account["source_id"]
 

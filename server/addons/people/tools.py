@@ -67,7 +67,7 @@ async def list_people(conn: Connection, query: Optional[str] = None, sort: str =
     return "\n".join(_person_line(p) for p in items[:max(1, min(limit, 50))])
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def get_person(conn: Connection, person: str) -> str:
     """Everything Dana knows about one person: relation, notes, birthday, how often they talk, the AI brief (what's going on, open loops), recent calls with summaries, recent messages from them and open tasks involving them.
 

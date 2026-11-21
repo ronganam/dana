@@ -16,31 +16,36 @@ It is one person's daily driver, published as is: opinionated, built around one 
 
 | Path | What |
 |---|---|
-| [`server/`](server/) | The server (Python 3.14, aiohttp, SQLite): agent, addons, APIs, web UI, Telegram bot, background jobs |
+| [`server/`](server/) | The server (Python 3.12+, tested on 3.14; aiohttp, SQLite): agent, addons, APIs, web UI, Telegram bot, background jobs |
 | [`android/`](android/) | The phone app, the wall-tablet kiosk and the TV home screen (flavors of one app), and the Wear OS watch app (Kotlin, Compose) |
 | [`extensions/raycast-assistant/`](extensions/raycast-assistant/) | A Raycast extension |
 | [`examples/addons/`](examples/addons/) | A working example of an addon you write yourself |
 
 ## Run the server
 
+The minimal first run needs two values in `server/.env`: an LLM key (`ANTHROPIC_API_KEY` with the default models, or another provider's key plus `MODEL`) and `API_TOKEN` (generate one: `openssl rand -hex 32`). Without `API_TOKEN` the server refuses to start.
+
 With Docker:
 
 ```bash
 cd server
-cp .env.example .env        # at least ANTHROPIC_API_KEY (or another provider's key + MODEL) and API_TOKEN
-docker compose up -d        # http://localhost:8080, sign in with API_TOKEN
+cp .env.example .env        # set ANTHROPIC_API_KEY and API_TOKEN
+docker compose up -d        # http://127.0.0.1:8080, sign in with API_TOKEN
 ```
 
-From source:
+The port is published on 127.0.0.1 only; to reach Dana from other devices, put a reverse proxy with HTTPS in front of it ([`server/docs/operations.md`](server/docs/operations.md)).
+
+From source (Python 3.12 or newer; the image and the tests run 3.14):
 
 ```bash
 cd server
-python3.14 -m venv .venv && .venv/bin/pip install -r requirements.txt
-cp .env.example .env
-.venv/bin/python main.py
+python3 -m venv .venv                        # or python3.14 / python3.12 when python3 is older
+.venv/bin/pip install -r requirements.lock   # every dependency pinned
+cp .env.example .env                         # set ANTHROPIC_API_KEY and API_TOKEN
+.venv/bin/python main.py                     # http://localhost:8080, sign in with API_TOKEN
 ```
 
-Then connect addons on the web UI (Settings → Addons) or with `bin/users.py`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
+At the first start the server creates you as its admin, turns on the addons that need no account (tasks, shopping, projects, people, phone…) and, unless `CREDENTIALS_KEY` is set, generates the key that encrypts addon credentials into `credentials.key` next to the database: back it up with the database. Then connect the rest on the web UI (Settings → Addons) or with `bin/users.py`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
 
 ## Your own deployment
 

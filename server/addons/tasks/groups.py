@@ -91,6 +91,7 @@ def owner_of(group_id: str) -> Optional[str]:
 
 def title_of(group_id: str) -> Optional[str]:
     with get_db_connection() as conn:
+        # scoped: title of a list the caller resolved for the user (sharing ItemType.title_of)
         row = conn.execute("SELECT name FROM task_groups WHERE id = ?", (group_id,)).fetchone()
     return row["name"] if row else None
 
@@ -232,6 +233,7 @@ def update_group(user: User, group_id: str, changes: Dict[str, Any]) -> bool:
     cols = [c for c in ("name", "emoji", "color", "description") if c in changes]
     if cols:
         with get_db_connection() as conn:
+            # scoped: the user owns the list (access == OWNER, above)
             conn.execute(f"UPDATE task_groups SET {', '.join(c + ' = ?' for c in cols)}, "
                          "updated_at = CURRENT_TIMESTAMP WHERE id = ?", (*[changes[c] for c in cols], group_id))
             conn.commit()
@@ -256,6 +258,7 @@ def delete_group(user: User, group_id: str) -> bool:
         raise ValueError("Cannot delete the default General group")
     with get_db_connection() as conn:
         conn.execute("UPDATE tasks SET group_id = ?, user_id = ? WHERE group_id = ?", (general, user.id, group_id))
+        # scoped: the user owns the list (access == OWNER, above)
         conn.execute("DELETE FROM task_groups WHERE id = ?", (group_id,))
         conn.commit()
     sharing.forget(ITEM_TYPE, group_id)

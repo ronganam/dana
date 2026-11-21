@@ -1,4 +1,5 @@
-"""Checks for the web-server auth middleware (core/auth.py). Run: bin/test test_auth"""
+"""Checks for the web-server auth middleware (core/auth.py) and the app publish token's rules (core/app_updates.py).
+Run: bin/test test_auth"""
 
 import asyncio
 import os
@@ -6,13 +7,12 @@ import os
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("auth_test")
 os.environ["API_TOKEN"] = "s3cret-token"
-os.environ["INTERNAL_HOSTS"] = "ganam-assistant.ganam-assistant,ganam-assistant.ganam-assistant.svc.cluster.local"
 
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 from yarl import URL
 
-from core import db, users
+from core import app_updates, db, users
 from core.auth import SESSION_COOKIE, setup_auth
 
 db.migrate()
@@ -61,14 +61,14 @@ async def main() -> None:
             r = await client.get(path)
             check(f"public {path} -> 200", r.status == 200)
 
-        r = await client.get("/api/tasks", headers={"Host": "ganam-assistant.ganam-assistant"})
-        check("internal Service host without credentials on an API path -> 401", r.status == 401)
+        r = await client.get("/api/tasks", headers={"Host": "dana.dana"})
+        check("an in-cluster Service host without credentials on an API path -> 401", r.status == 401)
 
-        r = await client.post("/webhook", headers={"Host": "ganam-assistant.ganam-assistant"})
-        check("internal Service host on /webhook (the old HA path, not inbound any more) -> 401", r.status == 401)
+        r = await client.post("/webhook", headers={"Host": "dana.dana"})
+        check("an in-cluster Service host on /webhook (the old HA path, not inbound any more) -> 401", r.status == 401)
 
-        r = await client.post("/webhook/waha", headers={"Host": "ganam-assistant.ganam-assistant.svc.cluster.local:80"})
-        check("internal Service host with port on /webhook/waha (WAHA) -> 200", r.status == 200)
+        r = await client.post("/webhook/waha", headers={"Host": "dana.dana.svc.cluster.local:80"})
+        check("/webhook/waha without credentials reaches its handler, which checks WAHA's signature", r.status == 200)
 
         r = await client.post("/webhook", headers={"Host": "dana.example.com"})
         check("webhook via public host without token -> 401", r.status == 401)
@@ -90,7 +90,17 @@ async def main() -> None:
         check("session cookie authenticates API calls", r.status == 200)
 
 
+def test_publish_token() -> None:
+    check("publish token: unset -> publishing disabled", app_updates.publish_token_problem("") is not None)
+    check("publish token: the example placeholder is refused",
+          app_updates.publish_token_problem("choose_a_random_publish_token") is not None)
+    check(f"publish token: shorter than {app_updates.PUBLISH_TOKEN_MIN_LENGTH} characters is refused",
+          "24" in (app_updates.publish_token_problem("a" * 23) or ""))
+    check("publish token: a long random value is accepted", app_updates.publish_token_problem("ab12" * 8) is None)
+
+
 asyncio.run(main())
+test_publish_token()
 if failures:
     raise SystemExit(f"{failures} auth check(s) failed")
 print("\nAll auth checks passed")

@@ -4,10 +4,9 @@ Run: bin/test test_calendar_users
 Google's client is faked where it is built (``addons.calendar.client.build``):
 each refresh token opens its own fake account with its own calendars and
 events, and every request is recorded with the token it came with. The first
-admin's addon comes from the env import (a 9.0 database with a
-calendar selection waiting for the import, converted first: the import picks
-the selection up); Bob connects his own account; Carl has no calendar.
-Checked: the import; nothing else reads the old env names or the memory;
+admin's calendar is connected by the operator (on a converted 9.0 database);
+Bob connects his own account; Carl has no calendar.
+Checked: nothing reads the old env names, the import tables or the memory;
 tools, ``/api/calendar/*``, the selection, undo of added / changed events, accepting a suggestion (HTTP and
 Now, with Now's undo), Now's events and approval card names, the briefing,
 meeting cards, the weekly review and the self-check use only the acting
@@ -34,20 +33,16 @@ from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
 os.environ["GOOGLE_CLIENT_ID"] = "server-client-id"  # the server's OAuth app (fake)
 os.environ["GOOGLE_CLIENT_SECRET"] = "server-client-secret"
-# The first admin's env values, as production has them (fake).
-os.environ["GOOGLE_REFRESH_TOKEN"] = "robin-refresh"
-os.environ["GOOGLE_CALENDAR_ID"] = "robin-cal"
+os.environ["GOOGLE_REFRESH_TOKEN"] = "robin-refresh"  # the old env import's names: read by nothing now
 os.environ["TIMEZONE"] = "Asia/Jerusalem"
 
 FIXTURE = os.path.join(testenv.FIXTURES, "db_9_0.sql")
 ROBIN_SELECTION = ["robin-cal", "robin-work"]
 
-# The production database before converting: 9.0 with the calendar picker's selection waiting for the env import.
+# A production database before converting (9.0).
 _db = sqlite3.connect(DB_PATH)
 with open(FIXTURE, encoding="utf-8") as f:
     _db.executescript(f.read())
-_db.execute("INSERT INTO integration_import_settings (kind, name, value) VALUES ('calendar', 'selected_calendars', ?)",
-            (json.dumps(ROBIN_SELECTION),))
 _db.commit()
 _db.close()
 
@@ -59,7 +54,9 @@ from core import db, users  # noqa: E402
 db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
-IMPORTED = addons_bootstrap.bootstrap()
+addons_bootstrap.bootstrap()
+testenv.connect_admin("calendar", credentials={"refresh_token": "robin-refresh"},
+                      settings={"calendar_id": "robin-cal", "selected_calendars": ROBIN_SELECTION})
 
 from addons.calendar import api as calendar_api  # noqa: E402
 from addons.phone import api as phone_api  # noqa: E402
@@ -253,18 +250,19 @@ AUTH = {ADMIN.id: {"Authorization": f"Bearer {os.environ['API_TOKEN']}"},
 NOT_CONNECTED = {"error": "not_connected", "addon": "calendar"}
 
 
-# --- 1. The env import, the selection's migration and the old names -------------------------------
+# --- 1. No env import: the old names and tables -----------------------------------------------------
 
 def test_import() -> None:
     cal = store.require(ADMIN, "calendar")
-    check("import: refresh token and default calendar from env, the selection that waited for it",
-          "calendar" in IMPORTED and dict(cal.credentials) == {"refresh_token": "robin-refresh"}
+    check("connection: the operator's refresh token, calendar and selection",
+          dict(cal.credentials) == {"refresh_token": "robin-refresh"}
           and dict(cal.settings) == {"calendar_id": "robin-cal", "selected_calendars": ROBIN_SELECTION},
-          (IMPORTED, dict(cal.settings)))
+          dict(cal.settings))
     with get_db_connection() as conn:
-        waiting = conn.execute("SELECT COUNT(*) FROM connection_import_settings").fetchone()[0]
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
         memory = conn.execute("SELECT 1 FROM memories WHERE key = 'selected_calendars'").fetchone()
-    check("import: the waiting selection was consumed and the memory is gone", waiting == 0 and memory is None)
+    check("the import tables are gone (core m0003) and the memory too",
+          not {"connection_imports", "connection_import_settings"} & tables and memory is None)
 
     root = testenv.SERVER
     old_names = ("GOOGLE_REFRESH_TOKEN", "GOOGLE_CALENDAR_ID")
@@ -272,11 +270,10 @@ def test_import() -> None:
     memory_readers = []
     for path in list((root / "core").rglob("*.py")) + [p for p in (root / "addons").rglob("*.py") if "tests" not in p.parts] + [root / "main.py"]:
         text = path.read_text(encoding="utf-8")
-        if not (path.name == "bootstrap.py" and path.parent.name == "addons"):
-            readers += [f"{path.relative_to(root)}: {n}" for n in old_names if re.search(rf'["\']{n}["\']', text)]
+        readers += [f"{path.relative_to(root)}: {n}" for n in old_names if re.search(rf'["\']{n}["\']', text)]
         if path.parent.name != "migrations" and re.search(r"key\s*=\s*'selected_calendars'", text):
             memory_readers.append(str(path.relative_to(root)))
-    check("old env names: read only by the env import", not readers, readers)
+    check("old env names: read by nothing", not readers, readers)
     check("the selected_calendars memory: read by nothing", not memory_readers, memory_readers)
 
 

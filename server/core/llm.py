@@ -169,12 +169,52 @@ def claude_kwargs(name: str, job: str, kwargs: Dict[str, Any]) -> Dict[str, Any]
     return kwargs
 
 
+# The API key env names of the common providers, any one of which is enough. Checked
+# here directly: LiteLLM's validate_environment counts a key set to "" (an empty
+# line in .env) as present.
+PROVIDER_KEYS: Dict[str, tuple] = {
+    "anthropic": ("ANTHROPIC_API_KEY",),
+    "gemini": ("GEMINI_API_KEY", "GOOGLE_API_KEY"),
+    "openai": ("OPENAI_API_KEY",),
+    "deepgram": ("DEEPGRAM_API_KEY",),
+    "groq": ("GROQ_API_KEY",),
+    "mistral": ("MISTRAL_API_KEY",),
+    "openrouter": ("OPENROUTER_API_KEY",),
+    "xai": ("XAI_API_KEY",),
+}
+
+
+def provider(name: str) -> str:
+    """The LiteLLM provider of a model id ("" when LiteLLM does not know it)."""
+    try:
+        return str(litellm.get_llm_provider(name)[1] or "")
+    except Exception:
+        return name.split("/", 1)[0] if "/" in name else ""
+
+
 def _missing_keys(name: str) -> List[str]:
+    """The env names of the key ``name``'s provider needs, when none of them holds a value ([] when set)."""
+    names = PROVIDER_KEYS.get(provider(name))
+    if names:
+        return [] if any(os.getenv(n, "").strip() for n in names) else list(names[:1])
     try:
         env = litellm.validate_environment(name)
     except Exception:
         return ["API key"]
-    return [] if env.get("keys_in_environment") else (env.get("missing_keys") or ["API key"])
+    missing = list(env.get("missing_keys") or [])
+    empty = [k for k in missing if not os.getenv(k, "").strip()]
+    return [] if env.get("keys_in_environment") and not empty else (empty or missing or ["API key"])
+
+
+def missing_key_message(name: str) -> str:
+    """One short line for a model whose provider has no API key, or refused the one set
+    (what the agent says instead of retrying an authentication error)."""
+    who = provider(name) or name
+    missing = _missing_keys(name)
+    if missing:
+        return f"No API key for {who}: set {missing[0]} in server/.env"
+    keys = PROVIDER_KEYS.get(provider(name)) or ("its API key",)
+    return f"The {who} API key was refused: check {keys[0]} in server/.env"
 
 
 def configured(job: str) -> bool:

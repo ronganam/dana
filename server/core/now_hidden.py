@@ -52,6 +52,7 @@ def active(user: User) -> Dict[str, Dict[str, Any]]:
     """item id → row of the cards ``user`` has hidden right now (expired rows dropped)."""
     now = utc_iso()
     with get_db_connection() as conn:
+        # scoped: server-wide expiry of hidden-card rows
         conn.execute("DELETE FROM now_hidden WHERE until <= ?", (now,))
         conn.commit()
         return {r["item_id"]: dict(r) for r in conn.execute(

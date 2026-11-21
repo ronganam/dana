@@ -523,6 +523,7 @@ async def add_task_group(conn: Connection, name: str, emoji: str = "📁", color
         if created:
             def _undo_group():
                 with get_db_connection() as c:
+                    # scoped: undo of the list this user just created: tasks added since keep it
                     if c.execute("SELECT 1 FROM tasks WHERE group_id = ?", (group_id,)).fetchone():
                         raise undoable.UndoConflict("Tasks were added to the group since, so it was kept.")
                 current = undoable.row("task_groups", "id", group_id, cols)
@@ -531,6 +532,7 @@ async def add_task_group(conn: Connection, name: str, emoji: str = "📁", color
                 if not undoable.same(current, created, cols):
                     raise undoable.UndoConflict("The group was changed since, so it was kept.")
                 with get_db_connection() as c:
+                    # scoped: the list this user just created, unchanged since (checked above)
                     c.execute("DELETE FROM task_groups WHERE id = ?", (group_id,))
                     c.commit()
                 sharing.forget(groups.ITEM_TYPE, group_id)

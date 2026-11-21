@@ -5,7 +5,7 @@ Works on the database directly, with the server's own env (``DATABASE_PATH``,
 ``CREDENTIALS_KEY``); the running server notices changes within its cache
 refresh (10 s). In the pod::
 
-    kubectl exec -n ganam-assistant deploy/ganam-assistant -- python bin/users.py list
+    kubectl exec -n <namespace> deploy/<deployment> -- python bin/users.py list
 
 Commands (``bin/users.py <command> --help`` for each)::
 
@@ -18,7 +18,7 @@ Commands (``bin/users.py <command> --help`` for each)::
     tokens revoke TOKEN_ID
     telegram add USER TELEGRAM_ID
     telegram move TELEGRAM_ID USER
-    telegram remove TELEGRAM_ID [--allow-open-bot]
+    telegram remove TELEGRAM_ID [--allow-no-ids]
     addons list                             every addon with its credential and setting fields
     addons show USER                        a user's connections (credential values never shown)
     addons connect USER ADDON [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
@@ -55,10 +55,8 @@ from core.users import User  # noqa: E402
 from core.addons import crypto, store  # noqa: E402
 from core.addons.addon import get_addon, all_addons  # noqa: E402
 
-# Rows a removed user keeps: usage is the server's cost history, and
-# connection_imports records that the env import happened (so it never runs
-# again for whoever becomes the first admin).
-KEPT_TABLES = ("usage_events", "usage_daily", "connection_imports")
+# Rows a removed user keeps: usage is the server's cost history.
+KEPT_TABLES = ("usage_events", "usage_daily")
 
 
 class CliError(Exception):
@@ -230,6 +228,7 @@ def remove_user(user: User) -> List[str]:
     except ValueError as e:
         raise CliError(str(e)) from e
     with get_db_connection() as conn:
+        # scoped: admin CLI: every shared item, to drop the shares of the removed user's items
         rows = conn.execute("SELECT DISTINCT item_type, item_id FROM item_access").fetchall()
     for row in rows:
         try:
@@ -284,8 +283,9 @@ def cmd_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
         print(f"  tokens: {tokens or 'none'}", file=out)
         names = [k for k in store.connected_addons(u) if not get_addon(k).everyone]
         print(f"  addons: {', '.join(names) or 'none'}", file=out)
-    if users.telegram_open():
-        print("Note: no user has a Telegram id, so the Telegram bot lets anyone in (as the first admin).", file=out)
+    if users.telegram_unlinked():
+        print("Note: no user has a Telegram id, so the Telegram bot refuses everyone "
+              "(link one: telegram add USER ID).", file=out)
 
 
 def _profile_args(p: argparse.ArgumentParser) -> None:
@@ -401,9 +401,9 @@ def cmd_telegram_remove(args: argparse.Namespace, out: TextIO, stdin: TextIO) ->
     owners = [u for u in users.list_users() if args.telegram_id in u.telegram_ids]
     if not owners:
         raise CliError(f"No user has Telegram id {args.telegram_id}.")
-    if sum(len(u.telegram_ids) for u in users.list_users()) == 1 and not args.allow_open_bot:
-        raise CliError("That is the last Telegram id: without any, the Telegram bot lets anyone in. "
-                       "Add another first, or pass --allow-open-bot.")
+    if sum(len(u.telegram_ids) for u in users.list_users()) == 1 and not args.allow_no_ids:
+        raise CliError("That is the last Telegram id: without any, the Telegram bot refuses everyone. "
+                       "Add another first, or pass --allow-no-ids.")
     users.remove_telegram_id(args.telegram_id)
     print(f"Telegram id {args.telegram_id} removed from {owners[0].name}.", file=out)
 
@@ -560,7 +560,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.set_defaults(func=cmd_telegram_move)
     p = tg.add_parser("remove", help="forget a Telegram user id")
     p.add_argument("telegram_id", type=int)
-    p.add_argument("--allow-open-bot", action="store_true", help="allow removing the last id (the bot opens)")
+    p.add_argument("--allow-no-ids", action="store_true",
+                   help="allow removing the last id (the bot then refuses everyone)")
     p.set_defaults(func=cmd_telegram_remove)
 
     ints = sub.add_parser("addons", help="addons and a user's connections").add_subparsers(

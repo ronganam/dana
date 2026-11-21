@@ -57,6 +57,7 @@ def reapply_rule(user: User, package: str, sender: str, action: str, *,
     untriaged: List[str] = []
     with get_db_connection() as conn:
         rows = [dict(r) for r in conn.execute(
+            # scoped: where starts with user_id = ? (above)
             f"SELECT id, sender, bucket, priority, priority_score, category, triage, triage_status "
             f"FROM notifications WHERE {where}", params)]
         low = rules.is_low_engagement(rules.engagement(conn, user, package)) if rows else False
@@ -79,6 +80,7 @@ def reapply_rule(user: User, package: str, sender: str, action: str, *,
                 continue
             if before is not None:
                 before.append({"id": r["id"], "bucket": r["bucket"], "priority": r["priority"]})
+            # scoped: ids from the user's rows (query above)
             conn.execute("UPDATE notifications SET bucket = ?, priority = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                          (bucket, pr, r["id"]))
         conn.commit()

@@ -116,6 +116,7 @@ async def _process(user: User, nid: str, client: Optional[httpx.AsyncClient]) ->
         except triage.TriageError as e:
             logger.warning(f"Triage failed for notification {nid}: {e}")
             with get_db_connection() as conn:
+                # scoped: row(conn, user, nid) checked above
                 conn.execute("UPDATE notifications SET triage_status = 'failed', triage = ?, "
                              "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                              (json.dumps({"error": str(e)[:300]}), nid))
@@ -126,6 +127,7 @@ async def _process(user: User, nid: str, client: Optional[httpx.AsyncClient]) ->
 
     with get_db_connection() as conn:
         conn.execute(
+            # scoped: row(conn, user, nid) checked above
             "UPDATE notifications SET triage_status = ?, category = ?, priority = ?, priority_score = ?, bucket = ?, "
             "triage = ?, action_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
             (status, decision["category"], decision["priority"], decision["priority_score"], decision["bucket"],
@@ -150,6 +152,7 @@ async def _process(user: User, nid: str, client: Optional[httpx.AsyncClient]) ->
                                                   f"From {n.get('app_name')}" + (f" · {who}" if who and who != n.get("app_name") else ""))
         else:
             with get_db_connection() as conn:
+                # scoped: row(conn, user, nid) checked above
                 conn.execute("UPDATE notifications SET action_status = 'none' WHERE id = ?", (nid,))
                 conn.commit()
     return decision
@@ -259,6 +262,7 @@ async def extract_suggestions(user: User, n: Dict[str, Any]) -> int:
                 sg["payload"]["triggers"] = {key: trig[key]}
         with get_db_connection() as conn:
             replace_pending_suggestions(conn, user, n["id"], found, source_type="notification")
+            # scoped: n is the user's notification (read with row(conn, user, …))
             conn.execute("UPDATE notifications SET action_status = 'done', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                          (n["id"],))
             conn.commit()
@@ -266,6 +270,7 @@ async def extract_suggestions(user: User, n: Dict[str, Any]) -> int:
     except Exception as e:
         logger.warning(f"Suggestion extraction failed for notification {n.get('id')}: {e}")
         with get_db_connection() as conn:
+            # scoped: n is the user's notification (read with row(conn, user, …))
             conn.execute("UPDATE notifications SET action_status = 'failed', updated_at = CURRENT_TIMESTAMP WHERE id = ?",
                          (n["id"],))
             conn.commit()

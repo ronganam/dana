@@ -82,6 +82,7 @@ def migrate_legacy() -> int:
     created = 0
     with get_db_connection() as conn:
         rows = conn.execute(
+            # scoped: memories has no user_id: the old single-owner table, copied to its owner (owner_id)
             "SELECT key, value, category, updated_at FROM memories "
             "WHERE COALESCE(category, '') != 'system' AND key NOT IN "
             "(SELECT legacy_key FROM about_facts WHERE legacy_key IS NOT NULL)").fetchall()
@@ -116,6 +117,7 @@ def unmigrated_rows(user: User, query: Optional[str] = None) -> List[Dict[str, A
         return []
     with get_db_connection() as conn:
         rows = [dict(r) for r in conn.execute(
+            # scoped: owns_memories(user) checked above (memories has no user_id)
             "SELECT key, value, category, updated_at FROM memories "
             "WHERE COALESCE(category, '') != 'system' AND key NOT IN "
             "(SELECT legacy_key FROM about_facts WHERE legacy_key IS NOT NULL)").fetchall()]

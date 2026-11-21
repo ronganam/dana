@@ -63,7 +63,7 @@ ensure_default_groups_for_everyone()
 
 from addons import bootstrap as addons_bootstrap
 
-addons_bootstrap.bootstrap()  # the first admin's official addons (env has no HA / WAHA / Google)
+addons_bootstrap.bootstrap()  # the first admin's default addons
 
 from core import assistant_api, debug_api
 from addons.phone import api as phone_api
@@ -99,6 +99,7 @@ FAKE_CREDS = {
 ADMIN = users.first_admin()
 for _kind, _creds in FAKE_CREDS.items():
     store.connect(ADMIN, _kind, credentials=_creds)
+store.connect(ADMIN, "ops")  # opt-in: never turned on by itself, an admin turns it on
 MEMBER = users.create("Member", telegram_ids=[222], telegram_chat_id=2222)
 for _kind in ("tasks", "shopping"):
     store.connect(MEMBER, _kind)
@@ -692,7 +693,7 @@ def test_ops_connect():
     check("ops: so the member has no ops tool",
           not store.is_connected(MEMBER, "ops")
           and not {"run_kubectl", "run_python"} & {t.name for t in registry.tools_for(MEMBER)})
-    check("ops: the admin has it", store.is_connected(ADMIN, "ops") and registry.has_tool(ADMIN, "run_kubectl"))
+    check("ops: the admin has it once turned on", store.is_connected(ADMIN, "ops") and registry.has_tool(ADMIN, "run_kubectl"))
 
 
 async def main() -> None:

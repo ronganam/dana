@@ -24,7 +24,7 @@ def _line(n: dict) -> str:
     return f"- {n['id']} [{when}] {n.get('app_name')}{who}: {n.get('title') or ''} — {text} [{tags}, {state}]{sugg}"
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def search_notifications(conn: Connection, query: str, limit: int = 15) -> str:
     """Full-text search over the notifications the user's phone received (last 30 days), e.g. a bank message, a courier update or what someone wrote.
 
@@ -38,7 +38,7 @@ async def search_notifications(conn: Connection, query: str, limit: int = 15) ->
     return f"{len(items)} notification(s):\n" + "\n".join(_line(n) for n in items)
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def list_notifications(conn: Connection, bucket: Optional[str] = None, app: Optional[str] = None, hours: int = 24,
                              include_dismissed: bool = False, limit: int = 30) -> str:
     """List recent phone notifications with Dana's triage (priority, category, whether they need the user).
@@ -67,7 +67,7 @@ async def list_notifications(conn: Connection, bucket: Optional[str] = None, app
     return head + "\n".join(_line(n) for n in items)
 
 
-@addon.tool()
+@addon.tool(untrusted_result=True)
 async def summarize_notifications(conn: Connection) -> str:
     """Summarize what is waiting in the user's phone notifications Inbox: a short briefing plus one summary per app (who wrote what, what needs the user). Use for "what did I miss?" or "anything important on my phone?".
     """

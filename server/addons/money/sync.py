@@ -202,6 +202,7 @@ async def _scrape(user: User, source: Dict[str, Any], run_: _Run) -> List[Dict[s
             with store.db() as conn:
                 conn.execute("UPDATE money_sources SET state = 'syncing', state_reason = NULL, updated_at = ? "
                              "WHERE id = ? AND user_id = ?", (store.now_iso(), source["id"], user.id))
+                # scoped: this source's own sync run (created for the user's source)
                 conn.execute("UPDATE money_syncs SET state = 'running' WHERE id = ?", (run_.sync_id,))
             code_given = await worker.post_code(job_id, code) or code_given
             continue
