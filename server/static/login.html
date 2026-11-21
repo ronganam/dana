@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#2b2622">
+    <title>Sign in · Dana</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <style>
+        :root {
+            --canvas: #2b2622;
+            --canvas-soft: #383330;
+            --hairline-strong: #4a443f;
+            --primary: #f7f5f0;
+            --on-primary: #2b2622;
+            --body: #c9c0ad;
+            --mute: #aea69c;
+            --destructive: #ff453a;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 16px;
+            background: var(--canvas);
+            color: var(--primary);
+            font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sans-serif;
+        }
+        form {
+            width: 100%;
+            max-width: 360px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        h1 { margin: 0 0 4px; font-size: 20px; font-weight: 600; }
+        p { margin: 0 0 8px; color: var(--mute); font-size: 14px; }
+        input {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid var(--hairline-strong);
+            background: var(--canvas-soft);
+            color: var(--primary);
+            font: inherit;
+        }
+        input:focus { outline: 2px solid var(--body); outline-offset: 1px; }
+        button {
+            padding: 10px 12px;
+            border: 0;
+            border-radius: 6px;
+            background: var(--primary);
+            color: var(--on-primary);
+            font: inherit;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .error { color: var(--destructive); font-size: 14px; }
+        .error[hidden] { display: none; }
+    </style>
+</head>
+<body>
+    <form method="post" action="/login">
+        <h1>Dana</h1>
+        <p>Enter the API token to sign in on this device.</p>
+        <div class="error" id="error" hidden>That token is not valid.</div>
+        <input type="password" name="token" placeholder="API token" autocomplete="current-password" required autofocus>
+        <input type="hidden" name="next" id="next" value="/">
+        <button type="submit">Sign in</button>
+    </form>
+    <script>
+        const params = new URLSearchParams(location.search);
+        document.getElementById("next").value = params.get("next") || "/";
+        document.getElementById("error").hidden = params.get("error") !== "1";
+    </script>
+</body>
+</html>

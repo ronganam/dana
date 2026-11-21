@@ -1,0 +1,70 @@
+#!/usr/bin/env bash
+# Test, then deploy, on this machine (docs: server/docs/operations.md, "Deploy").
+#
+# Pushing master/main:
+#   1. runs the server's `bin/test` on a clean checkout of the pushed commit when it
+#      changes anything under server/ besides docs; when it changes server/Dockerfile
+#      or server/requirements.txt also the image's `test` stage (the suite on the exact
+#      image), after bin/test, never at once;
+#   2. when it changes what the images contain (server/core/, integrations/, static/,
+#      main.py, requirements.txt, Dockerfile, VERSION, bin/users.py, bank-worker/) and
+#      server/deploy.env exists, deploys it: `server/bin/deploy` builds
+#      "<VERSION>-<commit>", pushes it and sets the GitOps tags.
+# Android changes are not tested here (./gradlew in android/; docs in android/AGENTS.md).
+# A failure stops the push. Push without deploying: DANA_NO_DEPLOY=1 git push …
+# Installed by: git config core.hooksPath .githooks     Skip everything: git push --no-verify
+set -euo pipefail
+cd "$(git rev-parse --show-toplevel)"
+
+root="$PWD"
+zero=0000000000000000000000000000000000000000
+changed=""
+tested=""
+fast_forward=1
+while read -r _local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in refs/heads/master|refs/heads/main) ;; *) continue ;; esac
+  [ "$local_sha" = "$zero" ] && continue                      # deleting the branch
+  if [ "$remote_sha" = "$zero" ] || ! git cat-file -e "$remote_sha^{commit}" 2>/dev/null; then
+    changed+=$'\n'"(everything)"
+  else
+    changed+=$'\n'"$(git diff --name-only "$remote_sha" "$local_sha")"
+    git merge-base --is-ancestor "$remote_sha" "$local_sha" || fast_forward=0
+  fi
+  tested="$local_sha"
+done
+changed="$(printf '%s\n' "$changed" | sed '/^$/d')"
+[ -z "$changed" ] && exit 0
+
+if ! printf '%s\n' "$changed" | grep -E '^(server/|\(everything\))' | grep -qvE '^(server/docs/.*|.*\.md)$'; then
+  echo "pre-push: no server code changed, no server tests."
+  exit 0
+fi
+
+# Test exactly the pushed commit, in a clean temporary checkout: the working tree may
+# hold someone's unfinished work.
+checkout="$(mktemp -d "${TMPDIR:-/tmp}/dana-prepush-XXXXXX")"
+trap 'git -C "$root" worktree remove --force "$checkout" >/dev/null 2>&1 || rm -rf "$checkout"' EXIT
+git worktree add --detach -q "$checkout" "$tested"
+python="$root/server/.venv/bin/python"; [ -x "$python" ] || python=python3
+
+echo "pre-push: bin/test on ${tested:0:7} (skip once with git push --no-verify)"
+(cd "$checkout/server" && "$python" bin/test) || { echo "pre-push: tests failed; nothing pushed."; exit 1; }
+
+if printf '%s\n' "$changed" | grep -qE '^(server/Dockerfile|server/requirements\.txt|\(everything\))$'; then
+  echo "pre-push: the image changed: running the suite in the image's test stage"
+  docker build --target test -q -t dana:test "$checkout/server" >/dev/null \
+    || { echo "pre-push: the image's test stage failed (docker build --target test server); nothing pushed."; exit 1; }
+fi
+
+if printf '%s\n' "$changed" | grep -qE '^(server/(core/|integrations/|static/|bank-worker/|main\.py$|requirements\.txt$|Dockerfile$|VERSION$|bin/users\.py$)|\(everything\)$)'; then
+  if [ ! -r "${DANA_DEPLOY_CONFIG:-$root/server/deploy.env}" ]; then
+    echo "pre-push: no server/deploy.env: tested, not deploying."
+  elif [ -n "${DANA_NO_DEPLOY:-}" ]; then
+    echo "pre-push: DANA_NO_DEPLOY set: pushing without a deploy."
+  elif [ "$fast_forward" = 0 ]; then
+    echo "pre-push: the remote has commits this push lacks (git will refuse it unless forced): not deploying."
+  else
+    DANA_DEPLOY_CHECKOUT="$checkout" server/bin/deploy "$tested" \
+      || { echo "pre-push: the deploy failed; nothing pushed (server/bin/deploy to retry by hand)."; exit 1; }
+  fi
+fi

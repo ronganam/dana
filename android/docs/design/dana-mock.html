@@ -1,0 +1,927 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dana mock</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+.wrap{display:flex;gap:28px;align-items:flex-start;justify-content:center;flex-wrap:wrap}
+.fit{width:384px;max-width:100%;flex:0 0 auto}
+.wrap.unf .fit{width:100%;flex:0 0 100%}
+
+/* ---------- the device: Dana's own Ink & Paper tokens ---------- */
+.phone{
+  --canvas:#13100E;--tint:#1B1714;--surface:#25201B;--text:#F2EBDD;--muted:#A69C8C;--faint:#73695C;
+  --rule:rgba(242,235,221,.13);--accent:#FF6A3D;--on-accent:#13100E;--ok:#8FB98A;--warn:#E0B062;
+  position:relative;width:100%;height:720px;
+  background:var(--canvas);color:var(--text);border:1px solid var(--rule);border-radius:30px;overflow:hidden;
+  display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) auto auto;
+  font:400 14px/1.45 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;
+}
+.phone.paper{
+  --canvas:#F3EDE1;--tint:#EAE3D4;--surface:#E1D9C8;--text:#1B1714;--muted:#6A6155;--faint:#93897A;
+  --rule:rgba(27,23,20,.15);--accent:#D1401A;--on-accent:#F3EDE1;--ok:#3F7A44;--warn:#9A6A12;
+}
+.phone button{font:inherit;color:inherit;background:none;border:0;padding:0;cursor:pointer}
+.phone button:focus-visible,.phone input:focus-visible,.phone [contenteditable]:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
+.phone .mono{font:500 10.5px/1.3 "DM Mono",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.serif{font-family:"Instrument Serif",Georgia,serif;font-weight:400}
+.phone ::-webkit-scrollbar{display:none}
+#v-now,#stage,#side,.msgs{scrollbar-width:none}
+
+#v-now{grid-area:1/1;min-height:0;overflow-y:auto;padding:20px 18px 14px}
+#stage{grid-area:1/1;z-index:2;min-height:0;overflow-y:auto;padding:20px 18px 14px;background:var(--canvas);display:none}
+.show-canvas #stage{display:block}
+#strip,#side{display:none}
+#thread{grid-area:1/1;z-index:3;min-height:0;display:flex;flex-direction:column;background:var(--canvas);transform:translateY(102%);transition:transform .26s cubic-bezier(.2,.8,.2,1)}
+#thread.open{transform:none}
+.toast{grid-area:1/1;align-self:end;margin:0 14px 10px;z-index:4}
+.ask{grid-area:2/1;z-index:5}
+#nav{grid-area:3/1;z-index:5;display:flex;justify-content:space-between;gap:6px;padding:8px 18px 13px;background:var(--tint)}
+.phone .navb{font:500 10.5px/1.3 "DM Mono",ui-monospace,monospace;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);padding:5px 0 0;border-top:2px solid transparent}
+.phone .navb.on{color:var(--text);border-top-color:var(--accent)}
+.navb i{font-style:normal;color:var(--accent);margin-inline-start:5px}
+
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:12px}
+.top h1,h1.big{margin:4px 0 0;font-size:40px;line-height:1}
+.phone .link{color:var(--muted);font-size:13px;font-weight:500}
+.phone .link:hover{color:var(--text)}
+.me{width:34px;height:34px;margin-bottom:4px;border-radius:50%;border:1px solid var(--rule);display:inline-flex;align-items:center;justify-content:center;font:italic 21px/1 "Instrument Serif",Georgia,serif}
+.me i{font-style:normal;color:var(--accent)}
+.lede{margin:14px 0 0;font:italic 20px/1.25 "Instrument Serif",Georgia,serif}
+.sec{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:22px 0 0;padding-bottom:8px;border-bottom:1px solid var(--rule)}
+
+/* rows: hairline rules, no cards */
+.q{position:relative;border-bottom:1px solid var(--rule);overflow:hidden}
+.q-under{position:absolute;inset:0;display:flex;justify-content:space-between;align-items:center;padding:0 14px;font-size:12.5px;font-weight:600}
+.q-under .u-do{color:var(--accent)}
+.q-under .u-no{color:var(--muted)}
+.q-body{position:relative;background:var(--canvas);padding:13px 0 12px;touch-action:pan-y;cursor:pointer;transition:transform .18s ease}
+.q-body.drag{transition:none}
+.lift{opacity:.35}
+.q-title{margin-top:5px;font-size:15.5px;font-weight:600;line-height:1.3}
+.q-why{margin-top:2px;color:var(--muted);font-size:13px}
+.acts{display:flex;flex-wrap:wrap;gap:6px 8px;margin-top:10px}
+.btn{min-height:32px;padding:0 12px!important;border-radius:10px;font-size:13px;font-weight:500;color:var(--muted)!important;border:1px solid var(--rule)!important}
+.btn:hover{color:var(--text)!important}
+.btn.pri{color:var(--accent)!important;border-color:var(--accent)!important}
+.btn.solid{background:var(--accent)!important;color:var(--on-accent)!important;border-color:var(--accent)!important}
+.btn.bare{border-color:transparent!important;padding:0 4px!important}
+.more{margin-top:12px;padding:12px;background:var(--tint);border-radius:14px;font-size:13px;color:var(--muted)}
+.more p,.decide p{margin:0 0 8px}
+.more .mono,.decide .mono{display:block;margin:10px 0 6px}
+.more .mono:first-child{margin-top:0}
+.decide{padding-top:4px;font-size:13.5px;color:var(--muted)}
+.chk{display:flex;gap:9px;align-items:flex-start;padding:5px 0;color:var(--text)}
+.chk input{accent-color:var(--accent);margin-top:3px}
+.inline-in{width:100%;margin-top:8px;padding:9px 11px;border-radius:10px;border:1px solid var(--rule);background:var(--canvas);color:var(--text);font:inherit}
+.empty{margin:28px 0 6px;font:italic 26px/1.2 "Instrument Serif",Georgia,serif}
+.empty + p{margin:0;color:var(--muted);font-size:13px}
+.fold{display:flex;justify-content:space-between;align-items:center;gap:10px;width:100%;padding:12px 0!important;border-bottom:1px solid var(--rule)!important;color:var(--muted)!important;font-size:13px;text-align:start}
+.quiet-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--rule);font-size:13px}
+.quiet-row span{flex:1;min-width:0}
+.later{display:grid;grid-template-columns:74px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid var(--rule);align-items:baseline}
+.later div{font-size:14px}
+
+/* reminders */
+.phone .seg{display:flex;gap:16px;margin-top:14px}
+.phone .seg button{font:500 10.5px/1.3 "DM Mono",ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--faint);padding:3px 0;border-bottom:1.5px solid transparent}
+.phone .seg button.on{color:var(--text);border-bottom-color:var(--accent)}
+.addin{width:100%;margin-top:12px;height:40px;padding:0 12px;border-radius:12px;border:1px dashed var(--rule);background:transparent;color:var(--text);font:inherit}
+.addin::placeholder{color:var(--muted)}
+.rrow{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--rule);cursor:pointer;touch-action:pan-y}
+.rrow > div{flex:1;min-width:0}
+.rrow b{display:block;font-weight:600;font-size:14.5px;line-height:1.3;margin-bottom:3px}
+.rrow.done b{text-decoration:line-through;color:var(--muted);font-weight:400}
+.hi{color:var(--accent)}
+.phone .circ{flex:0 0 auto;width:20px;height:20px;margin-top:1px;border-radius:50%;border:1.5px solid var(--faint)}
+.phone .circ.done{background:var(--accent);border-color:var(--accent)}
+.fld{margin-top:18px}
+.fld > .mono{display:block;margin-bottom:8px}
+.ed-title{font-size:22px;font-weight:600;line-height:1.25;margin:6px 0 4px}
+.ed-note{color:var(--muted);min-height:22px}
+.ed-note:empty::before{content:attr(data-ph);color:var(--faint)}
+
+/* notifications */
+.sweep{margin-top:14px;padding:13px;border-radius:14px;background:var(--tint);font-size:13.5px}
+.noticed{margin-top:10px;padding:13px;border:1px solid var(--rule);border-radius:14px;font-size:13.5px}
+.app{display:flex;gap:11px;align-items:flex-start;padding:12px 0;border-bottom:1px solid var(--rule);cursor:pointer}
+.app > div{flex:1;min-width:0}
+.app b{font-weight:600;font-size:14.5px}
+.app p{margin:3px 0 0;color:var(--muted);font-size:13px;line-height:1.35}
+.tile{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:var(--surface);display:grid;place-items:center;font:500 11px "DM Mono",ui-monospace,monospace;color:var(--muted)}
+.nitem{padding:12px 0;border-bottom:1px solid var(--rule)}
+.nitem b{font-weight:600}
+.acc{color:var(--accent)}
+
+/* ask bar */
+.ask{background:var(--tint);border-top:1px solid var(--rule);padding:8px 14px 6px;position:relative}
+.peek{display:flex;justify-content:space-between;gap:10px;width:100%;padding:4px 2px 8px!important;text-align:start}
+.peek span:first-child,.ctx{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.ctx{display:none;padding:4px 2px 8px}
+.chips{display:flex;gap:6px;overflow-x:auto;padding-bottom:9px;scrollbar-width:none}
+.chip{flex:0 0 auto;padding:6px 11px!important;border:1px solid var(--rule)!important;border-radius:999px;font-size:12.5px;color:var(--text)!important;white-space:nowrap}
+.chip.ctxchip{border-color:var(--accent)!important;color:var(--accent)!important}
+.ask-row{display:flex;gap:8px;align-items:center}
+.ask-row input{flex:1;min-width:0;height:44px;padding:0 14px;border-radius:14px;border:1px solid var(--rule);background:var(--canvas);color:var(--text);font:inherit;font-size:15px}
+.ask-row input::placeholder{color:var(--faint)}
+.go{width:44px;height:44px;border-radius:50%;background:var(--accent)!important;color:var(--on-accent)!important;display:grid;place-items:center;flex:0 0 auto}
+
+/* results, thread */
+.res{display:block;width:100%;padding:11px 0!important;border-bottom:1px solid var(--rule)!important;text-align:start}
+.res b{display:block;font-size:14.5px;font-weight:600;margin-top:3px}
+.res.askit b{color:var(--accent)}
+.thread-head{display:flex;justify-content:space-between;align-items:center;padding:16px 18px 10px;border-bottom:1px solid var(--rule)}
+.msgs{flex:1;min-height:0;overflow-y:auto;padding:6px 18px 16px}
+.sep{display:flex;align-items:center;gap:10px;margin:16px 0 10px}
+.sep::before,.sep::after{content:"";flex:1;height:1px;background:var(--rule)}
+.m-me{margin:8px 0 8px auto;max-width:82%;width:fit-content;padding:8px 12px;border-radius:14px 14px 4px 14px;background:var(--surface);font-size:14.5px}
+.m-dana{margin:8px 0;max-width:92%;width:fit-content;font-size:15px}
+.m-dana .mono{display:block;margin-top:4px}
+.m-ctx{margin:8px 0;padding:8px 11px;border-inline-start:2px solid var(--accent);color:var(--muted);font-size:13px}
+.appr{margin:10px 0;padding:12px;border:1px solid var(--accent);border-radius:14px}
+.appr [contenteditable]{display:block;margin:6px 0 2px;padding:7px 9px;border-radius:8px;background:var(--canvas);font-size:14.5px}
+
+.toast{position:relative;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;border-radius:12px;background:var(--text);color:var(--canvas);font-size:13px;font-weight:500;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .2s ease,transform .2s ease}
+.toast.on{opacity:1;pointer-events:auto;transform:none}
+.toast button{font-weight:600!important}
+.phone:not(.paper) .toast button{color:#D1401A!important}
+.phone.paper .toast button{color:#FF6A3D!important}
+
+/* more / detail / about / evidence */
+.back{display:inline-block;margin-bottom:10px}
+.cat{display:flex;justify-content:space-between;align-items:baseline;gap:10px;width:100%;padding:14px 0!important;border-bottom:1px solid var(--rule)!important;text-align:start}
+.cat b{font:400 25px/1 "Instrument Serif",Georgia,serif}
+.item{display:block;width:100%;padding:12px 0!important;border-bottom:1px solid var(--rule)!important;text-align:start}
+.item b{display:block;font-weight:600;font-size:15px;margin-top:3px}
+.d-title{margin:6px 0 4px;font-size:21px;font-weight:600;line-height:1.25}
+.d-line{padding:9px 0;border-bottom:1px solid var(--rule)}
+.fact{display:flex;gap:8px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--rule)}
+.fact > div{flex:1;min-width:0}
+.fact [contenteditable]{display:block}
+.x{color:var(--faint)!important;font-size:17px;line-height:1;padding:2px 4px!important}
+.dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--ok);margin-inline-end:8px}
+.dot.warn{background:var(--warn)}
+.note{margin:12px 0 0;color:var(--muted);font-size:13px}
+.tr{display:grid;grid-template-columns:44px 1fr;gap:10px;padding:7px 8px;border-radius:8px;align-items:baseline}
+.tr p{margin:0}
+.tr.hit{background:var(--tint);box-shadow:inset 2px 0 0 var(--accent)}
+.wa{max-width:78%;width:fit-content;padding:7px 11px;border-radius:12px;margin:7px 0;background:var(--surface)}
+.wa.mine{margin-left:auto;background:transparent;border:1px solid var(--rule)}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:12px 0 4px}
+.week div{padding:8px 0;text-align:center;border:1px solid var(--rule);border-radius:10px}
+.week b{display:block;font:400 19px/1.2 "Instrument Serif",Georgia,serif}
+.week .miss b{color:var(--warn)}
+
+/* ---------- unfolded: list | detail | Dana, under a day strip ---------- */
+.phone.unfolded{width:1000px;height:755px;border-radius:26px;transform-origin:0 0;font-size:15px;
+  grid-template-columns:290px minmax(0,1fr) 300px;grid-template-rows:auto minmax(0,1fr) auto}
+.unfolded .mono{font-size:11.5px}
+.unfolded #v-now,.unfolded.side-on #side{grid-area:1/1/4/2;min-height:0;overflow-y:auto;padding:20px 18px 64px;background:var(--tint);border-inline-end:1px solid var(--rule)}
+.unfolded.side-on #side{display:block}
+.unfolded.side-on #v-now{display:none}
+.unfolded #strip{grid-area:1/2/2/4;display:grid;grid-template-columns:84px repeat(7,minmax(0,1fr));border-bottom:1px solid var(--rule);min-height:96px}
+.unfolded #stage{grid-area:2/2/4/3;display:block;padding:22px 26px 18px}
+.unfolded #thread{grid-area:2/3/3/4;transform:none;background:var(--tint);border-inline-start:1px solid var(--rule)}
+.unfolded .ask{grid-area:3/3/4/4;border-inline-start:1px solid var(--rule);padding-bottom:14px}
+.unfolded #nav{grid-area:3/1/4/2;align-self:end;z-index:6;padding:11px 18px 15px;border-top:1px solid var(--rule);border-inline-end:1px solid var(--rule)}
+.unfolded .toast{grid-area:3/1/4/2;margin:0 14px 58px;z-index:7}
+.unfolded .peek,.unfolded #thread-close,.unfolded #later-wrap,.unfolded .q-under,.unfolded .cover-only{display:none}
+.unfolded .ctx{display:block}
+.unfolded .q-body{background:transparent}
+.unfolded .q:not(.sel) .q-why{display:none}
+.unfolded .q.sel,.unfolded .rrow.sel,.unfolded .app.sel{margin:0 -18px}
+.unfolded .q.sel .q-body,.unfolded .rrow.sel,.unfolded .app.sel{padding-inline:18px;background:var(--canvas);box-shadow:inset 3px 0 0 var(--accent)}
+.unfolded #side .sweep{background:var(--canvas)}
+.unfolded .chips{flex-wrap:wrap;overflow:visible}
+.unfolded .chip{white-space:normal;text-align:start}
+.unfolded #side .app p{overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.phone .slot{display:block;padding:11px 9px;border-inline-end:1px solid var(--rule);min-width:0;text-align:start}
+.phone .slot:last-child{border:0}
+.slot.over{background:var(--surface);box-shadow:inset 0 0 0 1px var(--accent)}
+.nowcell b{display:block;margin-top:3px;font:italic 27px/1 "Instrument Serif",Georgia,serif}
+.si{margin-top:6px;font-size:11.5px;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;color:var(--muted)}
+.si.ev{color:var(--text);padding:3px 6px;border-radius:6px;background:var(--surface)}
+.si.mv{color:var(--accent)}
+
+/* ---------- page chrome: thread theme variables ---------- */
+.notes{flex:1 1 250px;min-width:230px;max-width:300px;font-family:var(--font-sans);color:var(--foreground);font-size:13.5px;line-height:1.5}
+.notes h2{margin:0 0 8px;font:500 11px/1.3 var(--font-mono);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-foreground)}
+.notes ol{margin:0 0 18px;padding-inline-start:18px}
+.notes li{margin-bottom:7px;break-inside:avoid}
+.notes li::marker{color:var(--muted-foreground)}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
+.ctl button{font:500 12.5px var(--font-sans);color:var(--foreground);background:transparent;border:1px solid var(--border);border-radius:var(--radius);padding:6px 10px;cursor:pointer}
+.ctl button[aria-pressed="true"]{background:var(--secondary);color:var(--secondary-foreground)}
+.ctl button:focus-visible{outline:2px solid var(--ring);outline-offset:2px}
+.try-unf{display:none}
+.wrap.unf .try-unf{display:block;columns:2;column-gap:30px}
+.wrap.unf .try-cover{display:none}
+.wrap.unf .notes{flex:1 1 100%;max-width:none;display:grid;grid-template-columns:150px minmax(0,1fr) 150px;gap:26px}
+@media (max-width:620px){.wrap.unf .notes{display:block}.wrap.unf .try-unf{columns:1}}
+</style>
+</head>
+<body>
+<div class="wrap" id="wrap">
+
+  <div class="fit" id="fit">
+  <div class="phone" id="phone">
+    <section id="v-now">
+      <div class="top">
+        <div><div class="mono">Sat 14 Nov · 18:40</div><h1 class="serif">Now</h1></div>
+        <button class="me" data-go="about" aria-label="About you and settings">d<i>.</i></button>
+      </div>
+      <p class="lede">Noa at 19:30, rain after nine.</p>
+      <div class="sec"><span class="mono" id="q-count">Needs you</span><span class="mono" id="hint"></span></div>
+      <div id="queue"></div>
+      <div id="quiet"></div>
+      <div id="nline"></div>
+      <div id="later-wrap"><div class="sec"><span class="mono">Later today</span></div><div id="later"></div></div>
+    </section>
+    <section id="side"></section>
+
+    <div id="strip"></div>
+    <section id="stage"></section>
+
+    <section id="thread" aria-label="Conversation with Dana">
+      <div class="thread-head"><span class="mono">One thread · phone · watch · TV · Mac</span><button class="link" id="thread-close">Done</button></div>
+      <div class="msgs" id="msgs"></div>
+    </section>
+
+    <div class="toast" id="toast" role="status"><span id="toast-text"></span><button id="toast-undo">Undo</button></div>
+
+    <div class="ask">
+      <button class="peek mono" id="peek"><span id="peek-text"></span><span id="peek-arrow">open ↑</span></button>
+      <div class="ctx mono" id="ctx"></div>
+      <div class="chips" id="chips"></div>
+      <form class="ask-row" id="ask-form" autocomplete="off">
+        <input id="ask-in" placeholder="Ask, tell or search…" aria-label="Ask, tell or search" dir="auto">
+        <button class="go" id="go" aria-label="Speak or send">
+          <svg id="ic-mic" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>
+          <svg id="ic-send" hidden width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M6 11l6-6 6 6"/></svg>
+        </button>
+      </form>
+    </div>
+    <nav id="nav" aria-label="Sections"></nav>
+  </div>
+  </div>
+
+  <aside class="notes">
+    <div>
+      <h2>Screen</h2>
+      <div class="ctl" id="mode">
+        <button data-mode="cover" aria-pressed="false">Cover</button>
+        <button data-mode="unf" aria-pressed="false">Unfolded</button>
+      </div>
+      <h2>Look</h2>
+      <div class="ctl" id="theme">
+        <button data-theme="ink" aria-pressed="true">Ink</button>
+        <button data-theme="paper" aria-pressed="false">Paper</button>
+      </div>
+    </div>
+    <div>
+      <h2>Try</h2>
+      <ol class="try-unf">
+        <li>Bottom left switches Now, Reminders and Notifications. The list is always on the left, what you picked is in the middle.</li>
+        <li>Reminders: tap one and change when, where, its list or its name in the middle. There is no Save.</li>
+        <li>Reminders: switch "By when" and "By list", tick a circle, or drag one onto the day strip.</li>
+        <li>Notifications: "Clear the noise" sweeps what Dana marked as noise, on the phone too.</li>
+        <li>Notifications: open an app and choose Interrupt me, Let Dana decide or Keep quiet. "Dana noticed" sets one in a tap.</li>
+        <li>Anything manual can also be said: try the orange chips above the ask bar.</li>
+        <li>Switch to Cover: same state, folded.</li>
+      </ol>
+      <ol class="try-cover">
+        <li>The bottom row switches Now, Reminders, Notifications and More.</li>
+        <li>Reminders: tick the circle to finish one, tap a row to edit it, or type in "+ Add a reminder".</li>
+        <li>Notifications: clear the noise in one tap, clear a whole app, or open an app to reply and set how it behaves.</li>
+        <li>Now: swipe a row right to do it, left to dismiss it. Tap a row to open it.</li>
+        <li>Chips: the gate answers at once, "Add milk" just happens, "Tell Dan I'm late" still asks.</li>
+        <li>Type <b>dan</b> in the bar: it searches your things before asking Dana.</li>
+      </ol>
+    </div>
+    <div>
+      <h2>Jump to</h2>
+      <div class="ctl" id="jump">
+        <button data-go="now">Now</button>
+        <button data-go="rem">Reminders</button>
+        <button data-go="notif">Notifications</button>
+        <button data-go="about">About you</button>
+        <button data-go="reset">Reset</button>
+      </div>
+    </div>
+  </aside>
+</div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const phone=$('#phone'),wrap=$('#wrap'),fitEl=$('#fit');
+const he=t=>/[֐-׿]/.test(t);
+const esc=t=>String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const iso=t=>esc(t).replace(/[֐-׿](?:[֐-׿\s.?!־-]*[֐-׿.?!])?/g,m=>`<bdi>${m}</bdi>`);
+let S,UNF=false,ALL=[];
+const SLOTS=[['19','19:00'],['20','20:00'],['21','21:00'],['22','22:00'],['23','23:00'],['home','At home'],['wake','On waking']];
+const EVENTS={'19':[{t:'Meeting with Noa',at:'19:30',ev:true}]};
+const LISTS=['Home','Work','Personal','Health','Vacation','General'];
+const ZONES=['Home','Work',"Mom's house","Gym"];
+const BUCKETS=['Overdue','Today','When I get there','Later','Someday'];
+const RULE={alert:'Every notification from this app opens the full-screen alert.',normal:'Dana works out which ones need you and which are noise.',quiet:'Never shown as needing you and never interrupts. Still searchable.'};
+const phrase=k=>k==='home'?'when you get home':k==='wake'?'when you wake':k+':00';
+
+function fresh(){return{
+  queue:[
+    {id:'ac',src:'Call · אמא · 20 min ago',title:'להזמין טכנאי למזגן',why:'She asked you to book it before Friday.',
+     pri:'Remind me tomorrow 09:00',done:'Reminder set · tomorrow 09:00',
+     ev:`<div class="sec"><span class="mono">The call · today 17:52 · 6 min</span></div>
+       <div class="tr"><span class="mono"><bdi>אמא</bdi></span><p dir="auto">המזגן בסלון שוב מטפטף על הרצפה.</p></div>
+       <div class="tr"><span class="mono">You</span><p dir="auto">אני אזמין טכנאי.</p></div>
+       <div class="tr hit"><span class="mono"><bdi>אמא</bdi></span><p dir="auto">רק שיהיה לפני שישי, כולם באים לארוחה.</p></div>
+       <div class="tr"><span class="mono">You</span><p dir="auto">סגור. באיזו שעה?</p></div>
+       <div class="tr"><span class="mono"><bdi>אמא</bdi></span><p dir="auto">בשבע.</p></div>`,
+     more:`<div class="cover-only"><span class="mono">From the call</span><p dir="auto">אמא: המזגן בסלון מטפטף, תזמין טכנאי לפני שישי. ארוחת ערב ב-19:00.</p></div>
+       <span class="mono">Remind me</span><div class="acts" style="margin-top:0">
+       <button class="btn" data-act="when" data-label="Remind me tomorrow 09:00" data-done="Reminder set · tomorrow 09:00">Tomorrow 09:00</button>
+       <button class="btn" data-act="when" data-label="Remind me at home" data-done="Reminder set · when you get home">When I get home</button>
+       <button class="btn" data-act="when" data-label="Remind me when I wake" data-done="Reminder set · when you wake">When I wake</button></div>`},
+    {id:'dan',src:'WhatsApp · Dan · 6 min ago',title:'מתי אתה מגיע?',why:'A person is waiting for an answer.',
+     pri:'Reply',priAct:'open',done:'Sent to Dan',extra:[['In 1 h','Snoozed · back at 19:40']],
+     ev:`<div class="sec"><span class="mono">The chat</span><span class="mono">1 open reminder with Dan</span></div>
+       <div class="wa" dir="auto">נפגשים בשבע?</div><div class="wa mine" dir="auto">כן, יוצא עוד מעט</div><div class="wa" dir="auto">מתי אתה מגיע?</div>`,
+     more:`<span class="mono">Reply to Dan</span><div class="acts" style="margin-top:0">
+       <button class="btn" data-act="quick" data-text="בדרך">בדרך</button>
+       <button class="btn" data-act="quick" data-text="עוד 10 דקות">עוד 10 דקות</button></div>
+       <input class="inline-in" dir="auto" placeholder="Write a reply…" data-reply>
+       <div class="acts"><button class="btn solid" data-act="do">Send</button></div>`},
+    {id:'car',src:'Reminder · due now',title:'Take the car to the garage',why:'You moved this twice this week.',
+     pri:'Done',done:'Completed',
+     ev:`<div class="sec"><span class="mono">History</span></div>
+       <div class="d-line">Created 3 Nov, from a call with the garage</div><div class="d-line">Moved Monday → Wednesday → today</div>`,
+     more:`<span class="mono">Later</span><div class="acts" style="margin-top:0">
+       <button class="btn" data-act="snooze" data-done="Snoozed · 1 h">1 h</button>
+       <button class="btn" data-act="snooze" data-done="Snoozed · tonight 20:00">Tonight</button>
+       <button class="btn" data-act="snooze" data-done="Snoozed · when you get home">When I get home</button>
+       <button class="btn" data-act="snooze" data-done="Snoozed · tomorrow 08:00">Tomorrow morning</button></div>`},
+    {id:'wake',src:'Dana check',title:'No wake signal for 3 days',why:'Morning reminders and the briefing depend on it.',
+     pri:'Fix',priAct:'open',done:'Phone re-registered · watching tomorrow morning',noLabel:'Ignore',
+     ev:`<div class="sec"><span class="mono">Last 7 mornings</span></div>
+       <div class="week"><div><span class="mono">Sun</span><b>07:38</b></div><div><span class="mono">Mon</span><b>07:44</b></div><div><span class="mono">Tue</span><b>07:31</b></div><div><span class="mono">Wed</span><b>07:41</b></div><div class="miss"><span class="mono">Thu</span><b>–</b></div><div class="miss"><span class="mono">Fri</span><b>–</b></div><div class="miss"><span class="mono">Sat</span><b>–</b></div></div>`,
+     more:`<p>The phone last reported an unlock on Wed 07:41. Notification access is on, push is registered.</p>
+       <div class="acts" style="margin-top:0"><button class="btn solid" data-act="do">Re-register the phone</button></div>`},
+    {id:'rev',src:'Weekly review',title:'6 items, 3 worth changing',why:'Two stale reminders and one person you have not spoken to.',
+     pri:'Review',priAct:'open',done:'Review applied · 3 changes',noLabel:'Skip this week',
+     ev:`<div class="sec"><span class="mono">This week</span></div><div class="d-line">9 reminders done · 4 added · 12 calls</div>`,
+     more:`<label class="chk"><input type="checkbox" checked><span>Renew passport → move to Sunday</span></label>
+       <label class="chk"><input type="checkbox" checked><span>Fix the balcony light → delete, done in October</span></label>
+       <label class="chk"><input type="checkbox" checked><span>Call Uri → remind me Sunday evening</span></label>
+       <div class="acts"><button class="btn solid" data-act="do">Apply</button></div>`}
+  ],
+  open:null, quietOpen:false,
+  quiet:['Check the Jira ticket from Slack','Receipt from the pharmacy','GitHub: review requested','Charge the robot vacuum','Read the newsletter'],
+  thread:[
+    {sep:'This morning · Mac · 08:19'},{me:'שימי ערוץ 14 ווליום 13'},{dana:'בוצע.'},
+    {sep:'13:32 · watch'},{me:'פתחי את השער'},{dana:'נפתח.'}
+  ],
+  sepNow:false, threadOpen:false, view:'now', browse:{kind:null,item:null},
+  shopping:['Bread'], wakeOk:false, moved:{},
+  rems:[
+    {id:'r1',t:'Take the car to the garage',w:{k:'time',v:'Today 18:30',day:'today',over:true},list:'Home',hi:true,note:'',src:'Call · garage · 3 Nov'},
+    {id:'r2',t:'Take out the trash',w:{k:'place',z:'Home',ev:'arrive'},list:'Home'},
+    {id:'r3',t:'להוציא את הכביסה',w:{k:'time',v:'Today 22:00',day:'today',h:'22'},list:'Home'},
+    {id:'r4',t:'Call the insurance agent',w:{k:'place',z:'Work',ev:'arrive'},list:'Work',note:'The policy ends this month'},
+    {id:'r5',t:'Check tyre pressure',w:{k:'car',ev:'enter'},list:'General'},
+    {id:'r6',t:'Take vitamins',w:{k:'wake'},list:'Health'},
+    {id:'r7',t:'Send the expense report',w:{k:'time',v:'Tomorrow 09:00',day:'later'},list:'Work',hi:true},
+    {id:'r8',t:'לקנות מתנה לדן',w:{k:'time',v:'Thursday 18:00',day:'later'},list:'Personal',src:'Linked to Dan'},
+    {id:'r9',t:'Book flights for December',w:{k:'time',v:'Sunday 10:00',day:'later'},list:'Vacation'},
+    {id:'r10',t:'Renew passport',w:{k:'none'},list:'Personal',note:'Untouched for 24 days'},
+    {id:'r11',t:'Pay the electricity bill',w:{k:'none'},list:'Home',done:true},
+    {id:'r12',t:'Order printer ink',w:{k:'none'},list:'General',done:true}
+  ],
+  remSel:null, remBy:'when', doneOpen:false,
+  apps:[
+    {id:'wa',name:'WhatsApp',rule:'normal',sum:'Dan is waiting for an answer. The family group is planning Friday.',items:[
+      {id:'n1',who:'Dan',text:'מתי אתה מגיע?',ago:'6 min',needs:true,reply:true,q:'dan'},
+      {id:'n2',who:'משפחה',text:'אמא: מי מביא קינוח לשישי?',ago:'32 min',reply:true},
+      {id:'n3',who:'Noa',text:'שלחתי לך את הקישור למצלמה',ago:'1 h',reply:true}]},
+    {id:'slack',name:'Slack',rule:'normal',sum:'Amit asked for a review by tomorrow. The deploy thread is resolved.',items:[
+      {id:'n4',who:'Amit',text:'Can you review the auth PR by tomorrow?',ago:'40 min',reply:true},
+      {id:'n5',who:'#deploys',text:'Rollout finished, all green',ago:'18 min',noise:true},
+      {id:'n6',who:'#general',text:'Lunch order closes at 12',ago:'3 h',noise:true}]},
+    {id:'gmail',name:'Gmail',rule:'normal',sum:'One invoice to pay, two newsletters.',items:[
+      {id:'n7',who:'Electric company',text:'Your invoice for October',ago:'2 h'},
+      {id:'n8',who:'Substack',text:'This week in infrastructure',ago:'4 h',noise:true},
+      {id:'n9',who:'Booking',text:'Deals for your next trip',ago:'5 h',noise:true}]},
+    {id:'ha',name:'Home Assistant',rule:'normal',sum:'The washing machine finished.',items:[
+      {id:'n10',who:'Laundry',text:'Washing machine finished',ago:'12 min'}]},
+    {id:'gh',name:'GitHub',rule:'normal',sum:'CI passed on two pull requests, one dependency update.',items:[
+      {id:'n11',who:'homelab',text:'CI passed on #212',ago:'25 min',noise:true},
+      {id:'n12',who:'dana',text:'Build 7.19.0 succeeded',ago:'1 h',noise:true},
+      {id:'n13',who:'homelab',text:'Renovate: update argo-cd',ago:'3 h',noise:true}]},
+    {id:'tg',name:'Nekogram',rule:'normal',sum:'20 new posts in two channels. Nothing addressed to you.',items:[
+      {id:'n14',who:'News channel',text:'14 new posts',ago:'10 min',noise:true},
+      {id:'n15',who:'Tech deals',text:'6 new posts',ago:'1 h',noise:true}]},
+    {id:'x',name:'X',rule:'normal',sum:'Trending topics and a suggested post.',items:[
+      {id:'n16',who:'Trending',text:'What people are talking about tonight',ago:'30 min',noise:true},
+      {id:'n17',who:'For you',text:'A post you might like',ago:'2 h',noise:true}]}
+  ],
+  nSel:null, nReply:null, quietAppsOpen:false, noticed:true,
+  about:[
+    ['People',[['אמא: calls most days, usually in the evening','calls'],['Dan: writes on WhatsApp, shares your calendar','messages'],['Noa: you meet about the camera','calendar']]],
+    ['Home',[['"The gate" means the front gate','you said it 41 times'],['The living-room TV is the TCL; Yes+ for channels','chats']]],
+    ['Habits',[['You prefer "when I get home" over a clock time','30 of your reminders'],['Up around 07:30 on weekdays','phone unlocks']]]
+  ]
+};}
+
+const INDEX=[
+  {kind:'Calls',title:'אמא',sub:'today 17:52 · 6 min',body:['AC in the living room is leaking: book a technician before Friday.','Dinner on Friday at 19:00.','1 suggestion waiting']},
+  {kind:'Calls',title:'Dan',sub:'yesterday · 3 min',body:['Pickup time for Thursday.','No action items.']},
+  {kind:'Calls',title:'DJ',sub:'Thu · 11 min',body:['Playlist draft and the price.','1 reminder created']},
+  {kind:'People',title:'Dan',sub:'WhatsApp 6 min ago',body:['Waiting for a reply: "מתי אתה מגיע?"','1 open reminder: לקנות מתנה לדן','Last call yesterday, 3 min']},
+  {kind:'People',title:'אמא',sub:'spoke today',body:['Wants an AC technician before Friday.','Calls most days.']},
+  {kind:'People',title:'Noa',sub:'meeting 19:30',body:['Meeting today at 19:30 about the camera.']},
+  {kind:'Notes',title:'DJ quote',sub:'Wedding',body:['Price, deposit and what is included.','Saved from a call']},
+  {kind:'Notes',title:'Marvel movie order',sub:'list',body:['The watch order you asked Dana to keep.']},
+  {kind:'Notes',title:'Ted Lasso',sub:'where you stopped',body:['Season and minute you paused at.']}
+];
+const COUNTS={Calls:154,People:31,Notes:27,Shopping:0};
+const CHIPS=['פתחי את השער','Add milk',"Tell Dan I'm late",'מה אמא אמרה?','Remember I park on level -2'];
+
+/* ---------- state helpers ---------- */
+const KEYS=['queue','open','quiet','moved','rems','remSel','apps','nSel','noticed','about','shopping','wakeOk'];
+const snap=()=>JSON.stringify(KEYS.map(k=>S[k]));
+function restore(s){JSON.parse(s).forEach((v,i)=>S[KEYS[i]]=v);render();}
+function act(text,fn){const s=snap();fn();render();if(text)toast(text,()=>restore(s));return ()=>restore(s);}
+const cur=()=>S.view==='now'?S.queue.find(x=>x.id===S.open):null;
+const openRems=()=>S.rems.filter(r=>!r.done);
+const curRem=()=>S.rems.find(r=>r.id===S.remSel);
+const curApp=()=>S.apps.find(a=>a.id===S.nSel);
+const liveApps=()=>S.apps.filter(a=>a.items.length&&a.rule!=='quiet');
+const nCount=()=>S.apps.reduce((n,a)=>n+a.items.length,0);
+const noiseCount=()=>S.apps.reduce((n,a)=>n+a.items.filter(i=>i.noise||a.rule==='quiet').length,0);
+const wLabel=w=>w.k==='time'?w.v:w.k==='place'?(w.ev==='leave'?'Leaving ':'At ')+w.z:w.k==='car'?(w.ev==='leave'?'Getting out of the car':'In the car'):w.k==='wake'?'On waking':'No reminder set';
+const bucket=r=>r.w.k==='none'?'Someday':r.w.k!=='time'?'When I get there':r.w.over?'Overdue':r.w.day==='today'?'Today':'Later';
+const slotW=k=>k==='home'?{k:'place',z:'Home',ev:'arrive'}:k==='wake'?{k:'wake'}:{k:'time',v:'Today '+k+':00',day:'today',h:k};
+function dayItems(k){
+  const out=(EVENTS[k]||[]).slice();
+  openRems().forEach(r=>{const w=r.w;
+    if((w.k==='time'&&w.day==='today'&&!w.over&&w.h===k)||(k==='home'&&w.k==='place'&&w.z==='Home'&&w.ev!=='leave')||(k==='wake'&&w.k==='wake'))
+      out.push({t:r.t,at:w.k==='time'?w.v.replace('Today ',''):null});});
+  (S.moved[k]||[]).forEach(t=>out.push({t,mv:true}));
+  return out;
+}
+function allItems(){
+  return INDEX.concat(openRems().map(r=>({kind:'Reminders',title:r.t,sub:wLabel(r.w),rid:r.id})),
+    S.shopping.map(n=>({kind:'Shopping',title:n,sub:'on the list',body:['On the shopping list']})));
+}
+function dropItems(pred){
+  S.apps.forEach(a=>{a.items=a.items.filter(i=>{const hit=pred(i,a); if(hit&&i.q)S.queue=S.queue.filter(z=>z.id!==i.q); return !hit;});});
+  if(S.open&&!S.queue.find(z=>z.id===S.open))S.open=UNF&&S.queue.length?S.queue[0].id:null;
+  const a=curApp(); if(a&&!a.items.length){const n=liveApps()[0]; S.nSel=UNF&&n?n.id:null;}
+}
+const chipsHtml=(x,sel,opts)=>opts.map(([v,l])=>`<button class="btn${v===sel?' pri':''}" data-x="${x}" data-v="${esc(v)}">${esc(l)}</button>`).join('');
+
+/* ---------- Now: the queue ---------- */
+function rowHtml(it){
+  const open=S.open===it.id;
+  return `<div class="q${open?' sel':''}" data-id="${it.id}">
+    <div class="q-under"><span class="u-do">✓ ${esc(it.pri)}</span><span class="u-no">${esc(it.noLabel||'Dismiss')} ✕</span></div>
+    <div class="q-body">
+      <div class="mono">${iso(it.src)}</div>
+      <div class="q-title" dir="auto">${esc(it.title)}</div>
+      <div class="q-why">${esc(it.why)}</div>
+      <div class="acts">
+        <button class="btn pri" data-act="${it.priAct||'do'}">${esc(it.pri)}</button>
+        ${(it.extra||[]).map(e=>`<button class="btn" data-act="snooze" data-done="${esc(e[1])}">${esc(e[0])}</button>`).join('')}
+        <button class="btn" data-act="dismiss">${esc(it.noLabel||'Dismiss')}</button>
+      </div>
+      ${open&&!UNF?`<div class="more">${it.more}<div class="acts"><button class="btn bare" data-act="ask">Ask Dana about this →</button></div></div>`:''}
+    </div></div>`;
+}
+function laterHtml(){
+  return SLOTS.map(([k,l])=>dayItems(k).map(x=>`<div class="later"><span class="mono">${x.at||l}</span><div dir="auto"${x.mv?' class="acc"':''}>${esc(x.t)}</div></div>`).join('')).join('');
+}
+function renderNow(){
+  const n=S.queue.length;
+  $('#q-count').textContent=n?`Needs you · ${n}`:'Needs you';
+  $('#hint').textContent=UNF?'drag → day':'swipe → do · ← dismiss';
+  $('#queue').innerHTML=n?S.queue.map(rowHtml).join(''):
+    `<p class="empty">Nothing needs you.</p><p>New things land here quietly. Only urgent ones interrupt.</p>`;
+  const q=S.quiet;
+  $('#quiet').innerHTML=!q.length?'':
+    `<button class="fold" id="fold"><span>${q.length} quieter suggestions, never shown as pop-ups</span><span class="mono">${S.quietOpen?'hide':'show'}</span></button>`+
+    (S.quietOpen?q.map((t,i)=>`<div class="quiet-row"><span>${esc(t)}</span><button class="btn" data-q-add="${i}">Add</button><button class="x" data-q-x="${i}" aria-label="Dismiss">×</button></div>`).join('')+
+      `<div class="acts" style="margin:8px 0 2px"><button class="btn" id="q-all">Dismiss all</button></div>`:'');
+  $('#nline').innerHTML=`<div class="fold"><span>${nCount()} notifications, ${noiseCount()} of them noise</span><span style="white-space:nowrap"><button class="btn bare" data-x="nsweep">Clear noise</button> <button class="btn bare" data-go="notif">Open</button></span></div>`;
+  $('#later').innerHTML=laterHtml();
+}
+function nextOpen(i){return UNF&&S.queue.length?S.queue[Math.min(i,S.queue.length-1)].id:null;}
+function resolve(id,text){
+  if(!S.queue.find(z=>z.id===id))return;
+  act(text,()=>{
+    const i=S.queue.findIndex(z=>z.id===id); S.queue.splice(i,1); if(S.open===id)S.open=nextOpen(i);
+    if(id==='wake')S.wakeOk=!/Ignored|Dismissed/.test(text);
+    if(id==='dan')dropItems(n=>n.q==='dan');
+    if(id==='car'&&text==='Completed'){const r=S.rems.find(z=>z.id==='r1'); if(r)r.done=true;}
+  });
+}
+function schedule(id,slot,quiet){
+  return act(quiet?null:'Moved to '+phrase(slot),()=>{
+    const i=S.queue.findIndex(z=>z.id===id), t=S.queue.splice(i,1)[0];
+    (S.moved[slot]=S.moved[slot]||[]).push(t.title); if(S.open===id)S.open=nextOpen(i);
+  });
+}
+$('#v-now').addEventListener('click',e=>{
+  if(dragged)return;
+  const b=e.target.closest('button');
+  if(b&&b.id==='fold'){S.quietOpen=!S.quietOpen;return render();}
+  if(b&&b.id==='q-all'){const n=S.quiet.length;return act(`${n} dismissed`,()=>{S.quiet=[];});}
+  if(b&&b.dataset.qAdd!==undefined)return act('Reminder added',()=>{const t=S.quiet.splice(+b.dataset.qAdd,1)[0];S.rems.push({id:'r'+Date.now(),t,w:{k:'none'},list:'General'});});
+  if(b&&b.dataset.qX!==undefined)return act('Dismissed',()=>{S.quiet.splice(+b.dataset.qX,1);});
+  if(b)return;
+  const row=e.target.closest('.q'); if(!row||e.target.closest('input,label,[contenteditable]'))return;
+  const id=row.dataset.id; S.open=UNF?id:(S.open===id?null:id); render();
+});
+/* decision buttons work the same in a row and on the stage */
+phone.addEventListener('click',e=>{
+  const b=e.target.closest('button[data-act]'); if(!b)return;
+  const scope=b.closest('[data-id]'), it=scope&&S.queue.find(x=>x.id===scope.dataset.id); if(!it)return;
+  const a=b.dataset.act;
+  if(a==='open'){S.open=UNF?it.id:(S.open===it.id?null:it.id); render();}
+  else if(a==='do')resolve(it.id,it.done);
+  else if(a==='dismiss')resolve(it.id,it.noLabel?'Ignored':'Dismissed');
+  else if(a==='snooze')resolve(it.id,b.dataset.done);
+  else if(a==='when'){it.pri=b.dataset.label;it.done=b.dataset.done;render();}
+  else if(a==='quick'){const inp=scope.querySelector('[data-reply]');inp.value=b.dataset.text;inp.focus();}
+  else if(a==='ask'){openThread();nowSep();push({ctx:`About: ${it.title}`});$('#ask-in').focus();}
+});
+
+/* cover: swipe a queue row. unfolded: drag a queue row or a reminder onto the day */
+let drag=null,dragged=false,ghost=null;
+phone.addEventListener('pointerdown',e=>{
+  const body=e.target.closest('.q-body,.rrow'); if(!body||e.target.closest('button,input,label,[contenteditable]'))return;
+  const rem=body.classList.contains('rrow'); if(rem&&!UNF)return;
+  drag={body,rem,x:e.clientX,y:e.clientY,dx:0,on:false,id:rem?body.dataset.v:body.parentNode.dataset.id,slot:null};
+});
+phone.addEventListener('pointermove',e=>{
+  if(!drag)return; const dx=e.clientX-drag.x,dy=e.clientY-drag.y;
+  if(!drag.on){
+    if(Math.hypot(dx,dy)<8)return;
+    if((!UNF||e.pointerType==='touch')&&Math.abs(dx)<Math.abs(dy)){drag=null;return;}
+    drag.on=true; try{drag.body.setPointerCapture(e.pointerId)}catch(_){}
+    if(UNF){
+      const it=drag.rem?S.rems.find(x=>x.id===drag.id):S.queue.find(x=>x.id===drag.id), cs=getComputedStyle(phone);
+      ghost=document.createElement('div'); ghost.textContent=it?(it.title||it.t):''; ghost.dir='auto';
+      ghost.style.cssText=`position:fixed;z-index:50;pointer-events:none;max-width:220px;padding:8px 12px;border-radius:10px;font:600 13px Inter,system-ui,sans-serif;box-shadow:0 6px 20px rgba(0,0,0,.35);background:${cs.getPropertyValue('--text')};color:${cs.getPropertyValue('--canvas')}`;
+      document.body.appendChild(ghost); drag.body.classList.add('lift');
+    }else drag.body.classList.add('drag');
+  }
+  if(UNF){
+    ghost.style.left=e.clientX+12+'px'; ghost.style.top=e.clientY+12+'px';
+    const el=document.elementFromPoint(e.clientX,e.clientY), slot=el&&el.closest('[data-slot]');
+    document.querySelectorAll('.slot.over').forEach(x=>x.classList.remove('over'));
+    if(slot)slot.classList.add('over'); drag.slot=slot?slot.dataset.slot:null;
+  }else{drag.dx=dx; drag.body.style.transform=`translateX(${dx}px)`;}
+});
+function endDrag(){
+  if(!drag)return; const d=drag; drag=null; if(!d.on)return;
+  dragged=true; setTimeout(()=>dragged=false,80);
+  if(ghost){ghost.remove();ghost=null;d.body.classList.remove('lift');
+    document.querySelectorAll('.slot.over').forEach(x=>x.classList.remove('over'));
+    if(!d.slot)return;
+    if(d.rem)act('Moved to '+phrase(d.slot),()=>{const r=S.rems.find(x=>x.id===d.id); if(r)r.w=slotW(d.slot);});
+    else if(S.queue.find(x=>x.id===d.id))schedule(d.id,d.slot);
+    return;}
+  d.body.classList.remove('drag'); d.body.style.transform='';
+  const it=S.queue.find(x=>x.id===d.id); if(!it)return;
+  if(d.dx>96){ if(it.priAct==='open'){S.open=it.id;render();} else resolve(it.id,it.done); }
+  else if(d.dx<-96)resolve(it.id,it.noLabel?'Ignored':'Dismissed');
+}
+phone.addEventListener('pointerup',endDrag);
+phone.addEventListener('pointercancel',endDrag);
+
+/* ---------- toast ---------- */
+let tT=null,tUndo=null;
+function toast(text,undo){
+  $('#toast-text').textContent=text; tUndo=undo||null; $('#toast-undo').hidden=!undo;
+  $('#toast').classList.add('on'); clearTimeout(tT); tT=setTimeout(()=>$('#toast').classList.remove('on'),6000);
+}
+$('#toast-undo').onclick=()=>{ if(tUndo)tUndo(); tUndo=null; $('#toast').classList.remove('on'); };
+
+/* ---------- the day strip (unfolded) ---------- */
+function renderStrip(){
+  $('#strip').innerHTML=`<button class="slot nowcell" data-today="1" aria-label="Show the rest of today"><span class="mono">Now</span><b>18:40</b></button>`+
+    SLOTS.map(([k,l])=>`<div class="slot" data-slot="${k}"><span class="mono">${l}</span>${dayItems(k).map(x=>`<div class="si${x.ev?' ev':''}${x.mv?' mv':''}" dir="auto" title="${esc(x.t)}">${esc(x.t)}</div>`).join('')}</div>`).join('');
+}
+
+/* ---------- reminders ---------- */
+function remRow(r){
+  return `<div class="rrow${r.done?' done':''}${UNF&&S.remSel===r.id?' sel':''}" data-x="rsel" data-v="${r.id}">
+    <button class="circ${r.done?' done':''}" data-x="rdone" data-v="${r.id}" aria-label="${r.done?'Mark not done':'Mark done'}"></button>
+    <div><b dir="auto">${r.hi&&!r.done?'<span class="hi">● </span>':''}${esc(r.t)}</b><span class="mono">${esc(S.remBy==='when'?wLabel(r.w)+' · '+r.list:wLabel(r.w))}</span></div></div>`;
+}
+function remListHtml(){
+  const open=openRems(), done=S.rems.filter(r=>r.done);
+  const groups=S.remBy==='when'?BUCKETS.map(b=>[b,open.filter(r=>bucket(r)===b)]):LISTS.map(l=>[l,open.filter(r=>r.list===l)]);
+  return `<div class="mono">${open.length} open · ${open.filter(r=>/Overdue|Today/.test(bucket(r))).length} for today</div><h1 class="serif big">Reminders</h1>
+    <div class="seg"><button class="${S.remBy==='when'?'on':''}" data-x="rby" data-v="when">By when</button><button class="${S.remBy==='list'?'on':''}" data-x="rby" data-v="list">By list</button></div>
+    <input class="addin" id="r-add" placeholder="+ Add a reminder" aria-label="Add a reminder" dir="auto">
+    ${groups.filter(g=>g[1].length).map(([n,rs])=>`<div class="sec"><span class="mono">${n}</span><span class="mono">${rs.length}</span></div>${rs.map(remRow).join('')}`).join('')}
+    <button class="fold" data-x="rdoneopen"><span>Done recently · ${done.length}</span><span class="mono">${S.doneOpen?'hide':'show'}</span></button>${S.doneOpen?done.map(remRow).join(''):''}`;
+}
+function sentence(r){const w=r.w;
+  return w.k==='none'?'Dana will not remind you. It waits under Someday.':w.k==='time'?`Dana reminds you: ${w.v}.`:
+    w.k==='place'?`Dana reminds you when you ${w.ev==='leave'?'leave':'arrive at'} ${w.z}.`:
+    w.k==='car'?`Dana reminds you when you ${w.ev==='leave'?'get out of':'get into'} the car.`:'Dana reminds you once you are up in the morning.';
+}
+function remEditHtml(r){
+  const w=r.w, times=[['Today 20:00','Tonight 20:00'],['Tomorrow 09:00','Tomorrow 09:00'],['Saturday 10:00','Saturday 10:00']];
+  if(w.k==='time'&&!times.find(t=>t[0]===w.v))times.unshift([w.v,w.v]);
+  return `${UNF?'':'<button class="link back" data-x="rsel" data-v="">← Reminders</button>'}
+    <div class="mono">${r.done?'Done':esc(bucket(r))} · ${esc(r.list)}</div>
+    <div class="ed-title" contenteditable="true" dir="auto" data-ed="t">${esc(r.t)}</div>
+    <div class="ed-note" contenteditable="true" dir="auto" data-ed="note" data-ph="Add a note">${esc(r.note||'')}</div>
+    <div class="fld"><span class="mono">Remind me</span><div class="acts" style="margin:0">${chipsHtml('rk',w.k,[['none','No reminder'],['time','At a time'],['place','At a place'],['car','In the car'],['wake','On waking']])}</div>
+      ${w.k==='time'?`<div class="acts">${chipsHtml('rtime',w.v,times)}<button class="btn" data-x="rpick">Pick a time…</button></div>`:''}
+      ${w.k==='place'?`<div class="acts">${chipsHtml('rzone',w.z,ZONES.map(z=>[z,z]))}</div><div class="acts">${chipsHtml('rev',w.ev||'arrive',[['arrive','When I arrive'],['leave','When I leave']])}</div>`:''}
+      ${w.k==='car'?`<div class="acts">${chipsHtml('rev',w.ev||'enter',[['enter','Getting in'],['leave','Getting out']])}</div>`:''}
+      <p class="note" style="margin-top:9px">${esc(sentence(r))}</p></div>
+    <div class="fld"><span class="mono">List</span><div class="acts" style="margin:0">${chipsHtml('rlist',r.list,LISTS.map(l=>[l,l]))}</div></div>
+    <div class="fld"><span class="mono">Priority</span><div class="acts" style="margin:0">${chipsHtml('rhi',r.hi?'1':'0',[['0','Normal'],['1','Important']])}</div></div>
+    ${r.src?`<div class="fld"><span class="mono">Came from</span><div class="d-line" style="padding-top:0">${iso(r.src)}</div></div>`:''}
+    <div class="acts" style="margin-top:20px"><button class="btn solid" data-x="rdone" data-v="${r.id}">${r.done?'Not done':'Done'}</button><button class="btn" data-x="rdel" data-v="${r.id}">Delete</button></div>
+    <p class="note">Saved as you change it.</p>`;
+}
+
+/* ---------- notifications ---------- */
+function appRow(a){
+  const needs=a.items.filter(i=>i.needs).length;
+  return `<div class="app${UNF&&S.nSel===a.id?' sel':''}" data-x="nsel" data-v="${a.id}"><span class="tile">${esc(a.name.slice(0,2))}</span>
+    <div><b>${esc(a.name)}</b> <span class="mono">${a.items.length}${needs?` · <span class="acc">${needs} needs you</span>`:''}${a.rule==='alert'?' · interrupts':''}</span><p dir="auto">${esc(a.sum)}</p></div>
+    ${a.items.length?`<button class="btn bare" data-x="nclearapp" data-v="${a.id}">Clear</button>`:''}</div>`;
+}
+function notifListHtml(){
+  const live=liveApps().sort((a,b)=>b.items.filter(i=>i.needs).length-a.items.filter(i=>i.needs).length);
+  const quiet=S.apps.filter(a=>a.rule==='quiet'), n=nCount(), nz=noiseCount(), gh=S.apps.find(a=>a.id==='gh');
+  return `<div class="mono">${n} on your phone · ${nz} noise</div><h1 class="serif big">Notifications</h1>
+    <div class="sweep"><div>${nz?`${nz} are noise: feeds, build results, promotions.`:'No noise left. What remains is worth a look.'}</div>
+      ${nz?`<div class="acts"><button class="btn solid" data-x="nsweep">Clear the noise · ${nz}</button></div>`:''}</div>
+    ${S.noticed&&gh&&gh.rule!=='quiet'?`<div class="noticed"><span class="mono">Dana noticed</span><div style="margin-top:4px">You cleared GitHub 14 times this month without opening it. Keep it quiet?</div>
+      <div class="acts"><button class="btn pri" data-x="nyes">Keep it quiet</button><button class="btn" data-x="nno">No</button></div></div>`:''}
+    <div class="sec"><span class="mono">By app</span><span class="mono">${live.length}</span></div>${live.map(appRow).join('')||'<p class="empty">All clear.</p>'}
+    ${quiet.length?`<button class="fold" data-x="nquietopen"><span>Quiet apps · ${quiet.length}</span><span class="mono">${S.quietAppsOpen?'hide':'show'}</span></button>${S.quietAppsOpen?quiet.map(appRow).join(''):''}`:''}`;
+}
+function appHtml(a){
+  return `${UNF?'':'<button class="link back" data-x="nsel" data-v="">← Notifications</button>'}
+    <div class="top"><div><div class="mono">${a.items.length} waiting</div><h1 class="serif">${esc(a.name)}</h1></div>${a.items.length?`<button class="btn" data-x="nclearapp" data-v="${a.id}" style="margin-bottom:4px">Clear all</button>`:''}</div>
+    <p class="lede" style="font-size:18px" dir="auto">${esc(a.sum)}</p>
+    <div class="fld"><span class="mono">From this app</span><div class="acts" style="margin:0">${chipsHtml('nrule',a.rule,[['alert','Interrupt me'],['normal','Let Dana decide'],['quiet','Keep quiet']])}</div><p class="note" style="margin-top:9px">${RULE[a.rule]}</p></div>
+    <div class="sec"><span class="mono">Waiting</span></div>
+    ${a.items.map(i=>`<div class="nitem"><div><b dir="auto">${esc(i.who)}</b> <span class="mono">${i.ago} ago${i.needs?' · <span class="acc">needs you</span>':''}${i.noise?' · noise':''}</span></div><div dir="auto">${esc(i.text)}</div>
+      <div class="acts">${i.reply?`<button class="btn pri" data-x="nreply" data-v="${i.id}">Reply</button>`:''}<button class="btn" data-x="nopen">Open</button><button class="btn" data-x="nsnooze" data-v="${i.id}">In 1 h</button><button class="btn" data-x="nclear" data-v="${i.id}">Clear</button></div>
+      ${S.nReply===i.id?`<input class="inline-in" dir="auto" placeholder="Reply to ${esc(i.who)}…"><div class="acts"><button class="btn solid" data-x="nsend" data-v="${i.id}">Send</button></div>`:''}</div>`).join('')||'<p class="note">Nothing waiting from this app.</p>'}`;
+}
+function sweep(){const n=noiseCount(); if(!n){toast('No noise to clear');return null;} return act(`Cleared ${n} · on the phone too`,()=>dropItems((i,a)=>i.noise||a.rule==='quiet'));}
+
+/* one handler for every reminders / notifications control */
+phone.addEventListener('click',e=>{
+  const el=e.target.closest('[data-x]'); if(!el||dragged)return;
+  const x=el.dataset.x, v=el.dataset.v, r=curRem(), a=curApp();
+  if(x==='rsel'){S.remSel=v||null;render();}
+  else if(x==='rby'){S.remBy=v;render();}
+  else if(x==='rdoneopen'){S.doneOpen=!S.doneOpen;render();}
+  else if(x==='rdone'){const t=S.rems.find(z=>z.id===v); act(t.done?'Back on the list':'Completed',()=>{const z=S.rems.find(y=>y.id===v); z.done=!z.done;
+      if(z.done&&S.remSel===v){const o=openRems()[0]; S.remSel=UNF&&o?o.id:null;} if(z.done&&v==='r1')S.queue=S.queue.filter(y=>y.id!=='car');});}
+  else if(x==='rdel')act('Deleted',()=>{S.rems=S.rems.filter(z=>z.id!==v); const o=openRems()[0]; S.remSel=UNF&&o?o.id:null;});
+  else if(x==='rk'&&r){r.w=v==='time'?{k:'time',v:'Today 20:00',day:'today',h:'20'}:v==='place'?{k:'place',z:'Home',ev:'arrive'}:v==='car'?{k:'car',ev:'enter'}:{k:v};render();}
+  else if(x==='rtime'&&r){const today=/^Today/.test(v); r.w={k:'time',v,day:today?'today':'later',h:today?v.slice(6,8):null};render();}
+  else if(x==='rzone'&&r){r.w.z=v;render();}
+  else if(x==='rev'&&r){r.w.ev=v;render();}
+  else if(x==='rlist'&&r){r.list=v;render();}
+  else if(x==='rhi'&&r){r.hi=v==='1';render();}
+  else if(x==='rpick')toast('The date and time picker opens here');
+  else if(x==='nsel'){S.nSel=v||null;S.nReply=null;render();}
+  else if(x==='nsweep')sweep();
+  else if(x==='nclearapp'){const z=S.apps.find(y=>y.id===v); act(`Cleared ${z.items.length} from ${z.name}`,()=>dropItems((i,ap)=>ap.id===v));}
+  else if(x==='nclear')act('Cleared',()=>dropItems(i=>i.id===v));
+  else if(x==='nsnooze')act('Snoozed · back in 1 h',()=>dropItems(i=>i.id===v));
+  else if(x==='nsend'){S.nReply=null;act('Sent',()=>dropItems(i=>i.id===v));}
+  else if(x==='nopen')toast('Opens it on the phone');
+  else if(x==='nreply'){S.nReply=S.nReply===v?null:v;render();}
+  else if(x==='nrule'&&a){ if(v==='quiet')act(`${a.name} will stay quiet`,()=>{curApp().rule='quiet';}); else{a.rule=v;render();} }
+  else if(x==='nyes')act('GitHub will stay quiet',()=>{S.apps.find(z=>z.id==='gh').rule='quiet';S.noticed=false; if(S.nSel==='gh'){const n=liveApps()[0];S.nSel=UNF&&n?n.id:null;}});
+  else if(x==='nno'){S.noticed=false;render();}
+  else if(x==='nquietopen'){S.quietAppsOpen=!S.quietAppsOpen;render();}
+});
+phone.addEventListener('keydown',e=>{
+  const t=e.target; if(e.key!=='Enter')return;
+  if(t.id==='r-add'&&t.value.trim()){const title=t.value.trim(), id='r'+Date.now(); act('Added · set when it should come up',()=>{S.rems.unshift({id,t:title,w:{k:'none'},list:'General'});S.remSel=id;});}
+  else if(t.dataset&&t.dataset.ed==='t'){e.preventDefault();t.blur();}
+});
+phone.addEventListener('input',e=>{
+  const t=e.target, r=curRem(); if(!t.dataset)return;
+  if(t.dataset.ed&&r){r[t.dataset.ed]=t.textContent;renderSide();renderStrip();}
+  else if(t.dataset.s!==undefined)S.about[+t.dataset.s][1][+t.dataset.f][0]=t.textContent;
+});
+
+/* ---------- the stage ---------- */
+function resultsHtml(v){
+  const q=v.toLowerCase(), hits=ALL.filter(x=>(x.title+' '+x.sub+' '+x.kind).toLowerCase().includes(q)).slice(0,6);
+  return `<div class="mono" style="margin-bottom:4px">In your things · ${hits.length}</div>`+
+    hits.map(h=>`<button class="res" data-r="${ALL.indexOf(h)}"><span class="mono">${esc(h.kind)} · ${iso(h.sub)}</span><b dir="auto">${esc(h.title)}</b></button>`).join('')+
+    `<button class="res askit" data-ask="1"><span class="mono">Or ask Dana</span><b dir="auto">“${esc(v)}” ↵</b></button>`;
+}
+function itemHtml(it){
+  return `<div data-id="${it.id}"><div class="mono">${iso(it.src)}</div><div class="d-title" dir="auto">${esc(it.title)}</div><div class="q-why">${esc(it.why)}</div>
+    ${it.ev||''}<div class="sec"><span class="mono">Decide</span><span class="mono">or drag it onto the day</span></div><div class="decide">${it.more}</div></div>`;
+}
+function dayHtml(){
+  return `<div class="mono">Sat 14 Nov · from 18:40</div><h1 class="serif big" style="margin-bottom:6px">The rest of today</h1>${laterHtml()}
+    <p class="note">Open a row on the left to see what it is about, or drag it onto the strip above.</p>`;
+}
+function browseHtml(){
+  const b=S.browse;
+  if(b.item)return `<button class="link back" data-b="list">← ${esc(b.item.kind)}</button>
+      <div class="mono">${esc(b.item.kind)} · ${iso(b.item.sub)}</div><div class="d-title" dir="auto" style="margin-bottom:12px">${esc(b.item.title)}</div>
+      ${b.item.body.map(l=>`<div class="d-line" dir="auto">${esc(l)}</div>`).join('')}
+      ${UNF?`<p class="note">Dana can see this. Ask about it on the right.</p>`:`<div class="acts" style="margin-top:14px"><button class="btn pri" data-b="ask">Ask Dana about this</button></div>`}`;
+  if(b.kind){
+    const list=ALL.filter(x=>x.kind===b.kind), total=b.kind==='Shopping'?list.length:COUNTS[b.kind];
+    return `<button class="link back" data-b="home">← More</button>
+      <div class="top"><h1 class="serif" style="margin:0">${esc(b.kind)}</h1><span class="mono" style="padding-bottom:6px">${list.length} of ${total}</span></div>
+      <div style="margin-top:10px;border-top:1px solid var(--rule)">${list.map(x=>`<button class="item" data-i="${ALL.indexOf(x)}"><span class="mono">${iso(x.sub)}</span><b dir="auto">${esc(x.title)}</b></button>`).join('')||'<p class="note">Empty.</p>'}</div>`;
+  }
+  return `<div class="mono">Everything else Dana keeps</div><h1 class="serif big" style="margin-bottom:12px">More</h1>
+      <div style="border-top:1px solid var(--rule)">${Object.keys(COUNTS).map(k=>`<button class="cat" data-k="${k}"><b>${k}</b><span class="mono">${k==='Shopping'?S.shopping.length:COUNTS[k]}</span></button>`).join('')}
+      <button class="cat" data-go="about"><b>About you</b><span class="mono">what Dana knows · settings</span></button></div>
+      <p class="note">Memory and Projects are one place now: Notes. The ask bar searches all of this.</p>`;
+}
+function aboutHtml(){
+  return `<button class="link back" data-go="browse">← More</button>
+    <div class="mono">Dana keeps this · edit any line</div><h1 class="serif big">About you</h1>
+    ${S.about.map((sec,si)=>`<div class="sec"><span class="mono">${sec[0]}</span></div>`+
+      sec[1].map((f,fi)=>`<div class="fact"><div><span contenteditable="true" dir="auto" data-s="${si}" data-f="${fi}">${esc(f[0])}</span><span class="mono" style="margin-top:3px;display:block">learned from ${esc(f[1])}</span></div><button class="x" data-s="${si}" data-f="${fi}" aria-label="Forget">×</button></div>`).join('')).join('')}
+    <div class="sec"><span class="mono">How Dana acts</span></div>
+    <div class="d-line">Does things at once and shows Undo.</div>
+    <div class="d-line">Asks first only before sending a message or deleting.</div>
+    <div class="d-line">Interrupts only for urgent things. The rest waits in Now.</div>
+    <div class="sec"><span class="mono">Self-check</span></div>
+    <div class="d-line"><span class="dot"></span>Push to the phone · last 2 min ago</div>
+    <div class="d-line"><span class="dot"></span>Notification access · syncing</div>
+    <div class="d-line"><span class="dot"></span>Location and car · last event 16:05</div>
+    <div class="d-line"><span class="dot ${S.wakeOk?'':'warn'}"></span>Wake signal · ${S.wakeOk?'re-registered, watching':'quiet for 3 days'}</div>
+    <p class="note">Server address, token and permissions live under one more row here, not on a tab.</p>`;
+}
+let stageKey='';
+function renderStage(){
+  ALL=allItems();
+  const el=$('#stage'), v=$('#ask-in').value.trim(), r=curRem(), a=curApp(); let html='',key='',on=false;
+  if(v.length>=2&&(UNF||!S.threadOpen)){html=resultsHtml(v);key='res';on=true;}
+  else if(S.view==='browse'){html=browseHtml();key='b'+(S.browse.kind||'')+(S.browse.item?S.browse.item.title:'');on=true;}
+  else if(S.view==='about'){html=aboutHtml();key='about';on=true;}
+  else if(S.view==='rem'){html=r?remEditHtml(r):UNF?'<p class="empty">Nothing open.</p><p>Add one on the left, or tell Dana.</p>':remListHtml();key='rem'+(r?r.id:'');on=true;}
+  else if(S.view==='notif'){html=a?appHtml(a):UNF?'<p class="empty">All clear.</p><p>Nothing is waiting on your phone.</p>':notifListHtml();key='n'+(a?a.id:'');on=true;}
+  else if(UNF){const it=cur(); html=it?itemHtml(it):dayHtml(); key='now'+(it?it.id:'');}
+  el.innerHTML=html; phone.classList.toggle('show-canvas',on);
+  if(key!==stageKey){el.scrollTop=0;stageKey=key;}
+  const it=cur(), bi=S.view==='browse'&&S.browse.item;
+  $('#ctx').innerHTML='On screen · '+(it?iso(it.title):bi?esc(bi.kind)+' · '+iso(bi.title):S.view==='rem'&&r?iso(r.t):S.view==='notif'&&a?esc(a.name):'nothing open');
+}
+function renderSide(){
+  const on=UNF&&(S.view==='rem'||S.view==='notif');
+  phone.classList.toggle('side-on',on);
+  $('#side').innerHTML=!on?'':S.view==='rem'?remListHtml():notifListHtml();
+}
+$('#stage').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b||b.dataset.go||b.dataset.act||b.dataset.x)return;
+  if(b.dataset.ask)return send($('#ask-in').value);
+  if(b.dataset.r!==undefined){const it=ALL[+b.dataset.r];$('#ask-in').value='';
+    if(it.rid){S.view='rem';S.remSel=it.rid;}else{S.view='browse';S.browse={kind:it.kind,item:it};} return render();}
+  if(b.classList.contains('x'))return act('Forgotten',()=>{S.about[+b.dataset.s][1].splice(+b.dataset.f,1);});
+  if(b.dataset.k)S.browse={kind:b.dataset.k,item:null};
+  else if(b.dataset.i!==undefined)S.browse.item=ALL[+b.dataset.i];
+  else if(b.dataset.b==='home')S.browse={kind:null,item:null};
+  else if(b.dataset.b==='list')S.browse.item=null;
+  else if(b.dataset.b==='ask'){openThread();nowSep();push({ctx:`About: ${S.browse.item.kind} · ${S.browse.item.title}`});$('#ask-in').focus();return;}
+  else return;
+  render();
+});
+
+/* ---------- the thread ---------- */
+function renderThread(){
+  $('#msgs').innerHTML=S.thread.map((m,i)=>{
+    if(m.sep)return `<div class="sep mono">${esc(m.sep)}</div>`;
+    if(m.ctx)return `<div class="m-ctx" dir="auto">${esc(m.ctx)}</div>`;
+    if(m.me)return `<div class="m-me" dir="auto">${esc(m.me)}</div>`;
+    if(m.appr){
+      if(m.status)return `<div class="m-dana">${m.status==='sent'?'Sent.':'Cancelled.'}<span class="mono">${m.status==='sent'?'WhatsApp · Dan':'nothing was sent'}</span></div>`;
+      return `<div class="appr"><span class="mono">Send on WhatsApp to Dan?</span><span contenteditable="true" dir="auto">${esc(m.appr)}</span>
+        <div class="acts"><button class="btn solid" data-appr="sent" data-i="${i}">Send</button><button class="btn" data-appr="cancelled" data-i="${i}">Cancel</button></div></div>`;
+    }
+    return `<div class="m-dana" dir="auto">${esc(m.dana)}${m.meta?`<span class="mono">${esc(m.meta)}</span>`:''}
+      ${m.undo&&!m.undone?`<div class="acts"><button class="btn pri" data-undo="${i}">Undo</button></div>`:''}
+      ${m.src?`<div class="acts"><button class="btn" data-src="${m.src}">Call · <bdi>אמא</bdi> · today 17:52</button></div>`:''}</div>`;
+  }).join('');
+  const box=$('#msgs'); box.scrollTop=box.scrollHeight;
+  const last=[...S.thread].reverse().find(m=>m.dana||m.me);
+  $('#peek-text').innerHTML='Thread · '+(last?iso(last.dana||last.me):'empty');
+}
+function push(m){S.thread.push(m);renderThread();}
+function nowSep(){ if(!S.sepNow){S.sepNow=true;S.thread.push({sep:UNF?'Now · unfolded':'Now · phone'});} }
+function openThread(){S.threadOpen=true;$('#thread').classList.add('open');$('#peek-arrow').textContent='close ↓';renderStage();renderThread();}
+function closeThread(){S.threadOpen=false;$('#thread').classList.remove('open');$('#peek-arrow').textContent='open ↑';}
+$('#peek').onclick=()=>S.threadOpen?closeThread():openThread();
+$('#thread-close').onclick=closeThread;
+$('#msgs').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  if(b.dataset.undo!==undefined){const m=S.thread[+b.dataset.undo];m.undone=true;m.undo();render();push({dana:he(m.dana)?'בוטל.':'Undone.'});}
+  else if(b.dataset.appr){const m=S.thread[+b.dataset.i];m.status=b.dataset.appr;renderThread();}
+  else if(b.dataset.src){S.browse={kind:'Calls',item:INDEX.find(x=>x.kind==='Calls'&&x.title==='אמא')};show('browse',true);}
+});
+function answer(t){
+  const s=t.toLowerCase(), it=cur(), r=S.view==='rem'?curRem():null, a=S.view==='notif'?curApp():null;
+  if(/move this|תזיזי/.test(s)){
+    if(it){const title=it.title; return{dana:`Moved “${title}” to 21:00.`,meta:'it knew what was on screen',undo:schedule(it.id,'21',true)};}
+    if(r){const id=r.id; return{dana:`Moved “${r.t}” to 21:00.`,meta:'it knew what was on screen',undo:act(null,()=>{S.rems.find(z=>z.id===id).w=slotW('21');})};}
+    return{dana:'Open something on the left first.'};}
+  if(/clear the noise|תנקי/.test(s)){const n=noiseCount(); if(!n)return{dana:'There is no noise to clear.'};
+    const undo=act(null,()=>dropItems((i,ap)=>i.noise||ap.rule==='quiet')); return{dana:`Cleared ${n}. ${nCount()} left.`,meta:'on the phone too',undo};}
+  if(/summarize|תסכמי/.test(s))return{dana:a?a.sum:`${nCount()} notifications. Dan is waiting for an answer, ${noiseCount()} are noise.`,meta:a?a.name:'all apps'};
+  if(/remind me|תזכירי/.test(s)){const home=/home|בבית|הביתה/.test(s), id='r'+Date.now();
+    const title=t.replace(/^(remind me to|remind me|תזכירי לי)\s*/i,'').replace(/\s*(when i get home|at home)\s*$/i,'');
+    const undo=act(null,()=>{S.rems.unshift({id,t:title.charAt(0).toUpperCase()+title.slice(1),w:home?{k:'place',z:'Home',ev:'arrive'}:{k:'none'},list:'Home'}); if(S.view==='rem')S.remSel=id;});
+    return{dana:he(t)?'הוספתי תזכורת.':`Added “${title}”${home?' for when you get home':''}.`,meta:'done, not asked',undo};}
+  if(/שער|gate/.test(s))return{dana:he(t)?'נפתח.':'Opened.',meta:'0.3 s · learned phrase, no model',delay:250};
+  if(/milk|חלב/.test(s)){S.shopping.push('Milk');return{dana:he(t)?'הוספתי חלב לרשימת הקניות.':'Added milk to the shopping list.',meta:'done, not asked',undo:()=>{S.shopping=S.shopping.filter(x=>x!=='Milk');}};}
+  if(/late|מאחר|dan|גל/.test(s)&&!/remember|birthday/.test(s))return{appr:'אני מאחר ב-10 דקות'};
+  if(/אמא|mom|mum/.test(s)){const d={dana:he(t)?'ביקשה שתזמין טכנאי למזגן לפני שישי, וארוחת הערב ב-19:00.':'She asked you to book an AC technician before Friday. Dinner is at 19:00.'};
+    if(UNF){S.view='browse';S.browse={kind:'Calls',item:INDEX.find(x=>x.kind==='Calls'&&x.title==='אמא')};d.meta='the call is open in the middle';}else d.src='call'; return d;}
+  if(/remember|תזכרי|זכרי/.test(s)){const line=t.replace(/^(remember( that)?|תזכרי ש?|זכרי ש?)\s*/i,''), text=line.charAt(0).toUpperCase()+line.slice(1);
+    S.about[2][1].push([text,'you told Dana just now']);
+    return{dana:he(t)?'רשמתי.':'Noted.',meta:'kept in About you',undo:()=>{S.about[2][1]=S.about[2][1].filter(f=>f[0]!==text);}};}
+  return{dana:'This is a mock with a few scripted answers. Try the chips above the bar.'};
+}
+function send(text){
+  text=text.trim(); if(!text)return;
+  $('#ask-in').value=''; if(!UNF)openThread(); nowSep(); push({me:text});
+  const st=S, d=answer(text); render();
+  setTimeout(()=>{if(S===st)push(d);},d.delay||550);
+}
+
+/* ---------- ask bar and navigation ---------- */
+function renderAsk(){
+  const v=$('#ask-in').value.trim(); $('#ic-mic').hidden=!!v; $('#ic-send').hidden=!v;
+  const c=[];
+  if(UNF&&(cur()||(S.view==='rem'&&curRem())))c.push('Move this to 21:00');
+  if(S.view==='rem')c.push('Remind me to water the plants at home');
+  if(S.view==='notif'){c.push('Clear the noise'); c.push(curApp()?'Summarize this app':'Summarize my notifications');}
+  $('#chips').innerHTML=c.concat(CHIPS).map((t,i)=>`<button class="chip${i<c.length?' ctxchip':''}" dir="auto">${esc(t)}</button>`).join('');
+}
+function renderNav(){
+  const tabs=[['now','Now',0],['rem','Reminders',0],['notif','Notifications',nCount()],['browse','More',0]];
+  $('#nav').innerHTML=tabs.map(([v,l,n])=>`<button class="navb${S.view===v||(v==='browse'&&S.view==='about')?' on':''}" data-go="${v}">${l}${n?`<i>${n}</i>`:''}</button>`).join('');
+}
+$('#ask-in').addEventListener('input',()=>{renderAsk();renderStage();});
+$('#ask-form').addEventListener('submit',e=>{e.preventDefault();const v=$('#ask-in').value;if(v.trim())send(v);else{if(!UNF)openThread();toast('Listening would start here');}});
+$('#chips').addEventListener('click',e=>{const b=e.target.closest('.chip');if(b)send(b.textContent);});
+
+function render(){renderNow();renderSide();renderStrip();renderStage();renderAsk();renderNav();renderThread();}
+function settle(){
+  if(!UNF)return;
+  if(S.view==='now'&&!S.open&&S.queue.length)S.open=S.queue[0].id;
+  if(S.view==='rem'&&!curRem()){const o=openRems()[0];S.remSel=o?o.id:null;}
+  if(S.view==='notif'&&!curApp()){const n=liveApps()[0];S.nSel=n?n.id:null;}
+}
+function show(v,keep){
+  if(v==='reset'){S=fresh();$('#ask-in').value='';$('#toast').classList.remove('on');v='now';}
+  closeThread(); S.view=v;
+  if(!UNF&&!keep){ if(v==='rem')S.remSel=null; if(v==='notif')S.nSel=null; }
+  if(v==='browse'&&!keep)S.browse={kind:null,item:null};
+  settle(); render();
+}
+function fit(){
+  if(UNF){const s=Math.min(1,fitEl.clientWidth/1000); phone.style.transform=`scale(${s})`; fitEl.style.height=Math.round(755*s)+'px';}
+  else{phone.style.transform=''; fitEl.style.height='';}
+}
+function setMode(unf){
+  UNF=unf; phone.classList.toggle('unfolded',unf); wrap.classList.toggle('unf',unf);
+  document.querySelectorAll('#mode button').forEach(b=>b.setAttribute('aria-pressed',(b.dataset.mode==='unf')===unf));
+  if(unf)closeThread();
+  settle(); render(); fit();
+}
+document.addEventListener('click',e=>{
+  if(e.target.closest('[data-today]')){S.open=null;closeThread();S.view='now';render();return;}
+  const g=e.target.closest('[data-go]'); if(g)show(g.dataset.go);
+  const t=e.target.closest('[data-theme]'); if(t){ phone.classList.toggle('paper',t.dataset.theme==='paper');
+    document.querySelectorAll('#theme button').forEach(b=>b.setAttribute('aria-pressed',b===t)); }
+  const m=e.target.closest('[data-mode]'); if(m)setMode(m.dataset.mode==='unf');
+});
+window.addEventListener('resize',fit);
+
+S=fresh(); S.view='rem'; setMode(wrap.clientWidth>=600);
+})();
+</script>
+</body>
+</html>

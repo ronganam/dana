@@ -1,0 +1,6 @@
+# Opt-in (DANA_LOCAL_EGRESS=1): give the internal network a route out, for a real
+# model key (docs/local-testing.md). The app can then reach anything its
+# integrations point at.
+networks:
+  internal:
+    internal: false

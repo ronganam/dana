@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#000000</color>
+    <color name="white">#FFFFFF</color>
+    
+    <!-- Primary vibrant accent -->
+    <color name="primary">#7C3AED</color> <!-- Electric Indigo / Purple -->
+    <color name="primaryVariant">#5B21B6</color>
+    
+    <!-- Secondary accent -->
+    <color name="secondary">#38BDF8</color> <!-- Bright Light Blue -->
+    
+    <!-- Modern dark surfaces -->
+    <color name="background_dark">#09090B</color> <!-- Almost OLED black -->
+    <color name="surface_dark">#18181B</color> <!-- Deep dark gray -->
+    <color name="surface_variant">#27272A</color> <!-- Slightly lighter for cards/bubbles -->
+    
+    <color name="text_primary">#FAFAFA</color>
+    <color name="text_secondary">#A1A1AA</color>
+</resources>

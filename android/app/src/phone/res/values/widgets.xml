@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_ask">Ask Dana</string>
+    <string name="widget_ask_desc">Tap to talk or type to Dana</string>
+    <string name="widget_today">Today</string>
+    <string name="widget_today_desc">Morning briefing, next events and what\'s due — tick tasks off</string>
+    <string name="widget_waiting">Waiting on you</string>
+    <string name="widget_waiting_desc">Suggestions from calls and notifications — accept or dismiss</string>
+    <string name="widget_people">People</string>
+    <string name="widget_people_desc">Your pinned people — open their page or call</string>
+    <string name="widget_inbox">Inbox</string>
+    <string name="widget_inbox_desc">What needs you in your notifications, at a glance</string>
+    <string name="widget_shopping">Shopping list</string>
+    <string name="widget_shopping_desc">What\'s left to buy — tick items off</string>
+</resources>

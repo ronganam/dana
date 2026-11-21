@@ -1,0 +1,50 @@
+id: 1
+data: {"type": "run_start", "kind": "message", "session_id": "s_full", "model": {"id": "balanced", "label": "Balanced", "description": "Thinks before acting and shows its reasoning. Better at multi-step tasks.", "model": "gemini/gemini-flash-latest", "shows_reasoning": true}, "run_id": "68c7d1f0de43435c", "seq": 1, "ts": 1794647813.427}
+
+id: 2
+data: {"type": "step_start", "iteration": 1, "max_iterations": 10, "run_id": "68c7d1f0de43435c", "seq": 2, "ts": 1794647813.445}
+
+id: 3
+data: {"type": "reasoning_delta", "iteration": 1, "delta": "Thinking about ", "run_id": "68c7d1f0de43435c", "seq": 3, "ts": 1794647813.445}
+
+id: 4
+data: {"type": "reasoning_delta", "iteration": 1, "delta": "which lookups to run.", "run_id": "68c7d1f0de43435c", "seq": 4, "ts": 1794647813.445}
+
+id: 5
+data: {"type": "tool_call", "id": "call_a", "name": "zz_slow_lookup", "iteration": 1, "run_id": "68c7d1f0de43435c", "seq": 5, "ts": 1794647813.445}
+
+id: 6
+data: {"type": "tool_call", "id": "call_b", "name": "zz_slow_lookup", "iteration": 1, "run_id": "68c7d1f0de43435c", "seq": 6, "ts": 1794647813.445}
+
+id: 7
+data: {"type": "tool_start", "id": "call_a", "name": "zz_slow_lookup", "args": {"query": "a"}, "iteration": 1, "run_id": "68c7d1f0de43435c", "seq": 7, "ts": 1794647813.585}
+
+id: 8
+data: {"type": "tool_start", "id": "call_b", "name": "zz_slow_lookup", "args": {"query": "b"}, "iteration": 1, "run_id": "68c7d1f0de43435c", "seq": 8, "ts": 1794647813.585}
+
+id: 9
+data: {"type": "tool_end", "id": "call_a", "name": "zz_slow_lookup", "ok": true, "result": "result for a", "duration_ms": 300, "undos": [], "run_id": "68c7d1f0de43435c", "seq": 9, "ts": 1794647813.886}
+
+id: 10
+data: {"type": "tool_end", "id": "call_b", "name": "zz_slow_lookup", "ok": true, "result": "result for b", "duration_ms": 300, "undos": [], "run_id": "68c7d1f0de43435c", "seq": 10, "ts": 1794647813.886}
+
+id: 11
+data: {"type": "step_start", "iteration": 2, "max_iterations": 10, "run_id": "68c7d1f0de43435c", "seq": 11, "ts": 1794647813.887}
+
+id: 12
+data: {"type": "text_delta", "iteration": 2, "delta": "Both ", "run_id": "68c7d1f0de43435c", "seq": 12, "ts": 1794647813.887}
+
+id: 13
+data: {"type": "text_delta", "iteration": 2, "delta": "lookups ", "run_id": "68c7d1f0de43435c", "seq": 13, "ts": 1794647813.887}
+
+id: 14
+data: {"type": "text_delta", "iteration": 2, "delta": "done.", "run_id": "68c7d1f0de43435c", "seq": 14, "ts": 1794647813.887}
+
+id: 15
+data: {"type": "final", "content": "Both lookups done.", "run_id": "68c7d1f0de43435c", "seq": 15, "ts": 1794647813.889}
+
+id: 16
+data: {"type": "run_end", "status": "idle", "run_id": "68c7d1f0de43435c", "seq": 16, "ts": 1794647813.899}
+
+data: {"type": "state", "state": {"session_id": "s_full", "status": "idle", "title": "look up a and b", "pending_approval": null, "selection_request": null, "messages": [{"id": "msg_user_0", "sender": "You", "message": "look up a and b", "isUser": true, "toolCall": null, "images": []}, {"id": "msg_tool_1_call_a", "sender": "Tool", "message": "", "isUser": false, "toolCall": {"toolName": "zz_slow_lookup", "toolSummary": "zz_slow_lookup", "parameters": "{\n  \"query\": \"a\"\n}", "response": "result for a", "requiresApproval": false, "toolCallId": "call_a", "toolArgs": "{\"query\": \"a\"}", "isCollapsed": true}}, {"id": "msg_tool_1_call_b", "sender": "Tool", "message": "", "isUser": false, "toolCall": {"toolName": "zz_slow_lookup", "toolSummary": "zz_slow_lookup", "parameters": "{\n  \"query\": \"b\"\n}", "response": "result for b", "requiresApproval": false, "toolCallId": "call_b", "toolArgs": "{\"query\": \"b\"}", "isCollapsed": true}}, {"id": "msg_assistant_4", "sender": "Assistant", "message": "Both lookups done.", "isUser": false, "toolCall": null}], "context": null, "active_run": null, "undos": [], "shortcut": false}}
+

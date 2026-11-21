@@ -1,0 +1,1064 @@
+# Users, access and integrations
+
+Dana serves several people. Each person is a **user**; what a user can do is
+the set of **integrations** they have connected plus a small **access level**.
+Nothing in the code says "the owner": the person who runs the server is simply
+the first user, with access level `admin`.
+
+## User
+
+Code: `core/users.py` (the `User` value, lookups, create / update / remove,
+tokens, Telegram ids, bootstrap), `core/user_rows.py` (the rows' SQL and the
+first user's values), tables from migrations `m0002_users` and
+`m0016_user_profile`. Tests: `python test_users.py`, `python test_users_cli.py`,
+`python test_prompts_users.py`.
+
+| Field | Meaning |
+|---|---|
+| `id` | Stable id (text, 12 hex chars). |
+| `name` | Display name; its first word is how prompts name them ("About Maya:"). |
+| `access` | `admin` or `member` (see below). |
+| `telegram_chat_id` | Telegram chat for proactive messages (NULL: none), used by `notify(user, …)` (see "Proactive messages"). |
+| `context` | Their profile for prompts: a short free text (who they are, family, work, who the people they talk about are), read by every prompt that analyses something for them (calls, notifications, people briefs, the briefing, the weekly review, the notification triage state). '' = nothing known. |
+| `pronoun` | `he` / `she` / `they` (default `they`): how prompts refer to them, verbs agreeing ("she does", "they do"). |
+| `other_names` | Other spellings of their first name (another script), shown in brackets where a prompt reads a transcript: "Robin (רובין)". |
+| `prompt_name` | What Dana's own instructions call them (the agent prompt, the shared phone screen); '' = their first name. The first admin's is `the owner`. |
+| identities | Telegram user ids (`user_telegram`) and API tokens (`user_tokens`, one per device, with a label, created / last-used) that resolve to this user. |
+
+- **First user.** `users.bootstrap()` runs at startup (`main.py`, after
+  `db.migrate()`): when no user exists it creates one named `OWNER_NAME`
+  (default `Owner`), access `admin`, Telegram ids from
+  `ALLOWED_TELEGRAM_USER_IDS` (non-numeric entries skipped), proactive chat
+  `TELEGRAM_CHAT_ID`, and a profile from `OWNER_CONTEXT`, `OWNER_PRONOUN`
+  (default `they`), `OWNER_OTHER_NAMES` and the prompt name `the owner`
+  (`user_rows.first_user_profile()`; migration `m0016_user_profile` gives the
+  same values to an existing first admin). Those env values are read only
+  then; later changes are not applied (startup warns when
+  `ALLOWED_TELEGRAM_USER_IDS` lists ids no user has): change a user with
+  `bin/users.py update`. "The first admin" is the oldest user with access
+  `admin`.
+- **Tokens.** `API_TOKEN` (env) is always a valid token of the first admin and
+  is never stored. Other tokens are made by `users.issue_token(user_id, label)`
+  (returns the raw token once; `bin/users.py tokens issue`) and revoked by
+  `users.revoke_token(token_id)`. Stored hashed: `token_hash` = SHA-256 of the
+  token (Bearer lookups), `session_hash` = SHA-256 of the session cookie made
+  from it (cookie lookups). `last_used_at` is written at most once an hour per
+  token.
+- **Web login** keeps its cookie: `ganam_session` = HMAC-SHA256 of the token
+  with the constant `ganam-web-session` (`users.session_cookie_value`), so
+  existing browser, tablet and TV logins made with `API_TOKEN` stay valid.
+  `/login` accepts any valid token; revoking a token also ends the web logins
+  made with it.
+- **Requests** (`core/auth.py`): a Bearer token or the session cookie resolves
+  to a user and the middleware sets `request["user"]` (a `core.users.User`).
+  Public paths (`/login`, `/api/health`, `/api/app/version`,
+  `/api/app/upload`, `/api/app/download/*`, `/static/*`, `/sw.js`,
+  `/manifest.json`) need nothing and get no user.
+- **Internal hosts.** Requests without credentials whose `Host` is in
+  `INTERNAL_HOSTS` are accepted only on the inbound webhook path
+  (`/webhook/waha`; `auth.INBOUND_PATHS`), with no `request["user"]`: that
+  handler finds its user from the payload (see "Inbound"). Home Assistant
+  posts nothing any more (`/webhook` is gone: "Home Assistant triggers"). Every other path
+  needs credentials from any host (before: an internal host could call every
+  path).
+- **Local development.** With no `API_TOKEN` set, every request is the first
+  admin user (no user is set only if `bootstrap()` never ran, e.g. a test that
+  skips it).
+- **Telegram** (`core/telegram_bot.py::AuthMiddleware`): the sender's Telegram
+  id resolves to a user, passed to handlers as `user` in the handler data, and
+  the handler runs as that user (see "The current user"). Unknown ids are
+  refused with the same message as before. While no user has any Telegram id (`ALLOWED_TELEGRAM_USER_IDS`
+  was empty at bootstrap) the bot stays open, as it was, and everyone is the
+  first admin (`users.telegram_open()`).
+- **Profile in prompts** (`core/user_profile.py`): `for_user(user)` gives
+  every prompt its words for the user — name, first name, context, `called`
+  (first name with `other_names`), pronoun forms (`obj`, `possessive`,
+  `reflexive`, `agree(singular, plural)`), `referent` (`prompt_name` or the
+  first name), `about()` (the "About <first name>:" block) and
+  `mentions(name)` (their context names someone, used by the call labels).
+  It reads only the user's own row, so nothing in a prompt comes from another
+  user. The first admin's prompts are pinned byte for byte by
+  `test_parity.py` and `test_fixtures/calls/` (with the tests' made-up profile,
+  `testenv.py`).
+- **Call labels** (`integrations/phone/calls/labels.py`): one catalog for
+  everyone; `{first}` in a hint is the user's first name.
+- **Where the first admin is still looked up** (`users.first_admin()`): the
+  env token and local development in `core/auth.py`, the open Telegram bot,
+  the server timezone (`core/clock.py`, their Home Assistant), bootstrap and
+  migrations, startup logging, and `bin/users.py list` (marks them). Nothing
+  else.
+- **Lookups are cheap**: an in-memory copy of the three tables, rebuilt after
+  every change made through `core/users.py` and at most every
+  `CACHE_TTL_SECONDS` (10 s), so a change made by another process
+  (`bin/users.py`) takes effect within 10 s.
+
+## The current user
+
+Every piece of work has an explicit `User` and runs **as** that user:
+`users.acting_as(user)` binds it in a context variable, and deep code reads it
+with `users.current()` / `users.current_id()` (None outside any user: system
+work). One mechanism, bound in four places:
+
+- the web auth middleware, around every authenticated request (handlers also
+  read it explicitly with `core.auth.request_user(request)`, which answers 401
+  when there is none);
+- the Telegram `AuthMiddleware`, around every handler;
+- `core.runs.RunManager.start(user, …)`, around the run's task — so a run
+  (message, approve / deny, select, extend, a learned phrase, retry) and every
+  tool it executes (`integrations.framework.registry.execute(user, …)`) keep the user after the
+  request ends;
+- each background entry point, which takes a `User` and binds it; the
+  composers' loops (`wake.wake_watch_loop`, `briefing.fallback_loop`,
+  `briefing.meeting_cards_loop`, `weekly_review.schedule_loop`) go over every
+  user who has the kinds the work needs with `core/composers.for_each` (each
+  as that user, one failing not stopping the next); the phone's loops (notification retention,
+  digest, re-nudge, call audio retention: `integrations.phone.config.for_each_user`)
+  each user with `phone`, call processing / reanalysis
+  (`integrations.phone.calls.processing.process_call`) the call's owner; the
+  task time checker
+  (`integrations.tasks.triggers.time_checker_loop`) binds each user with
+  `tasks` in turn, the About learner (`integrations.about.learner.run_due` →
+  `run_pass(user)`) each user with `about`, the people brief loop
+  (`integrations.people.briefs.run_briefs` → `refresh_briefs(user)`) each
+  user with `people`, the Home Assistant entity watchers
+  (`integrations.homeassistant.watcher.UserWatcher.run`) and home-map
+  refreshes each their connection's user, an inbound WAHA event
+  (`integrations.whatsapp.events.process_event`) the user of the connection
+  whose account it names.
+
+`asyncio.create_task` copies the context, so tasks started from there inherit
+the user. Readers: undo (owner of each entry), usage (user of each row),
+tools.
+
+## The conversation core
+
+The agent, histories, pending approvals and pruning live in the core
+(`core/session_runner.py` owns the agent: `agent()` / `set_agent()`;
+`core/session.py`, `core/thread.py`, `core/history.py`), not in the Telegram
+bot. `core/telegram_bot.py` is a channel adapter: it turns updates into runs
+for the sender's user, renders results and is the sender behind `notify`.
+`main.py` builds the core first, then the adapter, then the web server.
+
+- **Sessions** (`sessions`, primary key `(user_id, session_id)`): every user has
+  their own sessions and their own `main` row; ids are per user, so the same id
+  can exist for two users. An id that exists only for someone else answers 404
+  on every session, assistant, stream and debug endpoint
+  (`session.owned_by_someone_else`). Telegram chats map to `tg_<chat id>` per
+  user, so two people in one group each have their own conversation there.
+- **Thread** (`thread_messages.user_id`): the wire id stays `main` and resolves
+  to the caller's own thread (window, paging, retention per user).
+- **Runs** are keyed `(user, session)`: two users can run in `main` at once.
+  Reattaching (`GET /api/sessions/{id}/stream?run_id=`) to another user's run
+  answers 404, also on `main`.
+- **Pending approvals** live on the user's session row. Over HTTP only the owner
+  finds them; in Telegram the buttons work only for the user who triggered
+  them — anyone else gets an alert and the message is left alone
+  (`session.waiting_for_someone_else`).
+- **Undo** entries record their user; another user's id answers 404
+  (HTTP) / "can no longer be undone" (Telegram).
+- **Learned phrases** (`shortcuts.user_id`, phrase unique per user): learned
+  from, matched, listed and deleted per user.
+- **Usage** (`usage_events.user_id`, `usage_daily.user_id`): the current user
+  at the time of the call; `''` when there is none (background work with no
+  user). `/api/usage` and `/api/usage/events` answer for the caller; an admin
+  may add `user=<id>` or `user=all` (no-user rows included); a member asking
+  for more than their own gets 403 → `docs/usage.md`.
+
+Migration `m0003_user_scope` gives every existing row to the first admin (and
+creates the first user from env, as bootstrap would, when an 8.1.0 database has
+rows but no user yet).
+
+## Proactive messages
+
+`core/notify.py`: `await notify(user, text, parse_mode=None)` sends to the
+user's Telegram chat (`telegram_chat_id`); without a chat, without a registered
+channel (tests, no bot) or when sending fails it does nothing and returns
+False. The Telegram adapter registers itself (`notify.register_telegram`) when
+it is built; the core never imports it. Reminders, the wake briefing, the
+weekly review and the notification digest use it. Phone push is per user and
+separate (`integrations/phone/push.py`: `await push.send(user, type, data)` /
+`push.notify(user, title, text, …)` reach only that user's devices; nothing
+without the `phone` kind). A user's inbound voice-note transcripts go
+to the chat of their `whatsapp` setting `voice_telegram_chat_id`
+(`notify.whatsapp_voice(user, chat_id, …)`, docs/whatsapp.md).
+
+## Access level
+
+Covers only what integrations cannot express.
+
+| Capability | `admin` | `member` | Enforced by |
+|---|---|---|---|
+| `ops`: connect the `ops` integration (kubectl, Python) | yes | no | `store.connect` (`Integration(requires="ops")`) → `PermissionError` |
+| `manage_users`: other users' integrations over the API | yes | no | `?user=<id>` on `/api/integrations*` (`core/integrations_api.py`); `bin/users.py` works on the database and needs shell access to the server instead |
+| `see_everyone`: everyone's usage, the server's own self-checks | yes | own usage only; the self-checks of their own integrations | `/api/usage` (`user=`), `core/checks.py` (`SERVER_CHECKS`: `reminders`) |
+| `manage_server`: the server's log buffer | yes | no | `GET` / `DELETE /api/debug/logs` |
+| `chat_profiles`: chat model profiles | all | `fast`, `balanced` | `core/models.py` (catalog, default, fallback) |
+
+Levels are defined in one place (`core/access.py`: `LEVELS`, one
+`AccessLevel` row each, `CAPABILITIES` naming the yes/no fields,
+`allows(capability)` and `may_use_profile(id)`); adding a level is adding a
+row there, adding a capability is a field set on every row. Nothing else
+names a level: code asks the user's level for a capability.
+
+## Enforcement
+
+Every way a tool can be listed, started or resumed asks
+`integrations.framework.registry` for the user it runs for; there is no
+second list anywhere. A tool the user does not have — because its kind (or
+a kind it `needs`) is not connected — gets exactly the answer a tool that
+does not exist gets (`registry.ToolNotAvailable`: `Tool 'x' is not
+registered.`), so a refusal never says whether someone else has it.
+
+| Surface | Code | What a tool the user does not have gets |
+|---|---|---|
+| Chat: the tool list | `core/agent.py` `_stream_completion` → `registry.tool_schemas(user)` | not in the request to the model |
+| Chat: a call the model makes anyway (made up, remembered from history, injected by untrusted content) | `core/agent.py` `_run_loop` (`_needs_user`, `_changes_something`), `_execute_tool` | never suspends (no approval card, no selection); runs as a read-only call and is refused by `registry.execute`: `tool_end{ok: false, result: "Error executing tool: Tool 'x' is not registered."}`, the model gets that text as the tool result and the run goes on to its final answer |
+| Approval resume (HTTP approve / deny, Telegram buttons, the rest of a suspended batch) | `core/session_runner.py` `resume_agent_background`, then `_run_loop` again | checked again at resume: an approve whose integration was disconnected since the card closes with the same refusal, the model finishes the turn, the pending state is gone |
+| Realtime voice | `core/realtime.py` `build_session_update_payload` (`registry.realtime_tool_schemas(user)`), the function-call branch; tools of a kind declared `realtime=False` (`gmail`) are left out the same way (`registry.in_realtime`) | not in the session's tools; a function call gets `{"error": "Tool 'x' is not registered.", "status": "failed"}` |
+| Learned phrases | `core/shortcuts.py` `learn` / `match`, `core/session_runner.py` `run_shortcut_background` | never learned; never matched, so the message goes to the model as if no phrase matched (whose different answer then clears the phrase, as any different outcome does) |
+| Chat: the system prompt's home map | `core/agent.py` `home_map_section(user)` → `registry.prompt_section(user, "homeassistant")` | no section (never another user's map) |
+| Chat: the system prompt's About section | `core/agent.py` `about_section(user)` → `registry.prompt_section(user, "about")` | no section (never another user's facts) |
+| Telegram `/memory` (command, buttons, typed input) | `core/telegram_bot.py` `handle_memory`, `handle_memory_callback`, `handle_message` | without `about`: "🧠 Memory isn't set up for you: the About you integration is not connected." |
+| Server code calling a tool function directly with `store.require(user, kind)` (accepting a calendar suggestion over HTTP or Now, its undo) | `integrations/phone/calls/actions.py` `accept_suggestion` (from `/api/suggestions/{id}/accept`, Now, the weekly review) | `store.NotConnected` → 403 `{"error": "not_connected", "integration": "<kind>"}` from one middleware (`core/auth.py` `integration_middleware`); handlers with a catch-all `except` re-raise it |
+| Endpoints about the whole server | `core/auth.py` `requires(capability)` | 403 `{"error": "forbidden", "needs": "<capability>"}` |
+
+Not a tool surface (no change): the selection prompt (`request_user_selection`
+is a `core` tool, which everyone has); background loops and inbound webhooks,
+which call no tool by name. Chat model profiles: `/api/assistant/models`
+lists only the caller's profiles and default; a message asking for one the
+caller may not use gets the caller's default, the same path an unknown id
+takes (`core.models.resolve_profile(id, level)`); a member's default is the
+server default when they may use it, else the first profile they may use.
+Tests: `python test_access.py`.
+
+Admin-only endpoints: `GET`/`DELETE /api/debug/logs`
+(the process log, everyone's activity).
+`GET /api/checks` and `POST /api/checks/{key}/ignore`: every user gets the
+checks of their own integrations, the server's own (`reminders`) only with
+`see_everyone`, and ignores only for themselves (a check they don't see → 404).
+Unchanged: `/api/debug/sessions*` (already the caller's own), `/api/usage*`
+(already scoped), `/api/app/version` and `/api/app/download/*` (public by
+design), `/api/app/upload` (guarded by `APP_PUBLISH_TOKEN`, not a user),
+`/api/health` (public liveness). Everything else is a user's data or
+integration and answers for the caller: the Now screen, its check cards,
+`/api/checks`, `/api/search`, `/api/briefing/*`, `/api/review/*`,
+`/api/phone/unlock`; `/api/phone/*` and `/api/notifications/*`, the caller's
+phone and Inbox; `/api/client-config`, `/api/zones`, `/api/ha/*` and the HA
+camera proxies, the caller's Home Assistant (the proxies also need
+`cameras`); `/api/calendar/*`, the caller's Google Calendar; `/api/frigate/*`,
+the caller's Frigate; `/api/me` and `/api/integrations*`, the caller's own
+(another user's with `manage_users`).
+
+## Security rules
+
+Rules that keep one user from reaching another user's data or the server's
+network through something they control. Tests: `python test_security.py`
+(each rule has its own section), plus the HTTP-reachable ones in
+`tests/local_env/e2e.py` ("security").
+
+- **Debug export** (`GET /api/debug/sessions/{id}`, the Telegram debug file;
+  `core/debug_env.py`). The `environment` section is filled only for a user
+  with `manage_server`; everyone else gets `{}` (same payload shape). For an
+  admin a value is masked (`******`) when its name has `key`, `token`,
+  `password`, `passwd`, `secret`, `auth`, `credential`, `private`, `cookie`,
+  `session` or `service_account` in it, ends in `_json`, or is one of the
+  names the one-time import reads (`integrations/bootstrap.py`
+  `CREDENTIAL_ENV`: `HOMEASSISTANT_HOST`, `HOMEASSISTANT_TOKEN`, `WAHA_URL`,
+  `WAHA_API_KEY`, `WAHA_TOKEN`, `WAHA_SESSION`, `GOOGLE_REFRESH_TOKEN`); and
+  when the value holds a PEM block (`-----BEGIN`), is a URL with a user name /
+  password, or parses as JSON with a secret-looking key anywhere (a service
+  account's `private_key`).
+- **Kinds an admin changes.** `Integration(change_requires="manage_users")`:
+  only a user with that capability may connect, update or disconnect the kind,
+  for themselves or for another user (`?user=`); everyone else gets 403
+  `{"error": "forbidden", "needs": "manage_users"}` (`store.Forbidden`).
+  `bin/users.py` and the env import act as the server (`by=None`). Today:
+  `cameras` (the Frigate address is the only thing it holds).
+- **Addresses** (`integrations/framework/addresses.py`, `Field(type=ADDRESS)`:
+  Home Assistant `host`, WAHA `url`, cameras `url`). For everyone: `http` /
+  `https`, a host, no user name / password, no query, no fragment, no `//`,
+  `.` or `..` path segment; stored normalised (scheme and host lower case,
+  default port dropped, no trailing slash). A user without `manage_users` may
+  use only an origin (scheme + host + port) that an admin's own integration of
+  the same kind uses, or one listed in `MEMBER_ALLOWED_ORIGINS`
+  (docs/configuration.md); anything else is 400 `invalid` on the field.
+  `test` and `options` run only on a stored connection whose addresses are
+  valid (else 400 `invalid`). Every request URL is the base joined with a
+  fixed path (`addresses.join`: the result keeps the base's scheme, host and
+  port; a path with a query, fragment, `//` or `..` is refused), ids in a path
+  go through `addresses.segment`, and Home Assistant entity ids
+  (`domain.object_id`), service names and camera names are checked strictly
+  before any request (400).
+- **Names.** `Field(type=NAME)` (WAHA `session`): letters, digits, `_`, `-`,
+  `.`. A user without `manage_users` may not use a WAHA session (on the same
+  WAHA address) that another user's connection already uses. This compares
+  address strings, so the same WAHA reached under a second hostname passes —
+  the account rule below is what holds then.
+- **One connection per WhatsApp account** (`integrations/whatsapp/accounts.py`,
+  `store.claim_account`, migration `m0019_whatsapp_account_claims`). The
+  account a connection's WAHA reports (`me.id`) belongs to the connection that
+  claimed it first; the check and the write are one transaction. A connection
+  whose WAHA reports an account another user's connection holds (a member's
+  own WAHA lying, the admin's session under another hostname) gets no
+  `account`; the reported one is kept in `integrations.account_conflict`. It
+  is never routed to (`route()` returns at most one connection; an event
+  without `me` only to a session's single connection without a conflict), and
+  its tools answer "This WhatsApp account is already connected by another
+  user…" without reaching WAHA (`Integration(blocked=)`). It keeps being asked
+  like any connection without an account, so it recovers by itself once its
+  WAHA reports another account (or the holder disconnects). An admin sees the
+  conflict: `account_conflict` in `/api/integrations` for that user (present
+  only then), `bin/users.py integrations show`, and a warning in the log
+  naming both user ids (no message content).
+- **Telegram chats.** `Field(type=TELEGRAM_CHAT)` (WhatsApp
+  `voice_telegram_chat_id`): stored as a number. A user without
+  `manage_users` may set only one of their own Telegram ids (their private
+  chat with the bot); a group chat (a negative id) is set by an admin.
+- **User-triggered fetches** (`core/outbound.py`). A download a user starts
+  (knowledge link media) by a user without `manage_server` must be `http` /
+  `https` on a host whose every address is public (no loopback, private,
+  link-local, CGNAT, reserved: no pod network, cluster services, node, cloud
+  metadata or home LAN); a name that does not resolve is refused. The URL is
+  checked before the download; yt-dlp then resolves the name again and
+  follows redirects itself, which cannot be checked from Dana, so for such a
+  user it runs with site extractors only (`--use-extractors
+  default,-generic`), which do not fetch arbitrary pages. The URL is always
+  passed after `--` (never read as an option). For a knowledge entry what
+  counts is who chose the link: `entries.url_set_by` records the user who
+  last set it (saving the entry, or changing its URL — a change that sends
+  the same URL back does not count; migration `m0018_entry_url_set_by`,
+  existing rows: the creator), and the download is restricted whenever that
+  user (unknown counts) or the one who asked for it lacks `manage_server` —
+  so an admin pressing Retry on a link a member put on her entry still gets
+  the restricted download. An undo of a URL change puts back who had set the
+  old one. A link set by a user without `manage_server` is also checked when
+  it is set (`core/outbound.check_url_form`: http(s), a host, no literal
+  non-public address, no `localhost`; names are judged at download time) and
+  refused with 400 `{"error": "invalid", "field": "url"}` / a tool error.
+  Admins' own links: unchanged.
+- **The WAHA webhook** (`/webhook/waha`) is accepted only from a host in
+  `INTERNAL_HOSTS` without credentials (WAHA in the cluster) or from a user
+  with `manage_server`; anyone else gets 403. Media named by an event is
+  fetched from the connection's own WAHA (its scheme and host; only the path
+  and query come from the event), so the API key never goes elsewhere.
+- **Shopping** (`docs/shopping.md`). The active list is the user's own
+  choice (see "Sharing" → Shopping); a share never changes where their tools
+  write. An invitation answered for a list not shared with the caller, and
+  `?list=` naming one, answer 404 like an unknown list; `use` needs `edit`.
+  `move_items` moves only the caller's own items to buy from their own list.
+  The event stream follows only lists the caller can see and ends (`end`)
+  when that stops.
+- **Undo re-checks access.** An undo of a task (tool undo, Now's undo, a call
+  suggestion's, a person link's) checks again that the user can still edit
+  the task's list (`tasks.service.check_still_writable`); a shopping undo on a
+  list its user can no longer edit is refused the same way ("You can no
+  longer change that shopping list."), and one whose item was changed since
+  is refused too. The undo of a task
+  change (`update_task`) goes through the tasks service like a new edit
+  (`tasks.service.restore_task`): write access on the list the task is in
+  now and, when the change moved it, on the list it goes back to; the owner
+  follows the list it goes back to (a moved task undone is its list owner's
+  again, never a task of the mover's inside someone else's list). Either
+  check failing refuses it ("You can no longer change this task…") and
+  leaves the task as it is. Every other move follows the same rule through
+  `save_task` (HTTP `PUT /api/tasks/{id}`, the weekly review's `move_group`);
+  nothing else moves items between containers (entries never change project,
+  shopping items change list only through the caller's own invitation `use`
+  with `move_items`, from their own list, Now only changes status / triggers in
+  place, created-item undos delete only while the task is unchanged —
+  `group_id` included — and still writable).
+- **Phone devices** are keyed `(user_id, device_id)` (migration
+  `m0017_phone_devices_per_user`): registering a device id another user has
+  makes the caller their own row; a row moves to another user only when the
+  same FCM token is presented (the same app signed in as someone else).
+- **Telegram selections** (the multi-select prompt's toggles) are kept per
+  `(user, session)`; a button pressed by someone else gets the "not yours"
+  alert.
+
+## Integration
+
+One user's own connection to one service. Never shared between users: two
+people using the same Home Assistant each add their own token.
+
+Code: `integrations/` (one package per kind), the framework in
+`integrations/framework/`, the startup import in `integrations/bootstrap.py`,
+table `integrations` from migration `core/db/migrations/m0004_integrations.py`.
+Tests: `python test_integrations.py`.
+
+An integration **kind** is a package `integrations/<kind>/` with `kind.py`
+(the declaration) and `tools.py` (its tools; other files where the service
+has a natural seam: `homeassistant/client.py` + `home_map.py`,
+`whatsapp/client.py`). The kind declares:
+
+- **credentials**: fields needed to connect (empty for built-in services).
+  Stored encrypted (see "Credentials").
+- **settings**: per-user choices (which Home Assistant entities are "me", the
+  Telegram chat voice transcripts go to, …), plain JSON, with declared defaults.
+- a field's **type** (`Field(type=…)`): `TEXT` (default), `ADDRESS` (a
+  service's base URL), `NAME` (an identifier such as a WAHA session),
+  or `TELEGRAM_CHAT` (a chat id); `store` validates and normalises them for every
+  change, with the member rules in "Security rules". A bad value raises
+  `InvalidValue` (with `.field`; HTTP 400 on that field). A credential is
+  write-only (`Field.secret`) unless it is an `ADDRESS`: an address is not a
+  secret, so the API returns its value to the connection's own user (and an
+  admin acting for them) like a setting; storage is the same.
+- **who may change what**: `store.field_rule(integration, user, field, by)`
+  and `store.kind_rule(integration, by)` say, before any value is typed,
+  whether `by` may change a field / the kind for `user` (`can_change`), why
+  not (`why_not`: "Set by an admin") and one line on what a value may be
+  (`rule`). The store's own checks (`_checked_value`, `change_requires`) go
+  through the same function, so what a client is told and what is refused
+  cannot drift (`test_security.py` tries every field a payload marks locked).
+- optional **change_requires**: a capability the user *making* the change
+  needs (`cameras`: `manage_users`), else `store.Forbidden` (403). Every
+  `store.connect / update / disconnect` takes `by=` (the acting user; None
+  for the server itself, `bin/users.py` and the env import).
+- optional **validate**: `Integration(validate=)`, a rule across fields and
+  users called with `(user, changes, credentials, settings, by)` before a
+  change is saved; it raises `InvalidValue` (WhatsApp: a session another user
+  has; shopping: an active list that is not their own or edit-shared).
+- optional **blocked**: `Integration(blocked=)`, a function of the user's
+  connection returning why its tools cannot run now (or None);
+  `registry.execute` answers `"Error: <reason>"` without calling the tool
+  (WhatsApp: the account its WAHA reports is held by another user's
+  connection).
+- **requires**: an access-level capability needed to connect it (`ops`:
+  `AccessLevel.ops`, admins only), or none.
+- **tools**: the kind owns its tools. A tool receives the user's connection as
+  its first argument `conn`; that argument is not part of the schema the model
+  sees. Schemas come from type hints (Pydantic) and Google-style docstrings.
+- optional **prompt parts**: `Integration(prompt_parts=(PromptPart(slot,
+  text, rank, needs), …))`, the kind's sentences in Dana's fixed instructions
+  (`core/agent.py::instructions(user)`). The template names the slots
+  (`tools`, `read_examples`, `id_examples`, `prompt_ids`, `undoable`,
+  `runs_at_once`, `done_examples`, `send_via`, `action_examples`,
+  `routing_heading`, `routing`, `choice_examples`, `guides`); a slot is the
+  joined parts of the kinds the user has connected, ordered by `rank` then
+  `KIND_ORDER` (`registry.prompt_parts(user, slot)`); `needs=("calendar",)`
+  keeps a part out unless that kind is connected too; `{user}` in a part is
+  the user's `referent`. Adding a kind adds its parts in its own `kind.py`,
+  never in `agent.py`. A user without a kind gets none of its words (no tool
+  names, no rules about it); the first admin with every kind gets the old
+  text byte for byte.
+- optional **prompt section**: `Integration(prompt_section=)`, a function of
+  the `User` returning the kind's cached, per-turn part of the system prompt
+  (never blocking; "" for nothing). The agent asks
+  `registry.prompt_section(user, kind)` for the run's user, which answers ""
+  without a user, without the kind connected or when the section fails, and
+  places each kind's section itself (`homeassistant`: their home map, then
+  `about`: their facts, both before the date/time line).
+- optional **check**: `Integration(check=)`, an async function of the
+  `Connection` returning None when the service answers with these
+  credentials, else a short reason without secrets ("Home Assistant refused
+  the token (HTTP 401)."). `POST /api/integrations/{kind}/test`. Implemented
+  for `homeassistant` (`GET /api/config`), `whatsapp` (`GET /sessions`: the
+  session exists and is `WORKING`), `calendar` (the calendar list) and
+  `cameras` (Frigate `GET /api/version`).
+- optional **options**: `Integration(options=)`, an async function of the
+  `Connection` returning `{setting: [{value, label}, …]}`, candidates for its
+  settings read from the service. `GET /api/integrations/{kind}/options`.
+  `homeassistant` (`integrations/homeassistant/options.py`): `person` (person
+  entities), `car_sensor` (sensors with a `connected_paired_devices`
+  attribute), `car_device` (the device names in those attributes),
+  `phone_interactive_sensor` (binary sensors), `phone_battery_sensor`
+  (sensors of device class `battery`), `weather_entity` (weather entities).
+- **inbound handlers** (webhooks, phone uploads) and **background jobs** (run
+  once per user who has the kind connected, as that user) — not part of the
+  framework: each kind runs its own per user (`tasks` time checker, `about`
+  learner, `people` briefs, `homeassistant` entity watchers and home maps,
+  `whatsapp` inbound events routed by account, `phone` notification
+  retention / digest / re-nudge / triage resume, call processing / resume /
+  audio retention).
+
+```python
+# integrations/whatsapp/kind.py
+whatsapp = Integration("whatsapp", credentials=(Field("url", ...), ...), settings=(...))
+
+# integrations/whatsapp/tools.py
+@whatsapp.tool(confirm=True)
+async def send_whatsapp_message(conn: Connection, chat_id: str, text: str) -> str: ...
+```
+
+`@kind.tool(...)` takes `is_write`, `confirm` (a bool or a function of the
+call's arguments), `acts_outside` (docs/agent-actions.md),
+`needs=("otherkind", …)` and `available=` (a function of the `User`: the tool
+is offered and runs only while it returns True — checked at listing, in
+`has_tool` and at execution, a refusal like any other; a rule that raises
+counts as False; `share_item` uses `sharing.tool_available`). `Integration(…,
+on_connect=)` runs a function of the `User` right after `store.connect` (a
+failure is logged, the connection stays): `tasks` seeds the default lists,
+`shopping` makes the user's own list, `whatsapp` learns its account;
+`Integration(…, on_credentials_change=)` runs one after `store.update` changed
+the credentials (`whatsapp`: forget the account, learn it again);
+`Integration(…, on_change=)` runs one after every connect, update or
+disconnect (`homeassistant`: wake the entity watchers so they reconcile at
+once, `watcher.request_reconcile`). With these, a change through the API
+needs no restart: the connection cache, the tool list and the prompt change
+at once, the watcher starts / restarts / stops, the WhatsApp account is
+learned, default task lists and the shopping list are made
+(`test_integrations_api.py`). A change made by `bin/users.py` (another
+process) reaches the server through the 10 s cache refresh and the watcher's
+periodic reconcile (`HA_WATCH_RECONCILE_SECONDS`); the CLI runs `on_connect`
+itself. Importing the `integrations` package registers
+every kind (explicit imports; `KIND_ORDER` in `integrations/__init__.py` fixes
+the order). Adding a kind: the package, one import line and its name in
+`KIND_ORDER`.
+
+API (`integrations/framework/`):
+
+| | |
+|---|---|
+| `store.connect(user, kind, credentials=, settings=, account=)` → `Connection` | refuses a kind the user's level does not allow (`PermissionError`), a second one (`ValueError`), unknown fields, missing required credentials |
+| `store.update(user, kind, credentials=, settings=, account=)` → `Connection` | merges; a setting set to None goes back to its default |
+| `store.disconnect(user, kind)` → bool | |
+| `store.get(user, kind)` → `Connection \| None`, `store.require(user, kind)` → `Connection` (`NotConnected`) | what a direct caller of a tool function passes as `conn` |
+| `store.connected_kinds(user)`, `store.is_connected(user, kind)`, `store.list_integrations(user)`, `store.users_with(kind)` | |
+| `registry.tool_schemas(user)`, `registry.realtime_tool_schemas(user)`, `registry.tools_for(user)`, `registry.has_tool(user, name)` | |
+| `await registry.execute(user, name, args)` | the only way to run a tool by name |
+| `registry.needs_confirmation(name, args, untrusted=)`, `registry.is_write_tool(name)`, `registry.acts_outside(name)`, `registry.returns_untrusted(name)`, `registry.in_realtime(name)` | properties of the tool, the same for everyone (`returns_untrusted`: its result is text written by other people; `in_realtime`: its kind is offered in realtime voice) |
+| `registry.prompt_section(user, kind)` → str | the kind's system-prompt section for the user ("" without the kind connected, without a section, or on failure) |
+| `registry.prompt_parts(user, slot)` → list of str | the parts of the user's connected kinds for one slot of Dana's instructions |
+
+`Connection` = `user`, `kind`, `credentials` (decrypted), `settings` (defaults
+filled in), `account`. Lookups read an in-memory copy of the table
+(decrypted values included), refreshed on every change made through `store`
+and at most every `CACHE_TTL_SECONDS` (10 s) for changes made elsewhere.
+
+Rules:
+
+- A user's tool list is the union of the tools of their connected
+  integrations, minus tools whose `needs` are not all connected, in a stable
+  order: `KIND_ORDER`, then the order the tools are defined in (so the tool
+  block stays cacheable).
+- The same check runs again at execution: a tool that belongs to an
+  integration the user does not have is refused, whoever asks for it (the
+  model, the realtime voice relay, a learned phrase, an approval being
+  resumed, a Telegram command). The refusal is the error a tool that does not
+  exist gets (`Tool 'x' is not registered.`), so it does not reveal whether
+  someone else has it. There is no way to run a tool without a user. Where
+  each surface checks: "Enforcement".
+- A tool that needs a second kind declares it
+  (`@people.tool(needs=("tasks",))`: `link_task_to_person`;
+  `accept_call_suggestion` needs `tasks`); it is offered and runs only when the
+  user has every kind it needs. It gets the connection of its own kind.
+- One integration per kind per user (primary key `(user_id, kind)`).
+- Every user has `core`, with no row; it cannot be connected or disconnected.
+  A new user has only `core` until integrations are connected for them.
+- Tool names, descriptions and argument schemas are the same for everyone;
+  the first admin's list is pinned by `test_parity.py`.
+
+### Kinds
+
+| Kind | Service | Credentials | Settings (default) | Notes |
+|---|---|---|---|---|
+| `core` | time, selection, web search | none | none | every user has it |
+| `tasks` | task lists, tasks, triggers | none | none | built in |
+| `shopping` | shopping lists | none | `active_list` (none: their own list): the list their tools and apps work on | built in; one list per user (made on connect), the *active list*: see "Sharing" → Shopping and `docs/shopping.md`; the name → aisle table is shared reference data (names only) |
+| `knowledge` | projects and entries | none | none | built in; projects per user with `project` sharing, entries follow their project (docs/knowledge.md) |
+| `about` | About-you facts and learner | none | none | built in, no sharing; facts, "do not re-add", the size cap, the prompt section and the learner per user (docs/about.md) |
+| `people` | people, briefs | none | none | built in, no sharing; people, their numbers (unique per user), briefs and the call card per user; calls / notifications linked only from the user's own (both by their `user_id`, `activity.calls_sql` / `notifications_sql`) (docs/people.md) |
+| `phone` | the Android phone: push, notifications Inbox, calls and suggestions | none (devices register with the user's API token) | none | built in. Devices, push events (one `seq` numbering for the server, each event fetched only by its user), notifications (FTS, rules, summaries, declines, action requests, digest state), calls (uploads, recordings, transcripts, labels, FTS search, processing / reanalysis / backfill as the owner), call and notification suggestions (only their owner's: listed, accepted, dismissed, edited, undone, popped up), context chats on them, the self-check marks `push` / `notification_sync` / `triage`, the calls check and the loops per user; `/api/phone/*`, `/api/notifications/*`, `/api/calls/*` and `/api/suggestions/*` for the caller, 403 `not_connected` without the kind (docs/notifications.md, docs/calls.md) |
+| `homeassistant` | Home Assistant | `host` (an address), `token` | `person` (person entity: zone triggers), `car_sensor` (the phone's Bluetooth connection sensor) + `car_device` (the car's Bluetooth name in its `connected_paired_devices`): car triggers, `phone_interactive_sensor` (screen on: wake confirmation), `phone_battery_sensor` (bedroom dashboard tile), `phone_notify_service` (only reported by `/api/client-config`), `weather_entity` (`weather.forecast_home`: briefing, Now); no other defaults (the first admin's values come from the env import) | no limits on Dana's side: whatever the token can do. Everything per connection: REST / WebSocket clients, zones, states cache, home map, the entity watcher (docs/tasks-and-triggers.md). Tools, `/api/ha/*`, `/api/zones`, `/api/client-config`, the HA camera proxies (which also need `cameras`): the caller's connection, 403 `not_connected` without it |
+| `whatsapp` | WAHA | `url` (an address), `api_key` (optional), `session` (a name, not one another user's connection uses) | `voice_telegram_chat_id` (none): the user's voice-transcript chat (their own Telegram id unless an admin sets it) | account: the session's WhatsApp id, learned from WAHA (routes inbound events, see "Inbound"). Tools, name maps, "me", dedupe, saved contacts (`whatsapp_contacts`) and the images its tools save per connection / user (docs/whatsapp.md). No HTTP endpoint of its own besides the inbound webhook |
+| `calendar` | Google Calendar | `refresh_token` (from the Google sign-in, "Google account") | `calendar_id` (`primary`): where new events go, `selected_calendars` (none): ids of the calendars shown and searched (none chosen: `calendar_id`) | OAuth client id/secret are server-wide. Tools, `/api/calendar/*`, undo of events, accepting an event suggestion and the composers' calendar reads (Now, briefing, meeting cards, weekly review, the `calendar` self-check) use the acting user's connection; credentials (access token) and today's events cached per connection; 403 `not_connected` without it. No sharing on Dana's side: calendars Google shares with a user show through their own account (docs/now.md) |
+| `contacts` | Google Contacts | `refresh_token` (from the Google sign-in) | none | a copy of the user's contacts, synced in the background (`CONTACTS_SYNC_MINUTES`) and deleted on disconnect; search / read tools, `add_contact` / `update_contact` ask first; fills the user's people and names unknown callers; never connected by the env import (docs/contacts.md) |
+| `gmail` | Gmail | `refresh_token` (from the Google sign-in) | none | account: the mailbox address. Chat tools only (`Integration(realtime=False)`: not offered or run in realtime voice, which has no Approve step); sending asks first, other changes have Undo; reading tools are `untrusted_result`; nothing is stored; never connected by the env import (docs/gmail.md) |
+| `telegram_account` | the user's own Telegram account (Telethon) | `session` (from the QR sign-in, `/telegram/connect`) | none | account: the Telegram name and @username. The app (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) is server-wide. Read-only tools, `untrusted_result`, chat only (`realtime=False`); nothing is marked read; one client per connection; never connected by the env import (docs/telegram-account.md) |
+| `cameras` | Frigate | none | `url` (an address; none; the first admin's from the env import) | changed only by a user with `manage_users` (for anyone); no tools, only the camera endpoints (`/api/frigate/*`, `/api/camera/{entity}/proxy`), each for the caller's own Frigate, 403 `not_connected` without the kind; the two that go through Home Assistant also need `homeassistant`; caches per connection (docs/dashboard.md) |
+| `money` | bank / card sites through the bank-worker sidecar | none of its own: each bank / card login is a row of `money_sources`, its credentials a Fernet token under the same `CREDENTIALS_KEY`, decrypted only in `integrations/money/sync.py` to start a worker job, never returned by an API or tool, never logged | `MONEY_SYNC_TIMES` is server-wide | built in for nobody: connected per user; sources, accounts, transactions, rules, syncs and code requests per user (another user's source / request id answers 404); disconnecting deletes all of them and the user's browser profiles. SMS sign-in codes are never stored or logged: the phone posts them to `/api/money/code-requests/{id}`, and a Telegram message of only 4–8 digits is taken as the code (before the agent, history or logs) only while that user has a pending request; never connected by the env import (docs/money.md) |
+| `ops` | kubectl, Python | none | none | `admin` only |
+
+Server-wide configuration stays in env: model keys and model names, the
+Telegram bot token, the FCM sender key, the Google OAuth client, TypeSafe,
+realtime voice, the Telegram app of `telegram_account`, timezone, and every tuning value. Only "whose account, which
+entities" lives in an integration.
+
+Each kind reads its configuration only from the connection (credentials and
+settings); nothing reads the old env names except the one-time import below.
+
+### Credentials
+
+Stored in the `integrations` table only as a Fernet token of their JSON
+(`integrations/framework/crypto.py`), with the key from the env var
+`CREDENTIALS_KEY` (kept in your secret store); settings are plain JSON. At startup
+(`integrations.bootstrap.bootstrap()`, `main.py`, after `users.bootstrap()`)
+the key is checked: if credentials are stored (or env values are waiting to
+be imported) and the key is missing, malformed or not the one they were
+encrypted with, the server refuses to start and the message says what to do
+(including how to generate a key). With nothing to protect it starts without
+a key.
+
+Then, for the first admin user only, each kind that was never imported is
+connected from env and recorded in `integration_imports`, so a kind the admin
+disconnects later is not created again at the next start:
+
+- built-in kinds (`tasks`, `shopping`, `knowledge`, `about`, `people`,
+  `phone`, `ops`) always;
+- `homeassistant` when `HOMEASSISTANT_TOKEN` is set, `whatsapp` when
+  `WAHA_URL` is set, `calendar` when `GOOGLE_REFRESH_TOKEN` is set, `cameras`
+  when `FRIGATE_URL` is set (a kind whose env values are
+  absent is not recorded, so it is imported at the first start that has them);
+- settings a migration moved out of older storage before the kind existed
+  (`integration_import_settings`; today only `calendar`'s
+  `selected_calendars`, from migration `m0012_calendar_per_user`) are added
+  to what the import connects with, and removed when the kind is recorded;
+- every credential and setting with the value the code resolves today: the
+  env value, else today's default (stored as a value, so a later default
+  change does not move it). The env names are listed in
+  `docs/configuration.md` → Integration credentials.
+
+`integrations/bootstrap.py` is the one module that reads those env names, and
+only to create integrations: after the first start that imported a kind,
+its env values can be removed and the values are edited on the
+Integrations page (`docs/operations.md` → Upgrading from 8.1.0).
+
+### Google account
+
+One Google sign-in connects every kind that uses the user's Google account
+(`integrations/google_account/`: `oauth.py`, `api.py`; tests: `python
+test_google_account.py`). It is not a kind: each Google kind keeps its own
+row with the credential `refresh_token`, declares the scopes its tools need
+(`oauth.register(kind, scopes)`, next to its `Integration(...)`) and
+`connect_url=oauth.CONNECT_PATH`, and builds its Google client from
+`oauth.credentials(conn)` (cached per user and kind; a new token starts
+over). The OAuth client (`GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) is the
+server's.
+
+- **Sign-in**: `GET /api/google/connect` sends the caller to Google's
+  consent page for the scopes of every Google kind their access level allows
+  plus `openid email`, with `access_type=offline` and `prompt=consent` (a
+  refresh token every time) and a one-time `state` kept in memory for 10
+  minutes, bound to that user. 503 `google_not_configured` without the
+  server's OAuth client.
+- **Coming back**: `GET /api/google/callback` needs the same signed-in user
+  and their unused `state` (else `expired`), exchanges the code and stores
+  the refresh token and the account's email (`integrations.account`) on each
+  Google kind **whose scopes were all granted**: a kind not connected is
+  connected, a connected one gets the new token and keeps its settings, a
+  kind whose scopes were not granted (or that the user's level cannot have)
+  is left as it is. Then it redirects to `/?google=<result>#integrations`
+  (`connected` · `denied` · `expired` · `failed`), which the page shows.
+- **Redirect address**: `PUBLIC_URL` + `/api/google/callback`, else the
+  address the request came to (`X-Forwarded-Proto` for the scheme). It has to
+  be one of the OAuth client's authorised redirect URIs in Google Cloud.
+- **Disconnecting** a Google kind removes only that kind's row; the others
+  keep working. The token can still be typed by hand (`refresh_token` on the
+  kind), as before.
+- `GET /api/google/status` → `{configured, redirect_uri, kinds: [{kind,
+  connected, account}]}` for the caller.
+- The sign-in is the caller's own: `/api/integrations` carries `connect_url`
+  only for the caller's own integrations, never with `?user=`.
+
+### Home Assistant triggers
+
+Dana watches the entities selected in the user's Home Assistant settings over
+that user's own connection and fires the triggers itself: zone enter/leave
+from the person entity, car enter/leave from the car sensor
+(`integrations/homeassistant/watcher.py`: one watcher per user with those
+settings, `subscribe_entities` over their WebSocket, back-off reconnects, a
+missed transition fired once after a reconnect, nothing on the initial
+state; the transitions are those of the old component → docs/tasks-and-triggers.md).
+The old `/webhook` endpoint (and with it the `wake_up` and `complete_task`
+events) and the custom HA component are gone. The self-check reports, per
+user, a selected entity that is missing (`ha_entities`), a watcher that is
+not connected (`ha_watcher`) and entities that have been silent (`location`,
+`car`).
+
+**Timezone.** One for the server: `core/clock.py` resolves `TIMEZONE` → the
+first admin's Home Assistant (`users.first_admin()` on purpose: a server
+setting; the kind registers the lookup) → `TZ` → UTC, once at startup.
+
+### Inbound
+
+- **WAHA** posts to `/webhook/waha` (accepted only from an `INTERNAL_HOSTS`
+  host without credentials or from a user with `manage_server`; everyone
+  else 403, see "Security rules"). The event is routed to the user
+  whose WhatsApp integration has the account the event names (`me.id`) and
+  processed as that user (`integrations/whatsapp/accounts.py`, `events.py`).
+  The account is learned from WAHA (the session's `me` in `GET /sessions`):
+  at connect / a credentials change, by a loop for connections without one
+  (startup, then every minute; WAHA down only delays it) and lazily when an
+  event matches no account (refresh, then retry once). An account belongs to
+  at most one connection (the first to claim it; see "Security rules"), so
+  an event goes to one user at most. Events for an unknown account are
+  logged without content and dropped; an event without `me` goes to the one
+  connection without an account conflict using its `session`, else it is
+  dropped → docs/whatsapp.md.
+- **Phone** uploads, notification batches, device registration and event
+  fetches carry the user's API token. A device row is the caller's own
+  (`(user_id, device_id)`); registering never moves another user's row
+  unless the stored FCM token is presented. Push goes only to that user's devices
+  (`integrations/phone/push.py`); a notification batch is stored, triaged and
+  synced back as that user.
+
+## Sharing
+
+Sharing is not part of integrations. It lives inside the built-in services, on
+their items: a task list, a shopping list, a knowledge project. About-you
+facts and people are not shareable. Built: task lists, shopping lists, projects.
+
+- Every item has an owner (the user who created it). The owner can give
+  another user `read` or `edit` on it; only the owner can share, unshare,
+  rename or delete the item.
+- One helper backs all three services (`integrations/framework/sharing.py`, table
+  `item_access`: item type, item id, user, level, granted by, granted at; from
+  migration `m0006_item_access.py`), with one question the services ask:
+  "which items of this type can this user see / edit?" Lists and lookups
+  return the user's own items plus the ones shared with them; a write to a
+  `read` item is refused (403); an item the user cannot see answers as if it
+  did not exist (404, "not found").
+- The other user needs the same kind connected to see a shared item (a
+  project shows up through their own `knowledge` integration). A share made
+  before that is kept and shows once they connect it.
+- What is inside a shared item follows the item: tasks in a shared list,
+  items on a shared shopping list, entries in a shared project. A task added
+  to a shared list belongs to the list's owner and records who added it;
+  deleting a shared list moves its tasks to the owner's General list and ends
+  its shares; unsharing hides the list and its tasks again. Moving a task to
+  another list (tool, HTTP, weekly review, and the undo of a move) needs
+  `edit` on both lists and gives the task to the target list's owner.
+- **Names.** When a name is ambiguous between an own item and a shared one,
+  the user's own item wins (lookups, `add_task(group=…)`, `share_item`, which
+  only finds the caller's own items).
+- **Shopping** (`docs/shopping.md`). Each user with `shopping` has their own
+  list (`integrations/shopping/lists.py`, table `shopping_lists` from
+  migration `m0007_shopping_lists.py`; made by the kind's `on_connect` and at
+  every start; the first admin's is the list that existed before, item ids
+  and order kept). The shopping tools, `/api/shopping*` and search work on
+  the user's *active* list (`lists.active_list(user)`), which is their own
+  choice: the `shopping` setting `active_list` (unset: their own list). It
+  may name only their own list or a list shared with them with `edit`; a
+  share never changes it by itself (the recipient gets an invitation: a
+  banner and a phone notification), and when the chosen list's share is
+  removed or downgraded to `read` they are back on their own list (the
+  setting is cleared). Choosing: the invitation's `use`, `PUT
+  /api/shopping/active {list_id}` (→ that list's screen + undo; 404 for a
+  list they cannot see, 403 `read_only` for a `read` one), the chat tool
+  `choose_shopping_list(list_name)` (offered only when the server has more
+  than one user; without a name it lists the lists; undoable), an admin with
+  `PUT /api/integrations/shopping?user=` or `bin/users.py integrations
+  update USER shopping active_list=<id>`. `GET /api/shopping/lists`
+  (`{active, lists: [{id, name, owner, access, active}]}`, also how a client
+  finds its list id for `/api/sharing`) shows which is active; any visible
+  list, `read` ones included, can be read with `?list=<id>`. This is how a
+  household keeps one list: the owner shares it with `edit`, the others use
+  it. The list payload carries `access` and `people`; tool output adds
+  "(shared by …)". An item id that is not on the list answers "not found" /
+  404. `share_item` takes `item_type: 'shopping_list'` (any `item` names the
+  caller's one list).
+  - **Undo.** Every change registers its own undo (`core/undo.py`), refused
+    once its user can no longer edit that list or when an item it restores
+    was changed since. There is no "undo last" and no operations log.
+- **Projects** (`integrations/knowledge/projects.py`, `entries.py`; owner
+  columns from migration `m0008_knowledge_per_user.py`, the first admin's
+  existing project and entries kept with their ids and FTS index). A project
+  belongs to its creator; its entries belong to the project's owner and
+  record who created them (an entry without a project belongs to its
+  creator). Own and shared projects show in every listing, tool, search (the
+  `search_knowledge` FTS, the search box) and endpoint; `edit` may add,
+  change and delete entries, `read` refuses with "This project is shared with
+  you read-only, so nothing in it can be changed." (HTTP 403 `read_only`);
+  only the owner changes (renames, archives), deletes or shares the project
+  (HTTP 403 `owner_only`). A stored media file (`GET /media/{name}`) is served
+  only to someone who can see an entry with it. Tasks that carry a project
+  stay governed by their own list (a project never grants access to a task,
+  nor a task to a project). Link processing runs as the entry's owner.
+  `share_item` takes `item_type: 'project'` (title or id; a title clash
+  resolves to the caller's own project). Payloads add `shared_by` / `access`
+  to shared projects and their entries → docs/knowledge.md.
+- **Reminders.** A task's triggers fire for the user who created the task,
+  also on a shared list, while they can still see it; the reminder goes to them.
+- **How to share.** One tool, `share_item(item_type, item, user, level)` in
+  the `core` kind (`level`: `read`, `edit` or `none` to stop sharing;
+  `confirm=True`, asks before it runs). It is offered (and runs) only when the
+  server has more than one user and the caller has a kind with a shareable
+  item type connected, so a single-user server's tool list does not change.
+  An unknown or ambiguous user name returns an error listing the other users'
+  names; a user is matched by full name, or a unique first name / start of a
+  name. API: `GET` / `PUT /api/sharing/{item_type}/{id}` (owner only; `PUT
+  {user_id, level}`) → `{item_type, id, title, owner: {id, name},
+  shared_with: [{user_id, name, level}], users: [{id, name}]}`; unknown type
+  or an item the caller cannot see 404, a shared (not own) item 403
+  `owner_only`, the kind not connected 403 `not_connected`, a bad level / user
+  / sharing with yourself 400. Shared items carry `shared_by` (the owner's
+  name) / `access` (`read` | `edit`) in API payloads and a "shared by …" note
+  in tool output only when they are shared, so payloads for unshared items are
+  unchanged.
+
+### The sharing helper (for each service)
+
+```python
+from integrations.framework import sharing
+
+sharing.register(sharing.ItemType(
+    name="task_list", kind="tasks", label="task list",
+    owner_of=groups.owner_of,      # (item_id) -> owner user id | None (None: no such item)
+    find_owned=groups.find_owned,  # (user, name or id) -> id of an item that user owns | None
+    title_of=groups.title_of,      # (item_id) -> display name | None
+    on_change=None,                # optional (item_id, user_id, new level | None) after a change
+))
+```
+
+Register at import of the kind's module that owns the items (the
+`share_item` tool's item types and the API come from the registry). Then:
+
+| | |
+|---|---|
+| `sharing.access(user, type, id)` → `"owner" \| "edit" \| "read" \| None` | None without the kind connected or with no access |
+| `sharing.can_see(user, type, id)`, `sharing.can_edit(user, type, id)` → bool | |
+| `sharing.shared_with(user, type)` → `[Share]` (newest first), `sharing.shared_ids(user, type)` → `{id: level}` | items shared with the user (empty without the kind) |
+| `sharing.shares(type, id)` → `[Share]` (oldest first) | who an item is shared with |
+| `sharing.set_level(owner, type, id, user_id, level)` → previous level | `level` `read` / `edit` / `none`; raises `KeyError` (type), `LookupError` (owner cannot see it), `sharing.NotOwner` (a `PermissionError`), `ValueError` (bad level, unknown user, yourself) |
+| `sharing.forget(type, id)` | the item is gone: drop its shares |
+| `sharing.tool_available(user)`, `sharing.item_types()`, `sharing.item_type(name)`, `sharing.shareable_kinds()` | |
+
+`Share` = `item_type, item_id, user_id, level, granted_by, granted_at`.
+Services do the rest: their lookups use `shared_ids` to add shared items,
+their writes check `access`, and payloads add `shared_by` / `access` only for
+shared items.
+
+## What is per user
+
+Sessions and the `main` thread (the wire id stays `main`), runs, pending
+approvals, undo entries, learned phrases, usage rows, About-you facts and the
+learner, people, tasks, shopping lists, projects, calls, notifications and
+rules, phone devices and events, briefings, weekly reviews, Now, self-checks
+of that user's integrations. Another user's ids answer 404.
+
+In detail: sessions and `main`, runs, pending approvals, undo entries,
+learned phrases, usage rows and the Now screen's approval cards (see "The
+conversation core"); task lists, tasks, task links (through their task),
+trigger marks, the time checker and reminders; shopping lists, their items,
+history, aisle choices and invitation answers; projects, entries, their FTS search,
+media files and link processing; About-you facts, their prompt section and
+the learner; people, their numbers, briefs, the call card and the brief loop
+(calls and notifications linked into them only from the user's own); their
+phone (devices, push events and the push / notification-sync / triage
+self-checks; the notifications Inbox: notifications, FTS search, rules and
+declines, AI summaries, action requests, escalation rate limit, notification
+suggestions, the digest and its state, retention, re-nudges, the agent tools,
+Now's needs-you cards and notification counts, search results; calls:
+uploads, recordings, transcripts, labels, FTS search, processing and
+reanalysis as the owner, call suggestions, pop-ups, context chats, audio
+retention, startup resume, the backfill, the calls self-check); their Home
+Assistant (tools, endpoints, zones, home map, weather, the entity watcher and
+its self-check marks); their WhatsApp (tools, caches, saved contacts, inbound
+voice notes and their Telegram chat); their Google Calendar (tools,
+`/api/calendar/*`, the selected calendars, event undo, today's events in Now,
+the briefing, meeting cards, the weekly review, the `calendar` self-check);
+their Frigate (every camera endpoint and its caches). Saved images
+(`/api/images/*`) belong to the user they were saved for. The composers
+(`core/composers.py`): the Now screen (items per kind, hidden cards
+`now_hidden`, act / undo, day slots, the lede), the wake flow (`wake_log` per
+user and date, the raw signal mark, the check in flight; needs `phone` and
+`homeassistant`), the briefing (`briefings` per user and date; for `phone`,
+or a Telegram chat and a kind with something to say), meeting cards
+(`calendar` + `phone`), the weekly review (`weekly_reviews.user_id`;
+`tasks`), search (own and shared items), the self-checks (per user, ignore
+per user), context chats and the bedroom dashboard's endpoints — each from
+the user's connected kinds only (a missing kind adds nothing; an action
+needing it is 403 `not_connected`; the polled `/api/briefing/today` and
+`/api/review/latest` answer null). Every prompt is written for its user from
+their profile (`core/user_profile.for_user`, see "User"); Dana's instructions
+hold only the parts of the kinds they have (see "Integration").
+
+Proactive messages go through one function, `notify(user, …)`: their Telegram
+chat if they have one today; their phone through `integrations/phone/push.py`
+(`send(user, …)` / `notify(user, …)`), which reaches only their devices.
+
+## Managing users
+
+Three ways, the same rules: `bin/users.py` on the server (everything, any
+user, works on the database directly), the HTTP API (a user's own
+integrations; an admin's for anyone) and the web UI's **Integrations** page
+built on that API (Settings → Integrations). Users, tokens, Telegram ids and
+sharing have no screen: the CLI (and the API for sharing) cover them.
+
+### bin/users.py
+
+Plain argparse, `--help` on every command; run where the server's env is
+(`DATABASE_PATH`, `CREDENTIALS_KEY`), in production in the pod:
+`kubectl exec -n <namespace> deploy/<deployment> -- python bin/users.py list`.
+It refuses to run on a database with pending migrations (start the server
+once). The running server sees a change within its 10 s cache refresh. Tests:
+`python test_users_cli.py`.
+
+```
+list                                    users: access, Telegram ids, tokens, integrations
+add NAME [--access] [--context] [--pronoun] [--telegram-chat]
+update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
+remove USER [--delete-data]             without the flag: says what would be deleted, removes nothing
+tokens issue USER [--label]             prints the token once
+tokens list [USER]
+tokens revoke TOKEN_ID
+telegram add USER TELEGRAM_ID
+telegram move TELEGRAM_ID USER
+telegram remove TELEGRAM_ID [--allow-open-bot]
+integrations kinds                      every kind with its credential and setting fields
+integrations show USER                  a user's integrations (credential values never shown)
+integrations connect USER KIND [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
+integrations update USER KIND [--credentials-file PATH | --credentials-stdin] [SETTING=VALUE ...]
+integrations disconnect USER KIND
+sharing [USER]                          who has access to what
+```
+
+- `USER` is a user id or name (full name, or a unique start of one, any case).
+- Credentials only from a file or stdin, as `name=value` lines, never on the
+  command line (they would land in shell history and `ps`). `SETTING=VALUE`
+  is read as JSON when it parses (numbers, `null`, lists), else as text;
+  `SETTING=` puts the setting back to its default.
+- Stored secrets are never printed: tokens only once, at `tokens issue`;
+  credentials only as set / not set.
+- The access level is respected (`ops` only for an admin), as in
+  `store.connect`. The last admin cannot be removed or made a member.
+- `telegram remove` refuses to remove the last Telegram id of all (the bot
+  would become open to anyone) unless `--allow-open-bot`.
+- **Removing a user** (`remove USER --delete-data`): their row and everything
+  they own go — sessions, thread, learned phrases, tokens, Telegram ids,
+  integrations (credentials included), task lists and tasks, shopping list,
+  projects and entries, About facts, people, phone devices / notifications /
+  calls (recording files and saved images deleted from disk), briefings,
+  reviews, Now state, and the shares they gave or were given. Kept: usage
+  rows (the server's cost history; their `user_id` stays as it was),
+  `integration_imports` (so the env import never runs again for whoever
+  becomes first admin), and what they added to other users' shared lists or
+  projects (it belongs to the list's / project's owner; `created_by` keeps
+  their old id). Other users' tasks pointing at a removed project lose the
+  link. Without `--delete-data` it lists the counts and removes nothing.
+
+### The Integrations page
+
+`static/integrations.js` + `static/integrations.css`, the panel
+`#panel-integrations` in `static/index.html`, opened from the Settings tile
+(or `/#integrations`); tests: `node test_web_integrations.mjs` (its pure part
+against payloads captured from the API in `test_fixtures/integrations_web.json`,
+regenerated with `WRITE_WEB_FIXTURE=1 python test_integrations_api.py`, which
+also fails when the API's shape drifts from the file) and the "Integrations
+page" section of `tests/local_env/e2e.py`.
+
+- **Header**: who is signed in (`/api/me`: name, access level). A user with
+  `manage_users` gets a picker of every user (`/api/users`); picking someone
+  else shows a banner ("You're editing Maya Levi's integrations") and every
+  request carries `?user=`.
+- **List**: services you connect with an account or address (a kind with
+  credentials or an address setting: Home Assistant, WhatsApp, Google
+  Calendar, Cameras) first, built-in kinds after. Each row: name,
+  description, state from the server only (connected / not connected / needs
+  attention: an `account_conflict` or a stored address that is no longer
+  valid, `problem`), the account (the WhatsApp number) or the service's host,
+  and "Number used by another user" on a conflict.
+- **Detail** (inline expand, works at phone width): a secret credential is an
+  empty password input with *set* / *not set* beside it (empty keeps the
+  stored value; an optional one has "Remove the saved …"); an address is a
+  normal input holding the current value; settings are text inputs, Telegram
+  chats number inputs with the field's `rule`, list settings
+  (`selected_calendars`) comma-separated; a kind with `options` offers its
+  candidates (`/options`) as suggestions while free text stays possible.
+  A kind with `connect_url` (the Google kinds) has "Connect with Google" /
+  "Sign in with Google again" (a link to that path) and a line saying one
+  sign-in connects them all; coming back, `?google=<result>` is shown as a
+  line under the header and dropped from the address.
+  Save sends only what changed (`PUT`, a 400 shows under its field), Test
+  connection (`POST …/test`), Disconnect behind a confirm that says what
+  stops and that nothing else is deleted. A service not connected shows its
+  fields and Connect; a built-in kind without fields has Connect /
+  Disconnect on its row.
+- **Read-only parts**: a kind or field with `can_change: false` has no input
+  or button, only its value (secrets: set / not set) and `why_not` ("Set by
+  an admin").
+- **Honest states**: loading, load failed (Try again), saving, saved,
+  testing, the test's result, the 503 `credentials_key` explained in a
+  sentence. The service worker never caches `/api/me`, `/api/users` or
+  `/api/integrations*`.
+- **No secret on the page**: secret values are never in a payload, so never
+  in the HTML; what is typed lives in the input and in memory until sent and
+  is dropped after a successful save (the form is drawn again, inputs empty)
+  and when leaving the screen; nothing goes to `localStorage` or the log.
+
+### HTTP API
+
+`core/integrations_api.py`, tests: `python test_integrations_api.py`.
+
+| | |
+|---|---|
+| `GET /api/me` | `{id, name, access, capabilities: [...], kinds: [...]}` — the caller, their level's capabilities, their connected kinds (`core` first) |
+| `GET /api/users` | `{users: [{id, name, access}]}` — every user, for a caller with `manage_users` (the Integrations page's picker); nothing else about them; 403 `forbidden` without the capability |
+| `GET /api/integrations` | `{user_id, integrations: [<integration>, ...]}` — every kind the user may connect (not `core`; `ops` only with the `ops` capability) |
+| `GET /api/integrations/{kind}` | `<integration>` |
+| `PUT /api/integrations/{kind}` | body `{credentials?: {name: str \| null}, settings?: {name: value \| null}}` → `<integration>`; 201 when it connects, 200 when it updates. Merges: a credential given replaces the stored one (`null` removes an optional one), a setting given replaces its value (`null` = default) |
+| `DELETE /api/integrations/{kind}` | `<integration>` with `connected: false`, plus `disconnected` (false when it was not connected) |
+| `POST /api/integrations/{kind}/test` | `{kind, checked, ok, reason}` — `checked: false, ok: null` for a kind without a check; `reason` is short and has no secrets |
+| `GET /api/integrations/{kind}/options` | `{kind, settings: {name: [{value, label}, ...]}}` — 404 `no_options` for a kind without any, 502 `unavailable` when the service cannot be read |
+
+`<integration>` = `{kind, description, connected, requires, can_change,
+why_not, credentials: [{name, description, required, set, type, secret,
+value?, can_change, why_not, rule}], settings: [{name, description, default,
+value, type, can_change, why_not, rule}], account, check, options}`, plus
+`account_conflict` (only while another user's connection holds the account
+the service reports) and `problem: {field, message}` (only while a stored
+address / name is not valid). Secret credentials are write-only: only whether
+each is `set` comes back, never the value; an address credential
+(`secret: false`: Home Assistant `host`, WAHA `url`) also carries its
+`value`. `type` is the field type (`text`, `address`, `name`,
+`telegram_chat`). `can_change` / `why_not` on the kind and
+on each field say whether the caller may change it for this user and, when
+not, why ("Set by an admin": `cameras` for a member, an address while no
+admin allowed any origin of the kind, a Telegram chat for a member without a
+Telegram id); `rule` is one line on what a
+value may be ("Only an address an admin has allowed for this service.").
+They come from `store.kind_rule` / `store.field_rule`, the functions the
+store's checks use. An address is still never shown to another member: the
+payload is only ever built for the connection's own user or an admin acting
+with `?user=`.
+
+Errors: 400 `{"error": "invalid", "field", "message"}` (a body that is not a
+JSON object, an unknown top-level key, field, credential or setting, a
+missing required credential, a credential that is not text, a value its
+field type or the kind's rule refuses: "Security rules"; for `test` /
+`options`, a stored address that is not valid); 403
+`{"error": "forbidden", "needs": "<capability>"}` (a kind the target's level
+may not connect, `?user=` without `manage_users`, a kind whose
+`change_requires` the caller lacks); 403 `not_connected` for
+`test` / `options` on a kind that is not connected; 404
+`unknown_integration` (unknown kind, or `core`), `user_not_found`; 503
+`credentials_key` when `CREDENTIALS_KEY` is missing (a save) or cannot
+decrypt the stored credentials (a read). `?user=<id>` acts on
+another user (needs `manage_users`; the target's level decides what they may
+connect).
+
+### How to
+
+- **Add a user.** `bin/users.py add "Maya Levi" --pronoun she --context
+  "Maya is a nurse in Haifa. Noa is her sister."`, then
+  `bin/users.py tokens issue maya --label phone` (give her the printed token
+  for the app / web login) and, for Telegram, `bin/users.py telegram add maya
+  <her Telegram user id>` plus `update maya --telegram-chat <chat id>` for
+  proactive messages. She starts with only `core`.
+- **Connect an integration from the page.** Settings → Integrations, open
+  the service (an admin first picks the user at the top), fill in the
+  address and the key / token, Connect; then Test connection, pick the
+  settings from the suggestions (Home Assistant: your person, the car's
+  Bluetooth sensor and name, the phone's sensors, the weather entity) and
+  Save. A built-in kind (Tasks, Shopping, …) is one Connect on its row. A
+  field marked "Set by an admin" is one an admin sets for you (pick your
+  name, change it, Save).
+- **Connect an integration with the CLI or the API.** Built-in kinds need nothing:
+  `bin/users.py integrations connect maya tasks` (her default lists are made
+  at once). A service: put the credentials in a file (`host=…`,
+  `token=…`), `bin/users.py integrations connect maya homeassistant
+  --credentials-file ha.txt person=person.maya`, delete the file; or
+  `PUT /api/integrations/homeassistant` with her token. `POST
+  /api/integrations/homeassistant/test` says whether it answers, `GET
+  /api/integrations/homeassistant/options` lists candidates for her
+  settings. No restart.
+- **Share an item.** Ask Dana ("share the Groceries list with Maya, she can
+  edit") — the `share_item` tool — or `PUT /api/sharing/{item_type}/{id}`
+  (see "Sharing" → How to share). `bin/users.py sharing [USER]` shows who has
+  access to what.
+
+## Limits
+
+- One integration per kind per user.
+- One timezone for the whole server.
+- No screen for users or sharing (the CLI and the API cover them);
+  integrations have the Integrations page.

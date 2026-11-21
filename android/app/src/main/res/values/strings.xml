@@ -1,0 +1,11 @@
+<resources>
+    <string name="app_name">Dana</string>
+    <string name="server_url_hint">Server URL (e.g. https://dana.example.com)</string>
+    <string name="api_token_hint">API Token (Optional)</string>
+    <string name="save_settings">Save Settings</string>
+    <string name="set_default_assistant">Set Default Assistant</string>
+    <string name="listening_text">Listening...</string>
+    <string name="processing_text">Processing...</string>
+    <string name="approve">Approve</string>
+    <string name="deny">Deny</string>
+</resources>

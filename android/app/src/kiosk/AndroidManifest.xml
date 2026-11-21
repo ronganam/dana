@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Wall-tablet build: dashboard + "Hey Dana". Drops the phone-only pieces
+     (call recordings, watch bridge, system assistant, reminders, updater). -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <uses-permission android:name="android.permission.READ_CALL_LOG" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:node="remove" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" tools:node="remove" />
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" tools:node="remove" />
+
+    <!-- DanaSpeaker looks for Google's TTS engine (Hebrew voices). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
+        </intent>
+    </queries>
+
+    <application>
+        <!-- Phone-only: the notification Inbox listener. -->
+        <service android:name="app.ganam.assistant.data.notifications.DanaNotificationListener" tools:node="remove" />
+        <activity android:name="app.ganam.assistant.NotificationAlertActivity" tools:node="remove" />
+        <activity android:name="app.ganam.assistant.SuggestionsPopupActivity" tools:node="remove" />
+
+        <activity
+            android:name=".kiosk.KioskActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:clearTaskOnLaunch="true"
+            android:excludeFromRecents="true"
+            android:screenOrientation="sensorLandscape"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode"
+            android:theme="@style/Theme.GanamAssistant"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- Be the home screen: Android relaunches it after boot, crashes and Home presses. -->
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+
+        <service
+            android:name=".wake.WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
+
+        <!-- The phone app's entry point stays (shared code links to it) but isn't launchable. -->
+        <activity android:name=".MainActivity" tools:node="merge">
+            <intent-filter tools:node="removeAll" />
+        </activity>
+
+        <receiver android:name=".BootReceiver" tools:node="remove" />
+        <receiver android:name=".data.sync.CallUploadReceiver" tools:node="remove" />
+        <receiver android:name=".push.AgentSessionReceiver" tools:node="remove" />
+        <service android:name=".GanamVoiceInteractionService" tools:node="remove" />
+        <service android:name=".GanamVoiceInteractionSessionService" tools:node="remove" />
+        <service android:name=".GanamRecognitionService" tools:node="remove" />
+        <service android:name=".CallRecordingObserverService" tools:node="remove" />
+        <service android:name=".data.wear.WearMessageListenerService" tools:node="remove" />
+    </application>
+</manifest>

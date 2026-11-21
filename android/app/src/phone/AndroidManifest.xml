@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Caller card: notice incoming / outgoing calls (callcard/CallerCard.kt). -->
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+
+    <application>
+        <!-- Direct push from the server: FCM wake-up pings (push/PhoneEvents). -->
+        <service
+            android:name=".push.DanaMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Caller card: floating card + watch card when someone calls. -->
+        <receiver
+            android:name=".callcard.CallerCardReceiver"
+            android:exported="true"
+            android:permission="android.permission.READ_PHONE_STATE">
+            <intent-filter>
+                <action android:name="android.intent.action.PHONE_STATE" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Ask Dana widget / launcher shortcut trampoline. -->
+        <activity
+            android:name=".AskDanaActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <!-- Home-screen widgets (widgets/Widgets.kt). -->
+        <receiver android:name=".widgets.AskWidgetReceiver" android:exported="true" android:label="@string/widget_ask">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_ask" />
+        </receiver>
+        <receiver android:name=".widgets.TodayWidgetReceiver" android:exported="true" android:label="@string/widget_today">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_today" />
+        </receiver>
+        <receiver android:name=".widgets.WaitingWidgetReceiver" android:exported="true" android:label="@string/widget_waiting">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_waiting" />
+        </receiver>
+        <receiver android:name=".widgets.PeopleWidgetReceiver" android:exported="true" android:label="@string/widget_people">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_people" />
+        </receiver>
+        <receiver android:name=".widgets.InboxWidgetReceiver" android:exported="true" android:label="@string/widget_inbox">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_inbox" />
+        </receiver>
+        <!-- The Shopping widget's +: quick add over the home screen (widgets/ShoppingQuickAddActivity.kt). -->
+        <activity
+            android:name=".widgets.ShoppingQuickAddActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.GanamAssistant.VoiceSession"
+            android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
+        <receiver android:name=".widgets.ShoppingWidgetReceiver" android:exported="true" android:label="@string/widget_shopping">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_shopping" />
+        </receiver>
+    </application>
+</manifest>

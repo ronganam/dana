@@ -1,0 +1,7 @@
+# Baseline profile: compile Dana's own watch code ahead of time when the app
+# is installed or updated (the Compose / Wear Compose libraries ship their
+# own rules). Without it a sideloaded watch app runs interpreted/JIT until
+# the watch's idle dexopt reaches it, and the first press after an install
+# is slow. bin/deploy-app.sh --watch-ip forces the compile after installing.
+HSPLapp/ganam/assistant/wear/**;->**(**)**
+Lapp/ganam/assistant/wear/**;

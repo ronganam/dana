@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dana</title>
+    <!-- PWA & Mobile Meta -->
+    <meta name="theme-color" content="#2b2622">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Dana">
+    <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="manifest" href="/manifest.json">
+    <!-- Google Fonts: Inter (narrative) & DM Mono (terminal/code) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Stylesheet -->
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/inbox.css">
+    <link rel="stylesheet" href="/static/people.css">
+    <link rel="stylesheet" href="/static/usage.css">
+    <link rel="stylesheet" href="/static/integrations.css">
+    <link rel="stylesheet" href="/static/shopping.css">
+    <link rel="stylesheet" href="/static/money.css">
+    <link rel="stylesheet" href="/static/projects.css">
+    <!-- Third-Party Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="/static/app-core.js" defer></script>
+    <script src="/static/app-nav.js" defer></script>
+    <script src="/static/app-stream.js" defer></script>
+    <script src="/static/app-thread.js" defer></script>
+    <script src="/static/app-chat.js" defer></script>
+    <script src="/static/app-voice.js" defer></script>
+    <script src="/static/app-tasks.js" defer></script>
+    <script src="/static/app-memory.js" defer></script>
+    <script src="/static/app-calls.js" defer></script>
+    <script src="/static/app-settings.js" defer></script>
+    <script src="/static/app-calendar.js" defer></script>
+    <script src="/static/app-debug.js" defer></script>
+    <script src="/static/app.js" defer></script>
+    <script src="/static/inbox.js" defer></script>
+    <script src="/static/people.js" defer></script>
+    <script src="/static/review.js" defer></script>
+    <script src="/static/usage.js" defer></script>
+    <script src="/static/integrations.js" defer></script>
+    <script src="/static/shopping-core.js" defer></script>
+    <script src="/static/shopping.js" defer></script>
+    <script src="/static/money-core.js" defer></script>
+    <script src="/static/money-dash.js" defer></script>
+    <script src="/static/money.js" defer></script>
+    <script src="/static/projects-core.js" defer></script>
+    <script src="/static/projects.js" defer></script>
+</head>
+<body>
+    <div class="app-container">
+        <!-- ── Navigation Rail (Desktop / Tablet >= 768px) ── -->
+        <aside class="nav-rail" id="nav-rail">
+            <div class="nav-rail-brand" id="rail-brand" title="Dana">D</div>
+            <div class="nav-rail-items">
+                <button class="rail-btn active" data-tab="chat" title="Chat & Assistant">
+                    <i data-lucide="message-square"></i>
+                    <span>Chat</span>
+                </button>
+                <button class="rail-btn" data-tab="inbox" title="Phone notifications">
+                    <i data-lucide="inbox"></i>
+                    <span>Inbox</span>
+                    <span class="ibx-nav-badge hidden" data-inbox-badge></span>
+                </button>
+                <button class="rail-btn" data-tab="people" title="People">
+                    <i data-lucide="users"></i>
+                    <span>People</span>
+                </button>
+                <button class="rail-btn" data-tab="tasks" title="Tasks & Reminders">
+                    <i data-lucide="check-square"></i>
+                    <span>Tasks</span>
+                </button>
+                <button class="rail-btn hidden" data-tab="shopping" data-shopping-nav title="Shopping list">
+                    <i data-lucide="shopping-cart"></i>
+                    <span>Shopping</span>
+                    <span class="ibx-nav-badge shp-nav-badge hidden" data-shopping-badge></span>
+                </button>
+                <button class="rail-btn hidden" data-tab="money" data-money-nav title="Money">
+                    <i data-lucide="wallet"></i>
+                    <span>Money</span>
+                </button>
+                <button class="rail-btn" data-tab="memory" title="Memory Center">
+                    <i data-lucide="star"></i>
+                    <span>Memory</span>
+                </button>
+                <button class="rail-btn" data-tab="projects" title="Projects & Knowledge">
+                    <i data-lucide="folder"></i>
+                    <span>Projects</span>
+                </button>
+                <button class="rail-btn" data-tab="calls" title="Calls & Memos">
+                    <i data-lucide="phone"></i>
+                    <span>Calls</span>
+                </button>
+                <button class="rail-btn" data-tab="settings" title="Settings">
+                    <i data-lucide="settings"></i>
+                    <span>Settings</span>
+                </button>
+            </div>
+            <div class="rail-divider"></div>
+            <div class="nav-rail-secondary">
+                <button class="rail-btn" data-tab="calendar" title="Calendar Hub">
+                    <i data-lucide="calendar"></i>
+                    <span>Calendar</span>
+                </button>
+                <button class="rail-btn" data-tab="debug" title="Debug & Logs">
+                    <i data-lucide="terminal"></i>
+                    <span>Debug</span>
+                </button>
+                <button class="rail-btn" data-tab="usage" title="Usage &amp; cost">
+                    <i data-lucide="receipt"></i>
+                    <span>Usage</span>
+                </button>
+                <a href="/dashboard" class="rail-btn" title="Dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dash</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- ── Mobile Bottom Navigation Bar (< 768px) ── -->
+        <nav class="bottom-nav" id="bottom-nav">
+            <button class="bottom-nav-btn active" data-tab="chat">
+                <i data-lucide="message-square"></i>
+                <span>Chat</span>
+            </button>
+            <button class="bottom-nav-btn" data-tab="tasks">
+                <i data-lucide="check-square"></i>
+                <span>Tasks</span>
+            </button>
+            <button class="bottom-nav-btn hidden" data-tab="shopping" data-shopping-nav>
+                <i data-lucide="shopping-cart"></i>
+                <span>Shopping</span>
+                <span class="ibx-nav-badge shp-nav-badge hidden" data-shopping-badge></span>
+            </button>
+            <button class="bottom-nav-btn hidden" data-tab="money" data-money-nav>
+                <i data-lucide="wallet"></i>
+                <span>Money</span>
+            </button>
+            <button class="bottom-nav-btn" data-tab="inbox">
+                <i data-lucide="inbox"></i>
+                <span>Inbox</span>
+                <span class="ibx-nav-badge hidden" data-inbox-badge></span>
+            </button>
+            <button class="bottom-nav-btn" data-tab="people">
+                <i data-lucide="users"></i>
+                <span>People</span>
+            </button>
+            <button class="bottom-nav-btn" data-tab="projects">
+                <i data-lucide="folder"></i>
+                <span>Projects</span>
+            </button>
+            <button class="bottom-nav-btn" data-tab="calls">
+                <i data-lucide="phone"></i>
+                <span>Calls</span>
+            </button>
+            <button class="bottom-nav-btn" data-tab="settings">
+                <i data-lucide="settings"></i>
+                <span>Settings</span>
+            </button>
+        </nav>
+
+        <!-- ── Main Viewport ── -->
+        <main class="main-viewport" id="main-viewport">
+
+            <!-- ════ SCREEN 1: CHAT (First-Class View) ════ -->
+            <section class="screen-panel active" id="panel-chat">
+                <header class="top-bar">
+                    <button class="icon-btn" id="btn-chat-history" title="Chats" aria-label="Show chats">
+                        <i data-lucide="panel-left"></i>
+                    </button>
+                    <div class="top-bar-title-group">
+                        <span class="top-bar-title">Dana</span>
+                        <span class="top-bar-subtitle" id="chat-session-badge" title="Click to copy session ID">
+                            Session: <code id="chat-session-id-label">#init</code>
+                        </span>
+                    </div>
+                    <div class="top-bar-actions">
+                        <button class="chip hidden" id="btn-chat-new-topic" title="New topic: Dana forgets this conversation so far (the messages stay)">
+                            <i data-lucide="eraser" style="width:14px;height:14px;"></i>
+                            <span>New topic</span>
+                        </button>
+                        <select class="chip chat-llm-select hidden" id="chat-llm-select" title="Model for chat replies" aria-label="Chat model"></select>
+                        <button class="chip" id="chat-model-btn" title="Toggle Realtime Model">
+                            <span id="chat-model-label">Realtime</span>
+                            <i data-lucide="chevron-down" style="width:14px;height:14px;"></i>
+                        </button>
+                        <button class="icon-btn primary" id="btn-chat-call" title="Start Realtime Call">
+                            <i data-lucide="phone" id="chat-call-icon"></i>
+                        </button>
+
+                    </div>
+                </header>
+
+                <div class="chat-layout">
+                <aside class="chat-sidebar" id="chat-sidebar" aria-label="Chats">
+                    <button class="btn-primary chat-sidebar-new" id="btn-chat-new-session">
+                        <i data-lucide="plus" style="width:15px;height:15px;"></i>
+                        <span>New chat</span>
+                    </button>
+                    <div class="chat-sidebar-item shared" data-session-id="main" id="chat-sidebar-shared">
+                        <i data-lucide="smartphone" class="chat-sidebar-icon"></i>
+                        <div class="chat-sidebar-text">
+                            <strong>Shared with your devices</strong>
+                            <span>Phone, watch &amp; tablet</span>
+                        </div>
+                    </div>
+                    <div class="chat-sidebar-label">Recent</div>
+                    <div class="chat-sidebar-list" id="chat-sessions-list"></div>
+                </aside>
+                <div class="chat-sidebar-backdrop" id="chat-sidebar-backdrop"></div>
+                <div class="chat-screen-container">
+                    <!-- Realtime Call Active Banner -->
+                    <div class="call-banner hidden" id="chat-call-banner">
+                        <div class="call-banner-top">
+                            <div class="call-banner-info">
+                                <div class="call-pulse-orb" id="call-pulse-orb" style="background: var(--connecting-amber);"></div>
+                                <div>
+                                    <div style="display:flex;align-items:center;gap:6px;">
+                                        <strong style="font-size:13px;">Realtime Call</strong>
+                                        <span class="call-model-badge" id="call-banner-model">GPT Realtime</span>
+                                    </div>
+                                    <span class="call-status-text" id="call-banner-status">Connecting...</span>
+                                </div>
+                            </div>
+                            <div class="call-banner-actions">
+                                <button class="icon-btn" id="btn-call-mute" title="Mute Mic">
+                                    <i data-lucide="mic" id="call-mute-icon"></i>
+                                </button>
+                                <button class="icon-btn" id="btn-call-speaker" title="Speaker Toggle">
+                                    <i data-lucide="volume-2" id="call-speaker-icon"></i>
+                                </button>
+                                <button class="btn-primary" id="btn-call-hangup" style="background: var(--destructive); color: white; padding: 5px 12px; font-size: 12px;">
+                                    <i data-lucide="phone-off" style="width:14px;height:14px;"></i>
+                                    <span>Hang Up</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="call-live-transcript hidden" id="call-live-transcript">
+                            <span id="call-live-text"></span>
+                        </div>
+                    </div>
+
+                    <!-- Chat Messages Stream -->
+                    <div class="chat-messages" id="chat-messages">
+                        <!-- Messages dynamically rendered here -->
+                    </div>
+
+                    <!-- Bottom Chat Input Bar -->
+                    <div class="chat-input-bar">
+                        <!-- Attached Image Preview -->
+                        <div class="chat-attached-preview hidden" id="chat-attached-preview">
+                            <img id="chat-preview-img" src="" alt="Selected image">
+                            <span id="chat-preview-name" style="font-size:12px;color:var(--body);">image.png</span>
+                            <button class="icon-btn destructive" id="btn-chat-preview-remove" style="width:28px;height:28px;margin-left:auto;">
+                                <i data-lucide="x" style="width:14px;height:14px;"></i>
+                            </button>
+                        </div>
+
+                        <div class="chat-input-wrapper" id="chat-input-wrapper">
+                            <!-- Image Attachment Button -->
+                            <button class="icon-btn" id="btn-chat-img" title="Attach Image">
+                                <i data-lucide="image"></i>
+                            </button>
+                            <input type="file" id="chat-img-input" accept="image/*" style="display:none;">
+
+                            <input type="text" class="chat-input" id="chat-text-input" placeholder="Ask me anything..." autocomplete="off">
+
+                            <!-- Send Button -->
+                            <button class="icon-btn primary" id="btn-chat-send" title="Send Message">
+                                <i data-lucide="send"></i>
+                            </button>
+
+                            <!-- Siri Glow Sphere Orb Visualizer -->
+                            <div class="siri-sphere-btn" id="btn-chat-voice" title="Voice Input / Recording">
+                                <canvas class="siri-sphere-canvas" id="siri-sphere-canvas" width="44" height="44"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                </div>
+            </section>
+
+            <!-- ════ SCREEN 2: TASKS (Reminders) ════ -->
+            <section class="screen-panel" id="panel-tasks">
+                <header class="top-bar">
+                    <span class="top-bar-title">Reminders</span>
+                    <div class="top-bar-actions">
+                        <button class="btn-primary" id="btn-add-task-top">
+                            <i data-lucide="plus" style="width:16px;height:16px;"></i>
+                            <span>New Reminder</span>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="today-strip hidden" id="today-strip"></div>
+                <div class="three-pane-container" id="tasks-three-pane">
+                    <!-- Pane 1: Filters Sidebar -->
+                    <div class="pane-filters" id="tasks-pane-filters">
+                        <!-- Sort Mode -->
+                        <div class="filter-sidebar-section">
+                            <span class="filter-sidebar-title">Sort By</span>
+                            <div class="filter-nav-item active" data-sort="group">
+                                <span>📁 Group</span>
+                            </div>
+                            <div class="filter-nav-item" data-sort="priority">
+                                <span>⚡ Priority</span>
+                            </div>
+                            <div class="filter-nav-item" data-sort="due">
+                                <span>📅 Due Date</span>
+                            </div>
+                        </div>
+
+                        <!-- Groups Filter -->
+                        <div class="filter-sidebar-section">
+                            <div style="display:flex;align-items:center;justify-content:space-between;">
+                                <span class="filter-sidebar-title">Groups</span>
+                                <button class="icon-btn" id="btn-manage-groups" title="Manage Groups" style="width:24px;height:24px;">
+                                    <i data-lucide="settings" style="width:13px;height:13px;"></i>
+                                </button>
+                            </div>
+                            <div id="tasks-group-filter-list">
+                                <div class="filter-nav-item active" data-group="all">
+                                    <span>All Reminders</span>
+                                    <span class="count-badge" id="tasks-count-all">0</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Triggers Filter -->
+                        <div class="filter-sidebar-section">
+                            <span class="filter-sidebar-title">Triggers</span>
+                            <div class="filter-nav-item" data-trigger="time">
+                                <span>⏰ Time</span>
+                                <span class="count-badge" id="tasks-count-time">0</span>
+                            </div>
+                            <div class="filter-nav-item" data-trigger="location">
+                                <span>📍 Location</span>
+                                <span class="count-badge" id="tasks-count-location">0</span>
+                            </div>
+                            <div class="filter-nav-item" data-trigger="car">
+                                <span>🚗 Car</span>
+                                <span class="count-badge" id="tasks-count-car">0</span>
+                            </div>
+                            <div class="filter-nav-item" data-trigger="wake">
+                                <span>☀️ Wake Up</span>
+                                <span class="count-badge" id="tasks-count-wake">0</span>
+                            </div>
+                        </div>
+
+                        <!-- Completed Tasks Option -->
+                        <div class="filter-sidebar-section" style="margin-top:auto;border-top:1px solid var(--hairline);padding-top:12px;">
+                            <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--body);cursor:pointer;padding:4px;">
+                                <input type="checkbox" id="task-toggle-completed" style="accent-color:var(--ink);">
+                                <span>Show completed</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Pane 2: Tasks List -->
+                    <div class="pane-list" id="tasks-pane-list">
+                        <div class="pane-master-header">
+                            <input type="text" class="form-control" id="tasks-search-input" placeholder="Search reminders...">
+                        </div>
+                        <div class="pane-master-list" id="tasks-scroll-list">
+                            <!-- Grouped collapsible tasks inserted here -->
+                        </div>
+                    </div>
+
+                    <!-- Pane 3: Selected Task Content / Detail -->
+                    <div class="pane-content" id="task-detail-pane">
+                        <div class="pane-empty-state">
+                            <i data-lucide="check-square" style="width:40px;height:40px;opacity:0.4;"></i>
+                            <span>Select a reminder to view its details</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="fab-btn" id="btn-add-task-fab" title="New Reminder">
+                    <i data-lucide="plus"></i>
+                </button>
+            </section>
+
+            <!-- ════ SCREEN 3: MEMORY CENTER ════ -->
+            <section class="screen-panel" id="panel-memory">
+                <header class="top-bar">
+                    <span class="top-bar-title">Memory Center</span>
+                    <div class="top-bar-actions">
+                        <button class="btn-primary" id="btn-add-memory-top">
+                            <i data-lucide="plus" style="width:16px;height:16px;"></i>
+                            <span>Add Memory</span>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="two-pane-container" id="memory-two-pane">
+                    <!-- Left: Master List -->
+                    <div class="pane-master">
+                        <div class="pane-master-header">
+                            <input type="text" class="form-control" id="memory-search-input" placeholder="Search memories...">
+                        </div>
+                        <div class="pane-master-list" id="memory-master-list">
+                            <!-- Memory compact rows inserted here -->
+                        </div>
+                    </div>
+                    <!-- Right: Detail / Inline Editor Pane -->
+                    <div class="pane-detail" id="memory-detail-pane">
+                        <div class="pane-empty-state">
+                            <i data-lucide="star" style="width:40px;height:40px;opacity:0.4;"></i>
+                            <span>Select a memory to view or edit</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="fab-btn" id="btn-add-memory-fab" title="Add Memory">
+                    <i data-lucide="plus"></i>
+                </button>
+            </section>
+
+            <!-- ════ PROJECTS (static/projects.js, static/projects-core.js; docs/knowledge.md) ════ -->
+            <section class="screen-panel" id="panel-projects" data-level="home">
+                <header class="top-bar prj-top">
+                    <nav class="prj-crumbs" id="prj-crumbs" aria-label="Where you are"><span class="top-bar-title">Projects</span></nav>
+                    <div class="top-bar-actions" id="prj-actions"></div>
+                </header>
+                <div class="prj-body">
+                    <aside class="prj-side" id="prj-side" aria-label="Projects"></aside>
+                    <main class="prj-main" id="prj-main"></main>
+                </div>
+                <div class="prj-sheet-backdrop hidden" id="prj-sheet-backdrop"></div>
+                <aside class="prj-sheet hidden" id="prj-sheet" role="dialog" aria-modal="true" aria-label="Details"></aside>
+                <div class="prj-toast hidden" id="prj-toast" role="status" aria-live="polite"></div>
+            </section>
+
+            <!-- ════ SCREEN 5: CALLS (Call Assistant) ════ -->
+            <section class="screen-panel" id="panel-calls">
+                <header class="top-bar">
+                    <span class="top-bar-title">Call Assistant</span>
+                    <div class="top-bar-actions">
+                        <button class="icon-btn" id="btn-refresh-calls" title="Refresh">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                        <button class="btn-primary" id="btn-upload-call-top">
+                            <i data-lucide="upload" style="width:16px;height:16px;"></i>
+                            <span>Upload Audio</span>
+                        </button>
+                    </div>
+                </header>
+
+                <div class="two-pane-container" id="calls-two-pane">
+                    <!-- Left: Master Calls List -->
+                    <div class="pane-master">
+                        <div class="pane-master-header">
+                            <input type="text" class="form-control" id="calls-search-input" placeholder="Search calls, transcripts...">
+                        </div>
+                        <div class="pane-master-list" id="calls-master-list">
+                            <!-- Compact call rows inserted here -->
+                        </div>
+                    </div>
+                    <!-- Right: Call Detail Pane -->
+                    <div class="pane-detail" id="calls-detail-pane">
+                        <div class="pane-empty-state">
+                            <i data-lucide="phone" style="width:40px;height:40px;opacity:0.4;"></i>
+                            <span>Select a call to listen, read summary & transcript</span>
+                        </div>
+                    </div>
+                </div>
+
+                <button class="fab-btn" id="btn-upload-call-fab" title="Upload Audio">
+                    <i data-lucide="upload"></i>
+                </button>
+            </section>
+
+            <!-- ════ INBOX: phone notifications (static/inbox.js) ════ -->
+            <section class="screen-panel" id="panel-inbox">
+                <header class="top-bar">
+                    <div class="ibx-titles">
+                        <span class="top-bar-title">Inbox</span>
+                        <span class="ibx-kicker" id="ibx-kicker"></span>
+                    </div>
+                    <div class="top-bar-actions">
+                        <button class="chip" id="ibx-group-toggle" title="Group by app (g)">
+                            <i data-lucide="layers" style="width:14px;height:14px;"></i><span>By app</span>
+                        </button>
+                        <button class="icon-btn" id="ibx-help-btn" title="Keyboard shortcuts (?)"><i data-lucide="keyboard"></i></button>
+                        <button class="icon-btn" id="ibx-refresh" title="Refresh (r)"><i data-lucide="refresh-cw"></i></button>
+                    </div>
+                </header>
+                <div class="ibx" id="ibx-root">
+                    <div class="ibx-list-pane">
+                        <div class="ibx-toolbar">
+                            <div class="ibx-views" id="ibx-views" role="tablist"></div>
+                            <div class="ibx-search">
+                                <i data-lucide="search"></i>
+                                <input type="search" id="ibx-search" placeholder="Search app, person or text   /" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="ibx-bulkbar hidden" id="ibx-bulkbar"></div>
+                        <div class="ibx-scroll" id="ibx-list" tabindex="-1"></div>
+                    </div>
+                    <div class="ibx-detail-pane" id="ibx-detail"></div>
+                </div>
+                <div class="ibx-toast hidden" id="ibx-toast" role="status" aria-live="polite"></div>
+                <div class="ibx-modal hidden" id="ibx-modal"></div>
+            </section>
+
+            <!-- ════ SHOPPING (static/shopping.js, static/shopping-core.js) — also opened at /shopping ════ -->
+            <section class="screen-panel" id="panel-shopping" data-state="loading">
+                <header class="top-bar shp-top">
+                    <div class="ibx-titles">
+                        <span class="top-bar-title">Shopping</span>
+                        <span class="ibx-kicker" id="shp-sub" aria-live="polite"></span>
+                    </div>
+                    <div class="top-bar-actions">
+                        <div id="shp-people"></div>
+                        <button class="chip hidden" id="shp-share-btn" title="Share this list"><i data-lucide="user-plus"></i><span>Share</span></button>
+                        <div class="shp-menu-wrap">
+                            <button class="icon-btn hidden" id="shp-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-label="List menu" title="More"><i data-lucide="ellipsis-vertical"></i></button>
+                            <div id="shp-menu" class="hidden"></div>
+                        </div>
+                    </div>
+                </header>
+                <div class="shp-scroll" id="shp-scroll">
+                    <div class="shp-inner">
+                        <div id="shp-invites"></div>
+                        <div class="shp-addbar" id="shp-addbar">
+                            <div class="shp-add-field">
+                                <i data-lucide="plus"></i>
+                                <input type="text" id="shp-add" placeholder="Add items…" autocomplete="off" autocapitalize="sentences" enterkeyhint="enter" dir="auto"
+                                       role="combobox" aria-label="Add items: type a name, or several separated by commas" aria-autocomplete="list" aria-expanded="false" aria-controls="shp-sugg">
+                                <kbd class="shp-kbd" aria-hidden="true">/</kbd>
+                            </div>
+                            <ul id="shp-sugg" class="shp-suggs hidden" role="listbox" aria-label="Bought before"></ul>
+                        </div>
+                        <div id="shp-usuals"></div>
+                        <div id="shp-status"></div>
+                        <div id="shp-list" class="shp-list"></div>
+                        <div id="shp-empty"></div>
+                    </div>
+                </div>
+                <div class="shp-snack hidden" id="shp-snack" role="status" aria-live="polite"></div>
+                <div class="shp-pop hidden" id="shp-pop" role="menu"></div>
+                <div class="shp-scrim hidden" id="shp-scrim"></div>
+                <div class="shp-sheet hidden" id="shp-sheet" role="dialog" aria-modal="true"></div>
+            </section>
+
+            <!-- ════ MONEY (static/money.js, static/money-dash.js, static/money-core.js) — also opened at /#money ════ -->
+            <section class="screen-panel" id="panel-money">
+                <header class="top-bar mny-top">
+                    <button class="icon-btn hidden" id="mny-back" title="Back to Money" aria-label="Back to Money"><i data-lucide="arrow-left"></i></button>
+                    <div class="ibx-titles mny-titles">
+                        <span class="top-bar-title" id="mny-title">Money</span>
+                        <span class="mny-status" id="mny-status" aria-live="polite"></span>
+                    </div>
+                    <div class="top-bar-actions">
+                        <div class="mny-month hidden" id="mny-month" role="group" aria-label="Month"></div>
+                        <button class="icon-btn mny-src-btn hidden" id="mny-sources-btn" title="Banks &amp; cards" aria-label="Banks and cards"><i data-lucide="landmark"></i><span class="mny-dot hidden"></span></button>
+                        <button class="chip hidden" id="mny-add-top"><i data-lucide="plus" style="width:14px;height:14px;"></i><span>Add</span></button>
+                        <button class="icon-btn mny-refresh" id="mny-refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
+                    </div>
+                </header>
+                <div class="mny-scroll" id="mny-scroll">
+                    <div class="mny-inner" id="mny-root"></div>
+                </div>
+                <div class="mny-toast hidden" id="mny-toast" role="status" aria-live="polite"></div>
+                <div class="mny-scrim hidden" id="mny-scrim"></div>
+                <div class="mny-sheet hidden" id="mny-sheet" role="dialog" aria-modal="true" aria-label="Money"></div>
+            </section>
+
+            <!-- ════ PEOPLE (static/people.js) ════ -->
+            <section class="screen-panel" id="panel-people">
+                <header class="top-bar">
+                    <span class="top-bar-title">People</span>
+                    <div class="top-bar-actions">
+                        <button class="icon-btn" id="ppl-refresh" title="Refresh"><i data-lucide="refresh-cw"></i></button>
+                        <button class="btn-primary" id="ppl-add"><i data-lucide="user-plus" style="width:16px;height:16px;"></i><span>Add</span></button>
+                    </div>
+                </header>
+                <div class="ibx ppl" id="ppl-root">
+                    <div class="ibx-list-pane">
+                        <div class="ibx-toolbar">
+                            <div class="ibx-views" id="ppl-sorts"></div>
+                            <div class="ibx-search">
+                                <i data-lucide="search"></i>
+                                <input type="search" id="ppl-search" placeholder="Name, relation or number   /" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="ibx-scroll" id="ppl-list"></div>
+                    </div>
+                    <div class="ibx-detail-pane" id="ppl-detail"></div>
+                </div>
+                <div class="ibx-toast hidden" id="ppl-toast" role="status" aria-live="polite"></div>
+                <div class="ibx-modal hidden" id="ppl-modal"></div>
+            </section>
+
+            <!-- ════ WEEKLY REVIEW (static/review.js) — opened from the Tasks banner or /#review ════ -->
+            <section class="screen-panel" id="panel-review">
+                <header class="top-bar">
+                    <button class="icon-btn" id="rv-back" title="Back to reminders"><i data-lucide="arrow-left"></i></button>
+                    <div class="ibx-titles">
+                        <span class="top-bar-title">Weekly review</span>
+                        <span class="ibx-kicker" id="rv-kicker"></span>
+                    </div>
+                    <div class="top-bar-actions">
+                        <button class="chip" id="rv-ask"><i data-lucide="sparkles" style="width:14px;height:14px;"></i><span>Ask Dana</span></button>
+                        <button class="icon-btn" id="rv-generate" title="Make a new review now"><i data-lucide="refresh-cw"></i></button>
+                    </div>
+                </header>
+                <div class="rv-scroll" id="rv-root"></div>
+                <div class="ibx-toast hidden" id="rv-toast" role="status" aria-live="polite"></div>
+            </section>
+
+            <!-- ════ SCREEN 6: SETTINGS ════ -->
+            <section class="screen-panel" id="panel-settings">
+                <header class="top-bar">
+                    <span class="top-bar-title">Settings</span>
+                </header>
+                <div class="settings-container">
+                    <div class="settings-card">
+                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Dana</h2>
+                        
+                        <div class="settings-input-group">
+                            <label class="settings-label" for="settings-server-url">Server URL</label>
+                            <input type="text" class="settings-input" id="settings-server-url" placeholder="https://dana.example.com">
+                        </div>
+
+                        <div class="settings-input-group">
+                            <label class="settings-label" for="settings-api-token">API Token (Optional)</label>
+                            <input type="password" class="settings-input" id="settings-api-token" placeholder="Bearer Token">
+                        </div>
+
+                        <button class="btn-primary" id="btn-save-settings">Save Settings</button>
+
+                        <div style="border-top:1px solid var(--hairline);padding-top:16px;">
+                            <span class="settings-label">Connected Interfaces & Hubs</span>
+                            <div class="settings-links">
+                                <a href="/calendar" class="settings-link-tile" target="_blank">
+                                    <i data-lucide="calendar"></i>
+                                    <span>Calendar TV View</span>
+                                </a>
+                                <a href="/dashboard" class="settings-link-tile" target="_blank">
+                                    <i data-lucide="layout-dashboard"></i>
+                                    <span>Bedroom Dashboard</span>
+                                </a>
+                                <button class="settings-link-tile" id="btn-open-integrations-tab">
+                                    <i data-lucide="plug"></i>
+                                    <span>Integrations</span>
+                                </button>
+                                <button class="settings-link-tile" id="btn-open-usage-tab">
+                                    <i data-lucide="receipt"></i>
+                                    <span>Usage &amp; Cost</span>
+                                </button>
+                                <button class="settings-link-tile" id="btn-open-debug-tab">
+                                    <i data-lucide="terminal"></i>
+                                    <span>Debug & Logs</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ════ INTEGRATIONS (static/integrations.js) — opened from Settings or /#integrations ════ -->
+            <section class="screen-panel" id="panel-integrations">
+                <header class="top-bar">
+                    <button class="icon-btn" id="itg-back" title="Back to settings"><i data-lucide="arrow-left"></i></button>
+                    <div class="ibx-titles" style="flex:1;margin-left:8px;">
+                        <span class="top-bar-title">Integrations</span>
+                        <span class="ibx-kicker" id="itg-kicker"></span>
+                    </div>
+                    <div class="top-bar-actions">
+                        <button class="icon-btn" id="itg-refresh" title="Refresh"><i data-lucide="refresh-cw"></i></button>
+                    </div>
+                </header>
+                <div class="itg-scroll">
+                    <div class="itg-inner">
+                        <div id="itg-head"></div>
+                        <div id="itg-list"></div>
+                    </div>
+                </div>
+                <div class="ibx-modal hidden" id="itg-modal"></div>
+            </section>
+
+            <!-- ════ USAGE & COST (static/usage.js) ════ -->
+            <section class="screen-panel" id="panel-usage">
+                <header class="top-bar">
+                    <span class="top-bar-title">Usage</span>
+                    <div class="top-bar-actions">
+                        <button class="icon-btn" id="usg-refresh" title="Refresh"><i data-lucide="refresh-cw"></i></button>
+                    </div>
+                </header>
+                <div class="usg-ranges" id="usg-ranges"></div>
+                <div class="usg-scroll">
+                    <div class="usg-inner">
+                        <div id="usg-hero"></div>
+                        <div class="usg-card" id="usg-chart"></div>
+                        <div class="usg-card" id="usg-breakdown"></div>
+                        <div class="usg-card" id="usg-events"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- ════ SCREEN 7: CALENDAR HUB ════ -->
+            <section class="screen-panel" id="panel-calendar">
+                <header class="top-bar">
+                    <span class="top-bar-title">Calendar Hub</span>
+                    <div class="top-bar-actions">
+                        <button class="icon-btn" id="btn-refresh-calendar" title="Refresh">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                    </div>
+                </header>
+                <div style="flex:1;overflow-y:auto;padding:24px;" id="calendar-events-container">
+                    <!-- Events list inserted here -->
+                </div>
+            </section>
+
+            <!-- ════ SCREEN 8: DEBUG & LOGS ════ -->
+            <section class="screen-panel" id="panel-debug">
+                <header class="top-bar">
+                    <span class="top-bar-title">Debug & Logs</span>
+                    <div class="top-bar-actions">
+                        <div class="segmented-control" id="debug-view-toggle" style="display:flex;width:230px;">
+                            <div class="segmented-btn active" data-view="logs"><i data-lucide="terminal" style="width:13px;height:13px;"></i> Live Logs</div>
+                            <div class="segmented-btn" data-view="session"><i data-lucide="search" style="width:13px;height:13px;"></i> Session</div>
+                        </div>
+                        <button class="icon-btn destructive" id="btn-clear-logs" title="Clear Logs">
+                            <i data-lucide="trash-2"></i>
+                        </button>
+                        <button class="icon-btn" id="btn-refresh-debug" title="Refresh">
+                            <i data-lucide="refresh-cw"></i>
+                        </button>
+                    </div>
+                </header>
+                <div class="two-pane-container debug-container">
+                    <div class="pane-master">
+                        <div class="pane-master-header">
+                            <span class="form-label">Recent Sessions</span>
+                        </div>
+                        <div class="pane-master-list" id="debug-sessions-list">
+                            <!-- Debug sessions inserted here -->
+                        </div>
+                    </div>
+                    <div class="pane-detail debug-detail">
+                        <!-- Live Logs View -->
+                        <div class="debug-detail-view" id="debug-live-logs-view">
+                            <div class="debug-view-head">
+                                <span class="form-label">Live Container Logs</span>
+                                <span class="debug-live-status"><span class="debug-live-dot"></span> <span id="debug-live-indicator">polling</span></span>
+                            </div>
+                            <div class="tool-json-box" id="debug-live-logs"></div>
+                        </div>
+                        <!-- Session Inspector View -->
+                        <div class="debug-detail-view hidden" id="debug-session-view">
+                            <div class="debug-view-head">
+                                <span class="form-label">Session Inspector</span>
+                                <button class="icon-btn" id="btn-debug-delete-session" title="Delete session" style="width:28px;height:28px;color:var(--destructive);">
+                                    <i data-lucide="trash-2" style="width:14px;height:14px;"></i>
+                                </button>
+                            </div>
+                            <div id="debug-session-detail">
+                                <!-- Session detail inserted here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- ════ MODALS & BOTTOM SHEETS ════ -->
+
+    <!-- Task Editor Modal -->
+    <div class="modal-overlay" id="task-modal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title" id="task-modal-title">New Reminder</h3>
+                <button class="icon-btn" id="task-modal-close"><i data-lucide="x"></i></button>
+            </div>
+            <form id="task-form" class="modal-body">
+                <input type="hidden" id="task-id">
+                <div class="form-group">
+                    <label class="form-label" for="task-title">Title</label>
+                    <input type="text" class="form-control" id="task-title" required placeholder="What do you need to do?">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="task-desc">Description (Optional)</label>
+                    <textarea class="form-control" id="task-desc" placeholder="Extra notes or instructions..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Priority</label>
+                    <div class="segmented-control" id="task-prio-control">
+                        <div class="segmented-btn" data-prio="low">Low</div>
+                        <div class="segmented-btn active" data-prio="medium">Medium</div>
+                        <div class="segmented-btn" data-prio="high">High</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="task-group-select">Group</label>
+                    <select class="form-control" id="task-group-select"></select>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Triggers (Optional)</label>
+                    <div style="display:flex;flex-direction:column;gap:8px;">
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                            <input type="checkbox" id="task-trig-time-enable"> Time Reminder
+                        </label>
+                        <input type="datetime-local" class="form-control hidden" id="task-trig-time-val">
+
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                            <input type="checkbox" id="task-trig-loc-enable"> Location Trigger
+                        </label>
+                        <div class="hidden" id="task-trig-loc-group" style="display:flex;gap:6px;">
+                            <select class="form-control" id="task-trig-loc-zone" style="flex:2;"></select>
+                            <select class="form-control" id="task-trig-loc-event" style="flex:1;">
+                                <option value="arrive">Arrive</option>
+                                <option value="leave">Leave</option>
+                            </select>
+                        </div>
+
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                            <input type="checkbox" id="task-trig-car-enable"> Car Status Trigger
+                        </label>
+                        <select class="form-control hidden" id="task-trig-car-val">
+                            <option value="enter">Enter Car</option>
+                            <option value="leave">Leave Car</option>
+                        </select>
+
+                        <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;">
+                            <input type="checkbox" id="task-trig-wake-enable"> Wake Up Trigger
+                        </label>
+                    </div>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn-destructive-outline hidden" id="btn-task-delete">Delete</button>
+                <button class="btn-secondary" id="btn-task-cancel">Cancel</button>
+                <button class="btn-primary" id="btn-task-save">Save Reminder</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memory Editor Modal -->
+    <div class="modal-overlay" id="memory-modal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title" id="memory-modal-title">New Memory</h3>
+                <button class="icon-btn" id="memory-modal-close"><i data-lucide="x"></i></button>
+            </div>
+            <form id="memory-form" class="modal-body">
+                <input type="hidden" id="memory-original-key">
+                <div class="form-group">
+                    <label class="form-label" for="memory-key">Topic / Key</label>
+                    <input type="text" class="form-control" id="memory-key" required placeholder="e.g. WiFi password">
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="memory-value">Content</label>
+                    <textarea class="form-control" id="memory-value" required rows="3" placeholder="What should the assistant remember?"></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Category</label>
+                    <div class="segmented-control" id="memory-cat-control">
+                        <div class="segmented-btn active" data-cat="general">General</div>
+                        <div class="segmented-btn" data-cat="personal">Personal</div>
+                        <div class="segmented-btn" data-cat="work">Work</div>
+                    </div>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn-destructive-outline hidden" id="btn-memory-delete">Delete</button>
+                <button class="btn-secondary" id="btn-memory-cancel">Cancel</button>
+                <button class="btn-primary" id="btn-memory-save">Save Memory</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Upload Modal -->
+    <div class="modal-overlay" id="call-upload-modal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title">Upload Call Audio</h3>
+                <button class="icon-btn" id="call-upload-close"><i data-lucide="x"></i></button>
+            </div>
+            <form id="call-upload-form" class="modal-body">
+                <div class="form-group">
+                    <label class="form-label" for="call-file">Audio File</label>
+                    <input type="file" class="form-control" id="call-file" accept="audio/*" required>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                    <div class="form-group">
+                        <label class="form-label" for="call-caller">Caller</label>
+                        <input type="text" class="form-control" id="call-caller" placeholder="Name or number">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="call-receiver">Receiver</label>
+                        <input type="text" class="form-control" id="call-receiver" placeholder="Me">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="call-instructions">Custom Instructions (Optional)</label>
+                    <textarea class="form-control" id="call-instructions" rows="2" placeholder="e.g. summarize in Hebrew, focus on action items..."></textarea>
+                </div>
+            </form>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-call-upload-cancel">Cancel</button>
+                <button class="btn-primary" id="btn-call-upload-submit">Upload & Analyze</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Call Reanalyze Modal -->
+    <div class="modal-overlay" id="call-reanalyze-modal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title">Regenerate Call Summary</h3>
+                <button class="icon-btn" id="call-reanalyze-close"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <p id="reanalyze-call-label" style="font-size:13px;color:var(--body);"></p>
+                <div class="form-group">
+                    <label class="form-label" for="reanalyze-instructions">Custom Instructions (Optional)</label>
+                    <textarea class="form-control" id="reanalyze-instructions" rows="3" placeholder="e.g. focus on dates and prices..."></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-reanalyze-cancel">Cancel</button>
+                <button class="btn-primary" id="btn-reanalyze-submit">Regenerate</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Task Group Manager Modal -->
+    <div class="modal-overlay" id="group-modal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title">Manage Task Groups</h3>
+                <button class="icon-btn" id="group-modal-close"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <span class="form-label">Existing Groups</span>
+                <div class="pane-master-list" id="group-manager-list" style="max-height:220px;gap:6px;"></div>
+
+                <div style="border-top:1px solid var(--hairline);margin:8px 0;padding-top:12px;">
+                    <span class="form-label" style="margin-bottom:8px;display:block;">Add New Group</span>
+                    <form id="group-form" style="display:flex;flex-direction:column;gap:10px;">
+                        <div style="display:flex;gap:8px;">
+                            <input type="text" class="form-control" id="new-group-emoji" value="📁" style="width:50px;text-align:center;">
+                            <input type="text" class="form-control" id="new-group-name" placeholder="Group Name (e.g. Travel)" required style="flex:1;">
+                            <input type="color" class="form-control" id="new-group-color" value="#6366f1" style="width:44px;padding:2px;cursor:pointer;">
+                        </div>
+                        <input type="text" class="form-control" id="new-group-desc" placeholder="Description (Optional)">
+                        <button type="submit" class="btn-primary" style="align-self:flex-end;">+ Add Group</button>
+                    </form>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-secondary" id="btn-group-close">Close</button>
+            </div>
+        </div>
+    </div>
+
+</body>
+</html>

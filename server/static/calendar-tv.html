@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dana — Calendar</title>
+    <meta name="theme-color" content="#2b2622">
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* ==========================================================================
+           Design tokens — identical to static/dashboard.css (WARP design system):
+           warm near-charcoal canvas, Inter only, hairline borders, no glows.
+           ========================================================================== */
+        :root {
+            --canvas: #2b2622;
+            --canvas-soft: #383330;
+            --canvas-raised: #403a36;
+            --hairline: #3f3a36;
+            --hairline-strong: #4a443f;
+
+            --ink: #f7f5f0;
+            --on-primary: #2b2622;
+            --body-strong: #dad2c1;
+            --body: #c9c0ad;
+            --mute: #aea69c;
+
+            --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+
+            --radius-sm: 3px;
+            --radius-md: 4px;
+            --radius-lg: 6px;
+            --radius-card: 8px;
+            --radius-full: 9999px;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+        body {
+            background-color: var(--canvas);
+            background-image: radial-gradient(circle at 50% 42%, rgba(247, 245, 240, 0.025) 0%, transparent 90%);
+            background-attachment: fixed;
+            color: var(--ink);
+            font-family: var(--font-inter);
+            display: flex;
+            flex-direction: column;
+            padding: 10px 14px 12px;
+            -webkit-font-smoothing: antialiased;
+        }
+        h1, h2, h3, h4 { font-weight: 600; letter-spacing: -0.2px; }
+        button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
+        a { color: inherit; text-decoration: none; }
+
+        /* Header — mirrors the dashboard clock & controls card */
+        .tv-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid var(--hairline);
+            flex-shrink: 0;
+        }
+        .tv-header .header-left h1 {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--ink);
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            white-space: nowrap;
+        }
+        .tv-header .header-left h1 svg,
+        .tv-header .header-left h1 i { width: 15px; height: 15px; color: var(--mute); }
+        .tv-header .header-sub {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            line-height: 1.05;
+            min-width: 0;
+        }
+        .tv-header .header-sub .dt-date {
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--mute);
+            white-space: nowrap;
+        }
+        .tv-header .header-sub .dt-time {
+            font-size: 32px;
+            font-weight: 600;
+            color: var(--ink);
+            letter-spacing: -1px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .tv-header .tv-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            justify-self: end;
+        }
+        .tv-header .tv-actions .zoom-group {
+            display: flex;
+            align-items: center;
+            gap: 1px;
+            background: var(--canvas-raised);
+            border: 1px solid var(--hairline);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            flex: 0 0 auto;
+        }
+        .tv-header .tv-actions .zoom-group button {
+            min-width: 30px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--body-strong);
+            font-size: 15px;
+            padding: 0 4px;
+            transition: all 0.15s;
+        }
+        .tv-header .tv-actions .zoom-group button:hover { background: var(--hairline-strong); color: var(--ink); }
+        .tv-header .tv-actions .zoom-group button:active { background: var(--ink); color: var(--on-primary); }
+        .tv-header .tv-actions .zoom-group .zoom-label {
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--mute);
+            min-width: 28px;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+            flex-shrink: 0;
+        }
+        .tv-header .tv-actions .last-updated {
+            font-size: 11px;
+            color: var(--mute);
+            white-space: nowrap;
+        }
+        .tv-header .tv-actions #tv-refresh-btn,
+        .tv-header .tv-actions a {
+            height: 32px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 0 12px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--body-strong);
+            background: var(--canvas-raised);
+            border: 1px solid var(--hairline);
+            border-radius: var(--radius-md);
+            cursor: pointer;
+            transition: all 0.15s;
+            white-space: nowrap;
+            flex: 0 0 auto;
+        }
+        .tv-header .tv-actions #tv-refresh-btn:hover,
+        .tv-header .tv-actions a:hover { background: var(--hairline-strong); color: var(--ink); }
+        .tv-header .tv-actions #tv-refresh-btn:active,
+        .tv-header .tv-actions a:active { background: var(--ink); color: var(--on-primary); border-color: var(--ink); }
+        .tv-header .tv-actions #tv-refresh-btn svg,
+        .tv-header .tv-actions #tv-refresh-btn i,
+        .tv-header .tv-actions a svg,
+        .tv-header .tv-actions a i { width: 13px; height: 13px; }
+
+        /* Calendar grid — same day-cell language as the dashboard's bottom strip */
+        .tv-calendar {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-top: 10px;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .tv-week-label {
+            font-size: 10px;
+            font-weight: 600;
+            color: var(--mute);
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            padding: 0 2px;
+            flex-shrink: 0;
+        }
+        .tv-week-row {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 8px;
+            min-height: 0;
+        }
+        .tv-day {
+            background: var(--canvas);
+            border: 1px solid var(--hairline);
+            border-radius: var(--radius-card);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            min-height: 0;
+            transition: opacity 0.2s ease;
+        }
+        .tv-day.today {
+            border-color: var(--hairline-strong);
+            background: var(--canvas-raised);
+        }
+        .tv-day-header {
+            padding: 7px 9px;
+            border-bottom: 1px solid var(--hairline);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            flex-shrink: 0;
+        }
+        .tv-day-header .day-name {
+            font-size: 10.5px;
+            font-weight: 600;
+            color: var(--mute);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .tv-day-header .day-number {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--body-strong);
+            line-height: 1.1;
+            font-variant-numeric: tabular-nums;
+        }
+        .tv-day.today .day-number {
+            background: var(--ink);
+            color: var(--on-primary);
+            width: 22px;
+            height: 22px;
+            border-radius: var(--radius-full);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12.5px;
+        }
+        .tv-day-body {
+            flex: 1;
+            padding: 6px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            min-height: 0;
+        }
+        .tv-event {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            padding: 4px 7px;
+            border-radius: var(--radius-sm);
+            font-size: 12.5px;
+            line-height: 1.3;
+            color: var(--ink);
+            flex-shrink: 0;
+        }
+        .tv-event.all-day { opacity: 0.72; }
+        /* Days that already happened — and events that already ended — recede so
+           the live part of the two weeks stays the focus. */
+        .tv-day.past { opacity: 0.42; }
+        .tv-event.past { opacity: 0.45; }
+        .tv-event .ev-name {
+            flex: 1 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-weight: 500;
+            text-align: left;
+        }
+        /* Time pinned to the right edge in a stable-width column, so every event
+           name starts at the same x position (same as the dashboard strip). */
+        .tv-event .ev-time {
+            flex: 0 0 auto;
+            min-width: 3em;
+            text-align: right;
+            font-weight: 600;
+            font-size: 11.5px;
+            font-variant-numeric: tabular-nums;
+            opacity: 0.7;
+        }
+        .tv-day-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            color: var(--mute);
+            opacity: 0.45;
+            font-size: 11px;
+        }
+
+        /* Loading / Error — same spinner as the dashboard camera panel */
+        .tv-loading, .tv-error {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            flex: 1;
+            gap: 12px;
+            color: var(--mute);
+            font-size: 13px;
+        }
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--hairline-strong);
+            border-top-color: var(--ink);
+            border-radius: 50%;
+            animation: spin 0.7s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        /* Scrollbars — same as dashboard.css */
+        ::-webkit-scrollbar { width: 5px; height: 5px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 2px; }
+
+        @media (max-width: 900px) {
+            body { padding: 8px 10px 10px; }
+            .tv-header .header-left h1 { font-size: 15px; }
+            .tv-header .header-sub .dt-time { font-size: 24px; letter-spacing: -0.5px; }
+            .tv-header .tv-actions .last-updated { display: none; }
+            .tv-week-row { gap: 4px; }
+            .tv-day-header { padding: 5px 7px; }
+            .tv-day-header .day-number { font-size: 13px; }
+            .tv-day.today .day-number { width: 20px; height: 20px; font-size: 11.5px; }
+            .tv-event { font-size: 11px; padding: 3px 6px; }
+            .tv-event .ev-time { font-size: 10.5px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="tv-header">
+        <div class="header-left">
+            <h1><i data-lucide="calendar"></i> Calendar</h1>
+        </div>
+        <div class="header-sub" id="tv-datetime">
+            <span class="dt-date"></span>
+            <span class="dt-time"></span>
+        </div>
+        <div class="tv-actions">
+            <div class="zoom-group">
+                <button id="zoom-out" title="Zoom out">−</button>
+                <span class="zoom-label" id="zoom-label">100%</span>
+                <button id="zoom-in" title="Zoom in">+</button>
+            </div>
+            <span class="last-updated" id="tv-last-updated"></span>
+            <button id="tv-refresh-btn"><i data-lucide="refresh-cw"></i> Refresh</button>
+            <a href="/"><i data-lucide="layout-dashboard"></i> Hub</a>
+        </div>
+    </div>
+
+    <div class="tv-calendar" id="tv-calendar">
+        <div class="tv-loading" id="tv-loading">
+            <div class="spinner"></div>
+            <p>Loading calendar events...</p>
+        </div>
+    </div>
+
+    <script>
+        const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+        // Same translucent calendar palette as the dashboard strip (dashboard.js CAL_COLORS).
+        const CALENDAR_COLORS = [
+            'rgba(255,45,85,0.28)', 'rgba(0,122,255,0.28)', 'rgba(52,199,89,0.28)',
+            'rgba(175,82,222,0.28)', 'rgba(255,149,0,0.28)', 'rgba(90,200,250,0.28)',
+            'rgba(255,59,48,0.28)', 'rgba(255,204,0,0.28)'
+        ];
+
+        function getCalendarColor(calendarId) {
+            let hash = 0;
+            for (let i = 0; i < (calendarId || '').length; i++) {
+                hash = ((hash << 5) - hash) + calendarId.charCodeAt(i);
+                hash |= 0;
+            }
+            return CALENDAR_COLORS[Math.abs(hash) % CALENDAR_COLORS.length];
+        }
+
+        function getWeekDates(startDate) {
+            const dates = [];
+            for (let i = 0; i < 7; i++) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + i);
+                dates.push(d);
+            }
+            return dates;
+        }
+
+        function getSunday(date) {
+            const d = new Date(date);
+            d.setDate(d.getDate() - d.getDay());
+            d.setHours(0, 0, 0, 0);
+            return d;
+        }
+
+        function formatDateKey(d) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+        }
+
+        function formatTime24(isoStr) {
+            if (!isoStr) return '';
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return isoStr;
+            const h = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `${h}:${min}`;
+        }
+
+        function formatCurrentDatetime() {
+            const now = new Date();
+            const dayName = DAY_NAMES[now.getDay()];
+            const date = String(now.getDate()).padStart(2, '0');
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const h = String(now.getHours()).padStart(2, '0');
+            const min = String(now.getMinutes()).padStart(2, '0');
+            const sec = String(now.getSeconds()).padStart(2, '0');
+            return { date: `${dayName}, ${date}/${month}`, time: `${h}:${min}:${sec}` };
+        }
+
+        function isToday(d) {
+            const today = new Date();
+            return d.getFullYear() === today.getFullYear()
+                && d.getMonth() === today.getMonth()
+                && d.getDate() === today.getDate();
+        }
+
+        // Local day key + real instant. Calendars can return mixed timezone
+        // offsets ("...Z" vs "...+03:00"), so raw ISO-string comparison puts
+        // events on the wrong day and orders them incorrectly.
+        function eventDayKey(ev) {
+            if (!ev || !ev.start) return '';
+            if (ev.all_day) return ev.start.substring(0, 10);
+            const d = new Date(ev.start);
+            return isNaN(d.getTime()) ? ev.start.substring(0, 10) : formatDateKey(d);
+        }
+
+        function eventSortTs(ev) {
+            if (ev.all_day) return Number.MIN_SAFE_INTEGER;   // all-day rows first
+            const d = new Date(ev.start);
+            return isNaN(d.getTime()) ? Number.MAX_SAFE_INTEGER : d.getTime();
+        }
+
+        // Has the event already finished? All-day events count as done once their
+        // (exclusive) end date is today or earlier; timed events once end < now.
+        function eventIsPast(ev, todayKey) {
+            if (!ev) return false;
+            if (ev.all_day) {
+                const endKey = (ev.end || '').substring(0, 10);
+                return endKey ? endKey <= todayKey : false;
+            }
+            const d = new Date(ev.end || ev.start);
+            return isNaN(d.getTime()) ? false : d.getTime() < Date.now();
+        }
+
+        // Today gets the widest column, tomorrow slightly wider than the rest.
+        function weekRowTemplate(dates, todayKey, tomorrowKey) {
+            return dates.map(d => {
+                const key = formatDateKey(d);
+                if (key === todayKey) return '1.5fr';
+                if (key === tomorrowKey) return '1.18fr';
+                return '1fr';
+            }).join(' ');
+        }
+
+        function getEventsForDate(events, dateStr) {
+            return events.filter(ev => eventDayKey(ev) === dateStr);
+        }
+
+        async function fetchEvents() {
+            try {
+                const now = new Date();
+                const sunday = getSunday(now);
+                const nextSat = new Date(sunday);
+                nextSat.setDate(nextSat.getDate() + 13);
+
+                const startStr = formatDateKey(sunday);
+                const endStr = formatDateKey(nextSat);
+
+                const res = await fetch(`/api/calendar/events?start_date=${startStr}&end_date=${endStr}`);
+                if (!res.ok) throw new Error('Failed to fetch events');
+                return await res.json();
+            } catch (err) {
+                console.error('Error fetching calendar events:', err);
+                throw err;
+            }
+        }
+
+        function renderCalendar(events) {
+            const now = new Date();
+            const thisSunday = getSunday(now);
+            const nextSunday = new Date(thisSunday);
+            nextSunday.setDate(nextSunday.getDate() + 7);
+            const tomorrow = new Date(now);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const todayKey = formatDateKey(now);
+            const tomorrowKey = formatDateKey(tomorrow);
+
+            const thisWeekDates = getWeekDates(thisSunday);
+            const nextWeekDates = getWeekDates(nextSunday);
+
+            const container = document.getElementById('tv-calendar');
+            container.innerHTML = '';
+
+            // This week
+            const thisLabel = document.createElement('div');
+            thisLabel.className = 'tv-week-label this-week';
+            thisLabel.textContent = 'This Week';
+            container.appendChild(thisLabel);
+
+            const thisRow = document.createElement('div');
+            thisRow.className = 'tv-week-row';
+            thisRow.style.gridTemplateColumns = weekRowTemplate(thisWeekDates, todayKey, tomorrowKey);
+            thisWeekDates.forEach(d => {
+                thisRow.appendChild(createDayColumn(d, events));
+            });
+            container.appendChild(thisRow);
+
+            // Next week
+            const nextLabel = document.createElement('div');
+            nextLabel.className = 'tv-week-label next-week';
+            nextLabel.textContent = 'Next Week';
+            container.appendChild(nextLabel);
+
+            const nextRow = document.createElement('div');
+            nextRow.className = 'tv-week-row';
+            nextRow.style.gridTemplateColumns = weekRowTemplate(nextWeekDates, todayKey, tomorrowKey);
+            nextWeekDates.forEach(d => {
+                nextRow.appendChild(createDayColumn(d, events));
+            });
+            container.appendChild(nextRow);
+
+            lucide.createIcons();
+        }
+
+        function createDayColumn(date, events) {
+            const dateStr = formatDateKey(date);
+            const todayKey = formatDateKey(new Date());
+            const dayPast = dateStr < todayKey;
+            const dayEvents = getEventsForDate(events, dateStr);
+            const today = isToday(date);
+
+            const col = document.createElement('div');
+            col.className = `tv-day${today ? ' today' : ''}${dayPast ? ' past' : ''}`;
+
+            const header = document.createElement('div');
+            header.className = 'tv-day-header';
+            header.innerHTML = `
+                <span class="day-name">${DAY_NAMES[date.getDay()]}</span>
+                <span class="day-number">${date.getDate()}</span>
+            `;
+            col.appendChild(header);
+
+            const body = document.createElement('div');
+            body.className = 'tv-day-body';
+
+            if (dayEvents.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'tv-day-empty';
+                empty.textContent = '--';
+                body.appendChild(empty);
+            } else {
+                dayEvents.sort((a, b) => eventSortTs(a) - eventSortTs(b));
+                dayEvents.forEach(ev => {
+                    const color = getCalendarColor(ev.calendar_id);
+                    // A past day is dimmed as a whole, so only flag ended events
+                    // on days that are still live.
+                    const evPast = !dayPast && eventIsPast(ev, todayKey);
+                    const el = document.createElement('div');
+                    el.className = 'tv-event' + (ev.all_day ? ' all-day' : '') + (evPast ? ' past' : '');
+                    el.style.background = color;
+                    el.innerHTML = `
+                        <span class="ev-name">${escapeHtml(ev.summary)}</span>
+                        <span class="ev-time">${ev.all_day ? 'All day' : formatTime24(ev.start)}</span>
+                    `;
+                    body.appendChild(el);
+                });
+            }
+
+            col.appendChild(body);
+            return col;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+        }
+
+        function updateClock() {
+            const el = document.getElementById('tv-datetime');
+            if (!el) return;
+            const { date, time } = formatCurrentDatetime();
+            el.querySelector('.dt-date').textContent = date;
+            el.querySelector('.dt-time').textContent = time;
+        }
+
+        function updateLastUpdated() {
+            const el = document.getElementById('tv-last-updated');
+            const now = new Date();
+            const h = String(now.getHours()).padStart(2, '0');
+            const min = String(now.getMinutes()).padStart(2, '0');
+            el.textContent = `Updated ${h}:${min}`;
+        }
+
+        async function loadAndRender() {
+            updateClock();
+            const container = document.getElementById('tv-calendar');
+            container.innerHTML = `
+                <div class="tv-loading" id="tv-loading">
+                    <div class="spinner"></div>
+                    <p>Loading calendar events...</p>
+                </div>
+            `;
+            try {
+                const events = await fetchEvents();
+                renderCalendar(events);
+                updateLastUpdated();
+            } catch (err) {
+                container.innerHTML = `<div class="tv-error"><i data-lucide="alert-triangle" style="width:24px;height:24px;color:var(--mute);"></i><p>Failed to load calendar events.</p></div>`;
+                lucide.createIcons();
+            }
+        }
+
+        // === Zoom controls ===
+        let currentZoom = 100;
+
+        function getZoomFromUrl() {
+            const params = new URLSearchParams(window.location.search);
+            const z = parseInt(params.get('zoom'), 10);
+            if (!isNaN(z) && z >= 20 && z <= 300) return z;
+            return 100;
+        }
+
+        function applyZoom(value) {
+            currentZoom = Math.min(300, Math.max(20, value));
+            document.body.style.zoom = currentZoom / 100;
+            document.getElementById('zoom-label').textContent = currentZoom + '%';
+        }
+
+        document.getElementById('zoom-out').addEventListener('click', () => applyZoom(currentZoom - 10));
+        document.getElementById('zoom-in').addEventListener('click', () => applyZoom(currentZoom + 10));
+        applyZoom(getZoomFromUrl());
+
+        document.getElementById('tv-refresh-btn').addEventListener('click', loadAndRender);
+
+        // Initial load + auto-refresh every 5 minutes
+        loadAndRender();
+        setInterval(loadAndRender, 5 * 60 * 1000);
+        // Update clock every minute
+        setInterval(updateClock, 1000);
+    </script>
+</body>
+</html>

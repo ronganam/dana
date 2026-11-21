@@ -1,0 +1,278 @@
+{
+  "$schema": "https://www.raycast.com/schemas/extension.json",
+  "name": "ganam-assistant",
+  "title": "Dana",
+  "description": "Chat with Dana, your personal assistant, and manage her tasks and shopping list.",
+  "icon": "icon.png",
+  "author": "ganam",
+  "platforms": [
+    "macOS",
+    "Windows"
+  ],
+  "categories": [
+    "Productivity",
+    "Applications"
+  ],
+  "keywords": [
+    "assistant",
+    "dana",
+    "ganam",
+    "tasks",
+    "shopping"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=22.22.2"
+  },
+  "type": "module",
+  "commands": [
+    {
+      "name": "ask-dana",
+      "title": "Ask Dana",
+      "subtitle": "Dana",
+      "description": "Chat with Dana. Replies stream in live; actions that change things wait for your approval.",
+      "mode": "view",
+      "arguments": [
+        {
+          "name": "prompt",
+          "type": "text",
+          "placeholder": "Message",
+          "required": false
+        }
+      ]
+    },
+    {
+      "name": "chat-history",
+      "title": "Search Chats",
+      "subtitle": "Dana",
+      "description": "Browse, continue and delete your conversations with Dana.",
+      "mode": "view"
+    },
+    {
+      "name": "manage-tasks",
+      "title": "Manage Tasks",
+      "subtitle": "Dana",
+      "description": "View, complete, snooze, edit and delete your tasks.",
+      "mode": "view"
+    },
+    {
+      "name": "create-task",
+      "title": "Create Task",
+      "subtitle": "Dana",
+      "description": "Add a task with a due date, priority and group.",
+      "mode": "view"
+    },
+    {
+      "name": "shopping-list",
+      "title": "Shopping List",
+      "subtitle": "Dana",
+      "description": "See the shopping list by aisle, add items, mark them bought and clear what you bought.",
+      "mode": "view"
+    },
+    {
+      "name": "menu-bar-tasks",
+      "title": "Tasks in Menu Bar",
+      "subtitle": "Dana",
+      "description": "Shows how many tasks are due and lets you complete them from the menu bar.",
+      "mode": "menu-bar",
+      "interval": "10m",
+      "disabledByDefault": true
+    }
+  ],
+  "tools": [
+    {
+      "name": "ask-dana",
+      "title": "Ask Dana",
+      "description": "Send a request to Dana, the user's personal assistant. Dana can read and control the user's smart home (Home Assistant), calendar, WhatsApp, phone calls, phone notifications, memories and notes. Use it for anything about the user's home, schedule, contacts, messages or personal data that the other tools here don't cover."
+    },
+    {
+      "name": "respond-to-dana",
+      "title": "Respond to Dana",
+      "description": "Answer Dana after ask-dana reports she is waiting: approve or deny the action she asked permission for, pick one of the options she offered, or let her continue after a pause."
+    },
+    {
+      "name": "get-tasks",
+      "title": "Get Tasks",
+      "description": "List the user's tasks (to-dos and reminders) with their id, due date, priority, group and status."
+    },
+    {
+      "name": "create-task",
+      "title": "Create Task",
+      "description": "Create a new task (to-do or reminder) for the user."
+    },
+    {
+      "name": "update-task",
+      "title": "Update Task",
+      "description": "Change an existing task: mark it done or open, rename it, or change its due date, priority or description."
+    },
+    {
+      "name": "get-shopping-list",
+      "title": "Get Shopping List",
+      "description": "List the items on the user's shopping list with their quantity, note and supermarket aisle."
+    },
+    {
+      "name": "add-shopping-items",
+      "title": "Add Shopping Items",
+      "description": "Add one or more items to the user's shopping list, each with its own quantity and note."
+    }
+  ],
+  "ai": {
+    "instructions": "Dana is the user's self-hosted personal assistant. Prefer the dedicated task and shopping tools for tasks and the shopping list; fetch tasks with get-tasks before updating one so you have its id. Use ask-dana for everything else Dana knows about (smart home, calendar, WhatsApp, calls, notifications, memories) and pass the user's request in their own words. Due dates are local times in the form YYYY-MM-DDTHH:mm. Dana may answer in Hebrew; keep her wording when quoting her.",
+    "evals": [
+      {
+        "input": "@ganam-assistant what tasks do I have?",
+        "mocks": {
+          "get-tasks": [
+            {
+              "id": "t1",
+              "title": "Call the dentist",
+              "status": "needs_action",
+              "priority": "high",
+              "due_date": "2026-11-12T10:00",
+              "group": "Health"
+            }
+          ]
+        },
+        "expected": [
+          {
+            "callsTool": "get-tasks"
+          },
+          {
+            "includes": "dentist"
+          }
+        ]
+      },
+      {
+        "input": "@ganam-assistant remind me to renew the car insurance next Monday at 9am",
+        "mocks": {
+          "create-task": {
+            "status": "created",
+            "id": "t2"
+          }
+        },
+        "expected": [
+          {
+            "callsTool": {
+              "name": "create-task",
+              "arguments": {
+                "title": {
+                  "includes": "insurance"
+                }
+              }
+            }
+          }
+        ]
+      },
+      {
+        "input": "@ganam-assistant add milk and eggs to the shopping list",
+        "mocks": {
+          "add-shopping-items": {
+            "results": [
+              {
+                "name": "milk",
+                "status": "added"
+              },
+              {
+                "name": "eggs",
+                "status": "added"
+              }
+            ],
+            "toBuy": 2
+          }
+        },
+        "expected": [
+          {
+            "callsTool": "add-shopping-items"
+          }
+        ]
+      },
+      {
+        "input": "@ganam-assistant is the living room light on?",
+        "mocks": {
+          "ask-dana": {
+            "reply": "Yes, the living room light is on at 60%."
+          }
+        },
+        "expected": [
+          {
+            "callsTool": "ask-dana"
+          },
+          {
+            "not": {
+              "callsTool": "get-tasks"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "preferences": [
+    {
+      "name": "serverUrl",
+      "title": "Server URL",
+      "description": "Address of your Dana server.",
+      "type": "textfield",
+      "required": true,
+      "placeholder": "https://dana.example.com"
+    },
+    {
+      "name": "apiToken",
+      "title": "API Token",
+      "description": "The server's API_TOKEN, sent as a Bearer token. Leave empty if the server has no token.",
+      "type": "password",
+      "required": false,
+      "placeholder": "API_TOKEN"
+    },
+    {
+      "name": "defaultModel",
+      "title": "Default Model",
+      "description": "Model profile for new chats. You can switch per chat from the dropdown in Ask Dana.",
+      "type": "dropdown",
+      "required": false,
+      "default": "fast",
+      "data": [
+        {
+          "title": "Fast",
+          "value": "fast"
+        },
+        {
+          "title": "Balanced",
+          "value": "balanced"
+        },
+        {
+          "title": "Deep",
+          "value": "deep"
+        }
+      ]
+    },
+    {
+      "name": "showReasoning",
+      "title": "Chat",
+      "label": "Show Dana's reasoning and tool steps",
+      "description": "Show the model's thinking and each tool Dana runs above her reply.",
+      "type": "checkbox",
+      "required": false,
+      "default": true
+    }
+  ],
+  "dependencies": {
+    "@raycast/api": "^2.11.1",
+    "@raycast/utils": "^2.3.3"
+  },
+  "devDependencies": {
+    "@raycast/eslint-config": "^2.2.0",
+    "@types/node": "26.6.5",
+    "@types/react": "19.3.0",
+    "eslint": "^9.39.4",
+    "prettier": "^3.10.0",
+    "typescript": "^6.0.3"
+  },
+  "scripts": {
+    "build": "ray build",
+    "dev": "ray develop",
+    "fix-lint": "ray lint --fix",
+    "lint": "ray lint",
+    "prepublishOnly": "echo \"\\n\\nIt seems like you are trying to publish the Raycast extension to npm.\\n\\nIf you did intend to publish it to npm, remove the \\`prepublishOnly\\` script and rerun \\`npm publish\\` again.\\nIf you wanted to publish it to the Raycast Store instead, use \\`npm run publish\\` instead.\\n\\n\" && exit 1",
+    "publish": "npx @raycast/api@latest publish"
+  }
+}

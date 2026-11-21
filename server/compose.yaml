@@ -1,0 +1,53 @@
+# Self-hosting Dana with Docker Compose (docs/operations.md, "Running it").
+#
+#   cp .env.example .env            # fill in at least the LLM key and API_TOKEN
+#   docker compose up -d            # http://localhost:8080
+#   docker compose --profile money up -d   # also the bank-worker sidecar (docs/money.md)
+#
+# Everything Dana writes (database, recordings, uploads, snapshots) lives in the `data` volume.
+name: dana
+
+services:
+  app:
+    build:
+      context: .
+      target: app
+    env_file: .env
+    environment:
+      DATABASE_PATH: /app/db/db.sqlite3
+    ports:
+      - "8080:8080"
+    volumes:
+      - data:/app/db
+    restart: unless-stopped
+
+  # The money kind's bank syncs: shares the app's network (Dana reaches it on 127.0.0.1:8090)
+  # and only the money/ folder of the data, which money-dir creates first.
+  money-dir:
+    profiles: [money]
+    image: dana-bank-worker
+    build: ./bank-worker
+    command: ["mkdir", "-p", "/data/money/profiles"]
+    volumes:
+      - data:/data
+    depends_on: [app]   # the app creates the volume first, owned by its user
+    restart: "no"
+  bank-worker:
+    profiles: [money]
+    image: dana-bank-worker
+    network_mode: "service:app"
+    volumes:
+      - type: volume
+        source: data
+        target: /app/db/money
+        volume:
+          subpath: money
+    depends_on:
+      app:
+        condition: service_started
+      money-dir:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  data:
