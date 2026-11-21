@@ -71,6 +71,10 @@ android {
         buildConfigField("String", "DEFAULT_SERVER_URL", quoted(siteValue("SERVER_URL")))
         // LAN resolvers the TV asks when the system DNS has no answer (comma-separated).
         buildConfigField("String", "LAN_DNS_SERVERS", quoted(siteValue("LAN_DNS_SERVERS")))
+        // Release builds talk HTTPS only; ALLOW_CLEARTEXT=true in your site's android.env lets
+        // your own build reach a plain-http server on your LAN (debug builds always may:
+        // src/debug's network security config). docs/release.md, "HTTPS".
+        manifestPlaceholders["usesCleartextTraffic"] = (siteValue("ALLOW_CLEARTEXT") == "true").toString()
     }
 
     signingConfigs {
