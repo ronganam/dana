@@ -5,7 +5,7 @@ import io.github.ronganam.dana.data.models.ChatMessage
 import io.github.ronganam.dana.data.models.ToolCallEntry
 import io.github.ronganam.dana.data.network.ApiException
 import io.github.ronganam.dana.ui.viewmodels.CallsController
-import io.github.ronganam.dana.ui.viewmodels.describeError
+import io.github.ronganam.dana.testing.ResourceTexts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -57,10 +57,10 @@ class ChatHistoryCodecTest {
     }
 
     @Test
-    fun describeErrorSeparatesUnreachableFromRejected() {
-        assertTrue(describeError(UnknownHostException("x")).contains("unreachable"))
-        assertTrue(describeError(ApiException(401, "no")).contains("API token"))
-        assertEquals("server error (HTTP 500)", describeError(ApiException(500, "boom")))
+    fun reasonSeparatesUnreachableFromRejected() {
+        assertTrue(ResourceTexts.reason(UnknownHostException("x")).contains("unreachable"))
+        assertTrue(ResourceTexts.reason(ApiException(401, "no")).contains("API token"))
+        assertEquals("server error (HTTP 500)", ResourceTexts.reason(ApiException(500, "boom")))
     }
 
     @Test

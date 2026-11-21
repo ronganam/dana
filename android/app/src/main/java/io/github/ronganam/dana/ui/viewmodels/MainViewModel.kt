@@ -47,7 +47,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private var apiService = serverConfig.api()
 
     private val userMessages = UserMessages()
-    private val ctx = ControllerContext(viewModelScope, userMessages) { apiService }
+    private val ctx = ControllerContext(viewModelScope, userMessages, Texts.of(appContext)) { apiService }
 
     /** One-shot error/info messages for a Snackbar. */
     val messages: SharedFlow<String> = userMessages.messages
@@ -282,7 +282,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 _wearUpdateInfo.value = UpdateManager.checkForUpdate(serverConfig.url, "wear")
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                android.util.Log.w("MainViewModel", "Update check failed: ${describeError(e)}")
+                android.util.Log.w("MainViewModel", "Update check failed: $e")
             } finally {
                 _updateCheckDone.value = true
             }
