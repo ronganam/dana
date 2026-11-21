@@ -200,7 +200,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:43993",
+       "value": "http://127.0.0.1:33157",
        "why_not": null
       },
       {
@@ -540,7 +540,7 @@
      "why_not": null
     }
    ],
-   "user_id": "a5de1b9e0b8d"
+   "user_id": "cbf0ed03418f"
   },
   "status": 200
  },
@@ -665,7 +665,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:32883",
+       "value": "http://127.0.0.1:41517",
        "why_not": null
       },
       {
@@ -775,7 +775,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:40577/api",
+       "value": "http://127.0.0.1:36531/api",
        "why_not": null
       },
       {
@@ -983,14 +983,14 @@
        "name": "url",
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "type": "address",
-       "value": "http://127.0.0.1:45823",
+       "value": "http://127.0.0.1:37693",
        "why_not": null
       }
      ],
      "why_not": null
     }
    ],
-   "user_id": "18ee2b81342a"
+   "user_id": "d9f7e41fe60f"
   },
   "status": 200
  },
@@ -1226,7 +1226,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:40577/api",
+       "value": "http://127.0.0.1:36531/api",
        "why_not": null
       },
       {
@@ -1441,7 +1441,7 @@
      "why_not": null
     }
    ],
-   "user_id": "9e41775506d7"
+   "user_id": "31944304cbe2"
   },
   "status": 200
  },
@@ -1566,7 +1566,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:32883",
+       "value": "http://127.0.0.1:41517",
        "why_not": null
       },
       {
@@ -1676,7 +1676,7 @@
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:40577/api",
+       "value": "http://127.0.0.1:36531/api",
        "why_not": null
       },
       {
@@ -1884,28 +1884,21 @@
        "name": "url",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:45823",
+       "value": "http://127.0.0.1:37693",
        "why_not": "Set by an admin"
       }
      ],
      "why_not": "Set by an admin"
     }
    ],
-   "user_id": "18ee2b81342a"
+   "user_id": "d9f7e41fe60f"
   },
   "status": 200
  },
  "me_admin": {
   "body": {
    "access": "admin",
-   "capabilities": [
-    "ops",
-    "manage_users",
-    "see_everyone",
-    "manage_server"
-   ],
-   "id": "a5de1b9e0b8d",
-   "kinds": [
+   "addons": [
     "essentials",
     "tasks",
     "shopping",
@@ -1915,6 +1908,18 @@
     "phone",
     "homeassistant"
    ],
+   "capabilities": [
+    "ops",
+    "manage_users",
+    "see_everyone",
+    "manage_server"
+   ],
+   "currency": "ILS",
+   "id": "cbf0ed03418f",
+   "languages": [
+    "he",
+    "en"
+   ],
    "name": "Robin Levi"
   },
   "status": 200
@@ -1922,14 +1927,18 @@
  "me_member": {
   "body": {
    "access": "member",
-   "capabilities": [],
-   "id": "18ee2b81342a",
-   "kinds": [
+   "addons": [
     "essentials",
     "homeassistant",
     "whatsapp",
     "calendar",
     "cameras"
+   ],
+   "capabilities": [],
+   "currency": "USD",
+   "id": "d9f7e41fe60f",
+   "languages": [
+    "en"
    ],
    "name": "Bob Builder"
   },
@@ -1953,7 +1962,7 @@
      "secret": false,
      "set": true,
      "type": "address",
-     "value": "http://127.0.0.1:40577/api",
+     "value": "http://127.0.0.1:36531/api",
      "why_not": "Set by an admin"
     },
     {
@@ -2074,17 +2083,17 @@
    "users": [
     {
      "access": "admin",
-     "id": "a5de1b9e0b8d",
+     "id": "cbf0ed03418f",
      "name": "Robin Levi"
     },
     {
      "access": "member",
-     "id": "18ee2b81342a",
+     "id": "d9f7e41fe60f",
      "name": "Bob Builder"
     },
     {
      "access": "member",
-     "id": "9e41775506d7",
+     "id": "31944304cbe2",
      "name": "Carl"
     }
    ]

@@ -12,12 +12,11 @@ import re
 import unicodedata
 from typing import Any, Iterable, List, Optional
 
-from core import clock
+from core import clock, user_locale
 from addons.whatsapp.resolve import transliterate_he_to_en
 
 ADDON = "people"
 
-COUNTRY_CODE = re.sub(r"\D", "", os.getenv("DEFAULT_COUNTRY_CODE", "972")) or "972"
 BRIEF_INTERVAL = int(os.getenv("PEOPLE_BRIEF_INTERVAL_SECONDS", "600"))
 BRIEF_BATCH = int(os.getenv("PEOPLE_BRIEF_BATCH", "6"))
 DRIFT_MIN_DAYS = int(os.getenv("PEOPLE_DRIFT_MIN_DAYS", "14"))
@@ -28,14 +27,16 @@ LATIN = re.compile(r"[A-Za-z]")
 
 
 def norm_phone(value: Optional[str]) -> str:
-    """'+972 50-123-4567' / '050-1234567' / '972501234567@c.us' → '972501234567' ('' if not a number)."""
-    raw = (value or "").split("@")[0]
-    d = re.sub(r"\D", "", raw)
-    if d.startswith("00"):
-        d = d[2:]
-    if d.startswith("0") and len(d) in (9, 10):
-        d = COUNTRY_CODE + d[1:]
+    """'+972 50-123-4567' / '972501234567@c.us' → '972501234567'; '050-1234567' → '972501234567' with
+    ``DEFAULT_COUNTRY_CODE=972``, '0501234567' without one (core/user_locale.py); '' if not a number."""
+    d = user_locale.international_digits((value or "").split("@")[0])
     return d if len(d) >= 7 else ""
+
+
+def shown_phone(digits: str) -> str:
+    """A stored number as people read it: '+972501234567', or '0501234567' as
+    is (a local number, kept when no ``DEFAULT_COUNTRY_CODE`` is set)."""
+    return digits if not digits or digits.startswith("0") else "+" + digits
 
 
 def norm_name(value: Optional[str]) -> str:

@@ -14,7 +14,7 @@
  *   POST   /api/undo/{id}                       the snackbar's Undo
  *
  * window.DanaShopping = {show, hide}; app-nav.js calls them on tab switches. The rail / bottom-nav buttons
- * ([data-shopping-nav]) appear only for a user with `shopping` connected (GET /api/me → kinds), with the
+ * ([data-shopping-nav]) appear only for a user with `shopping` connected (GET /api/me → addons), with the
  * count to buy ([data-shopping-badge]). /shopping opens the app on this panel.
  */
 (() => {
@@ -700,7 +700,7 @@
     const r = await request("GET", "/api/me");
     if (r.status !== 200) { if (atShopping) { S.status = "error"; S.error = C.errorText(r.status, r.body); render(); } return; }
     S.me = { id: r.body.id, name: r.body.name };
-    S.enabled = (r.body.kinds || []).includes("shopping");
+    S.enabled = (r.body.addons || []).includes("shopping");
     document.querySelectorAll("[data-shopping-nav]").forEach((b) => b.classList.toggle("hidden", !S.enabled));
     if (!S.enabled) { S.status = "off"; render(); return; }
     if (S.visible) { openStream(); load(); } else refreshBadge();

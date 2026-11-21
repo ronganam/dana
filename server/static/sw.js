@@ -1,4 +1,4 @@
-const CACHE_NAME = "dana-hub-v21";
+const CACHE_NAME = "dana-hub-v22";
 // Pages ("/", "/dashboard", ...) are not pre-cached: they require sign-in, and an
 // unauthenticated install would cache the login redirect in their place.
 const STATIC_ASSETS = [
@@ -26,6 +26,7 @@ const STATIC_ASSETS = [
   "/static/projects-core.js",
   "/static/projects.js",
   "/static/projects.css",
+  "/static/profile.js",
   "/static/favicon.png",
   "/manifest.json",
   "https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap",

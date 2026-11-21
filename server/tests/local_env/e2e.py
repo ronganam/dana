@@ -315,7 +315,7 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     me = await c.get("/api/me")
     check("upgrade: /api/me is the admin with every addon",
           me.status == 200 and me.body.get("name") == ADMIN_NAME and me.body.get("access") == "admin"
-          and me.body.get("kinds") == ALL_KINDS, me)
+          and me.body.get("addons") == ALL_KINDS, me)
     admin_id = (me.body or {}).get("id")
 
     # Every row of the fixture, with its id, through the API.

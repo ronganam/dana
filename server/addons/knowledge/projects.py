@@ -22,7 +22,7 @@ Payloads never carry the owner column; a project seen through a share carries
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from core import users
+from core import user_locale, users
 from core.db import get_db_connection
 from core.users import User
 from core.addons import sharing, store
@@ -40,6 +40,12 @@ class ReadOnly(PermissionError):
 
     def __init__(self) -> None:
         super().__init__("This project is shared with you read-only, so nothing in it can be changed.")
+
+
+def _payload(row: Any) -> Dict[str, Any]:
+    """A project row as the API shows it, plus ``currency``: the owner's
+    (core/user_locale.py), what its budget and prices are in, also for a share."""
+    return {**serialize_project(row), "currency": user_locale.currency(users.get(row["user_id"]))}
 
 
 # --- Sharing -------------------------------------------------------------------------
@@ -168,7 +174,7 @@ def list_projects(user: User, status: Optional[str] = None) -> List[Dict[str, An
             (*task_args, *args),
         ).fetchall()
         stats = _stats(conn, [r["id"] for r in rows])
-    return [with_share({**serialize_project(r), **stats.get(r["id"], _EMPTY_STATS)},
+    return [with_share({**_payload(r), **stats.get(r["id"], _EMPTY_STATS)},
                        *share_note(user, r["user_id"], levels.get(r["id"]))) for r in rows]
 
 
@@ -220,7 +226,7 @@ def get_project(user: Optional[User], project_id: Optional[str]) -> Optional[Dic
         row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
     if row is None:
         return None
-    return with_share(serialize_project(row), *share_note(user, row["user_id"], level))
+    return with_share(_payload(row), *share_note(user, row["user_id"], level))
 
 
 def active_projects(user: Optional[User]) -> List[Dict[str, str]]:
@@ -325,7 +331,7 @@ def update_project(user: User, project_id: str, *, title: Optional[str] = None, 
 
         # scoped: the user owns it (_owned, above)
         row = conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
-        return serialize_project(row)
+        return _payload(row)
 
 
 def delete_project(user: User, project_id: str) -> bool:

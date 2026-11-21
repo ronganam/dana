@@ -8,12 +8,12 @@ nothing is shared between connections, caches included (keyed by
 """
 import datetime
 import logging
-import os
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
 import httpx
 
+from core import user_locale
 from core.addons import Connection, addresses
 from addons.whatsapp.config import DEFAULT_SESSION
 
@@ -71,15 +71,9 @@ def signature(conn: Connection) -> Signature:
 
 
 def normalize_to_international(phone: str) -> str:
-    cleaned = "".join(c for c in phone if c.isdigit())
-    if cleaned.startswith("00"):
-        cleaned = cleaned[2:]
-    if cleaned.startswith("+"):
-        cleaned = cleaned[1:]
-    if cleaned.startswith("0"):
-        cc = os.getenv("DEFAULT_COUNTRY_CODE", "972")
-        cleaned = cc + cleaned[1:]
-    return cleaned
+    """The number's digits in international form (core/user_locale.py: ``DEFAULT_COUNTRY_CODE``
+    replaces a leading 0 when set; unset, the number stays as given)."""
+    return user_locale.international_digits(phone)
 
 
 # ---------------------------------------------------------------------------

@@ -4,7 +4,8 @@
  * /api/projects/{id}/items: {project, sections, entries, tasks}) into what the panel shows: values
  * formatted by column type, the best value of each compared column, the order options are shown in, a
  * section's state ("3 options · Chosen: X"), the date countdown, the budget, the fields a value edit
- * sends. Exercised by test_web_projects.mjs.
+ * sends. Money is shown in the open project's currency (its owner's: `project.currency`, set with
+ * setCurrency). Exercised by test_web_projects.mjs.
  */
 (() => {
   "use strict";
@@ -15,7 +16,7 @@
   const decisionLabel = (d, lang) => (lang === "he" ? DECISION_LABELS_HE : DECISION_LABELS)[d || ""];
   const DECISION_ORDER = { chosen: 0, shortlist: 1, "": 2, rejected: 3 };
   const TYPES = ["text", "money", "number", "phone", "url", "date", "checkbox", "rating", "select"];
-  const TYPE_LABELS = { text: "Text", money: "Price (₪)", number: "Number", phone: "Phone", url: "Link", date: "Date",
+  const TYPE_LABELS = { text: "Text", money: "Price ($)", number: "Number", phone: "Phone", url: "Link", date: "Date",
                         checkbox: "Yes / no", rating: "Rating", select: "Choice" };
 
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -32,8 +33,23 @@
     return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : null;
   }
 
-  const money = (n) => `₪${Math.round(n).toLocaleString("en-US")}`;
-  const shortMoney = (n) => (Math.abs(n) >= 1000 ? `₪${(Math.round(n / 100) / 10).toLocaleString("en-US")}k` : money(n));
+  /** "₪" for ILS, "$" for USD, "CHF " for a currency without a narrow symbol; "" for none. */
+  function currencySymbol(code) {
+    if (!/^[A-Z]{3}$/.test(code || "")) return "";
+    try {
+      const sym = new Intl.NumberFormat("en-US", { style: "currency", currency: code, currencyDisplay: "narrowSymbol" })
+        .formatToParts(0).find((p) => p.type === "currency")?.value || code;
+      return /^[A-Za-z]+$/.test(sym) ? `${sym} ` : sym;
+    } catch (_) { return `${code} `; }
+  }
+  let symbol = currencySymbol("USD");
+  /** The currency money values are shown in (an ISO 4217 code; the panel sets the open project's). */
+  function setCurrency(code) {
+    symbol = currencySymbol(code) || symbol;
+    TYPE_LABELS.money = `Price (${symbol.trim()})`;
+  }
+  const money = (n) => `${symbol}${Math.round(n).toLocaleString("en-US")}`;
+  const shortMoney = (n) => (Math.abs(n) >= 1000 ? `${symbol}${(Math.round(n / 100) / 10).toLocaleString("en-US")}k` : money(n));
 
   /** The field of `entry` named `name` (case-insensitive), or null. */
   function field(entry, name) {
@@ -252,7 +268,7 @@
 
   window.DanaProjectsCore = {
     DECISIONS, DECISION_LABELS, DECISION_LABELS_HE, decisionLabel, heCount, TYPES, TYPE_LABELS, FILE_ICONS,
-    esc, isRtl, plural, asNumber, money, shortMoney, field, valueOf, isEmpty, phoneLinks, safeUrl, host, valueHtml,
+    esc, isRtl, plural, asNumber, currencySymbol, setCurrency, money, shortMoney, field, valueOf, isEmpty, phoneLinks, safeUrl, host, valueHtml,
     formatDate, bestWay, bestIds, orderOptions, priceColumn, sectionState, countdown, budgetInfo, setField,
     extraFields, firstPhone, fileKind, fileSize, columnsPayload, orderProjects, preview,
   };

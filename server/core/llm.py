@@ -51,11 +51,11 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import litellm
 
-from core import purposes, usage
+from core import purposes, usage, user_locale, users
 
 logger = logging.getLogger(__name__)
 
@@ -98,17 +98,32 @@ _PROFILE_CHAINS: Dict[str, tuple] = {
     "deep": (("DEEP_MODEL",), OPUS),
 }
 
-_TRANSCRIBE_PROMPT = (
-    "Transcribe the following audio file accurately. "
-    "The speaker primarily speaks Hebrew (עברית) or English, or a mix of both (code-switching). "
-    "Accurately identify whether the speech is in Hebrew or English. "
-    "Do NOT hallucinate or transcribe into unintended foreign languages (such as Arabic, Turkish, Russian, "
-    "Persian, Spanish, etc.) unless unmistakably spoken. "
-    "If in Hebrew, transcribe in Hebrew letters. If in English, transcribe in English. "
-    "Output ONLY the transcribed text. Do not add any introduction, explanation, notes, or punctuation "
-    "commentary. Just output the exact words spoken. If there is no speech or only silence/noise, "
-    "reply with empty string."
-)
+# Languages a transcription model tends to drift into: named as unintended unless the user speaks them.
+_DRIFT_LANGUAGES = ("ar", "tr", "ru", "fa", "es")
+
+
+def transcription_prompt(langs: Tuple[str, ...]) -> str:
+    """The transcription instructions for a speaker of ``langs`` (the acting
+    user's languages, core/user_locale.py)."""
+    names = tuple(user_locale.language_name(c) for c in langs)
+    plain = tuple(user_locale.language_name(c, native=False) for c in langs)
+    if len(langs) == 1:
+        speaks, which = f"The speaker primarily speaks {names[0]}. ", ""
+    else:
+        mix = "a mix of both" if len(langs) == 2 else "a mix of them"
+        speaks = f"The speaker primarily speaks {user_locale.join_names(names, 'or')}, or {mix} (code-switching). "
+        which = (f"Accurately identify whether the speech is in {plain[0]} or {plain[1]}. " if len(langs) == 2
+                 else f"Accurately identify which of {user_locale.join_names(plain, 'or')} the speech is in. ")
+    drift = tuple(user_locale.language_name(c, native=False) for c in _DRIFT_LANGUAGES if c not in langs)
+    scripts = " ".join(f"If in {p}, transcribe in {user_locale.SCRIPTS.get(c.split('-')[0], p)}."
+                       for c, p in zip(langs, plain))
+    return ("Transcribe the following audio file accurately. " + speaks + which
+            + "Do NOT hallucinate or transcribe into unintended foreign languages"
+            + (f" (such as {', '.join(drift)}, etc.)" if drift else "") + " unless unmistakably spoken. "
+            + scripts + " "
+            "Output ONLY the transcribed text. Do not add any introduction, explanation, notes, or punctuation "
+            "commentary. Just output the exact words spoken. If there is no speech or only silence/noise, "
+            "reply with empty string.")
 
 
 def model(job: str) -> str:
@@ -451,10 +466,11 @@ async def transcribe(audio: bytes, mime_type: str, *, timeout: float = 30.0, not
 
     ``timeout`` defaults to the voice-turn budget; long recordings pass more.
     ``note`` is appended to the prompt (e.g. "This is part 2 of 5 of a longer call").
+    The prompt names the acting user's languages (:func:`transcription_prompt`).
     Raises on API failure (``status_code`` tells whether a retry can help).
     """
     name = model_for(purpose, "transcribe")
-    prompt = _TRANSCRIBE_PROMPT + (f" {note}" if note else "")
+    prompt = transcription_prompt(user_locale.languages(users.current())) + (f" {note}" if note else "")
     started = time.perf_counter()
     tag = usage.meta(purpose, ref, source, kind="transcribe")
     if _is_speech_to_text(name):

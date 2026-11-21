@@ -223,6 +223,8 @@ def test_convert_9_0():
     after = dump_data(path)
     expected = {t: rows for t, rows in _renamed(before).items() if t not in DROPPED}
     expected["sqlite_sequence"] = [r for r in expected["sqlite_sequence"] if r[0] not in DROPPED]
+    # core m0004 adds users.languages / users.currency, empty (the server's defaults apply)
+    expected["users"] = sorted(tuple(r) + ("''", "''") for r in expected["users"])
     changed = sorted(t for t in set(expected) | set(after) if expected.get(t) != after.get(t))
     check("9.0: every row kept with every value (FTS and sqlite_sequence included)", not changed, str(changed))
     check("9.0: the fixture's rows are there", after["users"] and after["tasks"] and after["phone_calls"])

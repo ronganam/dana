@@ -608,7 +608,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional total budget in NIS; chosen options' prices are counted against it."
+          "description": "Optional total budget in the user's currency; chosen options' prices are counted against it."
         }
       },
       "required": [
@@ -701,7 +701,7 @@
   {
     "type": "function",
     "name": "save_knowledge_item",
-    "description": "Save a knowledge entry (note, record, or link) into a project and return its ID. The returned ID is used later with update_knowledge_item / delete_knowledge_item / save_whatsapp_file. In an 'options' section (a decision such as photographers or venues) the entry is one option: give `fields` exactly the section's column names (see `list_project_entries`), in the column's type. Follow these AUTHORING RULES: - title is a SHORT label (max ~8 words) in the user's language, with NO markdown and NO punctuation. Example: \"Photographer — Yanai Budget\". Never paste a whole paragraph into the title. - body holds the full details written as clean Markdown: '##' or '###' headings, **bold** for key figures and names, '-' bullet lists, and a blank line between paragraphs. Preserve the user's facts, numbers, dates and Hebrew/English wording exactly. Example body: ## Contact - Phone: **050-1234567** - Email: yanai@example.com ## Budget - Price: 4,500 NIS - Deposit paid: **yes** (12/06/2026) - kind: 'note' for free text (ideas, general notes), 'record' for structured data (contacts, vendors, prices, contracts) — pair with fields, 'link' when saving a URL (auto-processed for transcript, summary and media). - fields: capture the few facts you might want to query later as [{\"name\": \"<label>\", \"type\": \"<type>\", \"value\": <value>}] where type is one of text, number, money (a plain number in NIS), phone, checkbox, date, url, select, rating (1-5). Example: [{\"name\": \"Phone\", \"type\": \"text\", \"value\": \"050-1234567\"}, {\"name\": \"Price\", \"type\": \"number\", \"value\": 4500}, {\"name\": \"Paid\", \"type\": \"checkbox\", \"value\": true}] - tags: 2-4 short labels (words or short phrases) in the user's language to enable cross-project search, e.g. [\"צלם\", \"תקציב\"] or [\"vendor\"], [\"budget\"]. - status: 'open' (default) | 'in_progress' | 'done' | 'archived'. - priority: 'low' | 'medium' | 'high'. - due_at: ISO date 'YYYY-MM-DD' only when a deadline or timing matters. - url: full URL to attach and auto-process; typically combined with kind 'link'.",
+    "description": "Save a knowledge entry (note, record, or link) into a project and return its ID. The returned ID is used later with update_knowledge_item / delete_knowledge_item / save_whatsapp_file. In an 'options' section (a decision such as photographers or venues) the entry is one option: give `fields` exactly the section's column names (see `list_project_entries`), in the column's type. Follow these AUTHORING RULES: - title is a SHORT label (max ~8 words) in the user's language, with NO markdown and NO punctuation. Example: \"Photographer — Yanai Budget\". Never paste a whole paragraph into the title. - body holds the full details written as clean Markdown: '##' or '###' headings, **bold** for key figures and names, '-' bullet lists, and a blank line between paragraphs. Preserve the user's facts, numbers, dates and Hebrew/English wording exactly. Example body: ## Contact - Phone: **050-1234567** - Email: yanai@example.com ## Budget - Price: 4,500 - Deposit paid: **yes** (12/06/2026) - kind: 'note' for free text (ideas, general notes), 'record' for structured data (contacts, vendors, prices, contracts) — pair with fields, 'link' when saving a URL (auto-processed for transcript, summary and media). - fields: capture the few facts you might want to query later as [{\"name\": \"<label>\", \"type\": \"<type>\", \"value\": <value>}] where type is one of text, number, money (a plain number in the user's currency), phone, checkbox, date, url, select, rating (1-5). Example: [{\"name\": \"Phone\", \"type\": \"text\", \"value\": \"050-1234567\"}, {\"name\": \"Price\", \"type\": \"number\", \"value\": 4500}, {\"name\": \"Paid\", \"type\": \"checkbox\", \"value\": true}] - tags: 2-4 short labels (words or short phrases) in the user's language to enable cross-project search, e.g. [\"צלם\", \"תקציב\"] or [\"vendor\"], [\"budget\"]. - status: 'open' (default) | 'in_progress' | 'done' | 'archived'. - priority: 'low' | 'medium' | 'high'. - due_at: ISO date 'YYYY-MM-DD' only when a deadline or timing matters. - url: full URL to attach and auto-process; typically combined with kind 'link'.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -918,7 +918,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional total budget in NIS."
+          "description": "Optional total budget in the user's currency."
         }
       },
       "required": [

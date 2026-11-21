@@ -66,6 +66,9 @@ class User:
     pronoun: str = "they"
     other_names: str = ""
     prompt_name: str = ""
+    # Their own languages (comma list) and currency; "" = the server's (core/user_locale.py).
+    languages: str = ""
+    currency: str = ""
 
     @property
     def level(self) -> access.AccessLevel:
@@ -134,7 +137,7 @@ def _load() -> _Snapshot:
                                   telegram_chat_id=r["telegram_chat_id"], created_at=r["created_at"],
                                   telegram_ids=tuple(tg_by_user.get(r["id"], ())), context=r["context"],
                                   pronoun=r["pronoun"], other_names=r["other_names"],
-                                  prompt_name=r["prompt_name"])
+                                  prompt_name=r["prompt_name"], languages=r["languages"], currency=r["currency"])
             if first_admin_id is None and r["access"] == access.ADMIN:
                 first_admin_id = r["id"]
         tokens = conn.execute("SELECT id, user_id, token_hash, session_hash FROM user_tokens").fetchall()
@@ -306,14 +309,17 @@ _UNSET: object = object()
 
 def update(user_id: str, *, name: Optional[str] = None, access_level: Optional[str] = None,
            context: Optional[str] = None, pronoun: Optional[str] = None, other_names: Optional[str] = None,
-           prompt_name: Optional[str] = None, telegram_chat_id: object = _UNSET) -> User:
+           prompt_name: Optional[str] = None, languages: Optional[str] = None, currency: Optional[str] = None,
+           telegram_chat_id: object = _UNSET) -> User:
     """Change a user; arguments left out stay as they are
-    (``telegram_chat_id=None`` removes the proactive chat).
+    (``telegram_chat_id=None`` removes the proactive chat; ``languages`` /
+    ``currency`` ``""``: back to the server's).
 
     Raises:
         LookupError: no such user.
-        ValueError: an empty name, an unknown access level or pronoun, or
-            taking ``admin`` away from the last admin.
+        ValueError: an empty name, an unknown access level or pronoun, a
+            malformed language or currency code, or taking ``admin`` away
+            from the last admin.
     """
     user = get(user_id)
     if user is None:
@@ -328,7 +334,9 @@ def update(user_id: str, *, name: Optional[str] = None, access_level: Optional[s
         context=user.context if context is None else context,
         pronoun=user.pronoun if pronoun is None else pronoun,
         other_names=user.other_names if other_names is None else other_names,
-        prompt_name=user.prompt_name if prompt_name is None else prompt_name)
+        prompt_name=user.prompt_name if prompt_name is None else prompt_name,
+        languages=user.languages if languages is None else languages,
+        currency=user.currency if currency is None else currency)
     chat = user.telegram_chat_id if telegram_chat_id is _UNSET else telegram_chat_id
     try:
         with get_db_connection() as conn:

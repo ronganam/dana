@@ -115,7 +115,8 @@ The web server listens on port 8080. Every path but the public ones (`docs/acces
 | `POST /api/sessions/main/clear` | New topic in the shared thread: Dana forgets it so far, messages stay (docs/agent-actions.md) |
 | `GET /api/assistant/models` | Chat model catalog + default id (the profiles the caller's access level may use) |
 | `GET /api/assistant/voice_stream` | WebSocket: PCM in, then the same run events as JSON frames, closed by `state` (or `no_speech`) |
-| `GET /api/me` | The caller: `{id, name, access, capabilities, kinds}` |
+| `GET /api/me` | The caller: `{id, name, access, capabilities, addons, languages, currency}` |
+| `GET` / `PUT /api/profile` | The caller's languages and currency (`core/profile_api.py`) |
 | `GET /api/users` | `manage_users` only: `{users: [{id, name, access}]}` — the Addons page's user picker |
 | `GET /api/addons` · `GET /api/addons/{name}` | The caller's addons (`?user=<id>` with `manage_users`): fields with their type, whether each credential is set (never a secret's value; an address's value is shown), settings, account, and whether the caller may change each addon / field (`can_change`, `why_not`, `rule`) (`docs/access.md` → Managing users) |
 | `PUT /api/addons/{name}` | Connect (201) or update (200): `{credentials?, settings?}`, merged; 400 `invalid` with the field; 403 `forbidden` for an addon the level may not have |

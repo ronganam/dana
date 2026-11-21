@@ -9,13 +9,13 @@ from typing import Any, Dict, List, Optional
 from addons.contacts import client, enrich, store
 from addons.contacts.addon import addon
 from core.addons import Connection
-from addons.people.values import norm_phone, valid_birthday
+from addons.people.values import norm_phone, shown_phone, valid_birthday
 
 logger = logging.getLogger(__name__)
 
 
 def _phone_text(phone: Dict[str, Any]) -> str:
-    shown = f"+{phone['number']}" if phone.get("number") else str(phone.get("value") or "")
+    shown = shown_phone(phone["number"]) if phone.get("number") else str(phone.get("value") or "")
     return shown + (f" ({phone['type']})" if phone.get("type") else "")
 
 

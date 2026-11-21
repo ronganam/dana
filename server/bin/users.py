@@ -10,8 +10,9 @@ refresh (10 s). In the pod::
 Commands (``bin/users.py <command> --help`` for each)::
 
     list                                    users: access, Telegram ids, tokens, addons
-    add NAME [--access] [--context] [--pronoun] [--telegram-chat]
-    update USER [--name] [--access] [--context] [--pronoun] [--other-names] [--prompt-name] [--telegram-chat]
+    add NAME [--access] [--context] [--pronoun] [--languages] [--currency] [--telegram-chat]
+    update USER [--name] [--access] [--context] [--pronoun] [--languages] [--currency] [--other-names]
+                [--prompt-name] [--telegram-chat]
     remove USER [--delete-data]             without the flag: says what would be deleted, removes nothing
     tokens issue USER [--label]             prints the token once
     tokens list [USER]
@@ -47,7 +48,7 @@ from typing import Any, Dict, List, Optional, Sequence, TextIO
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import addons  # noqa: E402,F401 — first: registers every addon (and the sharing item types)
-from core import access, db, user_rows, users  # noqa: E402
+from core import access, db, user_locale, user_rows, users  # noqa: E402
 from core.addons import sharing  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.paths import IMAGES_DIR, RECORDINGS_DIR  # noqa: E402
@@ -279,6 +280,8 @@ def cmd_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
         print(f"  telegram ids: {', '.join(map(str, u.telegram_ids)) or 'none'}"
               f"   proactive chat: {u.telegram_chat_id if u.telegram_chat_id is not None else 'none'}", file=out)
         print(f"  pronoun: {u.pronoun}   context: {_short(u.context) if u.context else 'none'}", file=out)
+        print(f"  languages: {','.join(user_locale.languages(u))}{'' if u.languages else ' (server default)'}"
+              f"   currency: {user_locale.currency(u)}{'' if u.currency else ' (server default)'}", file=out)
         tokens = ", ".join(f"{t.label or '(no label)'} ({t.id})" for t in users.list_tokens(u.id))
         print(f"  tokens: {tokens or 'none'}", file=out)
         names = [k for k in store.connected_addons(u) if not get_addon(k).everyone]
@@ -291,10 +294,14 @@ def cmd_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
 def _profile_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--context", help="who they are, family, work, the people they talk about (for prompts)")
     p.add_argument("--pronoun", choices=user_rows.PRONOUNS, help="how prompts refer to them")
+    p.add_argument("--languages", help="their languages, a comma list of codes, the first the default "
+                                       "(e.g. 'he,en'; '' = the server's DEFAULT_LANGUAGES)")
+    p.add_argument("--currency", help="their currency, ISO 4217 (e.g. EUR; '' = the server's CURRENCY)")
 
 
 def cmd_add(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
-    profile = user_rows.Profile(context=args.context or "", pronoun=args.pronoun or "they")
+    profile = user_rows.Profile(context=args.context or "", pronoun=args.pronoun or "they",
+                                languages=args.languages or "", currency=args.currency or "")
     try:
         user = users.create(args.name, args.access, telegram_chat_id=_chat_id(args.telegram_chat),  # type: ignore[arg-type]
                             profile=profile)
@@ -314,7 +321,7 @@ def cmd_update(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
         changes["name"] = args.name
     if args.access is not None:
         changes["access_level"] = args.access
-    for field in ("context", "pronoun", "other_names", "prompt_name"):
+    for field in ("context", "pronoun", "languages", "currency", "other_names", "prompt_name"):
         if getattr(args, field) is not None:
             changes[field] = getattr(args, field)
     if args.telegram_chat is not None:
@@ -519,7 +526,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--telegram-chat", help="Telegram chat id for proactive messages")
     p.set_defaults(func=cmd_add)
 
-    p = sub.add_parser("update", help="change a user's name, access, prompt profile or proactive chat")
+    p = sub.add_parser("update", help="change a user's name, access, prompt profile, languages, currency "
+                                      "or proactive chat")
     p.add_argument("user")
     p.add_argument("--name")
     p.add_argument("--access", choices=list(access.LEVELS))
