@@ -218,7 +218,7 @@ class MoneyController(val ctx: ControllerContext, appContext: Context) {
                 _loadError.value = null
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
-                _loadError.value = (e as? MoneyApiError)?.message ?: describeError(e)
+                _loadError.value = (e as? MoneyApiError)?.message ?: ctx.texts.reason(e)
             }
         }
         ctx.scope.launch { loadSources() }
@@ -284,7 +284,7 @@ class MoneyController(val ctx: ControllerContext, appContext: Context) {
             refresh()
         } catch (e: Exception) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            ctx.messages.post("$failure: ${(e as? MoneyApiError)?.message ?: describeError(e)}")
+            ctx.messages.post("$failure: ${(e as? MoneyApiError)?.message ?: ctx.texts.reason(e)}")
         }
     }
 

@@ -111,7 +111,7 @@ class NowController(
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
-                    Log.w("Now", "Load failed: ${describeError(e)}")
+                    Log.w("Now", "Load failed: $e")
                     _failed.value = true
                 } finally {
                     _loading.value = false
@@ -306,6 +306,6 @@ class NowController(
     }
 
     private fun reason(e: Exception): String =
-        if (e is io.github.ronganam.dana.data.network.ApiException && e.code != 401 && e.code != 403) e.message ?: describeError(e)
-        else describeError(e)
+        if (e is io.github.ronganam.dana.data.network.ApiException && e.code != 401 && e.code != 403) e.message ?: ctx.texts.reason(e)
+        else ctx.texts.reason(e)
 }

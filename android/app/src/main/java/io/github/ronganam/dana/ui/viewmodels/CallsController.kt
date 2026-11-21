@@ -109,7 +109,7 @@ class CallsController(private val ctx: ControllerContext) {
             } catch (e: kotlinx.coroutines.CancellationException) {
                 throw e
             } catch (e: Exception) {
-                ctx.messages.post(describeError(e))
+                ctx.messages.post(ctx.texts.reason(e))
             } finally {
                 setBusy(suggestion.id, false)
             }
@@ -282,7 +282,7 @@ class CallsController(private val ctx: ControllerContext) {
             } catch (e: Exception) {
                 Log.e("CallsController", "Error in manual upload", e)
                 _uploadFormState.value = state.copy(isSubmitting = false)
-                ctx.messages.post("Upload failed: ${describeError(e)}")
+                ctx.messages.post("Upload failed: ${ctx.texts.reason(e)}")
             } finally {
                 file.delete()
             }

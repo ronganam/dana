@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Failed requests (Texts.reason, ControllerContext.action) -->
+    <string name="error_not_authorized">not authorized (check the API token)</string>
+    <string name="error_http">server error (HTTP %1$d)</string>
+    <string name="error_unreachable">server unreachable — is the VPN on?</string>
+    <string name="error_rejected">%1$s: the server rejected the request</string>
+    <string name="error_with_reason">%1$s: %2$s</string>
+
+    <!-- The conversation (ChatController, ChatRunRenderer) -->
+    <string name="chat_offline_copy">Offline copy</string>
+    <string name="chat_new_chat">New Chat</string>
+    <string name="chat_dana_thinking">Dana is thinking…</string>
+    <string name="chat_thinking">Thinking…</string>
+    <string name="chat_step">Step %1$d of %2$d</string>
+    <string name="chat_writing">Writing…</string>
+    <string name="chat_retrying">Connection hiccup — retrying…</string>
+    <string name="chat_preparing_tool">Preparing %1$s…</string>
+    <string name="chat_running_tool">Running %1$s…</string>
+    <string name="chat_reading_results">Reading the results…</string>
+    <string name="chat_error">Error: %1$s</string>
+    <string name="chat_waiting_approval">Waiting for your approval</string>
+    <string name="chat_waiting_choice">Waiting for your choice</string>
+    <string name="chat_step_limit">Step limit reached</string>
+    <string name="chat_stopped">Stopped.</string>
+    <string name="chat_stopped_status">Stopped</string>
+    <string name="chat_following_busy">Still working on your previous request — following it…</string>
+    <string name="chat_reconnecting_status">Connection lost — reconnecting…</string>
+    <string name="chat_reconnecting">Reconnecting…</string>
+    <string name="chat_busy_message_back">Dana is still answering the last request. Your message is back in the box.</string>
+    <string name="chat_busy_say_again">Dana is still answering the last request. Say it again when she\'s done.</string>
+    <string name="chat_lost_connection">Lost the connection. Reopen this chat to see the reply.</string>
+    <string name="chat_connection_error">Connection error: %1$s</string>
+    <string name="chat_no_reply">Couldn\'t get a reply: %1$s</string>
+    <string name="chat_busy_clear">Dana is still answering — try again when the reply is done.</string>
+    <string name="chat_forgot">Dana forgot this conversation</string>
+    <string name="chat_new_topic_failed">Couldn\'t start a new topic: %1$s</string>
+    <string name="chat_screen">Screen</string>
+    <string name="chat_sending">Sending…</string>
+    <string name="chat_not_sent">Message not sent</string>
+    <string name="chat_set_server_first">%1$s: set the server URL in Settings first</string>
+    <string name="chat_couldnt_approve">Couldn\'t approve</string>
+    <string name="chat_couldnt_deny">Couldn\'t deny</string>
+    <string name="chat_executing">Executing...</string>
+    <string name="chat_cancelling">Cancelling...</string>
+    <string name="chat_selection_not_sent">Selection not sent</string>
+    <string name="chat_submitting_selection">Submitting selection...</string>
+    <string name="chat_couldnt_continue">Couldn\'t continue</string>
+    <string name="chat_continuing">Continuing with more steps...</string>
+    <string name="chat_couldnt_stop_run">Couldn\'t stop the run</string>
+    <string name="chat_wrapping_up">Wrapping up...</string>
+    <string name="chat_couldnt_undo">Couldn\'t undo: %1$s</string>
+
+    <!-- Push-to-talk (ChatVoice) -->
+    <string name="voice_set_server_first">Set the server URL in Settings first</string>
+    <string name="voice_checking_server">Checking server…</string>
+    <string name="voice_unreachable">Server unreachable — is the VPN on?</string>
+    <string name="voice_listening">Listening...</string>
+    <string name="voice_didnt_catch">Didn\'t catch that — try again</string>
+    <string name="voice_transcribing">Transcribing…</string>
+    <string name="voice_mic_error">Microphone error</string>
+    <string name="voice_failed">Voice failed: %1$s</string>
+    <string name="voice_connection_lost">connection lost</string>
+</resources>
