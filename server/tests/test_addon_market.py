@@ -364,6 +364,12 @@ async def test_catalog(c: TestClient) -> None:
     check("catalog.json in the repository: the hello entry waits for its release commit (skipped, with the reason)",
           shipped.entries == [] and any(p.startswith("hello:") and "commit" in p for p in shipped.problems),
           shipped.problems)
+    src = {"repo": "https://example.invalid/r.git", "path": "", "ref": "c" * 40}
+    iconed = catalog.parse({"addons": [{"name": "iconed", "icon": "cloud-sun", "source": src},
+                                       {"name": "badicon", "icon": "Cloud Sun", "source": src}]})
+    check("catalog: an entry's optional icon is a Lucide name (kept), anything else skips the entry",
+          [e.icon for e in iconed.entries] == ["cloud-sun"] and iconed.entries[0].to_json()["icon"] == "cloud-sun"
+          and any(p.startswith("badicon:") and "icon" in p for p in iconed.problems), iconed.problems)
     status, body = await call(c, "GET", "/api/addons/catalog", BOB_AUTH)
     check("catalog: admins only", status == 403)
     status, body = await call(c, "GET", "/api/addons/catalog", ADMIN_AUTH)

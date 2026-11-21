@@ -5,7 +5,8 @@
                                            (``addons``: the ones they have; ``languages`` / ``currency``: theirs,
                                            else the server's: core/user_locale.py; changed with PUT /api/profile)
     GET    /api/users                    → {users: [{id, name, access}]} (``manage_users`` only)
-    GET    /api/addons                   → {user_id, addons: [<addon>, ...], restart_needed, can_manage[, pending]}
+    GET    /api/addons                   → {user_id, addons: [<addon>, ...], restart_needed, can_manage, welcome[, pending]}
+    POST   /api/addons/welcome           {dismissed: bool} → <welcome> (the caller's own first-run welcome)
     GET    /api/addons/{name}            → <addon>
     PUT    /api/addons/{name}            {credentials?: {name: str|null}, settings?: {name: value|null}}
                                          → <addon> (connects it, or updates it)
@@ -27,10 +28,21 @@
 
 ``<addon>`` = ``{name, title, description, version, source, state, needs,
 everyone, web, worker, connected, requires, can_change, why_not,
-credentials: [{name, description, required, set, type, secret, value?,
-can_change, why_not, rule}], settings: [{name, description, default, value,
-type, can_change, why_not, rule}], account, check, options, connect_url,
-connect_label}``. ``source``: ``official`` / ``site`` / ``image`` /
+credentials: [{name, label, description, help, url, placeholder, required,
+set, type, secret, value?, can_change, why_not, rule}], settings: [{name,
+label, description, help, url, placeholder, default, value, type,
+can_change, why_not, rule}], account, check, options, connect_url,
+connect_label, icon, features, pages, setup, examples,
+disconnect_warning}``. The onboarding words come from the manifest
+(``Field(label=, help=, url=, placeholder=)``, ``Addon(icon=, features=,
+setup=, examples=, disconnect_warning=)``): ``label`` is never empty (the
+name in words by default), ``url`` and ``disconnect_warning`` are null when
+not given, ``features`` falls back to the tools' first docstring lines,
+``pages`` are the labels of the pages it adds to the navigation.
+``<welcome>`` = ``{show, dismissed, suggested: [addon name]}``: ``show``
+while the user has no optional addon on (beyond ``default_on`` / ``everyone``
+ones) and has not dismissed it; ``suggested`` are addons they can turn on
+now. An admin acting with ``?user=`` gets ``show: false``. ``source``: ``official`` / ``site`` / ``image`` /
 ``installed``; ``state`` for this user: ``on`` (they have it), ``available``
 (they can turn it on), ``off`` (only an admin can: ``why_not``),
 ``disabled-on-server`` (an admin disabled it, or an addon it needs, for
@@ -96,12 +108,12 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from aiohttp import web
 
-from core import addon_dirs, lifecycle, user_locale, users
+from core import addon_dirs, cards, lifecycle, now_hidden, user_locale, users
 from core.access import CAPABILITIES
 from core.auth import request_user, requires
 from core.users import User
 from core.addons import catalog, crypto, install, loader, state, store
-from core.addons.addon import Addon, InvalidValue, get_addon, all_addons
+from core.addons.addon import Addon, Field, InvalidValue, get_addon, all_addons
 
 logger = logging.getLogger(__name__)
 
@@ -111,6 +123,9 @@ OPTIONS_TIMEOUT_SECONDS = 20.0
 MANAGE = "manage_server"
 
 ON, AVAILABLE, OFF, DISABLED, FAILED = "on", "available", "off", "disabled-on-server", "failed"
+# The first-run welcome: dismissed is a hidden item of the user's (core/now_hidden.py), kept for good.
+WELCOME_ID = "welcome:addons"
+WELCOME_SUGGESTIONS = 8
 
 
 class Invalid(ValueError):
@@ -159,6 +174,40 @@ def _web(addon: Addon) -> List[Dict[str, Any]]:
             for p in addon.web]
 
 
+def _page_labels(addon: Addon) -> List[str]:
+    """The names of the pages ``addon`` adds to the web app's navigation."""
+    return [p.nav.label for p in addon.web if p.nav is not None]
+
+
+def _field_words(f: Field) -> Dict[str, Any]:
+    """What the Addons page shows beside a field's input (core/addons/addon.py, ``Field``)."""
+    return {"label": f.title, "description": f.description, "help": f.help, "url": f.url or None,
+            "placeholder": f.placeholder}
+
+
+def _onboarding(addon: Addon) -> Dict[str, Any]:
+    """What the Addons page tells someone about to turn ``addon`` on: what it adds, the steps, what to try."""
+    return {"icon": addon.icon, "features": list(addon.feature_lines()), "pages": _page_labels(addon),
+            "setup": list(addon.setup), "examples": list(addon.examples),
+            "disconnect_warning": addon.disconnect_warning or None}
+
+
+def welcome_payload(user: User) -> Dict[str, Any]:
+    """The first-run welcome for ``user``: shown while they have no optional addon on (only the ones
+    every user or every new user gets) and have not dismissed it; ``suggested``: the addons they could
+    turn on now, in the addon order (at most :data:`WELCOME_SUGGESTIONS`; none that needs a capability, ``ops``)."""
+    connected = set(store.connected_addons(user))
+    optional = [a for a in all_addons() if a.allowed_for(user) and not a.everyone and not a.default_on]
+    suggested = [a.name for a in optional
+                 if a.name not in connected and a.requires is None and state.is_enabled(a.name)
+                 and store.addon_rule(a, user).can_change
+                 and all(n in connected for n in a.needs)][:WELCOME_SUGGESTIONS]
+    dismissed = now_hidden.row(user, WELCOME_ID) is not None
+    has_optional = any(a.name in connected for a in optional)
+    return {"show": not has_optional and not dismissed and bool(suggested), "dismissed": dismissed,
+            "suggested": suggested}
+
+
 def _state(user: User, addon: Addon, connected: bool, can_change: bool) -> str:
     if not state.is_enabled(addon.name):
         return DISABLED
@@ -179,7 +228,7 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
     values: Mapping[str, Any] = conn.settings if conn is not None else addon.setting_defaults()
     credentials: List[Dict[str, Any]] = []
     for f in addon.credentials:
-        item: Dict[str, Any] = {"name": f.name, "description": f.description, "required": f.required,
+        item: Dict[str, Any] = {"name": f.name, **_field_words(f), "required": f.required,
                                 "set": bool(creds.get(f.name)), "type": f.type, "secret": f.secret}
         if not f.secret:
             item["value"] = creds.get(f.name) or None
@@ -211,7 +260,7 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
         "can_change": can_change,
         "why_not": why_not,
         "credentials": credentials,
-        "settings": [{"name": f.name, "description": f.description, "default": f.default,
+        "settings": [{"name": f.name, **_field_words(f), "default": f.default,
                       "value": values.get(f.name), "type": f.type,
                       **_rule_fields(store.field_rule(addon, user, f.name, by))} for f in addon.settings],
         "account": (conn.account or None) if conn is not None else None,
@@ -220,6 +269,7 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
         # The sign-in is the caller's own: not offered to an admin acting for someone else.
         "connect_url": addon.connect_url if by.id == user.id else None,
         "connect_label": addon.connect_label or None,
+        **_onboarding(addon),
     }
     if conn is not None and conn.account_conflict:
         # The account its service reports is held by another user's connection (whatsapp).
@@ -241,6 +291,7 @@ def failed_payload(failed: loader.Failed, by: User) -> Dict[str, Any]:
         "state": FAILED, "needs": [], "everyone": False, "web": [], "worker": False, "connected": False,
         "requires": None, "can_change": False, "why_not": "It did not load", "credentials": [], "settings": [],
         "account": None, "check": False, "options": False, "connect_url": None, "connect_label": None,
+        "icon": "", "features": [], "pages": [], "setup": [], "examples": [], "disconnect_warning": None,
     }
     if by.level.allows(MANAGE):
         out["error"] = failed.error
@@ -378,10 +429,29 @@ async def list_addons_api(request: web.Request) -> web.Response:
     items += [failed_payload(f, caller) for f in loader.failed().values()]
     pending = pending_changes()
     body: Dict[str, Any] = {"user_id": target.id, "addons": items, "restart_needed": bool(pending),
-                            "can_manage": caller.level.allows(MANAGE)}
+                            "can_manage": caller.level.allows(MANAGE),
+                            # Only for the caller's own addons: an admin acting for someone gets no welcome.
+                            "welcome": welcome_payload(target) if target.id == caller.id
+                            else {"show": False, "dismissed": False, "suggested": []}}
     if caller.level.allows(MANAGE):
         body["pending"] = pending
     return web.json_response(body)
+
+
+async def welcome_api(request: web.Request) -> web.Response:
+    """POST /api/addons/welcome {dismissed: bool}: hide the caller's first-run welcome for good, or bring it back."""
+    user = request_user(request)
+    try:
+        body = await request.json()
+    except Exception:
+        body = None
+    if not isinstance(body, dict) or not isinstance(body.get("dismissed"), bool):
+        return _invalid(Invalid("dismissed", "The body must be {\"dismissed\": true} or {\"dismissed\": false}."))
+    if body["dismissed"]:
+        now_hidden.hide(user, WELCOME_ID, cards.FAR, "dismissed")
+    else:
+        now_hidden.unhide(user, WELCOME_ID)
+    return web.json_response(welcome_payload(user))
 
 
 async def get_addon_api(request: web.Request) -> web.Response:
@@ -683,6 +753,7 @@ def setup(app: web.Application) -> None:
     # Before /api/addons/{name}: these names are reserved (core/addons/install.py).
     r.add_get("/api/addons/catalog", catalog_api)
     r.add_post("/api/addons/install", install_api)
+    r.add_post("/api/addons/welcome", welcome_api)
     r.add_post("/api/server/restart", restart_api)
     r.add_post("/api/addons/{name}/disable", disable_addon_api)
     r.add_post("/api/addons/{name}/enable", enable_addon_api)

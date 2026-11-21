@@ -8,6 +8,7 @@
      "compatible": true,
      "description": "The weather where you are",
      "homepage": "https://example.invalid/weather",
+     "icon": "",
      "installed": null,
      "min_dana": "9.0.0",
      "name": "weather",
@@ -25,7 +26,7 @@
      "update_available": false
     }
    ],
-   "origin": "/tmp/dana-test-sn8gbdlx/catalog.json",
+   "origin": "/scratch/catalog.json",
    "problems": [
     "later: source.ref 'FILL-ME' is not a full commit hash"
    ],
@@ -49,24 +50,43 @@
    "connect_url": null,
    "connected": true,
    "credentials": [],
-   "description": "Shopping lists",
+   "description": "Your shopping list, sorted by aisle and shared live",
+   "disconnect_warning": null,
    "everyone": false,
+   "examples": [
+    "Add milk and two loaves of bread",
+    "What's on the shopping list?"
+   ],
+   "features": [
+    "Add, tick and remove groceries by chat or voice",
+    "Sorted by supermarket aisle",
+    "Share the list with your household, live"
+   ],
+   "icon": "shopping-cart",
    "name": "shopping",
    "needs": [],
    "options": false,
+   "pages": [
+    "Shopping"
+   ],
    "requires": null,
    "settings": [
     {
      "can_change": true,
      "default": null,
      "description": "The list the user's shopping changes go to: their own (None) or the id of a list shared with them to edit.",
+     "help": "Chosen on the Shopping page; leave it empty for your own list.",
+     "label": "Active list",
      "name": "active_list",
+     "placeholder": "",
      "rule": null,
      "type": "text",
+     "url": null,
      "value": null,
      "why_not": null
     }
    ],
+   "setup": [],
    "source": "official",
    "state": "disabled-on-server",
    "title": "Shopping",
@@ -89,60 +109,93 @@
     {
      "can_change": true,
      "description": "WAHA API base URL",
+     "help": "The address your WAHA server answers at, the one its dashboard opens on.",
+     "label": "WAHA address",
      "name": "url",
+     "placeholder": "http://waha:3000",
      "required": true,
      "rule": "An http:// or https:// address, without a user name, ? or #.",
      "secret": false,
      "set": false,
      "type": "address",
+     "url": "https://github.com/devlikeapro/waha",
      "value": null,
      "why_not": null
     },
     {
      "can_change": true,
      "description": "WAHA API key",
+     "help": "The API key your WAHA server was started with; leave it empty if it has none.",
+     "label": "WAHA API key",
      "name": "api_key",
+     "placeholder": "",
      "required": false,
      "rule": null,
      "secret": true,
      "set": false,
      "type": "text",
+     "url": null,
      "why_not": null
     },
     {
      "can_change": true,
      "description": "WAHA session name",
+     "help": "The session's name in WAHA's dashboard, the one you linked your phone to.",
+     "label": "Session name",
      "name": "session",
+     "placeholder": "default",
      "required": true,
      "rule": "Letters, digits, _, - and . only.",
      "secret": true,
      "set": false,
      "type": "name",
+     "url": null,
      "why_not": null
     }
    ],
-   "description": "WhatsApp through WAHA",
+   "description": "Read and send WhatsApp messages, voice notes as text",
+   "disconnect_warning": null,
    "disconnected": true,
    "everyone": false,
+   "examples": [
+    "What did Noa write me on WhatsApp today?",
+    "Tell Avi on WhatsApp that I'm running late"
+   ],
+   "features": [
+    "Read your chats and find messages and files",
+    "Send messages and forward files (asks you first)",
+    "Turns the voice notes you receive into text"
+   ],
+   "icon": "message-circle",
    "name": "whatsapp",
    "needs": [],
    "options": false,
+   "pages": [],
    "requires": null,
    "settings": [
     {
      "can_change": true,
      "default": null,
      "description": "Telegram chat inbound voice-note transcripts go to (None: none).",
+     "help": "Optional: your Telegram user id, to get the voice notes you receive as text from Dana's bot.",
+     "label": "Send voice-note transcripts to",
      "name": "voice_telegram_chat_id",
+     "placeholder": "123456789",
      "rule": "A Telegram chat id: a person's own id, or a group's (a negative number).",
      "type": "telegram_chat",
+     "url": null,
      "value": null,
      "why_not": null
     }
    ],
+   "setup": [
+    "Run a WAHA server (a WhatsApp Web bridge) that Dana's server can reach; the link on the address below shows how.",
+    "In WAHA's dashboard, start a session and scan its QR code with WhatsApp on your phone (Settings → Linked devices).",
+    "Come back here with WAHA's address, its API key and the session's name."
+   ],
    "source": "official",
    "state": "available",
-   "title": "Whatsapp",
+   "title": "WhatsApp",
    "version": "",
    "web": [],
    "why_not": null,
@@ -159,24 +212,43 @@
    "connect_url": null,
    "connected": true,
    "credentials": [],
-   "description": "Shopping lists",
+   "description": "Your shopping list, sorted by aisle and shared live",
+   "disconnect_warning": null,
    "everyone": false,
+   "examples": [
+    "Add milk and two loaves of bread",
+    "What's on the shopping list?"
+   ],
+   "features": [
+    "Add, tick and remove groceries by chat or voice",
+    "Sorted by supermarket aisle",
+    "Share the list with your household, live"
+   ],
+   "icon": "shopping-cart",
    "name": "shopping",
    "needs": [],
    "options": false,
+   "pages": [
+    "Shopping"
+   ],
    "requires": null,
    "settings": [
     {
      "can_change": true,
      "default": null,
      "description": "The list the user's shopping changes go to: their own (None) or the id of a list shared with them to edit.",
+     "help": "Chosen on the Shopping page; leave it empty for your own list.",
+     "label": "Active list",
      "name": "active_list",
+     "placeholder": "",
      "rule": null,
      "type": "text",
+     "url": null,
      "value": null,
      "why_not": null
     }
    ],
+   "setup": [],
    "source": "official",
    "state": "on",
    "title": "Shopping",
@@ -231,13 +303,24 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking the user to pick, web search",
+     "description": "The time, asking you to pick, web search",
+     "disconnect_warning": null,
      "everyone": true,
+     "examples": [],
+     "features": [
+      "Get the current date, time, and day of the week.",
+      "Ask the user to choose one or more options from a predefined list.",
+      "Search the web for public information using DuckDuckGo.",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+     ],
+     "icon": "sparkles",
      "name": "essentials",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Essentials",
@@ -254,13 +337,27 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "Task lists, tasks and their triggers",
+     "description": "Task lists, reminders and their triggers",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Remind me tomorrow at 9 to call the bank",
+      "What's on my list today?"
+     ],
+     "features": [
+      "Tasks and lists, by chat or voice",
+      "Reminders at a time, when you arrive somewhere or wake up"
+     ],
+     "icon": "list-checks",
      "name": "tasks",
      "needs": [],
      "options": false,
+     "pages": [
+      "Tasks"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Tasks",
@@ -288,24 +385,43 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "Shopping lists",
+     "description": "Your shopping list, sorted by aisle and shared live",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Add milk and two loaves of bread",
+      "What's on the shopping list?"
+     ],
+     "features": [
+      "Add, tick and remove groceries by chat or voice",
+      "Sorted by supermarket aisle",
+      "Share the list with your household, live"
+     ],
+     "icon": "shopping-cart",
      "name": "shopping",
      "needs": [],
      "options": false,
+     "pages": [
+      "Shopping"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The list the user's shopping changes go to: their own (None) or the id of a list shared with them to edit.",
+       "help": "Chosen on the Shopping page; leave it empty for your own list.",
+       "label": "Active list",
        "name": "active_list",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Shopping",
@@ -333,16 +449,28 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "Projects and saved entries",
+     "description": "Projects, decisions and saved notes, links and files",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Projects with dates, budgets, decisions and notes",
+      "Save links, files and transcripts to them",
+      "Search everything you saved"
+     ],
+     "icon": "folder",
      "name": "knowledge",
      "needs": [],
      "options": false,
+     "pages": [
+      "Projects"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
-     "title": "Knowledge",
+     "title": "Projects",
      "version": "",
      "web": [
       {
@@ -367,16 +495,27 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "About-you facts and their learner",
+     "description": "What Dana remembers about you",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Remembers short facts about you and uses them in every answer",
+      "Learns them from your chats; see and edit them on the Memory page"
+     ],
+     "icon": "star",
      "name": "about",
      "needs": [],
      "options": false,
+     "pages": [
+      "Memory"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
-     "title": "About",
+     "title": "About you",
      "version": "",
      "web": [
       {
@@ -401,13 +540,24 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "People and their briefs",
+     "description": "The people you talk to and a brief on each",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "A page per person: who they are, your calls and open things",
+      "A short brief before you call or meet them"
+     ],
+     "icon": "users",
      "name": "people",
      "needs": [],
      "options": false,
+     "pages": [
+      "People"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "People",
@@ -436,12 +586,25 @@
      "connected": true,
      "credentials": [],
      "description": "The Android phone: notifications Inbox, calls and suggestions, push",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Your phone's notifications sorted in an Inbox, with summaries",
+      "Call recordings transcribed, with suggested tasks and events",
+      "Push notifications from Dana on your phone"
+     ],
+     "icon": "smartphone",
      "name": "phone",
      "needs": [],
      "options": false,
+     "pages": [
+      "Inbox",
+      "Calls"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Phone",
@@ -482,41 +645,68 @@
       {
        "can_change": true,
        "description": "Home Assistant base URL, e.g. https://home.example.com",
+       "help": "The address you open Home Assistant at in a browser, with http(s):// and the port if it has one.",
+       "label": "Address",
        "name": "host",
+       "placeholder": "https://home.example.com",
        "required": true,
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:34515",
+       "url": null,
+       "value": "http://127.0.0.1:18123",
        "why_not": null
       },
       {
        "can_change": true,
        "description": "Long-lived access token",
+       "help": "In Home Assistant: click your name at the bottom left → Security → Long-lived access tokens → Create token, then copy it here.",
+       "label": "Access token",
        "name": "token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile",
        "why_not": null
       }
      ],
-     "description": "Home Assistant",
+     "description": "Lights, devices and the TV, reminders when you arrive or get in the car",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Turn off the living room lights",
+      "Remind me to take out the trash when I get home",
+      "Is the gate open?"
+     ],
+     "features": [
+      "Turn lights, the AC, gates and other devices on and off",
+      "Reminders when you arrive at a place, leave it or get in the car",
+      "Knows which devices are in which room",
+      "Controls the TV",
+      "The weather for your morning briefing"
+     ],
+     "icon": "house",
      "name": "homeassistant",
      "needs": [],
      "options": true,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The user's person entity: zone enter / leave triggers",
+       "help": "Your person in Home Assistant (Settings → People), for reminders when you arrive or leave.",
+       "label": "You in Home Assistant",
        "name": "person",
+       "placeholder": "person.noa",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -524,9 +714,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's Bluetooth connection sensor: car enter / leave triggers",
+       "help": "From the Home Assistant phone app, for reminders when you get in the car.",
+       "label": "Phone's Bluetooth sensor",
        "name": "car_sensor",
+       "placeholder": "sensor.pixel_bluetooth_connection",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -534,9 +728,13 @@
        "can_change": true,
        "default": null,
        "description": "The car's Bluetooth name, as it shows in that sensor's connected_paired_devices",
+       "help": "The name your car has in your phone's Bluetooth list.",
+       "label": "Car's Bluetooth name",
        "name": "car_device",
+       "placeholder": "My Car",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -544,9 +742,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone screen-on (interactive) binary sensor: confirms the wake signal",
+       "help": "From the Home Assistant phone app; tells Dana you are awake.",
+       "label": "Phone's screen-on sensor",
        "name": "phone_interactive_sensor",
+       "placeholder": "binary_sensor.pixel_interactive",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -554,9 +756,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
+       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
+       "placeholder": "sensor.pixel_battery_level",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -564,9 +770,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's mobile_app notify service suffix (reported by /api/client-config)",
+       "help": "Set by the Dana phone app; change it only if it is wrong.",
+       "label": "Phone's notify service",
        "name": "phone_notify_service",
+       "placeholder": "mobile_app_pixel",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -574,9 +784,13 @@
        "can_change": true,
        "default": "weather.forecast_home",
        "description": "Weather entity for the wake briefing and the Now screen",
+       "help": "The weather entity your forecast comes from (Settings → Devices & services).",
+       "label": "Weather",
        "name": "weather_entity",
+       "placeholder": "weather.forecast_home",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "weather.forecast_home",
        "why_not": null
       },
@@ -584,9 +798,13 @@
        "can_change": true,
        "default": null,
        "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "help": "Your Android TV's media player (the Android Debug Bridge one), if Dana should control it.",
+       "label": "TV",
        "name": "tv_entity",
+       "placeholder": "media_player.living_room_tv",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -594,16 +812,21 @@
        "can_change": true,
        "default": null,
        "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "help": "Optional, for changing channels: a command with {channel} where the number goes.",
+       "label": "TV channel command",
        "name": "tv_channel_command",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "on",
-     "title": "Homeassistant",
+     "title": "Home Assistant",
      "version": "",
      "web": [],
      "why_not": null,
@@ -620,59 +843,92 @@
       {
        "can_change": true,
        "description": "WAHA API base URL",
+       "help": "The address your WAHA server answers at, the one its dashboard opens on.",
+       "label": "WAHA address",
        "name": "url",
+       "placeholder": "http://waha:3000",
        "required": true,
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "secret": false,
        "set": false,
        "type": "address",
+       "url": "https://github.com/devlikeapro/waha",
        "value": null,
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA API key",
+       "help": "The API key your WAHA server was started with; leave it empty if it has none.",
+       "label": "WAHA API key",
        "name": "api_key",
+       "placeholder": "",
        "required": false,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA session name",
+       "help": "The session's name in WAHA's dashboard, the one you linked your phone to.",
+       "label": "Session name",
        "name": "session",
+       "placeholder": "default",
        "required": true,
        "rule": "Letters, digits, _, - and . only.",
        "secret": true,
        "set": false,
        "type": "name",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "WhatsApp through WAHA",
+     "description": "Read and send WhatsApp messages, voice notes as text",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What did Noa write me on WhatsApp today?",
+      "Tell Avi on WhatsApp that I'm running late"
+     ],
+     "features": [
+      "Read your chats and find messages and files",
+      "Send messages and forward files (asks you first)",
+      "Turns the voice notes you receive into text"
+     ],
+     "icon": "message-circle",
      "name": "whatsapp",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "Telegram chat inbound voice-note transcripts go to (None: none).",
+       "help": "Optional: your Telegram user id, to get the voice notes you receive as text from Dana's bot.",
+       "label": "Send voice-note transcripts to",
        "name": "voice_telegram_chat_id",
+       "placeholder": "123456789",
        "rule": "A Telegram chat id: a person's own id, or a group's (a negative number).",
        "type": "telegram_chat",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [
+      "Run a WAHA server (a WhatsApp Web bridge) that Dana's server can reach; the link on the address below shows how.",
+      "In WAHA's dashboard, start a session and scan its QR code with WhatsApp on your phone (Settings → Linked devices).",
+      "Come back here with WAHA's address, its API key and the session's name."
+     ],
      "source": "official",
      "state": "available",
-     "title": "Whatsapp",
+     "title": "WhatsApp",
      "version": "",
      "web": [],
      "why_not": null,
@@ -689,29 +945,50 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Calendar",
+     "description": "Your events in chat, on the Now screen and in the briefing",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's on my calendar tomorrow?",
+      "Move my dentist appointment to Thursday at 10"
+     ],
+     "features": [
+      "Your events in chat, on the Now screen, in the morning briefing and the weekly review",
+      "Add and move events, with Undo (asks first when it invites people)"
+     ],
+     "icon": "calendar",
      "name": "calendar",
      "needs": [],
      "options": false,
+     "pages": [
+      "Calendar"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": "primary",
        "description": "Calendar new events go to",
+       "help": "Where the events Dana adds go; \"primary\" is your main calendar.",
+       "label": "Calendar for new events",
        "name": "calendar_id",
+       "placeholder": "primary",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "primary",
        "why_not": null
       },
@@ -719,16 +996,23 @@
        "can_change": true,
        "default": null,
        "description": "Calendars shown and searched (ids); none chosen: the default calendar",
+       "help": "Pick from the suggestions, separated by commas; empty: only your main calendar.",
+       "label": "Calendars Dana reads",
        "name": "selected_calendars",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
-     "title": "Calendar",
+     "title": "Google Calendar",
      "version": "",
      "web": [],
      "why_not": null,
@@ -745,25 +1029,44 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Contacts",
+     "description": "Names, numbers and birthdays of the people you know",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's Yael's email address?",
+      "Whose birthday is this week?"
+     ],
+     "features": [
+      "Look up names, phone numbers, emails and birthdays",
+      "Names the people Dana knows and the numbers that call you",
+      "Add or change a contact (asks you first)"
+     ],
+     "icon": "contact",
      "name": "contacts",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
-     "title": "Contacts",
+     "title": "Google Contacts",
      "version": "",
      "web": [],
      "why_not": null,
@@ -780,22 +1083,41 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Gmail",
+     "description": "Search, read and write your mail in chat",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread emails",
+      "Did the electricity company send me a bill this month?"
+     ],
+     "features": [
+      "Search and read your mail",
+      "Write new mail and replies (asks you before sending)",
+      "Archive, mark read and move to the trash, with Undo"
+     ],
+     "icon": "mail",
      "name": "gmail",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
      "title": "Gmail",
@@ -815,22 +1137,41 @@
       {
        "can_change": true,
        "description": "Telegram session (set by the QR sign-in)",
+       "help": "Filled in by Connect Telegram; you never type it.",
+       "label": "Telegram sign-in",
        "name": "session",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels (read-only)",
+     "description": "Your own Telegram chats and channels, read-only",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread Telegram channels",
+      "What's new in the building's group?"
+     ],
+     "features": [
+      "Lists and summarizes your unread chats and channels",
+      "Reads a chat when you ask; never marks anything read and never sends"
+     ],
+     "icon": "send",
      "name": "telegram_account",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the server's Telegram app once (TELEGRAM_API_ID and TELEGRAM_API_HASH from my.telegram.org; docs/telegram-account.md).",
+      "Press Connect Telegram and scan the QR code with Telegram on your phone (Settings → Devices → Link desktop device)."
+     ],
      "source": "official",
      "state": "available",
      "title": "Telegram account",
@@ -847,13 +1188,30 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Bank and card transactions",
+     "description": "Your bank and card spending, balances and ways to save",
+     "disconnect_warning": "Your saved bank and card logins, accounts and transactions are deleted from Dana.",
      "everyone": false,
+     "examples": [
+      "How much did I spend on food this month?",
+      "What subscriptions do I pay for?"
+     ],
+     "features": [
+      "Spending, income and balances in chat and on the Money page",
+      "Subscriptions, card bills and your balance ahead",
+      "Ways to save and spending worth watching"
+     ],
+     "icon": "wallet",
      "name": "money",
      "needs": [],
      "options": false,
+     "pages": [
+      "Money"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [
+      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money",
@@ -871,14 +1229,30 @@
      "connected": false,
      "credentials": [],
      "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
      "everyone": false,
+     "examples": [
+      "What's my bank balance?",
+      "How much is left on my meal card?"
+     ],
+     "features": [
+      "Reads your Israeli bank and card accounts into Money",
+      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
+      "Bank of Israel rates and price checks for ways to save"
+     ],
+     "icon": "landmark",
      "name": "money_il",
      "needs": [
       "money"
      ],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
+      "Turn it on here, then add each bank or card login on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
@@ -895,24 +1269,36 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Frigate cameras (no tools: the dashboard's proxy endpoints)",
+     "description": "Your Frigate cameras on the dashboard",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Live camera views and recent events on the dashboard and the TV"
+     ],
+     "icon": "cctv",
      "name": "cameras",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "Frigate base URL",
+       "help": "The address Frigate's web page opens at.",
+       "label": "Frigate address",
        "name": "url",
+       "placeholder": "http://frigate:5000",
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "type": "address",
+       "url": "https://docs.frigate.video/",
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Cameras",
@@ -930,12 +1316,21 @@
      "connected": false,
      "credentials": [],
      "description": "Read-only kubectl and Python run on the server (asks first; not a sandbox)",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Looks at the cluster with read-only kubectl",
+      "Runs Python on the server (asks first)"
+     ],
+     "icon": "terminal",
      "name": "ops",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": "ops",
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Ops",
@@ -953,13 +1348,19 @@
      "connected": false,
      "credentials": [],
      "description": "",
+     "disconnect_warning": null,
      "error": "ImportError: a missing package",
      "everyone": false,
+     "examples": [],
+     "features": [],
+     "icon": "",
      "name": "broken",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "site",
      "state": "failed",
      "title": "Broken",
@@ -972,7 +1373,20 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "349485b6b23d"
+   "user_id": "user-robin",
+   "welcome": {
+    "dismissed": false,
+    "show": false,
+    "suggested": [
+     "whatsapp",
+     "calendar",
+     "contacts",
+     "gmail",
+     "telegram_account",
+     "money",
+     "cameras"
+    ]
+   }
   },
   "status": 200
  },
@@ -987,13 +1401,24 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking the user to pick, web search",
+     "description": "The time, asking you to pick, web search",
+     "disconnect_warning": null,
      "everyone": true,
+     "examples": [],
+     "features": [
+      "Get the current date, time, and day of the week.",
+      "Ask the user to choose one or more options from a predefined list.",
+      "Search the web for public information using DuckDuckGo.",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+     ],
+     "icon": "sparkles",
      "name": "essentials",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Essentials",
@@ -1010,13 +1435,27 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Task lists, tasks and their triggers",
+     "description": "Task lists, reminders and their triggers",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Remind me tomorrow at 9 to call the bank",
+      "What's on my list today?"
+     ],
+     "features": [
+      "Tasks and lists, by chat or voice",
+      "Reminders at a time, when you arrive somewhere or wake up"
+     ],
+     "icon": "list-checks",
      "name": "tasks",
      "needs": [],
      "options": false,
+     "pages": [
+      "Tasks"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Tasks",
@@ -1033,24 +1472,43 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Shopping lists",
+     "description": "Your shopping list, sorted by aisle and shared live",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Add milk and two loaves of bread",
+      "What's on the shopping list?"
+     ],
+     "features": [
+      "Add, tick and remove groceries by chat or voice",
+      "Sorted by supermarket aisle",
+      "Share the list with your household, live"
+     ],
+     "icon": "shopping-cart",
      "name": "shopping",
      "needs": [],
      "options": false,
+     "pages": [
+      "Shopping"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The list the user's shopping changes go to: their own (None) or the id of a list shared with them to edit.",
+       "help": "Chosen on the Shopping page; leave it empty for your own list.",
+       "label": "Active list",
        "name": "active_list",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Shopping",
@@ -1067,16 +1525,28 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Projects and saved entries",
+     "description": "Projects, decisions and saved notes, links and files",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Projects with dates, budgets, decisions and notes",
+      "Save links, files and transcripts to them",
+      "Search everything you saved"
+     ],
+     "icon": "folder",
      "name": "knowledge",
      "needs": [],
      "options": false,
+     "pages": [
+      "Projects"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
-     "title": "Knowledge",
+     "title": "Projects",
      "version": "",
      "web": [],
      "why_not": null,
@@ -1090,16 +1560,27 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "About-you facts and their learner",
+     "description": "What Dana remembers about you",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Remembers short facts about you and uses them in every answer",
+      "Learns them from your chats; see and edit them on the Memory page"
+     ],
+     "icon": "star",
      "name": "about",
      "needs": [],
      "options": false,
+     "pages": [
+      "Memory"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
-     "title": "About",
+     "title": "About you",
      "version": "",
      "web": [],
      "why_not": null,
@@ -1113,13 +1594,24 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "People and their briefs",
+     "description": "The people you talk to and a brief on each",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "A page per person: who they are, your calls and open things",
+      "A short brief before you call or meet them"
+     ],
+     "icon": "users",
      "name": "people",
      "needs": [],
      "options": false,
+     "pages": [
+      "People"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "People",
@@ -1137,12 +1629,25 @@
      "connected": false,
      "credentials": [],
      "description": "The Android phone: notifications Inbox, calls and suggestions, push",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Your phone's notifications sorted in an Inbox, with summaries",
+      "Call recordings transcribed, with suggested tasks and events",
+      "Push notifications from Dana on your phone"
+     ],
+     "icon": "smartphone",
      "name": "phone",
      "needs": [],
      "options": false,
+     "pages": [
+      "Inbox",
+      "Calls"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Phone",
@@ -1162,41 +1667,68 @@
       {
        "can_change": true,
        "description": "Home Assistant base URL, e.g. https://home.example.com",
+       "help": "The address you open Home Assistant at in a browser, with http(s):// and the port if it has one.",
+       "label": "Address",
        "name": "host",
+       "placeholder": "https://home.example.com",
        "required": true,
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:32885",
+       "url": null,
+       "value": "http://127.0.0.1:18124",
        "why_not": null
       },
       {
        "can_change": true,
        "description": "Long-lived access token",
+       "help": "In Home Assistant: click your name at the bottom left → Security → Long-lived access tokens → Create token, then copy it here.",
+       "label": "Access token",
        "name": "token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile",
        "why_not": null
       }
      ],
-     "description": "Home Assistant",
+     "description": "Lights, devices and the TV, reminders when you arrive or get in the car",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Turn off the living room lights",
+      "Remind me to take out the trash when I get home",
+      "Is the gate open?"
+     ],
+     "features": [
+      "Turn lights, the AC, gates and other devices on and off",
+      "Reminders when you arrive at a place, leave it or get in the car",
+      "Knows which devices are in which room",
+      "Controls the TV",
+      "The weather for your morning briefing"
+     ],
+     "icon": "house",
      "name": "homeassistant",
      "needs": [],
      "options": true,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The user's person entity: zone enter / leave triggers",
+       "help": "Your person in Home Assistant (Settings → People), for reminders when you arrive or leave.",
+       "label": "You in Home Assistant",
        "name": "person",
+       "placeholder": "person.noa",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "person.bob",
        "why_not": null
       },
@@ -1204,9 +1736,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's Bluetooth connection sensor: car enter / leave triggers",
+       "help": "From the Home Assistant phone app, for reminders when you get in the car.",
+       "label": "Phone's Bluetooth sensor",
        "name": "car_sensor",
+       "placeholder": "sensor.pixel_bluetooth_connection",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1214,9 +1750,13 @@
        "can_change": true,
        "default": null,
        "description": "The car's Bluetooth name, as it shows in that sensor's connected_paired_devices",
+       "help": "The name your car has in your phone's Bluetooth list.",
+       "label": "Car's Bluetooth name",
        "name": "car_device",
+       "placeholder": "My Car",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1224,9 +1764,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone screen-on (interactive) binary sensor: confirms the wake signal",
+       "help": "From the Home Assistant phone app; tells Dana you are awake.",
+       "label": "Phone's screen-on sensor",
        "name": "phone_interactive_sensor",
+       "placeholder": "binary_sensor.pixel_interactive",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1234,9 +1778,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
+       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
+       "placeholder": "sensor.pixel_battery_level",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1244,9 +1792,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's mobile_app notify service suffix (reported by /api/client-config)",
+       "help": "Set by the Dana phone app; change it only if it is wrong.",
+       "label": "Phone's notify service",
        "name": "phone_notify_service",
+       "placeholder": "mobile_app_pixel",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1254,9 +1806,13 @@
        "can_change": true,
        "default": "weather.forecast_home",
        "description": "Weather entity for the wake briefing and the Now screen",
+       "help": "The weather entity your forecast comes from (Settings → Devices & services).",
+       "label": "Weather",
        "name": "weather_entity",
+       "placeholder": "weather.forecast_home",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "weather.forecast_home",
        "why_not": null
       },
@@ -1264,9 +1820,13 @@
        "can_change": true,
        "default": null,
        "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "help": "Your Android TV's media player (the Android Debug Bridge one), if Dana should control it.",
+       "label": "TV",
        "name": "tv_entity",
+       "placeholder": "media_player.living_room_tv",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1274,16 +1834,21 @@
        "can_change": true,
        "default": null,
        "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "help": "Optional, for changing channels: a command with {channel} where the number goes.",
+       "label": "TV channel command",
        "name": "tv_channel_command",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "on",
-     "title": "Homeassistant",
+     "title": "Home Assistant",
      "version": "",
      "web": [],
      "why_not": null,
@@ -1300,59 +1865,92 @@
       {
        "can_change": true,
        "description": "WAHA API base URL",
+       "help": "The address your WAHA server answers at, the one its dashboard opens on.",
+       "label": "WAHA address",
        "name": "url",
+       "placeholder": "http://waha:3000",
        "required": true,
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38815/api",
+       "url": "https://github.com/devlikeapro/waha",
+       "value": "http://127.0.0.1:13000/api",
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA API key",
+       "help": "The API key your WAHA server was started with; leave it empty if it has none.",
+       "label": "WAHA API key",
        "name": "api_key",
+       "placeholder": "",
        "required": false,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": null,
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA session name",
+       "help": "The session's name in WAHA's dashboard, the one you linked your phone to.",
+       "label": "Session name",
        "name": "session",
+       "placeholder": "default",
        "required": true,
        "rule": "Letters, digits, _, - and . only.",
        "secret": true,
        "set": true,
        "type": "name",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "WhatsApp through WAHA",
+     "description": "Read and send WhatsApp messages, voice notes as text",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What did Noa write me on WhatsApp today?",
+      "Tell Avi on WhatsApp that I'm running late"
+     ],
+     "features": [
+      "Read your chats and find messages and files",
+      "Send messages and forward files (asks you first)",
+      "Turns the voice notes you receive into text"
+     ],
+     "icon": "message-circle",
      "name": "whatsapp",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "Telegram chat inbound voice-note transcripts go to (None: none).",
+       "help": "Optional: your Telegram user id, to get the voice notes you receive as text from Dana's bot.",
+       "label": "Send voice-note transcripts to",
        "name": "voice_telegram_chat_id",
+       "placeholder": "123456789",
        "rule": "A Telegram chat id: a person's own id, or a group's (a negative number).",
        "type": "telegram_chat",
+       "url": null,
        "value": 424242,
        "why_not": null
       }
      ],
+     "setup": [
+      "Run a WAHA server (a WhatsApp Web bridge) that Dana's server can reach; the link on the address below shows how.",
+      "In WAHA's dashboard, start a session and scan its QR code with WhatsApp on your phone (Settings → Linked devices).",
+      "Come back here with WAHA's address, its API key and the session's name."
+     ],
      "source": "official",
      "state": "on",
-     "title": "Whatsapp",
+     "title": "WhatsApp",
      "version": "",
      "web": [],
      "why_not": null,
@@ -1369,29 +1967,50 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Calendar",
+     "description": "Your events in chat, on the Now screen and in the briefing",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's on my calendar tomorrow?",
+      "Move my dentist appointment to Thursday at 10"
+     ],
+     "features": [
+      "Your events in chat, on the Now screen, in the morning briefing and the weekly review",
+      "Add and move events, with Undo (asks first when it invites people)"
+     ],
+     "icon": "calendar",
      "name": "calendar",
      "needs": [],
      "options": false,
+     "pages": [
+      "Calendar"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": "primary",
        "description": "Calendar new events go to",
+       "help": "Where the events Dana adds go; \"primary\" is your main calendar.",
+       "label": "Calendar for new events",
        "name": "calendar_id",
+       "placeholder": "primary",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "primary",
        "why_not": null
       },
@@ -1399,16 +2018,23 @@
        "can_change": true,
        "default": null,
        "description": "Calendars shown and searched (ids); none chosen: the default calendar",
+       "help": "Pick from the suggestions, separated by commas; empty: only your main calendar.",
+       "label": "Calendars Dana reads",
        "name": "selected_calendars",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "on",
-     "title": "Calendar",
+     "title": "Google Calendar",
      "version": "",
      "web": [
       {
@@ -1436,25 +2062,44 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Contacts",
+     "description": "Names, numbers and birthdays of the people you know",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's Yael's email address?",
+      "Whose birthday is this week?"
+     ],
+     "features": [
+      "Look up names, phone numbers, emails and birthdays",
+      "Names the people Dana knows and the numbers that call you",
+      "Add or change a contact (asks you first)"
+     ],
+     "icon": "contact",
      "name": "contacts",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
-     "title": "Contacts",
+     "title": "Google Contacts",
      "version": "",
      "web": [],
      "why_not": null,
@@ -1471,22 +2116,41 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Gmail",
+     "description": "Search, read and write your mail in chat",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread emails",
+      "Did the electricity company send me a bill this month?"
+     ],
+     "features": [
+      "Search and read your mail",
+      "Write new mail and replies (asks you before sending)",
+      "Archive, mark read and move to the trash, with Undo"
+     ],
+     "icon": "mail",
      "name": "gmail",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
      "title": "Gmail",
@@ -1506,22 +2170,41 @@
       {
        "can_change": true,
        "description": "Telegram session (set by the QR sign-in)",
+       "help": "Filled in by Connect Telegram; you never type it.",
+       "label": "Telegram sign-in",
        "name": "session",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels (read-only)",
+     "description": "Your own Telegram chats and channels, read-only",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread Telegram channels",
+      "What's new in the building's group?"
+     ],
+     "features": [
+      "Lists and summarizes your unread chats and channels",
+      "Reads a chat when you ask; never marks anything read and never sends"
+     ],
+     "icon": "send",
      "name": "telegram_account",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the server's Telegram app once (TELEGRAM_API_ID and TELEGRAM_API_HASH from my.telegram.org; docs/telegram-account.md).",
+      "Press Connect Telegram and scan the QR code with Telegram on your phone (Settings → Devices → Link desktop device)."
+     ],
      "source": "official",
      "state": "available",
      "title": "Telegram account",
@@ -1538,13 +2221,30 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Bank and card transactions",
+     "description": "Your bank and card spending, balances and ways to save",
+     "disconnect_warning": "Your saved bank and card logins, accounts and transactions are deleted from Dana.",
      "everyone": false,
+     "examples": [
+      "How much did I spend on food this month?",
+      "What subscriptions do I pay for?"
+     ],
+     "features": [
+      "Spending, income and balances in chat and on the Money page",
+      "Subscriptions, card bills and your balance ahead",
+      "Ways to save and spending worth watching"
+     ],
+     "icon": "wallet",
      "name": "money",
      "needs": [],
      "options": false,
+     "pages": [
+      "Money"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [
+      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money",
@@ -1562,14 +2262,30 @@
      "connected": false,
      "credentials": [],
      "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
      "everyone": false,
+     "examples": [
+      "What's my bank balance?",
+      "How much is left on my meal card?"
+     ],
+     "features": [
+      "Reads your Israeli bank and card accounts into Money",
+      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
+      "Bank of Israel rates and price checks for ways to save"
+     ],
+     "icon": "landmark",
      "name": "money_il",
      "needs": [
       "money"
      ],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
+      "Turn it on here, then add each bank or card login on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
@@ -1586,24 +2302,36 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "Frigate cameras (no tools: the dashboard's proxy endpoints)",
+     "description": "Your Frigate cameras on the dashboard",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Live camera views and recent events on the dashboard and the TV"
+     ],
+     "icon": "cctv",
      "name": "cameras",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "Frigate base URL",
+       "help": "The address Frigate's web page opens at.",
+       "label": "Frigate address",
        "name": "url",
+       "placeholder": "http://frigate:5000",
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "type": "address",
-       "value": "http://127.0.0.1:37157",
+       "url": "https://docs.frigate.video/",
+       "value": "http://127.0.0.1:15000",
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Cameras",
@@ -1621,13 +2349,19 @@
      "connected": false,
      "credentials": [],
      "description": "",
+     "disconnect_warning": null,
      "error": "ImportError: a missing package",
      "everyone": false,
+     "examples": [],
+     "features": [],
+     "icon": "",
      "name": "broken",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "site",
      "state": "failed",
      "title": "Broken",
@@ -1640,7 +2374,12 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "d66f006eadc2"
+   "user_id": "user-bob",
+   "welcome": {
+    "dismissed": false,
+    "show": false,
+    "suggested": []
+   }
   },
   "status": 200
  },
@@ -1655,13 +2394,24 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking the user to pick, web search",
+     "description": "The time, asking you to pick, web search",
+     "disconnect_warning": null,
      "everyone": true,
+     "examples": [],
+     "features": [
+      "Get the current date, time, and day of the week.",
+      "Ask the user to choose one or more options from a predefined list.",
+      "Search the web for public information using DuckDuckGo.",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+     ],
+     "icon": "sparkles",
      "name": "essentials",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Essentials",
@@ -1678,13 +2428,27 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "Task lists, tasks and their triggers",
+     "description": "Task lists, reminders and their triggers",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Remind me tomorrow at 9 to call the bank",
+      "What's on my list today?"
+     ],
+     "features": [
+      "Tasks and lists, by chat or voice",
+      "Reminders at a time, when you arrive somewhere or wake up"
+     ],
+     "icon": "list-checks",
      "name": "tasks",
      "needs": [],
      "options": false,
+     "pages": [
+      "Tasks"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Tasks",
@@ -1712,24 +2476,43 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "Shopping lists",
+     "description": "Your shopping list, sorted by aisle and shared live",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Add milk and two loaves of bread",
+      "What's on the shopping list?"
+     ],
+     "features": [
+      "Add, tick and remove groceries by chat or voice",
+      "Sorted by supermarket aisle",
+      "Share the list with your household, live"
+     ],
+     "icon": "shopping-cart",
      "name": "shopping",
      "needs": [],
      "options": false,
+     "pages": [
+      "Shopping"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The list the user's shopping changes go to: their own (None) or the id of a list shared with them to edit.",
+       "help": "Chosen on the Shopping page; leave it empty for your own list.",
+       "label": "Active list",
        "name": "active_list",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Shopping",
@@ -1757,16 +2540,28 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Projects and saved entries",
+     "description": "Projects, decisions and saved notes, links and files",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Projects with dates, budgets, decisions and notes",
+      "Save links, files and transcripts to them",
+      "Search everything you saved"
+     ],
+     "icon": "folder",
      "name": "knowledge",
      "needs": [],
      "options": false,
+     "pages": [
+      "Projects"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
-     "title": "Knowledge",
+     "title": "Projects",
      "version": "",
      "web": [],
      "why_not": null,
@@ -1780,16 +2575,27 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "About-you facts and their learner",
+     "description": "What Dana remembers about you",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Remembers short facts about you and uses them in every answer",
+      "Learns them from your chats; see and edit them on the Memory page"
+     ],
+     "icon": "star",
      "name": "about",
      "needs": [],
      "options": false,
+     "pages": [
+      "Memory"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
-     "title": "About",
+     "title": "About you",
      "version": "",
      "web": [],
      "why_not": null,
@@ -1803,13 +2609,24 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "People and their briefs",
+     "description": "The people you talk to and a brief on each",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "A page per person: who they are, your calls and open things",
+      "A short brief before you call or meet them"
+     ],
+     "icon": "users",
      "name": "people",
      "needs": [],
      "options": false,
+     "pages": [
+      "People"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "People",
@@ -1827,12 +2644,25 @@
      "connected": false,
      "credentials": [],
      "description": "The Android phone: notifications Inbox, calls and suggestions, push",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Your phone's notifications sorted in an Inbox, with summaries",
+      "Call recordings transcribed, with suggested tasks and events",
+      "Push notifications from Dana on your phone"
+     ],
+     "icon": "smartphone",
      "name": "phone",
      "needs": [],
      "options": false,
+     "pages": [
+      "Inbox",
+      "Calls"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Phone",
@@ -1852,41 +2682,68 @@
       {
        "can_change": true,
        "description": "Home Assistant base URL, e.g. https://home.example.com",
+       "help": "The address you open Home Assistant at in a browser, with http(s):// and the port if it has one.",
+       "label": "Address",
        "name": "host",
+       "placeholder": "https://home.example.com",
        "required": true,
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "secret": false,
        "set": false,
        "type": "address",
+       "url": null,
        "value": null,
        "why_not": null
       },
       {
        "can_change": true,
        "description": "Long-lived access token",
+       "help": "In Home Assistant: click your name at the bottom left → Security → Long-lived access tokens → Create token, then copy it here.",
+       "label": "Access token",
        "name": "token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile",
        "why_not": null
       }
      ],
-     "description": "Home Assistant",
+     "description": "Lights, devices and the TV, reminders when you arrive or get in the car",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Turn off the living room lights",
+      "Remind me to take out the trash when I get home",
+      "Is the gate open?"
+     ],
+     "features": [
+      "Turn lights, the AC, gates and other devices on and off",
+      "Reminders when you arrive at a place, leave it or get in the car",
+      "Knows which devices are in which room",
+      "Controls the TV",
+      "The weather for your morning briefing"
+     ],
+     "icon": "house",
      "name": "homeassistant",
      "needs": [],
      "options": true,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The user's person entity: zone enter / leave triggers",
+       "help": "Your person in Home Assistant (Settings → People), for reminders when you arrive or leave.",
+       "label": "You in Home Assistant",
        "name": "person",
+       "placeholder": "person.noa",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1894,9 +2751,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's Bluetooth connection sensor: car enter / leave triggers",
+       "help": "From the Home Assistant phone app, for reminders when you get in the car.",
+       "label": "Phone's Bluetooth sensor",
        "name": "car_sensor",
+       "placeholder": "sensor.pixel_bluetooth_connection",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1904,9 +2765,13 @@
        "can_change": true,
        "default": null,
        "description": "The car's Bluetooth name, as it shows in that sensor's connected_paired_devices",
+       "help": "The name your car has in your phone's Bluetooth list.",
+       "label": "Car's Bluetooth name",
        "name": "car_device",
+       "placeholder": "My Car",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1914,9 +2779,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone screen-on (interactive) binary sensor: confirms the wake signal",
+       "help": "From the Home Assistant phone app; tells Dana you are awake.",
+       "label": "Phone's screen-on sensor",
        "name": "phone_interactive_sensor",
+       "placeholder": "binary_sensor.pixel_interactive",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1924,9 +2793,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
+       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
+       "placeholder": "sensor.pixel_battery_level",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1934,9 +2807,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's mobile_app notify service suffix (reported by /api/client-config)",
+       "help": "Set by the Dana phone app; change it only if it is wrong.",
+       "label": "Phone's notify service",
        "name": "phone_notify_service",
+       "placeholder": "mobile_app_pixel",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1944,9 +2821,13 @@
        "can_change": true,
        "default": "weather.forecast_home",
        "description": "Weather entity for the wake briefing and the Now screen",
+       "help": "The weather entity your forecast comes from (Settings → Devices & services).",
+       "label": "Weather",
        "name": "weather_entity",
+       "placeholder": "weather.forecast_home",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "weather.forecast_home",
        "why_not": null
       },
@@ -1954,9 +2835,13 @@
        "can_change": true,
        "default": null,
        "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "help": "Your Android TV's media player (the Android Debug Bridge one), if Dana should control it.",
+       "label": "TV",
        "name": "tv_entity",
+       "placeholder": "media_player.living_room_tv",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -1964,16 +2849,21 @@
        "can_change": true,
        "default": null,
        "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "help": "Optional, for changing channels: a command with {channel} where the number goes.",
+       "label": "TV channel command",
        "name": "tv_channel_command",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "available",
-     "title": "Homeassistant",
+     "title": "Home Assistant",
      "version": "",
      "web": [],
      "why_not": null,
@@ -1991,59 +2881,92 @@
       {
        "can_change": true,
        "description": "WAHA API base URL",
+       "help": "The address your WAHA server answers at, the one its dashboard opens on.",
+       "label": "WAHA address",
        "name": "url",
+       "placeholder": "http://waha:3000",
        "required": true,
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38815/api",
+       "url": "https://github.com/devlikeapro/waha",
+       "value": "http://127.0.0.1:13000/api",
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA API key",
+       "help": "The API key your WAHA server was started with; leave it empty if it has none.",
+       "label": "WAHA API key",
        "name": "api_key",
+       "placeholder": "",
        "required": false,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": null,
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA session name",
+       "help": "The session's name in WAHA's dashboard, the one you linked your phone to.",
+       "label": "Session name",
        "name": "session",
+       "placeholder": "default",
        "required": true,
        "rule": "Letters, digits, _, - and . only.",
        "secret": true,
        "set": true,
        "type": "name",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "WhatsApp through WAHA",
+     "description": "Read and send WhatsApp messages, voice notes as text",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What did Noa write me on WhatsApp today?",
+      "Tell Avi on WhatsApp that I'm running late"
+     ],
+     "features": [
+      "Read your chats and find messages and files",
+      "Send messages and forward files (asks you first)",
+      "Turns the voice notes you receive into text"
+     ],
+     "icon": "message-circle",
      "name": "whatsapp",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "Telegram chat inbound voice-note transcripts go to (None: none).",
+       "help": "Optional: your Telegram user id, to get the voice notes you receive as text from Dana's bot.",
+       "label": "Send voice-note transcripts to",
        "name": "voice_telegram_chat_id",
+       "placeholder": "123456789",
        "rule": "A Telegram chat id: a person's own id, or a group's (a negative number).",
        "type": "telegram_chat",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [
+      "Run a WAHA server (a WhatsApp Web bridge) that Dana's server can reach; the link on the address below shows how.",
+      "In WAHA's dashboard, start a session and scan its QR code with WhatsApp on your phone (Settings → Linked devices).",
+      "Come back here with WAHA's address, its API key and the session's name."
+     ],
      "source": "official",
      "state": "on",
-     "title": "Whatsapp",
+     "title": "WhatsApp",
      "version": "",
      "web": [],
      "why_not": null,
@@ -2060,29 +2983,50 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Calendar",
+     "description": "Your events in chat, on the Now screen and in the briefing",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's on my calendar tomorrow?",
+      "Move my dentist appointment to Thursday at 10"
+     ],
+     "features": [
+      "Your events in chat, on the Now screen, in the morning briefing and the weekly review",
+      "Add and move events, with Undo (asks first when it invites people)"
+     ],
+     "icon": "calendar",
      "name": "calendar",
      "needs": [],
      "options": false,
+     "pages": [
+      "Calendar"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": "primary",
        "description": "Calendar new events go to",
+       "help": "Where the events Dana adds go; \"primary\" is your main calendar.",
+       "label": "Calendar for new events",
        "name": "calendar_id",
+       "placeholder": "primary",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "primary",
        "why_not": null
       },
@@ -2090,16 +3034,23 @@
        "can_change": true,
        "default": null,
        "description": "Calendars shown and searched (ids); none chosen: the default calendar",
+       "help": "Pick from the suggestions, separated by commas; empty: only your main calendar.",
+       "label": "Calendars Dana reads",
        "name": "selected_calendars",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
-     "title": "Calendar",
+     "title": "Google Calendar",
      "version": "",
      "web": [],
      "why_not": null,
@@ -2116,25 +3067,44 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Contacts",
+     "description": "Names, numbers and birthdays of the people you know",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's Yael's email address?",
+      "Whose birthday is this week?"
+     ],
+     "features": [
+      "Look up names, phone numbers, emails and birthdays",
+      "Names the people Dana knows and the numbers that call you",
+      "Add or change a contact (asks you first)"
+     ],
+     "icon": "contact",
      "name": "contacts",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
-     "title": "Contacts",
+     "title": "Google Contacts",
      "version": "",
      "web": [],
      "why_not": null,
@@ -2151,22 +3121,41 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Gmail",
+     "description": "Search, read and write your mail in chat",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread emails",
+      "Did the electricity company send me a bill this month?"
+     ],
+     "features": [
+      "Search and read your mail",
+      "Write new mail and replies (asks you before sending)",
+      "Archive, mark read and move to the trash, with Undo"
+     ],
+     "icon": "mail",
      "name": "gmail",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
      "title": "Gmail",
@@ -2186,22 +3175,41 @@
       {
        "can_change": true,
        "description": "Telegram session (set by the QR sign-in)",
+       "help": "Filled in by Connect Telegram; you never type it.",
+       "label": "Telegram sign-in",
        "name": "session",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels (read-only)",
+     "description": "Your own Telegram chats and channels, read-only",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread Telegram channels",
+      "What's new in the building's group?"
+     ],
+     "features": [
+      "Lists and summarizes your unread chats and channels",
+      "Reads a chat when you ask; never marks anything read and never sends"
+     ],
+     "icon": "send",
      "name": "telegram_account",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the server's Telegram app once (TELEGRAM_API_ID and TELEGRAM_API_HASH from my.telegram.org; docs/telegram-account.md).",
+      "Press Connect Telegram and scan the QR code with Telegram on your phone (Settings → Devices → Link desktop device)."
+     ],
      "source": "official",
      "state": "available",
      "title": "Telegram account",
@@ -2218,13 +3226,30 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Bank and card transactions",
+     "description": "Your bank and card spending, balances and ways to save",
+     "disconnect_warning": "Your saved bank and card logins, accounts and transactions are deleted from Dana.",
      "everyone": false,
+     "examples": [
+      "How much did I spend on food this month?",
+      "What subscriptions do I pay for?"
+     ],
+     "features": [
+      "Spending, income and balances in chat and on the Money page",
+      "Subscriptions, card bills and your balance ahead",
+      "Ways to save and spending worth watching"
+     ],
+     "icon": "wallet",
      "name": "money",
      "needs": [],
      "options": false,
+     "pages": [
+      "Money"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [
+      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money",
@@ -2242,14 +3267,30 @@
      "connected": false,
      "credentials": [],
      "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
      "everyone": false,
+     "examples": [
+      "What's my bank balance?",
+      "How much is left on my meal card?"
+     ],
+     "features": [
+      "Reads your Israeli bank and card accounts into Money",
+      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
+      "Bank of Israel rates and price checks for ways to save"
+     ],
+     "icon": "landmark",
      "name": "money_il",
      "needs": [
       "money"
      ],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
+      "Turn it on here, then add each bank or card login on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
@@ -2266,24 +3307,36 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Frigate cameras (no tools: the dashboard's proxy endpoints)",
+     "description": "Your Frigate cameras on the dashboard",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Live camera views and recent events on the dashboard and the TV"
+     ],
+     "icon": "cctv",
      "name": "cameras",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "Frigate base URL",
+       "help": "The address Frigate's web page opens at.",
+       "label": "Frigate address",
        "name": "url",
+       "placeholder": "http://frigate:5000",
        "rule": "An http:// or https:// address, without a user name, ? or #.",
        "type": "address",
+       "url": "https://docs.frigate.video/",
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Cameras",
@@ -2301,13 +3354,19 @@
      "connected": false,
      "credentials": [],
      "description": "",
+     "disconnect_warning": null,
      "error": "ImportError: a missing package",
      "everyone": false,
+     "examples": [],
+     "features": [],
+     "icon": "",
      "name": "broken",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "site",
      "state": "failed",
      "title": "Broken",
@@ -2320,7 +3379,12 @@
    "can_manage": true,
    "pending": [],
    "restart_needed": false,
-   "user_id": "ed0c99727e32"
+   "user_id": "user-carl",
+   "welcome": {
+    "dismissed": false,
+    "show": false,
+    "suggested": []
+   }
   },
   "status": 200
  },
@@ -2335,13 +3399,24 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking the user to pick, web search",
+     "description": "The time, asking you to pick, web search",
+     "disconnect_warning": null,
      "everyone": true,
+     "examples": [],
+     "features": [
+      "Get the current date, time, and day of the week.",
+      "Ask the user to choose one or more options from a predefined list.",
+      "Search the web for public information using DuckDuckGo.",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+     ],
+     "icon": "sparkles",
      "name": "essentials",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Essentials",
@@ -2358,13 +3433,27 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Task lists, tasks and their triggers",
+     "description": "Task lists, reminders and their triggers",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Remind me tomorrow at 9 to call the bank",
+      "What's on my list today?"
+     ],
+     "features": [
+      "Tasks and lists, by chat or voice",
+      "Reminders at a time, when you arrive somewhere or wake up"
+     ],
+     "icon": "list-checks",
      "name": "tasks",
      "needs": [],
      "options": false,
+     "pages": [
+      "Tasks"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Tasks",
@@ -2381,24 +3470,43 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Shopping lists",
+     "description": "Your shopping list, sorted by aisle and shared live",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Add milk and two loaves of bread",
+      "What's on the shopping list?"
+     ],
+     "features": [
+      "Add, tick and remove groceries by chat or voice",
+      "Sorted by supermarket aisle",
+      "Share the list with your household, live"
+     ],
+     "icon": "shopping-cart",
      "name": "shopping",
      "needs": [],
      "options": false,
+     "pages": [
+      "Shopping"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The list the user's shopping changes go to: their own (None) or the id of a list shared with them to edit.",
+       "help": "Chosen on the Shopping page; leave it empty for your own list.",
+       "label": "Active list",
        "name": "active_list",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Shopping",
@@ -2415,16 +3523,28 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Projects and saved entries",
+     "description": "Projects, decisions and saved notes, links and files",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Projects with dates, budgets, decisions and notes",
+      "Save links, files and transcripts to them",
+      "Search everything you saved"
+     ],
+     "icon": "folder",
      "name": "knowledge",
      "needs": [],
      "options": false,
+     "pages": [
+      "Projects"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
-     "title": "Knowledge",
+     "title": "Projects",
      "version": "",
      "web": [],
      "why_not": null,
@@ -2438,16 +3558,27 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "About-you facts and their learner",
+     "description": "What Dana remembers about you",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Remembers short facts about you and uses them in every answer",
+      "Learns them from your chats; see and edit them on the Memory page"
+     ],
+     "icon": "star",
      "name": "about",
      "needs": [],
      "options": false,
+     "pages": [
+      "Memory"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
-     "title": "About",
+     "title": "About you",
      "version": "",
      "web": [],
      "why_not": null,
@@ -2461,13 +3592,24 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "People and their briefs",
+     "description": "The people you talk to and a brief on each",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "A page per person: who they are, your calls and open things",
+      "A short brief before you call or meet them"
+     ],
+     "icon": "users",
      "name": "people",
      "needs": [],
      "options": false,
+     "pages": [
+      "People"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "People",
@@ -2485,12 +3627,25 @@
      "connected": false,
      "credentials": [],
      "description": "The Android phone: notifications Inbox, calls and suggestions, push",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Your phone's notifications sorted in an Inbox, with summaries",
+      "Call recordings transcribed, with suggested tasks and events",
+      "Push notifications from Dana on your phone"
+     ],
+     "icon": "smartphone",
      "name": "phone",
      "needs": [],
      "options": false,
+     "pages": [
+      "Inbox",
+      "Calls"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Phone",
@@ -2510,41 +3665,68 @@
       {
        "can_change": true,
        "description": "Home Assistant base URL, e.g. https://home.example.com",
+       "help": "The address you open Home Assistant at in a browser, with http(s):// and the port if it has one.",
+       "label": "Address",
        "name": "host",
+       "placeholder": "https://home.example.com",
        "required": true,
        "rule": "Only an address an admin has allowed for this service.",
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:32885",
+       "url": null,
+       "value": "http://127.0.0.1:18124",
        "why_not": null
       },
       {
        "can_change": true,
        "description": "Long-lived access token",
+       "help": "In Home Assistant: click your name at the bottom left → Security → Long-lived access tokens → Create token, then copy it here.",
+       "label": "Access token",
        "name": "token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile",
        "why_not": null
       }
      ],
-     "description": "Home Assistant",
+     "description": "Lights, devices and the TV, reminders when you arrive or get in the car",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Turn off the living room lights",
+      "Remind me to take out the trash when I get home",
+      "Is the gate open?"
+     ],
+     "features": [
+      "Turn lights, the AC, gates and other devices on and off",
+      "Reminders when you arrive at a place, leave it or get in the car",
+      "Knows which devices are in which room",
+      "Controls the TV",
+      "The weather for your morning briefing"
+     ],
+     "icon": "house",
      "name": "homeassistant",
      "needs": [],
      "options": true,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The user's person entity: zone enter / leave triggers",
+       "help": "Your person in Home Assistant (Settings → People), for reminders when you arrive or leave.",
+       "label": "You in Home Assistant",
        "name": "person",
+       "placeholder": "person.noa",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "person.bob",
        "why_not": null
       },
@@ -2552,9 +3734,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's Bluetooth connection sensor: car enter / leave triggers",
+       "help": "From the Home Assistant phone app, for reminders when you get in the car.",
+       "label": "Phone's Bluetooth sensor",
        "name": "car_sensor",
+       "placeholder": "sensor.pixel_bluetooth_connection",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -2562,9 +3748,13 @@
        "can_change": true,
        "default": null,
        "description": "The car's Bluetooth name, as it shows in that sensor's connected_paired_devices",
+       "help": "The name your car has in your phone's Bluetooth list.",
+       "label": "Car's Bluetooth name",
        "name": "car_device",
+       "placeholder": "My Car",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -2572,9 +3762,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone screen-on (interactive) binary sensor: confirms the wake signal",
+       "help": "From the Home Assistant phone app; tells Dana you are awake.",
+       "label": "Phone's screen-on sensor",
        "name": "phone_interactive_sensor",
+       "placeholder": "binary_sensor.pixel_interactive",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -2582,9 +3776,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
+       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
+       "placeholder": "sensor.pixel_battery_level",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -2592,9 +3790,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's mobile_app notify service suffix (reported by /api/client-config)",
+       "help": "Set by the Dana phone app; change it only if it is wrong.",
+       "label": "Phone's notify service",
        "name": "phone_notify_service",
+       "placeholder": "mobile_app_pixel",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -2602,9 +3804,13 @@
        "can_change": true,
        "default": "weather.forecast_home",
        "description": "Weather entity for the wake briefing and the Now screen",
+       "help": "The weather entity your forecast comes from (Settings → Devices & services).",
+       "label": "Weather",
        "name": "weather_entity",
+       "placeholder": "weather.forecast_home",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "weather.forecast_home",
        "why_not": null
       },
@@ -2612,9 +3818,13 @@
        "can_change": true,
        "default": null,
        "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "help": "Your Android TV's media player (the Android Debug Bridge one), if Dana should control it.",
+       "label": "TV",
        "name": "tv_entity",
+       "placeholder": "media_player.living_room_tv",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -2622,16 +3832,21 @@
        "can_change": true,
        "default": null,
        "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "help": "Optional, for changing channels: a command with {channel} where the number goes.",
+       "label": "TV channel command",
        "name": "tv_channel_command",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "on",
-     "title": "Homeassistant",
+     "title": "Home Assistant",
      "version": "",
      "web": [],
      "why_not": null,
@@ -2648,59 +3863,92 @@
       {
        "can_change": true,
        "description": "WAHA API base URL",
+       "help": "The address your WAHA server answers at, the one its dashboard opens on.",
+       "label": "WAHA address",
        "name": "url",
+       "placeholder": "http://waha:3000",
        "required": true,
        "rule": "Only an address an admin has allowed for this service.",
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38815/api",
+       "url": "https://github.com/devlikeapro/waha",
+       "value": "http://127.0.0.1:13000/api",
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA API key",
+       "help": "The API key your WAHA server was started with; leave it empty if it has none.",
+       "label": "WAHA API key",
        "name": "api_key",
+       "placeholder": "",
        "required": false,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": null,
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA session name",
+       "help": "The session's name in WAHA's dashboard, the one you linked your phone to.",
+       "label": "Session name",
        "name": "session",
+       "placeholder": "default",
        "required": true,
        "rule": "Letters, digits, _, - and . only.",
        "secret": true,
        "set": true,
        "type": "name",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "WhatsApp through WAHA",
+     "description": "Read and send WhatsApp messages, voice notes as text",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What did Noa write me on WhatsApp today?",
+      "Tell Avi on WhatsApp that I'm running late"
+     ],
+     "features": [
+      "Read your chats and find messages and files",
+      "Send messages and forward files (asks you first)",
+      "Turns the voice notes you receive into text"
+     ],
+     "icon": "message-circle",
      "name": "whatsapp",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "Telegram chat inbound voice-note transcripts go to (None: none).",
+       "help": "Optional: your Telegram user id, to get the voice notes you receive as text from Dana's bot.",
+       "label": "Send voice-note transcripts to",
        "name": "voice_telegram_chat_id",
+       "placeholder": "123456789",
        "rule": "Only your own Telegram id (your private chat with the bot).",
        "type": "telegram_chat",
+       "url": null,
        "value": 424242,
        "why_not": null
       }
      ],
+     "setup": [
+      "Run a WAHA server (a WhatsApp Web bridge) that Dana's server can reach; the link on the address below shows how.",
+      "In WAHA's dashboard, start a session and scan its QR code with WhatsApp on your phone (Settings → Linked devices).",
+      "Come back here with WAHA's address, its API key and the session's name."
+     ],
      "source": "official",
      "state": "on",
-     "title": "Whatsapp",
+     "title": "WhatsApp",
      "version": "",
      "web": [],
      "why_not": null,
@@ -2717,29 +3965,50 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Calendar",
+     "description": "Your events in chat, on the Now screen and in the briefing",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's on my calendar tomorrow?",
+      "Move my dentist appointment to Thursday at 10"
+     ],
+     "features": [
+      "Your events in chat, on the Now screen, in the morning briefing and the weekly review",
+      "Add and move events, with Undo (asks first when it invites people)"
+     ],
+     "icon": "calendar",
      "name": "calendar",
      "needs": [],
      "options": false,
+     "pages": [
+      "Calendar"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": "primary",
        "description": "Calendar new events go to",
+       "help": "Where the events Dana adds go; \"primary\" is your main calendar.",
+       "label": "Calendar for new events",
        "name": "calendar_id",
+       "placeholder": "primary",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "primary",
        "why_not": null
       },
@@ -2747,16 +4016,23 @@
        "can_change": true,
        "default": null,
        "description": "Calendars shown and searched (ids); none chosen: the default calendar",
+       "help": "Pick from the suggestions, separated by commas; empty: only your main calendar.",
+       "label": "Calendars Dana reads",
        "name": "selected_calendars",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "on",
-     "title": "Calendar",
+     "title": "Google Calendar",
      "version": "",
      "web": [
       {
@@ -2784,25 +4060,44 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Contacts",
+     "description": "Names, numbers and birthdays of the people you know",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's Yael's email address?",
+      "Whose birthday is this week?"
+     ],
+     "features": [
+      "Look up names, phone numbers, emails and birthdays",
+      "Names the people Dana knows and the numbers that call you",
+      "Add or change a contact (asks you first)"
+     ],
+     "icon": "contact",
      "name": "contacts",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
-     "title": "Contacts",
+     "title": "Google Contacts",
      "version": "",
      "web": [],
      "why_not": null,
@@ -2819,22 +4114,41 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Gmail",
+     "description": "Search, read and write your mail in chat",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread emails",
+      "Did the electricity company send me a bill this month?"
+     ],
+     "features": [
+      "Search and read your mail",
+      "Write new mail and replies (asks you before sending)",
+      "Archive, mark read and move to the trash, with Undo"
+     ],
+     "icon": "mail",
      "name": "gmail",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
      "title": "Gmail",
@@ -2854,22 +4168,41 @@
       {
        "can_change": true,
        "description": "Telegram session (set by the QR sign-in)",
+       "help": "Filled in by Connect Telegram; you never type it.",
+       "label": "Telegram sign-in",
        "name": "session",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels (read-only)",
+     "description": "Your own Telegram chats and channels, read-only",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread Telegram channels",
+      "What's new in the building's group?"
+     ],
+     "features": [
+      "Lists and summarizes your unread chats and channels",
+      "Reads a chat when you ask; never marks anything read and never sends"
+     ],
+     "icon": "send",
      "name": "telegram_account",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the server's Telegram app once (TELEGRAM_API_ID and TELEGRAM_API_HASH from my.telegram.org; docs/telegram-account.md).",
+      "Press Connect Telegram and scan the QR code with Telegram on your phone (Settings → Devices → Link desktop device)."
+     ],
      "source": "official",
      "state": "available",
      "title": "Telegram account",
@@ -2886,13 +4219,30 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Bank and card transactions",
+     "description": "Your bank and card spending, balances and ways to save",
+     "disconnect_warning": "Your saved bank and card logins, accounts and transactions are deleted from Dana.",
      "everyone": false,
+     "examples": [
+      "How much did I spend on food this month?",
+      "What subscriptions do I pay for?"
+     ],
+     "features": [
+      "Spending, income and balances in chat and on the Money page",
+      "Subscriptions, card bills and your balance ahead",
+      "Ways to save and spending worth watching"
+     ],
+     "icon": "wallet",
      "name": "money",
      "needs": [],
      "options": false,
+     "pages": [
+      "Money"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [
+      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money",
@@ -2910,14 +4260,30 @@
      "connected": false,
      "credentials": [],
      "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
      "everyone": false,
+     "examples": [
+      "What's my bank balance?",
+      "How much is left on my meal card?"
+     ],
+     "features": [
+      "Reads your Israeli bank and card accounts into Money",
+      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
+      "Bank of Israel rates and price checks for ways to save"
+     ],
+     "icon": "landmark",
      "name": "money_il",
      "needs": [
       "money"
      ],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
+      "Turn it on here, then add each bank or card login on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
@@ -2934,24 +4300,36 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "Frigate cameras (no tools: the dashboard's proxy endpoints)",
+     "description": "Your Frigate cameras on the dashboard",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Live camera views and recent events on the dashboard and the TV"
+     ],
+     "icon": "cctv",
      "name": "cameras",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": false,
        "default": null,
        "description": "Frigate base URL",
+       "help": "The address Frigate's web page opens at.",
+       "label": "Frigate address",
        "name": "url",
+       "placeholder": "http://frigate:5000",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:37157",
+       "url": "https://docs.frigate.video/",
+       "value": "http://127.0.0.1:15000",
        "why_not": "Set by an admin"
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Cameras",
@@ -2969,12 +4347,18 @@
      "connected": false,
      "credentials": [],
      "description": "",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [],
+     "icon": "",
      "name": "broken",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "site",
      "state": "failed",
      "title": "Broken",
@@ -2986,7 +4370,17 @@
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "d66f006eadc2"
+   "user_id": "user-bob",
+   "welcome": {
+    "dismissed": false,
+    "show": false,
+    "suggested": [
+     "contacts",
+     "gmail",
+     "telegram_account",
+     "money"
+    ]
+   }
   },
   "status": 200
  },
@@ -3001,13 +4395,24 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking the user to pick, web search",
+     "description": "The time, asking you to pick, web search",
+     "disconnect_warning": null,
      "everyone": true,
+     "examples": [],
+     "features": [
+      "Get the current date, time, and day of the week.",
+      "Ask the user to choose one or more options from a predefined list.",
+      "Search the web for public information using DuckDuckGo.",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+     ],
+     "icon": "sparkles",
      "name": "essentials",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Essentials",
@@ -3024,13 +4429,27 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Task lists, tasks and their triggers",
+     "description": "Task lists, reminders and their triggers",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Remind me tomorrow at 9 to call the bank",
+      "What's on my list today?"
+     ],
+     "features": [
+      "Tasks and lists, by chat or voice",
+      "Reminders at a time, when you arrive somewhere or wake up"
+     ],
+     "icon": "list-checks",
      "name": "tasks",
      "needs": [],
      "options": false,
+     "pages": [
+      "Tasks"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Tasks",
@@ -3047,24 +4466,43 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Shopping lists",
+     "description": "Your shopping list, sorted by aisle and shared live",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Add milk and two loaves of bread",
+      "What's on the shopping list?"
+     ],
+     "features": [
+      "Add, tick and remove groceries by chat or voice",
+      "Sorted by supermarket aisle",
+      "Share the list with your household, live"
+     ],
+     "icon": "shopping-cart",
      "name": "shopping",
      "needs": [],
      "options": false,
+     "pages": [
+      "Shopping"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The list the user's shopping changes go to: their own (None) or the id of a list shared with them to edit.",
+       "help": "Chosen on the Shopping page; leave it empty for your own list.",
+       "label": "Active list",
        "name": "active_list",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "disabled-on-server",
      "title": "Shopping",
@@ -3081,16 +4519,28 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Projects and saved entries",
+     "description": "Projects, decisions and saved notes, links and files",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Projects with dates, budgets, decisions and notes",
+      "Save links, files and transcripts to them",
+      "Search everything you saved"
+     ],
+     "icon": "folder",
      "name": "knowledge",
      "needs": [],
      "options": false,
+     "pages": [
+      "Projects"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
-     "title": "Knowledge",
+     "title": "Projects",
      "version": "",
      "web": [],
      "why_not": null,
@@ -3104,16 +4554,27 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "About-you facts and their learner",
+     "description": "What Dana remembers about you",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Remembers short facts about you and uses them in every answer",
+      "Learns them from your chats; see and edit them on the Memory page"
+     ],
+     "icon": "star",
      "name": "about",
      "needs": [],
      "options": false,
+     "pages": [
+      "Memory"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
-     "title": "About",
+     "title": "About you",
      "version": "",
      "web": [],
      "why_not": null,
@@ -3127,13 +4588,24 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "People and their briefs",
+     "description": "The people you talk to and a brief on each",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "A page per person: who they are, your calls and open things",
+      "A short brief before you call or meet them"
+     ],
+     "icon": "users",
      "name": "people",
      "needs": [],
      "options": false,
+     "pages": [
+      "People"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "People",
@@ -3151,12 +4623,25 @@
      "connected": false,
      "credentials": [],
      "description": "The Android phone: notifications Inbox, calls and suggestions, push",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Your phone's notifications sorted in an Inbox, with summaries",
+      "Call recordings transcribed, with suggested tasks and events",
+      "Push notifications from Dana on your phone"
+     ],
+     "icon": "smartphone",
      "name": "phone",
      "needs": [],
      "options": false,
+     "pages": [
+      "Inbox",
+      "Calls"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "official",
      "state": "available",
      "title": "Phone",
@@ -3176,41 +4661,68 @@
       {
        "can_change": true,
        "description": "Home Assistant base URL, e.g. https://home.example.com",
+       "help": "The address you open Home Assistant at in a browser, with http(s):// and the port if it has one.",
+       "label": "Address",
        "name": "host",
+       "placeholder": "https://home.example.com",
        "required": true,
        "rule": "Only an address an admin has allowed for this service.",
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:32885",
+       "url": null,
+       "value": "http://127.0.0.1:18124",
        "why_not": null
       },
       {
        "can_change": true,
        "description": "Long-lived access token",
+       "help": "In Home Assistant: click your name at the bottom left → Security → Long-lived access tokens → Create token, then copy it here.",
+       "label": "Access token",
        "name": "token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile",
        "why_not": null
       }
      ],
-     "description": "Home Assistant",
+     "description": "Lights, devices and the TV, reminders when you arrive or get in the car",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Turn off the living room lights",
+      "Remind me to take out the trash when I get home",
+      "Is the gate open?"
+     ],
+     "features": [
+      "Turn lights, the AC, gates and other devices on and off",
+      "Reminders when you arrive at a place, leave it or get in the car",
+      "Knows which devices are in which room",
+      "Controls the TV",
+      "The weather for your morning briefing"
+     ],
+     "icon": "house",
      "name": "homeassistant",
      "needs": [],
      "options": true,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "The user's person entity: zone enter / leave triggers",
+       "help": "Your person in Home Assistant (Settings → People), for reminders when you arrive or leave.",
+       "label": "You in Home Assistant",
        "name": "person",
+       "placeholder": "person.noa",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "person.bob",
        "why_not": null
       },
@@ -3218,9 +4730,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's Bluetooth connection sensor: car enter / leave triggers",
+       "help": "From the Home Assistant phone app, for reminders when you get in the car.",
+       "label": "Phone's Bluetooth sensor",
        "name": "car_sensor",
+       "placeholder": "sensor.pixel_bluetooth_connection",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -3228,9 +4744,13 @@
        "can_change": true,
        "default": null,
        "description": "The car's Bluetooth name, as it shows in that sensor's connected_paired_devices",
+       "help": "The name your car has in your phone's Bluetooth list.",
+       "label": "Car's Bluetooth name",
        "name": "car_device",
+       "placeholder": "My Car",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -3238,9 +4758,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone screen-on (interactive) binary sensor: confirms the wake signal",
+       "help": "From the Home Assistant phone app; tells Dana you are awake.",
+       "label": "Phone's screen-on sensor",
        "name": "phone_interactive_sensor",
+       "placeholder": "binary_sensor.pixel_interactive",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -3248,9 +4772,13 @@
        "can_change": true,
        "default": null,
        "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
+       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
+       "placeholder": "sensor.pixel_battery_level",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -3258,9 +4786,13 @@
        "can_change": true,
        "default": null,
        "description": "The phone's mobile_app notify service suffix (reported by /api/client-config)",
+       "help": "Set by the Dana phone app; change it only if it is wrong.",
+       "label": "Phone's notify service",
        "name": "phone_notify_service",
+       "placeholder": "mobile_app_pixel",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -3268,9 +4800,13 @@
        "can_change": true,
        "default": "weather.forecast_home",
        "description": "Weather entity for the wake briefing and the Now screen",
+       "help": "The weather entity your forecast comes from (Settings → Devices & services).",
+       "label": "Weather",
        "name": "weather_entity",
+       "placeholder": "weather.forecast_home",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "weather.forecast_home",
        "why_not": null
       },
@@ -3278,9 +4814,13 @@
        "can_change": true,
        "default": null,
        "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "help": "Your Android TV's media player (the Android Debug Bridge one), if Dana should control it.",
+       "label": "TV",
        "name": "tv_entity",
+       "placeholder": "media_player.living_room_tv",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       },
@@ -3288,16 +4828,21 @@
        "can_change": true,
        "default": null,
        "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "help": "Optional, for changing channels: a command with {channel} where the number goes.",
+       "label": "TV channel command",
        "name": "tv_channel_command",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "on",
-     "title": "Homeassistant",
+     "title": "Home Assistant",
      "version": "",
      "web": [],
      "why_not": null,
@@ -3314,59 +4859,92 @@
       {
        "can_change": true,
        "description": "WAHA API base URL",
+       "help": "The address your WAHA server answers at, the one its dashboard opens on.",
+       "label": "WAHA address",
        "name": "url",
+       "placeholder": "http://waha:3000",
        "required": true,
        "rule": "Only an address an admin has allowed for this service.",
        "secret": false,
        "set": true,
        "type": "address",
-       "value": "http://127.0.0.1:38815/api",
+       "url": "https://github.com/devlikeapro/waha",
+       "value": "http://127.0.0.1:13000/api",
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA API key",
+       "help": "The API key your WAHA server was started with; leave it empty if it has none.",
+       "label": "WAHA API key",
        "name": "api_key",
+       "placeholder": "",
        "required": false,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": null,
        "why_not": null
       },
       {
        "can_change": true,
        "description": "WAHA session name",
+       "help": "The session's name in WAHA's dashboard, the one you linked your phone to.",
+       "label": "Session name",
        "name": "session",
+       "placeholder": "default",
        "required": true,
        "rule": "Letters, digits, _, - and . only.",
        "secret": true,
        "set": true,
        "type": "name",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "WhatsApp through WAHA",
+     "description": "Read and send WhatsApp messages, voice notes as text",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What did Noa write me on WhatsApp today?",
+      "Tell Avi on WhatsApp that I'm running late"
+     ],
+     "features": [
+      "Read your chats and find messages and files",
+      "Send messages and forward files (asks you first)",
+      "Turns the voice notes you receive into text"
+     ],
+     "icon": "message-circle",
      "name": "whatsapp",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": null,
        "description": "Telegram chat inbound voice-note transcripts go to (None: none).",
+       "help": "Optional: your Telegram user id, to get the voice notes you receive as text from Dana's bot.",
+       "label": "Send voice-note transcripts to",
        "name": "voice_telegram_chat_id",
+       "placeholder": "123456789",
        "rule": "Only your own Telegram id (your private chat with the bot).",
        "type": "telegram_chat",
+       "url": null,
        "value": 424242,
        "why_not": null
       }
      ],
+     "setup": [
+      "Run a WAHA server (a WhatsApp Web bridge) that Dana's server can reach; the link on the address below shows how.",
+      "In WAHA's dashboard, start a session and scan its QR code with WhatsApp on your phone (Settings → Linked devices).",
+      "Come back here with WAHA's address, its API key and the session's name."
+     ],
      "source": "official",
      "state": "on",
-     "title": "Whatsapp",
+     "title": "WhatsApp",
      "version": "",
      "web": [],
      "why_not": null,
@@ -3383,29 +4961,50 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": true,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Calendar",
+     "description": "Your events in chat, on the Now screen and in the briefing",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's on my calendar tomorrow?",
+      "Move my dentist appointment to Thursday at 10"
+     ],
+     "features": [
+      "Your events in chat, on the Now screen, in the morning briefing and the weekly review",
+      "Add and move events, with Undo (asks first when it invites people)"
+     ],
+     "icon": "calendar",
      "name": "calendar",
      "needs": [],
      "options": false,
+     "pages": [
+      "Calendar"
+     ],
      "requires": null,
      "settings": [
       {
        "can_change": true,
        "default": "primary",
        "description": "Calendar new events go to",
+       "help": "Where the events Dana adds go; \"primary\" is your main calendar.",
+       "label": "Calendar for new events",
        "name": "calendar_id",
+       "placeholder": "primary",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": "primary",
        "why_not": null
       },
@@ -3413,16 +5012,23 @@
        "can_change": true,
        "default": null,
        "description": "Calendars shown and searched (ids); none chosen: the default calendar",
+       "help": "Pick from the suggestions, separated by commas; empty: only your main calendar.",
+       "label": "Calendars Dana reads",
        "name": "selected_calendars",
+       "placeholder": "",
        "rule": null,
        "type": "text",
+       "url": null,
        "value": null,
        "why_not": null
       }
      ],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "on",
-     "title": "Calendar",
+     "title": "Google Calendar",
      "version": "",
      "web": [
       {
@@ -3450,25 +5056,44 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Google Contacts",
+     "description": "Names, numbers and birthdays of the people you know",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "What's Yael's email address?",
+      "Whose birthday is this week?"
+     ],
+     "features": [
+      "Look up names, phone numbers, emails and birthdays",
+      "Names the people Dana knows and the numbers that call you",
+      "Add or change a contact (asks you first)"
+     ],
+     "icon": "contact",
      "name": "contacts",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
-     "title": "Contacts",
+     "title": "Google Contacts",
      "version": "",
      "web": [],
      "why_not": null,
@@ -3485,22 +5110,41 @@
       {
        "can_change": true,
        "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
        "name": "refresh_token",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Gmail",
+     "description": "Search, read and write your mail in chat",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread emails",
+      "Did the electricity company send me a bill this month?"
+     ],
+     "features": [
+      "Search and read your mail",
+      "Write new mail and replies (asks you before sending)",
+      "Archive, mark read and move to the trash, with Undo"
+     ],
+     "icon": "mail",
      "name": "gmail",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
      "source": "official",
      "state": "available",
      "title": "Gmail",
@@ -3520,22 +5164,41 @@
       {
        "can_change": true,
        "description": "Telegram session (set by the QR sign-in)",
+       "help": "Filled in by Connect Telegram; you never type it.",
+       "label": "Telegram sign-in",
        "name": "session",
+       "placeholder": "",
        "required": true,
        "rule": null,
        "secret": true,
        "set": false,
        "type": "text",
+       "url": null,
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels (read-only)",
+     "description": "Your own Telegram chats and channels, read-only",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [
+      "Summarize my unread Telegram channels",
+      "What's new in the building's group?"
+     ],
+     "features": [
+      "Lists and summarizes your unread chats and channels",
+      "Reads a chat when you ask; never marks anything read and never sends"
+     ],
+     "icon": "send",
      "name": "telegram_account",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin sets up the server's Telegram app once (TELEGRAM_API_ID and TELEGRAM_API_HASH from my.telegram.org; docs/telegram-account.md).",
+      "Press Connect Telegram and scan the QR code with Telegram on your phone (Settings → Devices → Link desktop device)."
+     ],
      "source": "official",
      "state": "available",
      "title": "Telegram account",
@@ -3552,13 +5215,30 @@
      "connect_url": null,
      "connected": false,
      "credentials": [],
-     "description": "Bank and card transactions",
+     "description": "Your bank and card spending, balances and ways to save",
+     "disconnect_warning": "Your saved bank and card logins, accounts and transactions are deleted from Dana.",
      "everyone": false,
+     "examples": [
+      "How much did I spend on food this month?",
+      "What subscriptions do I pay for?"
+     ],
+     "features": [
+      "Spending, income and balances in chat and on the Money page",
+      "Subscriptions, card bills and your balance ahead",
+      "Ways to save and spending worth watching"
+     ],
+     "icon": "wallet",
      "name": "money",
      "needs": [],
      "options": false,
+     "pages": [
+      "Money"
+     ],
      "requires": null,
      "settings": [],
+     "setup": [
+      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money",
@@ -3576,14 +5256,30 @@
      "connected": false,
      "credentials": [],
      "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
      "everyone": false,
+     "examples": [
+      "What's my bank balance?",
+      "How much is left on my meal card?"
+     ],
+     "features": [
+      "Reads your Israeli bank and card accounts into Money",
+      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
+      "Bank of Israel rates and price checks for ways to save"
+     ],
+     "icon": "landmark",
      "name": "money_il",
      "needs": [
       "money"
      ],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [
+      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
+      "Turn it on here, then add each bank or card login on the Money page."
+     ],
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
@@ -3600,24 +5296,36 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "Frigate cameras (no tools: the dashboard's proxy endpoints)",
+     "description": "Your Frigate cameras on the dashboard",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [
+      "Live camera views and recent events on the dashboard and the TV"
+     ],
+     "icon": "cctv",
      "name": "cameras",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [
       {
        "can_change": false,
        "default": null,
        "description": "Frigate base URL",
+       "help": "The address Frigate's web page opens at.",
+       "label": "Frigate address",
        "name": "url",
+       "placeholder": "http://frigate:5000",
        "rule": null,
        "type": "address",
-       "value": "http://127.0.0.1:37157",
+       "url": "https://docs.frigate.video/",
+       "value": "http://127.0.0.1:15000",
        "why_not": "Set by an admin"
       }
      ],
+     "setup": [],
      "source": "official",
      "state": "on",
      "title": "Cameras",
@@ -3635,12 +5343,18 @@
      "connected": false,
      "credentials": [],
      "description": "",
+     "disconnect_warning": null,
      "everyone": false,
+     "examples": [],
+     "features": [],
+     "icon": "",
      "name": "broken",
      "needs": [],
      "options": false,
+     "pages": [],
      "requires": null,
      "settings": [],
+     "setup": [],
      "source": "site",
      "state": "failed",
      "title": "Broken",
@@ -3652,7 +5366,1005 @@
    ],
    "can_manage": false,
    "restart_needed": false,
-   "user_id": "d66f006eadc2"
+   "user_id": "user-bob",
+   "welcome": {
+    "dismissed": false,
+    "show": false,
+    "suggested": [
+     "contacts",
+     "gmail",
+     "telegram_account",
+     "money"
+    ]
+   }
+  },
+  "status": 200
+ },
+ "list_new_user": {
+  "body": {
+   "addons": [
+    {
+     "account": null,
+     "can_change": false,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": true,
+     "credentials": [],
+     "description": "The time, asking you to pick, web search",
+     "disconnect_warning": null,
+     "everyone": true,
+     "examples": [],
+     "features": [
+      "Get the current date, time, and day of the week.",
+      "Ask the user to choose one or more options from a predefined list.",
+      "Search the web for public information using DuckDuckGo.",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+     ],
+     "icon": "sparkles",
+     "name": "essentials",
+     "needs": [],
+     "options": false,
+     "pages": [],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "on",
+     "title": "Essentials",
+     "version": "",
+     "web": [],
+     "why_not": "Every user has it",
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Task lists, reminders and their triggers",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Remind me tomorrow at 9 to call the bank",
+      "What's on my list today?"
+     ],
+     "features": [
+      "Tasks and lists, by chat or voice",
+      "Reminders at a time, when you arrive somewhere or wake up"
+     ],
+     "icon": "list-checks",
+     "name": "tasks",
+     "needs": [],
+     "options": false,
+     "pages": [
+      "Tasks"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Tasks",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Your shopping list, sorted by aisle and shared live",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Add milk and two loaves of bread",
+      "What's on the shopping list?"
+     ],
+     "features": [
+      "Add, tick and remove groceries by chat or voice",
+      "Sorted by supermarket aisle",
+      "Share the list with your household, live"
+     ],
+     "icon": "shopping-cart",
+     "name": "shopping",
+     "needs": [],
+     "options": false,
+     "pages": [
+      "Shopping"
+     ],
+     "requires": null,
+     "settings": [
+      {
+       "can_change": true,
+       "default": null,
+       "description": "The list the user's shopping changes go to: their own (None) or the id of a list shared with them to edit.",
+       "help": "Chosen on the Shopping page; leave it empty for your own list.",
+       "label": "Active list",
+       "name": "active_list",
+       "placeholder": "",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      }
+     ],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Shopping",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Projects, decisions and saved notes, links and files",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [],
+     "features": [
+      "Projects with dates, budgets, decisions and notes",
+      "Save links, files and transcripts to them",
+      "Search everything you saved"
+     ],
+     "icon": "folder",
+     "name": "knowledge",
+     "needs": [],
+     "options": false,
+     "pages": [
+      "Projects"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Projects",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "What Dana remembers about you",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [],
+     "features": [
+      "Remembers short facts about you and uses them in every answer",
+      "Learns them from your chats; see and edit them on the Memory page"
+     ],
+     "icon": "star",
+     "name": "about",
+     "needs": [],
+     "options": false,
+     "pages": [
+      "Memory"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "About you",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "The people you talk to and a brief on each",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [],
+     "features": [
+      "A page per person: who they are, your calls and open things",
+      "A short brief before you call or meet them"
+     ],
+     "icon": "users",
+     "name": "people",
+     "needs": [],
+     "options": false,
+     "pages": [
+      "People"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "People",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "The Android phone: notifications Inbox, calls and suggestions, push",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [],
+     "features": [
+      "Your phone's notifications sorted in an Inbox, with summaries",
+      "Call recordings transcribed, with suggested tasks and events",
+      "Push notifications from Dana on your phone"
+     ],
+     "icon": "smartphone",
+     "name": "phone",
+     "needs": [],
+     "options": false,
+     "pages": [
+      "Inbox",
+      "Calls"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Phone",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [
+      {
+       "can_change": true,
+       "description": "Home Assistant base URL, e.g. https://home.example.com",
+       "help": "The address you open Home Assistant at in a browser, with http(s):// and the port if it has one.",
+       "label": "Address",
+       "name": "host",
+       "placeholder": "https://home.example.com",
+       "required": true,
+       "rule": "Only an address an admin has allowed for this service.",
+       "secret": false,
+       "set": false,
+       "type": "address",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "description": "Long-lived access token",
+       "help": "In Home Assistant: click your name at the bottom left → Security → Long-lived access tokens → Create token, then copy it here.",
+       "label": "Access token",
+       "name": "token",
+       "placeholder": "",
+       "required": true,
+       "rule": null,
+       "secret": true,
+       "set": false,
+       "type": "text",
+       "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile",
+       "why_not": null
+      }
+     ],
+     "description": "Lights, devices and the TV, reminders when you arrive or get in the car",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Turn off the living room lights",
+      "Remind me to take out the trash when I get home",
+      "Is the gate open?"
+     ],
+     "features": [
+      "Turn lights, the AC, gates and other devices on and off",
+      "Reminders when you arrive at a place, leave it or get in the car",
+      "Knows which devices are in which room",
+      "Controls the TV",
+      "The weather for your morning briefing"
+     ],
+     "icon": "house",
+     "name": "homeassistant",
+     "needs": [],
+     "options": true,
+     "pages": [],
+     "requires": null,
+     "settings": [
+      {
+       "can_change": true,
+       "default": null,
+       "description": "The user's person entity: zone enter / leave triggers",
+       "help": "Your person in Home Assistant (Settings → People), for reminders when you arrive or leave.",
+       "label": "You in Home Assistant",
+       "name": "person",
+       "placeholder": "person.noa",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "The phone's Bluetooth connection sensor: car enter / leave triggers",
+       "help": "From the Home Assistant phone app, for reminders when you get in the car.",
+       "label": "Phone's Bluetooth sensor",
+       "name": "car_sensor",
+       "placeholder": "sensor.pixel_bluetooth_connection",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "The car's Bluetooth name, as it shows in that sensor's connected_paired_devices",
+       "help": "The name your car has in your phone's Bluetooth list.",
+       "label": "Car's Bluetooth name",
+       "name": "car_device",
+       "placeholder": "My Car",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Phone screen-on (interactive) binary sensor: confirms the wake signal",
+       "help": "From the Home Assistant phone app; tells Dana you are awake.",
+       "label": "Phone's screen-on sensor",
+       "name": "phone_interactive_sensor",
+       "placeholder": "binary_sensor.pixel_interactive",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
+       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "label": "Phone's battery sensor",
+       "name": "phone_battery_sensor",
+       "placeholder": "sensor.pixel_battery_level",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "The phone's mobile_app notify service suffix (reported by /api/client-config)",
+       "help": "Set by the Dana phone app; change it only if it is wrong.",
+       "label": "Phone's notify service",
+       "name": "phone_notify_service",
+       "placeholder": "mobile_app_pixel",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": "weather.forecast_home",
+       "description": "Weather entity for the wake briefing and the Now screen",
+       "help": "The weather entity your forecast comes from (Settings → Devices & services).",
+       "label": "Weather",
+       "name": "weather_entity",
+       "placeholder": "weather.forecast_home",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": "weather.forecast_home",
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "help": "Your Android TV's media player (the Android Debug Bridge one), if Dana should control it.",
+       "label": "TV",
+       "name": "tv_entity",
+       "placeholder": "media_player.living_room_tv",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "help": "Optional, for changing channels: a command with {channel} where the number goes.",
+       "label": "TV channel command",
+       "name": "tv_channel_command",
+       "placeholder": "",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      }
+     ],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Home Assistant",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [
+      {
+       "can_change": true,
+       "description": "WAHA API base URL",
+       "help": "The address your WAHA server answers at, the one its dashboard opens on.",
+       "label": "WAHA address",
+       "name": "url",
+       "placeholder": "http://waha:3000",
+       "required": true,
+       "rule": "Only an address an admin has allowed for this service.",
+       "secret": false,
+       "set": false,
+       "type": "address",
+       "url": "https://github.com/devlikeapro/waha",
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "description": "WAHA API key",
+       "help": "The API key your WAHA server was started with; leave it empty if it has none.",
+       "label": "WAHA API key",
+       "name": "api_key",
+       "placeholder": "",
+       "required": false,
+       "rule": null,
+       "secret": true,
+       "set": false,
+       "type": "text",
+       "url": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "description": "WAHA session name",
+       "help": "The session's name in WAHA's dashboard, the one you linked your phone to.",
+       "label": "Session name",
+       "name": "session",
+       "placeholder": "default",
+       "required": true,
+       "rule": "Letters, digits, _, - and . only.",
+       "secret": true,
+       "set": false,
+       "type": "name",
+       "url": null,
+       "why_not": null
+      }
+     ],
+     "description": "Read and send WhatsApp messages, voice notes as text",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "What did Noa write me on WhatsApp today?",
+      "Tell Avi on WhatsApp that I'm running late"
+     ],
+     "features": [
+      "Read your chats and find messages and files",
+      "Send messages and forward files (asks you first)",
+      "Turns the voice notes you receive into text"
+     ],
+     "icon": "message-circle",
+     "name": "whatsapp",
+     "needs": [],
+     "options": false,
+     "pages": [],
+     "requires": null,
+     "settings": [
+      {
+       "can_change": false,
+       "default": null,
+       "description": "Telegram chat inbound voice-note transcripts go to (None: none).",
+       "help": "Optional: your Telegram user id, to get the voice notes you receive as text from Dana's bot.",
+       "label": "Send voice-note transcripts to",
+       "name": "voice_telegram_chat_id",
+       "placeholder": "123456789",
+       "rule": null,
+       "type": "telegram_chat",
+       "url": null,
+       "value": null,
+       "why_not": "Set by an admin"
+      }
+     ],
+     "setup": [
+      "Run a WAHA server (a WhatsApp Web bridge) that Dana's server can reach; the link on the address below shows how.",
+      "In WAHA's dashboard, start a session and scan its QR code with WhatsApp on your phone (Settings → Linked devices).",
+      "Come back here with WAHA's address, its API key and the session's name."
+     ],
+     "source": "official",
+     "state": "available",
+     "title": "WhatsApp",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": "/api/google/connect",
+     "connected": false,
+     "credentials": [
+      {
+       "can_change": true,
+       "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
+       "name": "refresh_token",
+       "placeholder": "",
+       "required": true,
+       "rule": null,
+       "secret": true,
+       "set": false,
+       "type": "text",
+       "url": null,
+       "why_not": null
+      }
+     ],
+     "description": "Your events in chat, on the Now screen and in the briefing",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "What's on my calendar tomorrow?",
+      "Move my dentist appointment to Thursday at 10"
+     ],
+     "features": [
+      "Your events in chat, on the Now screen, in the morning briefing and the weekly review",
+      "Add and move events, with Undo (asks first when it invites people)"
+     ],
+     "icon": "calendar",
+     "name": "calendar",
+     "needs": [],
+     "options": false,
+     "pages": [
+      "Calendar"
+     ],
+     "requires": null,
+     "settings": [
+      {
+       "can_change": true,
+       "default": "primary",
+       "description": "Calendar new events go to",
+       "help": "Where the events Dana adds go; \"primary\" is your main calendar.",
+       "label": "Calendar for new events",
+       "name": "calendar_id",
+       "placeholder": "primary",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": "primary",
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Calendars shown and searched (ids); none chosen: the default calendar",
+       "help": "Pick from the suggestions, separated by commas; empty: only your main calendar.",
+       "label": "Calendars Dana reads",
+       "name": "selected_calendars",
+       "placeholder": "",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      }
+     ],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
+     "source": "official",
+     "state": "available",
+     "title": "Google Calendar",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": "/api/google/connect",
+     "connected": false,
+     "credentials": [
+      {
+       "can_change": true,
+       "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
+       "name": "refresh_token",
+       "placeholder": "",
+       "required": true,
+       "rule": null,
+       "secret": true,
+       "set": false,
+       "type": "text",
+       "url": null,
+       "why_not": null
+      }
+     ],
+     "description": "Names, numbers and birthdays of the people you know",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "What's Yael's email address?",
+      "Whose birthday is this week?"
+     ],
+     "features": [
+      "Look up names, phone numbers, emails and birthdays",
+      "Names the people Dana knows and the numbers that call you",
+      "Add or change a contact (asks you first)"
+     ],
+     "icon": "contact",
+     "name": "contacts",
+     "needs": [],
+     "options": false,
+     "pages": [],
+     "requires": null,
+     "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
+     "source": "official",
+     "state": "available",
+     "title": "Google Contacts",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": "/api/google/connect",
+     "connected": false,
+     "credentials": [
+      {
+       "can_change": true,
+       "description": "Google OAuth refresh token",
+       "help": "Filled in by Connect with Google; you never type it.",
+       "label": "Google sign-in",
+       "name": "refresh_token",
+       "placeholder": "",
+       "required": true,
+       "rule": null,
+       "secret": true,
+       "set": false,
+       "type": "text",
+       "url": null,
+       "why_not": null
+      }
+     ],
+     "description": "Search, read and write your mail in chat",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Summarize my unread emails",
+      "Did the electricity company send me a bill this month?"
+     ],
+     "features": [
+      "Search and read your mail",
+      "Write new mail and replies (asks you before sending)",
+      "Archive, mark read and move to the trash, with Undo"
+     ],
+     "icon": "mail",
+     "name": "gmail",
+     "needs": [],
+     "options": false,
+     "pages": [],
+     "requires": null,
+     "settings": [],
+     "setup": [
+      "An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; docs/configuration.md). Then Connect with Google below."
+     ],
+     "source": "official",
+     "state": "available",
+     "title": "Gmail",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": "Connect Telegram",
+     "connect_url": "/telegram/connect",
+     "connected": false,
+     "credentials": [
+      {
+       "can_change": true,
+       "description": "Telegram session (set by the QR sign-in)",
+       "help": "Filled in by Connect Telegram; you never type it.",
+       "label": "Telegram sign-in",
+       "name": "session",
+       "placeholder": "",
+       "required": true,
+       "rule": null,
+       "secret": true,
+       "set": false,
+       "type": "text",
+       "url": null,
+       "why_not": null
+      }
+     ],
+     "description": "Your own Telegram chats and channels, read-only",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Summarize my unread Telegram channels",
+      "What's new in the building's group?"
+     ],
+     "features": [
+      "Lists and summarizes your unread chats and channels",
+      "Reads a chat when you ask; never marks anything read and never sends"
+     ],
+     "icon": "send",
+     "name": "telegram_account",
+     "needs": [],
+     "options": false,
+     "pages": [],
+     "requires": null,
+     "settings": [],
+     "setup": [
+      "An admin sets up the server's Telegram app once (TELEGRAM_API_ID and TELEGRAM_API_HASH from my.telegram.org; docs/telegram-account.md).",
+      "Press Connect Telegram and scan the QR code with Telegram on your phone (Settings → Devices → Link desktop device)."
+     ],
+     "source": "official",
+     "state": "available",
+     "title": "Telegram account",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Your bank and card spending, balances and ways to save",
+     "disconnect_warning": "Your saved bank and card logins, accounts and transactions are deleted from Dana.",
+     "everyone": false,
+     "examples": [
+      "How much did I spend on food this month?",
+      "What subscriptions do I pay for?"
+     ],
+     "features": [
+      "Spending, income and balances in chat and on the Money page",
+      "Subscriptions, card bills and your balance ahead",
+      "Ways to save and spending worth watching"
+     ],
+     "icon": "wallet",
+     "name": "money",
+     "needs": [],
+     "options": false,
+     "pages": [
+      "Money"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [
+      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+     ],
+     "source": "official",
+     "state": "available",
+     "title": "Money",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
+     "everyone": false,
+     "examples": [
+      "What's my bank balance?",
+      "How much is left on my meal card?"
+     ],
+     "features": [
+      "Reads your Israeli bank and card accounts into Money",
+      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
+      "Bank of Israel rates and price checks for ways to save"
+     ],
+     "icon": "landmark",
+     "name": "money_il",
+     "needs": [
+      "money"
+     ],
+     "options": false,
+     "pages": [],
+     "requires": null,
+     "settings": [],
+     "setup": [
+      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
+      "Turn it on here, then add each bank or card login on the Money page."
+     ],
+     "source": "official",
+     "state": "available",
+     "title": "Money (Israel)",
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": true
+    },
+    {
+     "account": null,
+     "can_change": false,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Your Frigate cameras on the dashboard",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [],
+     "features": [
+      "Live camera views and recent events on the dashboard and the TV"
+     ],
+     "icon": "cctv",
+     "name": "cameras",
+     "needs": [],
+     "options": false,
+     "pages": [],
+     "requires": null,
+     "settings": [
+      {
+       "can_change": false,
+       "default": null,
+       "description": "Frigate base URL",
+       "help": "The address Frigate's web page opens at.",
+       "label": "Frigate address",
+       "name": "url",
+       "placeholder": "http://frigate:5000",
+       "rule": null,
+       "type": "address",
+       "url": "https://docs.frigate.video/",
+       "value": null,
+       "why_not": "Set by an admin"
+      }
+     ],
+     "setup": [],
+     "source": "official",
+     "state": "off",
+     "title": "Cameras",
+     "version": "",
+     "web": [],
+     "why_not": "Set by an admin",
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": false,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [],
+     "features": [],
+     "icon": "",
+     "name": "broken",
+     "needs": [],
+     "options": false,
+     "pages": [],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "site",
+     "state": "failed",
+     "title": "Broken",
+     "version": "",
+     "web": [],
+     "why_not": "It did not load",
+     "worker": false
+    }
+   ],
+   "can_manage": false,
+   "restart_needed": false,
+   "user_id": "user-dee",
+   "welcome": {
+    "dismissed": false,
+    "show": true,
+    "suggested": [
+     "homeassistant",
+     "whatsapp",
+     "calendar",
+     "contacts",
+     "gmail",
+     "telegram_account",
+     "money"
+    ]
+   }
   },
   "status": 200
  },
@@ -3676,7 +6388,7 @@
     "manage_server"
    ],
    "currency": "ILS",
-   "id": "349485b6b23d",
+   "id": "user-robin",
    "languages": [
     "he",
     "en"
@@ -3697,7 +6409,7 @@
    ],
    "capabilities": [],
    "currency": "USD",
-   "id": "d66f006eadc2",
+   "id": "user-bob",
    "languages": [
     "en"
    ],
@@ -3717,59 +6429,92 @@
     {
      "can_change": false,
      "description": "WAHA API base URL",
+     "help": "The address your WAHA server answers at, the one its dashboard opens on.",
+     "label": "WAHA address",
      "name": "url",
+     "placeholder": "http://waha:3000",
      "required": true,
      "rule": null,
      "secret": false,
      "set": true,
      "type": "address",
-     "value": "http://127.0.0.1:38815/api",
+     "url": "https://github.com/devlikeapro/waha",
+     "value": "http://127.0.0.1:13000/api",
      "why_not": "Set by an admin"
     },
     {
      "can_change": true,
      "description": "WAHA API key",
+     "help": "The API key your WAHA server was started with; leave it empty if it has none.",
+     "label": "WAHA API key",
      "name": "api_key",
+     "placeholder": "",
      "required": false,
      "rule": null,
      "secret": true,
      "set": true,
      "type": "text",
+     "url": null,
      "why_not": null
     },
     {
      "can_change": true,
      "description": "WAHA session name",
+     "help": "The session's name in WAHA's dashboard, the one you linked your phone to.",
+     "label": "Session name",
      "name": "session",
+     "placeholder": "default",
      "required": true,
      "rule": "Letters, digits, _, - and . only.",
      "secret": true,
      "set": true,
      "type": "name",
+     "url": null,
      "why_not": null
     }
    ],
-   "description": "WhatsApp through WAHA",
+   "description": "Read and send WhatsApp messages, voice notes as text",
+   "disconnect_warning": null,
    "everyone": false,
+   "examples": [
+    "What did Noa write me on WhatsApp today?",
+    "Tell Avi on WhatsApp that I'm running late"
+   ],
+   "features": [
+    "Read your chats and find messages and files",
+    "Send messages and forward files (asks you first)",
+    "Turns the voice notes you receive into text"
+   ],
+   "icon": "message-circle",
    "name": "whatsapp",
    "needs": [],
    "options": false,
+   "pages": [],
    "requires": null,
    "settings": [
     {
      "can_change": true,
      "default": null,
      "description": "Telegram chat inbound voice-note transcripts go to (None: none).",
+     "help": "Optional: your Telegram user id, to get the voice notes you receive as text from Dana's bot.",
+     "label": "Send voice-note transcripts to",
      "name": "voice_telegram_chat_id",
+     "placeholder": "123456789",
      "rule": "Only your own Telegram id (your private chat with the bot).",
      "type": "telegram_chat",
+     "url": null,
      "value": 424242,
      "why_not": null
     }
    ],
+   "setup": [
+    "Run a WAHA server (a WhatsApp Web bridge) that Dana's server can reach; the link on the address below shows how.",
+    "In WAHA's dashboard, start a session and scan its QR code with WhatsApp on your phone (Settings → Linked devices).",
+    "Come back here with WAHA's address, its API key and the session's name."
+   ],
    "source": "official",
    "state": "on",
-   "title": "Whatsapp",
+   "title": "WhatsApp",
    "version": "",
    "web": [],
    "why_not": null,
@@ -3853,17 +6598,17 @@
    "users": [
     {
      "access": "admin",
-     "id": "349485b6b23d",
+     "id": "user-robin",
      "name": "Robin Levi"
     },
     {
      "access": "member",
-     "id": "d66f006eadc2",
+     "id": "user-bob",
      "name": "Bob Builder"
     },
     {
      "access": "member",
-     "id": "ed0c99727e32",
+     "id": "user-carl",
      "name": "Carl"
     }
    ]

@@ -7,11 +7,16 @@ from addons.shopping.values import ACTIVE_SETTING
 # Connecting it gives the user their own shopping list.
 addon = Addon(
     "shopping", web=(Page("shopping", panel="shopping.js", style="shopping.css", nav=Nav("Shopping", icon="shopping-cart", order=10)),), order=30, default_on=True, llm_jobs={"shopping_category": LlmJob("fast", "Shopping aisles")},
+    title="Shopping", icon="shopping-cart",
     settings=(
         Field(ACTIVE_SETTING, "The list the user's shopping changes go to: their own (None) or the id of a "
-                              "list shared with them to edit."),
+                              "list shared with them to edit.", label="Active list",
+              help="Chosen on the Shopping page; leave it empty for your own list."),
     ),
-    description="Shopping lists",
+    description="Your shopping list, sorted by aisle and shared live",
+    features=("Add, tick and remove groceries by chat or voice", "Sorted by supermarket aisle",
+              "Share the list with your household, live"),
+    examples=("Add milk and two loaves of bread", "What's on the shopping list?"),
     on_connect=lists.ensure_list,
     validate=lists.validate_settings,
     prompt_parts=(

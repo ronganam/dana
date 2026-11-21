@@ -11,8 +11,12 @@ from addons.cameras.config import ADDON, URL
 # kind, for themselves or for someone else (docs/access.md, "Security rules").
 addon = Addon(
     ADDON, order=150,
-    settings=(Field(URL, "Frigate base URL", type=ADDRESS),),
+    title="Cameras", icon="cctv",
+    settings=(Field(URL, "Frigate base URL", type=ADDRESS, label="Frigate address",
+                    help="The address Frigate's web page opens at.", url="https://docs.frigate.video/",
+                    placeholder="http://frigate:5000"),),
     change_requires="manage_users",
-    description="Frigate cameras (no tools: the dashboard's proxy endpoints)",
+    description="Your Frigate cameras on the dashboard",
+    features=("Live camera views and recent events on the dashboard and the TV",),
     test=client.check,
 )

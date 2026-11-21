@@ -20,8 +20,17 @@ TELEGRAM_GUIDE = (
 # rule for untrusted content (as gmail).
 addon = Addon(
     ADDON, order=130, llm_jobs={"telegram_summary": LlmJob("fast", "Telegram summaries")},
-    credentials=(Field(SESSION, "Telegram session (set by the QR sign-in)"),),
-    description="Your own Telegram chats and channels (read-only)",
+    title="Telegram account", icon="send",
+    credentials=(Field(SESSION, "Telegram session (set by the QR sign-in)", label="Telegram sign-in",
+                       help="Filled in by Connect Telegram; you never type it."),),
+    description="Your own Telegram chats and channels, read-only",
+    features=("Lists and summarizes your unread chats and channels",
+              "Reads a chat when you ask; never marks anything read and never sends"),
+    setup=("An admin sets up the server's Telegram app once (TELEGRAM_API_ID and TELEGRAM_API_HASH from "
+           "my.telegram.org; docs/telegram-account.md).",
+           "Press Connect Telegram and scan the QR code with Telegram on your phone (Settings → Devices → "
+           "Link desktop device)."),
+    examples=("Summarize my unread Telegram channels", "What's new in the building's group?"),
     test=client.check,
     connect_url=CONNECT_PATH,
     connect_label="Connect Telegram",

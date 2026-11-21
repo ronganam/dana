@@ -28,7 +28,15 @@ def _changed(user: User) -> None:
 
 addon = Addon(
     ADDON, order=141, needs=("money",), title="Money (Israel)",
+    icon="landmark",
     description="Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
+    features=("Reads your Israeli bank and card accounts into Money",
+              "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
+              "Bank of Israel rates and price checks for ways to save"),
+    setup=("An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
+           "Turn it on here, then add each bank or card login on the Money page."),
+    examples=("What's my bank balance?", "How much is left on my meal card?"),
+    disconnect_warning="Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
     llm_jobs={"money_market": LlmJob("balanced", "Money price checks")},
     # The bank-worker sidecar, built from worker/ by bin/deploy (docs/operations.md, "Workers").
     worker=Worker(port=8090, url_env="MONEY_WORKER_URL"),

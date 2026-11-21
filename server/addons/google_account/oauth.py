@@ -42,6 +42,11 @@ IDENTITY_SCOPES = ("openid", "email")
 STATE_TTL_SECONDS = 600
 TOKEN_TIMEOUT_SECONDS = 20.0
 CREDENTIAL = "refresh_token"
+# The step outside Dana before a Google addon can connect (``Addon(setup=)``), and its credential's words.
+SETUP = ("An admin sets up the Google sign-in for this server once (GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET; "
+         "docs/configuration.md). Then Connect with Google below.",)
+TOKEN_LABEL = "Google sign-in"
+TOKEN_HELP = "Filled in by Connect with Google; you never type it."
 
 # addon → the scopes its tools need (:func:`register`).
 _scopes: Dict[str, Tuple[str, ...]] = {}
