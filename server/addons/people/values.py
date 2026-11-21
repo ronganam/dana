@@ -1,7 +1,7 @@
 """People: server-wide tuning, normalisation and formatting every module of the addon shares.
 
 Pure functions, no database: phone numbers and names normalised for matching,
-"12 days ago" wording, birthdays, the cleaned lists people's names are kept in.
+birthdays, the cleaned lists people's names are kept in.
 """
 from __future__ import annotations
 
@@ -79,28 +79,6 @@ def parse_time(value: Optional[str]) -> Optional[datetime.datetime]:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=clock.get_timezone())
     return dt.astimezone(clock.get_timezone())
-
-
-def ago(dt: Optional[datetime.datetime], now: Optional[datetime.datetime] = None) -> str:
-    """'just now' / '3h ago' / 'yesterday' / '12 days ago' / '3 months ago'."""
-    if not dt:
-        return ""
-    now = now or clock.now()
-    secs = (now - dt).total_seconds()
-    if secs < 90:
-        return "just now"
-    if secs < 3600:
-        return f"{int(secs // 60)} min ago"
-    days = (now.date() - dt.date()).days
-    if days <= 0:
-        return f"{int(secs // 3600)}h ago"
-    if days == 1:
-        return "yesterday"
-    if days < 45:
-        return f"{days} days ago"
-    if days < 365:
-        return f"{round(days / 30)} months ago"
-    return f"{round(days / 365, 1):g} years ago"
 
 
 def initials(name: str) -> str:

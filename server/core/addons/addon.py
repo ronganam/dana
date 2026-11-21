@@ -21,7 +21,8 @@ import inspect
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, TypeVar, Union
+from typing import (Any, Awaitable, Callable, Collection, Dict, List, Mapping, Optional, Sequence, Tuple, TypeVar,
+                    Union)
 
 from core.access import CAPABILITIES
 from core.users import User
@@ -54,15 +55,19 @@ SettingOptions = Callable[[Any], Awaitable[Dict[str, List[Dict[str, Any]]]]]
 # filled in) and who makes the change (None: the server itself / an operator
 # with shell access). Raises InvalidValue to refuse.
 SettingsRule = Callable[[User, Mapping[str, Any], Mapping[str, Any], Mapping[str, Any], Optional[User]], None]
-# The Approve card of one call of a tool: the call's arguments → a
-# core.addons.hooks.Approval (typed Any: tools import hooks lazily-free).
-DescribeRule = Callable[[Dict[str, Any]], Any]
+# The Approve card of one call of a tool: (the user, the call's arguments) → a
+# core.addons.hooks.Approval (typed Any here).
+DescribeRule = Callable[[User, Dict[str, Any]], Any]
 # Event names: <addon>.<thing>.<what happened> (core: core.<thing>.<what>).
 EVENT_NAME = re.compile(r"^[a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+$")
 DAILY = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 # Composer hooks: their functions are plain (not async): composers call them in
 # a worker thread, next to their own database reads.
-SYNC_HOOKS = ("now_cards", "day_items", "briefing", "search", "selfcheck", "context", "context_card")
+SYNC_HOOKS = ("now_cards", "day_items", "briefing", "review", "search", "selfcheck", "context", "context_card")
+# Hooks declared for a key (a card prefix, a section key, a check key, an item
+# type, a context kind): one addon per key and kind across every addon (the
+# loader fails the later addon that repeats one).
+KEYED_HOOKS = ("now_action", "briefing", "review", "review_action", "selfcheck", "context", "context_card")
 
 
 @dataclass(frozen=True)
@@ -377,10 +382,10 @@ class Addon:
                 people (an email). Once it ran, the rest of that turn counts
                 as carrying untrusted content: every ``acts_outside`` tool
                 asks first (``core/agent.py``).
-            describe: The Approve card's words for one call: a function of
-                the call's arguments returning a
-                :class:`~core.addons.hooks.Approval` (``core/approval_text.py``
-                uses it before its own descriptions).
+            describe: The Approve card's words for one call: ``f(user,
+                args)`` returning a :class:`~core.addons.hooks.Approval`
+                (``core/approval_text.py`` uses it before its own
+                descriptions; when it raises, the default card is shown).
 
         Re-registering a name in the same addon replaces that tool in place
         (tests swap a tool for a fake this way); a name owned by another addon
@@ -415,25 +420,30 @@ class Addon:
     # --- Background work --------------------------------------------------------
 
     def job(self, *, every: Optional[datetime.timedelta] = None, daily: Optional[str] = None,
-            at_start: bool = False, delay: float = 0.0, name: Optional[str] = None) -> Callable[[F], F]:
+            at_start: bool = False, delay: float = 0.0, timeout: float = 600.0,
+            name: Optional[str] = None) -> Callable[[F], F]:
         """``async def f(user)`` run for every user who has this addon, each as
         that user (``users.acting_as``), one failing user never stopping the
         next (core/addons/scheduler.py). Exactly one of ``every`` (an interval:
-        ``minutes(5)``), ``daily`` ("HH:MM", local time; also run on the day the
-        server starts after that time) or ``at_start`` (once, when the server
-        starts). ``delay``: seconds after the start before its first pass. Each pass
-        writes a heartbeat (:func:`core.addons.scheduler.last_run`)."""
+        ``minutes(5)``; a restart waits out what is left of it), ``daily``
+        ("HH:MM", local time; once a day, also on the day the server starts after
+        that time, never twice on one day across restarts) or ``at_start`` (once,
+        when the server starts). ``delay``: seconds after the start before its
+        first pass. ``timeout``: seconds one user's run may take before it is
+        cancelled. Each pass writes a heartbeat (:func:`core.addons.scheduler.last_run`)."""
         if sum(bool(x) for x in (every, daily, at_start)) != 1:
             raise ValueError(f"{self.name}: a job takes exactly one of every=, daily=, at_start=")
         if daily is not None and not DAILY.match(daily):
             raise ValueError(f"{self.name}: daily={daily!r} must be HH:MM")
         if every is not None and every.total_seconds() <= 0:
             raise ValueError(f"{self.name}: every= must be positive")
+        if timeout <= 0:
+            raise ValueError(f"{self.name}: timeout= must be positive")
 
         def decorator(func: F) -> F:
             _require_async(self.name, "job", func)
             self.jobs.append(Job(self.name, name or func.__name__, func, every=every, daily=daily,
-                                 at_start=at_start, delay=delay))
+                                 at_start=at_start, delay=delay, timeout=timeout))
             return func
         return decorator
 
@@ -497,10 +507,23 @@ class Addon:
         The user must have this addon (403 ``not_connected`` otherwise)."""
         return self._hook("now_action", prefix)
 
-    def briefing(self, func: F) -> F:
-        """``def f(user, ctx: BriefingContext) -> Section | None``: a section of
-        the morning briefing or the weekly review (``ctx.kind``)."""
-        return self._hook("briefing")(func)
+    def briefing(self, key: str, *, counts: Sequence[str] = ()) -> Callable[[F], F]:
+        """``def f(user, ctx: BriefingContext) -> Section | None``: this addon's
+        section of the morning briefing, stored under ``key`` in the briefing's
+        data (unique across addons). ``counts``: the keys of ``Section.counts``
+        it may give the briefing's push (unique across addons; others are dropped)."""
+        if not key:
+            raise ValueError(f"{self.name}: @addon.briefing needs a section key")
+        return self._hook("briefing", key, counts=tuple(counts))
+
+    def review(self, key: str) -> Callable[[F], F]:
+        """``def f(user, ctx: BriefingContext) -> Section | None``: this addon's
+        section of the weekly review (``key`` unique across addons): its
+        ``items`` are the decisions, acted on by its ``@addon.review_action``,
+        its ``data`` joins the review's facts."""
+        if not key:
+            raise ValueError(f"{self.name}: @addon.review needs a section key")
+        return self._hook("review", key)
 
     def review_action(self, item_type: str, actions: Sequence[str]) -> Callable[[F], F]:
         """``async def f(user, item, action, decision, today) -> str``: applying
@@ -510,7 +533,7 @@ class Addon:
 
     def search(self, func: F) -> F:
         """``def f(user, query, limit) -> list[Hit]``: at most ``limit`` results in
-        the global search (``core.search.match_score`` / ``like_pattern`` help match)."""
+        the global search (``core.addons.helpers.match_score`` / ``like_pattern`` help match)."""
         return self._hook("search")(func)
 
     def selfcheck(self, key: str, label: str, *, server: bool = False, after: str = "") -> Callable[[F], F]:
@@ -591,21 +614,34 @@ def all_tools() -> List[Tool]:
     return [t for k in all_addons() for t in k.tools]
 
 
-def validate() -> None:
-    """Every ``needs`` (of a tool or a prompt part) names a declared addon.
-
-    Raises:
-        ValueError: a tool or prompt part needs an unknown addon.
-    """
-    for t in _tools.values():
-        unknown = [k for k in t.needs if k not in _addons]
+def needs_problem(addon: Addon, known: Collection[str]) -> Optional[str]:
+    """Why ``addon``'s tools or prompt parts cannot be used (one ``needs`` an
+    addon not in ``known``), or None."""
+    for t in addon.tools:
+        unknown = [k for k in t.needs if k not in known]
         if unknown:
-            raise ValueError(f"Tool {t.name!r} needs unknown addon(s) {unknown}")
-    for k in _addons.values():
-        for part in k.prompt_parts:
-            unknown = [n for n in part.needs if n not in _addons]
-            if unknown:
-                raise ValueError(f"A prompt part of {k.name!r} needs unknown addon(s) {unknown}")
+            return f"tool {t.name!r} needs {', '.join(unknown)}, which is not loaded"
+    for part in addon.prompt_parts:
+        unknown = [n for n in part.needs if n not in known]
+        if unknown:
+            return f"a prompt part needs {', '.join(unknown)}, which is not loaded"
+    return None
+
+
+def key_clash(addon: Addon, others: Sequence[Addon]) -> Optional[str]:
+    """Why ``addon`` cannot load next to ``others`` (the addons already loaded):
+    it declares a keyed hook (:data:`KEYED_HOOKS`) for a key another addon has,
+    or a briefing count key another addon has; None when every key is its own."""
+    taken = {(h.kind, h.key): o.name for o in others for h in o.hooks if h.kind in KEYED_HOOKS}
+    counts = {c: o.name for o in others for h in o.hooks if h.kind == "briefing" for c in h.option("counts", ())}
+    for h in addon.hooks:
+        if h.kind in KEYED_HOOKS and (h.kind, h.key) in taken:
+            return f"@addon.{h.kind}({h.key!r}) is already declared by the {taken[(h.kind, h.key)]} addon"
+        if h.kind == "briefing":
+            for c in h.option("counts", ()):
+                if c in counts:
+                    return f"the briefing count {c!r} is already declared by the {counts[c]} addon"
+    return None
 
 
 def check_values(addon: Addon, credentials: Optional[Mapping[str, Any]],

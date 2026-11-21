@@ -71,23 +71,23 @@ def my_add(conn: Connection, title: str) -> str:
 `conn` is the user's connection (`conn.user`, `conn.settings`, `conn.credentials`), left out of the schema. A write runs at once and registers an undo (`core/undo.py`); `confirm=True` asks first, and `describe=` gives the Approve card's words:
 
 ```python
-def describe_delete(a: dict) -> Approval:
+def describe_delete(user: User, a: dict) -> Approval:
     return Approval(title=f"Delete “{a['title']}”", heading="Delete", emoji="🗑", question="Delete it?")
 
 @addon.tool(is_write=True, confirm=True, describe=describe_delete)
 ```
 
-Other flags: `acts_outside`, `untrusted_result` (`docs/agent-actions.md`).
+If `describe` raises, the framework logs it and falls back to the default Approve card. Other flags: `acts_outside`, `untrusted_result` (`docs/agent-actions.md`).
 
 ## Background work
 
 ```python
-@addon.job(every=minutes(5))            # or daily="07:30", or at_start=True; delay= seconds
-async def refresh(user: User) -> int:   # once per user who has the addon, as that user
+@addon.job(every=minutes(5))            # or daily="07:30", or at_start=True; delay= seconds; timeout=600.0
+async def refresh(user: User) -> int:   # once per user who has the addon active, as that user
     return store.refresh(user)
 ```
 
-One user's failure is logged and the next user still runs; each pass writes a heartbeat (`scheduler.last_run("my_addon", "refresh")`). Tests run a pass with `await scheduler.run_once(registry.job("my_addon.refresh"))`.
+One user's failure (or exceeding `timeout`) is logged and the next user still runs, and the whole pass is guarded so a transient error never stops the job. `every=` and `daily=` persist their last run in `system_marks`, so a restart waits out the remainder of an interval and never repeats a daily pass on the same day. Each pass writes a heartbeat (`scheduler.last_run("my_addon", "refresh")`). Tests run a pass with `await scheduler.run_once(registry.job("my_addon.refresh"))`.
 
 ```python
 @addon.service
@@ -141,23 +141,29 @@ async def act(user, ref: str, action: str, args: dict, now) -> dict:
 ## Briefing and weekly review
 
 ```python
-@addon.briefing
-def section(user: User, ctx: BriefingContext) -> Section | None:   # ctx.kind: BRIEFING or WEEKLY_REVIEW
-    return Section(key="my", data=summary, points=["2 things due"], counts={"due": 2})
+@addon.briefing("my", counts=("my_due",))
+def morning(user: User, ctx: BriefingContext) -> Section | None:
+    return Section(data=summary, points=["2 things due"], counts={"my_due": 2})
+
+@addon.review("my")
+def weekly(user: User, ctx: BriefingContext) -> Section | None:
+    return Section(data=summary, items=[{"ref": "1", "type": "my_item", "title": "…", "why": "…", "facts": {}}])
 
 @addon.review_action("my_item", ("complete", "keep"))
 async def apply(user, item: dict, action: str, decision: dict, today) -> str:
     return "Completed"
 ```
 
-A weekly-review section lists its decisions in `Section(items=[{"ref", "type", "title", "why", "facts"}])`.
+Section keys and briefing `counts` keys are unique across addons (a second addon declaring the same key fails to load; core keys like `events` and `date` are reserved).
 
 ## Search, self-checks, context chats
 
 ```python
+from core.addons import helpers
+
 @addon.search
 def find(user: User, query: str, limit: int) -> list[Hit]:
-    return [Hit("my", r["id"], r["title"], score=search.match_score(r["title"], query)) for r in rows]
+    return [Hit("my", r["id"], r["title"], score=helpers.match_score(r["title"], query)) for r in rows]
 
 @addon.selfcheck("my_sync", "My sync", after="calendar")      # server=True: a check of the server
 def check(user: User | None, now) -> Check:
@@ -172,6 +178,12 @@ def card(user: User, ref_id: str) -> dict:                       # LookupError: 
     return {"kind": "my", "id": ref_id, "title": store.get(user, ref_id)["title"]}
 ```
 
+## Helpers
+
+`core.addons.helpers` gives plain functions addons share without importing core composers:
+- Times: `parse_time`, `ago`, `when_phrase`, `fmt_date`, `age_days`, `next_weekday`, `valid_future_date`.
+- Search: `like_escape`, `like_pattern`, `search_terms`, `match_score`.
+
 ## Data
 
 ```python
@@ -180,7 +192,7 @@ VERSION, NAME = 1, "baseline"
 def up(conn): conn.execute("CREATE TABLE my_items (id TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, title TEXT NOT NULL)")
 ```
 
-Numbered 1, 2, 3… per addon, found by file name, applied at start (after a snapshot) and recorded in `schema_migrations (addon, version, name, applied_at)`. `up` runs inside the runner's transaction: never commit. A change is the next file; never edit a shipped one. An addon touches only its own tables (it may reference core's) and every query filters by the user. Never `CREATE TABLE` outside a migration.
+Numbered 1, 2, 3… per addon, found by file name, applied at start in `needs` order (after a snapshot) and recorded in `schema_migrations (addon, version, name, applied_at)`. Non-official addons' migrations run in their own transaction and a failure unloads only that addon. `up` runs inside the runner's transaction: never commit. A change is the next file; never edit a shipped one. An addon touches only its own tables (it may reference core's, or another addon's only when `needs` declares it) and every query filters by the user. Never `CREATE TABLE` outside a migration.
 
 ## Routes
 
@@ -197,7 +209,7 @@ def setup(app: web.Application) -> None:      # api.py; behind the same auth as 
 
 ## Rules that save time
 
-- Import core composers as modules (`from core import now as now_screen`) and use their attributes inside functions: a composer may still be importing when your addon loads. Never import another addon to react to it: use its events.
+- Use `core.addons.helpers` for shared time and search helpers instead of importing core composers (which may pull in other modules at load time). Never import another addon to react to it: use its events.
 - Composer hooks are plain functions (run in a worker thread); jobs, services, handlers, channels and the action hooks are `async`.
 - Background work takes a `User`; user-facing times come from `core.clock.now()`.
 

@@ -9,10 +9,13 @@ check runs again at execution, whoever asks: a tool the user does not have is
 refused exactly like a tool that does not exist.
 
 Hooks (:func:`jobs`, :func:`services`, :func:`handlers`, :func:`channels`,
-:func:`hooks`, :func:`hook_for`) come in the fixed addon order; those asked
-for a user only from the addons that user has, the others never from an
-addon disabled on the server (core/addons/state.py; the scheduler checks
-jobs and services itself).
+:func:`hooks`, :func:`hook_for`) come in the fixed addon order. Those asked
+for a user come only from the addons the user has *active*
+(:func:`active_addons`: connected, enabled on the server, and every addon in
+the addon's own ``needs`` connected too); those asked without a user (``None``:
+the server's own view, e.g. its self-checks) from every addon enabled on the
+server. Composers look hooks up only through :func:`hooks` and
+:func:`hook_for`. The scheduler checks jobs and services itself.
 """
 
 import inspect
@@ -21,7 +24,7 @@ from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Tuple
 
 from core.users import User
 from core.addons import state, store
-from core.addons.addon import Tool, all_tools, find_tool, get_addon, all_addons, version
+from core.addons.addon import Addon, Tool, all_tools, find_tool, get_addon, all_addons, version
 from core.addons.hooks import Channel, Handler, Hook, Job, Service
 from core.addons.schema import flatten_for_realtime
 
@@ -248,30 +251,57 @@ def services() -> List[Service]:
     return [s for a in all_addons() for s in a.services]
 
 
+def active_addons(user: User) -> Tuple[str, ...]:
+    """The addons ``user`` has that are active for them: connected (or
+    ``everyone``), enabled on the server, and with every addon of their
+    ``needs`` connected too; in the fixed addon order."""
+    connected = store.connected_addons(user)
+    have = set(connected)
+    return tuple(n for n in connected if set(get_addon(n).needs) <= have)
+
+
 def handlers(event: str, user: User) -> List[Handler]:
-    """The ``@addon.on(event)`` handlers of the addons ``user`` has."""
-    connected = set(store.connected_addons(user))
-    return [h for a in all_addons() if a.name in connected for h in a.handlers if h.event == event]
+    """The ``@addon.on(event)`` handlers of the addons active for ``user``."""
+    active = set(active_addons(user))
+    return [h for a in all_addons() if a.name in active for h in a.handlers if h.event == event]
 
 
 def channels(user: User) -> List[Channel]:
-    """The ``@addon.channel`` channels of the addons ``user`` has."""
-    connected = set(store.connected_addons(user))
-    return [c for a in all_addons() if a.name in connected for c in a.channels]
+    """The ``@addon.channel`` channels of the addons active for ``user``."""
+    active = set(active_addons(user))
+    return [c for a in all_addons() if a.name in active for c in a.channels]
 
 
-def hooks(kind: str, user: Optional[User] = None) -> List[Hook]:
-    """Every composer hook of ``kind`` (``now_cards``, ``briefing``…): of the
-    addons ``user`` has, or of every addon enabled on the server without a user."""
+def _scope(user: Optional[User]) -> List[Addon]:
+    """The addons whose hooks ``user`` gets (None: every addon enabled on the server)."""
+    if user is None:
+        off = state.disabled()
+        return [a for a in all_addons() if a.name not in off]
+    active = set(active_addons(user))
+    return [a for a in all_addons() if a.name in active]
+
+
+def hooks(kind: str, user: Optional[User]) -> List[Hook]:
+    """Every composer hook of ``kind`` (``now_cards``, ``briefing``…) of the
+    addons active for ``user``, in addon order; ``user`` None: of every addon
+    enabled on the server."""
+    return [h for a in _scope(user) for h in a.hooks if h.kind == kind]
+
+
+def hook_for(kind: str, key: str, user: Optional[User]) -> Optional[Hook]:
+    """The hook of ``kind`` declared for ``key`` (a card prefix, a section or
+    check key, an item type, a context kind) when it is ``user``'s (``user``
+    None: of any addon enabled on the server); None when no enabled addon
+    declares it.
+
+    Raises:
+        NotConnected: an enabled addon declares it, but it is not active for ``user``.
+    """
     off = state.disabled()
-    connected = set(store.connected_addons(user)) if user is not None else None
-    return [h for a in all_addons() if (a.name in connected if connected is not None else a.name not in off)
-            for h in a.hooks if h.kind == kind]
-
-
-def hook_for(kind: str, key: str) -> Optional[Hook]:
-    """The hook of ``kind`` declared for ``key`` (a card prefix, a context kind,
-    a check key), or None (also when its addon is disabled on the server)."""
-    off = state.disabled()
-    return next((h for a in all_addons() if a.name not in off for h in a.hooks if h.kind == kind and h.key == key),
-                None)
+    owner = next((h for a in all_addons() if a.name not in off for h in a.hooks if h.kind == kind and h.key == key),
+                 None)
+    if owner is None or user is None:
+        return owner
+    if owner.addon not in active_addons(user):
+        raise store.NotConnected(user, owner.addon)
+    return owner

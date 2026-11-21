@@ -283,7 +283,7 @@ async def test_disable(c: TestClient) -> None:
     check("before: tool, prompt part, hooks, job, channel for the users who have mk",
           registry.has_tool(ADMIN, "mk_ping") and any("mk_ping" in p for p in registry.prompt_parts(ADMIN, "guides"))
           and [h.addon for h in registry.hooks("now_cards", ADMIN)].count("mk") == 1
-          and registry.hook_for("now_action", "mk") is not None
+          and registry.hook_for("now_action", "mk", None) is not None
           and any(ch.addon == "mk" for ch in registry.channels(ADMIN)))
     out = await scheduler.run_once(registry.job("mk.tick"))
     check("before: the job runs for both users", out == {ADMIN.id: ADMIN.name, BOB.id: "Bob"}, out)
@@ -311,8 +311,8 @@ async def test_disable(c: TestClient) -> None:
     check("disabled: no prompt part", not any("mk_ping" in p for p in registry.prompt_parts(ADMIN, "guides")))
     check("disabled: no composer hooks (for a user, without one, by key)",
           not [h for h in registry.hooks("now_cards", ADMIN) if h.addon == "mk"]
-          and not [h for h in registry.hooks("now_cards") if h.addon == "mk"]
-          and registry.hook_for("now_action", "mk") is None)
+          and not [h for h in registry.hooks("now_cards", None) if h.addon == "mk"]
+          and registry.hook_for("now_action", "mk", None) is None)
     check("disabled: no notify channel", not any(ch.addon == "mk" for ch in registry.channels(ADMIN)))
     check("disabled: not connected for anyone (and mkplus, which needs it, neither)",
           "mk" not in store.connected_addons(ADMIN) and "mkplus" not in store.connected_addons(ADMIN)

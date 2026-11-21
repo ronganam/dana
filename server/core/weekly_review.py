@@ -39,7 +39,7 @@ from core.users import User
 from addons.calendar import config as calendar_config, events as calendar_events
 from addons.money import config as money_config, queries as money_queries, savings as money_savings
 from core.addons import registry, store
-from core.addons.hooks import WEEKLY_REVIEW
+from core.addons.helpers import age_days, next_weekday, valid_future_date
 from addons.people import cadence as people_cadence
 from addons.people.values import ADDON as PEOPLE
 from addons.phone import push as phone_push, suggestions as phone_suggestions
@@ -67,14 +67,14 @@ _locks: Dict[str, asyncio.Lock] = {}
 
 def _review_addons() -> List[str]:
     """The addons a review is about: those with an ``@addon.review_action`` (the tasks addon), in addon order."""
-    return list(dict.fromkeys(h.addon for h in registry.hooks("review_action")))
+    return list(dict.fromkeys(h.addon for h in registry.hooks("review_action", None)))
 
 
 def actions_for(item_type: str) -> tuple:
-    """What may be proposed for an item of ``item_type`` (() for an unknown type)."""
+    """What may be proposed for an item of ``item_type`` (() for an unknown type; core's types first)."""
     if item_type in ACTIONS:
         return ACTIONS[item_type]
-    hook = registry.hook_for("review_action", item_type)
+    hook = registry.hook_for("review_action", item_type, None)
     return tuple(hook.option("actions", ())) if hook else ()
 
 
@@ -124,25 +124,12 @@ def _loads(raw, default):
 # Finding what needs a decision
 # ---------------------------------------------------------------------------
 
-def _age_days(ts: Optional[str], now: datetime.datetime) -> Optional[int]:
-    if not ts:
-        return None
-    try:
-        dt = datetime.datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if dt.tzinfo is None:  # CURRENT_TIMESTAMP columns are UTC
-        dt = dt.replace(tzinfo=datetime.timezone.utc)
-    return (now - dt).days
-
-
 def candidates(user: User, now: Optional[datetime.datetime] = None) -> Dict[str, Any]:
     """What needs a decision among ``user``'s own items: each addon's section
-    (``@addon.briefing`` for the weekly review: the tasks addon's overdue,
-    snoozed-often and stale tasks, the week's numbers and the groups), old
-    suggestions and people."""
+    (``@addon.review``: the tasks addon's overdue, snoozed-often and stale
+    tasks, the week's numbers and the groups), old suggestions and people."""
     now = now or clock.now()
-    parts = briefing.sections(user, WEEKLY_REVIEW, now)
+    parts = list(briefing.collect("review", user, now).values())
     items: List[Dict[str, Any]] = [i for p in parts for i in p.items]
     data: Dict[str, Any] = {}
     for p in parts:
@@ -156,7 +143,7 @@ def candidates(user: User, now: Optional[datetime.datetime] = None) -> Dict[str,
             "ORDER BY s.created_at", vis_args).fetchall() if store.is_connected(user, PHONE) else []
 
     for s in suggestions:
-        age = _age_days(s["created_at"], now)
+        age = age_days(s["created_at"], now)
         if age is not None and age >= SUGGESTION_DAYS:
             p = _loads(s["payload"], {})
             items.append({"ref": s["id"], "type": "suggestion", "title": p.get("title") or "Suggestion",
@@ -226,10 +213,6 @@ async def next_week(user: User, now: Optional[datetime.datetime] = None) -> Opti
 # Proposals
 # ---------------------------------------------------------------------------
 
-def next_weekday(base: datetime.date, weekday: int) -> datetime.date:
-    return base + datetime.timedelta(days=(weekday - base.weekday()) % 7 or 7)
-
-
 def default_action(item: Dict[str, Any], today: datetime.date) -> Dict[str, Any]:
     """The no-model proposal: reschedule overdue to Sunday, keep the rest unticked."""
     if item["why"] == "overdue" and "reschedule" in actions_for(item["type"]):
@@ -278,14 +261,6 @@ _SCHEMA = {"type": "object", "properties": {
         "ref": {"type": "string"}, "action": {"type": "string"}, "due_date": {"type": "string"},
         "group": {"type": "string"}, "reason": {"type": "string"}}, "required": ["ref", "action"]}}},
     "required": ["headline", "summary", "items"]}
-
-
-def valid_future_date(v: Any, today: datetime.date) -> Optional[str]:
-    try:
-        d = datetime.date.fromisoformat(str(v or "")[:10])
-        return d.isoformat() if d > today else None
-    except ValueError:
-        return None
 
 
 def merge_proposals(c: Dict[str, Any], raw: Optional[Dict[str, Any]], today: datetime.date) -> List[Dict[str, Any]]:
@@ -452,8 +427,10 @@ async def apply(user: User, rid: str, decisions: Optional[List[Dict[str, Any]]] 
 
 async def _apply_one(item, action, d, today, user: User) -> str:
     ref = item["ref"]
-    hook = registry.hook_for("review_action", item["type"])
-    if hook is not None:
+    if item["type"] not in ACTIONS:
+        hook = registry.hook_for("review_action", item["type"], user)  # NotConnected: no longer theirs
+        if hook is None:
+            raise LookupError(f"no addon acts on '{item['type']}' items")
         return str(await hook.func(user, item, action, d, today))
     if item["type"] == "suggestion":
         if action == "accept":

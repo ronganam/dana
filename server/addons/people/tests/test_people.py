@@ -56,7 +56,7 @@ from addons.phone import push as phone_push
 from addons.people import api as people_api, briefs as people_briefs, cadence, detail, linking, merge
 from addons.people import store as people_store, values as people_values
 from core.db import get_db_connection
-from core.addons import registry
+from core.addons import helpers, registry
 
 results = []
 
@@ -257,8 +257,8 @@ async def main():
     check("phone: short codes aren't numbers", people_values.norm_phone("*6060") == "")
     check("name: emoji and case dropped", people_values.norm_name("גל כהן 🚀❤️🔥") == "גל כהן"
           and people_values.norm_name("  Yossi  COHEN!") == "yossi cohen")
-    check("ago: wording", people_values.ago(NOW - datetime.timedelta(days=12)) == "12 days ago"
-          and people_values.ago(NOW - datetime.timedelta(days=1, hours=1)).startswith(("yesterday", "1 days")) is not None)
+    check("ago: wording", helpers.ago(NOW - datetime.timedelta(days=12)) == "12 days ago"
+          and helpers.ago(NOW - datetime.timedelta(days=1, hours=1)).startswith(("yesterday", "1 days")) is not None)
 
     # --- linking ------------------------------------------------------------------
     # Gal: calls every ~3 days for a month, then 40 days of silence → drifting.

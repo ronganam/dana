@@ -119,10 +119,14 @@ types, the budget column) are sheets too.
   is skipped. The URL is always passed after `--`.
 - **Tasks with a project** (`tasks.project_id`, legacy; and task links of
   `ref_type` `project`) stay governed by their own list: a project shows only
-  the tasks the user can see through `tasks` (`project_tasks`, `task_count`);
-  a project never grants access to a task, nor a task to a project. Deleting a
-  project deletes the owner's tasks that carry it; another user's task only
-  loses the project.
+  the tasks the user can see through `tasks` (`project_tasks`, `task_count`,
+  both asked of the tasks addon's service: `project_tasks`,
+  `project_task_counts`, `project_in_use`); a project never grants access to a
+  task, nor a task to a project. The column has no foreign key (the projects
+  table is this addon's, the tasks table the tasks addon's): deleting a project
+  emits `knowledge.project.deleted` (`project_id`) for its owner, and the tasks
+  addon then deletes the owner's tasks that carry it and clears it from
+  everyone else's (`service.forget_project`, run in the background).
 - **Composers.** The call analysis context lists the current user's active
   projects (`projects.active_projects`); approval cards name a project / entry
   only when the current user can see it.

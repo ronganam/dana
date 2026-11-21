@@ -60,8 +60,11 @@ def default_group_id(user: User) -> str:
 def ensure_default_groups(user: User) -> None:
     """Give ``user`` any default list they lack (by id; a name they already
     use is left alone). Run when ``tasks`` is connected for them and at every
-    start, so a deleted default list comes back on restart."""
+    start, so a deleted default list comes back on restart. Who owns the bare
+    ids is read and the lists written in one write transaction, so two of
+    these at once (two users connecting) never both take the bare ids."""
     with get_db_connection() as conn:
+        conn.execute("BEGIN IMMEDIATE")
         prefix = _id_prefix(conn, user)
         for g in DEFAULT_GROUPS:
             conn.execute(

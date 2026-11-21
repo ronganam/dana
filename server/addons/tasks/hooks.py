@@ -5,6 +5,9 @@ docs/now.md; the hooks: docs/writing-an-addon.md):
   triggers fire; at start every user gets the default lists they lack;
 - events: ``homeassistant.location.changed`` / ``homeassistant.car.changed``
   fire location / car triggers, ``core.user.woke`` the wake ones;
+  ``knowledge.project.deleted`` deletes the owner's tasks that carried the
+  project and clears it from everyone else's (``tasks.project_id`` has no
+  foreign key: the projects table is the knowledge addon's);
 - the Now screen: a card per reminder that fired and nobody handled
   (``task:<id>``: done / snooze / schedule / dismiss), reminders in the day
   strip (at their hour, "At home", "On waking");
@@ -27,10 +30,9 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
-from core import cards, checks, notify, now as now_screen, search as search_box, undo, weekly_review
+from core import cards, notify, now as now_screen, undo
 from core.addons import BriefingContext, Card, Check, ContextRequest, DayItem, Hit, NowContext, Section
-from core.addons import scheduler
-from core.addons.hooks import BRIEFING, WEEKLY_REVIEW
+from core.addons import helpers, scheduler
 from core.db import get_db_connection
 from core.users import User
 from addons.tasks import groups, links, service, triggers
@@ -78,6 +80,12 @@ async def on_wake(user: User, data: Dict[str, Any]) -> None:
     await triggers.fire(user, "wake")
 
 
+@addon.on("knowledge.project.deleted")
+async def on_project_deleted(user: User, data: Dict[str, Any]) -> None:
+    """The project's owner deleted it: their tasks that carry it go, others' lose the link."""
+    service.forget_project(user, str(data.get("project_id") or ""))
+
+
 # --- Now: reminders that fired --------------------------------------------------------
 
 _FIRED_PHRASE = {"time": "due", "location_arrive": "arrived", "location_leave": "left",
@@ -98,7 +106,7 @@ def due_reminders(user: User, now: datetime.datetime, hidden: Dict[str, Any]) ->
         fired = None
         if t["id"] in fires:
             at, ttype = fires[t["id"]]
-            updated = checks.parse(t.get("updated_at"))
+            updated = helpers.parse_time(t.get("updated_at"))
             fresh = (now - at).total_seconds() <= REMINDER_MAX_HOURS * 3600
             if fresh and (not updated or updated <= at + datetime.timedelta(seconds=FIRE_TOLERANCE_SECONDS)):
                 fired = (at, ttype)
@@ -110,7 +118,7 @@ def due_reminders(user: User, now: datetime.datetime, hidden: Dict[str, Any]) ->
         if not fired:
             continue
         h = hidden.get(f"task:{t['id']}")
-        if h and (checks.parse(h["created_at"]) or cards.FAR) >= fired[0]:
+        if h and (helpers.parse_time(h["created_at"]) or cards.FAR) >= fired[0]:
             continue  # dismissed / snoozed in Now after this firing
         out.append({**t, "_fired_at": fired[0], "_fired": fired[1], "_triggers": trig if isinstance(trig, dict) else {}})
     out.sort(key=lambda t: t["_fired_at"], reverse=True)
@@ -119,7 +127,7 @@ def due_reminders(user: User, now: datetime.datetime, hidden: Dict[str, Any]) ->
 
 def _task_facts(t: Dict[str, Any], task_links: List[Dict[str, Any]], now: datetime.datetime) -> List[str]:
     facts = []
-    created = checks.parse(t.get("created_at"))
+    created = helpers.parse_time(t.get("created_at"))
     origin = ""
     for l in task_links:
         if l["ref_type"] == "call" and l.get("contact"):
@@ -137,10 +145,10 @@ def _task_facts(t: Dict[str, Any], task_links: List[Dict[str, Any]], now: dateti
     if n:
         facts.append(f"Moved {n} time{'s' if n != 1 else ''}")
     if t.get("due_date"):
-        facts.append(f"Due {now_screen.fmt_date(t['due_date'])}")
+        facts.append(f"Due {helpers.fmt_date(t['due_date'])}")
     fired = t.get("_fired_at")
     if fired:
-        facts.append(f"Reminded {now_screen.ago(fired, now)}")
+        facts.append(f"Reminded {helpers.ago(fired, now)}")
     return facts
 
 
@@ -159,7 +167,7 @@ def reminder_cards(user: User, ctx: NowContext) -> List[Card]:
         elif (t.get("priority") or "") == "high":
             why = "Marked important."
         elif t.get("due_date"):
-            why = f"Due {now_screen.fmt_date(t['due_date'])}."
+            why = f"Due {helpers.fmt_date(t['due_date'])}."
         else:
             why = "Its reminder went off."
         blocks: List[Dict[str, Any]] = [{"type": "facts", "label": "History",
@@ -171,7 +179,7 @@ def reminder_cards(user: User, ctx: NowContext) -> List[Card]:
         out.append(Card(
             id=f"task:{t['id']}", kind="reminder",
             source=f"Reminder · {fired_phrase} " + ("now" if (now - t["_fired_at"]).total_seconds() < 300
-                                                    else now_screen.ago(t["_fired_at"], now)),
+                                                    else helpers.ago(t["_fired_at"], now)),
             title=cards.clip(t["title"], 160), why=why,
             primary=cards.action("done", "Done"),
             secondary=now_screen.snooze_options(user, now) + [cards.action("dismiss", "Dismiss")],
@@ -316,20 +324,8 @@ def _briefing(user: User, today: str) -> Section:
         points.append("Due today: " + ", ".join(x["title"] for x in today_due[:3]))
     if overdue:
         points.append(f"{len(overdue)} overdue: " + ", ".join(x["title"] for x in overdue[:2]))
-    return Section("tasks", data, points=points, headline=f", {len(today_due)} due" if today_due else "",
+    return Section(data, points=points, headline=f", {len(today_due)} due" if today_due else "",
                    counts={"due": len(today_due)})
-
-
-def _age_days(ts: Optional[str], now: datetime.datetime) -> Optional[int]:
-    if not ts:
-        return None
-    try:
-        dt = datetime.datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
-    except ValueError:
-        return None
-    if dt.tzinfo is None:  # CURRENT_TIMESTAMP columns are UTC
-        dt = dt.replace(tzinfo=datetime.timezone.utc)
-    return (now - dt).days
 
 
 def _future_time_trigger(trig: Dict[str, Any], now: datetime.datetime) -> bool:
@@ -375,23 +371,26 @@ def _review(user: User, now: datetime.datetime) -> Section:
         if (t.get("snooze_count") or 0) >= SNOOZE_MIN:
             item(t, "snoozed_often", [f"snoozed {t['snooze_count']}×"])
     for t in sorted(tasks, key=lambda t: t["updated_at"] or ""):
-        age = _age_days(t["updated_at"], now)
+        age = helpers.age_days(t["updated_at"], now)
         trig = cards.loads(t["triggers"], {})
         trig = trig if isinstance(trig, dict) else {}
         if age is not None and age >= STALE_DAYS and not _future_time_trigger(trig, now):
             waiting = [k for k in ("location", "car", "wake") if trig.get(k)]
             item(t, "stale", [f"untouched {age} days", f"waits for a {'/'.join(waiting)} trigger" if waiting else ""])
     stats = {"done": len(done), "done_titles": [d["title"] for d in done[:8]], "created": created, "open": len(tasks)}
-    return Section("tasks", {"stats": stats, "groups": sorted(set(names.values()))}, items=items)
+    return Section({"stats": stats, "groups": sorted(set(names.values()))}, items=items)
 
 
-@addon.briefing
-def tasks_section(user: User, ctx: BriefingContext) -> Optional[Section]:
-    if ctx.kind == BRIEFING:
-        return _briefing(user, ctx.today)
-    if ctx.kind == WEEKLY_REVIEW:
-        return _review(user, ctx.now)
-    return None
+@addon.briefing("tasks", counts=("due",))
+def briefing_section(user: User, ctx: BriefingContext) -> Section:
+    """Due or overdue tasks, high priority ones, today's reminders."""
+    return _briefing(user, ctx.today)
+
+
+@addon.review("tasks")
+def review_section(user: User, ctx: BriefingContext) -> Section:
+    """Overdue, snoozed-often and stale tasks to decide on; the week's numbers and the groups."""
+    return _review(user, ctx.now)
 
 
 @addon.review_action("task", ("complete", "reschedule", "delete", "move_group", "keep"))
@@ -407,8 +406,8 @@ async def apply_review_item(user: User, item: Dict[str, Any], action: str, decis
     elif action == "delete":
         service.delete_task(user, ref)
     elif action == "reschedule":
-        due = weekly_review.valid_future_date(decision.get("due_date"), today) \
-            or weekly_review.next_weekday(today, 6).isoformat()
+        due = helpers.valid_future_date(decision.get("due_date"), today) \
+            or helpers.next_weekday(today, 6).isoformat()
         service.save_task(user, ref, {"due_date": due, "snooze_count": 0})
         return f"due {due}"
     elif action == "move_group":
@@ -427,7 +426,7 @@ async def apply_review_item(user: User, item: Dict[str, Any], action: str, decis
 @addon.search
 def search_reminders(user: User, q: str, limit: int) -> List[Hit]:
     """``user``'s open tasks (own and on lists shared with them) whose title or note matches."""
-    like = search_box.like_pattern(q)
+    like = helpers.like_pattern(q)
     where, args = service.visible_sql(user, "")
     with get_db_connection() as conn:
         rows = conn.execute(
@@ -441,7 +440,7 @@ def search_reminders(user: User, q: str, limit: int) -> List[Hit]:
         sub = now_screen.trigger_phrase(trig) if isinstance(trig, dict) else ""
         sub = (sub[:1].upper() + sub[1:]) if sub else (f"Due {r['due_date'][:10]}" if r["due_date"] else "No reminder set")
         title_hit = q.casefold() in (r["title"] or "").casefold()
-        out.append(Hit("reminder", r["id"], r["title"], sub, score=search_box.match_score(r["title"], q) if title_hit else 0.6))
+        out.append(Hit("reminder", r["id"], r["title"], sub, score=helpers.match_score(r["title"], q) if title_hit else 0.6))
     return sorted(out, key=lambda h: -h.score)[:limit]
 
 
@@ -451,7 +450,7 @@ def search_reminders(user: User, q: str, limit: int) -> List[Hit]:
 def reminder_checks(user: Optional[User], now: datetime.datetime) -> Check:
     """The time-trigger job is alive (its last pass, ``scheduler.last_run``)."""
     last_utc = scheduler.last_run(addon.name, check_time_triggers.__name__)
-    last = checks.parse(last_utc.isoformat()) if last_utc else None
+    last = helpers.parse_time(last_utc.isoformat()) if last_utc else None
     why = "Time reminders won't fire until the server restarts."
     if not last:
         if time.monotonic() - _STARTED < TIME_CHECKER_MINUTES * 60:
@@ -459,8 +458,8 @@ def reminder_checks(user: Optional[User], now: datetime.datetime) -> Check:
         return Check(False, "never ran", title="Reminder checks aren't running", why=why)
     quiet = (now - last).total_seconds()
     if quiet > TIME_CHECKER_MINUTES * 60:
-        return Check(False, f"stopped {checks.ago(last, now)}", last, title="Reminder checks stopped", why=why)
-    return Check(True, f"last {checks.ago(last, now)}", last)
+        return Check(False, f"stopped {helpers.ago(last, now)}", last, title="Reminder checks stopped", why=why)
+    return Check(True, f"last {helpers.ago(last, now)}", last)
 
 
 # --- Context chats --------------------------------------------------------------------------

@@ -17,12 +17,15 @@ grants access to a task, nor a task to a project).
 
 Payloads never carry the owner column; a project seen through a share carries
 ``shared_by`` / ``access``.
+
+Events (core/events.py): ``knowledge.project.deleted`` (``project_id``) for
+the owner who deleted a project; the tasks addon clears the project from tasks.
 """
 
 import uuid
 from typing import Any, Dict, List, Optional, Set, Tuple
 
-from core import user_locale, users
+from core import events, user_locale, users
 from core.db import get_db_connection
 from core.users import User
 from core.addons import sharing, store
@@ -156,24 +159,25 @@ def list_projects(user: User, status: Optional[str] = None) -> List[Dict[str, An
     with their entry count and the count of tasks with that project that
     ``user`` can see (the ``GET /api/projects`` payload)."""
     where, args = visible_sql(user)
-    task_where, task_args = tasks_service.visible_sql(user)
     if status:
         where += " AND p.status = ?"
         args = [*args, status]
     levels = shared_projects(user)
     with get_db_connection() as conn:
-        rows = conn.execute(
+        found = conn.execute(
             f"""
             SELECT p.*,
                    (SELECT COUNT(*) FROM entries e WHERE e.project_id = p.id) AS entry_count,
-                   (SELECT COUNT(*) FROM tasks t WHERE t.project_id = p.id AND {task_where}) AS task_count
+                   0 AS task_count
             FROM projects p
             WHERE {where}
             ORDER BY p.created_at DESC
             """,
-            (*task_args, *args),
+            args,
         ).fetchall()
-        stats = _stats(conn, [r["id"] for r in rows])
+        stats = _stats(conn, [r["id"] for r in found])
+    counts = tasks_service.project_task_counts(user, [r["id"] for r in found])
+    rows = [{**dict(r), "task_count": counts.get(r["id"], 0)} for r in found]
     return [with_share({**_payload(r), **stats.get(r["id"], _EMPTY_STATS)},
                        *share_note(user, r["user_id"], levels.get(r["id"]))) for r in rows]
 
@@ -242,11 +246,7 @@ def project_tasks(user: User, project_id: str) -> List[Dict[str, Any]]:
     """Tasks with ``project_id`` that ``user`` can see through ``tasks``, open
     first, newest first (API shape: no owner columns, ``shared_by`` /
     ``access`` for tasks of a shared list)."""
-    where, args = tasks_service.visible_sql(user, "")
-    with get_db_connection() as conn:
-        rows = conn.execute(f"SELECT * FROM tasks WHERE project_id = ? AND {where} "
-                            "ORDER BY status ASC, created_at DESC", (project_id, *args)).fetchall()
-    return [tasks_service.public_task(user, dict(r)) for r in rows]
+    return tasks_service.project_tasks(user, project_id)
 
 
 def search_titles(user: Optional[User], like: str, limit: int = 10) -> List[Dict[str, Any]]:
@@ -335,9 +335,10 @@ def update_project(user: User, project_id: str, *, title: Optional[str] = None, 
 
 
 def delete_project(user: User, project_id: str) -> bool:
-    """Delete a project ``user`` owns along with its entries and the owner's
-    tasks that carry it (another user's task only loses the project), and
-    end its shares. Returns False when they cannot see it.
+    """Delete a project ``user`` owns along with its entries, end its shares
+    and emit ``knowledge.project.deleted`` (``project_id``): the tasks addon
+    then deletes the owner's tasks that carry it and clears it from everyone
+    else's. Returns False when they cannot see it.
 
     Raises:
         sharing.NotOwner: it is shared with them, not theirs.
@@ -349,13 +350,12 @@ def delete_project(user: User, project_id: str) -> bool:
         # scoped: the user owns the project (_owned, above): its entries go with it
         files.forget_entries(conn, [r["id"] for r in conn.execute("SELECT id FROM entries WHERE project_id = ?",
                                                                    (project_id,))])
-        conn.execute("DELETE FROM tasks WHERE project_id = ? AND user_id = ?", (project_id, user.id))
-        # scoped: the user owns the project (_owned, above): others' tasks only lose the link
-        conn.execute("UPDATE tasks SET project_id = NULL WHERE project_id = ?", (project_id,))
         # scoped: the user owns the project (_owned, above): its entries go with it
         conn.execute("DELETE FROM entries WHERE project_id = ?", (project_id,))
         # scoped: the user owns the project (_owned, above)
         rows = conn.execute("DELETE FROM projects WHERE id = ?", (project_id,)).rowcount
         conn.commit()
     sharing.forget(ITEM_TYPE, project_id)
+    if rows > 0:
+        events.emit("knowledge.project.deleted", user, project_id=project_id)
     return rows > 0

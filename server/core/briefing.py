@@ -31,7 +31,7 @@ import logging
 import os
 import re
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, FrozenSet, List, Optional
 
 from core import clock, composers, llm, user_profile, users
 from core.db import get_db_connection
@@ -39,7 +39,6 @@ from core.notify import notify
 from core.users import User
 from addons.calendar import config as calendar_config, events as calendar_events
 from core.addons import BriefingContext, Section, registry, store
-from core.addons.hooks import BRIEFING
 from addons.homeassistant import client as ha_client, config as ha_config
 from addons.people import cadence as people_cadence, detail as people_detail, store as people_store
 from addons.people.values import ADDON as PEOPLE
@@ -149,21 +148,42 @@ async def _events_today(user: User) -> Optional[List[Dict[str, Any]]]:
     return out
 
 
-def sections(user: User, kind: str, now: datetime.datetime) -> List[Section]:
-    """The parts of ``user``'s briefing (``kind`` :data:`BRIEFING`) or weekly review
-    (:data:`WEEKLY_REVIEW`) from every ``@addon.briefing`` of an addon they have
-    (one failing is logged and left out)."""
-    out: List[Section] = []
-    ctx = BriefingContext(kind=kind, now=now)
-    for hook in registry.hooks("briefing", user):
+# The keys of the briefing's own data: an addon section under one of these is left out.
+CORE_KEYS = frozenset({"date", "weekday", "events", "calendar_ok", "suggestions", "inbox", "weather", "people",
+                       SECTIONS})
+
+
+def collect(kind: str, user: User, now: datetime.datetime,
+            reserved: FrozenSet[str] = frozenset()) -> Dict[str, Section]:
+    """Section key → section of every ``@addon.<kind>`` hook (``briefing`` or
+    ``review``) of the addons active for ``user``, in addon order; one that
+    fails or returns None is left out (logged), so is one under a ``reserved``
+    key. A briefing section keeps only the ``counts`` its decorator declares."""
+    out: Dict[str, Section] = {}
+    ctx = BriefingContext(now=now)
+    for hook in registry.hooks(kind, user):
+        if hook.key in reserved:
+            logger.warning(f"The {kind} section {hook.key!r} of {hook.addon} is one of core's keys; left out")
+            continue
         try:
             section = hook.func(user, ctx)
         except Exception as e:
-            logger.warning(f"Briefing section of {hook.addon} failed for user {user.id}: {e}", exc_info=True)
+            logger.warning(f"The {kind} section of {hook.addon} failed for user {user.id}: {e}", exc_info=True)
             continue
-        if section is not None:
-            out.append(section)
+        if section is None:
+            continue
+        declared = hook.option("counts", ())
+        extra = sorted(set(section.counts) - set(declared))
+        if extra:
+            logger.warning(f"The {kind} section of {hook.addon} gave undeclared counts {extra}; left out")
+            section.counts = {k: v for k, v in section.counts.items() if k in declared}
+        out[hook.key] = section
     return out
+
+
+def sections(user: User, now: datetime.datetime) -> Dict[str, Section]:
+    """The addons' parts of ``user``'s briefing (``@addon.briefing``), by section key."""
+    return collect("briefing", user, now, CORE_KEYS)
 
 
 def _suggestions(conn, user: User) -> Dict[str, Any]:
@@ -243,12 +263,12 @@ async def gather(user: User) -> Dict[str, Any]:
     now = clock.now()
     today = now.date().isoformat()
     events, weather_now = await asyncio.gather(_events_today(user), weather(user))
-    parts = await asyncio.to_thread(sections, user, BRIEFING, now)
+    parts = await asyncio.to_thread(sections, user, now)
     with get_db_connection() as conn:
         sugg = _suggestions(conn, user)
     return {"date": today, "weekday": now.strftime("%A"), "events": events or [],
-            "calendar_ok": events is not None, **{p.key: p.data for p in parts}, "suggestions": sugg,
-            "inbox": _inbox(user), "weather": weather_now, "people": _people(user), SECTIONS: parts}
+            "calendar_ok": events is not None, **{key: p.data for key, p in parts.items()}, "suggestions": sugg,
+            "inbox": _inbox(user), "weather": weather_now, "people": _people(user), SECTIONS: list(parts.values())}
 
 
 # ---------------------------------------------------------------------------
@@ -362,7 +382,7 @@ def push_payload(b: Dict[str, Any], counts: Optional[Dict[str, int]] = None) -> 
 def counts(user: User) -> Dict[str, int]:
     """The addons' counts for the briefing's push (their sections' ``counts``, now)."""
     out: Dict[str, int] = {}
-    for p in sections(user, BRIEFING, clock.now()):
+    for p in sections(user, clock.now()).values():
         for k, v in p.counts.items():
             out[k] = out.get(k, 0) + v
     return out

@@ -20,9 +20,10 @@ from core.db import get_db_connection
 from core.cards import loads
 from core.users import User
 from core.addons import registry, store
+from core.addons.helpers import ago, like_pattern, match_score, search_terms
 from addons.knowledge import entries as knowledge_entries, projects as knowledge_projects
 from addons.people import store as people_store
-from addons.people.values import ago, norm_name, norm_phone, parse_time
+from addons.people.values import norm_name, norm_phone, parse_time
 from addons.phone.config import ADDON as PHONE
 from addons.phone.notifications import store as notification_store
 from addons.shopping import items as shopping_items, lists as shopping_lists
@@ -31,34 +32,8 @@ from addons.shopping import items as shopping_items, lists as shopping_lists
 KIND_ORDER = ("person", "call", "note", "notification", "shopping")
 
 
-def _terms(q: str) -> List[str]:
-    return [t for t in re.findall(r"\w+", q or "", flags=re.UNICODE) if t][:8]
-
-
 def _fts(q: str) -> str:
-    return " ".join(f'"{t}"*' for t in _terms(q))
-
-
-def like_pattern(q: str) -> str:
-    return "%" + q.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-
-
-def match_score(title: str, q: str) -> float:
-    t, s = (title or "").casefold().strip(), q.casefold().strip()
-    if not s:
-        return 0.0
-    if t == s:
-        return 4.0
-    if t.startswith(s):
-        return 3.0
-    if any(w.startswith(s) for w in re.findall(r"\w+", t, flags=re.UNICODE)):
-        return 2.5
-    if s in t:
-        return 2.0
-    terms = _terms(s)
-    if terms and all(x in t for x in terms):
-        return 1.5
-    return 0.5
+    return " ".join(f'"{t}"*' for t in search_terms(q))
 
 
 def _local_ago(value: Any) -> str:

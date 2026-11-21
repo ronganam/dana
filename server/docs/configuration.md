@@ -2,6 +2,10 @@
 
 Local: `.env` (gitignored, from `.env.example`). Production: the same names as environment variables, from whatever secret store you use (a Kubernetes Secret, Infisical, Vault, …); the process reads them at start. Never print or commit secret values.
 
+## The .env file
+
+`main.py` and `bin/dana` load exactly one file, first thing, before any other module of Dana (several read their configuration at import) and before anything imports LiteLLM (`core/env_file.py`): `server/.env`, or the file `DANA_ENV_FILE` names (`DANA_ENV_FILE=""`: none; the tests set that, so a `bin/dana` they start never reads a real `.env`). A variable already set in the environment wins over the file. They also set `LITELLM_MODE=PRODUCTION` (whatever the file says): otherwise LiteLLM, when imported, loads any `.env` that python-dotenv finds walking up from LiteLLM's own install folder, so a virtual environment inside one checkout would read that checkout's `.env` even when another checkout or a test is running. Nothing else in Dana loads a `.env`.
+
 ## Models
 
 Every model is a LiteLLM id (`provider/model`: `anthropic/claude-haiku-5-5`, `gemini/gemini-3.1-flash-lite`, `openai/gpt-5-mini`…), so switching provider is an env change plus that provider's key. All calls go through `core/llm.py` (the web/app chat through the profile catalog in `core/models.py`). Unset → Claude: `anthropic/claude-sonnet-5-5` for `MODEL` and `SEARCH_MODEL`, `anthropic/claude-haiku-5-5` for the background jobs; `TRANSCRIBE_MODEL` → `gemini/gemini-3.1-flash-lite` (Claude takes no audio).

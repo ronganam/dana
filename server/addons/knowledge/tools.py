@@ -17,6 +17,7 @@ from addons.knowledge.entries import ENTRY_COLUMNS
 from addons.knowledge.addon import addon
 from addons.knowledge.projects import PROJECT_COLUMNS
 from addons.knowledge.sections import SECTION_COLUMNS
+from addons.tasks import service as tasks_service
 from addons.knowledge.values import (DECISIONS, KINDS, STATUSES, as_number, clean_str, loads_json,
                                            norm_section_kind)
 
@@ -35,9 +36,8 @@ def _record_project_created(user: User, project_id: str, title: str) -> None:
     def _undo():
         with get_db_connection() as conn:
             # scoped: undo of the project this user just created: anything saved into it since keeps it
-            busy = (conn.execute("SELECT 1 FROM entries WHERE project_id = ?", (project_id,)).fetchone()
-                    # scoped: undo of the project this user just created: anything saved into it since keeps it
-                    or conn.execute("SELECT 1 FROM tasks WHERE project_id = ?", (project_id,)).fetchone())
+            busy = conn.execute("SELECT 1 FROM entries WHERE project_id = ?", (project_id,)).fetchone() \
+                or tasks_service.project_in_use(project_id)
         if busy:
             raise undoable.UndoConflict("Things were saved into the project since, so it was kept.")
         current = undoable.row("projects", "id", project_id, PROJECT_COLUMNS)
