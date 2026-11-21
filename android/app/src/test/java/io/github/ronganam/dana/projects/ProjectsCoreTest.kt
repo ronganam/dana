@@ -52,8 +52,8 @@ class ProjectsCoreTest {
         val best = ProjectsCore.bestIds(photo, its.entries.filter { it.sectionId == photo.id })
         // Chosen 13,400 vs shortlist 13,900; the rejected range is ignored.
         val chosen = its.entries.first { it.decision == "chosen" }
-        assertEquals(setOf(chosen.id), best["e4e25675"])
-        assertNull(best["9ebea31c"]) // phone: no best
+        assertEquals(setOf(chosen.id), best[photo.columns[0].key])
+        assertNull(best[photo.columns[1].key]) // phone: no best
         // One option alone has no best.
         val dj = its.sections[2]
         assertTrue(ProjectsCore.bestIds(dj, its.entries.filter { it.sectionId == dj.id }).isEmpty())

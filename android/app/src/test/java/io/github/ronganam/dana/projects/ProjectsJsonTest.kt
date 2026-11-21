@@ -47,7 +47,7 @@ class ProjectsJsonTest {
         assertFalse(items.sections[1].isOptions)
         assertEquals(listOf("money", "phone", "checkbox"), photo.columns.map { it.type })
         assertEquals("price", photo.columns[0].role)
-        assertEquals("e4e25675", photo.columns[0].key)
+        assertTrue(photo.columns[0].key.matches(Regex("[0-9a-f]{8}"))) // a generated key: the fixture's changes when it is rewritten
         assertEquals("## TL;DR\n- אורי: 13,400", photo.summary)
 
         assertEquals(4, items.entries.size)
@@ -82,7 +82,7 @@ class ProjectsJsonTest {
         val items = ProjectsJson.items(ProjectsFixture.text("items_owner"))
         val cols = ApiJson.encodeToJsonElement(ListSerializer(ColumnBody.serializer()), ProjectsJson.columnsBody(items.sections[0].columns)) as JsonArray
         assertEquals(3, cols.size)
-        assertEquals("e4e25675", (cols[0] as JsonObject).text("key"))
+        assertEquals(items.sections[0].columns[0].key, (cols[0] as JsonObject).text("key"))
         assertEquals("price", (cols[0] as JsonObject).text("role"))
         assertFalse((cols[1] as JsonObject).containsKey("role"))
 
