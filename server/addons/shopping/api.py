@@ -12,6 +12,7 @@
     GET    /api/shopping/lists                  → {active, lists}
     PUT    /api/shopping/active                 {list_id}
     POST   /api/shopping/invites/{list_id}      {action: use | dismiss, move_items}
+    GET    /shopping                            the web app, opened on the Shopping page (web/shopping.js)
 
 Every route answers for the request's user, who must have ``shopping``
 connected (else 403 ``not_connected`` from the addon middleware), on
@@ -29,6 +30,7 @@ from typing import Any, Dict, Optional
 
 from aiohttp import web
 
+from core import pages_api
 from core.auth import request_user
 from core.users import User
 from core.addons import store
@@ -294,3 +296,4 @@ def setup(app: web.Application) -> None:
     r.add_get("/api/shopping/lists", lists_api)
     r.add_put("/api/shopping/active", active_api)
     r.add_post("/api/shopping/invites/{list_id}", invite_api)
+    r.add_get("/shopping", pages_api.index_handler)   # the shell opens the page named by the path

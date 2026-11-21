@@ -1,4 +1,5 @@
-/* Shopping — the grocery list panel (docs/shopping.md). The pure part is static/shopping-core.js.
+/* Shopping — the grocery list panel (docs/shopping.md), the shopping addon's page. The pure part is
+ * shopping-core.js (loaded first, Dana.panel `scripts`).
  *
  *   GET    /api/shopping[?list=]                the screen; every write answers with it (+ undo, results)
  *   POST   /api/shopping/items?list=            add {text} | {items: [{name}]}
@@ -13,13 +14,14 @@
  *   GET/PUT /api/sharing/shopping_list/{id}     the Share sheet (owner)
  *   POST   /api/undo/{id}                       the snackbar's Undo
  *
- * window.DanaShopping = {show, hide}; app-nav.js calls them on tab switches. The rail / bottom-nav buttons
- * ([data-shopping-nav]) appear only for a user with `shopping` connected (GET /api/me → addons), with the
- * count to buy ([data-shopping-badge]). /shopping opens the app on this panel.
+ * Registered with Dana.panel (static/dana.js): the shell shows it only to a user with `shopping` on, its
+ * navigation button carries the count to buy (kept fresh in the background), and /shopping (the addon's
+ * route, api.py) opens the app on it.
  */
 (() => {
   "use strict";
-  const C = window.DanaShoppingCore;
+  let C = null;          // DanaShoppingCore (shopping-core.js), once loaded
+  let A = null;          // the page's Dana api (static/dana.js)
   const $ = (id) => document.getElementById(id);
   const icons = () => { try { window.lucide?.createIcons(); } catch (_) { /* ignore */ } };
   const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -383,10 +385,7 @@
 
   function setBadge(n) {
     if (n === null || n === undefined) return;
-    document.querySelectorAll("[data-shopping-badge]").forEach((b) => {
-      b.textContent = n > 99 ? "99+" : String(n);
-      b.classList.toggle("hidden", !n);
-    });
+    A?.badge(n, "quiet");    // a quiet count, not an alert
   }
 
   function renderHeader() {
@@ -676,37 +675,77 @@
   // ---------- start ----------
 
   let wired = false;
-  window.DanaShopping = {
-    show() {
-      if (!wired && $("panel-shopping")) { wire(); wired = true; }
-      S.visible = true;
-      if (location.pathname === "/") history.replaceState(history.state, "", `/shopping${location.hash}`);
-      if (S.enabled) { openStream(); load(); } else render();
-    },
-    hide() {
-      if (!S.visible) return;
-      S.visible = false;
-      closeStream();
-      if (S.editor) saveEditor();
-      if (S.share) closeSheet();
-      closeMenu(); closeUsualMenu(); hideSnack();
-      if (location.pathname === "/shopping") history.replaceState(history.state, "", `/${location.hash}`);
-    },
-  };
-
-  async function init() {
-    const atShopping = location.pathname === "/shopping";
-    if (atShopping) window.danaSwitchTab?.("shopping");
-    const r = await request("GET", "/api/me");
-    if (r.status !== 200) { if (atShopping) { S.status = "error"; S.error = C.errorText(r.status, r.body); render(); } return; }
-    S.me = { id: r.body.id, name: r.body.name };
-    S.enabled = (r.body.addons || []).includes("shopping");
-    document.querySelectorAll("[data-shopping-nav]").forEach((b) => b.classList.toggle("hidden", !S.enabled));
-    if (!S.enabled) { S.status = "off"; render(); return; }
-    if (S.visible) { openStream(); load(); } else refreshBadge();
-    setInterval(() => { if (!S.visible && !document.hidden) refreshBadge(); }, 120000);
+  function show() {
+    S.visible = true;
+    if (location.pathname === "/") history.replaceState(history.state, "", `/shopping${location.hash}`);
+    if (S.enabled) { openStream(); load(); } else render();
   }
-  // After the app's scripts (static/app.js; they load before this one), which wire the tabs and open Chat.
-  if (document.readyState === "complete") init();
-  else document.addEventListener("DOMContentLoaded", init);
+  function hide() {
+    if (!S.visible) return;
+    S.visible = false;
+    closeStream();
+    if (S.editor) saveEditor();
+    if (S.share) closeSheet();
+    closeMenu(); closeUsualMenu(); hideSnack();
+    if (location.pathname === "/shopping") history.replaceState(history.state, "", `/${location.hash}`);
+  }
+
+  const TEMPLATE = `
+    <header class="top-bar shp-top">
+        <div class="ibx-titles">
+            <span class="top-bar-title">Shopping</span>
+            <span class="ibx-kicker" id="shp-sub" aria-live="polite"></span>
+        </div>
+        <div class="top-bar-actions">
+            <div id="shp-people"></div>
+            <button class="chip hidden" id="shp-share-btn" title="Share this list"><i data-lucide="user-plus"></i><span>Share</span></button>
+            <div class="shp-menu-wrap">
+                <button class="icon-btn hidden" id="shp-menu-btn" aria-haspopup="menu" aria-expanded="false" aria-label="List menu" title="More"><i data-lucide="ellipsis-vertical"></i></button>
+                <div id="shp-menu" class="hidden"></div>
+            </div>
+        </div>
+    </header>
+    <div class="shp-scroll" id="shp-scroll">
+        <div class="shp-inner">
+            <div id="shp-invites"></div>
+            <div class="shp-addbar" id="shp-addbar">
+                <div class="shp-add-field">
+                    <i data-lucide="plus"></i>
+                    <input type="text" id="shp-add" placeholder="Add items…" autocomplete="off" autocapitalize="sentences" enterkeyhint="enter" dir="auto"
+                           role="combobox" aria-label="Add items: type a name, or several separated by commas" aria-autocomplete="list" aria-expanded="false" aria-controls="shp-sugg">
+                    <kbd class="shp-kbd" aria-hidden="true">/</kbd>
+                </div>
+                <ul id="shp-sugg" class="shp-suggs hidden" role="listbox" aria-label="Bought before"></ul>
+            </div>
+            <div id="shp-usuals"></div>
+            <div id="shp-status"></div>
+            <div id="shp-list" class="shp-list"></div>
+            <div id="shp-empty"></div>
+        </div>
+    </div>
+    <div class="shp-snack hidden" id="shp-snack" role="status" aria-live="polite"></div>
+    <div class="shp-pop hidden" id="shp-pop" role="menu"></div>
+    <div class="shp-scrim hidden" id="shp-scrim"></div>
+    <div class="shp-sheet hidden" id="shp-sheet" role="dialog" aria-modal="true"></div>
+
+  `;
+
+  Dana.panel({
+    id: "shopping", title: "Shopping", icon: "shopping-cart",
+    scripts: ["shopping-core.js"],
+    start(api) {
+      A = api;
+      C = window.DanaShoppingCore;
+      const me = api.me || {};
+      S.me = { id: me.id, name: me.name };
+      S.enabled = true;       // the shell lists this page only for a user with shopping on
+      refreshBadge();
+      setInterval(() => { if (!S.visible && !document.hidden) refreshBadge(); }, 120000);
+    },
+    mount(el) {
+      if (!wired) { el.dataset.state = "loading"; el.innerHTML = TEMPLATE; wire(); wired = true; }
+      show();
+    },
+    unmount: hide,
+  });
 })();

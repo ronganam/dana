@@ -1,6 +1,6 @@
-/* Money — bank and card transactions, investment accounts (docs/money.md "Money tab"). The pure part is
- * static/money-core.js; the Overview / Spending / Cash flow / Save / Investments views are drawn by
- * static/money-dash.js (window.DanaMoneyDash).
+/* Money — bank and card transactions, investment accounts (docs/money.md "Money tab"), the money addon's
+ * page. The pure part is money-core.js; the Overview / Spending / Cash flow / Save / Investments views are
+ * drawn by money-dash.js (DanaMoneyDash); both load first (Dana.panel `scripts`).
  *
  * Views: Overview · Spending · Cash flow · Save · Investments (only with an investment account) ·
  * Transactions; the header's month switcher hides on Save and Investments (not tied to a month). Each view
@@ -32,16 +32,16 @@
  *   GET    /api/money/changes?since=            polled every 30 s while shown (5 s while a sync runs)
  *   POST   /api/chat/context {kind: "transaction", id}   "Ask Dana"
  *
- * window.DanaMoney = {show, hide}; app-nav.js calls them on tab switches. The rail / bottom-nav buttons
- * ([data-money-nav]) appear only for a user with `money` connected (GET /api/me → addons). The page's
+ * Registered with Dana.panel (static/dana.js): the shell shows it only to a user with `money` on. The page's
  * state (view, month, filters, the accounts view) lives in the hash: #money/spending?month=2026-10&category=food.
  * Login details go only into the add / update request bodies: never the URL, the console or storage.
  */
 (() => {
   "use strict";
-  const C = window.DanaMoneyCore;
+  let C = null;          // DanaMoneyCore (money-core.js), once loaded
+  let A = null;          // the page's Dana api (static/dana.js)
   const $ = (id) => document.getElementById(id);
-  const esc = C.esc;
+  const esc = (v) => C.esc(v);
   const icons = () => { try { window.lucide?.createIcons(); } catch (_) { /* ignore */ } };
   const icon = (name, cls = "") => `<i data-lucide="${name}"${cls ? ` class="${cls}"` : ""}></i>`;
   const wide = () => window.matchMedia("(min-width: 1180px)").matches;
@@ -55,7 +55,7 @@
 
   const S = {
     enabled: null, visible: false, wired: false,
-    month: C.monthOf(), view: "page", tab: "overview", f: { ...C.EMPTY_FILTERS },
+    month: "", view: "page", tab: "overview", f: {},   // month and f: set in start, from DanaMoneyCore
     d: {}, stale: new Set(), sources: null, companies: null, taxonomy: null,
     error: "", loaded: false,
     txns: [], next: null, txLoading: false, txError: "", txLoaded: false, txDirty: true,
@@ -155,7 +155,7 @@
     const e = S.d[name];
     return e && e.url === URLS[name]() ? e.body : null;
   }
-  const D = window.DanaMoneyDash({ S, C, got, esc, icon, icons, today, isCurrent, seriesCls, acctOf, catLabel });
+  let D = null;          // the dashboard views (money-dash.js), made in start
 
   async function fetchOne(name) {
     const url = URLS[name]();
@@ -346,7 +346,6 @@
   }
   function setEnabled(on) {
     S.enabled = on;
-    document.querySelectorAll("[data-money-nav]").forEach((b) => b.classList.toggle("hidden", !on));
     render();
   }
 
@@ -983,7 +982,7 @@
     const id = S.openId;
     if (!id) return;
     const r = await request("POST", "/api/chat/context", { kind: "transaction", id });
-    if (r.status === 200 && r.body && r.body.session_id) { S.sheet = null; renderSheet(); window.danaOpenSession?.(r.body.session_id); }
+    if (r.status === 200 && r.body && r.body.session_id) { S.sheet = null; renderSheet(); A.openSession(r.body.session_id); }
     else toast(C.errorText(r.status, r.body));
   }
 
@@ -1356,7 +1355,7 @@
 
   function act(a, n) {
     switch (a) {
-      case "addons": window.danaSwitchTab?.("addons"); break;
+      case "addons": A.open("addons"); break;
       case "retry": S.error = ""; loadAll(); break;
       case "retry-tx": loadTxns(); break;
       case "this-month": setMonth(thisMonth()); break;
@@ -1491,43 +1490,71 @@
 
   // ---------- start ----------
 
-  window.DanaMoney = {
-    show() {
-      if (!S.wired && $("panel-money")) { wire(); S.wired = true; }
-      const was = S.visible;
-      S.visible = true;
-      syncHash();
-      if (S.enabled === true) { if (!was) loadAll(); }
-      else render();
-    },
-    hide() {
-      if (!S.visible) return;
-      S.visible = false;
-      clearTimeout(pollTimer);
-      clearInterval(tickTimer);
-      stopChecks();
-      S.sheet = null;
-      renderSheet();
-      $("mny-toast")?.classList.add("hidden");
-      if (location.hash.startsWith("#money")) history.replaceState(history.state, "", location.pathname + location.search);
-    },
-  };
-
-  async function init() {
-    const fromHash = C.stateFromHash(location.hash);
-    if (fromHash) {
-      if (fromHash.month && fromHash.month <= thisMonth()) S.month = fromHash.month;
-      S.view = fromHash.view;
-      S.tab = fromHash.tab;
-      S.f = fromHash.f;
-      window.danaSwitchTab?.("money");
-    }
-    const r = await request("GET", "/api/me");
-    if (r.status !== 200) { if (S.visible) { S.error = C.errorText(r.status, r.body); render(); } return; }
-    setEnabled((r.body.addons || []).includes("money"));
-    if (S.enabled && S.visible) loadAll();
+  function show() {
+    const was = S.visible;
+    S.visible = true;
+    syncHash();
+    if (S.enabled === true) { if (!was) loadAll(); }
+    else render();
   }
-  // After the app's scripts (static/app.js; they load before this one), which wire the tabs and open Chat.
-  if (document.readyState === "complete") init();
-  else document.addEventListener("DOMContentLoaded", init);
+  function hide() {
+    if (!S.visible) return;
+    S.visible = false;
+    clearTimeout(pollTimer);
+    clearInterval(tickTimer);
+    stopChecks();
+    S.sheet = null;
+    renderSheet();
+    $("mny-toast")?.classList.add("hidden");
+    if (location.hash.startsWith("#money")) history.replaceState(history.state, "", location.pathname + location.search);
+  }
+
+  const TEMPLATE = `
+    <header class="top-bar mny-top">
+        <button class="icon-btn hidden" id="mny-back" title="Back to Money" aria-label="Back to Money"><i data-lucide="arrow-left"></i></button>
+        <div class="ibx-titles mny-titles">
+            <span class="top-bar-title" id="mny-title">Money</span>
+            <span class="mny-status" id="mny-status" aria-live="polite"></span>
+        </div>
+        <div class="top-bar-actions">
+            <div class="mny-month hidden" id="mny-month" role="group" aria-label="Month"></div>
+            <button class="icon-btn mny-src-btn hidden" id="mny-sources-btn" title="Banks &amp; cards" aria-label="Banks and cards"><i data-lucide="landmark"></i><span class="mny-dot hidden"></span></button>
+            <button class="chip hidden" id="mny-add-top"><i data-lucide="plus" style="width:14px;height:14px;"></i><span>Add</span></button>
+            <button class="icon-btn mny-refresh" id="mny-refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
+        </div>
+    </header>
+    <div class="mny-scroll" id="mny-scroll">
+        <div class="mny-inner" id="mny-root"></div>
+    </div>
+    <div class="mny-toast hidden" id="mny-toast" role="status" aria-live="polite"></div>
+    <div class="mny-scrim hidden" id="mny-scrim"></div>
+    <div class="mny-sheet hidden" id="mny-sheet" role="dialog" aria-modal="true" aria-label="Money"></div>
+
+  `;
+
+  Dana.panel({
+    id: "money", title: "Money", icon: "wallet",
+    scripts: ["money-core.js", "money-dash.js"],
+    start(api) {
+      A = api;
+      C = window.DanaMoneyCore;
+      D = window.DanaMoneyDash({ S, C, got, esc, icon, icons, today, isCurrent, seriesCls, acctOf, catLabel });
+      S.month = C.monthOf();
+      S.f = { ...C.EMPTY_FILTERS };
+      // Opened at #money/…: the view, month and filters it names (the shell opens the page).
+      const fromHash = C.stateFromHash(location.hash);
+      if (fromHash) {
+        if (fromHash.month && fromHash.month <= thisMonth()) S.month = fromHash.month;
+        S.view = fromHash.view;
+        S.tab = fromHash.tab;
+        S.f = fromHash.f;
+      }
+      S.enabled = true;       // the shell lists this page only for a user with money on
+    },
+    mount(el) {
+      if (!S.wired) { el.innerHTML = TEMPLATE; wire(); S.wired = true; }
+      show();
+    },
+    unmount: hide,
+  });
 })();

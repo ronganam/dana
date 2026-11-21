@@ -6,7 +6,8 @@
  *   POST   /api/people/{id}/merge {other_id}    · GET /api/people/merge-candidates
  *   POST   /api/people/{id}/brief               rewrite the AI brief now
  *   POST   /api/chat/context {kind: "person"}   "Ask Dana" about them
- * Exposes window.DanaPeople = {show, hide, open(id)}; app-nav.js calls show/hide on tab switches.
+ * The people addon's page (Dana.panel, static/dana.js); opened with a person's id (api.open("people", id))
+ * it shows that person.
  */
 (() => {
   "use strict";
@@ -22,6 +23,7 @@
   const S = { sort: store("ppl.sort") || "recent", q: "", hidden: false, items: [], pairs: [], openId: null, person: null,
               loading: false, visible: false, briefBusy: false };
   let $ = {};
+  let A = null;          // the page's Dana api (static/dana.js)
   let searchTimer = null;
   let toastTimer = null;
 
@@ -276,7 +278,7 @@
   async function ask() {
     try {
       const res = await api("/api/chat/context", { body: { kind: "person", id: S.openId } });
-      window.danaOpenSession?.(res.session_id);
+      A.openSession(res.session_id);
     } catch (e) { toast(e.message); }
   }
 
@@ -349,7 +351,7 @@
       if (t.closest("[data-ask]")) { ask(); return; }
       if (t.closest("[data-brief]")) { refreshBrief(); return; }
       const c = t.closest("[data-call]");
-      if (c) { window.danaOpenCall?.(c.dataset.call) ?? window.danaSwitchTab?.("calls"); }
+      if (c) A.open("calls", c.dataset.call || null);
     });
     document.getElementById("ppl-add")?.addEventListener("click", () => editModal(null));
     document.getElementById("ppl-refresh")?.addEventListener("click", () => { S.pairs = []; loadList(); if (S.openId) open(S.openId); });
@@ -365,10 +367,40 @@
     await loadList();
   }
 
-  window.DanaPeople = {
-    show,
-    hide() { S.visible = false; },
-    async open(id) { window.danaSwitchTab?.("people"); await open(id); },
-  };
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init); else init();
+  const TEMPLATE = `
+    <header class="top-bar">
+        <span class="top-bar-title">People</span>
+        <div class="top-bar-actions">
+            <button class="icon-btn" id="ppl-refresh" title="Refresh"><i data-lucide="refresh-cw"></i></button>
+            <button class="btn-primary" id="ppl-add"><i data-lucide="user-plus" style="width:16px;height:16px;"></i><span>Add</span></button>
+        </div>
+    </header>
+    <div class="ibx ppl" id="ppl-root">
+        <div class="ibx-list-pane">
+            <div class="ibx-toolbar">
+                <div class="ibx-views" id="ppl-sorts"></div>
+                <div class="ibx-search">
+                    <i data-lucide="search"></i>
+                    <input type="search" id="ppl-search" placeholder="Name, relation or number   /" autocomplete="off">
+                </div>
+            </div>
+            <div class="ibx-scroll" id="ppl-list"></div>
+        </div>
+        <div class="ibx-detail-pane" id="ppl-detail"></div>
+    </div>
+    <div class="ibx-toast hidden" id="ppl-toast" role="status" aria-live="polite"></div>
+    <div class="ibx-modal hidden" id="ppl-modal"></div>
+
+  `;
+
+  Dana.panel({
+    id: "people", title: "People", icon: "users",
+    async mount(el, api, personId) {
+      A = api;
+      if (!el.firstChild) { el.innerHTML = TEMPLATE; init(); }
+      await show();
+      if (personId) await open(personId);
+    },
+    unmount() { S.visible = false; },
+  });
 })();

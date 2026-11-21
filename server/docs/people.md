@@ -1,6 +1,6 @@
 # People, call card, wake briefing, weekly review
 
-## People (`addons/people/`, web `static/people.js`)
+## People (`addons/people/`, web `addons/people/web/people.js`: the addon's page)
 
 Code: `values` (tuning, normalisation, formatting), `activity` (every read / write of calls and notifications), `store` (people and numbers, lookups), `linking`, `merge`, `person_tasks`, `cadence` (cadence, drifting, the People list), `briefs`, `detail` (a person in full, the call card, the context chat), `api` (`/api/people*`), `tools`. Tests: `bin/test test_people`, `bin/test test_people_users`.
 

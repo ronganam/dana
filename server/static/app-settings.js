@@ -12,15 +12,15 @@ const settingsApiToken = document.getElementById("settings-api-token");
 const btnSaveSettings = document.getElementById("btn-save-settings");
 
 if (settingsServerUrl) {
-    settingsServerUrl.value = localStorage.getItem("ganam_server_url") || window.location.origin;
+    settingsServerUrl.value = localStorage.getItem("dana_server_url") || window.location.origin;
 }
 if (settingsApiToken) {
-    settingsApiToken.value = localStorage.getItem("ganam_api_token") || "";
+    settingsApiToken.value = localStorage.getItem("dana_api_token") || "";
 }
 
 btnSaveSettings?.addEventListener("click", () => {
-    localStorage.setItem("ganam_server_url", settingsServerUrl.value.trim());
-    localStorage.setItem("ganam_api_token", settingsApiToken.value.trim());
+    localStorage.setItem("dana_server_url", settingsServerUrl.value.trim());
+    localStorage.setItem("dana_api_token", settingsApiToken.value.trim());
     btnSaveSettings.textContent = "Settings Saved!";
     setTimeout(() => { btnSaveSettings.textContent = "Save Settings"; }, 1500);
 });
