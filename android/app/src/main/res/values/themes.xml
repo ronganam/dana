@@ -1,5 +1,5 @@
 <resources xmlns:tools="http://schemas.android.com/tools">
-    <style name="Theme.GanamAssistant" parent="Theme.Material3.DayNight.NoActionBar">
+    <style name="Theme.Dana" parent="Theme.Material3.DayNight.NoActionBar">
         <!-- Colors -->
         <item name="colorPrimary">@color/primary</item>
         <item name="colorOnPrimary">@color/white</item>
@@ -18,7 +18,7 @@
         <item name="android:windowLightStatusBar">false</item>
     </style>
 
-    <style name="Theme.GanamAssistant.VoiceSession" parent="Theme.GanamAssistant">
+    <style name="Theme.Dana.VoiceSession" parent="Theme.Dana">
         <item name="android:windowIsFloating">false</item>
         <item name="android:windowNoTitle">true</item>
         <item name="android:windowBackground">@android:color/transparent</item>

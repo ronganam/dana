@@ -19,7 +19,7 @@ Projects on the phone: a wedding, a trip, a flat hunt — decisions whose option
 | `ProjectEditors.kt` | The project editor (icon, name, description, date, budget, colour, Archive / Restore, Delete) and the section editor (icon, name, kind, columns) |
 | `ProjectMarkdown.kt` | The small Markdown of summaries and details: headings, lists, checks, code, quotes, pipe tables (shared column widths, sideways scroll), rules; each line runs in its own script's direction |
 | `ProjectsUi.kt` | Shared bits: `ProjectScope` (Hebrew projects lay out right to left and speak Hebrew), kicker, back link, tile, ring, bar, decision pill, `ValueText`, the overlays (editor + confirm) |
-| `ProjectsScreen.kt` | `ProjectsStage` (what the stage shows) and the previous layout's tab |
+| `ProjectsScreen.kt` | `ProjectsStage` (what the stage shows) |
 | `ui/shell/destinations/ProjectsDestination.kt` | The place in the shell |
 
 ## The place
@@ -37,4 +37,4 @@ Projects on the phone: a wedding, a trip, a flat hunt — decisions whose option
 
 ## Tests
 
-`app/src/test/java/app/ganam/assistant/projects/`: `ProjectsJsonTest` (the fixture's list / owner / read-share payloads, the writers), `ProjectsCoreTest` (numbers, money, best values, order, section lines, countdown, budget, `setField`, phones, values by type, the column payload, helpers), `ProjectMarkdownTest` (tables, lists, checks, code). The fixture is `app/src/test/resources/projects_web.json`, the server's `test_fixtures/projects_web.json` with the sharer's name replaced.
+`app/src/test/java/io/github/ronganam/dana/projects/`: `ProjectsJsonTest` (the fixture's list / owner / read-share payloads, the writers), `ProjectsCoreTest` (numbers, money, best values, order, section lines, countdown, budget, `setField`, phones, values by type, the column payload, helpers), `ProjectMarkdownTest` (tables, lists, checks, code). The fixture is `app/src/test/resources/projects_web.json`, the server's `test_fixtures/projects_web.json` with the sharer's name replaced.

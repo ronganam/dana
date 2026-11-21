@@ -1,9 +1,169 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<!-- The phone app: everything the kiosk and the TV don't have (call recordings,
+     the watch bridge, the system assistant, the notification Inbox, pop-ups,
+     direct push, widgets, in-app updates). docs/permissions.md lists why each
+     permission is here. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Coding-agent sessions as Android 16 Live Updates (push/AgentSessions.kt) -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- In-app updates: lets the app hand the downloaded APK to the system installer -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- WorkManager runs long call-recording uploads as a foreground job -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- Caller card: notice incoming / outgoing calls (callcard/CallerCard.kt). -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <application>
+        <!-- The launcher entry and share target (the activity itself is in main). -->
+        <activity android:name=".MainActivity" android:exported="true" tools:node="merge">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="audio/*" />
+            </intent-filter>
+            <!-- Share text, links and images from any app into a new chat -->
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="text/plain" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- Urgent phone notifications → full-screen alert (direct push) -->
+        <activity
+            android:name=".NotificationAlertActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Dana"
+            android:showOnLockScreen="true"
+            android:turnScreenOn="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:taskAffinity="io.github.ronganam.dana.alert"
+            android:configChanges="orientation|screenSize|keyboardHidden" />
+
+        <!-- New suggestions pop up for review (direct push) -->
+        <activity
+            android:name=".SuggestionsPopupActivity"
+            android:exported="false"
+            android:theme="@style/Theme.Dana"
+            android:showOnLockScreen="true"
+            android:excludeFromRecents="true"
+            android:launchMode="singleTask"
+            android:taskAffinity="io.github.ronganam.dana.suggestions"
+            android:windowSoftInputMode="adjustResize" />
+
+        <!-- Alerts, suggestion pop-ups, reminders and web button presses arrive
+             by direct push (push/DanaMessagingService), not as exported
+             broadcasts any app could send. -->
+
+        <!-- Restarts the call observer after a reboot or app update -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- "Hide" on a coding-agent session's live notification -->
+        <receiver
+            android:name=".push.AgentSessionReceiver"
+            android:exported="false" />
+
+        <!-- "Retry" on a failed call-recording upload notification -->
+        <receiver
+            android:name=".data.sync.CallUploadReceiver"
+            android:exported="false" />
+
+        <!-- WorkManager's foreground service for long uploads (dataSync) -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
+
+        <!-- Dana as the device's assistant app (power-button sheet) -->
+        <service
+            android:name=".DanaVoiceInteractionService"
+            android:exported="true"
+            android:permission="android.permission.BIND_VOICE_INTERACTION">
+            <intent-filter>
+                <action android:name="android.service.voice.VoiceInteractionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.voice_interaction"
+                android:resource="@xml/interaction_service" />
+        </service>
+
+        <service
+            android:name=".DanaVoiceInteractionSessionService"
+            android:permission="android.permission.BIND_VOICE_INTERACTION"
+            android:process=":session" />
+
+        <service
+            android:name=".DanaRecognitionService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.speech.RecognitionService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.speech"
+                android:resource="@xml/recognition_service" />
+        </service>
+
+        <service
+            android:name=".CallRecordingObserverService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Monitors the call recordings directory for new recordings and uploads them to Dana" />
+        </service>
+
+        <service
+            android:name=".data.wear.WearMessageListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.BIND_LISTENER"
+                    tools:ignore="WearableBindListener" />
+            </intent-filter>
+        </service>
+
+        <!-- Phone notifications → Dana's Inbox (needs "Notification access") -->
+        <service
+            android:name=".data.notifications.DanaNotificationListener"
+            android:exported="true"
+            android:label="Dana notification inbox"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <!-- Direct push from the server: FCM wake-up pings (push/PhoneEvents). -->
         <service
             android:name=".push.DanaMessagingService"
@@ -59,7 +219,7 @@
             android:exported="false"
             android:excludeFromRecents="true"
             android:taskAffinity=""
-            android:theme="@style/Theme.GanamAssistant.VoiceSession"
+            android:theme="@style/Theme.Dana.VoiceSession"
             android:windowSoftInputMode="stateAlwaysVisible|adjustResize" />
         <receiver android:name=".widgets.ShoppingWidgetReceiver" android:exported="true" android:label="@string/widget_shopping">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>

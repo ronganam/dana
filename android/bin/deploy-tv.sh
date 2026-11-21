@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Build Dana TV (app.ganam.assistant.tv, `tv` flavor) and install it on the
+# Build Dana TV (io.github.ronganam.dana.tv, `tv` flavor) and install it on the
 # TV over adb, then grant what it needs to keep itself
 # working: the remote-button accessibility service, the PiP overlay, and the
 # right to re-enable that service after its own updates (TCL drops it).
@@ -33,7 +33,7 @@ done
 [[ "$SERIAL" == *:* ]] && adb connect "$SERIAL" >/dev/null
 ADB=(adb); [[ -n "$SERIAL" ]] && ADB=(adb -s "$SERIAL")
 lower=$(echo "$VARIANT" | tr '[:upper:]' '[:lower:]')
-PKG=app.ganam.assistant.tv
+PKG=io.github.ronganam.dana.tv
 HOME_ACT=$PKG/$PKG.TvHomeActivity
 KEY_SVC=$PKG/$PKG.DanaKeyService
 
