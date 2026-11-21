@@ -5,7 +5,7 @@ package io.github.ronganam.dana.data.shopping
  * What the Shopping screen, the widget and the watch show, worked out from a
  * screen payload: rows by aisle, Bought, the quiet line, invitations, the
  * menu, the Share sheet, the editor's rules and every sentence. The same
- * words as the web panel (server repo `static/shopping-core.js`). Pure, so the
+ * words as the web panel (`server/static/shopping-core.js`). Pure, so the
  * unit tests check it against the server's real payloads.
  */
 object ShoppingView {

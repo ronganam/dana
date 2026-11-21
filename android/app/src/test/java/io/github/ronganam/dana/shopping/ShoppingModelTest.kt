@@ -16,15 +16,15 @@ import org.junit.Test
 
 /** Parsing real payloads, the screen model (aisles, lingering ticks, words) and the typed-text parser. */
 class ShoppingModelTest {
-    private val noa = Who("d3b2f55f2a70", "Noa Peretz")
-    private val tom = Who("be9d56b897fa", "Tom Hadad")
+    private val noa = ShoppingFixture.noa
+    private val tom = ShoppingFixture.tom
 
     // ---------- parsing ----------
 
     @Test
     fun parsesTheSharedOwnersScreen() {
         val s = ShoppingFixture.screen("owner_shared")
-        assertEquals("a142b3bd0785", s.list.id)
+        assertEquals(ShoppingFixture.list, s.list.id)
         assertEquals("owner", s.list.access)
         assertTrue(s.list.isOwner && s.list.canEdit)
         assertEquals(20L, s.list.version)
@@ -36,7 +36,7 @@ class ShoppingModelTest {
         assertEquals(14, s.items.size)
         assertEquals(12, s.counts.toBuy)
         assertEquals(2, s.counts.bought)
-        assertEquals(listOf("Oat milk", "Pita"), s.usuals.map { it.name })
+        assertEquals(setOf("Oat milk", "Pita"), s.usuals.map { it.name }.toSet())
         val bananas = s.items.first { it.name == "bananas" }
         assertEquals("1 kg", bananas.quantity)
         assertEquals("produce", bananas.category)
@@ -62,7 +62,7 @@ class ShoppingModelTest {
     fun parsesWriteAnswersWithUndoAndResults() {
         val add = ShoppingJson.answer(ShoppingFixture.body("add_mixed"))!!
         assertEquals(listOf("already", "restored", "added"), add.results.map { it.status })
-        assertEquals("d08ea160b089", add.undo?.id)
+        assertEquals(ShoppingFixture.undoId("add_mixed"), add.undo?.id)
         assertEquals(6L, add.screen.list.version)
         val check = ShoppingJson.answer(ShoppingFixture.body("check"))!!
         assertEquals("Bought 'Eggs'", check.undo?.label)
@@ -134,7 +134,7 @@ class ShoppingModelTest {
         val bananas = s.items.first { it.name == "bananas" }
         val anchor = ShoppingView.anchorAfter(s, bananas.id)
         assertEquals(s.items.first { it.name == "Avocado" }.id, anchor)
-        val ticked = ShoppingOps.applyOps(s, listOf(ShoppingOp.Check("o1", s.list.id, bananas.id, true, "bananas")), noa, "2026-11-16T15:00:00Z")!!
+        val ticked = ShoppingOps.applyOps(s, listOf(ShoppingOp.Check("o1", s.list.id, bananas.id, true, "bananas")), noa, "2100-01-01T15:00:00Z")!!
         val lingering = ShoppingView.model(ticked, noa, mapOf(bananas.id to anchor))
         val produce = lingering.groups.first { it.key == "produce" }.rows
         assertEquals(listOf("עגבניות שרי", "bananas", "Avocado"), produce.map { it.name })
@@ -231,7 +231,7 @@ class ShoppingModelTest {
         assertTrue(ShoppingView.editChanges(item, d.copy(name = "   ")).isFailure)
     }
 
-    // ---------- the typed-text parser (the server's own table, integrations/shopping/names.py) ----------
+    // ---------- the typed-text parser (the server's own table, server/addons/shopping/names.py) ----------
 
     @Test
     fun parsesTypedTextLikeTheServer() {

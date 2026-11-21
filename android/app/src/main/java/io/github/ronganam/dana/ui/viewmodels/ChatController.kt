@@ -967,7 +967,7 @@ class ChatController(
 
         val pending = state.pendingApproval
         // The server stores "waiting_approval" while an approval is pending
-        // (core/session_runner.py), so accept both spellings. Clear only when
+        // (server/core/session_runner.py), so accept both spellings. Clear only when
         // the state carries no pending approval at all.
         if ((status == "pending_approval" || status == "waiting_approval") && pending != null) {
             val id = pending.toolCallId

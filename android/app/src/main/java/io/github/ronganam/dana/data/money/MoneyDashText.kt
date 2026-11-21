@@ -13,7 +13,7 @@ import kotlin.math.roundToLong
 
 /**
  * The words and numbers of the Money dashboards: a port of the web's pure
- * `static/money-core.js` (₪ formatting, dates, the tiles, the sentences),
+ * `server/static/money-core.js` (₪ formatting, dates, the tiles, the sentences),
  * so the app says what the web page says. Tested in `MoneyDashTextTest`
  * against the server's fixtures. Plain strings: Hebrew runs inside a server
  * sentence are isolated with [isolateHebrew]; amounts are drawn left to right
@@ -24,44 +24,11 @@ object MoneyDashText {
     private const val FSI = "⁨"
     private const val PDI = "⁩"
     private val MON = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
-    private val CURRENCY = mapOf("ILS" to "₪", "USD" to "$", "EUR" to "€", "GBP" to "£")
-
-    enum class Sign { MINUS, PLUS, NONE }
 
     private fun group3(n: Long): String = "%,d".format(Locale.US, n)
 
-    /**
-     * Agorot → "₪1,234.50". [sign] MINUS (default: "−" on money out), PLUS
-     * (also "+" on money in), NONE (the absolute amount); [cents] false =
-     * whole shekels, rounded.
-     */
-    fun money(agorot: Long, sign: Sign = Sign.MINUS, cents: Boolean = true): String {
-        val a = abs(agorot)
-        val body = if (!cents) group3(roundHalfUp(a / 100.0)) else group3(a / 100) + "." + (a % 100).toString().padStart(2, '0')
-        val s = "₪$body"
-        if (sign == Sign.NONE || agorot == 0L || (!cents && roundHalfUp(a / 100.0) == 0L)) return s
-        if (agorot < 0) return MINUS + s
-        return if (sign == Sign.PLUS) "+$s" else s
-    }
-
-    /** Whole shekels ("₪4,018"). */
-    fun whole(agorot: Long, sign: Sign = Sign.MINUS) = money(agorot, sign, cents = false)
-
     /** JS Math.round: halves go up (toward +∞). */
     private fun roundHalfUp(v: Double): Long = floor(v + 0.5).toLong()
-
-    /** Short axis values: ₪850, ₪4.8k, ₪12k, ₪1.2M. */
-    fun compact(agorot: Double): String {
-        val sh = abs(agorot) / 100
-        val neg = if (agorot < 0) MINUS else ""
-        fun trim(x: Double) = String.format(Locale.US, "%.1f", x).removeSuffix(".0")
-        return when {
-            sh >= 1e6 -> "$neg₪${trim(sh / 1e6)}M"
-            sh >= 1e4 -> "$neg₪${roundHalfUp(sh / 1e3)}k"
-            sh >= 1e3 -> "$neg₪${trim(sh / 1e3)}k"
-            else -> "$neg₪${roundHalfUp(sh)}"
-        }
-    }
 
     // ------------------------------------------------------------ dates
 
@@ -140,17 +107,17 @@ object MoneyDashText {
         val income = ov.incomeMonth
         val net = ov.net
         val rate = when {
-            income > 0 -> if (net >= 0) "Kept ${pct(net, income)}% of income" else "${whole(-net)} more out than in"
+            income > 0 -> if (net >= 0) "Kept ${pct(net, income)}% of income" else "${MoneyFormat.whole(-net)} more out than in"
             ov.inProgress -> "No income yet this month"
             else -> "No income that month"
         }
-        val typ = if (cf != null && cf.typicalIncome > 0) "typical ${whole(cf.typicalNet)}" else ""
+        val typ = if (cf != null && cf.typicalIncome > 0) "typical ${MoneyFormat.whole(cf.typicalNet)}" else ""
         return NetTile(
             label = if (ov.inProgress) "Net so far" else "Net",
             value = net,
             tone = if (net < 0) "out" else "in",
             rate = rate,
-            sub = "Earned ${whole(income)} · spent ${whole(income - net)}",
+            sub = "Earned ${MoneyFormat.whole(income)} · spent ${MoneyFormat.whole(income - net)}",
             typical = typ
         )
     }
@@ -158,9 +125,9 @@ object MoneyDashText {
     data class EverydayTile(val value: Long, val track: String, val typical: String, val dir: String)
 
     fun everydayTile(e: Everyday, inProgress: Boolean): EverydayTile {
-        val track = if (inProgress && e.onTrack != null) "On track for ${whole(e.onTrack)}" else ""
+        val track = if (inProgress && e.onTrack != null) "On track for ${MoneyFormat.whole(e.onTrack)}" else ""
         val typ = e.typical ?: 0
-        val typical = if (typ > 0) "typical ${whole(typ)}" else ""
+        val typical = if (typ > 0) "typical ${MoneyFormat.whole(typ)}" else ""
         val ref = if (inProgress) e.onTrack else e.total
         val dir = if (typ > 0 && ref != null) when {
             ref > typ * 1.05 -> "up"
@@ -179,10 +146,10 @@ object MoneyDashText {
         var low = ""
         var tone = ""
         if (sl != null && sl.balance < fc.balance) {
-            low = "Lowest in the next $days days: ${whole(sl.balance)} on ${shortDate(sl.date, today)}"
+            low = "Lowest in the next $days days: ${MoneyFormat.whole(sl.balance)} on ${shortDate(sl.date, today)}"
             if (sl.balance < 0) tone = "bad"
-        } else if (sl != null) low = "Stays above ${whole(sl.balance)} for the next $days days"
-        val end = if (fc.endBalance != null && fc.end != null) "${whole(fc.endBalance)} by ${shortDate(fc.end, today)}" else ""
+        } else if (sl != null) low = "Stays above ${MoneyFormat.whole(sl.balance)} for the next $days days"
+        val end = if (fc.endBalance != null && fc.end != null) "${MoneyFormat.whole(fc.endBalance)} by ${shortDate(fc.end, today)}" else ""
         return BalanceTile(fc.balance, low, end, tone)
     }
 
@@ -195,7 +162,7 @@ object MoneyDashText {
             ov.incomeMonth > 0 -> "${pct(v, ov.incomeMonth)}% of this month's income"
             else -> ""
         }
-        val yearly = if (ov.yearlyMonthly > 0) "incl. ${whole(ov.yearlyMonthly)} a month for yearly charges" else ""
+        val yearly = if (ov.yearlyMonthly > 0) "incl. ${MoneyFormat.whole(ov.yearlyMonthly)} a month for yearly charges" else ""
         return FixedTile(v, share, yearly)
     }
 
@@ -211,14 +178,14 @@ object MoneyDashText {
         if (typical == 0L) return Vs("new", "usually nothing")
         val d = value - typical
         if (abs(d) < maxOf(100.0, typical * 0.05)) return Vs("same", "about typical")
-        return Vs(if (d > 0) "up" else "down", "${whole(abs(d))} ${if (d > 0) "above" else "below"} typical")
+        return Vs(if (d > 0) "up" else "down", "${MoneyFormat.whole(abs(d))} ${if (d > 0) "above" else "below"} typical")
     }
 
     /** "₪2,250 above" style delta of a mover: "+₪940", "−₪300", "new". */
     fun moverDelta(m: Mover): String = when (m.direction) {
         "new" -> "new"
-        "up" -> "+" + whole(abs(m.delta), Sign.NONE)
-        else -> MINUS + whole(abs(m.delta), Sign.NONE)
+        "up" -> "+" + MoneyFormat.whole(abs(m.delta), MoneyFormat.Sign.NONE)
+        else -> MINUS + MoneyFormat.whole(abs(m.delta), MoneyFormat.Sign.NONE)
     }
 
     // ------------------------------------------------------------ Coming up
@@ -244,7 +211,7 @@ object MoneyDashText {
         val after = fc.series.associate { it.date to it.balance }
         val events = fc.events.filter { it.date <= end }.map { e ->
             val r = e.range?.takeIf { it.first != it.second }?.let { listOf(abs(it.first), abs(it.second)).sorted() }
-            Upcoming(e, cardBillParts(e), r?.let { "${whole(it[0])} – ${whole(it[1])}" } ?: "", after[e.date])
+            Upcoming(e, cardBillParts(e), r?.let { "${MoneyFormat.whole(it[0])} – ${MoneyFormat.whole(it[1])}" } ?: "", after[e.date])
         }
         return UpcomingList(events, end, fc.series.filter { it.date <= end })
     }
@@ -253,12 +220,12 @@ object MoneyDashText {
 
     fun cashflowTotalsText(cf: MoneyCashflow): String {
         val t = cf.totals
-        return "${cf.months.size} months: earned ${whole(t.income)}, spent ${whole(t.spent)}, set aside ${whole(t.setAside)}, net ${whole(t.net)}"
+        return "${cf.months.size} months: earned ${MoneyFormat.whole(t.income)}, spent ${MoneyFormat.whole(t.spent)}, set aside ${MoneyFormat.whole(t.setAside)}, net ${MoneyFormat.whole(t.net)}"
     }
 
     fun forecastNote(fc: MoneyForecast?): String {
         fc ?: return ""
-        val out = if (fc.leftOutTotal != 0L) "${whole(abs(fc.leftOutTotal))} in the last 12 months" else "none in the last 12 months"
+        val out = if (fc.leftOutTotal != 0L) "${MoneyFormat.whole(abs(fc.leftOutTotal))} in the last 12 months" else "none in the last 12 months"
         return "Forecast leaves out one-offs ($out), includes yearly charges and installment plans."
     }
 
@@ -274,8 +241,8 @@ object MoneyDashText {
     fun cadenceAmount(amount: Long, monthlyCost: Long?, cadence: String?): CadenceAmount {
         val c = cadence ?: "monthly"
         val monthly = if (c != "monthly" && monthlyCost != null && abs(monthlyCost) != abs(amount))
-            "≈ ${money(abs(monthlyCost), Sign.NONE)} a month" else ""
-        return CadenceAmount(money(abs(amount), Sign.NONE), perText(c), monthly)
+            "≈ ${MoneyFormat.amount(abs(monthlyCost), MoneyFormat.Sign.NONE)} a month" else ""
+        return CadenceAmount(MoneyFormat.amount(abs(amount), MoneyFormat.Sign.NONE), perText(c), monthly)
     }
 
     data class PlanText(val left: String, val rest: String, val next: String)
@@ -284,7 +251,7 @@ object MoneyDashText {
         val n = p.dates.size.takeIf { it > 0 } ?: maxOf(0, p.of - p.number)
         return PlanText(
             left = "$n payment${if (n == 1) "" else "s"} left of ${p.of}",
-            rest = "${money(abs(p.left), Sign.NONE)} to go",
+            rest = "${MoneyFormat.amount(abs(p.left), MoneyFormat.Sign.NONE)} to go",
             next = p.dates.firstOrNull()?.let { "next ${shortDate(it, today)}" } ?: ""
         )
     }
@@ -293,7 +260,7 @@ object MoneyDashText {
     fun priceChangeText(pc: PriceChange?, today: LocalDate): String {
         pc ?: return ""
         val d = parseDay(pc.since) ?: return ""
-        return "${money(pc.from)} → ${money(pc.to)} since ${MON[d.monthValue - 1]}" + if (d.year != today.year) " ${d.year}" else ""
+        return "${MoneyFormat.amount(pc.from)} → ${MoneyFormat.amount(pc.to)} since ${MON[d.monthValue - 1]}" + if (d.year != today.year) " ${d.year}" else ""
     }
 
     // ------------------------------------------------------------ investments
@@ -317,18 +284,6 @@ object MoneyDashText {
         val frac = ((a - w) * 10000).roundToLong()
         val f = if (frac == 0L) "" else "." + frac.toString().padStart(4, '0').trimEnd('0')
         return (if (q < 0) MINUS else "") + group3(w) + f
-    }
-
-    /** A unit price in its own currency: "₪250.00", "$150.00", "12.50 CHF". */
-    fun unitPrice(price: Double?, currency: String?): String {
-        if (price == null || price.isNaN()) return ""
-        val a = abs(price)
-        val s = java.math.BigDecimal(a).setScale(if (a >= 1) 2 else 4, java.math.RoundingMode.HALF_UP).toPlainString()
-        val (w, f) = s.split(".").let { it[0] to it.getOrElse(1) { "00" } }
-        val frac = if (f.length > 2) f.take(2) + f.drop(2).trimEnd('0') else f
-        val body = group3(w.toLong()) + "." + frac
-        val code = (currency ?: "ILS").uppercase().let { if (it == "NIS") "ILS" else it }
-        return CURRENCY[code]?.let { it + body } ?: "$body $currency"
     }
 
     data class Tile(val value: Long?, val sub: String, val tone: String = "")
@@ -366,11 +321,11 @@ object MoneyDashText {
         val since = shortDate(g.from, today)
         if (g.moved != 0L) {
             val net = g.change - g.moved
-            val besides = "besides ${whole(abs(g.moved), Sign.NONE)} ${if (g.moved > 0) "put in" else "taken out"}"
-            return if (net != 0L) "${if (net > 0) "Up" else "Down"} ${whole(abs(net), Sign.NONE)} since $since, $besides" else "No change since $since, $besides"
+            val besides = "besides ${MoneyFormat.whole(abs(g.moved), MoneyFormat.Sign.NONE)} ${if (g.moved > 0) "put in" else "taken out"}"
+            return if (net != 0L) "${if (net > 0) "Up" else "Down"} ${MoneyFormat.whole(abs(net), MoneyFormat.Sign.NONE)} since $since, $besides" else "No change since $since, $besides"
         }
         if (g.change == 0L) return "No change since $since"
-        return "${if (g.change > 0) "Up" else "Down"} ${whole(abs(g.change), Sign.NONE)}" +
+        return "${if (g.change > 0) "Up" else "Down"} ${MoneyFormat.whole(abs(g.change), MoneyFormat.Sign.NONE)}" +
             (g.changePct?.let { " (${pctText(it)})" } ?: "") + " since $since"
     }
 
@@ -409,8 +364,8 @@ object MoneyDashText {
         val meta = listOfNotNull(
             shortDate(t.date, today),
             if (units) "${quantityText(abs(t.quantity!!))} units" else null,
-            t.commission?.takeIf { it != 0L }?.let { "fee ${money(abs(it), Sign.NONE)}" },
-            t.tax?.takeIf { it != 0L && t.kind != "tax" }?.let { "tax ${money(abs(it), Sign.NONE)}" },
+            t.commission?.takeIf { it != 0L }?.let { "fee ${MoneyFormat.amount(abs(it), MoneyFormat.Sign.NONE)}" },
+            t.tax?.takeIf { it != 0L && t.kind != "tax" }?.let { "tax ${MoneyFormat.amount(abs(it), MoneyFormat.Sign.NONE)}" },
             if (word != null && t.action != null && t.kind != "buy" && t.kind != "sell") t.action else null
         ).filter { it.isNotEmpty() }
         return TradeText(title, t.name.orEmpty(), meta, t.amount, if (t.amount == 0L) "" else if (t.amount > 0) "in" else "out")
@@ -446,14 +401,14 @@ object MoneyDashText {
             c.left == 0L && c.count > 0 -> Pace("Used up", "neg",
                 if (days > 0) "$days ${if (days == 1) "day" else "days"} until it renews on ${shortDate(renews, today)}" else "It renews tomorrow")
             c.runsOut != null -> Pace("Lasts to ${shortDate(c.runsOut, today)}", "neg", "at this cycle's pace; it renews on ${shortDate(renews, today)}")
-            c.left != 0L -> Pace("${whole(c.perDayLeft ?: 0)} a day", "", if (c.used != 0L) "on track to last the cycle" else "nothing used yet this cycle")
+            c.left != 0L -> Pace("${MoneyFormat.whole(c.perDayLeft ?: 0)} a day", "", if (c.used != 0L) "on track to last the cycle" else "nothing used yet this cycle")
             else -> Pace("—", "", "")
         }
         return MealTiles(
-            left = Tile(c.left, if (c.budget != null && c.budget != 0L) "of ${whole(c.budget)} · until ${shortDate(c.end, today)}" else "until ${shortDate(c.end, today)}"),
+            left = Tile(c.left, if (c.budget != null && c.budget != 0L) "of ${MoneyFormat.whole(c.budget)} · until ${shortDate(c.end, today)}" else "until ${shortDate(c.end, today)}"),
             pace = pace,
             card = Tile(c.cardPaid, if (c.cardPaid != 0L) "beyond the budget, on your own card" else "nothing beyond the budget"),
-            count = Tile(c.count.toLong(), if (c.used != 0L) "${whole(c.used)} from the budget" else "this cycle")
+            count = Tile(c.count.toLong(), if (c.used != 0L) "${MoneyFormat.whole(c.used)} from the budget" else "this cycle")
         )
     }
 

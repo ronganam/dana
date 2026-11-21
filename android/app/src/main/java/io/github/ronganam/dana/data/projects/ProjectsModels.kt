@@ -1,7 +1,7 @@
 package io.github.ronganam.dana.data.projects
 
 /**
- * The Projects payloads (server docs/knowledge.md, integrations/knowledge/values.py).
+ * The Projects payloads (server docs/knowledge.md, server/addons/knowledge/values.py).
  * `GET /api/projects` → [Project] (with its stats); `GET /api/projects/{id}/items` → [ProjectItems].
  * [access] is null for the user's own projects, "edit" / "read" through a share.
  */

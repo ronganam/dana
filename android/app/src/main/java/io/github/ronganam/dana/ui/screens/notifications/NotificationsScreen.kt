@@ -66,7 +66,7 @@ private val NEEDS_FLAG = Regex("""\s*\[needs [^\]]*\]\s*""", RegexOption.IGNORE_
 
 /**
  * A summary point without the "[needs <name>]" flag the server's model sometimes
- * copies from its input (core/notification_summary.py), and whether it had it.
+ * copies from its input (server/addons/phone/notifications/summary.py), and whether it had it.
  */
 internal fun summaryPoint(raw: String): Pair<String, Boolean> =
     if (NEEDS_FLAG.containsMatchIn(raw)) NEEDS_FLAG.replace(raw, " ").trim() to true else raw to false

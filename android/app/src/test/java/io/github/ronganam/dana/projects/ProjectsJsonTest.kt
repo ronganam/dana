@@ -71,7 +71,7 @@ class ProjectsJsonTest {
     fun aReadShareCarriesItsAccess() {
         val items = ProjectsJson.items(ProjectsFixture.text("items_read"))
         assertEquals("read", items.project.access)
-        assertEquals("Sam Example", items.project.sharedBy)
+        assertEquals("Robin Levi", items.project.sharedBy)
         assertFalse(items.project.canEdit)
         assertFalse(items.project.isOwner)
         assertTrue(items.entries.all { it.access == "read" })

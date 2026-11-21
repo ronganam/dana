@@ -5,8 +5,7 @@ import kotlinx.serialization.json.JsonObject
 
 /**
  * Server payloads: `server/tests/fixtures/projects_web.json` (written by
- * `WRITE_WEB_FIXTURE=1 python test_integrations_api.py`), copied with the sharer's name
- * replaced. Keys: `list_owner` (GET /api/projects), `items_owner` / `items_read`
+ * `server/addons/knowledge/tests/test_knowledge_sections.py`). Keys: `list_owner` (GET /api/projects), `items_owner` / `items_read`
  * (GET /api/projects/{id}/items as the owner and through a read share).
  */
 object ProjectsFixture {

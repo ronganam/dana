@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.projects
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -113,7 +114,7 @@ private fun ColumnScope.ProjectForm(c: ProjectsController, d: ProjectsEditor.Pro
                 }
             }
             Spacer(Modifier.width(10.dp))
-            Labeled("Budget ₪", Modifier.weight(1f)) {
+            Labeled("Budget ${MoneyFormat.symbol}", Modifier.weight(1f)) {
                 InkField(d.budget, { c.updateEditor(d.copy(budget = it.filter { ch -> ch.isDigit() || ch == '.' || ch == ',' })) },
                     Modifier.fillMaxWidth(), placeholder = "150000", keyboard = KeyboardOptions(keyboardType = KeyboardType.Decimal))
             }

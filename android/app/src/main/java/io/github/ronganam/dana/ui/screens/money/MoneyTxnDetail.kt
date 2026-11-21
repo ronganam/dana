@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -152,13 +153,13 @@ private fun Facts(money: MoneyController, t: Txn, full: Boolean, company: String
         Fact("Bought", MoneyLedger.longDate(t.purchaseDate) + if (time.isNotEmpty()) ", $time" else "")
         if (t.chargeDate != null && t.chargeDate != t.purchaseDate) Fact("Charged", MoneyLedger.longDate(t.chargeDate))
         x?.installment?.let { i ->
-            Fact("Installments", "Payment ${i.number} of ${i.total}" + (i.purchaseAmount?.let { " · ${MoneyLedger.money(it, sign = "none")} in all" } ?: ""))
+            Fact("Installments", "Payment ${i.number} of ${i.total}" + (i.purchaseAmount?.let { " · ${MoneyFormat.amount(it, sign = MoneyFormat.Sign.NONE)} in all" } ?: ""))
         }
-        x?.foreign?.takeIf { it.currency != "ILS" }?.let { f -> Fact("Paid in", "${MoneyLedger.foreignText(f.amount, f.currency)} → ${MoneyLedger.money(t.amount, sign = "none")}") }
+        x?.foreign?.takeIf { !MoneyFormat.isUsers(it.currency) }?.let { f -> Fact("Paid in", "${MoneyFormat.foreign(f.amount, f.currency)} → ${MoneyFormat.amount(t.amount, sign = MoneyFormat.Sign.NONE)}") }
         x?.bankCategory?.let { Fact("${company ?: "Card"}'s category", it) }
         x?.sameMerchant?.let { sm ->
             if (sm.count > 1) {
-                Fact("History", "${sm.count} charges, ${MoneyLedger.money(kotlin.math.abs(sm.total), sign = "none")} since ${MoneyLedger.shortDate(sm.firstDate, today)}")
+                Fact("History", "${sm.count} charges, ${MoneyFormat.amount(kotlin.math.abs(sm.total), sign = MoneyFormat.Sign.NONE)} since ${MoneyLedger.shortDate(sm.firstDate, today)}")
                 TextLink("See them", Modifier.padding(start = 112.dp)) {
                     money.openTransactions(TxnFilter(q = t.merchant, allTime = true))
                     money.closeDetail()
@@ -216,7 +217,7 @@ private fun CategoryPicker(money: MoneyController, t: Txn) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 18.dp)) {
             Text(t.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = TextDirection.Content), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            MonoLabel("${MoneyLedger.money(t.amount)} · ${MoneyLedger.shortDate(t.purchaseDate)}", Modifier.padding(bottom = 10.dp))
+            MonoLabel("${MoneyFormat.amount(t.amount)} · ${MoneyLedger.shortDate(t.purchaseDate)}", Modifier.padding(bottom = 10.dp))
             Segments(listOf("merchant" to "Always for this merchant", "one" to "Only this one"), if (forMerchant) "merchant" else "one") {
                 ledger.setForMerchant(it == "merchant")
             }

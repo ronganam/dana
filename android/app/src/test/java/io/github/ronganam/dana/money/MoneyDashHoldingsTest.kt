@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.money.AllocationRow
 import io.github.ronganam.dana.data.money.DatedValue
 import io.github.ronganam.dana.data.money.Flow
@@ -71,12 +72,12 @@ class MoneyDashHoldingsTest {
         assertEquals("", MoneyDashText.pctText(null))
         assertEquals("", MoneyDashText.pctText(Double.NaN))
         assertEquals(listOf("120", "15.5", "1,234.25", ""), listOf(120.0, 15.5, 1234.25, null).map { MoneyDashText.quantityText(it) })
-        assertEquals("₪250.00", MoneyDashText.unitPrice(250.0, "ILS"))
-        assertEquals("$150.00", MoneyDashText.unitPrice(150.0, "USD"))
-        assertEquals("₪0.50", MoneyDashText.unitPrice(0.5, "ILS"))
-        assertEquals("₪0.1235", MoneyDashText.unitPrice(0.12345, "NIS"))
-        assertEquals("12.50 CHF", MoneyDashText.unitPrice(12.5, "CHF"))
-        assertEquals("", MoneyDashText.unitPrice(null, "ILS"))
+        assertEquals("₪250.00", MoneyFormat.unitPrice(250.0, "ILS"))
+        assertEquals("$150.00", MoneyFormat.unitPrice(150.0, "USD"))
+        assertEquals("₪0.50", MoneyFormat.unitPrice(0.5, "ILS"))
+        assertEquals("₪0.1235", MoneyFormat.unitPrice(0.12345, "NIS"))
+        assertEquals("CHF12.50", MoneyFormat.unitPrice(12.5, "CHF"))
+        assertEquals("", MoneyFormat.unitPrice(null, "ILS"))
     }
 
     @Test fun valueChart() {

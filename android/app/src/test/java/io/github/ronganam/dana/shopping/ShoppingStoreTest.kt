@@ -24,8 +24,8 @@ import java.nio.file.Files
 /** The store: the disk cache, optimistic changes, the offline queue (order, client ids, dropped-when-gone, restarts), Undo. */
 class ShoppingStoreTest {
     private lateinit var dir: File
-    private val me = Who("d3b2f55f2a70", "Noa Peretz")
-    private val list = "a142b3bd0785"
+    private val me = ShoppingFixture.noa
+    private val list = ShoppingFixture.list
 
     /** A scripted server: answers per request, or unreachable. Records what it was sent. */
     private inner class FakeServer {
@@ -75,7 +75,7 @@ class ShoppingStoreTest {
         val bananas = s.shown()!!.items.first { it.name == "bananas" }
         val outcome = s.submit(ShoppingOp.Check("o1", list, bananas.id, true, "bananas"))
         assertTrue(outcome is ShoppingStore.Outcome.Sent)
-        assertEquals("0b2e817d7fd3", (outcome as ShoppingStore.Outcome.Sent).answer?.undo?.id)
+        assertEquals(ShoppingFixture.undoId("check"), (outcome as ShoppingStore.Outcome.Sent).answer?.undo?.id)
         assertEquals("/api/shopping/items/${bananas.id}?list=$list", server.writes().single().second)
         assertTrue(s.state.value.inflight.isEmpty() && s.state.value.queued.isEmpty())
     }
@@ -185,7 +185,7 @@ class ShoppingStoreTest {
         server.online = true
         assertEquals(0, s.flush())
         assertEquals(listOf("POST"), server.writes().map { it.first })
-        assertEquals(ShoppingStore.Cancel.Sent("8702857c9de9"), s.cancel("o2"))
+        assertEquals(ShoppingStore.Cancel.Sent(ShoppingFixture.undoId("add")), s.cancel("o2"))
         assertEquals(ShoppingStore.Cancel.Gone, s.cancel("o2"))
         assertEquals(ShoppingStore.Cancel.Gone, s.cancel("never"))
     }

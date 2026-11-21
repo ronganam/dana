@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money.charts
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -362,7 +363,7 @@ fun PaceChart(
                 TipTitle("${it.day} $monthName")
                 it.thisMonth?.let { t -> TipLine(MoneyPalette.line, "$thisName ${money(t)}") }
                 it.typical?.let { t -> TipLine(ink.axis, "Typical ${money(t)}", dashed = true) }
-                if (it.low != null && it.high != null && it.high > it.low) TipLine(null, "usually ${whole(it.low)} – ${whole(it.high)}", muted = true)
+                if (it.low != null && it.high != null && it.high > it.low) TipLine(null, "usually ${MoneyFormat.whole(it.low)} – ${MoneyFormat.whole(it.high)}", muted = true)
             }
         }
     ) {
@@ -397,8 +398,8 @@ fun PaceChart(
     }
 }
 
-private fun money(v: Long) = io.github.ronganam.dana.data.money.MoneyDashText.money(v, io.github.ronganam.dana.data.money.MoneyDashText.Sign.NONE)
-private fun whole(v: Long) = io.github.ronganam.dana.data.money.MoneyDashText.whole(v)
+private fun money(v: Long) = io.github.ronganam.dana.data.money.MoneyFormat.amount(v, io.github.ronganam.dana.data.money.MoneyFormat.Sign.NONE)
+private fun whole(v: Long) = io.github.ronganam.dana.data.money.MoneyFormat.whole(v)
 
 // ------------------------------------------------------------------ 12 months
 
@@ -496,7 +497,7 @@ fun CashflowChart(
                 listOf("income" to m.income, "fixed" to m.fixed, "yearly" to m.yearly, "everyday" to m.everyday, "one_off" to m.oneOff, "set_aside" to m.setAside)
                     .filter { it.second != 0L }
                     .forEach { (k, v) -> TipLine(MoneyPalette.flow(k), "${MoneyDashGeometry.FLOW_LABELS[k]} ${money(v)}") }
-                TipLine(ink.ink, "Net ${io.github.ronganam.dana.data.money.MoneyDashText.money(m.net, io.github.ronganam.dana.data.money.MoneyDashText.Sign.PLUS)}")
+                TipLine(ink.ink, "Net ${io.github.ronganam.dana.data.money.MoneyFormat.amount(m.net, io.github.ronganam.dana.data.money.MoneyFormat.Sign.PLUS)}")
                 m.savingsRate?.let { r -> TipLine(null, if (r >= 0) "Kept ${Math.round(r * 100)}% of income" else "More out than in", muted = true) }
             }
         }
@@ -566,7 +567,7 @@ fun BalanceChart(b: io.github.ronganam.dana.data.money.MoneyBalance, horizon: In
                 low.x < g.box.l + 60.dp.toPx() -> 0f
                 else -> 0.5f
             }
-            label(tm, "lowest ${io.github.ronganam.dana.data.money.MoneyDashText.compact(low.value.toDouble())}", low.x.toFloat(),
+            label(tm, "lowest ${io.github.ronganam.dana.data.money.MoneyFormat.compact(low.value.toDouble())}", low.x.toFloat(),
                 min(g.box.base - 8.dp.toPx(), low.y + 14.dp.toPx()).toFloat(), style.copy(color = ink.ink), align, backing = ink.canvas)
         }
         sel.value?.let { g.points.getOrNull(it) }?.let { p ->
@@ -579,8 +580,8 @@ fun BalanceChart(b: io.github.ronganam.dana.data.money.MoneyBalance, horizon: In
 private fun balanceTip(p: MoneyDashGeometry.TimePoint): @Composable () -> Unit = {
     TipTitle(io.github.ronganam.dana.data.money.MoneyDashText.longDate(p.date))
     TipLine(null, (if (p.forecast) "Forecast " else "Balance ") +
-        io.github.ronganam.dana.data.money.MoneyDashText.money(p.value, cents = !p.forecast))
-    if (p.forecast && p.low != null && p.high != null && p.low != p.high) TipLine(null, "${whole(p.low)} – ${whole(p.high)}", muted = true)
+        io.github.ronganam.dana.data.money.MoneyFormat.amount(p.value, cents = !p.forecast))
+    if (p.forecast && p.low != null && p.high != null && p.low != p.high) TipLine(null, "${MoneyFormat.whole(p.low)} – ${MoneyFormat.whole(p.high)}", muted = true)
 }
 
 /** Coming up's sparkline: the next 45 days of the forecast, scaled to itself, the 45-day low marked. */
@@ -636,8 +637,8 @@ fun ValueChart(p: io.github.ronganam.dana.data.money.MoneyPortfolio, days: Int, 
         tip = pt?.let { tp ->
             {
                 TipTitle(io.github.ronganam.dana.data.money.MoneyDashText.longDate(tp.date))
-                TipLine(null, "Value ${whole(tp.value)}")
-                if (tp.flow != 0L) TipLine(MoneyPalette.flow("set_aside"), "${if (tp.flow > 0) "Put in" else "Taken out"} ${whole(kotlin.math.abs(tp.flow))}", muted = true)
+                TipLine(null, "Value ${MoneyFormat.whole(tp.value)}")
+                if (tp.flow != 0L) TipLine(MoneyPalette.flow("set_aside"), "${if (tp.flow > 0) "Put in" else "Taken out"} ${MoneyFormat.whole(kotlin.math.abs(tp.flow))}", muted = true)
             }
         }
     ) {

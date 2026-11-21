@@ -1,10 +1,11 @@
 package io.github.ronganam.dana.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.money.MoneyBalance
 import io.github.ronganam.dana.data.money.MoneyCashflow
 import io.github.ronganam.dana.data.money.MoneyDashText
 import io.github.ronganam.dana.data.money.MoneyDashText.MINUS
-import io.github.ronganam.dana.data.money.MoneyDashText.Sign
+import io.github.ronganam.dana.data.money.MoneyFormat.Sign
 import io.github.ronganam.dana.data.money.MoneyForecast
 import io.github.ronganam.dana.data.money.MoneyOverview
 import io.github.ronganam.dana.data.money.MoneyRecurring
@@ -26,18 +27,18 @@ class MoneyDashTextTest {
     private val rec = MoneyRecurring.parse(MoneyDashFixture.web("recurring"))
 
     @Test fun money() {
-        assertEquals("$MINUS₪1,500.00", MoneyDashText.money(-150000))
-        assertEquals("+₪15,000.00", MoneyDashText.money(1500000, Sign.PLUS))
-        assertEquals("₪0.00", MoneyDashText.money(0, Sign.PLUS))
-        assertEquals("₪709.00", MoneyDashText.money(-70900, Sign.NONE))
-        assertEquals("₪4,777", MoneyDashText.whole(477684))
-        assertEquals("₪1,234,567.89", MoneyDashText.money(123456789))
+        assertEquals("$MINUS₪1,500.00", MoneyFormat.amount(-150000))
+        assertEquals("+₪15,000.00", MoneyFormat.amount(1500000, Sign.PLUS))
+        assertEquals("₪0.00", MoneyFormat.amount(0, Sign.PLUS))
+        assertEquals("₪709.00", MoneyFormat.amount(-70900, Sign.NONE))
+        assertEquals("₪4,777", MoneyFormat.whole(477684))
+        assertEquals("₪1,234,567.89", MoneyFormat.amount(123456789))
     }
 
     @Test fun compact() {
         assertEquals(listOf("₪0", "₪850", "₪4.8k", "₪20k", "₪1.5M", "₪5k"),
-            listOf(0.0, 85000.0, 480000.0, 2000000.0, 150000000.0, 500000.0).map { MoneyDashText.compact(it) })
-        assertEquals("$MINUS₪10k", MoneyDashText.compact(-1000000.0))
+            listOf(0.0, 85000.0, 480000.0, 2000000.0, 150000000.0, 500000.0).map { MoneyFormat.compact(it) })
+        assertEquals("$MINUS₪10k", MoneyFormat.compact(-1000000.0))
     }
 
     @Test fun dates() {

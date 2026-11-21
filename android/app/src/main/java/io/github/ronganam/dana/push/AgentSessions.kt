@@ -31,7 +31,7 @@ import java.time.OffsetDateTime
 
 /**
  * The user's coding-agent sessions (Claude Code, Codex) on the laptop, live
- * (server: integrations/phone/agent_sessions.py). Each `agent_sessions` push
+ * (server: server/addons/phone/agent_sessions.py). Each `agent_sessions` push
  * carries the whole list, so [show] makes the shade match it:
  *
  * - running / waiting → one ongoing notification per session, asked to be

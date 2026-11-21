@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,7 +16,7 @@ import io.github.ronganam.dana.data.money.MoneyBalance
 import io.github.ronganam.dana.data.money.MoneyCashflow
 import io.github.ronganam.dana.data.money.MoneyDashGeometry
 import io.github.ronganam.dana.data.money.MoneyDashText
-import io.github.ronganam.dana.data.money.MoneyDashText.Sign
+import io.github.ronganam.dana.data.money.MoneyFormat.Sign
 import io.github.ronganam.dana.data.money.MoneyOverview
 import io.github.ronganam.dana.data.money.MoneyRecurring
 import io.github.ronganam.dana.data.money.RecurringItem
@@ -73,12 +74,12 @@ private fun BankBalance(d: Dash) {
                 val now = fc?.balance ?: b.history.last().balance
                 val last = fc?.series?.lastOrNull()
                 Text(
-                    MoneyDashText.money(now) + " now" + (last?.let { " · about ${MoneyDashText.whole(it.balance)} on ${MoneyDashText.shortDate(it.date, d.today)}" } ?: ""),
+                    MoneyFormat.amount(now) + " now" + (last?.let { " · about ${MoneyFormat.whole(it.balance)} on ${MoneyDashText.shortDate(it.date, d.today)}" } ?: ""),
                     Modifier.padding(top = 10.dp), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum")
                 )
                 fc?.lowPoint?.let {
                     Text(
-                        "lowest ${MoneyDashText.whole(it.balance)} on ${MoneyDashText.shortDate(it.date, d.today)}",
+                        "lowest ${MoneyFormat.whole(it.balance)} on ${MoneyDashText.shortDate(it.date, d.today)}",
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                         color = if (it.balance < 0) MoneyPalette.bad else MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -103,7 +104,7 @@ private fun FixedCosts(d: Dash) {
     val ov = ovJson?.let { runCatching { MoneyOverview.parse(it) }.getOrNull() }?.takeIf { it.month == d.month }
     val r = d.parsed("recurring") { MoneyRecurring.parse(it) }
     val b = d.parsed("balance") { MoneyBalance.parse(it) }
-    DashSection("Fixed costs", trailing = ov?.let { { HeadNum(MoneyDashText.money(it.fixedMonthly, Sign.NONE), "/ month") } }) {
+    DashSection("Fixed costs", trailing = ov?.let { { HeadNum(MoneyFormat.amount(it.fixedMonthly, Sign.NONE), "/ month") } }) {
         if (r == null) SkelRows(5) else {
             val items = r.items.filter { it.direction != "in" }
             val keys = items.map { it.merchantKey }.toSet()
@@ -130,7 +131,7 @@ private fun FixedCosts(d: Dash) {
                     val pt = MoneyDashText.planText(p, d.today)
                     FixedRow(
                         d, p.merchant, listOf(pt.left, pt.next, d.accountName(p.accountId)).filter { it.isNotEmpty() }.joinToString(" · "), null,
-                        MoneyDashText.money(p.left, Sign.NONE), "to go", "${MoneyDashText.money(p.amount, Sign.NONE)} a payment", Color.Unspecified
+                        MoneyFormat.amount(p.left, Sign.NONE), "to go", "${MoneyFormat.amount(p.amount, Sign.NONE)} a payment", Color.Unspecified
                     )
                 }
             }

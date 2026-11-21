@@ -143,7 +143,7 @@ class ChatControllerStreamTest {
     private fun sse(vararg events: JSONObject): String =
         events.joinToString("") { ev -> (if (ev.has("seq")) "id: ${ev.getInt("seq")}\n" else "") + "data: $ev\n\n" }
 
-    /** Stamp events with run_id + consecutive seq, like core/runs.py does. */
+    /** Stamp events with run_id + consecutive seq, like server/core/runs.py does. */
     private fun runEvents(runId: String, startSeq: Int, vararg events: JSONObject): Array<JSONObject> =
         events.mapIndexed { i, e -> e.put("run_id", runId).put("seq", startSeq + i) }.toTypedArray()
 
@@ -200,6 +200,29 @@ class ChatControllerStreamTest {
         assertEquals("Need to add a task.", thoughts.reasoning)
         assertTrue("reasoning sits above the tool card", messages.indexOf(thoughts) < messages.indexOfFirst { it.toolCall != null })
         assertEquals("one answer bubble, built from deltas", 1, messages.count { it.message == "Added milk." })
+        assertFalse(messages.any { it.isThinking || it.isStreaming })
+        assertEquals("", chat.chatStatusText.value)
+    }
+
+    /**
+     * The server's own stream (`server/tests/fixtures/golden.sse`, captured by
+     * its run stream test): reasoning, two tools run side by side, the
+     * streamed answer, `run_end` and the closing `state`.
+     */
+    @Test
+    fun theServersGoldenStreamRenders() {
+        val golden = javaClass.classLoader!!.getResource("golden.sse")!!.readText()
+        messageResponse = MockResponse().setHeader("Content-Type", "text/event-stream").setBody(golden)
+
+        assertTrue(chat.sendChatMessage("look up a and b"))
+        waitUntil(what = "stream to finish") { !chat.isStreaming.value && chat.chatMessages.value.any { it.message == "Both lookups done." } }
+
+        val messages = chat.chatMessages.value
+        assertEquals("look up a and b", messages.first().message)
+        val tools = messages.mapNotNull { it.toolCall }
+        assertEquals(listOf("zz_slow_lookup", "zz_slow_lookup"), tools.map { it.toolName })
+        assertTrue(tools.none { it.isRunning || it.isPreparing })
+        assertEquals("one answer bubble", 1, messages.count { it.message == "Both lookups done." })
         assertFalse(messages.any { it.isThinking || it.isStreaming })
         assertEquals("", chat.chatStatusText.value)
     }
