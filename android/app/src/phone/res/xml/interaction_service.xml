@@ -2,7 +2,6 @@
 <voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:sessionService="io.github.ronganam.dana.DanaVoiceInteractionSessionService"
     android:recognitionService="io.github.ronganam.dana.DanaRecognitionService"
-    android:settingsActivity="io.github.ronganam.dana.SettingsActivity"
     android:supportsAssist="true"
     android:supportsLaunchVoiceAssistFromKeyguard="true"
     android:supportsLocalInteraction="true" />

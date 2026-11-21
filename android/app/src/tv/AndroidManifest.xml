@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Living-room TV build ("Dana TV"): home screen + "Hey Dana" + remote-button
-     camera picture-in-picture. Drops the phone-only pieces like the kiosk does. -->
+     camera picture-in-picture, on top of what every flavor has (src/main). -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
@@ -10,21 +10,8 @@
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- Camera PiP fallback when the button service is off; also lets the wake word open Dana over other apps. -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <!-- Granted over adb (bin/deploy-tv.sh): lets the app switch its button service back on after updates. -->
     <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" tools:ignore="ProtectedPermissions" />
-
-    <uses-permission android:name="android.permission.READ_CALL_LOG" tools:node="remove" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" tools:node="remove" />
-    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" tools:node="remove" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" tools:node="remove" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" tools:node="remove" />
-    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" tools:node="remove" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" tools:node="remove" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" tools:node="remove" />
-    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" tools:node="remove" />
-    <uses-permission android:name="android.permission.VIBRATE" tools:node="remove" />
 
     <queries>
         <!-- The home screen lists every launchable TV app. -->
@@ -46,11 +33,6 @@
         android:name=".tv.DanaTvApplication"
         tools:replace="android:name"
         android:banner="@drawable/tv_banner">
-        <!-- Phone-only: the notification Inbox listener. -->
-        <service android:name="io.github.ronganam.dana.data.notifications.DanaNotificationListener" tools:node="remove" />
-        <activity android:name="io.github.ronganam.dana.NotificationAlertActivity" tools:node="remove" />
-        <activity android:name="io.github.ronganam.dana.SuggestionsPopupActivity" tools:node="remove" />
-
         <activity
             android:name=".tv.TvHomeActivity"
             android:exported="true"
@@ -117,19 +99,5 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
-
-        <!-- The phone app's entry point stays (shared code links to it) but isn't launchable. -->
-        <activity android:name=".MainActivity" tools:node="merge">
-            <intent-filter tools:node="removeAll" />
-        </activity>
-
-        <receiver android:name=".BootReceiver" tools:node="remove" />
-        <receiver android:name=".data.sync.CallUploadReceiver" tools:node="remove" />
-        <receiver android:name=".push.AgentSessionReceiver" tools:node="remove" />
-        <service android:name=".DanaVoiceInteractionService" tools:node="remove" />
-        <service android:name=".DanaVoiceInteractionSessionService" tools:node="remove" />
-        <service android:name=".DanaRecognitionService" tools:node="remove" />
-        <service android:name=".CallRecordingObserverService" tools:node="remove" />
-        <service android:name=".data.wear.WearMessageListenerService" tools:node="remove" />
     </application>
 </manifest>
