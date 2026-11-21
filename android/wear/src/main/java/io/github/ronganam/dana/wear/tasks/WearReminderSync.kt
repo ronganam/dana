@@ -7,7 +7,9 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.google.android.gms.wearable.Wearable
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.decodeOrNull
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.builtins.serializer
 
 /**
  * Watch half of the phone/watch reminder sync (phone side:
@@ -25,7 +27,7 @@ object WearReminderSync {
 
     fun zones(context: Context): List<String> {
         val raw = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_ZONES, null)
-        return raw?.let { runCatching { org.json.JSONArray(it).let { a -> List(a.length()) { i -> a.getString(i) } } }.getOrNull() }
+        return raw?.let { ListSerializer(String.serializer()).decodeOrNull(it) }
             ?.takeIf { it.isNotEmpty() }
             ?: listOf("Home")
     }
@@ -36,7 +38,7 @@ object WearReminderSync {
     fun handledOnWatch(context: Context, taskId: String) {
         if (taskId.isEmpty()) return
         cancelNotification(context, taskId)
-        sendToPhone(context, WearPaths.REMINDER_HANDLED_ON_WATCH, ReminderHandled(taskId).toJson())
+        sendToPhone(context, WearPaths.REMINDER_HANDLED_ON_WATCH, ReminderHandled(taskId).encode())
     }
 
     /** The phone handled the alarm: stop ringing here. */
@@ -49,12 +51,12 @@ object WearReminderSync {
         (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).cancel(notificationId(taskId))
     }
 
-    fun sendToPhone(context: Context, path: String, payload: JSONObject) {
+    fun sendToPhone(context: Context, path: String, payload: String) {
         val app = context.applicationContext
         Wearable.getNodeClient(app).connectedNodes
             .addOnSuccessListener { nodes ->
                 val phoneId = nodes.firstOrNull()?.id ?: return@addOnSuccessListener
-                Wearable.getMessageClient(app).sendMessage(phoneId, path, payload.toString().toByteArray())
+                Wearable.getMessageClient(app).sendMessage(phoneId, path, payload.toByteArray())
                     .addOnFailureListener { e -> Log.w("WearReminderSync", "Couldn't send $path", e) }
             }
     }

@@ -67,7 +67,6 @@ import androidx.wear.compose.material.Text
 import io.github.ronganam.dana.wear.ui.theme.DanaWear
 import io.github.ronganam.dana.wear.ui.theme.DanaWearTheme
 import com.google.android.gms.wearable.Wearable
-import org.json.JSONObject
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.sin
@@ -129,13 +128,13 @@ class WearReminderActivity : ComponentActivity() {
                     onComplete = {
                         stopVibration()
                         WearReminderSync.handledOnWatch(this, taskId)
-                        sendAction(WearPaths.UPDATE_TASK_STATUS, TaskStatusRequest(taskId, "completed").toJson())
+                        sendAction(WearPaths.UPDATE_TASK_STATUS, TaskStatusRequest(taskId, "completed").encode())
                         finish()
                     },
                     onSnooze = { option ->
                         stopVibration()
                         WearReminderSync.handledOnWatch(this, taskId)
-                        sendAction(WearPaths.SNOOZE_TASK, option.request(taskId).toJson())
+                        sendAction(WearPaths.SNOOZE_TASK, option.request(taskId).encode())
                         finish()
                     },
                     onDismiss = {
@@ -148,12 +147,12 @@ class WearReminderActivity : ComponentActivity() {
         }
     }
 
-    private fun sendAction(path: String, payload: JSONObject) {
+    private fun sendAction(path: String, payload: String) {
         Wearable.getNodeClient(this).connectedNodes
             .addOnSuccessListener { nodes ->
                 val phoneId = nodes.firstOrNull()?.id ?: return@addOnSuccessListener
                 Wearable.getMessageClient(this)
-                    .sendMessage(phoneId, path, payload.toString().toByteArray())
+                    .sendMessage(phoneId, path, payload.toByteArray())
             }
     }
 

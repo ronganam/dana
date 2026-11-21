@@ -18,8 +18,11 @@ import io.github.ronganam.dana.DanaCards
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
-import org.json.JSONArray
-import org.json.JSONObject
+import io.github.ronganam.dana.protocol.DanaSnapshot
+import io.github.ronganam.dana.protocol.SnapshotEvent
+import io.github.ronganam.dana.protocol.SnapshotPerson
+import io.github.ronganam.dana.protocol.SnapshotSuggestion
+import io.github.ronganam.dana.protocol.SnapshotTask
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -47,31 +50,31 @@ data class WidgetSnapshot(
     companion object {
         private const val KEY = "widget_snapshot"
 
+        /** The stored snapshot ([DanaSnapshot]); an empty one when there is none yet. */
+        fun stored(context: Context): DanaSnapshot =
+            DanaSnapshot.decode(ServerConfig.prefs(context).getString(KEY, null)) ?: DanaSnapshot()
+
         fun load(context: Context): WidgetSnapshot {
-            val raw = ServerConfig.prefs(context).getString(KEY, null)
-            val o = runCatching { JSONObject(raw ?: "{}") }.getOrDefault(JSONObject())
-            fun arr(k: String) = o.optJSONArray(k) ?: JSONArray()
-            fun strs(a: JSONArray) = (0 until a.length()).map { a.optString(it) }
-            fun objs(a: JSONArray) = (0 until a.length()).mapNotNull { a.optJSONObject(it) }
+            val o = stored(context)
             // The briefing push may be newer than the last snapshot.
             val cached = DanaCards.cachedBriefing(context)
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
             val brief = cached?.takeIf { it.date == today }
             return WidgetSnapshot(
-                briefingHeadline = brief?.headline ?: o.optString("briefing_headline").takeIf { it.isNotBlank() },
-                briefingPoints = brief?.points ?: strs(arr("briefing_points")),
-                events = objs(arr("events")).map { it.optString("time") to it.optString("title") },
-                tasks = objs(arr("tasks")).map { Triple(it.optString("id"), it.optString("title"), it.optString("due")) },
-                suggestions = objs(arr("suggestions")).map { Triple(it.optString("id"), it.optString("title"), it.optString("source")) },
-                suggestionCount = o.optInt("suggestion_count"),
-                people = objs(arr("people")).map { WidgetPerson(it.optString("id"), it.optString("name"), it.optString("initials"), it.optString("ago"), it.optString("phone"), it.optInt("open"), it.optBoolean("drifting")) },
-                inboxNeeds = o.optInt("inbox_needs"), inboxActive = o.optInt("inbox_active"), inboxPoints = strs(arr("inbox_points")),
-                updatedAt = o.optLong("updated_at"),
+                briefingHeadline = brief?.headline ?: o.briefingHeadline?.takeIf { it.isNotBlank() },
+                briefingPoints = brief?.points ?: o.briefingPoints,
+                events = o.events.map { it.time to it.title },
+                tasks = o.tasks.map { Triple(it.id, it.title, it.due) },
+                suggestions = o.suggestions.map { Triple(it.id, it.title, it.source) },
+                suggestionCount = o.suggestionCount,
+                people = o.people.map { WidgetPerson(it.id, it.name, it.initials, it.ago, it.phone, it.open, it.drifting) },
+                inboxNeeds = o.inboxNeeds ?: 0, inboxActive = o.inboxActive, inboxPoints = o.inboxPoints,
+                updatedAt = o.updatedAt,
             )
         }
 
-        fun save(context: Context, o: JSONObject) {
-            ServerConfig.prefs(context).edit { putString(KEY, o.toString()) }
+        fun save(context: Context, snapshot: DanaSnapshot, commit: Boolean = false) {
+            ServerConfig.prefs(context).edit(commit = commit) { putString(KEY, snapshot.encode()) }
         }
     }
 }
@@ -103,17 +106,14 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Coroutin
             val shopping = async { safe { io.github.ronganam.dana.data.shopping.ShoppingSync.get(context).refresh() } }
             val events = async { safe { api.tasks.calendarEvents() } }
 
-            val previous = runCatching {
-                JSONObject(ServerConfig.prefs(context).getString("widget_snapshot", "{}") ?: "{}")
-            }.getOrDefault(JSONObject())
-            val o = JSONObject(previous.toString())
+            var o = WidgetSnapshot.stored(context)
             val today = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date())
 
-            briefing.await()?.let { b ->
+            o = briefing.await()?.let { b ->
                 DanaCards.storeBriefingQuietly(context, b)
-                o.put("briefing_headline", b.headline).put("briefing_points", JSONArray(b.points))
-            } ?: run { if (o.optString("briefing_date") != today) { o.remove("briefing_headline"); o.remove("briefing_points") } }
-            o.put("briefing_date", today)
+                o.copy(briefingHeadline = b.headline, briefingPoints = b.points)
+            } ?: if (o.briefingDate != today) o.copy(briefingHeadline = null, briefingPoints = emptyList()) else o
+            o = o.copy(briefingDate = today)
 
             tasks.await()?.let { list ->
                 val open = list.filter { it.status == "needs_action" }
@@ -122,41 +122,41 @@ class WidgetRefreshWorker(context: Context, params: WorkerParameters) : Coroutin
                     { t -> when (t.priority) { "urgent" -> 0; "high" -> 1; "medium" -> 2; else -> 3 } },
                     { t -> t.dueDate ?: "9999" },
                 ))
-                o.put("tasks", JSONArray(ranked.take(6).map { t ->
+                o = o.copy(tasks = ranked.take(6).map { t ->
                     val due = t.dueDate?.take(10)
-                    JSONObject().put("id", t.id).put("title", t.title).put("due", when {
+                    SnapshotTask(t.id, t.title, when {
                         due == null -> ""
                         due < today -> "overdue"
                         due == today -> "today"
                         else -> due.substring(5)
                     })
-                }))
+                })
             }
             sugg.await()?.let { list ->
-                o.put("suggestion_count", list.size)
-                o.put("suggestions", JSONArray(list.take(3).map { s ->
-                    JSONObject().put("id", s.id).put("title", s.payload.text("title").orEmpty())
-                        .put("source", if (s.sourceType == "notification") "notification" else "call")
-                }))
+                o = o.copy(
+                    suggestionCount = list.size,
+                    suggestions = list.take(3).map { s ->
+                        SnapshotSuggestion(s.id, s.payload.text("title").orEmpty(), if (s.sourceType == "notification") "notification" else "call")
+                    }
+                )
             }
             people.await()?.let { list ->
                 val shown = list.filter { it.pinned }.ifEmpty { list }.take(6)
-                o.put("people", JSONArray(shown.map { p ->
-                    JSONObject().put("id", p.id).put("name", p.name).put("initials", p.initials)
-                        .put("ago", p.stats.lastContactAgo).put("phone", p.phones.firstOrNull()?.let { "+$it" } ?: "")
-                        .put("open", p.openTasks).put("drifting", p.stats.drifting)
-                }))
+                o = o.copy(people = shown.map { p ->
+                    SnapshotPerson(
+                        id = p.id, name = p.name, initials = p.initials, ago = p.stats.lastContactAgo,
+                        phone = p.phones.firstOrNull()?.let { "+$it" } ?: "", open = p.openTasks, drifting = p.stats.drifting
+                    )
+                })
             }
-            inbox.await()?.let { c -> o.put("inbox_needs", c.needsYou).put("inbox_active", c.active) }
-            summaries.await()?.let { s -> o.put("inbox_points", JSONArray(s.overall?.points.orEmpty().take(3))) }
+            inbox.await()?.let { c -> o = o.copy(inboxNeeds = c.needsYou, inboxActive = c.active) }
+            summaries.await()?.let { s -> o = o.copy(inboxPoints = s.overall?.points.orEmpty().take(3)) }
             shopping.await()
-            io.github.ronganam.dana.data.shopping.ShoppingSnapshot.merge(
-                o, io.github.ronganam.dana.data.shopping.ShoppingSnapshot.fields(io.github.ronganam.dana.data.shopping.ShoppingSync.get(context).shown())
-            )
+            o = io.github.ronganam.dana.data.shopping.ShoppingSnapshot.apply(o, io.github.ronganam.dana.data.shopping.ShoppingSync.get(context).shown())
             events.await()?.let { list ->
-                o.put("events", JSONArray(todaysEvents(list).take(4).map { JSONObject().put("time", it.first).put("title", it.second) }))
+                o = o.copy(events = todaysEvents(list).take(4).map { SnapshotEvent(it.first, it.second) })
             }
-            o.put("updated_at", System.currentTimeMillis())
+            o = o.copy(updatedAt = System.currentTimeMillis())
             WidgetSnapshot.save(context, o)
             io.github.ronganam.dana.data.wear.WearCards.sendSnapshot(context, o)
         }

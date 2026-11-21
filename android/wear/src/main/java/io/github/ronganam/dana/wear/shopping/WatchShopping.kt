@@ -1,10 +1,13 @@
 package io.github.ronganam.dana.wear.shopping
 
+import io.github.ronganam.dana.protocol.ShopItem
 import android.content.Context
 import android.net.Uri
 import android.os.SystemClock
 import android.util.Log
-import io.github.ronganam.dana.wear.cards.DanaSnapshot
+import io.github.ronganam.dana.protocol.DanaSnapshot
+import io.github.ronganam.dana.protocol.ShopAnswer
+import io.github.ronganam.dana.wear.cards.SnapshotStore
 import com.google.android.gms.wearable.MessageClient
 import com.google.android.gms.wearable.Wearable
 import kotlinx.coroutines.CoroutineScope
@@ -18,7 +21,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import org.json.JSONObject
 import java.util.UUID
 
 /**
@@ -48,7 +50,7 @@ object WatchShopping {
 
     private val answers = MessageClient.OnMessageReceivedListener { event ->
         if (event.path != ShoppingLink.PATH_ANSWER) return@OnMessageReceivedListener
-        runCatching { JSONObject(String(event.data)) }.getOrNull()?.let { scope.launch { onAnswer(it) } }
+        ShopAnswer.decode(String(event.data))?.let { scope.launch { onAnswer(it) } }
     }
 
     fun now(): Long = SystemClock.elapsedRealtime()
@@ -61,7 +63,7 @@ object WatchShopping {
             val c = context.applicationContext
             app = c
             val queue = Shop.parseQueue(c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_QUEUE, null))
-            _state.value = ShopState(list = ShopList.parse(DanaSnapshot.load(c)), pending = queue)
+            _state.value = ShopState(list = ShopList.parse(SnapshotStore.load(c)), pending = queue)
             runCatching {
                 Wearable.getMessageClient(c).addListener(answers, Uri.parse("wear://*${ShoppingLink.PATH_ANSWER}"), MessageClient.FILTER_LITERAL)
             }.onFailure { Log.w(TAG, "Couldn't listen for answers", it) }
@@ -113,7 +115,7 @@ object WatchShopping {
     // ---------- the phone ----------
 
     /** A snapshot arrived (`/wear/dana_snapshot`): the phone is reachable, so send what waits. */
-    fun onSnapshot(context: Context, snapshot: JSONObject) {
+    fun onSnapshot(context: Context, snapshot: DanaSnapshot) {
         init(context)
         val list = ShopList.parse(snapshot)
         scope.launch {
@@ -122,7 +124,7 @@ object WatchShopping {
         }
     }
 
-    fun onAnswer(answer: JSONObject) {
+    fun onAnswer(answer: ShopAnswer) {
         update { Shop.answered(it, answer, now()) }
         pump()
     }
@@ -152,7 +154,7 @@ object WatchShopping {
         val count = Shop.toBuy(after, now())
         if (count != lastCount) {
             lastCount = count
-            app?.let { DanaSnapshot.refreshSurfaces(it) }
+            app?.let { SnapshotStore.refreshSurfaces(it) }
         }
     }
 

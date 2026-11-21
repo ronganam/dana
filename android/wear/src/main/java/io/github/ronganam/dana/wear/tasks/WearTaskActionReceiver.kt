@@ -7,7 +7,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.google.android.gms.wearable.Wearable
-import org.json.JSONObject
 
 class WearTaskActionReceiver : BroadcastReceiver() {
 
@@ -17,11 +16,11 @@ class WearTaskActionReceiver : BroadcastReceiver() {
 
         when (action) {
             "complete" -> {
-                sendAction(context, WearPaths.UPDATE_TASK_STATUS, TaskStatusRequest(taskId, "completed").toJson())
+                sendAction(context, WearPaths.UPDATE_TASK_STATUS, TaskStatusRequest(taskId, "completed").encode())
             }
             "snooze" -> {
                 val minutes = intent.getIntExtra("snooze_minutes", 60)
-                sendAction(context, WearPaths.SNOOZE_TASK, SnoozeRequest(taskId, "time", minutes = minutes).toJson())
+                sendAction(context, WearPaths.SNOOZE_TASK, SnoozeRequest(taskId, "time", minutes = minutes).encode())
             }
         }
 
@@ -29,12 +28,12 @@ class WearTaskActionReceiver : BroadcastReceiver() {
         WearReminderSync.handledOnWatch(context, taskId)
     }
 
-    private fun sendAction(context: Context, path: String, payload: JSONObject) {
+    private fun sendAction(context: Context, path: String, payload: String) {
         Wearable.getNodeClient(context).connectedNodes
             .addOnSuccessListener { nodes ->
                 val phoneId = nodes.firstOrNull()?.id ?: return@addOnSuccessListener
                 Wearable.getMessageClient(context)
-                    .sendMessage(phoneId, path, payload.toString().toByteArray())
+                    .sendMessage(phoneId, path, payload.toByteArray())
             }
     }
 }

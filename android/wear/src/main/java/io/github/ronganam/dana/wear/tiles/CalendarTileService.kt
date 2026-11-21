@@ -17,7 +17,7 @@ import androidx.wear.tiles.TileService
 import com.google.common.util.concurrent.Futures
 import com.google.common.util.concurrent.ListenableFuture
 import io.github.ronganam.dana.wear.data.WearPrefs
-import org.json.JSONArray
+import io.github.ronganam.dana.protocol.WearEvent
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -240,40 +240,21 @@ class CalendarTileService : TileService() {
     }
 
     private fun parseFilteredEvents(json: String): List<CalendarEventItem> {
-        val result = mutableListOf<CalendarEventItem>()
-        try {
-            val array = JSONArray(json)
-            val now = Date().time
-            val graceMs = 30 * 60 * 1000L
-            val twoDaysLater = Calendar.getInstance().apply {
-                add(Calendar.DAY_OF_MONTH, 2)
-                set(Calendar.HOUR_OF_DAY, 23)
-                set(Calendar.MINUTE, 59)
-                set(Calendar.SECOND, 59)
-            }.timeInMillis
-
-            for (i in 0 until array.length()) {
-                val obj = array.getJSONObject(i)
-                if (obj.optBoolean("all_day", false)) continue
-
-                val startStr = obj.optString("start", "")
-                val endStr = obj.optString("end", "")
-
-                val startMs = parseIsoTime(startStr) ?: continue
-                val endMs = if (endStr.isNotEmpty()) parseIsoTime(endStr) else null
-
-                if (endMs != null && now > endMs + graceMs) continue
-                if (startMs > twoDaysLater) continue
-
-                result.add(
-                    CalendarEventItem(
-                        title = obj.optString("summary", ""),
-                        startTime = startStr
-                    )
-                )
-            }
-        } catch (e: org.json.JSONException) {
-            android.util.Log.w("CalendarTile", "Cached events aren't valid JSON", e)
+        val now = Date().time
+        val graceMs = 30 * 60 * 1000L
+        val twoDaysLater = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_MONTH, 2)
+            set(Calendar.HOUR_OF_DAY, 23)
+            set(Calendar.MINUTE, 59)
+            set(Calendar.SECOND, 59)
+        }.timeInMillis
+        val result = WearEvent.decodeList(json).mapNotNull { event ->
+            if (event.allDay) return@mapNotNull null
+            val startMs = parseIsoTime(event.start) ?: return@mapNotNull null
+            val endMs = if (event.end.isNotEmpty()) parseIsoTime(event.end) else null
+            if (endMs != null && now > endMs + graceMs) return@mapNotNull null
+            if (startMs > twoDaysLater) return@mapNotNull null
+            CalendarEventItem(title = event.summary, startTime = event.start)
         }
         return result.sortedBy { parseIsoTime(it.startTime) ?: 0L }
     }

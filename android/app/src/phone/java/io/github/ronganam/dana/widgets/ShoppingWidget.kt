@@ -1,6 +1,5 @@
 package io.github.ronganam.dana.widgets
 
-import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
 import android.util.Log
@@ -52,8 +51,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import org.json.JSONObject
-import androidx.core.content.edit
+import io.github.ronganam.dana.protocol.DanaSnapshot
 
 /**
  * The Shopping widget: what is left to buy in the server's order, aisle by
@@ -209,11 +207,9 @@ object ShoppingWidgetSync {
 
     /** Put the current shopping fields into the widget snapshot; returns the whole snapshot. */
     @Synchronized
-    fun writeFields(context: Context): JSONObject {
-        val prefs = ServerConfig.prefs(context)
-        val o = runCatching { JSONObject(prefs.getString("widget_snapshot", "{}") ?: "{}") }.getOrDefault(JSONObject())
-        ShoppingSnapshot.merge(o, ShoppingSnapshot.fields(ShoppingSync.get(context).shown()))
-        prefs.edit { putString("widget_snapshot", o.toString()) }
+    fun writeFields(context: Context): DanaSnapshot {
+        val o = ShoppingSnapshot.apply(WidgetSnapshot.stored(context), ShoppingSync.get(context).shown())
+        WidgetSnapshot.save(context, o)
         return o
     }
 }
