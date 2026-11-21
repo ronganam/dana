@@ -35,7 +35,7 @@ import org.junit.Test
 
 class NowModelTest {
 
-    /** Shaped like `GET /api/now` (core/now.py): a suggestion with choices + checks, a reminder, a notification, junk. */
+    /** Shaped like `GET /api/now` (server/core/now.py): a suggestion with choices + checks, a reminder, a notification, junk. */
     private val payloadJson = """
     {
       "now": "2026-11-14T18:40:00+02:00",

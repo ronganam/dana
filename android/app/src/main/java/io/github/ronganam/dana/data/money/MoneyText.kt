@@ -1,7 +1,5 @@
 package io.github.ronganam.dana.data.money
 
-import java.text.DecimalFormat
-import java.text.DecimalFormatSymbols
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
@@ -13,43 +11,10 @@ import kotlin.math.abs
 
 /**
  * Pure words and numbers of the Money screens (like the web's
- * `static/money-core.js`): shekels from agorot, months, "2 h ago".
+ * `server/static/money-core.js`): months, "2 h ago". Amounts: [MoneyFormat].
  * Tested in `MoneyTextTest`.
  */
 object MoneyText {
-    private val whole = DecimalFormat("#,##0", DecimalFormatSymbols(Locale.US))
-    private val cents = DecimalFormat("#,##0.00", DecimalFormatSymbols(Locale.US))
-
-    /**
-     * "₪1,234" (whole shekels) or "₪1,234.50" when [exact] and there are
-     * agorot; money out (negative) gets a minus sign "−₪12". [signed] puts
-     * "+" before money in.
-     */
-    fun shekels(agorot: Long, exact: Boolean = false, signed: Boolean = false): String {
-        val a = abs(agorot)
-        val body = if (exact && a % 100 != 0L) cents.format(a / 100.0) else whole.format(Math.round(a / 100.0))
-        val sign = when {
-            agorot < 0 -> "−"
-            signed && agorot > 0 -> "+"
-            else -> ""
-        }
-        return "$sign₪$body"
-    }
-
-    /** "₪12.4k" / "₪1.2M" for chart axes and tight tiles. */
-    fun shekelsShort(agorot: Long): String {
-        val s = abs(agorot) / 100.0
-        val sign = if (agorot < 0) "−" else ""
-        return sign + when {
-            s >= 1_000_000 -> "₪" + trim(s / 1_000_000) + "M"
-            s >= 10_000 -> "₪" + Math.round(s / 1000) + "k"
-            s >= 1_000 -> "₪" + trim(s / 1000) + "k"
-            else -> "₪" + Math.round(s)
-        }
-    }
-
-    private fun trim(v: Double): String = String.format(Locale.US, "%.1f", v).removeSuffix(".0")
-
     fun thisMonth(today: LocalDate = LocalDate.now()): String = YearMonth.from(today).toString()
 
     /** "2026-11" ± [by] months. */

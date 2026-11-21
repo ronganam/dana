@@ -135,6 +135,11 @@ android {
             kotlin.directories += "src/wake/java"
             assets.directories += "src/wake/assets"
         }
+        // The server's captured payloads (`*_web.json`, `golden.sse`) are the
+        // contract tests' fixtures, read where the server writes them.
+        getByName("test") {
+            resources.directories += "../../server/tests/fixtures"
+        }
     }
 
     buildTypes {
@@ -163,6 +168,11 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = true
+        // Money and dates are written the way the phone's locale writes them: tests pin en-US.
+        unitTests.all {
+            it.systemProperty("user.language", "en")
+            it.systemProperty("user.country", "US")
+        }
     }
 }
 

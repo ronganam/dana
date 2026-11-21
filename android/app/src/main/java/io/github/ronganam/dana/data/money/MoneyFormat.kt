@@ -27,8 +27,7 @@ object MoneyFormat {
 
     /** Set the user's currency from its ISO code; an unknown or blank code keeps the current one. */
     fun use(code: String?) {
-        val c = code?.trim()?.uppercase()?.let { if (it == "NIS") "ILS" else it }?.takeIf { it.isNotEmpty() } ?: return
-        runCatching { Currency.getInstance(c) }.getOrNull()?.let { currency = it }
+        currencyOf(code)?.let { currency = it }
     }
 
     /** The currency's symbol as [locale] writes it ("₪", "$", "€"). */
@@ -73,8 +72,8 @@ object MoneyFormat {
     /** Whole units, rounded ("₪4,018"). */
     fun whole(minor: Long, sign: Sign = Sign.MINUS): String = amount(minor, sign, cents = false)
 
-    /** An amount already in whole units (a project's budget, a price typed as 4,500) → "₪4,500". */
-    fun major(value: Double, sign: Sign = Sign.MINUS): String = whole(Math.round(value * minorPerMajor), sign)
+    /** An amount already in whole units (a project's budget, a price typed as 4,500) → "₪4,500"; [cents] as in [amount]. */
+    fun major(value: Double, sign: Sign = Sign.MINUS, cents: Boolean? = false): String = amount(Math.round(value * minorPerMajor), sign, cents)
 
     /** Short axis and tile values: ₪850, ₪4.8k, ₪12k, ₪1.2M (from minor units). */
     fun compact(minor: Double, sign: Sign = Sign.MINUS): String {
@@ -94,14 +93,36 @@ object MoneyFormat {
     /** A short value of whole units ("₪12k", "₪850"). */
     fun compactMajor(value: Double): String = compact(value * minorPerMajor)
 
+    /** Whole units in thousands with one decimal, like the web's Projects panel: "₪13.4k", "₪150k"; under 1,000 as [major]. */
+    fun thousands(value: Double): String {
+        if (abs(value) < 1000) return major(value)
+        val k = Math.round(value / 100) / 10.0
+        val number = String.format(locale, if (k % 1.0 == 0.0) "%,.0f" else "%,.1f", abs(k)) + "k"
+        val body = if (symbolFirst) symbol + number else "$number $symbol"
+        return if (k < 0) MINUS + body else body
+    }
+
     /** "Price (₪)", "Budget (₪)": a label for a field that takes amounts. */
     fun label(text: String): String = "$text ($symbol)"
+
+    private fun currencyOf(code: String?): Currency? =
+        code?.trim()?.uppercase()?.let { if (it == "NIS") "ILS" else it }?.takeIf { it.isNotEmpty() }
+            ?.let { runCatching { Currency.getInstance(it) }.getOrNull() }
+
+    /** Whether [code] is the user's currency ("NIS" counts as ILS). */
+    fun isUsers(code: String?): Boolean = currencyOf(code) == currency
+
+    /** A foreign amount in that currency's minor units → "$5.00", "€35.00" (absolute). */
+    fun foreign(minor: Long, code: String): String {
+        val cur = currencyOf(code) ?: return "${BigDecimal(abs(minor)).movePointLeft(2).toPlainString()} $code".trim()
+        val digits = cur.defaultFractionDigits.coerceAtLeast(0)
+        return format(cur, digits).format(BigDecimal(abs(minor)).movePointLeft(digits))
+    }
 
     /** A unit price in its own currency (holdings): "₪250.00", "$150.00"; 4 decimals under 1. */
     fun unitPrice(price: Double?, code: String?): String {
         if (price == null || price.isNaN()) return ""
-        val cur = code?.trim()?.uppercase()?.let { if (it == "NIS") "ILS" else it }?.takeIf { it.isNotEmpty() }
-            ?.let { runCatching { Currency.getInstance(it) }.getOrNull() } ?: currency
+        val cur = currencyOf(code) ?: currency
         val a = abs(price)
         val f = format(cur, 2).apply { if (a < 1) maximumFractionDigits = 4 }
         return f.format(BigDecimal(a))

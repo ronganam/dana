@@ -33,7 +33,7 @@ class NotificationSyncWorker(appContext: Context, params: WorkerParameters) : Co
         io.github.ronganam.dana.push.PushSetup.ensureRegistered(ctx)
         io.github.ronganam.dana.push.PhoneEvents.catchUp(ctx)
         val api = ServerConfig.load(ctx).api()
-        // Bank / card app notifications for the money kind: their own queue and endpoint.
+        // Bank / card app notifications for the money add-on: their own queue and endpoint.
         val moneyDone = io.github.ronganam.dana.data.money.MoneySignals.drain(ctx, api)
         return try {
             var rounds = 0

@@ -77,7 +77,7 @@ data class SessionState(
 data class RunModel(val id: String = "", val label: OptString = null)
 
 /**
- * One event of a run (server `core/runs.py`), from the SSE stream, a reattach
+ * One event of a run (server `server/core/runs.py`), from the SSE stream, a reattach
  * or the voice socket. Which fields are set depends on [type]; the rest keep
  * their defaults. The closing `state` frame carries [state].
  */

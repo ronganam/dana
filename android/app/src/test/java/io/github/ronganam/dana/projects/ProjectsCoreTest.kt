@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.projects
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.projects.Column
 import io.github.ronganam.dana.data.projects.Entry
 import io.github.ronganam.dana.data.projects.EntryField
@@ -35,11 +36,11 @@ class ProjectsCoreTest {
 
     @Test
     fun formatsMoney() {
-        assertEquals("₪13,400", ProjectsCore.money(13400.0))
-        assertEquals("-₪500", ProjectsCore.money(-500.0))
-        assertEquals("₪13.4k", ProjectsCore.shortMoney(13400.0))
-        assertEquals("₪150k", ProjectsCore.shortMoney(150000.0))
-        assertEquals("₪900", ProjectsCore.shortMoney(900.0))
+        assertEquals("₪13,400", MoneyFormat.major(13400.0))
+        assertEquals("−₪500", MoneyFormat.major(-500.0))
+        assertEquals("₪13.4k", MoneyFormat.thousands(13400.0))
+        assertEquals("₪150k", MoneyFormat.thousands(150000.0))
+        assertEquals("₪900", MoneyFormat.thousands(900.0))
         assertEquals("4.5", ProjectsCore.number(4.5))
         assertEquals("1,200", ProjectsCore.number(1200.0))
     }

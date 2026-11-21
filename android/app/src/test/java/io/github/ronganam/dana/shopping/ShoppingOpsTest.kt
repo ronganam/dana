@@ -14,8 +14,8 @@ import org.junit.Test
 
 /** Changes applied on screen (the server's add rules), versions, requests and the queue's encoding. */
 class ShoppingOpsTest {
-    private val me = Who("d3b2f55f2a70", "Noa Peretz")
-    private val now = "2026-11-16T15:00:00Z"
+    private val me = ShoppingFixture.noa
+    private val now = "2100-01-01T15:00:00Z" // after any capture of the fixture
     private val s = ShoppingFixture.screen("owner_shared")
     private val list = s.list.id
 

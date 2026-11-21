@@ -44,7 +44,7 @@ private data class VersionEntry(
  * Checks the Dana server for new app versions and performs the
  * download + system-installer handoff.
  *
- * Server endpoints (the server's core/app_updates.py):
+ * Server endpoints (server/core/app_updates.py):
  *   GET {server}/api/app/version          -> {"phone": {...}, "wear": {...}}
  *   GET {server}/api/app/download/{file}  -> the APK
  */

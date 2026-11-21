@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.money.MoneyLedger
 import io.github.ronganam.dana.data.money.MoneyLedger.MINUS
 import io.github.ronganam.dana.data.money.Txn
@@ -13,7 +14,7 @@ import java.time.LocalDate
 
 /**
  * Transactions, the detail and Accounts against the server's own payloads:
- * `test_fixtures/money_web.json` of the server repo (a synthetic dataset,
+ * `server/tests/fixtures/money_web.json` (a synthetic dataset,
  * today 18 Nov 2026), the same assertions as its `test_web_money.mjs`.
  */
 class MoneyLedgerTest {
@@ -29,15 +30,15 @@ class MoneyLedgerTest {
 
     @Test
     fun moneyAndDates() {
-        assertEquals("$MINUS₪1,500.00", MoneyLedger.money(-150000))
-        assertEquals("+₪15,000.00", MoneyLedger.money(1500000, sign = "plus"))
-        assertEquals("₪0.00", MoneyLedger.money(0, sign = "plus"))
-        assertEquals("₪709.00", MoneyLedger.money(-70900, sign = "none"))
-        assertEquals("₪4,777", MoneyLedger.money(477684, cents = false))
-        assertEquals("₪100", MoneyLedger.money(10000, cents = null))
-        assertEquals("₪15.94", MoneyLedger.money(1594, cents = null))
-        assertEquals("€35.00", MoneyLedger.foreignText(-3500, "EUR"))
-        assertEquals("5.00 CHF", MoneyLedger.foreignText(500, "CHF"))
+        assertEquals("$MINUS₪1,500.00", MoneyFormat.amount(-150000))
+        assertEquals("+₪15,000.00", MoneyFormat.amount(1500000, sign = MoneyFormat.Sign.PLUS))
+        assertEquals("₪0.00", MoneyFormat.amount(0, sign = MoneyFormat.Sign.PLUS))
+        assertEquals("₪709.00", MoneyFormat.amount(-70900, sign = MoneyFormat.Sign.NONE))
+        assertEquals("₪4,777", MoneyFormat.amount(477684, cents = false))
+        assertEquals("₪100", MoneyFormat.amount(10000, cents = null))
+        assertEquals("₪15.94", MoneyFormat.amount(1594, cents = null))
+        assertEquals("€35.00", MoneyFormat.foreign(-3500, "EUR"))
+        assertEquals("CHF5.00", MoneyFormat.foreign(500, "CHF"))
         assertEquals("Today", MoneyLedger.dayLabel("2026-11-18", today))
         assertEquals("Yesterday", MoneyLedger.dayLabel("2026-11-17", today))
         assertEquals("Mon 16 Nov", MoneyLedger.dayLabel("2026-11-16", today))

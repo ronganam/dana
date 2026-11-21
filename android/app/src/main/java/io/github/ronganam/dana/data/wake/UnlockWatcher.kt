@@ -18,7 +18,7 @@ import java.time.LocalDate
 import java.time.LocalTime
 
 /**
- * The morning wake signal (server `core/webhooks.py::handle_wake`): the first
+ * The morning wake signal (server `server/core/wake.py`): the first
  * unlocks of the day between 05:00 and 12:00 are reported to the server, which
  * confirms from the screen history that the user is really up and then fires the
  * wake reminders and the briefing. An alarm ringing or a glance at the clock

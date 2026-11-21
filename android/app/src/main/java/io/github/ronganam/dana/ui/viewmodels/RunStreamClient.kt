@@ -26,7 +26,7 @@ internal class RunTracker {
 }
 
 /**
- * Follows a run over Server-Sent Events (server `core/runs.py`). Every
+ * Follows a run over Server-Sent Events (server `server/core/runs.py`). Every
  * stream closes with a `state` frame; one that drops before it reattaches to
  * `GET /api/sessions/{id}/stream` after the last seen `seq` (backing off, for
  * up to [REATTACH_GIVE_UP_MS]); a 409 (the session is busy) follows the run

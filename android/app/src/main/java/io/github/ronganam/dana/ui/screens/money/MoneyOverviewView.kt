@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -18,7 +19,7 @@ import io.github.ronganam.dana.data.money.Insight
 import io.github.ronganam.dana.data.money.MoneyBalance
 import io.github.ronganam.dana.data.money.MoneyCashflow
 import io.github.ronganam.dana.data.money.MoneyDashText
-import io.github.ronganam.dana.data.money.MoneyDashText.Sign
+import io.github.ronganam.dana.data.money.MoneyFormat.Sign
 import io.github.ronganam.dana.data.money.MoneyInsights
 import io.github.ronganam.dana.data.money.MoneyOverview
 import io.github.ronganam.dana.data.money.MoneyPace
@@ -87,28 +88,28 @@ private fun overviewTiles(d: Dash, ov: MoneyOverview, cf: MoneyCashflow?, fc: io
     val fx = MoneyDashText.fixedTile(ov)
     return listOf(
         TileData(
-            net.label, MoneyDashText.money(net.value, Sign.PLUS), tone = if (net.value < 0) bad else good,
+            net.label, MoneyFormat.amount(net.value, Sign.PLUS), tone = if (net.value < 0) bad else good,
             strong = net.rate + if (net.typical.isNotEmpty()) " · ${net.typical}" else "", sub = net.sub,
             onClick = { money.select(MoneyView.CASHFLOW) }
         ),
         TileData(
-            "Everyday spending", MoneyDashText.money(ev.value, Sign.NONE),
+            "Everyday spending", MoneyFormat.amount(ev.value, Sign.NONE),
             strong = ev.track.takeIf { it.isNotEmpty() }?.let { (if (ev.dir == "up") "↗ " else if (ev.dir == "down") "↘ " else "") + it },
             strongTone = when (ev.dir) { "up" -> bad; "down" -> good; else -> null },
             sub = ev.typical.ifEmpty { if (ov.inProgress) "so far this month" else "in all" },
             onClick = { money.select(MoneyView.SPENDING) }
         ),
         if (bt != null) TileData(
-            "Balance ahead", MoneyDashText.money(bt.value), tone = if (bt.value < 0) bad else null,
+            "Balance ahead", MoneyFormat.amount(bt.value), tone = if (bt.value < 0) bad else null,
             strong = bt.low, strongTone = if (bt.tone == "bad") bad else null, sub = bt.end,
             onClick = { money.select(MoneyView.CASHFLOW) }
         ) else TileData(
-            "One-offs", MoneyDashText.money(ov.oneOff, Sign.NONE),
-            sub = if (ov.setAside != 0L) "Set aside ${MoneyDashText.whole(ov.setAside, Sign.NONE)}" else "left out of everyday spending",
+            "One-offs", MoneyFormat.amount(ov.oneOff, Sign.NONE),
+            sub = if (ov.setAside != 0L) "Set aside ${MoneyFormat.whole(ov.setAside, Sign.NONE)}" else "left out of everyday spending",
             onClick = { money.select(MoneyView.SPENDING) }
         ),
         TileData(
-            "Fixed costs", MoneyDashText.money(fx.value, Sign.NONE), per = "/ month",
+            "Fixed costs", MoneyFormat.amount(fx.value, Sign.NONE), per = "/ month",
             strong = fx.share, sub = fx.yearly.ifEmpty { "recurring and yearly charges" },
             onClick = { money.select(MoneyView.CASHFLOW) }
         )
@@ -196,14 +197,14 @@ private fun ComingUp(d: Dash) {
                 val low = fc.soonLow
                 Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Bottom) {
                     Text(
-                        MoneyDashText.money(fc.balance) + " now" +
-                            (last?.let { " → about ${MoneyDashText.whole(it.balance)} on ${MoneyDashText.shortDate(it.date, d.today)}" } ?: ""),
+                        MoneyFormat.amount(fc.balance) + " now" +
+                            (last?.let { " → about ${MoneyFormat.whole(it.balance)} on ${MoneyDashText.shortDate(it.date, d.today)}" } ?: ""),
                         style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum")
                     )
                 }
                 if (low != null && low.balance < fc.balance) {
                     Text(
-                        "lowest ${MoneyDashText.whole(low.balance)} on ${MoneyDashText.shortDate(low.date, d.today)}",
+                        "lowest ${MoneyFormat.whole(low.balance)} on ${MoneyDashText.shortDate(low.date, d.today)}",
                         style = MaterialTheme.typography.bodySmall.copy(fontWeight = FontWeight.Medium),
                         color = if (low.balance < 0) MoneyPalette.bad else MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -229,7 +230,7 @@ private fun ComingUp(d: Dash) {
                         Column(horizontalAlignment = Alignment.End) {
                             if (e.estimated) MonoLabel("about")
                             Amount(
-                                MoneyDashText.money(e.amount, if (e.amount > 0) Sign.PLUS else Sign.MINUS, cents = !e.estimated),
+                                MoneyFormat.amount(e.amount, if (e.amount > 0) Sign.PLUS else Sign.MINUS, cents = !e.estimated),
                                 MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
                                 if (e.amount > 0) MoneyPalette.good else Color.Unspecified
                             )
@@ -254,7 +255,7 @@ private fun BillParts(u: MoneyDashText.Upcoming) {
         u.parts.forEach { p ->
             Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                 Text(p.label, style = MaterialTheme.typography.bodySmall, modifier = Modifier.weight(1f))
-                Amount(MoneyDashText.money(p.amount, Sign.NONE, cents = p.key != "everyday"), MaterialTheme.typography.bodySmall)
+                Amount(MoneyFormat.amount(p.amount, Sign.NONE, cents = p.key != "everyday"), MaterialTheme.typography.bodySmall)
             }
         }
         if (u.event.items.isNotEmpty()) {
@@ -263,7 +264,7 @@ private fun BillParts(u: MoneyDashText.Upcoming) {
                 Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f).padding(end = 8.dp)) { Name(it.label, style = MaterialTheme.typography.bodySmall) }
                     Text("${ITEM_KINDS[it.kind] ?: ""} · ", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    Amount(MoneyDashText.money(it.amount, Sign.NONE), MaterialTheme.typography.bodySmall)
+                    Amount(MoneyFormat.amount(it.amount, Sign.NONE), MaterialTheme.typography.bodySmall)
                 }
             }
         }
@@ -304,9 +305,9 @@ private fun PaceBody(d: Dash, ov: MoneyOverview, p: MoneyPace) {
         val so = p.thisMonth.lastOrNull { it != null } ?: 0L
         val at = p.today?.let { it - 1 } ?: ((p.typical?.size ?: 0) - 1)
         val typ = p.typical?.takeIf { at >= 0 }?.getOrNull(minOf(at, p.typical.size - 1))
-        val track = if (ov.month == p.month && ov.everyday.onTrack != null && p.today != null) " · on track for ${MoneyDashText.whole(ov.everyday.onTrack)}" else ""
-        val foot = MoneyDashText.money(so, Sign.NONE) + (if (p.today != null) " so far" else " in all") + track +
-            (typ?.let { " · typical ${MoneyDashText.whole(it)} ${if (p.today != null) "by day ${p.today}" else "for the month"}" } ?: "")
+        val track = if (ov.month == p.month && ov.everyday.onTrack != null && p.today != null) " · on track for ${MoneyFormat.whole(ov.everyday.onTrack)}" else ""
+        val foot = MoneyFormat.amount(so, Sign.NONE) + (if (p.today != null) " so far" else " in all") + track +
+            (typ?.let { " · typical ${MoneyFormat.whole(it)} ${if (p.today != null) "by day ${p.today}" else "for the month"}" } ?: "")
         Text(foot, Modifier.padding(top = 10.dp), style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"))
         if (p.typical == null) Note("A typical month needs a whole month of history.")
         Note("Everyday spending only: fixed costs, yearly charges and one-offs are left out. Typical = the median of the last ${p.months} whole months.")

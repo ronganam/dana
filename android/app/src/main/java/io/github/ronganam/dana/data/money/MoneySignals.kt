@@ -14,7 +14,7 @@ import org.json.JSONObject
 import java.io.File
 
 /**
- * Notifications from bank / card apps for the server's `money` kind
+ * Notifications from bank / card apps for the server's `money` add-on
  * (`POST /api/money/signals`). While the user has `money` in `/api/me`
  * (cached by [Me]), a notification from one of [PACKAGES] goes here, codes
  * hidden by [Redactor], and **never** to the Inbox — whatever "Skip banking &
@@ -24,7 +24,7 @@ import java.io.File
  * Durable like the Inbox outbox (`filesDir/money_signals.json`,
  * write-then-rename, capped); [NotificationSyncWorker][io.github.ronganam.dana.data.notifications.NotificationSyncWorker]
  * drains it in the same debounced, retried runs. A 403 `not_connected`
- * forgets the kind (until the next `/api/me` says otherwise) and the queue.
+ * forgets the add-on (until the next `/api/me` says otherwise) and the queue.
  */
 object MoneySignals {
     private const val TAG = "MoneySignals"
@@ -36,7 +36,7 @@ object MoneySignals {
     /** Bank / card apps whose notifications are money signals (Cal, Hapoalim, Max, Isracard). */
     val PACKAGES = setOf("com.onoapps.cal4u", "com.ideomobile.hapoalim", "com.max.android", "com.isracard.isracardapp")
 
-    /** True when [pkg]'s notifications go to money instead of the Inbox (the user has the kind). */
+    /** True when [pkg]'s notifications go to money instead of the Inbox (the user has the add-on). */
     fun routes(context: Context, pkg: String?): Boolean =
         pkg != null && pkg in PACKAGES && Me.cached(context)?.has(ADDON) == true
 
@@ -82,7 +82,7 @@ object MoneySignals {
 
     /**
      * Send what is queued. True when nothing is left to retry (sent, refused
-     * or the user lacks the kind); false = unreachable or 5xx, try again later.
+     * or the user lacks the add-on); false = unreachable or 5xx, try again later.
      */
     suspend fun drain(context: Context, api: ApiService): Boolean {
         repeat(10) {

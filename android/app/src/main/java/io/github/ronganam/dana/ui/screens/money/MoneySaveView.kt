@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -81,7 +82,7 @@ internal fun SaveView(money: MoneyController, modifier: Modifier = Modifier) {
                 val t = MoneySave.tiles(s, today(day))
                 Row(horizontalArrangement = Arrangement.spacedBy(14.dp), modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
                     Tile("Could save", t.could, t.couldSub, Success, Modifier.weight(1f).fillMaxHeight())
-                    Tile("Saved so far", MoneyLedger.whole(t.saved), t.savedSub, MaterialTheme.colorScheme.onSurface, Modifier.weight(1f).fillMaxHeight())
+                    Tile("Saved so far", MoneyFormat.whole(t.saved), t.savedSub, MaterialTheme.colorScheme.onSurface, Modifier.weight(1f).fillMaxHeight())
                 }
                 Muted(t.source, Modifier.padding(top = 8.dp))
                 val parts = remember(s) { MoneySave.parts(s.items, day) }
@@ -406,11 +407,11 @@ private fun TargetBlock(money: MoneyController, it: SavingItem, editing: Boolean
     }
     if (editing) Column(Modifier.padding(top = 10.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Text("Spend at most ₪", style = MaterialTheme.typography.bodyMedium)
+            Text("Spend at most ${MoneyFormat.symbol}", style = MaterialTheme.typography.bodyMedium)
             InkField(draft, { v -> ledger.setTargetDraft(v) }, "650", Modifier.width(110.dp).padding(horizontal = 6.dp), keyboard = KeyboardType.Number, onDone = { ledger.submitTarget(it.key) }, ltr = true)
             Text("a month", style = MaterialTheme.typography.bodyMedium)
         }
-        it.suggestedTarget?.let { s -> Muted("Halfway back to before is ${MoneyLedger.whole(s)}.", Modifier.padding(top = 6.dp)) }
+        it.suggestedTarget?.let { s -> Muted("Halfway back to before is ${MoneyFormat.whole(s)}.", Modifier.padding(top = 6.dp)) }
         error?.let { e -> Text(e, color = Danger, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp)) }
         Row(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InkButton(if (it.target != null) "Save target" else "Set target", emphasis = InkEmphasis.SOLID, enabled = !busy) { ledger.submitTarget(it.key) }

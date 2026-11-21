@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -171,10 +172,10 @@ private fun LoginBlock(money: MoneyController, s: MoneySource, form: LoginForm?,
 private fun AccountLine(s: MoneySource, a: MoneyAccount, now: Instant) {
     val name = MoneyLedger.accountName(a.kind, a.number, a.label, s.companyName)
     val (value, sub) = when (a.kind) {
-        "meal" -> (a.balance?.let { MoneyLedger.money(it, cents = false) } ?: "") to (a.balance?.let { "left, as of ${MoneyLedger.whenText(a.balanceAt, now)}" } ?: "")
-        "bank" -> (a.balance?.let { MoneyLedger.money(it) } ?: "") to (a.balance?.let { "as of ${MoneyLedger.whenText(a.balanceAt, now)}" } ?: "")
-        "investment" -> (a.balance?.let { MoneyLedger.money(it, cents = false) } ?: "") to (a.balance?.let { "worth, as of ${MoneyLedger.whenText(a.balanceAt, now)}" } ?: "")
-        else -> if (a.nextCharge != null && a.nextCharge != 0L) MoneyLedger.money(a.nextCharge, sign = "none") to "bill on ${MoneyLedger.shortDate(a.nextChargeDate, LocalDate.now())}"
+        "meal" -> (a.balance?.let { MoneyFormat.amount(it, cents = false) } ?: "") to (a.balance?.let { "left, as of ${MoneyLedger.whenText(a.balanceAt, now)}" } ?: "")
+        "bank" -> (a.balance?.let { MoneyFormat.amount(it) } ?: "") to (a.balance?.let { "as of ${MoneyLedger.whenText(a.balanceAt, now)}" } ?: "")
+        "investment" -> (a.balance?.let { MoneyFormat.amount(it, cents = false) } ?: "") to (a.balance?.let { "worth, as of ${MoneyLedger.whenText(a.balanceAt, now)}" } ?: "")
+        else -> if (a.nextCharge != null && a.nextCharge != 0L) MoneyFormat.amount(a.nextCharge, sign = MoneyFormat.Sign.NONE) to "bill on ${MoneyLedger.shortDate(a.nextChargeDate, LocalDate.now())}"
         else "" to "no bill coming"
     }
     Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {
