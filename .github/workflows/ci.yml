@@ -66,4 +66,11 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - run: ./gradlew --no-configuration-cache :app:testPhoneDebugUnitTest :wear:testDebugUnitTest :app:compileKioskDebugKotlin :app:compileTvDebugKotlin
+      # Unit tests, the phone and watch debug APKs, lint (app: new issues only, over
+      # app/lint-baseline.xml), and the kiosk / TV flavors compiled.
+      - run: >-
+          ./gradlew --no-configuration-cache --continue
+          :app:testPhoneDebugUnitTest :wear:testDebugUnitTest :protocol:testDebugUnitTest
+          :app:assemblePhoneDebug :wear:assembleDebug
+          :app:lintPhoneDebug :wear:lintDebug
+          :app:compileKioskDebugKotlin :app:compileTvDebugKotlin

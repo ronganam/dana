@@ -24,7 +24,7 @@
 
     <application>
         <!-- The launcher entry and share target (the activity itself is in main). -->
-        <activity android:name=".MainActivity" tools:node="merge">
+        <activity android:name=".MainActivity" android:exported="true" tools:node="merge">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
