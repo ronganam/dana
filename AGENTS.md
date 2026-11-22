@@ -11,7 +11,7 @@
 | `website/` | The project's one-page site (static, no build) | its `README.md` |
 | `site.example/` | The template of a deployment's **site** folder: `site/` (gitignored, often a link to a private repository) holds one deployment's config, site addons, app defaults and notes | `docs/site.md` |
 | `.githooks/pre-push` | Pushing master runs the server tests, then deploys when `site/deploy.env` exists (`server/docs/operations.md`) | |
-| `.github/` | CI (server tests, Android unit tests / debug builds / lint, Raycast build & lint, Docker image builds), Dependabot, issue and PR templates | |
+| `.github/` | CI (the website on GitHub Pages: `workflows/pages.yml`; server tests, Android unit tests / debug builds / lint, Raycast build & lint, Docker image builds), Dependabot, issue and PR templates | |
 
 **This deployment**: when `site/AGENTS.md` exists, read it first. It describes the deployment this checkout serves (production, secret store, devices, site addons). Change a deployment through its site (config, site addons), and Dana's code only in ways every deployment gets (`docs/site.md`). Never copy a site's details into the repository.
 
