@@ -91,8 +91,8 @@ class MainActivity : ComponentActivity() {
             DanaTheme {
                 val mainViewModel: MainViewModel = viewModel()
                 val paired by mainViewModel.paired.collectAsState()
-                val pairing by mainViewModel.pairingController.state.collectAsState()
-                if (!paired || pairing.requested) {
+                val pairingRequested by mainViewModel.pairingController.requested.collectAsState()
+                if (!paired || pairingRequested) {
                     // Unpaired (a fresh install, after Unpair), "Pair again" or a dana://pair link.
                     io.github.ronganam.dana.ui.screens.PairingScreen(mainViewModel)
                 } else {

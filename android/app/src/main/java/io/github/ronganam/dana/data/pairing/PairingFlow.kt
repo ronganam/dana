@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.data.pairing
 
+import io.github.ronganam.dana.protocol.PairError
+import io.github.ronganam.dana.protocol.PairingCode
 import io.github.ronganam.dana.data.discovery.DiscoveredServer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow

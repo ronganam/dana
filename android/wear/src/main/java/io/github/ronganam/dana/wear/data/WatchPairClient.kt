@@ -2,10 +2,8 @@ package io.github.ronganam.dana.wear.data
 
 import io.github.ronganam.dana.protocol.PairAnswer
 import io.github.ronganam.dana.protocol.PairRequest
+import io.github.ronganam.dana.protocol.PairError
 import io.github.ronganam.dana.protocol.WearJson
-import io.github.ronganam.dana.protocol.pairFailureMessage
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
@@ -52,10 +50,7 @@ object WatchPairClient {
                 val answer = PairAnswer.decode(text) ?: return PairOutcome.Refused("The server's answer had no token.")
                 return PairOutcome.Paired(base, answer)
             }
-            val error = runCatching { (WearJson.parseToJsonElement(text) as? JsonObject)?.get("error") as? JsonPrimitive }
-                .getOrNull()?.content.orEmpty()
-            val retryAfter = connection.getHeaderField("Retry-After")?.trim()?.toLongOrNull()
-            return PairOutcome.Refused(pairFailureMessage(status, error, retryAfter))
+            return PairOutcome.Refused(PairError.from(status, text, connection.getHeaderField("Retry-After")).message)
         } finally {
             connection.disconnect()
         }

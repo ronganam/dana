@@ -1,11 +1,11 @@
 package io.github.ronganam.dana.pairing
 
+import io.github.ronganam.dana.protocol.PairError
+import io.github.ronganam.dana.protocol.PairingCode
 import io.github.ronganam.dana.data.network.ServerConfig
-import io.github.ronganam.dana.data.pairing.PairError
 import io.github.ronganam.dana.data.pairing.PairOutcome
 import io.github.ronganam.dana.data.pairing.PairedDevice
 import io.github.ronganam.dana.data.pairing.PairingClient
-import io.github.ronganam.dana.data.pairing.PairingCode
 import kotlinx.coroutines.runBlocking
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer

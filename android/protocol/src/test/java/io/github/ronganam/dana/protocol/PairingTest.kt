@@ -28,33 +28,39 @@ class PairingTest {
     }
 
     @Test fun codeShape() {
-        assertEquals("K7QM4XPZ", normalizePairCode("k7qm 4xpz"))
-        assertTrue(isPairCodeShape("K7QM4XPZ"))
-        assertFalse(isPairCodeShape("K7QM4XP"))       // short
-        assertFalse(isPairCodeShape("K7QM4XP0"))      // 0 isn't drawn
-        assertFalse(isPairCodeShape("K7QM4XPI"))      // nor I
-        assertFalse(isPairCodeShape("K7QM4XPZZ"))     // long
+        assertEquals("K7QM4XPZ", PairingCode.normalize(" k7qm 4xpz "))
+        assertEquals("K7QM4XPZ", PairingCode.normalize("k7qm-4xpz"))
+        assertTrue(PairingCode.isComplete("K7QM4XPZ"))
+        assertFalse(PairingCode.isComplete("K7QM4XP"))       // short
+        assertFalse(PairingCode.isComplete("K7QM4XP0"))      // 0 isn't drawn
+        assertFalse(PairingCode.isComplete("K7QM4XPI"))      // nor I
+        assertFalse(PairingCode.isComplete("K7QM4XPZZ"))     // long
+        assertEquals("K7QM 4XPZ", PairingCode.grouped("K7QM4XPZ"))
     }
 
     @Test fun pairAnswerNeedsAToken() {
         val answer = PairAnswer.decode(
-            """{"token":"tok-1","device":{"id":"d1","name":"Pixel","kind":"phone","paired":true},"user":{"id":"u1","name":"Robin"},"server":{"version":"10.0.0"}}"""
+            """{"token":"tok-1","device":{"id":"d1","name":"Pixel","kind":"phone","room":"","role":"","paired":true},"user":{"id":"u1","name":"Robin"},"server":{"version":"10.0.0"}}"""
         )
         assertEquals("tok-1", answer?.token)
-        assertEquals(PairDevice("d1", "Pixel", "phone"), answer?.device)
-        assertEquals(PairUser("u1", "Robin"), answer?.user)
+        assertEquals(PairAnswerDevice("d1", "Pixel", "phone"), answer?.device)
+        assertEquals(PairAnswerUser("u1", "Robin"), answer?.user)
+        assertEquals("10.0.0", answer?.server?.version)
         assertNull(PairAnswer.decode("""{"device":{"id":"d1"}}"""))
         assertNull(PairAnswer.decode("not json"))
+        assertNull(PairAnswer.decode(""))
     }
 
-    @Test fun failureMessages() {
-        assertTrue(pairFailureMessage(403, "invalid_code").startsWith("That code isn't right"))
-        assertTrue(pairFailureMessage(409, "wrong_kind").contains("another kind of device"))
-        assertEquals("Too many wrong codes. Try again in 2 minutes.", pairFailureMessage(429, "rate_limited", 90))
-        assertEquals("Too many wrong codes. Try again in 30 seconds.", pairFailureMessage(429, "rate_limited", 30))
-        assertEquals("Too many wrong codes. Wait a few minutes and try again.", pairFailureMessage(429, "", null))
-        assertTrue(pairFailureMessage(503, "setup_required").contains("isn't set up"))
-        assertEquals("Couldn't pair (HTTP 500).", pairFailureMessage(500, ""))
+    @Test fun refusalsReadFromTheServersAnswer() {
+        assertEquals(PairError.InvalidCode, PairError.from(403, """{"error":"invalid_code","detail":"x"}""", null))
+        assertEquals(PairError.WrongKind("watch"), PairError.from(409, """{"error":"wrong_kind","expected":"watch"}""", null))
+        assertEquals(PairError.RateLimited(90), PairError.from(429, """{"error":"rate_limited"}""", " 90 "))
+        assertEquals("Too many wrong codes. Try again in 2 minutes.", PairError.RateLimited(90).message)
+        assertEquals("Too many wrong codes. Try again in 30 seconds.", PairError.RateLimited(30).message)
+        assertEquals(PairError.RateLimited(null), PairError.from(429, "", null))
+        assertEquals(PairError.Invalid("kind must be one of phone"), PairError.from(400, """{"error":"invalid","detail":"kind must be one of phone"}""", null))
+        assertEquals(PairError.Http(503), PairError.from(503, """{"error":"setup_required"}""", null))
+        assertEquals(PairError.Http(502), PairError.from(502, "<html>bad gateway</html>", null))
     }
 
     @Test fun watchPairingMessagesRoundTrip() {

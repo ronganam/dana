@@ -2,6 +2,8 @@ package io.github.ronganam.dana.ui.screens
 
 import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.pairing.DevicePairing
+import io.github.ronganam.dana.data.pairing.PairedDevice
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -609,13 +611,15 @@ private fun CallerCardSettings() {
 @Composable
 private fun PairedServerCard(viewModel: MainViewModel) {
     val config = viewModel.serverConfig
+    val context = LocalContext.current
+    val device = remember(config) { DevicePairing.device(context) }
     var confirmUnpair by remember { mutableStateOf(false) }
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(config.url, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    pairedAsText(config),
+                    pairedAsText(device),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -645,8 +649,9 @@ private fun PairedServerCard(viewModel: MainViewModel) {
     }
 }
 
-/** "Paired as Pixel 8 (Robin's)": the device's name on the Devices page and whose it is. */
-internal fun pairedAsText(config: ServerConfig): String {
-    val device = config.deviceName.ifBlank { "this phone" }
-    return if (config.userName.isBlank()) "Paired as $device" else "Paired as $device, ${config.userName}'s device"
+/** "Paired as Pixel 8, Robin's device": the device's name on the Devices page and whose it is. */
+internal fun pairedAsText(device: PairedDevice?): String {
+    val name = device?.name?.ifBlank { null } ?: "this phone"
+    val user = device?.userName.orEmpty()
+    return if (user.isBlank()) "Paired as $name" else "Paired as $name, $user's device"
 }

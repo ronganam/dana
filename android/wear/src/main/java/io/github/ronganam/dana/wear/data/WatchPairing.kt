@@ -10,8 +10,7 @@ import io.github.ronganam.dana.protocol.PairAnswer
 import io.github.ronganam.dana.protocol.WearPairOffer
 import io.github.ronganam.dana.protocol.WearPairRequest
 import io.github.ronganam.dana.protocol.WearPaths
-import io.github.ronganam.dana.protocol.isPairCodeShape
-import io.github.ronganam.dana.protocol.normalizePairCode
+import io.github.ronganam.dana.protocol.PairingCode
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -63,8 +62,8 @@ class WatchPairingFlow(
 
     /** Redeem a code typed on the watch (or offered by the phone). */
     fun withCode(server: String, code: String): WatchPairState {
-        val clean = normalizePairCode(code)
-        if (!isPairCodeShape(clean)) return WatchPairState.NeedsCode(NeedsCodeReason.BAD_CODE)
+        val clean = PairingCode.normalize(code)
+        if (!PairingCode.isComplete(clean)) return WatchPairState.NeedsCode(NeedsCodeReason.BAD_CODE)
         return try {
             when (val outcome = redeem(server, clean, name)) {
                 is PairOutcome.Paired -> {

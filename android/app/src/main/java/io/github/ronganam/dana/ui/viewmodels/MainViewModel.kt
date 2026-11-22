@@ -1,6 +1,8 @@
 package io.github.ronganam.dana.ui.viewmodels
 
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.pairing.DevicePairing
+import io.github.ronganam.dana.data.pairing.PairingClient
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
@@ -51,19 +53,24 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val paired: StateFlow<Boolean> = _paired.asStateFlow()
 
     private val userMessages = UserMessages()
+    private val pairingClient = PairingClient()
     private val ctx = ControllerContext(viewModelScope, userMessages, Texts.of(appContext)) { apiService }
 
-    /** The pairing screen and Settings' Unpair / Pair again. */
+    /** The pairing screen and Settings' Unpair / Pair again (kind `phone`). */
     val pairingController = PairingController(
         viewModelScope,
-        deviceName = deviceModelName(),
         current = { serverConfig },
-        onPaired = { config ->
+        device = { DevicePairing.device(appContext) },
+        pair = { server, code -> pairingClient.pair(server, code, kind = "phone", name = DevicePairing.deviceName()) },
+        store = { server, paired ->
             // The shell starts (MainActivity: initialize) once the pairing screen closes.
-            useServerConfig(ServerConfig.savePaired(appContext, config))
-            io.github.ronganam.dana.push.PushSetup.ensureRegistered(appContext, force = true)
+            DevicePairing.store(appContext, server, paired).also {
+                io.github.ronganam.dana.push.PushSetup.ensureRegistered(appContext, force = true)
+            }
         },
-        onUnpaired = { useServerConfig(ServerConfig.clear(appContext)) },
+        remove = { config, id -> pairingClient.remove(config, id) },
+        forget = { DevicePairing.unpair(appContext, pairingClient) },
+        reload = { useServerConfig(ServerConfig.load(appContext)) },
         notify = { userMessages.post(it) },
     )
 
@@ -474,16 +481,5 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "yyyy-MM-dd'T'HH:mm:ssXXX",
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"
         )
-    }
-
-    /** How this phone is named on the Devices page ("Google Pixel 8"). */
-    private fun deviceModelName(): String {
-        val maker = android.os.Build.MANUFACTURER.orEmpty().replaceFirstChar { it.titlecase() }
-        val model = android.os.Build.MODEL.orEmpty()
-        return when {
-            model.isBlank() -> "Phone"
-            maker.isBlank() || model.startsWith(maker, ignoreCase = true) -> model
-            else -> "$maker $model"
-        }.take(60)
     }
 }

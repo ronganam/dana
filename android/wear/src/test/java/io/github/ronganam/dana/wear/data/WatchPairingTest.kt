@@ -2,6 +2,8 @@ package io.github.ronganam.dana.wear.data
 
 import com.sun.net.httpserver.HttpServer
 import io.github.ronganam.dana.protocol.PairAnswer
+import io.github.ronganam.dana.protocol.PairAnswerDevice
+import io.github.ronganam.dana.protocol.PairError
 import io.github.ronganam.dana.protocol.WearPairOffer
 import io.github.ronganam.dana.protocol.WearPairRequest
 import kotlinx.coroutines.runBlocking
@@ -61,9 +63,9 @@ class WatchPairingTest {
 
     @Test fun redeemRefusalsBecomeSentences() {
         status = 403; answer = """{"error":"invalid_code"}"""
-        assertTrue((WatchPairClient.redeem(base, "K7QM4XPZ", "W") as PairOutcome.Refused).message.startsWith("That code isn't right"))
+        assertEquals(PairError.InvalidCode.message, (WatchPairClient.redeem(base, "K7QM4XPZ", "W") as PairOutcome.Refused).message)
         status = 409; answer = """{"error":"wrong_kind","expected":"phone"}"""
-        assertTrue((WatchPairClient.redeem(base, "K7QM4XPZ", "W") as PairOutcome.Refused).message.contains("another kind"))
+        assertEquals(PairError.WrongKind("phone").message, (WatchPairClient.redeem(base, "K7QM4XPZ", "W") as PairOutcome.Refused).message)
         status = 429; answer = """{"error":"rate_limited"}"""; retryAfter = "45"
         assertEquals("Too many wrong codes. Try again in 45 seconds.",
             (WatchPairClient.redeem(base, "K7QM4XPZ", "W") as PairOutcome.Refused).message)
@@ -86,7 +88,7 @@ class WatchPairingTest {
         val asked = mutableListOf<WearPairRequest>()
         val redeemed = mutableListOf<Pair<String, String>>()
         val saved = mutableListOf<Pair<String, PairAnswer>>()
-        var redeem: (String, String) -> PairOutcome = { s, _ -> PairOutcome.Paired(s, PairAnswer("tok", io.github.ronganam.dana.protocol.PairDevice("d", "Galaxy Watch", "watch"))) }
+        var redeem: (String, String) -> PairOutcome = { s, _ -> PairOutcome.Paired(s, PairAnswer("tok", PairAnswerDevice("d", "Galaxy Watch", "watch"))) }
     }
 
     private fun flow(f: Fakes) = WatchPairingFlow(

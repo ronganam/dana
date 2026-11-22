@@ -42,7 +42,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import io.github.ronganam.dana.ui.components.FoundServers
 import io.github.ronganam.dana.ui.components.GlassCard
+import io.github.ronganam.dana.ui.components.rememberFoundServers
 import io.github.ronganam.dana.ui.components.ScreenTopBar
 import io.github.ronganam.dana.ui.components.SectionLabel
 import io.github.ronganam.dana.ui.theme.hues
@@ -57,7 +59,10 @@ import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 @Composable
 fun PairingScreen(viewModel: MainViewModel) {
     val pairing = viewModel.pairingController
-    val state by pairing.state.collectAsState()
+    val form = pairing.flow
+    val state by form.state.collectAsState()
+    val found by rememberFoundServers()
+    LaunchedEffect(found) { form.discovered(found) }
     val paired by viewModel.paired.collectAsState()
     val snackbar = remember { SnackbarHostState() }
     LaunchedEffect(Unit) { viewModel.messages.collect { snackbar.showSnackbar(it) } }
@@ -106,7 +111,7 @@ fun PairingScreen(viewModel: MainViewModel) {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         OutlinedTextField(
                             value = state.server,
-                            onValueChange = pairing::setServer,
+                            onValueChange = form::setServer,
                             label = { Text("Server address") },
                             placeholder = { Text("dana.example.com") },
                             singleLine = true,
@@ -114,9 +119,10 @@ fun PairingScreen(viewModel: MainViewModel) {
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Next),
                             modifier = Modifier.fillMaxWidth()
                         )
+                        FoundServers(state.found, state.server, form::pick)
                         OutlinedTextField(
                             value = state.code,
-                            onValueChange = pairing::setCode,
+                            onValueChange = form::setCode,
                             label = { Text("Pairing code") },
                             placeholder = { Text("K7QM 4XPZ") },
                             singleLine = true,
@@ -128,14 +134,14 @@ fun PairingScreen(viewModel: MainViewModel) {
                                 autoCorrectEnabled = false,
                                 imeAction = ImeAction.Done
                             ),
-                            keyboardActions = KeyboardActions(onDone = { pairing.pair() }),
+                            keyboardActions = KeyboardActions(onDone = { form.submit() }),
                             modifier = Modifier.fillMaxWidth()
                         )
                         state.error?.let {
                             Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.error)
                         }
                         Button(
-                            onClick = { pairing.pair() },
+                            onClick = { form.submit() },
                             enabled = !state.busy,
                             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                         ) {

@@ -2,6 +2,7 @@ package io.github.ronganam.dana.data.wear
 
 import io.github.ronganam.dana.data.network.ApiException
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.pairing.PairingClient
 import io.github.ronganam.dana.protocol.WearPairOffer
 import io.github.ronganam.dana.protocol.WearPairRequest
 import kotlinx.coroutines.CancellationException
@@ -15,12 +16,12 @@ import java.io.IOException
  * Devices page. Never fails: a refusal is a sentence in [WearPairOffer.error].
  */
 object WatchPairingOffer {
-    suspend fun offer(config: ServerConfig, request: WearPairRequest): WearPairOffer {
+    suspend fun offer(config: ServerConfig, request: WearPairRequest, client: PairingClient = PairingClient()): WearPairOffer {
         if (!config.isConfigured) return WearPairOffer(error = "Pair the phone with Dana first.")
         return try {
-            val started = config.api().pairing.startPairing("watch", request.name.take(60))
-            if (started.code.isBlank()) WearPairOffer(error = "The server sent no code.")
-            else WearPairOffer(server = config.url, code = started.code)
+            val code = client.startPairing(config, "watch", request.name)
+            if (code.isBlank()) WearPairOffer(error = "The server sent no code.")
+            else WearPairOffer(server = config.url, code = code)
         } catch (e: CancellationException) {
             throw e
         } catch (e: ApiException) {
