@@ -1,5 +1,5 @@
 /**
- * The web navigation's places (static/app-places.js): Chat and the pages in Nav order, the default primary places (Nav primary), a saved choice applied (unknown ids skipped, new pages in the rest), what fits on the rail, the places under More, More's badge, pin / unpin / reorder.
+ * The web navigation's places (static/app-places.js): the lead places (Now, Chat) and the pages in Nav order, the default primary places (lead places, Nav primary), a saved choice applied (unknown ids skipped, new pages in the rest), what fits on the rail, the places under More, More's badge, pin / unpin / reorder.
  *
  * The pages come from the real payload captured in tests/fixtures/addons_web.json (panelEntries,
  * static/app-panels.js), plus made-up pages for the long lists.
@@ -65,6 +65,16 @@ check("defaults: the asking pages before the first ones by order", eq(plain(P.de
 check("defaults: none asks → the first places by Nav order", eq(plain(P.defaultPrimary(P.navPlaces(CHAT, made(6), []).main)), ["chat", "p0", "p1", "p2"]));
 check("defaults: more pages ask than fit → the first by order", eq(plain(P.defaultPrimary(P.navPlaces(CHAT, made(6, [1, 2, 3, 4]), []).main)), ["chat", "p1", "p2", "p3"]));
 check("defaults: fewer places than slots → all of them", eq(plain(P.defaultPrimary(P.navPlaces(CHAT, made(1), []).main)), ["chat", "p0"]));
+
+// The shell's lead places (app-nav.js NAV_LEAD): Now, the screen the app opens on, then Chat — both first, both primary.
+const NOW = { id: "now", label: "Now", icon: "sunrise", order: -2 };
+const led = P.navPlaces([NOW, CHAT], made(6, [1, 2, 3]), CORE);
+check("lead places: Now then Chat come first, before the pages", eq(ids(led.main).slice(0, 3), ["now", "chat", "p0"])
+      && led.main[0].lead === true && led.main[1].lead === true && led.main[2].lead === false);
+check("defaults with lead places: Now and Chat, then the asking pages, up to four", eq(plain(P.defaultPrimary(led.main)), ["now", "chat", "p1", "p2"]));
+check("lead places: a page cannot take a lead place's id", ids(P.navPlaces([NOW, CHAT], [{ id: "now", label: "X", nav: true }], []).main).join() === "now,chat");
+check("a saved choice from before Now keeps its places (Now joins the rest)",
+      eq(plain(P.applyChoice(led.main, ["chat", "p4"])), ["chat", "p4"]) && ids(P.navLayout(led, ["chat", "p4"]).rest)[0] === "now");
 
 // ---------- a saved choice ----------
 check("parseChoice: a list of ids", eq(plain(P.parseChoice('["p3","chat"]')), ["p3", "chat"]));

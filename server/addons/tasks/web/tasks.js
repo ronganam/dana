@@ -457,6 +457,7 @@
 
   Dana.panel({
     scripts: ["tasks-core.js"],
+    opens: ["task"],
     start(api) { A = api; C = window.DanaTasksCore; },
     mount(el) {
       if (!root) { root = el; el.innerHTML = TEMPLATE; wire(); }

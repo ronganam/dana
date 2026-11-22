@@ -1,5 +1,5 @@
-/* The web app (static/index.html) — starts it: opens Chat, lists the user's addon pages, registers the
- * service worker.
+/* The web app (static/index.html) — starts it: opens Now (Chat for `#chat`), lists the user's addon pages,
+ * registers the service worker.
  *
  * The shell is classic scripts sharing one global scope, no build step, one area each:
  *   dana.js          the SDK addon pages are written against (Dana.panel; tested by test_web_panels.mjs)
@@ -13,6 +13,8 @@
  *   app-stream.js    the assistant stream client (its run model is pure, tested by test_web_stream.mjs)
  *   app-thread.js    the shared conversation's memory line (pure, tested by test_web_thread.mjs)
  *   app-chat.js      the Chat screen and its chats sidebar
+ *   app-now-core.js  the Now screen's pure part: DanaNow (tested by test_web_now.mjs)
+ *   app-now.js       the Now screen, the one the app opens on
  *   app-voice.js     the orb, voice messages, realtime calls
  *   app-settings.js, app-debug.js   one screen each
  *   app.js           this file, last
@@ -27,7 +29,7 @@
 // ══════════════════════════════════════════════════════════════════════
 // INITIALIZATION
 // ══════════════════════════════════════════════════════════════════════
-switchTab("chat");
+switchTab(routeOf(location.pathname, location.hash) === "chat" ? "chat" : "now");
 refreshIcons();
 startPanels();
 

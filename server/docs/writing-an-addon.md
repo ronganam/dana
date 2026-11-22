@@ -214,7 +214,7 @@ While an admin has disabled the addon its routes answer 404 `addon_disabled` bef
 
 ### Pages
 
-`web=(Page(id, panel, style="", nav=None), …)`: any number of pages. The id names the screen (`#panel-<id>`; `/<id>` and `#<id>` open it), unique across addons and never a core screen's (`chat`, `settings`, `addons`, `usage`, `debug`, `review`). A page without `nav` has no button and opens from a link or `api.open(id)`. The shell loads each page's script when the app starts, the style the first time it opens, and gives it its own `<section>`.
+`web=(Page(id, panel, style="", nav=None), …)`: any number of pages. The id names the screen (`#panel-<id>`; `/<id>` and `#<id>` open it), unique across addons and never a core screen's (`now`, `chat`, `settings`, `addons`, `usage`, `debug`, `review`). A page without `nav` has no button and opens from a link or `api.open(id)`. The shell loads each page's script when the app starts, the style the first time it opens, and gives it its own `<section>`.
 
 ```js
 Dana.panel({
@@ -222,8 +222,11 @@ Dana.panel({
   start(api) {},                         // optional: once, at registration (a badge: api.badge(n))
   async mount(el, api, arg) {},          // each time it opens; el is empty the first time; arg from api.open(id, arg)
   unmount() {},                          // optional: when the user leaves it
+  opens: ["tide"],                       // optional: the ref types it opens (a Now card's ref.type, a day item's <type>_id)
 });
 ```
+
+With `opens`, the Now screen opens this page for a card or a day item that refers to one of those types, with the thing's id as `arg` (the tasks page opens `task`, Calls `call`, Inbox `notification`, Calendar `event`).
 
 `api` (one object per page):
 
@@ -235,7 +238,7 @@ Dana.panel({
 | `api.call(path, {method, body})` | a JSON request that throws `Error` (`.status`, `.body`) unless 2xx |
 | `api.fetch(path, init)` | `fetch`, signed in, never from a cache (uploads) |
 | `api.stream(path, {event: fn(data, ev)})` | Server-Sent Events; returns `{close()}` |
-| `api.open(id, arg)` | a core screen (`chat`, `settings`, `addons`, `review`, `usage`) or any page by its id |
+| `api.open(id, arg)` | a core screen (`now`, `chat`, `settings`, `addons`, `review`, `usage`) or any page by its id |
 | `api.openSession(sid)` | a chat session in Chat |
 | `api.piece(name, el)` | draws a core piece into an element of the page: `"today"` (the morning briefing and the weekly-review banner) |
 | `api.badge(value, tone)` | this page's navigation badge: a count (0 / null hides it) or a short text; tone `"quiet"` |

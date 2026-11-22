@@ -15,10 +15,10 @@
     <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="manifest" href="/manifest.json">
-    <!-- Google Fonts: Inter (narrative) & DM Mono (terminal/code) -->
+    <!-- Google Fonts: Inter (narrative), DM Mono (labels), Instrument Serif (headlines) -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Stylesheet -->
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="/static/kit.css">
@@ -41,6 +41,8 @@
     <script src="/static/app-voice.js" defer></script>
     <script src="/static/app-settings.js" defer></script>
     <script src="/static/app-debug.js" defer></script>
+    <script src="/static/app-now-core.js" defer></script>
+    <script src="/static/app-now.js" defer></script>
     <script src="/static/app.js" defer></script>
     <script src="/static/review.js" defer></script>
     <script src="/static/usage.js" defer></script>
@@ -51,7 +53,7 @@
     <div class="app-container">
         <!-- ── Navigation (static/app-nav.js draws the places: the rail when wide, the bottom bar when narrow) ── -->
         <aside class="nav-rail" id="nav-rail">
-            <button type="button" class="nav-rail-brand" id="rail-brand" title="Dana" aria-label="Dana: open Chat">D</button>
+            <button type="button" class="nav-rail-brand" id="rail-brand" title="Dana" aria-label="Dana: open Now">D</button>
             <nav class="nav-rail-items" id="rail-places" aria-label="Places"></nav>
             <div class="rail-divider"></div>
             <nav class="nav-rail-secondary" id="rail-core" aria-label="Settings and tools"></nav>
@@ -62,8 +64,16 @@
         <!-- ── Main Viewport ── -->
         <main class="main-viewport" id="main-viewport">
 
+            <!-- ════ NOW (static/app-now.js) — the screen the app opens on ════ -->
+            <section class="screen-panel active" id="panel-now">
+                <div class="now-scroll" id="now-scroll">
+                    <div class="now-inner" id="now-root"></div>
+                </div>
+                <div class="ibx-toast now-toast hidden" id="now-toast" role="status" aria-live="polite"></div>
+            </section>
+
             <!-- ════ CHAT ════ -->
-            <section class="screen-panel active" id="panel-chat">
+            <section class="screen-panel" id="panel-chat">
                 <header class="top-bar">
                     <button class="icon-btn" id="btn-chat-history" title="Chats" aria-label="Show chats">
                         <i data-lucide="panel-left"></i>

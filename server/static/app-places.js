@@ -1,8 +1,8 @@
 /* The web app — the navigation's places, pure (static/app.js says how the app's scripts fit together).
  *
- * A place is something the navigation opens: Chat and the user's addon pages with a Nav (the main places,
- * in Nav order), and the shell's own screens (the core group: settings, addons, usage, debug, the
- * dashboard link), drawn quieter and last. The user pins up to NAV_MAX_PRIMARY main places as primary:
+ * A place is something the navigation opens: the shell's lead places (Now, then Chat) and the user's addon
+ * pages with a Nav (the main places, in Nav order), and the shell's own screens (the core group: settings,
+ * addons, usage, debug, the dashboard link), drawn quieter and last. The user pins up to NAV_MAX_PRIMARY main places as primary:
  * the phone's bottom bar (they plus More) and the top of the desktop rail. Everything else is "the rest",
  * under More on a phone, and on the rail below the primary ones until the rail is full (then under More).
  * The saved choice is a list of place ids; ids the user no longer has are skipped, new pages fall into the
@@ -11,27 +11,30 @@
 
 const NAV_MAX_PRIMARY = 4;   // the phone bar's places (a fifth slot is More)
 
-/** {main, core}: Chat first, then the pages with a Nav in Nav order; `core` as given. Each place: {id, label, icon, order, primary, href}. */
-function navPlaces(chat, entries, core) {
-    const place = (p) => ({ id: p.id, label: p.label, icon: p.icon, order: Number.isFinite(p.order) ? p.order : 100,
-                            primary: Boolean(p.primary), href: p.href || null });
+/** {main, core}: the lead places first (one place or a list: Now, Chat), then the pages with a Nav in Nav
+ *  order; `core` as given. Each place: {id, label, icon, order, primary, lead, href}. */
+function navPlaces(lead, entries, core) {
+    const place = (p, isLead) => ({ id: p.id, label: p.label, icon: p.icon, order: Number.isFinite(p.order) ? p.order : 100,
+                                    primary: Boolean(p.primary), lead: isLead, href: p.href || null });
     const seen = new Set();
     const main = [];
+    const leads = (Array.isArray(lead) ? lead : [lead]).filter(Boolean);
     const pages = (entries || []).filter(e => e && e.nav !== false)
         .sort((x, y) => (x.order ?? 100) - (y.order ?? 100) || String(x.label).localeCompare(String(y.label)));
-    for (const p of [chat, ...pages]) {
+    for (const [p, isLead] of [...leads.map(p => [p, true]), ...pages.map(p => [p, false])]) {
         if (!p || !p.id || seen.has(p.id)) continue;
         seen.add(p.id);
-        main.push(place(p));
+        main.push(place(p, isLead));
     }
     return { main, core: (core || []).filter(p => p && p.id && !seen.has(p.id)).map(place) };
 }
 
-/** The primary places when the user chose none: the first main place (Chat), then the pages whose Nav asks
- *  for it (`primary`), then the first others in Nav order, up to `max`. */
+/** The primary places when the user chose none: the lead places (Now, Chat; at least the first main
+ *  place), then the pages whose Nav asks for it (`primary`), then the first others in Nav order, up to `max`. */
 function defaultPrimary(main, max = NAV_MAX_PRIMARY) {
     const out = main.length ? [main[0].id] : [];
-    for (const p of main.slice(1)) if (p.primary && out.length < max) out.push(p.id);
+    for (const p of main.slice(1)) if (p.lead && out.length < max) out.push(p.id);
+    for (const p of main.slice(1)) if (p.primary && !out.includes(p.id) && out.length < max) out.push(p.id);
     for (const p of main) if (out.length < max && !out.includes(p.id)) out.push(p.id);
     return out;
 }

@@ -11,6 +11,8 @@
  *     mount(el, api, arg) {},       each time the page is opened (`arg`: what api.open passed, else null);
  *                                   `el` is the page's empty <section> the first time, then the same element
  *     unmount() {},                 optional: each time the user leaves it
+ *     opens: ["task"],              optional: the kinds of things this page opens (a Now card's or day
+ *                                   item's ref type); the shell opens the page with the thing's id as `arg`
  *   });
  *
  * `api` is the same object every time: { addon, page, me, base, fetch, json, call, stream, toast, open,
@@ -160,7 +162,7 @@
       },
       /** A short message at the bottom of the screen. */
       toast: (text) => shell && shell.toast(text),
-      /** Opens a screen: a core one ("chat", "settings", "addons", "review", "usage") or a page by its id
+      /** Opens a screen: a core one ("now", "chat", "settings", "addons", "review", "usage") or a page by its id
        *  (its own addon's or another's); `arg` reaches that page's mount. Resolves false when there is none. */
       open: (id, arg) => shell && shell.open(id, arg === undefined ? null : arg),
       /** Opens a chat session in Chat. */

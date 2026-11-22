@@ -53,6 +53,7 @@
   }
 
   Dana.panel({
+    opens: ["event"],
     mount(el, api) {
       if (!el.firstChild) {
         el.innerHTML = TEMPLATE;

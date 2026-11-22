@@ -7,6 +7,7 @@
  * <section id="panel-<id>"> and calls its mount; leaving calls unmount. `/<id>` and `#<id>…` open a page
  * when the app loads. The Addons page announces changes with the `dana:addons-changed` event and the
  * navigation is built again.
+ * A page may say which kinds of things it opens (Dana.panel `opens`); `panelOpening(type)` finds it.
  * The pure part (`panelEntries`, `routeOf`, `badgeText`) is tested by tests/test_web_panels.mjs.
  */
 
@@ -55,6 +56,17 @@ const panelHost = {
 };
 
 const pageEntry = (id) => panelHost.entries.find(e => e.id === id) || null;
+
+/** The page of the user's that opens things of type `type` (its Dana.panel `opens`: "task", "call", …),
+ *  or null: how a core screen (Now) opens what a card or a day item refers to without naming a page. */
+function panelOpening(type) {
+    if (!type) return null;
+    for (const e of panelHost.entries) {
+        const reg = window.Dana.registered(e.id);
+        if (reg && Array.isArray(reg.def.opens) && reg.def.opens.includes(type)) return e.id;
+    }
+    return null;
+}
 
 function loadPanelStyle(url) {
     if (!url) return Promise.resolve();
@@ -176,7 +188,7 @@ function refreshPanels() {
         if (!addons) return;
         await Promise.all(panelHost.entries.map(loadPanel));
         // A page the user no longer has stays registered (scripts cannot be unloaded) but leaves the screen.
-        if (panelHost.current && !pageEntry(panelHost.current)) switchTab("chat");
+        if (panelHost.current && !pageEntry(panelHost.current)) switchTab("now");
     })();
     return panelHost.ready;
 }

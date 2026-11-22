@@ -18,7 +18,7 @@
 
 // The shell's own screens (core/addons/hooks.py, CORE_SCREENS: no addon page may take one of these ids);
 // every other screen is an addon's page (app-panels.js).
-const CORE_SCREENS = ["chat", "settings", "addons", "usage", "debug", "review"];
+const CORE_SCREENS = ["now", "chat", "settings", "addons", "usage", "debug", "review"];
 
 // Core pieces an addon page can host in an element of its own (api.piece(name, el), static/dana.js).
 const CORE_PIECES = {
@@ -29,8 +29,9 @@ const CORE_PIECES = {
 let previousTab = null;
 const visitedScreens = new Set();   // screens opened once: their rows rise in only the first time
 
-// The first main place, and the core group (the shell's screens and the dashboard link), quieter, last.
-const NAV_CHAT = { id: "chat", label: "Chat", icon: "message-square", order: -1 };
+// The lead places (Now, the screen the app opens on, then Chat), and the core group (the shell's screens
+// and the dashboard link), quieter, last.
+const NAV_LEAD = [{ id: "now", label: "Now", icon: "sunrise", order: -2 }, { id: "chat", label: "Chat", icon: "message-square", order: -1 }];
 function coreNavPlaces(me) {
     const can = (c) => Boolean(me && Array.isArray(me.capabilities) && me.capabilities.includes(c));
     return [
@@ -48,7 +49,7 @@ const RAIL_SIZE = { item: 56, coreItem: 44, more: 56, edit: 40, divider: 21, sep
 
 const nav = {
     me: null,
-    places: navPlaces(NAV_CHAT, [], coreNavPlaces(null)),
+    places: navPlaces(NAV_LEAD, [], coreNavPlaces(null)),
     primary: [],                      // the primary ids
     layout: { primary: [], rest: [], core: [] },
     plan: { rest: 0, core: true, more: false },
@@ -58,16 +59,26 @@ const nav = {
 };
 
 const navChoiceKey = () => "dana_nav_places" + (nav.me && nav.me.id ? `_${nav.me.id}` : "");
-const savedNavChoice = () => parseChoice(window.Dana.store.get(navChoiceKey()));
+// A choice saved before Now was a place gets Now in front once (its last place moves to the rest when the
+// bar is full); removed again afterwards, it stays removed.
+function savedNavChoice() {
+    const ids = parseChoice(window.Dana.store.get(navChoiceKey()));
+    const met = navChoiceKey() + "_now";
+    if (!ids || ids.includes("now") || window.Dana.store.get(met)) return ids;
+    const next = ["now", ...ids].slice(0, NAV_MAX_PRIMARY);
+    window.Dana.store.set(navChoiceKey(), JSON.stringify(next));
+    window.Dana.store.set(met, "1");
+    return next;
+}
 function saveNavChoice(ids) {
-    if (ids) window.Dana.store.set(navChoiceKey(), JSON.stringify(ids));
+    if (ids) { window.Dana.store.set(navChoiceKey(), JSON.stringify(ids)); window.Dana.store.set(navChoiceKey() + "_now", "1"); }
     else window.Dana.store.remove(navChoiceKey());
 }
 
 /** The places change (the user's pages, who they are): draw the navigation again. */
 function setNavPlaces(entries, me) {
     if (me) nav.me = me;
-    nav.places = navPlaces(NAV_CHAT, entries, coreNavPlaces(nav.me));
+    nav.places = navPlaces(NAV_LEAD, entries, coreNavPlaces(nav.me));
     renderNav();
 }
 
@@ -415,6 +426,7 @@ function switchTab(tabId, arg = null) {
     if (tabId === "review") window.DanaReview?.show(); else window.DanaReview?.hide();
     if (tabId === "usage") window.DanaUsage?.show(); else window.DanaUsage?.hide();
     if (tabId === "addons") window.DanaAddons?.show(); else window.DanaAddons?.hide();
+    if (tabId === "now") showNow(); else hideNow();
     if (tabId === "debug") { loadDebugData(); startDebugPolling(); }
     else if (tabId === "chat") {
         // Scroll to bottom of chat
@@ -435,7 +447,7 @@ function openScreen(id, arg = null) {
 window.danaOpenSession = (sid) => { switchTab("chat"); loadSession(sid); };
 window.danaSwitchTab = openScreen;
 // Back to the screen shown before this one (the weekly review's back button).
-window.danaBack = () => openScreen(previousTab && previousTab !== activeTab ? previousTab : "chat");
+window.danaBack = () => openScreen(previousTab && previousTab !== activeTab ? previousTab : "now");
 
 // A place in the rail or the bar opens its screen (the buttons are drawn again and again: one listener each).
 for (const id of ["nav-rail", "bottom-nav"]) {
@@ -445,7 +457,7 @@ for (const id of ["nav-rail", "bottom-nav"]) {
     });
 }
 
-document.getElementById("rail-brand")?.addEventListener("click", () => switchTab("chat"));
+document.getElementById("rail-brand")?.addEventListener("click", () => switchTab("now"));
 document.getElementById("btn-open-debug-tab")?.addEventListener("click", () => switchTab("debug"));
 document.getElementById("btn-open-usage-tab")?.addEventListener("click", () => switchTab("usage"));
 document.getElementById("btn-open-addons-tab")?.addEventListener("click", () => switchTab("addons"));

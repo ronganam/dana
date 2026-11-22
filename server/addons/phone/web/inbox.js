@@ -974,6 +974,7 @@
   `;
 
   Dana.panel({
+    opens: ["notification"],
     start(api) { A = api; pollBadge(); setInterval(pollBadge, BADGE_MS); },
     mount(el) {
       if (!el.firstChild) { el.innerHTML = TEMPLATE; init(); }

@@ -44,13 +44,15 @@ Every colour is a token on `:root`; a screen never hardcodes one.
 
 ## Navigation (`static/app-places.js`, `static/app-nav.js`)
 
-The shell draws the navigation from **places**: Chat and every addon page with a `Nav` (the main places, in
-`Nav` order), and the core group (Settings, Addons, Usage, Debug for a user with `manage_server`, and the
+The shell draws the navigation from **places**: the lead places Now and Chat, then every addon page with a
+`Nav` (the main places, in `Nav` order), and the core group (Settings, Addons, Usage, Debug for a user with `manage_server`, and the
 Dash link to `/dashboard`), drawn quieter and last. The shell names no addon page: which pages appear, and
 in what order, comes from `GET /api/addons`.
 
-- **Primary places**: up to four main places the user pins. Until they choose, Chat and the pages whose
-  `Nav(..., primary=True)` asks for it (Tasks, Inbox, Calendar), filled by `Nav` order up to four.
+- **Primary places**: up to four main places the user pins. Until they choose, Now and Chat, then the pages
+  whose `Nav(..., primary=True)` asks for it (Tasks, Inbox), filled by `Nav` order up to four. A choice saved
+  before Now existed gets Now in front once (`dana_nav_places_<user id>_now` marks it; removed afterwards,
+  it stays removed).
 - **Phone** (below 768 px): the bottom bar holds the primary places and **More**. More opens a bottom sheet
   (a dialog over the scrim) with every other place in a grid (icon, label, badge) and the core group as
   quieter rows under "Settings and tools".
@@ -79,6 +81,57 @@ in what order, comes from `GET /api/addons`.
 
 The pure part (places, defaults, a saved choice, what fits, what is under More, More's badge, pin / unpin /
 move) is `static/app-places.js`, tested by `tests/test_web_places.mjs`.
+
+## Now (`static/app-now.js`, `static/app-now-core.js`)
+
+The screen the app opens on (`/`, `/#now`; `/#chat` opens Chat; the rail's brand opens Now). A core screen
+(`CORE_SCREENS`), drawn only from `GET /api/now` (`docs/now.md`); every card renders from its fields and
+blocks, so an addon's own cards (any `kind`) need nothing here.
+
+- **Header**: the date in DM Mono caps ("SUNDAY · 22 NOVEMBER", from the payload's own clock), the `lede` in
+  Instrument Serif (a right-to-left lede in Inter: the serif is Latin only). Without a lede: "Nothing needs
+  you right now." when nothing waits, else a line from the time of day.
+- **All clear** (no cards): a sage hue mark and an italic serif "All clear.", above the day.
+- **Day**: a horizontal strip from `day.slots`: a Now cell (accent "NOW", the time in italic serif, an
+  ember line), the hours that hold something, one narrow cell for each run of empty hours, then "At home" /
+  "On waking" when they hold something. Items: a dot in their hue (reminders amber, events and the rest
+  sky), time, title; past ones dimmed, the next one in ink and accent. An item with a `<type>_id` opens
+  the page that opens that type. Nothing in any slot: no strip; `calendar: false` adds "Calendar couldn't
+  be read".
+- **Needs you**: the count in the accent, then a hairline row per card in server order: a 3 px start bar and
+  a dot in the kind's hue (approval ember, notification teal, suggestion plum or sage for a call's,
+  reminder amber, a charge rose, other money sage, check rose, review and any other kind sky), `source` in
+  mono caps (each " · " part isolated, so a Hebrew name keeps its place), the title, `why`, the blocks
+  folded behind More (every block type of `docs/now.md`; `choices` change the primary's label), the
+  primary filled and the secondary actions quiet. An open row sits on `--canvas-soft`.
+- **Acting**: optimistic: the row completes and collapses (`Dana.motion.complete`), the request runs
+  meanwhile; the answer's `message` shows in a toast with Undo when it has an `undo_id` (`POST
+  /api/undo/{id}`, then a refresh brings the card back); an error puts the card back where it was with the
+  message on it. Client actions: `reply` is drawn disabled ("Reply on phone": the web cannot reach the
+  phone's shade); `open` goes to an approval's thread, the weekly review, a context chat for a charge or a
+  saving, else unfolds the blocks, else opens the page for the card's `ref.type`.
+- **Pages by ref type**: a page says what it opens with `Dana.panel({opens: ["task"]})`
+  (`writing-an-addon.md`); the shell finds it with `panelOpening(type)`, so Now names no page. Tasks opens
+  `task`, Calls `call` (with the id), Inbox `notification`, Calendar `event`.
+- **Can wait**: folded "Can wait · N" (`quiet_total`); open, compact rows with their actions and "Dismiss
+  all" (`quiet:all`) when there are several.
+- **Notifications**: one line "17 notifications · 1 needs you · 11 noise" that opens the page for
+  `notification` (Inbox).
+- **Freshness**: refreshed when it opens, when the window gets focus or the tab becomes visible, and every
+  60 s while it is the screen on show (never in the background). A refresh keeps the rows on screen as they
+  are (their open state and choices too), redraws a changed card in place with `Dana.motion.flash`, and only
+  new cards rise in (`.dn-new`); counts roll (`Dana.motion.number`). When a refresh fails the last data
+  stays and "Updated 2 min ago" shows by the date.
+- **Motion**: the screen's first data arrives with `Dana.motion.arrive` (the first eight rows staggered);
+  nothing else moves on its own.
+- **Keyboard**: j / k (and the arrows on a row) move between cards, Enter on a row = its primary (or More
+  when it has none the web can do), e = More. Each row is a region labelled by its title; user text has
+  `dir="auto"`.
+
+The pure part (hues, the date line and the lede's fallback, the day strip's cells, the primary's label and
+body, what a client action opens, removing / restoring a card, reconciling a refresh, the notifications
+line, "Updated … ago", keyboard steps) is `DanaNow` in `static/app-now-core.js`, tested by
+`tests/test_web_now.mjs`.
 
 ## Motion (`static/styles.css`, section 14; `Dana.motion` in `static/dana.js`)
 

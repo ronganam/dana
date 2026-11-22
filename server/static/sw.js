@@ -29,6 +29,8 @@ const SHELL = [
   "/static/app-voice.js",
   "/static/app-settings.js",
   "/static/app-debug.js",
+  "/static/app-now-core.js",
+  "/static/app-now.js",
   "/static/app.js",
   "/static/review.js",
   "/static/usage.js",

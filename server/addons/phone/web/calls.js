@@ -233,6 +233,7 @@
 
   Dana.panel({
     scripts: ["calls-core.js"],
+    opens: ["call"],
     start(api) { A = api; C = window.DanaCallsCore; },
     async mount(el, api, callId) {
       if (!root) { root = el; el.innerHTML = TEMPLATE; wire(); }

@@ -42,7 +42,7 @@ class Nav:
 
 
 # The web app's own screens: no addon page may take one of these ids (static/app-nav.js, CORE_SCREENS).
-CORE_SCREENS = ("chat", "settings", "addons", "usage", "debug", "review")
+CORE_SCREENS = ("now", "chat", "settings", "addons", "usage", "debug", "review")
 PAGE_ID = re.compile(r"^[a-z][a-z0-9_-]*$")
 
 

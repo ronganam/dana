@@ -786,6 +786,194 @@ a {
   padding: 32px;
 }
 
+/* --- 4b. Screen: Now (static/app-now.js; server/docs/web-design.md, "Now") ---
+   The date in mono caps, the lede in the serif, the day strip, the needs-you rows (a 3 px start bar and a
+   dot in the kind's hue, set as --hue / --hue-text on the row), "Can wait", the notifications line. Rows are
+   hairline-separated on the canvas (the glow shows through); an open row sits on --canvas-soft. */
+.now-scroll { flex: 1; overflow-y: auto; outline: none; }
+#panel-now [hidden] { display: none !important; }
+.now-inner { max-width: 760px; margin: 0 auto; padding: 28px 32px 72px; display: flex; flex-direction: column; gap: 28px; }
+.now-head { display: flex; flex-direction: column; gap: 6px; }
+.now-date-row { display: flex; align-items: center; gap: 10px; min-height: 32px; }
+.now-date, .now-section-h, .now-cell-label, .now-src, .now-block-label, .now-quiet-toggle, .now-stale, .now-day-time, .now-qsrc {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: .7px; text-transform: uppercase; font-weight: 400;
+}
+.now-date { color: var(--mute); }
+.now-stale { color: var(--amber-text); text-transform: none; letter-spacing: 0; }
+.now-refresh { margin-inline-start: auto; width: 32px; height: 32px; color: var(--mute); }
+.now-refresh svg { width: 16px; height: 16px; }
+.now-lede {
+  font-family: var(--font-serif); font-weight: 400; font-size: 40px; line-height: 1.12; letter-spacing: -0.2px;
+  color: var(--ink); text-wrap: balance; max-width: 22em;
+}
+.now-lede.script { font-family: var(--font-inter); font-weight: 500; font-size: 30px; line-height: 1.25; letter-spacing: -0.4px; }
+.now-muted { color: var(--mute); font-size: 13px; }
+.now-section-h { color: var(--mute); display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
+.now-count { color: var(--accent-text); font-weight: 500; }
+
+/* All clear: one hue mark and the italic serif line. */
+.now-clear { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
+.now-mark { width: 18px; height: 3px; border-radius: var(--radius-xs); background: var(--sage); }
+.now-allclear { font-family: var(--font-serif); font-style: italic; font-size: 26px; line-height: 1.2; color: var(--body-strong); }
+.now-offline { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 40px; }
+
+/* Day strip: Now, the hours with something, a narrow cell for a run of empty hours, At home, On waking. */
+.now-strip {
+  list-style: none; display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity;
+  border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
+  margin-inline: -4px; padding-inline: 4px;
+}
+.now-strip::-webkit-scrollbar { display: none; }
+.now-cell {
+  flex: 0 0 auto; min-width: 132px; max-width: 220px; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 6px;
+  border-inline-start: 1px solid var(--hairline); scroll-snap-align: start;
+}
+.now-cell:first-child { border-inline-start: 0; }
+.now-cell-label { color: var(--mute); }
+.now-cell.gap { min-width: 0; width: calc(28px + 10px * var(--hours, 1)); max-width: 120px; padding-inline: 10px; justify-content: flex-start; }
+.now-cell.gap .now-cell-label { font-size: 10px; opacity: .7; white-space: normal; line-height: 1.35; }
+.now-cell.nowcell { min-width: 84px; position: relative; border-inline-start: 0; }
+.now-cell.nowcell::after {
+  content: ""; position: absolute; top: 8px; bottom: 8px; inset-inline-end: -1px; width: 2px; border-radius: 2px; background: var(--accent);
+}
+.now-cell.nowcell .now-cell-label { color: var(--accent-text); }
+.now-cell-time { font-family: var(--font-serif); font-style: italic; font-size: 24px; line-height: 1; color: var(--ink); }
+.now-day-item {
+  display: grid; grid-template-columns: 8px auto 1fr; align-items: baseline; column-gap: 6px; text-align: start;
+  font-size: 13px; line-height: 1.35; color: var(--body); padding: 3px 6px; margin-inline: -6px; border-radius: var(--radius-md);
+}
+button.now-day-item { cursor: pointer; transition: var(--t-state); }
+button.now-day-item:hover { background: rgb(var(--ink-rgb) / .06); }
+.now-day-item:not(:has(.now-day-time)) { grid-template-columns: 8px 1fr; }
+.now-day-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--hue); align-self: center; }
+.now-day-time { color: var(--mute); font-size: 10.5px; letter-spacing: .3px; }
+.now-day-title { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.now-day-item.next { color: var(--ink); font-weight: 500; }
+.now-day-item.next .now-day-time { color: var(--accent-text); }
+.now-day-item.past { opacity: .45; }
+.now-cal-note { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; }
+.now-cal-note svg { width: 14px; height: 14px; }
+
+/* Needs you: a row per card. */
+.now-list { display: flex; flex-direction: column; border-top: 1px solid var(--hairline); }
+.now-card {
+  position: relative; padding: 16px 16px 14px 20px; border-bottom: 1px solid var(--hairline);
+  display: flex; flex-direction: column; gap: 4px; outline: none; transition: background-color var(--dur-fast) var(--ease-standard);
+}
+.now-card::before {
+  content: ""; position: absolute; inset-block: 14px; inset-inline-start: 0; width: 3px; border-radius: 2px; background: var(--hue);
+}
+.now-card.open { background: var(--canvas-soft); }
+.now-card:focus-visible { box-shadow: inset 0 0 0 2px rgb(var(--ember-rgb) / .45); }
+.now-src { display: flex; align-items: center; gap: 7px; color: var(--hue-text); min-width: 0; }
+.now-src-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.now-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: var(--radius-full); background: var(--hue); }
+.now-title { font-size: 16px; font-weight: 600; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
+.now-why { font-size: 13.5px; color: var(--mute); line-height: 1.45; }
+.now-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.now-btn { padding: 6px 14px; font-size: 13px; min-height: 34px; }
+.now-btn.quiet { background: transparent; border-color: transparent; color: var(--body); padding-inline: 10px; }
+.now-btn.quiet:hover { background: rgb(var(--ink-rgb) / .07); border-color: transparent; color: var(--ink); }
+.now-btn:disabled { opacity: .55; cursor: default; }
+.now-btn svg { width: 14px; height: 14px; }
+.now-more {
+  margin-inline-start: auto; display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; min-height: 34px;
+  font-size: 12.5px; color: var(--mute); border-radius: var(--radius-sm); transition: var(--t-state);
+}
+.now-more:hover { color: var(--ink); background: rgb(var(--ink-rgb) / .06); }
+.now-more svg { width: 14px; height: 14px; transition: transform var(--dur-fast) var(--ease-standard); }
+.now-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.now-err { color: var(--rose-text); font-size: 13px; margin-top: 6px; }
+.now-card.dn-completing { opacity: .55; }
+.now-card.dn-completing .now-title { text-decoration: line-through; text-decoration-color: var(--hue); }
+
+/* Blocks (folded behind More), each in the order the server sent. */
+.now-blocks { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
+.now-block { border: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.now-block-label { color: var(--mute); font-size: 10.5px; padding: 0; }
+.now-text { white-space: pre-wrap; font-size: 13.5px; color: var(--body-strong); line-height: 1.5; overflow-wrap: anywhere; }
+.now-lines { display: flex; flex-direction: column; gap: 3px; padding: 10px 12px; background: var(--well); border-radius: var(--radius-lg); }
+.now-line { font-size: 13px; color: var(--body); line-height: 1.5; }
+.now-line.hit { color: var(--ink); background: var(--accent-tint); margin-inline: -6px; padding-inline: 6px; border-radius: var(--radius-sm); }
+.now-who { font-weight: 600; color: var(--body-strong); margin-inline-end: 4px; }
+.now-chat { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.now-msg {
+  max-width: 85%; padding: 6px 10px; border-radius: 10px; border-start-start-radius: 3px; background: var(--canvas-raised);
+  font-size: 13.5px; color: var(--ink); line-height: 1.4; display: flex; flex-direction: column; overflow-wrap: anywhere;
+}
+.now-msg .now-who { font-size: 11.5px; }
+.now-msg.mine { align-self: flex-end; background: var(--teal-tint); border-start-start-radius: 10px; border-start-end-radius: 3px; }
+.now-facts { list-style: none; display: flex; flex-direction: column; gap: 3px; }
+.now-facts li { font-size: 13px; color: var(--body-strong); padding-inline-start: 12px; position: relative; overflow-wrap: anywhere; }
+.now-facts li::before { content: ""; position: absolute; inset-inline-start: 0; top: .65em; width: 4px; height: 1px; background: var(--mute); }
+.now-week { list-style: none; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; max-width: 420px; }
+.now-week-cell { display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 6px 2px; border-radius: var(--radius-md); background: rgb(var(--ink-rgb) / .04); }
+.now-week-mark { width: 8px; height: 8px; border-radius: var(--radius-full); border: 1.5px solid var(--hairline-strong); }
+.now-week-cell.ok .now-week-mark { background: var(--sage); border-color: var(--sage); }
+.now-week-cell.bad .now-week-mark { background: var(--rose); border-color: var(--rose); }
+.now-week-label { font-family: var(--font-mono); font-size: 10px; color: var(--mute); text-transform: uppercase; }
+.now-week-value { font-size: 11.5px; color: var(--body-strong); font-variant-numeric: tabular-nums; }
+.now-choices { display: flex; flex-wrap: wrap; gap: 6px; }
+.now-choice {
+  position: relative; display: inline-flex; align-items: center; padding: 6px 12px; min-height: 34px; border-radius: var(--radius-lg);
+  border: 1px solid var(--hairline-strong); font-size: 13px; color: var(--body); cursor: pointer; transition: var(--t-state);
+}
+.now-choice:hover { color: var(--ink); }
+.now-choice.on { border-color: rgb(var(--ember-rgb) / .6); background: var(--accent-tint); color: var(--accent-text); }
+.now-choice input { position: absolute; opacity: 0; pointer-events: none; }
+.now-choice:has(input:focus-visible) { box-shadow: var(--focus-ring); }
+.now-checks { display: flex; flex-direction: column; gap: 2px; }
+.now-check { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; font-size: 13.5px; color: var(--body-strong); cursor: pointer; }
+.now-check input { accent-color: var(--accent); width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
+
+/* Can wait: folded; compact rows with their actions. */
+.now-quiet-head { display: flex; align-items: center; gap: 10px; }
+.now-quiet-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--mute); padding: 6px 4px; margin-inline-start: -4px; border-radius: var(--radius-sm); transition: var(--t-state); }
+.now-quiet-toggle:hover { color: var(--ink); }
+.now-quiet-toggle svg { width: 14px; height: 14px; transition: transform var(--dur-fast) var(--ease-standard); }
+.now-quiet.open .now-quiet-toggle svg { transform: rotate(90deg); }
+[dir="rtl"] .now-quiet-toggle svg { transform: scaleX(-1); }
+.now-quiet-n { color: var(--body-strong); }
+.now-quiet-head .ibx-link { margin-inline-start: auto; }
+.now-quiet-list { display: flex; flex-direction: column; margin-top: 6px; border-top: 1px solid var(--hairline); }
+.now-qrow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
+.now-qtext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.now-qtitle { font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-qsrc { color: var(--mute); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-qacts { display: flex; gap: 4px; flex-shrink: 0; }
+.now-qacts .chip.quiet { background: transparent; border-color: transparent; }
+
+/* The notifications line. */
+.now-notifs {
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: var(--radius-full);
+  border: 1px solid var(--hairline); font-size: 13px; color: var(--body); transition: var(--t-state);
+}
+.now-notifs:hover:not(:disabled) { color: var(--ink); border-color: var(--hairline-strong); }
+.now-notifs:disabled { cursor: default; }
+.now-notifs:disabled svg { display: none; }
+.now-notifs svg { width: 14px; height: 14px; color: var(--mute); }
+.now-notifs-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--teal); }
+.now-notifs.loud .now-notifs-dot { background: var(--accent); }
+
+/* Loading */
+.now-skel { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
+.now-skel-line, .now-skel-card { border-radius: var(--radius-md); background: rgb(var(--ink-rgb) / .06); }
+.now-skel-line.short { width: 180px; height: 12px; }
+.now-skel-line.wide { width: 70%; height: 34px; }
+.now-skel-card { height: 92px; margin-top: 8px; }
+
+@media (max-width: 767px) {
+  .now-inner { padding: 20px 16px 40px; gap: 24px; }
+  .now-lede { font-size: 32px; }
+  .now-lede.script { font-size: 25px; }
+  .now-card { padding: 14px 12px 12px 16px; margin-inline: -4px; }
+  .now-cell { min-width: 120px; padding-inline: 12px; }
+  .now-strip { margin-inline: -16px; padding-inline: 16px; }
+  .ibx-toast.now-toast { bottom: calc(var(--bottomnav-height) + 16px); }
+  .now-qrow { flex-wrap: wrap; }
+  .now-qacts { width: 100%; padding-inline-start: 16px; }
+}
+
 /* --- 5. Screen 1: Chat --- */
 .chat-layout {
   display: flex;
@@ -2421,18 +2609,18 @@ textarea.form-control {
 .dn-arrive :nth-child(6) { --dn-i: 5; }
 .dn-arrive :nth-child(7) { --dn-i: 6; }
 .dn-arrive :nth-child(8) { --dn-i: 7; }
-.dn-arrive :is(.dn-row, .itg-row, .itg-card, .usg-row, .rv-item, .chat-sidebar-item, .settings-card) {
+.dn-arrive :is(.dn-row, .itg-row, .itg-card, .usg-row, .rv-item, .chat-sidebar-item, .settings-card, .now-head, .now-day, .now-clear) {
   animation: dn-rise var(--dur-slow) var(--ease-decel) both;
   animation-delay: calc(var(--stagger) * var(--dn-i, 0));
 }
-.dn-arrive :is(.dn-row, .itg-row, .itg-card, .usg-row, .rv-item, .chat-sidebar-item, .settings-card):nth-child(n+9) { animation: none; }
+.dn-arrive :is(.dn-row, .itg-row, .itg-card, .usg-row, .rv-item, .chat-sidebar-item, .settings-card, .now-head, .now-day, .now-clear):nth-child(n+9) { animation: none; }
 
 /* Chat: a new message rises in (app-chat.js marks only messages that were not on screen before). */
 .dn-new { animation: dn-rise var(--dur-base) var(--ease-decel) both; }
 
 /* Press: a quick scale, everywhere something is tapped. */
 :is(.btn-primary, .btn-secondary, .btn-destructive-outline, .btn-ghost-danger, .chip, .icon-btn, .rail-btn, .bottom-nav-btn,
-  .nav-tile, .segmented-btn, .task-card, .chat-sidebar-item, .settings-link-tile, .selection-option-row, .filter-nav-item, .ibx-link,
+  .nav-tile, .segmented-btn, .task-card, .now-more, .now-choice, .now-notifs, .now-quiet-toggle, button.now-day-item, .chat-sidebar-item, .settings-link-tile, .selection-option-row, .filter-nav-item, .ibx-link,
   .chat-bubble-act-btn, .project-tab, .knowledge-entry-card):active:not(:disabled) {
   transform: scale(0.97);
 }
