@@ -6,7 +6,7 @@ from __future__ import annotations
 import datetime
 from typing import Any, Dict, Optional
 
-from core import clock, llm, user_profile
+from core import budget, clock, llm, user_profile
 from core.users import User
 from addons.phone.calls.context import feedback_prompt, gather_context
 from addons.phone.calls.labels import LABEL_IDS, catalog_for_prompt, clean_labels
@@ -139,6 +139,8 @@ async def analyze_transcript(user: Optional[User], transcript: str, call: Dict[s
         result = await llm.complete_json(prompt, analysis_schema(), job="calls", timeout=180.0,
                                          purpose="call_analysis", source="phone",
                                          ref=f"call:{call['id']}" if call.get("id") else "")
+    except budget.Paused:
+        raise
     except RuntimeError as e:
         raise RuntimeError(f"Call analysis failed: {e}") from e
     return normalize_analysis(result, ctx)

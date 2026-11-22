@@ -195,8 +195,13 @@ async def _process(conn: Connection, data: Dict[str, Any]) -> None:
             logger.warning(f"Failed to download audio for WhatsApp voice message {message_id}; skipping")
             return
 
-        transcript = await llm.transcribe(audio_bytes, _clean_mimetype(mimetype), source="whatsapp",
-                                         ref=f"whatsapp:{message_id}")
+        try:
+            transcript = await llm.transcribe(audio_bytes, _clean_mimetype(mimetype), source="whatsapp",
+                                             ref=f"whatsapp:{message_id}")
+        except llm.TranscriptionUnavailable as e:
+            # The server's "transcription" self-check tells the admin; nothing to send without text.
+            logger.warning(f"WhatsApp voice message {message_id} not transcribed: {e}")
+            return
         logger.info(f"Transcribed WhatsApp voice message {message_id}: {transcript[:100]!r}")
 
         try:

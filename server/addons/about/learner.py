@@ -18,7 +18,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from core import llm, user_profile, users
+from core import budget, llm, user_profile, users
 from core.db import get_db_connection
 from core.users import User
 from addons.about import facts
@@ -423,6 +423,8 @@ async def _run_pass(user: User) -> Optional[Dict[str, Any]]:
                 logger.warning(f"About learner: no API key for {llm.model(_learn_job())}; not learning")
                 _warned_no_key = True
             return None
+        if budget.holds("about_learner"):
+            return None  # paused by the monthly budget (logged once by core/budget.py); no back-off
         outcome = await learn_once(user)
         _failures.pop(user.id, None)
         return outcome

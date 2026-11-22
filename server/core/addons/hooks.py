@@ -208,10 +208,13 @@ class Touches:
 @dataclass(frozen=True)
 class LlmJob:
     """An LLM purpose of the addon: its default model profile (``fast`` /
-    ``balanced`` / ``deep``) and how the Usage screen names it ("" = from the
-    purpose's name)."""
+    ``balanced`` / ``deep``), how the Usage screen names it ("" = from the
+    purpose's name), and whether it is ``background`` work Dana does on its
+    own (the monthly budget pauses it; core/budget.py) rather than something a
+    person asked for."""
     profile: str
     label: str = ""
+    background: bool = False
 
 
 def minutes(n: float) -> datetime.timedelta:

@@ -241,7 +241,7 @@ def _register_purposes(a: Addon) -> Optional[str]:
     """Register ``a``'s LLM purposes; why they cannot be (taken, unknown profile), or None."""
     try:
         for purpose, job in a.llm_jobs.items():
-            purposes.register(purpose, job.profile, job.label, addon=a.name)
+            purposes.register(purpose, job.profile, job.label, addon=a.name, background=job.background)
     except ValueError as e:
         purposes.forget_addon(a.name)
         return str(e)

@@ -15,7 +15,7 @@ from typing import Any, Dict
 
 from aiohttp import web
 
-from core import paths
+from core import budget, paths
 from addons.knowledge import projects as knowledge_projects
 from addons.phone import suggestions as phone_suggestions
 from addons.phone.access import phone_user
@@ -196,7 +196,8 @@ async def reanalyze_call_api(request: web.Request) -> web.Response:
         body = {}
     custom_instructions = (body.get("custom_instructions") or "").strip()
     try:
-        calls_processing.request_reanalysis(user, call_id, custom_instructions)
+        with budget.user_started():  # asked for now: the monthly budget does not hold it back
+            calls_processing.request_reanalysis(user, call_id, custom_instructions)
     except LookupError as e:
         return web.json_response({"error": str(e)}, status=404)
     except ValueError as e:

@@ -25,7 +25,7 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional
 
-from core import briefing, clock, composers, llm, notify as notify_mod, user_locale, user_profile, users
+from core import briefing, budget, clock, composers, llm, notify as notify_mod, user_locale, user_profile, users
 from core.addons import BriefingContext, registry, store
 from core.addons.helpers import next_weekday, valid_future_date
 from core.db import get_db_connection
@@ -251,7 +251,8 @@ async def generate(user: User, now: Optional[datetime.datetime] = None,
         c = await asyncio.to_thread(candidates, user, now)
         nw = await next_week(user, now)
         raw = None
-        if c["items"] and llm.configured("briefs"):
+        # The monthly budget holding background work leaves the defaults, like a failed model.
+        if c["items"] and llm.configured("briefs") and not budget.holds("weekly_review"):
             try:
                 with users.acting_as(user):  # usage is theirs
                     raw = await llm.complete_json(review_prompt(c, nw, today, user), _SCHEMA, job="briefs",

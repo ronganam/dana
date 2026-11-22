@@ -335,6 +335,8 @@ class TelegramBot:
                 
             return await llm.transcribe(voice_bytes, "audio/ogg", source="telegram")
 
+        except llm.TranscriptionUnavailable:
+            raise
         except Exception as e:
             logger.error(f"Error transcribing voice message: {e}", exc_info=True)
             raise e
@@ -390,6 +392,10 @@ class TelegramBot:
                 if not user_text:
                     await status_msg.edit_text("⚠️ *No speech detected in the voice note.*", parse_mode="Markdown")
                     return
+            except llm.TranscriptionUnavailable as e:
+                logger.warning(f"Voice note not transcribed: {e}")
+                await status_msg.edit_text(escape_markdown(f"⚠️ {e}"), parse_mode="Markdown")
+                return
             except Exception as e:
                 logger.error(f"Failed to transcribe voice note: {e}", exc_info=True)
                 await status_msg.edit_text("⚠️ *Failed to transcribe voice note.*", parse_mode="Markdown")

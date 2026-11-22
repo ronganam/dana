@@ -32,7 +32,7 @@ import re
 import time
 from typing import Any, Dict, FrozenSet, List, Optional
 
-from core import clock, composers, llm, notify as notify_mod, user_locale, user_profile, users
+from core import budget, clock, composers, llm, notify as notify_mod, user_locale, user_profile, users
 from core.addons import BriefingContext, Section, registry, store
 from core.db import get_db_connection
 from core.notify import notify
@@ -257,8 +257,9 @@ _SCHEMA = {"type": "object", "properties": {"headline": {"type": "string"},
 
 
 async def compose(d: Dict[str, Any], user: User) -> Dict[str, Any]:
-    """Headline + points for ``user``'s briefing data (the plain version when the model fails)."""
-    if llm.configured("briefs"):
+    """Headline + points for ``user``'s briefing data (the plain version when the
+    model fails, and while the monthly budget holds background work)."""
+    if llm.configured("briefs") and not budget.holds("wake_briefing"):
         try:
             with users.acting_as(user):  # usage is theirs
                 raw = await llm.complete_json(briefing_prompt(d, user), _SCHEMA, job="briefs", temperature=0.3,

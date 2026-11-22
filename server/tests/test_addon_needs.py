@@ -139,9 +139,9 @@ check("official: Home Assistant needs its server and a long-lived token, keeps t
       [n.kind for n in ha.needs if not n.optional] == ["hardware", "account"] and "long-lived" in ha.needs[1].what
       and ha.touches.stores_credentials and ha.touches.acts_outside)
 ph = official_addon("phone")
-check("official: Phone needs the Android app; a recorder and the transcription key are optional",
-      [(n.kind, n.optional) for n in ph.needs][:3] == [("app", False), ("hardware", True), ("env", True)]
-      and "Recordings/Call" in ph.needs[1].what and ph.needs[2].what == "GEMINI_API_KEY")
+check("official: Phone needs the Android app; a recorder and a transcription model are optional",
+      [(n.kind, n.optional) for n in ph.needs][:3] == [("app", False), ("hardware", True), ("account", True)]
+      and "Recordings/Call" in ph.needs[1].what and ph.needs[2].what.startswith("a transcription model") and ph.needs[2].optional)
 tg = official_addon("telegram_account")
 check("official: the Telegram account needs the server's Telegram app and never acts outside",
       {n.what for n in tg.needs if n.kind == "env"} == {"TELEGRAM_API_ID", "TELEGRAM_API_HASH"}

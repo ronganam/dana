@@ -7,7 +7,7 @@ env change: set the id and that provider's API key (``ANTHROPIC_API_KEY``,
 
 Jobs and their env vars (each falls back to the next one in its chain, then to the
 job's default in ``_DEFAULTS``: Claude Sonnet for chat and search, Claude Haiku for
-the background jobs, Gemini for transcription since Claude does not take audio):
+the background jobs):
 
   chat           ``MODEL``                                   Telegram, triggers, small helpers
   calls          ``CALL_ANALYSIS_MODEL`` → ``BACKGROUND_MODEL``  call analysis
@@ -16,7 +16,6 @@ the background jobs, Gemini for transcription since Claude does not take audio):
   shopping       ``SHOPPING_MODEL``      → ``BACKGROUND_MODEL``  shopping-list aisles
   money          ``MONEY_MODEL``         → ``BACKGROUND_MODEL``  transaction categories and merchant names
   search         ``SEARCH_MODEL``        → ``MODEL``             web-grounded answers (money price checks)
-  transcribe     ``TRANSCRIBE_MODEL``                        audio → text
 
 The web/app chat picks its model from the profile catalog in ``core/models.py``.
 
@@ -36,7 +35,19 @@ the answer with the pages it was grounded on and raises :class:`NoSearch` when
 the model answered without searching.
 
 ``transcribe`` needs a model that hears audio: a chat model with audio input
-(Gemini) or a speech-to-text model (``openai/gpt-4o-transcribe``, ``deepgram/nova-3``…).
+(Gemini) or a speech-to-text model (``openai/gpt-4o-transcribe``, ``deepgram/nova-3``,
+a local Whisper server). :func:`transcriber` picks it on every call, first that
+applies: ``MODEL_<PURPOSE>``, ``TRANSCRIBE_MODEL``; the chosen provider's own audio
+model when it hears audio and its key is set (Gemini, OpenAI; Claude does not);
+``OPENAI_API_KEY`` → ``openai/gpt-4o-transcribe``; ``WHISPER_URL`` (an
+OpenAI-compatible speech-to-text server such as speaches, the root compose.yaml's
+``whisper`` profile) with ``WHISPER_MODEL``. With none of them,
+:class:`TranscriptionUnavailable` (``code`` ``no_transcription_model``): each
+feature that transcribes says it needs a transcription model.
+
+The monthly budget (core/budget.py): :func:`complete`, :func:`complete_json`,
+:func:`search` and :func:`transcribe` refuse a background purpose with
+``budget.Paused`` while the month's budget is spent.
 
 Claude thinks before it answers (always on for the 5.5 models; its thinking tokens
 count against ``max_tokens``): :func:`claude_kwargs` sets how hard per job
@@ -51,11 +62,14 @@ import logging
 import os
 import re
 import time
+from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 import litellm
 
-from core import llm_provider, purposes, usage, user_locale, users
+import aiohttp
+
+from core import budget, llm_provider, purposes, usage, user_locale, users
 
 logger = logging.getLogger(__name__)
 
@@ -67,8 +81,6 @@ OPUS = "anthropic/claude-opus-5-5"
 _DEFAULTS: Dict[str, str] = {
     "chat": SONNET,
     "search": SONNET,
-    # Claude has no audio input: transcription stays on a model that hears audio.
-    "transcribe": "gemini/gemini-3.1-flash-lite",
 }
 
 # job → Claude effort (output_config.effort) when the caller sets none; a job not
@@ -88,7 +100,6 @@ _CHAINS: Dict[str, tuple] = {
     "money": ("MONEY_MODEL", "BACKGROUND_MODEL"),
     "telegram": ("TELEGRAM_SUMMARY_MODEL", "BACKGROUND_MODEL"),
     "search": ("SEARCH_MODEL", "MODEL"),
-    "transcribe": ("TRANSCRIBE_MODEL",),
 }
 
 # profile (core/purposes.py) → env vars tried in order, then its default model
@@ -167,6 +178,17 @@ def _call(purpose: str, job: Optional[str]) -> tuple:
     return job or "chat", model(job or "chat")
 
 
+def _call_checked(purpose: str, job: Optional[str]) -> tuple:
+    """:func:`_call`, after the monthly budget let the call through.
+
+    Raises:
+        budget.Paused: a background purpose while the month's budget is spent.
+    """
+    filed, name = _call(purpose, job)
+    budget.check(filed)
+    return filed, name
+
+
 def is_claude(name: str) -> bool:
     return "claude" in name.lower()
 
@@ -240,16 +262,20 @@ def configured(job: str) -> bool:
 
 
 def log_configuration() -> None:
-    """Log the model each job uses; warn about jobs whose provider has no API key."""
+    """Log the model each job uses and the transcription model; warn about jobs
+    whose provider has no API key, and when nothing can transcribe."""
     for job in _CHAINS:
         name = model(job)
         missing = _missing_keys(name)
-        if job == "transcribe" and is_claude(name):
-            logger.warning(f"LLM {job}: {name} — Claude does not take audio, transcription will fail")
-        elif missing:
+        if missing:
             logger.warning(f"LLM {job}: {name} — {', '.join(missing)} not set, these calls will fail")
         else:
             logger.info(f"LLM {job}: {name}")
+    t = transcriber()
+    if t is None:
+        logger.warning(f"LLM transcribe: none — {UNAVAILABLE_HINT}")
+    else:
+        logger.info(f"LLM transcribe: {t.model} ({t.why})")
 
 
 def status_code(e: BaseException) -> Optional[int]:
@@ -259,7 +285,10 @@ def status_code(e: BaseException) -> Optional[int]:
 
 
 def retryable(e: BaseException) -> bool:
-    """Network errors, timeouts, 5xx and 429 are worth retrying; other 4xx are not."""
+    """Network errors, timeouts, 5xx and 429 are worth retrying; other 4xx are
+    not, nor a call refused before it was made (no transcription model, the budget)."""
+    if isinstance(e, (TranscriptionUnavailable, budget.Paused)):
+        return False
     code = status_code(e)
     return code is None or code == 429 or code >= 500
 
@@ -277,7 +306,7 @@ async def complete(messages: List[Dict[str, Any]], *, job: Optional[str] = None,
                    source: str = "", **kwargs: Any) -> str:
     """One plain completion; returns the reply text (model: :func:`model_for`).
     Raises on API failure and for an unknown purpose."""
-    purpose, name = _call(purpose, job)
+    purpose, name = _call_checked(purpose, job)
     response = await litellm.acompletion(model=name, messages=messages, drop_params=True,
                                          litellm_metadata=usage.meta(purpose, ref, source),
                                          **claude_kwargs(name, job or "", kwargs))
@@ -312,8 +341,9 @@ async def complete_json(prompt: str, schema: Dict[str, Any], *, job: Optional[st
     ``effort``: Claude's ``output_config.effort`` for this call (default: the job's;
     ignored by other providers).
     Raises RuntimeError when every attempt failed, ``purposes.UnknownPurpose``
-    for an unknown purpose (model: :func:`model_for`)."""
-    purpose, name = _call(purpose, job)
+    for an unknown purpose, ``budget.Paused`` for a background purpose while the
+    month's budget is spent (model: :func:`model_for`)."""
+    purpose, name = _call_checked(purpose, job)
     response_format = {"type": "json_schema", "json_schema": {"name": "result", "schema": schema}}
     tag = usage.meta(purpose, ref, source)
     extra = claude_kwargs(name, job or "", {"output_config": {"effort": effort}} if effort and is_claude(name) else {})
@@ -454,6 +484,7 @@ async def search(prompt: str, *, purpose: str, ref: str = "", source: str = "",
     came back (the model did not search, or the provider dropped the option),
     RuntimeError when the call failed."""
     name = model_for(purpose, "search")
+    budget.check(purpose)
     tag = usage.meta(purpose, ref, source)
     response: Any = None
     for attempt in range(2):
@@ -476,6 +507,79 @@ async def search(prompt: str, *, purpose: str, ref: str = "", source: str = "",
     return {"text": _cite_passages(_text(response), response, sources), "sources": sources}
 
 
+OPENAI_TRANSCRIBE = "openai/gpt-4o-transcribe"
+WHISPER_DEFAULT_MODEL = "Systran/faster-whisper-small"
+WHISPER_INSTALL_TIMEOUT = 900.0
+UNAVAILABLE_CODE = "no_transcription_model"
+UNAVAILABLE_HINT = ("needs a transcription model: add an OpenAI or Gemini key in Settings → The model, "
+                    "set OPENAI_API_KEY, or run a local Whisper server and set WHISPER_URL")
+
+
+class TranscriptionUnavailable(RuntimeError):
+    """No model can transcribe on this server (see :func:`transcriber`)."""
+
+    code = UNAVAILABLE_CODE
+
+
+@dataclass(frozen=True)
+class Transcriber:
+    """The model a transcription goes to: its LiteLLM id, the setting that chose
+    it (``MODEL_<PURPOSE>``, ``TRANSCRIBE_MODEL``, ``provider``,
+    ``OPENAI_API_KEY``, ``WHISPER_URL``) and, for a Whisper server, its
+    OpenAI-compatible address (``…/v1``)."""
+
+    model: str
+    why: str
+    api_base: str = ""
+
+
+# The last transcription refused for want of a model: {"at": unix time, "purpose"} (the self-check).
+_refused: Optional[Dict[str, Any]] = None
+
+
+def _env(name: str) -> str:
+    return os.getenv(name, "").strip()
+
+
+def _whisper_base(url: str) -> str:
+    base = url.rstrip("/")
+    return base if base.endswith("/v1") else f"{base}/v1"
+
+
+def transcriber(purpose: str = "voice_transcript") -> Optional[Transcriber]:
+    """Which model transcribes for ``purpose`` now (read on every call), the
+    first that applies: ``MODEL_<PURPOSE>``; ``TRANSCRIBE_MODEL``; the chosen
+    provider's own audio model when it hears audio and its key is set (with no
+    choice, the provider of the chat model); ``OPENAI_API_KEY`` →
+    ``openai/gpt-4o-transcribe``; ``WHISPER_URL`` → its ``WHISPER_MODEL``.
+    None when nothing can transcribe.
+
+    Raises:
+        purposes.UnknownPurpose: neither core nor a loaded addon declares ``purpose``.
+    """
+    purposes.get(purpose)
+    for var in (f"MODEL_{purpose.upper()}", "TRANSCRIBE_MODEL"):
+        value = _env(var)
+        if value:
+            return Transcriber(value, var)
+    own = llm_provider.audio_model(provider(model("chat")))
+    if own and not _missing_keys(own):
+        return Transcriber(own, "provider")
+    if _env("OPENAI_API_KEY"):
+        return Transcriber(OPENAI_TRANSCRIBE, "OPENAI_API_KEY")
+    url = _env("WHISPER_URL")
+    if url:
+        return Transcriber(f"openai/{_env('WHISPER_MODEL') or WHISPER_DEFAULT_MODEL}", "WHISPER_URL",
+                           _whisper_base(url))
+    return None
+
+
+def transcription_refused() -> Optional[Dict[str, Any]]:
+    """The last transcription refused for want of a model since the server
+    started (``{"at": unix time, "purpose"}``), or None."""
+    return dict(_refused) if _refused else None
+
+
 def _is_speech_to_text(name: str) -> bool:
     try:
         return litellm.get_model_info(name).get("mode") == "audio_transcription"
@@ -483,36 +587,78 @@ def _is_speech_to_text(name: str) -> bool:
         return False
 
 
+async def _install_whisper_model(t: Transcriber) -> None:
+    """Ask the Whisper server to download ``t``'s model (speaches answers 404
+    for a model it has not installed). Raises RuntimeError when it refuses."""
+    name = t.model.split("/", 1)[1]
+    logger.info(f"Transcription: asking the Whisper server to download {name} (once)")
+    timeout = aiohttp.ClientTimeout(total=WHISPER_INSTALL_TIMEOUT)
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        async with session.post(f"{t.api_base}/models/{name}") as response:
+            if response.status >= 400:
+                raise RuntimeError(f"The Whisper server could not download {name}: HTTP {response.status} "
+                                   f"{(await response.text())[:200]}")
+
+
+async def _whisper(t: Transcriber, file: tuple, timeout: float, tag: Dict[str, Any]) -> Any:
+    """One transcription on a Whisper server; its model is downloaded first when the server lacks it."""
+    for attempt in range(2):
+        try:
+            return await litellm.atranscription(model=t.model, file=file, api_base=t.api_base, api_key="none",
+                                                timeout=timeout, litellm_metadata=tag)
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            if attempt or status_code(e) != 404:
+                raise
+            await _install_whisper_model(t)
+    raise RuntimeError("unreachable")
+
+
 async def transcribe(audio: bytes, mime_type: str, *, timeout: float = 30.0, note: str = "",
                      purpose: str = "voice_transcript", ref: str = "", source: str = "") -> str:
-    """Audio bytes → transcript ("" for silence). Sent inline, so keep it under ~15 MB.
+    """Audio bytes → transcript ("" for silence) with :func:`transcriber`'s
+    model. Sent inline, so keep it under ~15 MB.
 
     ``timeout`` defaults to the voice-turn budget; long recordings pass more.
     ``note`` is appended to the prompt (e.g. "This is part 2 of 5 of a longer call").
     The prompt names the acting user's languages (:func:`transcription_prompt`).
-    Raises on API failure (``status_code`` tells whether a retry can help).
+
+    Raises:
+        TranscriptionUnavailable: no model can transcribe (``code`` ``no_transcription_model``).
+        budget.Paused: a background purpose while the month's budget is spent.
+        Exception: the provider's error (``status_code`` tells whether a retry can help).
     """
-    name = model_for(purpose, "transcribe")
+    global _refused
+    t = transcriber(purpose)
+    if t is None:
+        _refused = {"at": time.time(), "purpose": purpose}
+        raise TranscriptionUnavailable(f"Transcription {UNAVAILABLE_HINT}")
+    budget.check(purpose)
+    _refused = None
     prompt = transcription_prompt(user_locale.languages(users.current())) + (f" {note}" if note else "")
     started = time.perf_counter()
     tag = usage.meta(purpose, ref, source, kind="transcribe")
-    if _is_speech_to_text(name):
+    if t.api_base or _is_speech_to_text(t.model):
         # Speech-to-text endpoints take no instructions (their `prompt` is
         # vocabulary/preceding text), so the prompt and note apply to chat models only.
         ext = mime_type.split("/")[-1].split(";")[0] or "bin"
-        result = await litellm.atranscription(model=name, file=(f"audio.{ext}", audio, mime_type),
-                                              timeout=timeout, litellm_metadata=tag)
+        file = (f"audio.{ext}", audio, mime_type)
+        if t.api_base:
+            result = await _whisper(t, file, timeout, tag)
+        else:
+            result = await litellm.atranscription(model=t.model, file=file, timeout=timeout, litellm_metadata=tag)
         transcript = (result.text or "").strip()
     else:
         data_uri = f"data:{mime_type};base64,{base64.b64encode(audio).decode()}"
         response = await litellm.acompletion(
-            model=name, timeout=timeout, litellm_metadata=tag,
+            model=t.model, timeout=timeout, litellm_metadata=tag,
             messages=[{"role": "user", "content": [
                 {"type": "text", "text": prompt},
                 {"type": "file", "file": {"file_data": data_uri}},
             ]}])
         transcript = _text(response)
-    logger.info("Transcribed %d bytes of %s with %s in %.2fs", len(audio), mime_type, name,
+    logger.info("Transcribed %d bytes of %s with %s in %.2fs", len(audio), mime_type, t.model,
                 time.perf_counter() - started)
     return transcript
 

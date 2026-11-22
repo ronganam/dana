@@ -20,6 +20,7 @@ import logging
 
 from aiohttp import web
 
+from core import budget
 from core.auth import request_user
 from core.users import User
 from core.addons import store as connections
@@ -114,7 +115,8 @@ async def refresh_brief_api(request: web.Request) -> web.Response:
     user = people_user(request)
     pid = request.match_info["id"]
     try:
-        updated = await refresh_brief(user, pid, force=True)
+        with budget.user_started():  # asked for now: the monthly budget does not hold it back
+            updated = await refresh_brief(user, pid, force=True)
     except Exception as e:
         return web.json_response({"error": str(e)}, status=502)
     p = detail.get_person(user, pid, schedule_brief=False)

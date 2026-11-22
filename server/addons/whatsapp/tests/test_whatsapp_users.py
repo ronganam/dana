@@ -43,6 +43,7 @@ os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway ke
 # The first admin's env values, as production has them (fake).
 os.environ["WAHA_URL"] = "http://env-waha.invalid/api/"  # the old env import's names: read by nothing now
 os.environ["WHATSAPP_VOICE_TELEGRAM_CHAT_ID"] = "1001"
+os.environ["TRANSCRIBE_MODEL"] = "gemini/gemini-3.1-flash-lite"  # a model that hears audio (LiteLLM is mocked)
 
 import litellm
 from aiohttp import web

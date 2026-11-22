@@ -40,7 +40,7 @@ import re
 import sqlite3
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, Tuple
 
-from core import llm, users
+from core import budget, llm, users
 from core.users import User
 from core.addons import store as connections
 from addons.money import categories, config, ingest, providers, store
@@ -48,6 +48,7 @@ from addons.money import categories, config, ingest, providers, store
 logger = logging.getLogger(__name__)
 
 JOB = "money"
+PURPOSE = "money_classify"
 MODEL_BATCH = 40
 # Rows still missing something, retried at each run (newest first).
 RETRY_LIMIT = 200
@@ -422,7 +423,7 @@ async def _ask(user: User, batch: List[Dict[str, Any]], ref: str) -> Dict[str, D
               "description": (r.get("description") or "")[:200], "memo": (r.get("memo") or "")[:200],
               "bank_category": own_category(r)[0]} for sid, r in short.items()]
     notes = [s.classify_note for s in providers.statements(user)]
-    data = await llm.complete_json(build_prompt(items, notes), _schema(), job=JOB, purpose="money_classify",
+    data = await llm.complete_json(build_prompt(items, notes), _schema(), job=JOB, purpose=PURPOSE,
                                    source="background", ref=ref)
     out: Dict[str, Dict[str, Any]] = {}
     for answer in data.get("rows") or []:
@@ -615,7 +616,8 @@ async def run(user: User, ids: Iterable[str] = (), *, ref: str = "") -> Dict[str
     wanted = list(ids)
     async with _lock(user.id):
         with users.acting_as(user):
-            use_model = llm.configured(JOB)
+            # The budget holds the model back: the rows get their deterministic categories meanwhile.
+            use_model = llm.configured(JOB) and not budget.holds(PURPOSE)
             todo, counts = await asyncio.to_thread(_deterministic, user, wanted, use_model)
             counts["model"] = 0
             if todo and use_model:

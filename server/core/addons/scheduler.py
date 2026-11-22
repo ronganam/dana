@@ -38,7 +38,7 @@ import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from core import clock, users
+from core import budget, clock, users
 from core.db import get_db_connection
 from core.users import User
 from core.addons import registry, state, store
@@ -147,6 +147,9 @@ async def run_once(job: Job) -> Dict[str, Any]:
                 return user.id, True, await asyncio.wait_for(job.func(user), timeout=job.timeout)
         except asyncio.TimeoutError:
             logger.error(f"Job {job.key} took longer than {job.timeout:.0f}s for user {user.id}; cancelled")
+        except budget.Paused:
+            # Background model work waits for the monthly budget (logged once by core/budget.py): not a failure.
+            return user.id, True, None
         except Exception:
             logger.exception(f"Job {job.key} failed for user {user.id}")
         return user.id, False, None

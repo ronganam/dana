@@ -5,7 +5,12 @@
            breakdown: {kind|purpose|source|model: [{key, label, calls, failures, cost, unpriced,
                        input_tokens, output_tokens, cached_tokens, avg_ms}]}, raw_days}
         range: today · 7d · 30d · 90d · 1y · all. Costs are USD; ``unpriced`` counts successful
-        calls whose price is unknown (not included in ``cost``).
+        calls whose price is unknown (not included in ``cost``). Plus ``budget``, the server's
+        monthly budget (core/budget.py): ``{limit, spent, forecast, state: ok|warn|paused, month,
+        resets, can_edit: true}`` for whoever may manage the server, ``{state, can_edit: false}``
+        for anyone else (no amounts: the spend is everyone's).
+    PUT /api/usage/budget {limit: <USD> | null} (``manage_server``) → the budget as above;
+        null or 0 removes it; 400 for a negative or non-numeric limit.
     GET /api/usage/events?range=7d&sort=recent|cost&limit=50&before=<id>
                          &kind=&purpose=&source=&model=&ref=&ok=0|1&user=
         → {events: [{id, ts, kind, purpose, purpose_label, source, ref, provider, model, input_tokens,
@@ -29,8 +34,8 @@ from typing import Optional
 
 from aiohttp import web
 
-from core import usage, users
-from core.auth import request_user
+from core import budget, usage, users
+from core.auth import request_user, requires
 
 logger = logging.getLogger(__name__)
 
@@ -70,18 +75,44 @@ def _scope(request: web.Request) -> Optional[str]:
     return wanted
 
 
+def _budget(request: web.Request) -> dict:
+    """The monthly budget as the caller may see it (amounts only for whoever may manage the server)."""
+    st = budget.state()
+    if request_user(request).level.allows("manage_server"):
+        return {**st, "can_edit": True}
+    return {"state": st["state"], "can_edit": False}
+
+
 async def usage_api(request: web.Request) -> web.Response:
     q = request.query
     user_id = _scope(request)
     await _fresh()
+    budget.forget_cache()  # the screen shows the spend as of now
     try:
         data = await asyncio.to_thread(usage.summary, q.get("range", "30d"), dict(q), user_id)
+        data["budget"] = await asyncio.to_thread(_budget, request)
     except ValueError as e:
         return _err(str(e))
     except Exception as e:
         logger.error(f"GET /api/usage failed: {e}", exc_info=True)
         return _err(str(e), 500)
     return web.json_response(data)
+
+
+@requires("manage_server")
+async def budget_put_api(request: web.Request) -> web.Response:
+    try:
+        body = await request.json()
+    except Exception:
+        return _err("expected a JSON body {limit}")
+    if not isinstance(body, dict) or "limit" not in body:
+        return _err("expected a JSON body {limit}")
+    await _fresh()
+    try:
+        st = await asyncio.to_thread(budget.set_limit, body["limit"], by=request_user(request).id)
+    except ValueError as e:
+        return _err(str(e))
+    return web.json_response({**st, "can_edit": True})
 
 
 async def usage_events_api(request: web.Request) -> web.Response:
@@ -125,4 +156,5 @@ async def _on_cleanup(app: web.Application) -> None:
 def setup(app: web.Application) -> None:
     app.router.add_get("/api/usage", usage_api)
     app.router.add_get("/api/usage/events", usage_events_api)
+    app.router.add_put("/api/usage/budget", budget_put_api)
     app.on_cleanup.append(_on_cleanup)

@@ -210,13 +210,16 @@ the fixed addon order).
 ### LlmJob
 
 An LLM purpose of the addon: its default model profile (`fast` /
-`balanced` / `deep`) and how the Usage screen names it ("" = from the
-purpose's name).
+`balanced` / `deep`), how the Usage screen names it ("" = from the
+purpose's name), and whether it is `background` work Dana does on its
+own (the monthly budget pauses it; core/budget.py) rather than something a
+person asked for.
 
 | Field | Type | Default |
 |---|---|---|
 | `profile` | str | required |
 | `label` | str | `''` |
+| `background` | bool | `False` |
 
 ### Page
 
@@ -1300,7 +1303,7 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
   },
   "LlmJob": {
    "type": "object",
-   "description": "An LLM purpose of the addon: its default model profile (``fast`` / ``balanced`` / ``deep``) and how the Usage screen names it (\"\" = from the purpose's name).",
+   "description": "An LLM purpose of the addon: its default model profile (``fast`` / ``balanced`` / ``deep``), how the Usage screen names it (\"\" = from the purpose's name), and whether it is ``background`` work Dana does on its own (the monthly budget pauses it; core/budget.py) rather than something a person asked for.",
    "properties": {
     "profile": {
      "type": "string",
@@ -1312,6 +1315,9 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
     },
     "label": {
      "type": "string"
+    },
+    "background": {
+     "type": "boolean"
     }
    },
    "required": [

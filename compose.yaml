@@ -7,6 +7,11 @@
 # Settings: an optional .env next to this file (server/docs/configuration.md); none are needed to start.
 # Upgrading: docker compose pull && docker compose up -d. Building from source instead: server/compose.yaml.
 #
+# Transcription without an OpenAI or Gemini key (Claude does not hear audio): a local Whisper server,
+#   docker compose --profile whisper up -d
+# with WHISPER_URL=http://whisper:8000 in .env (server/docs/configuration.md, "Transcription").
+# It runs on the CPU; the first transcription downloads the model (WHISPER_MODEL) into its volume.
+#
 # Everything Dana writes (database, credentials key, recordings, uploads, app updates) lives in the
 # `data` volume: back it up.
 name: dana
@@ -33,5 +38,17 @@ services:
       retries: 3
     restart: unless-stopped
 
+  # Optional: speech-to-text on this machine (an OpenAI-compatible /v1/audio/transcriptions).
+  whisper:
+    image: ghcr.io/speaches-ai/speaches:0.8.3-cpu
+    profiles: [whisper]
+    environment:
+      ENABLE_UI: "false"
+      LOG_LEVEL: info
+    volumes:
+      - whisper-models:/home/ubuntu/.cache/huggingface/hub
+    restart: unless-stopped
+
 volumes:
   data:
+  whisper-models:

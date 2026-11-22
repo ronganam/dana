@@ -161,7 +161,8 @@ async def assistant_voice_api(request: web.Request) -> web.StreamResponse:
 
     Multipart parts: ``audio`` (required), optional ``device_screen`` (JSON
     string, the shared phone screen; the query parameter of the same name
-    works too, for short content only).
+    works too, for short content only). A server that cannot transcribe answers
+    503 ``{"error", "code": "no_transcription_model"}``.
     """
     session_id = request.query.get("session_id") or "0"
     user = session_of(request, session_id)
@@ -203,6 +204,9 @@ async def assistant_voice_api(request: web.Request) -> web.StreamResponse:
         logger.info(f"Transcribing audio upload with MIME type: {mime_type}...")
         try:
             transcript = await llm.transcribe(bytes(audio_bytes), mime_type, source="app")
+        except llm.TranscriptionUnavailable as te:
+            logger.warning(f"Web audio not transcribed: {te}")
+            return web.json_response({"error": str(te), "code": te.code}, status=503)
         except Exception as te:
             logger.error(f"Failed to transcribe web audio: {te}", exc_info=True)
             return web.json_response({"error": f"Transcription failed: {str(te)}"}, status=500)
@@ -238,8 +242,9 @@ async def assistant_voice_stream_api(request: web.Request) -> web.StreamResponse
     Server → client: JSON text frames with the same schema as the SSE
     stream — ``transcription``, then the run's events, then a closing
     ``{"type": "state", ...}``. ``{"type": "no_speech"}`` replaces all of that
-    when nothing intelligible was said. The socket stays open for another
-    utterance.
+    when nothing intelligible was said; ``{"type": "error", "code":
+    "no_transcription_model", "message"}`` when the server cannot transcribe.
+    The socket stays open for another utterance.
     """
     session_id = request.query.get("session_id", "0")
     user = session_of(request, session_id)
@@ -294,6 +299,11 @@ async def assistant_voice_stream_api(request: web.Request) -> web.StreamResponse
 
             try:
                 transcript = await llm.transcribe(bytes(wav_data), "audio/wav", source="app")
+            except llm.TranscriptionUnavailable as te:
+                logger.warning(f"Voice stream not transcribed: {te}")
+                await ws.send_json({"type": "error", "code": te.code, "message": str(te)})
+                await send_state()
+                continue
             except Exception as te:
                 logger.error(f"Transcription failed: {te}", exc_info=True)
                 await ws.send_json({"type": "error", "message": f"Transcription failed: {te}"})

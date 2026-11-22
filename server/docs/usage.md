@@ -2,7 +2,7 @@
 
 What every model and decision-model call costs, where it came from, and what it was for. Web screen **Usage** (rail, or Settings → Usage & Cost on a phone; deep link `/#usage`).
 
-Code: `core/usage.py` (capture, storage, roll-up, reads), `core/usage_api.py` (routes), `static/usage.js` + `usage.css`. Tests: `bin/test test_usage`, `bin/test test_multi_user_core` (scoping).
+Code: `core/usage.py` (capture, storage, roll-up, reads), `core/budget.py` (the monthly budget), `core/usage_api.py` (routes), `static/usage.js` + `usage.css`. Tests: `bin/test test_usage`, `bin/test test_budget`, `bin/test test_multi_user_core` (scoping).
 
 ## What is tracked
 
@@ -46,11 +46,24 @@ No prompts or replies are stored, only metadata.
 `GET /api/usage/events?range=7d&sort=recent|cost&limit=50&before=<id>&kind=&purpose=&source=&model=&ref=&ok=0|1&user=` →
 `{events: [{id, ts, kind, purpose, purpose_label, source, ref, provider, model, input_tokens, output_tokens, cached_tokens, reasoning_tokens, units, cost, ms, ok, error}], next, raw_days}`. Only calls still held raw; `next` is the cursor for the next page (recent order).
 
-Both flush the write buffer first.
+Both flush the write buffer first. `GET /api/usage` also carries `budget` (next section).
+
+## Monthly budget
+
+A server-wide ceiling on what the models cost a month, in USD (`core/budget.py`). Whoever may manage the server (`manage_server`, docs/access.md) sets it on the Usage page; it is stored in `server_settings['budget']` (no env); none set means no budget.
+
+- **The month's spend** is everyone's, system calls included, in the server's zone: `usage.spent_since(<first of the month>)` over both tables plus what is still queued, read at most once a minute (`budget.CACHE_SECONDS`; a limit change and `GET /api/usage` read it again). **Forecast**: the spend so far carried on at the same daily rate to the end of the month.
+- **States**: `ok` below 80 %; `warn` from 80 %; `paused` from 100 %, until the month ends (`resets`, the first of the next month) or the limit is raised.
+- **At 80 %** admins get a Now card (`kind` `budget`, id `budget:<YYYY-MM>`, the spend, the limit and the forecast in its blocks; `core/now.py`). `POST /api/now/act {id, action: "dismiss"}` hides it until the next month (with Undo); at 100 % the `budget` self-check takes over.
+- **At 100 %** background work pauses: every LLM purpose is either background or user-started (`core/purposes.py`: core's `wake_briefing` and `weekly_review`; an addon's `LlmJob(..., background=True)`: `about_learner`, `money_classify`, `people_brief`, `call_transcript`, `call_analysis`, `notification_triage`, `notification_extract`, `notification_summary`, `media_summary`). `core/llm.py` refuses a background purpose in `complete`, `complete_json`, `search` and `transcribe` with `budget.Paused` (so no caller can forget) — except inside an agent run or a `budget.user_started()` block (a person asked: Reanalyze a call, Refresh a person's brief). Chat, voice, transcription of what a person says and every other user-started purpose keep working. The background loops ask `budget.holds(purpose)` before their pass and skip it quietly: the briefing and weekly review are written without the model (their plain versions), notifications stay pending for triage and extraction, money rows keep their deterministic categories, a new call is failed with "Waiting: background work is paused…", and an `@addon.job` pass that hits `Paused` counts as done. The pause is logged once a month, and the `budget` self-check (admins) says "paused by the budget".
+
+`GET /api/usage` → `budget`: `{limit, spent, forecast, state: "ok"|"warn"|"paused", month: "YYYY-MM", resets: "YYYY-MM-DD", can_edit: true}` for `manage_server`, `{state, can_edit: false}` for anyone else (no amounts: the spend is everyone's).
+
+`PUT /api/usage/budget {limit: <USD> | null}` (`manage_server`; anyone else 403 `forbidden`) → the same object; `null` or `0` removes the budget, a negative or non-numeric limit is 400.
 
 ## Screen
 
-Range chips, headline cost with the change against the previous period, token / cache / latency stats, cost per day (per week past 100 days), a breakdown by what for / source / model / type (click a row to filter the whole screen by it), and the individual calls (recent or most expensive) with links to the chat, call or person that caused them. Prices that are unknown are called out, not hidden.
+Range chips, headline cost with the change against the previous period, token / cache / latency stats, **this month** (admins: spent, forecast and the budget with a meter marked at 80 %, its state, and Set / Change / Remove; members see it only when the budget is nearly used or paused, without amounts), cost per day (per week past 100 days), a breakdown by what for / source / model / type (click a row to filter the whole screen by it), and the individual calls (recent or most expensive) with links to the chat, call or person that caused them. Prices that are unknown are called out, not hidden.
 
 ## Not covered
 

@@ -6,6 +6,9 @@ calls) and says whether the signal still arrives:
 
 - ``wake`` / ``briefing``: core's own checks (confirmed wakes in ``wake_log``,
   today's briefing in ``briefings``);
+- ``budget`` / ``transcription``: core's server checks, for whoever may manage
+  the server (background work paused by the monthly budget, core/budget.py;
+  a transcription refused for want of a model, core/llm.py ``transcriber``);
 - every addon's ``@addon.selfcheck`` (phone's ``push``, ``notification_sync``,
   ``triage``, ``calls``; Home Assistant's ``location``, ``car``, ``ha_entities``,
   ``ha_watcher``; tasks' ``reminders``; calendar's ``calendar``; money's
@@ -30,7 +33,7 @@ import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from core import briefing, clock, now_hidden, undo, users, wake
+from core import briefing, budget, clock, llm, now_hidden, undo, users, wake
 from core.addons import helpers, registry
 from core.addons.helpers import parse_time
 from core.addons.hooks import Check, Hook
@@ -44,6 +47,8 @@ WAKE_DAYS = int(os.getenv("CHECK_WAKE_DAYS", "3"))
 LABELS: Dict[str, str] = {
     "wake": "Wake signal",
     "briefing": "Morning briefing",
+    "budget": "Monthly budget",
+    "transcription": "Transcription",
 }
 # A check about the server itself (``server=True``) is shown only to users who may see everyone.
 SERVER_CAPABILITY = "see_everyone"
@@ -52,6 +57,8 @@ SERVER_CAPABILITY = "see_everyone"
 APPLIES: Dict[str, Callable[[User], bool]] = {
     "wake": lambda user: wake.available(user),
     "briefing": lambda user: briefing.available(user),
+    "budget": lambda user: user.level.allows("manage_server"),
+    "transcription": lambda user: user.level.allows("manage_server"),
 }
 
 
@@ -185,9 +192,47 @@ def _check_briefing(conn, now: datetime.datetime, user: Optional[User]) -> Dict[
     return _result("briefing", True, "not due yet", None)
 
 
+def _check_budget(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
+    if user is None or not APPLIES["budget"](user):
+        return _result("budget", True, "not connected", None)
+    st = budget.state(now.date())
+    if st["limit"] is None:
+        return _result("budget", True, "no budget set", None)
+    used = f"${st['spent']:,.2f} of ${st['limit']:,.2f}"
+    if st["state"] == budget.PAUSED:
+        day = datetime.date.fromisoformat(st["resets"])
+        resets = f"{day.day} {day.strftime('%B')}"
+        return _result("budget", False, "paused by the budget", None, title="Background work paused by the budget",
+                       why=f"This month's model budget is spent ({used}). Triage, briefs, learning and summaries "
+                           f"wait until {resets} or until the budget is raised on the Usage page; chat and voice "
+                           "keep working.",
+                       blocks=[{"type": "facts", "label": "This month",
+                                "items": [f"Spent {used}", f"Forecast ${st['forecast']:,.2f}"]}])
+    return _result("budget", True, f"{used} this month", None)
+
+
+def _check_transcription(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
+    if user is None or not APPLIES["transcription"](user):
+        return _result("transcription", True, "not connected", None)
+    t = llm.transcriber()
+    if t is not None:
+        return _result("transcription", True, t.model, None)
+    refused = llm.transcription_refused()
+    if refused is None:
+        return _result("transcription", True, "no model; nothing asked for one yet", None)
+    since = datetime.datetime.fromtimestamp(refused["at"], clock.get_timezone())
+    return _result("transcription", False, "needs a transcription model", since,
+                   title="Transcription needs a model",
+                   why="Voice notes, call recordings and voice turns are not turned into text: Claude does not hear "
+                       "audio. Add an OpenAI or Gemini key in Settings → The model, or run a local Whisper server "
+                       "and set WHISPER_URL.")
+
+
 _CHECKS = {
     "wake": _check_wake,
     "briefing": _check_briefing,
+    "budget": _check_budget,
+    "transcription": _check_transcription,
 }
 
 

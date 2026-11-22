@@ -44,8 +44,8 @@ Plain DB reads plus cached values; no model call. Calendar events are the caller
 ```
 
 - `why` is **optional**: present only when there is something specific to say (see each kind); clients show nothing when it's missing.
-- `id` is stable and prefixed by kind: `approval:<session_id>`, `notif:<notification id>`, `sug:<suggestion id>`, `task:<task id>`, `check:<key>`, `review:<review id>`, `money:<transaction id>`, `money_save:<saving key>`, `money_target:<saving key>:<YYYY-MM>`. Send it back as is to `/api/now/act`.
-- `kind`: `approval` | `notification` | `suggestion` | `reminder` | `money` | `check` | `review`.
+- `id` is stable and prefixed by kind: `approval:<session_id>`, `notif:<notification id>`, `sug:<suggestion id>`, `task:<task id>`, `check:<key>`, `review:<review id>`, `budget:<YYYY-MM>`, `money:<transaction id>`, `money_save:<saving key>`, `money_target:<saving key>:<YYYY-MM>`. Send it back as is to `/api/now/act`.
+- `kind`: `approval` | `notification` | `suggestion` | `reminder` | `money` | `check` | `review` | `budget`.
 - `schedulable`: the card may be dropped on a day slot (`action: "schedule"`).
 - `ref.type`: `thread` (approval → open the conversation), `call`, `notification`, `task`, `check`, `review` — what to open or pass as on-screen context (`POST /api/chat/context` accepts `call`, `notification`, `task`, `review`, `suggestion`, `person`).
 - `notification` (notification items only): `{id, key, package, app, can_reply, on_phone, actions: [{title, reply}]}` — `key` is the Android shade key, so the phone can reply / open / press a button through its own notification listener. `can_reply` = still in the shade and has a reply button.
@@ -87,6 +87,7 @@ Order of `items` (each group capped): approval (1, sessions waiting ≤ 48 h, th
 | `money` (an unusual charge, `ref {type: "transaction", id}`) | `open` (client) "Ask Dana" (chat context kind `transaction`) | `dismiss` (sticks; `snooze` / `schedule` also accepted), with Undo; another user's charge 404, without `money` 403 `not_connected` | `facts` (amount, merchant, when, account, why it stands out) |
 | `money` (a way to save or a target, `ref {type: "saving", id: <saving key>}`; "Ask Dana" opens the `saving` context chat) | `open` (client) "Ask Dana" | `dismiss`, with Undo (hides the card only: the saving's status is not changed); another user's key 404, without `money` 403 `not_connected` | `facts` Saving (the saving or the money at stake, the first step) / Target (the target, spent so far, or what was saved against the usual pace) |
 | `check` | `open` (client) "Details" | `ignore {days: 7}` | `week` (wake), `facts`, `text` (what it is / how to fix) |
+| `budget` (admins, from 80 % of the monthly budget until it is spent; docs/usage.md, `ref {type: "usage", id: <YYYY-MM>}`) | `open` (client) "Details" | `dismiss` "Dismiss for this month" (hidden until the next month, with Undo; a past month 409, without `manage_server` 400) | `facts` This month (spent, budget, forecast) |
 | `review` | `apply` (with the `checks` block, key `items`) or `open` (client) when nothing is proposed | `skip` | `facts` This week, `facts` Money (with `money`, when there is something to say), `checks` Proposed (actions other than keep) |
 
 A **due reminder** is an open task whose reminder fired (the caller's `last_trigger_v2_*` mark in `task_trigger_marks`, written by `addons/tasks/triggers.py` for time / place / car / wake triggers) within `NOW_REMINDER_MAX_HOURS` (48) and that nobody touched since (completed, snoozed, edited — `updated_at` later than the firing + 5 min — or dismissed in Now), plus open tasks whose time trigger has passed but hasn't fired yet. Older firings are left to the Reminders screen.
@@ -199,6 +200,8 @@ The `suggestions` push (full-screen review on the phone) is sent for calls that 
 | `calls` | no recording failed to process in 3 days (silent ones excluded) and one was uploaded within `CHECK_CALLS_DAYS` (7) | `phone_calls` |
 | `calendar` | the last read of the caller's calendar (Now's cache) worked (ok "not connected" without the addon) | `system_marks['calendar:<user>']` (written by `addons/calendar/today.py`) |
 | `briefing` | the caller's briefing of today exists (checked from 11:00; shown to users who get one) | their `briefings` row |
+| `budget` | the monthly budget is not spent (shown with `manage_server`; red "paused by the budget" while background work waits, docs/usage.md) | `core/budget.py` (the month's spend from `usage_events` / `usage_daily`) |
+| `transcription` | a transcription model is set (docs/configuration.md → Transcription), or none was asked for since the server started (shown with `manage_server`; red "needs a transcription model" once a transcription was refused) | `llm.transcriber()`, `llm.transcription_refused()` (in memory) |
 
 ## Search
 

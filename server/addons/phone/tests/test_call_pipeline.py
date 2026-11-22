@@ -21,6 +21,7 @@ testenv.isolate("call_pipeline_test")
 os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
+os.environ["TRANSCRIBE_MODEL"] = "gemini/gemini-3.1-flash-lite"  # a model that hears audio (LiteLLM is mocked)
 
 import httpx
 import litellm
