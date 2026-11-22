@@ -100,7 +100,7 @@ private fun MoreList(viewModel: MainViewModel, selected: MoreItem?) {
         Triple(MoreItem.MONEY, "spending · accounts · savings", setOf(MoreItem.MONEY)).takeIf { "money" in addons },
         Triple(MoreItem.CALLS, calls.size.takeIf { it > 0 }?.toString().orEmpty(), setOf(MoreItem.CALLS)),
         Triple(MoreItem.PEOPLE, people.size.takeIf { it > 0 }?.toString().orEmpty(), setOf(MoreItem.PEOPLE)),
-        Triple(MoreItem.ABOUT, "what Dana knows · settings", setOf(MoreItem.ABOUT, MoreItem.SETTINGS, MoreItem.MEMORY))
+        Triple(MoreItem.ABOUT, "what Dana knows · settings", setOf(MoreItem.ABOUT, MoreItem.SETTINGS, MoreItem.SIGNALS, MoreItem.MEMORY))
     )
     val accent = MaterialTheme.colorScheme.primary
     val canvas = MaterialTheme.colorScheme.background
@@ -154,8 +154,9 @@ private fun MoreItemStage(viewModel: MainViewModel, item: MoreItem, stacked: Boo
     val shell = viewModel.shellController
     val back = { shell.clearPick(Place.MORE) }
     Column(Modifier.fillMaxSize()) {
-        // Screens with their own back arrow (People, About you, Settings, Review) get it; the others get "← More" on the cover.
-        val ownBack = item == MoreItem.PEOPLE || item == MoreItem.ABOUT || item == MoreItem.SETTINGS || item == MoreItem.REVIEW
+        // Screens with their own back arrow (People, About you, Settings, Signals, Review) get it; the others get "← More" on the cover.
+        val ownBack = item == MoreItem.PEOPLE || item == MoreItem.ABOUT || item == MoreItem.SETTINGS || item == MoreItem.SIGNALS ||
+            item == MoreItem.REVIEW
         if (item == MoreItem.MEMORY) BackLink("← About you", back)
         else if (stacked && !ownBack) BackLink("← More", back)
         PaneWindow(Modifier.weight(1f)) {
@@ -167,7 +168,9 @@ private fun MoreItemStage(viewModel: MainViewModel, item: MoreItem, stacked: Boo
                 MoreItem.MEMORY -> MemoryScreen(viewModel)
                 MoreItem.ABOUT -> AboutScreen(viewModel, onBack = if (stacked) back else null, onOpenSettings = { shell.selectMore(MoreItem.SETTINGS) })
                 // Reached from About you, so Back always returns there.
-                MoreItem.SETTINGS -> SettingsScreen(viewModel, onBack = back)
+                MoreItem.SETTINGS -> SettingsScreen(viewModel, onBack = back, onOpenSignals = { shell.selectMore(MoreItem.SIGNALS) })
+                // Reached from Settings, so Back returns there.
+                MoreItem.SIGNALS -> io.github.ronganam.dana.ui.screens.signals.SignalsScreen(viewModel, onBack = back)
                 MoreItem.REVIEW -> ReviewScreen(viewModel, onBack = back)
             }
         }

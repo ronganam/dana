@@ -187,6 +187,11 @@ object PhoneEvents {
                 d.long("items")?.toInt() ?: 0,
                 (d["summary"] as? JsonArray).orEmpty().map { (it as? JsonPrimitive)?.contentOrNull.orEmpty() }
             )
+            // The user's zones changed: the geofences and the zone names follow.
+            "zones_changed" -> {
+                io.github.ronganam.dana.data.signals.PhoneSignals.zonesChanged(context)
+                io.github.ronganam.dana.data.network.Zones.refresh(context)
+            }
             // The laptop's coding-agent sessions (the whole list each time): live notifications.
             "agent_sessions" -> AgentSessions.show(context, d)
             else -> Log.w(TAG, "Unknown event type $type (newer server?)")

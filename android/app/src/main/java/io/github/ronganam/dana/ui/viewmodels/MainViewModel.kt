@@ -94,6 +94,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** The Shopping screen (the list itself is shared with the widget and the watch: `ShoppingSync`). */
     val shoppingController = ShoppingController(ctx, appContext)
     val moneyController = MoneyController(ctx, appContext)
+    /** Settings → Signals: where each signal comes from, the wake window, the phone sources. */
+    val signalsController = SignalsController(ctx, appContext)
     /** The addons the user has connected (`/api/me`), as they change: which places and More rows show. */
     val addons: kotlinx.coroutines.flow.StateFlow<Set<String>> = io.github.ronganam.dana.data.network.Me.addons(appContext)
     /** Navigation state of the new main screen (places, picks, thread sheet, on-screen context). */
@@ -194,6 +196,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 if (online && !wasOnline) {
                     TaskActionQueue.flushAsync(appContext)
                     shoppingController.flush()
+                    io.github.ronganam.dana.data.signals.SignalSync.flushAsync(appContext)
                 }
                 // Back online: what the screens show may be stale.
                 if (online && !wasOnline && initialized) {
@@ -225,6 +228,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // A reply may have finished while we were in the background.
         chatController.resyncIfIdle()
         TaskActionQueue.flushAsync(appContext)
+        io.github.ronganam.dana.data.signals.SignalSync.flushAsync(appContext)
         shoppingController.flush()
         shoppingController.fetchMe()
         callsController.fetchSuggestions()

@@ -149,10 +149,20 @@ data class CalendarEvent(
     val location: String? = null
 )
 
+/**
+ * One of the user's zones (`GET /api/zones`): what the reminder editors show
+ * ([name], [entityId]) and where it is, for the phone's geofences
+ * (`data/signals/GeofenceDiff`).
+ */
 @Serializable
 data class ZoneItem(
     val name: String = "",
-    val entityId: String = ""
+    val entityId: String = "",
+    val id: String = "",
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val radiusM: Double? = null,
+    val isHome: Boolean = false
 )
 
 /** A call recording (`GET /api/calls`, and the call part of `GET /api/calls/{id}`). */

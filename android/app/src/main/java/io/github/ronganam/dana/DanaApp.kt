@@ -19,6 +19,8 @@ open class DanaApp : Application(), Configuration.Provider {
         if (android.os.Build.VERSION.SDK_INT < 28 || getProcessName() == packageName) {
             io.github.ronganam.dana.push.PushSetup.init(this)
             io.github.ronganam.dana.data.wake.UnlockWatcher.register(this)
+            // The phone's signals: car mode, the periodic run, geofences (a no-op on the kiosk and the TV).
+            io.github.ronganam.dana.data.signals.PhoneSignals.init(this)
         }
     }
 

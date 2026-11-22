@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.provider.Settings
 import android.widget.Toast
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -47,7 +48,7 @@ import io.github.ronganam.dana.R
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
+fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null, onOpenSignals: (() -> Unit)? = null) {
     val context = LocalContext.current
     val prefs = ServerConfig.prefs(context)
 
@@ -147,6 +148,25 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                                 prefs.edit { putBoolean(DeviceSpeech.PREF_KEY, it) }
                             }
                         )
+                    }
+                }
+            }
+
+            // --- Signals (phone only: wake, car, places; their own page) ---
+            if (onOpenSignals != null && !BuildConfig.KIOSK && !BuildConfig.TV) {
+                Spacer(Modifier.height(8.dp))
+                SectionLabel("Signals", hue = hues.amber)
+                GlassCard(modifier = Modifier.fillMaxWidth().clickable(onClick = onOpenSignals)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Signals", style = MaterialTheme.typography.titleSmall)
+                            Text(
+                                "Waking up, the car, arriving and leaving places: what this phone tells Dana, and the wake window.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text("→", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
                     }
                 }
             }
