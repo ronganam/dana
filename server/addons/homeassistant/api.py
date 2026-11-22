@@ -3,7 +3,7 @@ Assistant for the web UI, the tablet and the TV (docs/dashboard.md).
 
 - ``POST /api/ha/zones/import`` — copy their Home Assistant zones into their Dana zones
   (core/zones.py) → ``{added: [zone], skipped: [name]}``; 502 ``unreachable`` when HA fails
-- ``GET /api/client-config`` — their phone / person entity names
+- ``GET /api/client-config`` — their phone / person entity names (notify service, screen sensor, person)
 - ``GET /api/ha/state/{entity_id}``, ``GET /api/ha/states?ids=|domains=`` (compact tiles)
 - ``POST /api/ha/service {domain, service, entity_id, service_data?}``
 

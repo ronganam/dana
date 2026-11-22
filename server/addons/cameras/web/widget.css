@@ -1,0 +1,78 @@
+/* The cameras addon's dashboard widget (web/widget.js): the live picture fills its widget, black around it;
+ * the events rail (large size) beside it; the live / connecting / frozen badge in sage / amber / rose. */
+.cw-body { padding: 0 !important; flex-direction: row !important; gap: 8px; }
+.cw-body .dw-note { padding: 10px; }
+.cw-viewport {
+    flex: 1 1 auto; min-width: 0; position: relative; overflow: hidden; background: #000;
+    display: flex; align-items: center; justify-content: center; touch-action: none; cursor: grab;
+}
+.cw-viewport:active { cursor: grabbing; }
+.cw-viewport video {
+    width: 100%; height: 100%; object-fit: contain; transform-origin: center center; will-change: transform;
+    user-select: none; -webkit-user-drag: none; display: none;
+}
+.cw-loading {
+    position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: var(--mute); gap: 10px; font-size: 12.5px; z-index: 1;
+}
+.cw-overlay {
+    position: absolute; top: 8px; left: 10px; right: 10px; display: flex; align-items: center;
+    justify-content: space-between; pointer-events: none; z-index: 2;
+}
+.cw-label, .cw-live {
+    display: flex; align-items: center; gap: 5px; font-size: 10.5px; font-weight: 600;
+    background: rgba(0, 0, 0, 0.45); padding: 3px 8px; border-radius: var(--radius-md);
+}
+.cw-label { color: rgba(247, 245, 240, 0.65); }
+.cw-label svg { width: 11px; height: 11px; }
+.cw-live { letter-spacing: 0.05em; font-size: 10px; }
+.cw-live .live-dot { width: 6px; height: 6px; border-radius: var(--radius-full); }
+.cw-live.live { color: var(--sage); }
+.cw-live.live .live-dot { background: var(--sage); animation: cwPulse 1.5s ease-in-out infinite; }
+.cw-live.connecting { color: var(--amber); }
+.cw-live.connecting .live-dot { background: var(--amber); animation: cwPulse 1s ease-in-out infinite; }
+.cw-live.frozen { color: var(--rose); }
+.cw-live.frozen .live-dot { background: var(--rose); }
+@keyframes cwPulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.25; } }
+.cw-frozen {
+    position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: none; align-items: center;
+    gap: 8px; background: rgba(43, 37, 33, 0.92); border: 1px solid rgba(240, 112, 154, 0.55); color: var(--rose);
+    font-size: 12px; font-weight: 500; padding: 8px 12px; border-radius: var(--radius-lg); z-index: 3;
+    white-space: nowrap; max-width: calc(100% - 20px);
+}
+.cw-frozen.visible { display: flex; }
+.cw-frozen svg { width: 14px; height: 14px; flex-shrink: 0; }
+.cw-frozen button { font-size: 11px; font-weight: 600; color: var(--ink); background: var(--rose); border-radius: var(--radius-sm); padding: 5px 10px; }
+
+/* The events rail: exactly three equal rows beside the picture. */
+.cw-events { flex: 0 0 clamp(120px, 24%, 180px); display: flex; flex-direction: column; min-height: 0; padding: 8px 8px 8px 0; }
+.cw-events-list { display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 8px; min-height: 0; flex: 1; }
+.cw-events[data-stale] .cw-events-list { opacity: 0.45; }
+.cw-events-empty { font-size: 12px; color: var(--mute); padding: 6px 2px; }
+.ev-card {
+    display: flex; flex-direction: column; min-height: 0; cursor: pointer; background: var(--canvas);
+    border: 1px solid var(--hairline); border-radius: var(--radius-card); overflow: hidden;
+}
+.ev-card.ev-new { border-color: var(--amber); }
+.ev-media { flex: 1 1 auto; min-height: 0; background: #000; }
+.ev-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ev-card.ev-err .ev-media img { visibility: hidden; }
+.ev-meta { display: flex; flex-direction: column; gap: 1px; padding: 5px 8px 6px; line-height: 1.25; min-width: 0; }
+.ev-label { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ev-ago { font-size: 11px; color: rgba(247, 245, 240, 0.6); font-variant-numeric: tabular-nums; }
+.ev-card.ev-live .ev-ago { color: var(--amber); font-weight: 600; }
+.ev-card.ev-motion .ev-label { color: rgba(247, 245, 240, 0.7); font-weight: 500; }
+html[data-layout="narrow"] .cw-body { flex-direction: column !important; }
+html[data-layout="narrow"] .cw-events { flex: 0 0 auto; padding: 0 8px 8px; }
+html[data-layout="narrow"] .cw-events-list { display: flex; height: 110px; }
+html[data-layout="narrow"] .ev-card { width: 140px; }
+
+/* A tapped event's clip, full-screen. */
+.cw-clip {
+    position: fixed; inset: 0; z-index: 9000; background: rgba(0, 0, 0, 0.85);
+    display: flex; align-items: center; justify-content: center; padding: 14px;
+}
+.cw-clip-box { display: flex; flex-direction: column; gap: 8px; width: min(100%, calc((100vh - 80px) * 16 / 9)); max-width: 100%; }
+.cw-clip-head { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600; }
+.cw-clip-head button { font-size: 28px; line-height: 1; padding: 2px 12px; color: var(--ink); }
+.cw-clip-box video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: var(--radius-card); }

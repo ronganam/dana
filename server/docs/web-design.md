@@ -1,6 +1,6 @@
 # The web design system
 
-The web UI (`static/`, the addons' `web/` pages and the bedroom dashboard) shares one look with the
+The web UI (`static/`, the addons' `web/` pages and widgets, and the tablets' and TVs' dashboards) shares one look with the
 Android apps (`../android/DESIGN.md`): a warm ink canvas, Inter body, DM Mono labels, one ember accent,
 hairline rows. This page says where its colours and motion live and how a screen uses them.
 
@@ -156,11 +156,20 @@ work.
 
 An addon page gets the same helpers as `api.motion` (`docs/writing-an-addon.md`).
 
-## The bedroom dashboard (`static/dashboard.css`, `static/dashboard.js`)
+## Dashboards (`static/dashboard.css`, `static/dashboard.js`, the addons' widget scripts)
 
-A low-power target: the wall tablet's WebView. It has the Ink tokens and the hues (written as plain hex and
-rgba, no `rgb(var() / a)`), Ink only, no glow. Colour: today's date and the selected AC mode in ember,
-calendar sources on the hues, the briefing in amber, the live / connecting / frozen badge in sage / amber
-/ rose. Motion only for presses (scale 0.97) and values that change after their first fill
-(`setValue`: temperature, humidity, batteries crossfade, `.dash-changed`); no entrance, stagger, shimmer or
-glow. The clock is set directly.
+A low-power target: a wall tablet's or TV's WebView (`docs/dashboard.md`). It has the Ink tokens and the hues
+(written as plain hex and rgba, no `rgb(var() / a)`), Ink only, no glow. Each widget is a card (`.dw`, a
+title line `.dw-head` in DM Mono unless the renderer is `bare`) on a four-column grid; widgets build on the
+shared pieces of `dashboard.css` (`.dw-big` a large value, `.dw-sub`, `.dw-list` / `.dw-item` hairline rows,
+`.dw-dot`, `.dw-end`, `.dw-pill` / `.active`, `.dw-bar`, `.dw-empty`, `.dw-note` for a widget that has nothing
+to show, `.dw-rtl` for Hebrew or Arabic text) and keep their own CSS small and prefixed. Colour: today's date
+and a selected mode in ember, calendar sources on the hues, the briefing in amber, the camera's live /
+connecting / frozen badge in sage / amber / rose, a low battery or overspending in rose. Motion only for
+presses (scale 0.97) and values that change after their first fill (`api.setValue`: the value crossfades,
+`.dash-changed`); no entrance, stagger, shimmer or glow. The clock is set directly.
+
+The editor (Devices → a tablet's or TV's dashboard button, `static/dashboard-editor.js`) is a plain list in
+the shell's modal: one hairline row per widget (its icon, title and description, a size select, settings,
+up / down, remove), the preset select above it and Add below it; a widget whose addon is gone is marked in
+rose until removed.

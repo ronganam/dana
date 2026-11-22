@@ -1,0 +1,22 @@
+/* The Home Assistant addon's dashboard widgets (web/widget.js): Climate (the selected mode in ember), Lights,
+ * entities, Batteries (sage / amber / rose by level). */
+.hw-climate { display: flex; flex-direction: column; gap: 6px; height: 100%; }
+.hw-temps { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.hw-target { display: flex; align-items: center; gap: 6px; }
+.hw-set { font-size: 20px; font-weight: 600; min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
+.hw-modes, .hw-fans { display: flex; flex-wrap: wrap; gap: 4px; }
+.hw-missing .hw-temps, .hw-missing .hw-modes, .hw-missing .hw-fans { display: none; }
+.hw-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; margin-top: 6px; overflow: hidden; }
+.hw-tile {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 8px;
+    border-radius: var(--radius-md); background: var(--canvas-raised); color: var(--body); text-align: left;
+    font-size: 12.5px; min-width: 0; transition: transform var(--dur-fast) var(--ease-standard);
+}
+.hw-tile span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.hw-tile svg { width: 16px; height: 16px; }
+.hw-tile small { color: var(--mute); font-size: 11px; }
+.hw-tile.hw-on { background: var(--amber-tint); color: var(--ink); }
+.hw-tile.hw-on svg { color: var(--amber); }
+.hw-batt + .hw-batt { margin-top: 8px; }
+.hw-batt-top { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; margin-bottom: 4px; }
+.hw-batt-top span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

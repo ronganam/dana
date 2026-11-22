@@ -3,7 +3,6 @@
 - ``GET /`` — the web app (an addon may serve it at its own path too: ``/shopping``)
 - ``GET /sw.js``, ``GET /manifest.json`` — the service worker (its ``RELEASE``: :func:`web_release`) and the PWA manifest
 - ``GET /calendar`` — the full-screen calendar TV view
-- ``GET /dashboard`` — the bedroom tablet dashboard (docs/dashboard.md), its CSS/JS versioned by the release
 - ``GET /api/health`` — ``{ok, version, time}``; ``version`` is the ``VERSION`` file (CI writes the release name into it)
 """
 
@@ -108,22 +107,6 @@ async def calendar_fullscreen_handler(request: web.Request) -> web.StreamRespons
     return web.FileResponse(tv_path)
 
 
-async def dashboard_fullscreen_handler(request: web.Request) -> web.StreamResponse:
-    """Serve the full-screen bedroom dashboard view."""
-    static_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
-    dashboard_path = os.path.join(static_dir, "dashboard.html")
-    if not os.path.exists(dashboard_path):
-        return web.Response(text="Dashboard view file not found.", status=404)
-    # Kiosk WebViews cache aggressively (no validators on /static), so a new release
-    # would never reach the wall tablet. The page itself is always revalidated and
-    # its CSS/JS are versioned by the release, so an update lands on the next load.
-    with open(dashboard_path, encoding="utf-8") as f:
-        html = f.read()
-    for asset in ("/static/dashboard.css", "/static/dashboard.js"):
-        html = html.replace(f'"{asset}"', f'"{asset}?v={_SERVER_VERSION}"')
-    return web.Response(text=html, content_type="text/html", headers={"Cache-Control": "no-cache"})
-
-
 def setup(app: web.Application) -> None:
     """Register the pages and ``/api/health``."""
     app.router.add_get("/", index_handler)
@@ -131,4 +114,3 @@ def setup(app: web.Application) -> None:
     app.router.add_get("/manifest.json", manifest_handler)
     app.router.add_get("/api/health", health_api)
     app.router.add_get("/calendar", calendar_fullscreen_handler)
-    app.router.add_get("/dashboard", dashboard_fullscreen_handler)

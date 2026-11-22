@@ -19,6 +19,22 @@
  * openSession, badge, visible, piece, icons, esc, store, motion } (each described where it is built, `makeApi`;
  * `motion` is `Dana.motion`, below).
  * Nothing else of the shell is a page's business: no globals, no other page's elements.
+ *
+ * A dashboard widget (`@addon.widget("<key>", script="widget.js", …)`, server/docs/dashboard.md) is drawn by a
+ * script of the addon's web/ folder that the dashboard page (static/dashboard.js) loads; it registers each widget
+ * it draws:
+ *
+ *   Dana.widget("<key>", {
+ *     style: "widget.css",          optional: a stylesheet of the same web/ folder, loaded once
+ *     bare: true,                   optional: no title line above it (the clock)
+ *     mount(el, w, api) {},         draws it into its empty element; w = {id, widget, size, settings, data}
+ *     update(el, w, api) {},        optional: new data (w.data) for it; default: emptied and mounted again
+ *     unmount(el, api) {},          optional: before it leaves the page (stop timers, close streams)
+ *   });
+ *
+ * Its `api` is a page's (above) plus: size, settings, refresh() (reads its data again and calls update),
+ * night() (whether the dashboard is in night mode), kiosk (window.DanaKiosk inside the kiosk app, else null),
+ * setValue(el, text) (sets a value; one that changed crossfades in: the dashboard's only motion).
  * Works in Node too (no DOM until a page mounts): tests/test_web_panels.mjs.
  */
 (() => {
@@ -216,9 +232,28 @@
     });
   }
 
+  const widgets = new Map();      // widget key → {addon, def, url}
+
+  /** Registers a dashboard widget's renderer (see the top of this file). Called by a widget script while it runs. */
+  function widget(key, def) {
+    if (!def || typeof def.mount !== "function") throw new Error("Dana.widget: mount(el, w, api) is required");
+    const src = (typeof document !== "undefined" && document.currentScript && document.currentScript.src) || "";
+    const found = /\/addons\/([A-Za-z0-9_]+)\/web\//.exec(bare(src));
+    if (!found) throw new Error("Dana.widget: not loaded from an addon's web/ folder");
+    if (widgets.has(key)) throw new Error(`Dana.widget: the ${key} widget is already registered`);
+    widgets.set(key, { addon: found[1], def, url: src });
+  }
+
   root.Dana = {
     panel,
     load,
+    widget,
+    /** A widget's registration ({addon, def, url}), or null. */
+    widgetDef: (key) => widgets.get(key) || null,
+    /** The api a widget of `addon` (its script at `url`) gets: a page's, plus `extra`. */
+    widgetApi: (addon, url, extra) => Object.assign(makeApi(addon, "dashboard", url), extra || {}),
+    /** Loads a classic script once; resolves when it has run. */
+    loadScript,
     /** The shell lends pages its services: {me(), toast(text), open(id, arg), openSession(sid),
      *  badge(page, value, tone), visible(page), piece(name, el)}. */
     attach(services) { shell = services; },

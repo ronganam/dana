@@ -269,6 +269,33 @@ With `opens`, the Now screen opens this page for a card or a day item that refer
 
 A page uses only its own elements and `api`. It builds on the shell's tokens and classes (`static/styles.css`: `--ink`, `--canvas`, the named hues `--sage` / `--sage-tint` / `--sage-text` …, `.top-bar`, `.btn-primary`, `.chip`, `.form-control`; `static/kit.css`: `.ibx` list and detail panes, toolbars, modals, fields) and the shared motion (`api.motion`: rows marked `.dn-row` rise in on the page's first opening, `complete(row)`, `flash(el)`, `number(el, text)`, skeletons with `.dn-shimmer`); `docs/web-design.md` says which colour means what and which motion goes where. Put pure logic in a `web/<x>-core.js` that sets `globalThis.<Name>` and test it with `tests/test_web_<x>.mjs` (the official pages do: shopping, projects, money, tasks, calls).
 
+### Dashboard widgets
+
+A tablet's or TV's dashboard (`dashboard.md`) is built from widgets addons declare. The function gives the widget's data for a user as JSON; a script in `web/` draws it:
+
+```python
+@addon.widget("tides_next", title="Next tide", script="widget.js", icon="waves", refresh=300,
+              sizes=("small", "medium"),                         # of small / medium / large; the first is the default
+              settings=(Field("beach", "The beach", default="", required=False, label="Beach"),),
+              description="The next high and low tide")
+def next_tide(user: User, ctx: WidgetContext) -> dict:          # or async
+    return {"beach": ctx.settings["beach"], "next": store.next_tide(user, ctx.settings["beach"], ctx.now)}
+```
+
+```js
+// web/widget.js
+Dana.widget("tides_next", {
+  style: "widget.css",                   // optional: a stylesheet beside it, loaded once
+  mount(el, w, api) {                    // w = {id, widget, size, settings, data}
+    el.innerHTML = `<div class="dw-big">${api.esc(w.data.next)}</div>`;
+  },
+  update(el, w, api) {},                 // optional: new data (default: emptied and mounted again)
+  unmount(el, api) {},                   // optional: stop timers, close streams
+});
+```
+
+The key is unique across addons. Settings are text `Field`s (at most 8) a person sets per placed widget on the editor; `ctx.settings` has each, its default filled in. `refresh` is how often (seconds, 0 or ≥ 10) the dashboard reads the data again; the widget's `api` adds `size`, `settings`, `refresh()`, `night()`, `kiosk` and `setValue(el, text)` to a page's. A user without the addon gets `not_connected` where a preset placed it, and the editor does not offer it. Build on the dashboard's shared classes (`.dw-big`, `.dw-sub`, `.dw-list` / `.dw-item`, `.dw-empty`…; `docs/web-design.md`, "Dashboards"): the dashboard is a low-power WebView, so no entrance motion.
+
 ### Workers
 
 `worker=Worker(port=8091, url_env="TIDES_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained; the app image leaves it out); the addon reaches it at the URL in `url_env`. An addon published in its own repository (a catalog addon) builds its worker image there instead (a workflow pushing `ghcr.io/<owner>/<repo>-worker:<commit>`) and names it, `Worker(port, url_env, image="ghcr.io/<owner>/<repo>-worker")`: deployments then run that image at the installed commit and build nothing. `bin/dana addons new tides --worker` writes a small standard-library server and a tool that calls it. Deploying and running workers: `operations.md`, "Workers".

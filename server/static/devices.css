@@ -44,3 +44,34 @@
 .dev-done { display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; padding: 8px 0; color: var(--body); }
 .dev-done svg { width: 36px; height: 36px; color: var(--sage); }
 .dev-done strong { color: var(--ink); font-size: 15px; }
+
+/* The dashboard editor (static/dashboard-editor.js): a plain list, one row per widget. */
+.ibx-modal-card.dde { max-width: 640px; }
+.dde-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.dde-head h3 { margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dde-open, .dde-add .btn-secondary { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; }
+.dde-open svg, .dde-add svg { width: 14px; height: 14px; }
+.dde-body { display: flex; flex-direction: column; gap: 14px; }
+.dde-help { color: var(--mute); font-size: 12.5px; }
+.dde-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--hairline); }
+.dde-row { border-bottom: 1px solid var(--hairline); padding: 8px 0; }
+.dde-line { display: flex; align-items: center; gap: 10px; }
+.dde-icon { width: 32px; height: 32px; flex-shrink: 0; border-radius: var(--radius-full); display: flex; align-items: center;
+  justify-content: center; background: rgb(var(--ink-rgb) / .06); color: var(--body-strong); }
+.dde-icon svg { width: 16px; height: 16px; }
+.dde-text { flex: 1; min-width: 0; }
+.dde-name { color: var(--ink); font-weight: 500; font-size: 13.5px; }
+.dde-meta { color: var(--mute); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dde-row.gone .dde-name, .dde-row.gone .dde-meta { color: var(--rose-text); }
+.dde-size { width: auto; flex-shrink: 0; padding: 4px 8px; font-size: 12.5px; }
+.dde-line .icon-btn.active { background: var(--accent-tint); color: var(--accent-text); }
+.dde-line .icon-btn:disabled { opacity: .35; cursor: default; }
+.dde-settings { display: flex; flex-direction: column; gap: 6px; padding: 10px 0 4px 42px; }
+.dde-add { display: flex; gap: 8px; }
+.dde-add select { flex: 1; min-width: 0; }
+@media (max-width: 560px) {
+  .dde-line { flex-wrap: wrap; }
+  .dde-text { flex-basis: calc(100% - 42px); }
+  .dde-size { margin-left: 42px; }
+  .dde-settings { padding-left: 0; }
+}

@@ -569,7 +569,7 @@ WEB_LOAD = [
     ("/api/usage?range=30d", has("totals", "by_day", "previous")),
     ("/api/usage/events?sort=recent&limit=50", has("events", "next")),
     ("/api/zones", is_list("name", "entity_id")),
-    ("/api/client-config", has("battery_sensor", "interactive_sensor", "person", "notify_service")),
+    ("/api/client-config", has("interactive_sensor", "person", "notify_service")),
     ("/api/ha/state/sensor.robin_phone_battery", has("entity_id", "state", "attributes")),
     ("/api/shopping/items", is_list("id", "name", "checked", "quantity", "note", "category")),
     ("/api/shopping", has("list", "categories", "items", "counts", "usuals", "invites", "lists")),

@@ -26,7 +26,8 @@ from typing import (Any, Awaitable, Callable, Collection, Dict, List, Mapping, O
 
 from core.access import CAPABILITIES
 from core.users import User
-from core.addons.hooks import ADDON as ADDON_NEED, Channel, Handler, Hook, Job, LlmJob, Need, Page, Service, Touches, Worker
+from core.addons.hooks import (ADDON as ADDON_NEED, WIDGET_SIZES, Channel, Handler, Hook, Job, LlmJob, Need, Page,
+                               Service, Touches, Worker)
 from core.addons.schema import generate_schema
 
 logger = logging.getLogger(__name__)
@@ -66,12 +67,12 @@ DAILY = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 # sync or async functions (e.g. ``briefing`` sections that fetch weather, or ``provide``).
 SYNC_HOOKS = ("now_cards", "day_items", "review", "search", "selfcheck", "context", "context_card",
               "context_block", "demo")
-FLEX_HOOKS = ("briefing", "provide")
+FLEX_HOOKS = ("briefing", "provide", "widget")
 # Hooks declared for a key (a card prefix, a section key, a check key, an item
 # type, a context kind, a provider key): one addon per key and kind across every addon (the
 # loader fails the later addon that repeats one).
 KEYED_HOOKS = ("now_action", "briefing", "review", "review_action", "selfcheck", "context", "context_card",
-               "context_block", "provide")
+               "context_block", "provide", "widget")
 _MISSING = object()
 
 
@@ -123,6 +124,10 @@ MAX_PLACEHOLDER = 80
 MAX_LINE = 200
 MAX_LINES = 8
 ICON = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+# A dashboard widget's key, and the file of the addon's web/ folder that draws it.
+WIDGET_KEY = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+WIDGET_SCRIPT = re.compile(r"^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\.js$")
+MAX_WIDGET_SETTINGS = 8
 
 
 def _https_url(owner: str, url: str) -> None:
@@ -695,6 +700,45 @@ class Addon:
         the demo deletes its users, and nothing else is cleaned up. Never
         through the model or an outside service."""
         return self._hook("demo")(func)
+
+    def widget(self, key: str, *, title: str, script: str, sizes: Sequence[str] = WIDGET_SIZES,
+               settings: Sequence[Field] = (), description: str = "", icon: str = "",
+               refresh: int = 60) -> Callable[[F], F]:
+        """``def f(user, ctx: WidgetContext) -> dict`` (or async): the data of this
+        addon's dashboard widget ``key`` (unique across addons) for ``user``, as
+        JSON. Offered on the dashboards of users who have the addon; on one of a
+        user who does not, it answers ``not_connected``. ``script``: the file of
+        the addon's ``web/`` folder that draws it, registering with
+        ``Dana.widget(key, …)`` (static/dana.js). ``sizes``: the sizes it can be
+        drawn at, of ``small`` / ``medium`` / ``large`` (the first is its
+        default). ``settings``: what each placed widget lets the user choose
+        (:class:`Field`; values are text, the default used while one is
+        empty). ``refresh``: seconds between its data refreshes on a dashboard
+        (0: only when the page loads or its script asks)."""
+        owner = f"{self.name}: @addon.widget({key!r})"
+        if not WIDGET_KEY.match(key or ""):
+            raise ValueError(f"{owner}: the key must be lower-case letters, digits and _, starting with a letter")
+        if not title or len(title) > MAX_LABEL:
+            raise ValueError(f"{owner}: title must be words, up to {MAX_LABEL} characters")
+        _short(owner, "description", description, MAX_LINE)
+        if not WIDGET_SCRIPT.match(script or ""):
+            raise ValueError(f"{owner}: script must be a .js file of its web/ folder (\"widget.js\")")
+        if isinstance(sizes, str) or not sizes or len(set(sizes)) != len(sizes) \
+                or any(s not in WIDGET_SIZES for s in sizes):
+            raise ValueError(f"{owner}: sizes must name some of {WIDGET_SIZES}, each once")
+        if isinstance(settings, Field) or not all(isinstance(f, Field) for f in settings):
+            raise TypeError(f"{owner}: settings= takes a tuple of Field")
+        names = [f.name for f in settings]
+        if len(set(names)) != len(names) or len(names) > MAX_WIDGET_SETTINGS:
+            raise ValueError(f"{owner}: settings must have distinct names, at most {MAX_WIDGET_SETTINGS}")
+        if any(f.type != TEXT for f in settings):
+            raise ValueError(f"{owner}: a widget setting is plain text (type TEXT)")
+        if icon and not ICON.match(icon):
+            raise ValueError(f"{owner}: icon {icon!r} must be a Lucide icon name")
+        if not isinstance(refresh, int) or refresh < 0 or 0 < refresh < 10:
+            raise ValueError(f"{owner}: refresh is 0 or at least 10 seconds")
+        return self._hook("widget", key, title=title, script=script, sizes=tuple(sizes), settings=tuple(settings),
+                          description=description, icon=icon, refresh=refresh)
 
     def provide(self, key: str) -> Callable[[F], F]:
         """Register a named capability ``key`` (sync or async) that core composers

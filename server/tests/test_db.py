@@ -262,9 +262,10 @@ def test_convert_9_0():
     if got == wanted and len(by_id) == len(moved):
         expected["devices"], expected["phone_push"] = after["devices"], after["phone_push"]
     # core m0006: no zones yet, and every user who exists has the first-run wizard finished;
-    # core m0007: no server settings yet.
+    # core m0007: no server settings yet; the dashboards migration: no dashboards yet.
     expected["zones"] = []
     expected["server_settings"] = []
+    expected["dashboards"] = []
     wizard_rows = after.get("user_wizard", [])
     check("9.0: every existing user has the wizard finished (no steps)",
           sorted(r[0] for r in wizard_rows) == sorted(r[0] for r in after["users"])

@@ -1,0 +1,5 @@
+/* The money addon's dashboard widget (web/widget.js): money out / over in rose, on track in sage. */
+.mw-spent { margin: 2px 0 4px; }
+.mw-over { color: var(--rose); }
+.mw-ok { color: var(--sage); }
+.mw-bank { margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--hairline); }

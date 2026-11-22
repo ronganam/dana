@@ -1,0 +1,13 @@
+/* The essentials addon's dashboard widgets (web/widgets.js): the clock, Now. */
+.ew-clock { display: flex; flex-direction: column; justify-content: center; height: 100%; gap: 2px; }
+.ew-date { font-size: 15px; font-weight: 600; color: var(--ember-text); }
+.ew-time { font-size: clamp(34px, 5.2vw, 72px); font-weight: 600; letter-spacing: -1px; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.dw-small .ew-time { font-size: 30px; }
+.ew-weather { margin-top: 4px; }
+.ew-lede { margin-bottom: 6px; }
+.ew-kind-task, .ew-kind-reminder { background: var(--amber); }
+.ew-kind-approval { background: var(--ember); }
+.ew-kind-notification { background: var(--teal); }
+.ew-kind-call, .ew-kind-call_suggestion { background: var(--sage); }
+.ew-kind-event { background: var(--sky); }
+.ew-kind-money { background: var(--rose); }

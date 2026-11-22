@@ -22,7 +22,7 @@ core migrations `m0005_devices`, `m0006_zones_wizard` (`user_wizard`). Tests: `b
 | `name` | one line, at most 60 characters; empty → the kind's name ("Phone") |
 | `kind` | `phone`, `watch`, `tablet`, `tv`, `browser`, `other` (checked in code: `devices.KINDS`) |
 | `room` | free text, at most 40 characters, may be empty |
-| `role` | empty for a personal device; `kitchen`, `bedroom`, `hall`, `living_room` for a household tablet or TV (`devices.ROLES`; only a tablet or a TV has one) |
+| `role` | empty for a personal device; `kitchen`, `bedroom`, `hall`, `living_room` for a household tablet or TV (`devices.ROLES`; only a tablet or a TV has one): its dashboard starts from that room's preset (`docs/dashboard.md`) |
 | `token_id` | its own row in `user_tokens` (core/users.py): an ordinary user token, hashed; NULL for a phone moved from the phone addon's old push registrations, until it is paired (`paired: false` in the API) |
 | `created_at`, `last_seen_at` | ISO UTC; `last_seen_at` is written by requests made with its token, at most every 5 minutes (`devices.TOUCH_INTERVAL_SECONDS`) |
 
@@ -84,6 +84,8 @@ They send `POST /api/pair {code, kind: "tablet" | "tv", name: <manufacturer and 
 and role from the pairing; their settings show the device (read back from `GET /api/devices`, the `current`
 one) and **Unpair** (`DELETE /api/devices/{id}` with the device's own token). A tablet whose dashboard lands
 on `/login` (its device was removed) forgets the pairing and asks again (`android/docs/kiosk.md`, `tv.md`).
+What a tablet or TV shows, and who may change it, is its dashboard (`docs/dashboard.md`; the web's Devices
+page edits it).
 
 **In a browser**: `/login` accepts a pairing code of kind `browser` as well as a token: the browser becomes
 a device of the code's user (named from its User-Agent, "Firefox on Linux") and gets the session cookie of

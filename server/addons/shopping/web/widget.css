@@ -1,0 +1,5 @@
+/* The shopping addon's dashboard widget (web/widget.js). */
+.sw-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.sw-list { columns: 1; }
+.dw-large .sw-list { display: block; columns: 2; column-gap: 18px; }
+.dw-large .sw-list .dw-item { break-inside: avoid; }

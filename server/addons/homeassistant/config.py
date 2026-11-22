@@ -17,7 +17,7 @@ PERSON = "person"                          # person entity: zone enter / leave t
 CAR_SENSOR = "car_sensor"                  # phone Bluetooth connection sensor: car enter / leave
 CAR_DEVICE = "car_device"                  # the car's Bluetooth name in that sensor's connected_paired_devices
 SCREEN_SENSOR = "phone_interactive_sensor"  # phone screen-on binary sensor: wake confirmation
-BATTERY_SENSOR = "phone_battery_sensor"     # phone battery sensor: the bedroom dashboard's tile
+BATTERY_SENSOR = "phone_battery_sensor"     # phone battery sensor: the Batteries widget's default
 NOTIFY_SERVICE = "phone_notify_service"     # mobile_app notify service suffix (only reported by /api/client-config)
 WEATHER = "weather_entity"                  # weather entity: the briefing and the Now lede
 TV = "tv_entity"                            # Android TV media_player: control_android_tv's default
@@ -42,6 +42,5 @@ def client_config(conn: Connection) -> Dict[str, Any]:
     return {
         "notify_service": conn.settings.get(NOTIFY_SERVICE),
         "interactive_sensor": conn.settings.get(SCREEN_SENSOR),
-        "battery_sensor": conn.settings.get(BATTERY_SENSOR),
         "person": conn.settings.get(PERSON),
     }

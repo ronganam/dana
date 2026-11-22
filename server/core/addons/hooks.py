@@ -8,7 +8,7 @@ Manifest values: :class:`Page` / :class:`Nav` (a page in the web app),
 schedule helpers :func:`minutes` / :func:`hours` for ``@addon.job(every=)``.
 
 What hooks get besides the user: :class:`NowContext`, :class:`BriefingContext`,
-:class:`ContextRequest`, :class:`DemoContext`. What they return (``to_json()`` gives a payload):
+:class:`ContextRequest`, :class:`DemoContext`, :class:`WidgetContext`. What they return (``to_json()`` gives a payload):
 
 - :class:`Card` — a card on the Now screen (``@addon.now_cards``);
 - :class:`DayItem` — an item in the Now screen's day strip (``@addon.day_items``);
@@ -283,9 +283,9 @@ class Hook:
     """A hook declared with ``@addon.<kind>`` (``now_cards``, ``day_items``,
     ``now_action``, ``briefing``, ``review``, ``review_action``, ``search``,
     ``selfcheck``, ``context``, ``context_card``, ``context_block``,
-    ``provide``): ``key`` names what it is for when the hook has one (the card
+    ``provide``, ``widget``): ``key`` names what it is for when the hook has one (the card
     prefix it acts on, the section key, the item type, the context kind, the
-    check or provider key; unique across addons), ``options`` its decorator's
+    check, provider or widget key; unique across addons), ``options`` its decorator's
     other values."""
     addon: str
     kind: str
@@ -353,6 +353,21 @@ class NowContext:
     now: datetime.datetime
     hidden: Dict[str, Any]
     events: Optional[List[Dict[str, Any]]] = None
+
+
+# The sizes a dashboard widget can be drawn at (``@addon.widget``; docs/dashboard.md).
+WIDGET_SIZES = ("small", "medium", "large")
+
+
+@dataclass(frozen=True)
+class WidgetContext:
+    """What a dashboard widget's function gets besides the user (``@addon.widget``):
+    this widget's ``settings`` on the dashboard (every setting it declares, the
+    default filled in where the dashboard has none), the ``size`` it is drawn at
+    and the moment ``now`` (aware, the user's zone)."""
+    settings: Dict[str, Any]
+    size: str
+    now: datetime.datetime
 
 
 @dataclass(frozen=True)
