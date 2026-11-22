@@ -7,6 +7,8 @@
  *   GET    /api/devices/pairings/{id}            polled while the code shows: pending | paired | expired
  *   DELETE /api/devices/pairings/{id}            the dialog closed before the device paired
  *
+ * A tablet's or TV's row also opens its dashboard editor (static/dashboard-editor.js, docs/dashboard.md).
+ *
  * Pairing: choose the kind (and, for a tablet or a TV, its room and role), then the QR code (what the app
  * scans: `qr`, drawn with the vendored qrcode-generator) and the typed code with a five-minute countdown; the
  * dialog follows the pairing and says when the device has paired. A browser gets no QR: it types the code on
@@ -145,6 +147,7 @@
           <div class="dev-meta">${esc(metaLine(d, now))}</div>
         </div>
         <div class="dev-acts">
+          ${ROLE_KINDS.has(d.kind) ? `<button class="icon-btn" data-act="dashboard" title="Dashboard" aria-label="Dashboard of ${esc(d.name)}"><i data-lucide="layout-dashboard"></i></button>` : ""}
           <button class="icon-btn" data-act="edit" title="Rename" aria-label="Rename ${esc(d.name)}"><i data-lucide="pencil"></i></button>
           <button class="icon-btn destructive" data-act="remove" title="Remove" aria-label="Remove ${esc(d.name)}"><i data-lucide="trash-2"></i></button>
         </div>
@@ -337,7 +340,9 @@
     const row = e.target.closest("[data-id]");
     const d = row && S.devices.find((x) => x.id === row.dataset.id);
     if (!b || !d) return;
-    if (b.dataset.act === "edit") editDevice(d); else removeDevice(d);
+    if (b.dataset.act === "dashboard") {
+      window.DanaDashboardEditor?.open(d, { openModal(html) { openModal(html); return $("dev-modal"); }, closeModal });
+    } else if (b.dataset.act === "edit") editDevice(d); else removeDevice(d);
   });
   $("dev-modal")?.addEventListener("click", (e) => {
     if (e.target.id === "dev-modal" || e.target.closest("[data-close]")) closeModal();

@@ -1,6 +1,7 @@
 """The ``showcase`` composer hooks (a module the manifest names in ``modules=``): a Now card and
 its action, a day item, a briefing section, a weekly-review section and its action, search
-results, a self-check, context for a chat about a plant, and a named capability.
+results, a self-check, context for a chat about a plant, a named capability and a
+dashboard widget.
 
 Composer hooks are plain functions (the composers call them in a worker thread);
 the action hooks are async. Each runs only for a user who has the addon.
@@ -10,7 +11,8 @@ import datetime
 from typing import Any, Dict, List, Optional
 
 from core import cards, clock
-from core.addons import BriefingContext, Card, Check, ContextRequest, DayItem, Hit, NowContext, Section
+from core.addons import (BriefingContext, Card, Check, ContextRequest, DayItem, Field, Hit, NowContext, Section,
+                         WidgetContext)
 from core.addons.helpers import match_score
 from core.users import User
 from addons.showcase import store
@@ -147,4 +149,17 @@ def plant_block(user: User, ref_id: str) -> str:
 def thirsty_count(user: User) -> int:
     """How many of the user's plants need water now; others call it through registry.provider."""
     return len(store.due(user, clock.now()))
+# --- end ---
+
+
+# --- reference: widget ---
+@addon.widget("plants_thirsty", title="Thirsty plants", script="widget.js", icon="sprout", refresh=300,
+              sizes=("small", "medium"),
+              settings=(Field("heading", "The words above the list", default="Needs water", required=False,
+                              label="Heading", placeholder="Needs water"),),
+              description="The plants that need water now")
+def thirsty_widget(user: User, ctx: WidgetContext) -> Dict[str, Any]:
+    """The widget's data for one dashboard: its heading (a setting) and the thirsty plants (fewer when small)."""
+    names = [p["name"] for p in store.due(user, ctx.now)]
+    return {"heading": ctx.settings["heading"], "plants": names[:3] if ctx.size == "small" else names}
 # --- end ---

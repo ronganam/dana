@@ -257,15 +257,15 @@ async def test_http() -> None:
     async with TestClient(TestServer(build_app())) as client:
         clear()
         r = await client.get("/api/client-config", headers=ADMIN_AUTH)
-        check("client-config: the first admin's response is what it was, byte for byte",
+        check("client-config: the first admin's phone and person entities, byte for byte (no battery sensor: "
+              "dashboards read it through their Batteries widget)",
               await r.text() == json.dumps({"notify_service": "mobile_app_pixel_8",
                                             "interactive_sensor": "binary_sensor.pixel_8_interactive",
-                                            "battery_sensor": "sensor.pixel_8_battery_level",
                                             "person": "person.robin"}), await r.text())
         r = await client.get("/api/client-config", headers=BOB_AUTH)
         body = await r.json()
         check("client-config: Bob's own entities", body["person"] == "person.bob"
-              and body["battery_sensor"] == "sensor.b_battery" and body["notify_service"] is None, body)
+              and body["interactive_sensor"] == "binary_sensor.b_screen" and "battery_sensor" not in body and body["notify_service"] is None, body)
 
         clear()
         core_zones.create(BOB, "Work", 1.0, 2.0)  # his own Work stays as it is

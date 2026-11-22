@@ -364,7 +364,7 @@ Called with the user right after `update` changed the stored credentials (anothe
 
 ## Hooks
 
-Declared with a decorator on the `addon` object, in any module the loader imports. Composer hooks (`now_cards`, `day_items`, `review`, `search`, `selfcheck`, `context*`) are plain functions; jobs, services, handlers, channels and the action hooks are `async`; `briefing` and `provide` may be either. Keys (a card prefix, a section, a check, a provider) are unique across addons.
+Declared with a decorator on the `addon` object, in any module the loader imports. Composer hooks (`now_cards`, `day_items`, `review`, `search`, `selfcheck`, `context*`) are plain functions; jobs, services, handlers, channels and the action hooks are `async`; `briefing`, `provide` and `widget` may be either. Keys (a card prefix, a section, a check, a provider, a widget) are unique across addons.
 
 ### `@addon.tool(name=None, *, is_write=False, confirm=False, acts_outside=False, needs=(), available=None, untrusted_result=False, describe=None, shortcut=False, shortcut_prep=False, shortcut_describe=None)`
 
@@ -764,6 +764,50 @@ def thirsty_count(user: User) -> int:
     return len(store.due(user, clock.now()))
 ```
 
+### `@addon.widget(key, *, title, script, sizes=('small', 'medium', 'large'), settings=(), description='', icon='', refresh=60)`
+
+`def f(user, ctx: WidgetContext) -> dict` (or async): the data of this
+addon's dashboard widget `key` (unique across addons) for `user`, as
+JSON. Offered on the dashboards of users who have the addon; on one of a
+user who does not, it answers `not_connected`. `script`: the file of
+the addon's `web/` folder that draws it, registering with
+`Dana.widget(key, …)` (static/dana.js). `sizes`: the sizes it can be
+drawn at, of `small` / `medium` / `large` (the first is its
+default). `settings`: what each placed widget lets the user choose
+(`Field`; values are text, the default used while one is
+empty). `refresh`: seconds between its data refreshes on a dashboard
+(0: only when the page loads or its script asks).
+
+From [`examples/addons/showcase/now.py`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/now.py):
+
+```python
+@addon.widget("plants_thirsty", title="Thirsty plants", script="widget.js", icon="sprout", refresh=300,
+              sizes=("small", "medium"),
+              settings=(Field("heading", "The words above the list", default="Needs water", required=False,
+                              label="Heading", placeholder="Needs water"),),
+              description="The plants that need water now")
+def thirsty_widget(user: User, ctx: WidgetContext) -> Dict[str, Any]:
+    """The widget's data for one dashboard: its heading (a setting) and the thirsty plants (fewer when small)."""
+    names = [p["name"] for p in store.due(user, ctx.now)]
+    return {"heading": ctx.settings["heading"], "plants": names[:3] if ctx.size == "small" else names}
+```
+
+From [`examples/addons/showcase/web/widget.js`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/web/widget.js):
+
+```js
+(() => {
+  "use strict";
+  Dana.widget("plants_thirsty", {
+    mount(el, w, api) {
+      const { heading, plants } = w.data;
+      el.innerHTML = `<div class="dw-sub">${api.esc(heading)}</div>` + (plants.length
+        ? `<ul class="dw-list">${plants.map((n) => `<li class="dw-item">${api.esc(n)}</li>`).join("")}</ul>`
+        : `<div class="dw-empty">All watered</div>`);
+    },
+  });
+})();
+```
+
 ## What hooks get and return
 
 From `core.addons` (`core/addons/hooks.py`); `to_json()` gives the payload clients read.
@@ -898,6 +942,19 @@ value; empty values are left out) and the `question`.
 | `body` | any | `''` |
 | `facts` | list of list of str | `()` |
 | `fact_limit` | int | `300` |
+
+### WidgetContext
+
+What a dashboard widget's function gets besides the user (`@addon.widget`):
+this widget's `settings` on the dashboard (every setting it declares, the
+default filled in where the dashboard has none), the `size` it is drawn at
+and the moment `now` (aware, the user's zone).
+
+| Field | Type | Default |
+|---|---|---|
+| `settings` | dict of str → any | required |
+| `size` | str | required |
+| `now` | datetime | required |
 
 ## More examples
 

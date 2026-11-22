@@ -14,6 +14,9 @@ docs/now.md; the hooks: docs/writing-an-addon.md):
 - the morning briefing (due, overdue, high priority, today's reminders) and
   the weekly review (overdue / snoozed often / stale tasks, the week's
   numbers; complete / reschedule / delete / move_group);
+- the dashboard's Reminders widget (``reminders``: due today, overdue, high
+  priority, today's timed reminders, and the morning's briefing; drawn by
+  ``web/widget.js``);
 - the global search ("reminder" results), the "Reminder checks" self-check
   (the time-trigger job is alive; a check of the server), the context of a
   chat opened from a task.
@@ -30,8 +33,8 @@ import re
 import time
 from typing import Any, Dict, List, Optional
 
-from core import cards, notify, now as now_screen, undo
-from core.addons import BriefingContext, Card, Check, ContextRequest, DayItem, Hit, NowContext, Section
+from core import briefing as briefings, cards, notify, now as now_screen, undo
+from core.addons import BriefingContext, Card, Check, ContextRequest, DayItem, Hit, NowContext, Section, WidgetContext
 from core.addons import helpers, scheduler
 from core.db import get_db_connection
 from core.users import User
@@ -385,6 +388,24 @@ def _review(user: User, now: datetime.datetime) -> Section:
 def briefing_section(user: User, ctx: BriefingContext) -> Section:
     """Due or overdue tasks, high priority ones, today's reminders."""
     return _briefing(user, ctx.today)
+
+
+# The morning's briefing shows on the Reminders widget until this hour.
+WIDGET_BRIEFING_UNTIL = 12
+
+
+@addon.widget("reminders", title="Reminders", script="widget.js", icon="list-checks", refresh=60,
+              sizes=("medium", "small", "large"),
+              description="Due today and overdue, high priority, today's timed reminders; the briefing in the morning")
+def reminders_widget(user: User, ctx: WidgetContext) -> Dict[str, Any]:
+    """``due`` (``{id, title, priority, due_date, overdue}``), ``high_priority``,
+    ``reminders_today`` (``{id, title, time}``) of the tasks the user sees, and
+    before noon today's briefing (``{headline, points}``) or None."""
+    data = _briefing(user, ctx.now.date().isoformat()).data
+    brief = briefings.get_today(user) if ctx.now.hour < WIDGET_BRIEFING_UNTIL else None
+    data["briefing"] = ({"headline": brief.get("headline") or "", "points": list(brief.get("points") or [])[:3]}
+                        if brief else None)
+    return data
 
 
 @addon.review("tasks")

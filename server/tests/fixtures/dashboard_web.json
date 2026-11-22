@@ -1,0 +1,523 @@
+{
+ "bedroom_tablet": {
+  "body": {
+   "device": {
+    "id": "device-robin-tablet",
+    "kind": "tablet",
+    "name": "Bedroom tablet",
+    "role": "bedroom",
+    "room": ""
+   },
+   "edited": false,
+   "preset": "bedroom",
+   "release": "RELEASE",
+   "time": "2026-11-22T08:00:00+00:00",
+   "widgets": [
+    {
+     "addon": "essentials",
+     "data": {
+      "weather": {
+       "condition": "sunny",
+       "high": 20,
+       "low": 10,
+       "rain_chance": 5,
+       "temperature": 27,
+       "unit": "°C"
+      }
+     },
+     "id": "clock-1",
+     "refresh": 900,
+     "script": "/addons/essentials/web/widgets.js?v=RELEASE",
+     "settings": {},
+     "size": "medium",
+     "title": "Clock and weather",
+     "widget": "clock"
+    },
+    {
+     "addon": "cameras",
+     "data": null,
+     "error": "not_connected",
+     "id": "cameras-1",
+     "refresh": 15,
+     "script": "/addons/cameras/web/widget.js?v=RELEASE",
+     "settings": {
+      "camera": ""
+     },
+     "size": "large",
+     "title": "Camera",
+     "widget": "cameras"
+    },
+    {
+     "addon": "tasks",
+     "data": {
+      "briefing": null,
+      "due": [
+       {
+        "due_date": "2026-11-22",
+        "id": "task-1",
+        "overdue": false,
+        "priority": "medium",
+        "title": "Pay the water bill"
+       }
+      ],
+      "high_priority": [],
+      "reminders_today": []
+     },
+     "id": "reminders-1",
+     "refresh": 60,
+     "script": "/addons/tasks/web/widget.js?v=RELEASE",
+     "settings": {},
+     "size": "medium",
+     "title": "Reminders",
+     "widget": "reminders"
+    },
+    {
+     "addon": "homeassistant",
+     "data": {
+      "current": 23.5,
+      "entity_id": "climate.bedroom",
+      "fan_mode": "auto",
+      "fan_modes": [
+       "auto",
+       "low",
+       "high"
+      ],
+      "humidity": 48.0,
+      "max": 30.0,
+      "min": 16.0,
+      "mode": "cool",
+      "modes": [
+       "off",
+       "cool",
+       "heat"
+      ],
+      "name": "Bedroom AC",
+      "step": 0.5,
+      "target": 22.0,
+      "unit": "°C"
+     },
+     "id": "ha_climate-1",
+     "refresh": 30,
+     "script": "/addons/homeassistant/web/widget.js?v=RELEASE",
+     "settings": {
+      "entity": ""
+     },
+     "size": "medium",
+     "title": "Climate",
+     "widget": "ha_climate"
+    },
+    {
+     "addon": "homeassistant",
+     "data": {
+      "batteries": [
+       {
+        "entity_id": "sensor.robin_phone_battery",
+        "level": 81,
+        "name": "Robin's phone battery"
+       }
+      ]
+     },
+     "id": "ha_batteries-1",
+     "refresh": 60,
+     "script": "/addons/homeassistant/web/widget.js?v=RELEASE",
+     "settings": {
+      "sensors": ""
+     },
+     "size": "small",
+     "title": "Batteries",
+     "widget": "ha_batteries"
+    }
+   ]
+  },
+  "status": 200
+ },
+ "catalog": {
+  "body": {
+   "default_preset": "bedroom",
+   "presets": [
+    {
+     "key": "kitchen",
+     "title": "Kitchen",
+     "widgets": [
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "clock"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "now"
+      },
+      {
+       "settings": {},
+       "size": "large",
+       "widget": "shopping"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "calendar"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "reminders"
+      },
+      {
+       "settings": {},
+       "size": "small",
+       "widget": "ha_lights"
+      }
+     ]
+    },
+    {
+     "key": "bedroom",
+     "title": "Bedroom",
+     "widgets": [
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "clock"
+      },
+      {
+       "settings": {
+        "camera": ""
+       },
+       "size": "large",
+       "widget": "cameras"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "reminders"
+      },
+      {
+       "settings": {
+        "entity": ""
+       },
+       "size": "medium",
+       "widget": "ha_climate"
+      },
+      {
+       "settings": {
+        "sensors": ""
+       },
+       "size": "small",
+       "widget": "ha_batteries"
+      }
+     ]
+    },
+    {
+     "key": "hall",
+     "title": "Hall",
+     "widgets": [
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "clock"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "now"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "calendar"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "reminders"
+      },
+      {
+       "settings": {
+        "camera": ""
+       },
+       "size": "medium",
+       "widget": "cameras"
+      }
+     ]
+    },
+    {
+     "key": "living_room",
+     "title": "Living room",
+     "widgets": [
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "clock"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "now"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "calendar"
+      },
+      {
+       "settings": {
+        "camera": ""
+       },
+       "size": "medium",
+       "widget": "cameras"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "ha_lights"
+      },
+      {
+       "settings": {},
+       "size": "medium",
+       "widget": "money"
+      }
+     ]
+    }
+   ],
+   "sizes": [
+    "small",
+    "medium",
+    "large"
+   ],
+   "widgets": [
+    {
+     "addon": "essentials",
+     "description": "The time and date in large type, with the weather when one of your add-ons gives it",
+     "icon": "clock",
+     "key": "clock",
+     "refresh": 900,
+     "settings": [],
+     "sizes": [
+      "medium",
+      "small",
+      "large"
+     ],
+     "title": "Clock and weather"
+    },
+    {
+     "addon": "essentials",
+     "description": "What needs you: reminders that fired, approvals, suggestions",
+     "icon": "inbox",
+     "key": "now",
+     "refresh": 60,
+     "settings": [],
+     "sizes": [
+      "small",
+      "medium",
+      "large"
+     ],
+     "title": "Now"
+    },
+    {
+     "addon": "tasks",
+     "description": "Due today and overdue, high priority, today's timed reminders; the briefing in the morning",
+     "icon": "list-checks",
+     "key": "reminders",
+     "refresh": 60,
+     "settings": [],
+     "sizes": [
+      "medium",
+      "small",
+      "large"
+     ],
+     "title": "Reminders"
+    },
+    {
+     "addon": "shopping",
+     "description": "Your active shopping list, live: what is left to buy, by aisle",
+     "icon": "shopping-cart",
+     "key": "shopping",
+     "refresh": 0,
+     "settings": [],
+     "sizes": [
+      "large",
+      "medium",
+      "small"
+     ],
+     "title": "Shopping list"
+    },
+    {
+     "addon": "homeassistant",
+     "description": "An AC or thermostat: the temperature, the target and its modes, with controls",
+     "icon": "thermometer",
+     "key": "ha_climate",
+     "refresh": 30,
+     "settings": [
+      {
+       "default": "",
+       "help": "Its entity id; empty: the first climate device.",
+       "label": "Climate device",
+       "name": "entity",
+       "placeholder": "climate.bedroom"
+      }
+     ],
+     "sizes": [
+      "medium",
+      "large"
+     ],
+     "title": "Climate"
+    },
+    {
+     "addon": "homeassistant",
+     "description": "Lights, on or off, with a tap to switch each",
+     "icon": "lightbulb",
+     "key": "ha_lights",
+     "refresh": 30,
+     "settings": [
+      {
+       "default": "",
+       "help": "Their entity ids, separated by commas; empty: every light.",
+       "label": "Lights",
+       "name": "entities",
+       "placeholder": "light.kitchen, light.hall"
+      }
+     ],
+     "sizes": [
+      "medium",
+      "small",
+      "large"
+     ],
+     "title": "Lights"
+    },
+    {
+     "addon": "homeassistant",
+     "description": "The entities you choose: their state, with a tap to switch the ones that switch",
+     "icon": "house",
+     "key": "ha_entities",
+     "refresh": 30,
+     "settings": [
+      {
+       "default": "",
+       "help": "Their entity ids, separated by commas.",
+       "label": "Entities",
+       "name": "entities",
+       "placeholder": "sensor.outside_temperature, switch.boiler"
+      }
+     ],
+     "sizes": [
+      "small",
+      "medium",
+      "large"
+     ],
+     "title": "Home Assistant"
+    },
+    {
+     "addon": "homeassistant",
+     "description": "Battery levels of your phone, watch or other devices",
+     "icon": "battery-medium",
+     "key": "ha_batteries",
+     "refresh": 60,
+     "settings": [
+      {
+       "default": "",
+       "help": "Their entity ids, separated by commas; empty: your phone's battery sensor (Home Assistant settings).",
+       "label": "Battery sensors",
+       "name": "sensors",
+       "placeholder": "sensor.phone_battery_level, sensor.watch_battery_level"
+      }
+     ],
+     "sizes": [
+      "small",
+      "medium"
+     ],
+     "title": "Batteries"
+    },
+    {
+     "addon": "calendar",
+     "description": "Today's and tomorrow's events from your selected calendars",
+     "icon": "calendar-days",
+     "key": "calendar",
+     "refresh": 300,
+     "settings": [],
+     "sizes": [
+      "medium",
+      "small",
+      "large"
+     ],
+     "title": "Calendar"
+    },
+    {
+     "addon": "money",
+     "description": "This month's spending so far and where it is heading, and the bank balance ahead",
+     "icon": "wallet",
+     "key": "money",
+     "refresh": 900,
+     "settings": [],
+     "sizes": [
+      "medium",
+      "small"
+     ],
+     "title": "Money"
+    }
+   ]
+  },
+  "status": 200
+ },
+ "save": {
+  "body": {
+   "device": {
+    "id": "device-robin-tv",
+    "kind": "tv",
+    "name": "Living room TV",
+    "role": "",
+    "room": ""
+   },
+   "edited": true,
+   "preset": "kitchen",
+   "release": "RELEASE",
+   "widgets": [
+    {
+     "addon": "shopping",
+     "id": "shopping-1",
+     "refresh": 0,
+     "script": "/addons/shopping/web/widget.js?v=RELEASE",
+     "settings": {},
+     "size": "medium",
+     "title": "Shopping list",
+     "widget": "shopping"
+    },
+    {
+     "addon": "homeassistant",
+     "id": "ha_climate-1",
+     "refresh": 30,
+     "script": "/addons/homeassistant/web/widget.js?v=RELEASE",
+     "settings": {
+      "entity": "climate.office"
+     },
+     "size": "large",
+     "title": "Climate",
+     "widget": "ha_climate"
+    },
+    {
+     "addon": "essentials",
+     "id": "clock-1",
+     "refresh": 900,
+     "script": "/addons/essentials/web/widgets.js?v=RELEASE",
+     "settings": {},
+     "size": "small",
+     "title": "Clock and weather",
+     "widget": "clock"
+    },
+    {
+     "addon": "cameras",
+     "id": "cameras-1",
+     "refresh": 15,
+     "script": "/addons/cameras/web/widget.js?v=RELEASE",
+     "settings": {
+      "camera": "front_door"
+     },
+     "size": "large",
+     "title": "Camera",
+     "widget": "cameras"
+    }
+   ]
+  },
+  "status": 200
+ }
+}

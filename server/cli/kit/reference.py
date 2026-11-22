@@ -52,6 +52,7 @@ HOOKS: Tuple[Tuple[str, Sequence[str], str], ...] = (
     ("context_card", (), "context"),
     ("context_block", (), "context"),
     ("provide", ("provide",), ""),
+    ("widget", ("widget", "widget_web"), ""),
 )
 # Manifest fields that take a function, and the example of each.
 CALLBACKS: Tuple[Tuple[str, str], ...] = (
@@ -60,7 +61,8 @@ CALLBACKS: Tuple[Tuple[str, str], ...] = (
 )
 # The types hooks get and return (core/addons/hooks.py).
 RESULT_TYPES = (hook_types.Card, hook_types.DayItem, hook_types.NowContext, hook_types.BriefingContext,
-                hook_types.Section, hook_types.Hit, hook_types.Check, hook_types.ContextRequest, hook_types.Approval)
+                hook_types.Section, hook_types.Hit, hook_types.Check, hook_types.ContextRequest, hook_types.Approval,
+                hook_types.WidgetContext)
 # More examples: (heading, showcase keys, words before them).
 MORE = (
     ("Settings and credentials", ("manifest",), "Declared on the manifest (`settings=`, `credentials=`); a tool reads "
@@ -233,8 +235,9 @@ def render() -> str:
     out.append("## Hooks\n")
     out.append("Declared with a decorator on the `addon` object, in any module the loader imports. Composer "
                "hooks (`now_cards`, `day_items`, `review`, `search`, `selfcheck`, `context*`) are plain functions; "
-               "jobs, services, handlers, channels and the action hooks are `async`; `briefing` and `provide` may "
-               "be either. Keys (a card prefix, a section, a check, a provider) are unique across addons.\n")
+               "jobs, services, handlers, channels and the action hooks are `async`; `briefing`, `provide` and "
+               "`widget` may be either. Keys (a card prefix, a section, a check, a provider, a widget) are unique "
+               "across addons.\n")
     for name, keys, see in HOOKS:
         out.append(f"### `{decorator_signature(name)}`\n")
         out.append(md(inspect.cleandoc(getattr(Addon, name).__doc__ or "")) + "\n")

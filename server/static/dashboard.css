@@ -11,11 +11,12 @@
 }
 
 /* ==========================================================================
-   DANA — THE BEDROOM DASHBOARD (/dashboard; server/docs/web-design.md, docs/dashboard.md)
+   DANA — THE DASHBOARD OF A TABLET OR TV (/dashboard; server/docs/web-design.md, docs/dashboard.md)
    The Ink tokens and named hues of static/styles.css, Ink only (a bedroom at night). Kiosk-first layout:
    fills the viewport exactly (100dvh), never scrolls the page. A low-power target (a 2018 tablet's
    WebView): colour yes; motion only for presses and values that change (.dash-changed), no entrance,
    stagger, shimmer or glow. Plain hex / rgba values here, no rgb(var() / a), for older WebViews.
+   The widgets' shared pieces (.dw-*) are here; a widget's own look is in its addon's web/ folder.
    ========================================================================== */
 
 /* --- Design Tokens (the Ink values of styles.css) --- */
@@ -64,11 +65,7 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
-html, body {
-    height: 100%;
-    overflow: hidden;
-    touch-action: manipulation;
-}
+html, body { height: 100%; overflow: hidden; touch-action: manipulation; }
 
 body {
     --zoom-scale: 1;
@@ -76,9 +73,6 @@ body {
     background-color: var(--canvas);
     color: var(--ink);
     font-family: var(--font-inter);
-    display: grid;
-    /* Top row hugs the camera (--main-h from fitCamPanel); the calendar gets the rest. */
-    grid-template-rows: auto minmax(0, 1fr);
     zoom: var(--zoom-scale);
     width: calc(100vw / var(--zoom-scale));
     height: calc(100dvh / var(--zoom-scale));
@@ -89,597 +83,95 @@ h1, h2, h3, h4 { font-weight: 600; letter-spacing: -0.2px; }
 button { font-family: inherit; cursor: pointer; border: none; background: none; color: inherit; }
 a { color: inherit; text-decoration: none; }
 
-/* --- Main Layout --- */
-:root { --events-w: clamp(124px, 13vw, 176px); }
-.dash-main {
+/* --- The grid ---
+   Four columns (two on a narrow screen), rows sharing the height. small = 1 column x 1 row, medium = 1 x 2,
+   large = 2 x 3; the order is the dashboard's, holes filled by later widgets (dense). */
+.dash-grid {
+    --cols: 4;
+    position: relative; left: var(--shift-x, 0px); top: var(--shift-y, 0px);
     display: grid;
-    grid-template-columns: minmax(0, 1fr) var(--events-w) clamp(250px, 24vw, 320px);
+    grid-template-columns: repeat(var(--cols), minmax(0, 1fr));
+    grid-auto-rows: minmax(0, 1fr);
+    grid-auto-flow: row dense;
     gap: 10px;
     padding: 10px 14px;
-    height: var(--main-h, auto);
-    min-height: 0;
-    min-width: 0;
-}
-/* --- Camera Panel ---
-   Sized to the real stream aspect ratio so the feed fills the card with no
-   letterbox bars. --cam-ratio is set from JS once video metadata arrives
-   (falls back to 16:9). JS also sets an explicit pixel box (--cam-w/--cam-h)
-   fitted to the slot, since pure CSS aspect-ratio cannot honour both a
-   max-width and a max-height without distorting the ratio. */
-.cam-slot {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-}
-.cam-panel {
-    display: flex;
-    flex-direction: column;
-    background: var(--canvas-soft);
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius-card);
-    overflow: hidden;
-    width: var(--cam-w, 100%);
-    height: var(--cam-h, auto);
-    aspect-ratio: var(--cam-ratio, 16 / 9);
-    max-width: 100%;
-    max-height: 100%;
-    flex: 0 0 auto;
-}
-.cam-viewport {
-    flex: 1;
-    position: relative;
-    overflow: hidden;
-    cursor: grab;
-    background: #000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    touch-action: none;   /* pinch and drag are handled in dashboard.js */
-    min-height: 0;
-}
-.cam-viewport:active { cursor: grabbing; }
-.cam-viewport video {
-    width: 100%;
     height: 100%;
-    object-fit: contain;
-    transform-origin: center center;
-    will-change: transform;
-    user-select: none;
-    -webkit-user-drag: none;
 }
-.cam-loading {
-    position: absolute; inset: 0;
-    display: flex; flex-direction: column;
-    align-items: center; justify-content: center;
-    color: var(--mute); gap: 10px; font-size: 12.5px;
-    z-index: 1;
-}
-.cam-overlay {
-    position: absolute; top: 8px; left: 10px; right: 10px;
-    display: flex; align-items: center; justify-content: space-between;
-    pointer-events: none; z-index: 2;
-}
-.cam-overlay .cam-label {
-    font-size: 10.5px; font-weight: 600; color: rgba(247, 245, 240, 0.65);
-    display: flex; align-items: center; gap: 5px;
-    background: rgba(0, 0, 0, 0.45);
-    padding: 3px 8px;
-    border-radius: var(--radius-md);
-}
-.cam-overlay .cam-label svg, .cam-overlay .cam-label i { width: 11px; height: 11px; }
-.cam-overlay .cam-live {
-    display: flex; align-items: center; gap: 6px;
-    font-size: 10px; font-weight: 600; letter-spacing: 0.05em;
-    background: rgba(0, 0, 0, 0.45);
-    padding: 3px 8px;
-    border-radius: var(--radius-md);
-}
-.cam-overlay .cam-live .live-dot {
-    width: 6px; height: 6px; border-radius: var(--radius-full);
-}
-.cam-live.live { color: var(--listening-green); }
-.cam-live.live .live-dot { background: var(--listening-green); animation: livePulse 1.5s ease-in-out infinite; }
-.cam-live.connecting { color: var(--connecting-amber); }
-.cam-live.connecting .live-dot { background: var(--connecting-amber); animation: livePulse 1s ease-in-out infinite; }
-.cam-live.frozen { color: var(--destructive); }
-.cam-live.frozen .live-dot { background: var(--destructive); animation: none; }
-@keyframes livePulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+.dash-grid[hidden] { display: none; }
+html[data-layout="narrow"] .dash-grid { --cols: 2; overflow-y: auto; grid-auto-rows: minmax(90px, auto); height: auto; max-height: 100%; }
+.dw-small { grid-column: span 1; grid-row: span 1; }
+.dw-medium { grid-column: span 1; grid-row: span 2; }
+.dw-large { grid-column: span 2; grid-row: span 3; }
 
-/* Frozen / stalled stream banner */
-.cam-frozen-overlay {
-    position: absolute;
-    left: 50%; bottom: 14px;
-    transform: translateX(-50%);
-    display: none;
-    align-items: center;
-    gap: 8px;
-    background: rgba(43, 37, 33, 0.92);
-    border: 1px solid rgba(240, 112, 154, 0.55);
-    color: var(--destructive);
-    font-size: 12px;
-    font-weight: 500;
-    padding: 8px 12px;
-    border-radius: var(--radius-lg);
-    z-index: 3;
-    white-space: nowrap;
-    max-width: calc(100% - 20px);
-}
-.cam-frozen-overlay.visible { display: flex; }
-.cam-frozen-overlay svg, .cam-frozen-overlay i { width: 14px; height: 14px; flex-shrink: 0; }
-.cam-frozen-overlay button {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--ink);
-    background: var(--destructive);
-    border-radius: var(--radius-sm);
-    padding: 5px 10px;
-    transition: opacity 0.15s;
-}
-.cam-frozen-overlay button:hover { opacity: 0.85; }
-
-/* --- Right Sidebar --- */
-.dash-sidebar {
-    display: grid;
-    grid-template-rows: auto auto auto auto;
-    gap: 8px;
-    min-width: 0;
-    min-height: 0;
-    align-content: start;
-}
-
-/* --- Cards --- */
-.dash-card {
+/* --- A widget --- */
+.dw {
+    display: flex; flex-direction: column; min-width: 0; min-height: 0;
     background: var(--canvas-soft);
     border: 1px solid var(--hairline);
     border-radius: var(--radius-card);
     overflow: hidden;
-    display: flex;
-    flex-direction: column;
-    min-height: 0;
 }
-.card-header { display: none; }
-.card-title { display: none; }
-.card-body { padding: 7px 10px; }
-.climate-body { padding: 6px 8px; }
-
-/* --- Clock & Controls Card --- */
-.clock-card {
-    padding: 8px 10px;
-    gap: 8px;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-}
-.clock-main {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    min-width: 0;
-}
-.clock-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 6px;
-}
-.clock-date {
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--mute);
-    white-space: nowrap;
-}
-.clock-time {
-    font-size: 36px;
-    font-weight: 600;
-    color: var(--ink);
-    letter-spacing: -1px;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.05;
-    white-space: nowrap;
-}
-html[data-layout="compact"] .clock-time { font-size: 22px; letter-spacing: -0.5px; }
-html[data-layout="tiny"] .clock-time { font-size: 18px; letter-spacing: -0.5px; }
-html[data-layout="compact"] .clock-date { font-size: 11px; }
-/* Zoom pinned through the URL (?zoom=): JS flags data-url-zoom, the controls
-   column (page zoom + camera zoom) is hidden and the clock gets its space. */
-html[data-url-zoom] .clock-card .controls-col { display: none; }
-html[data-url-zoom] .clock-time { font-size: 48px; letter-spacing: -2px; }
-html[data-url-zoom] .clock-date { font-size: 15px; }
-html[data-url-zoom][data-layout="compact"] .clock-time { font-size: 32px; letter-spacing: -1px; }
-html[data-url-zoom][data-layout="compact"] .clock-date { font-size: 12px; }
-html[data-url-zoom][data-layout="tiny"] .clock-time { font-size: 24px; letter-spacing: -0.5px; }
-.clock-card .clock-main { flex: 1 1 auto; min-width: 0; }
-.clock-card .controls-col {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 4px;
-}
-.clock-card .controls-row {
-    display: flex;
-    gap: 6px;
-    margin-top: 0;
-    flex-wrap: nowrap;
-}
-.ctrl-group {
-    display: flex;
-    align-items: center;
-    gap: 1px;
-    background: var(--canvas-raised);
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius-lg);
-    overflow: hidden;
+.dw-head {
     flex: 0 0 auto;
-}
-.ctrl-group button {
-    min-width: 30px;
-    height: 32px;
-    display: flex; align-items: center; justify-content: center;
-    color: var(--body-strong);
-    font-size: 15px;
-    transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
-    padding: 0 4px;
-}
-.ctrl-group button:hover { background: var(--hairline-strong); color: var(--ink); }
-.ctrl-group button:active { background: var(--ember-tint); color: var(--ember-text); transform: scale(0.97); }
-.ctrl-group button svg, .ctrl-group button i { width: 13px; height: 13px; }
-.ctrl-group .ctrl-label {
-    font-size: 10px; font-weight: 500; color: var(--mute);
-    min-width: 28px; text-align: center;
-    font-variant-numeric: tabular-nums;
-    flex-shrink: 0;
-}
-
-/* --- Climate Card --- */
-.climate-main {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 6px;
-    gap: 6px;
-}
-.climate-current { text-align: center; flex-shrink: 0; }
-.cur-temp {
-    font-size: 28px; font-weight: 600; line-height: 1;
-    letter-spacing: -1px;
-    color: var(--ink);
-    font-variant-numeric: tabular-nums;
-    display: block;
-}
-.climate-target { text-align: center; }
-.temp-control {
-    display: flex; align-items: center; gap: 4px;
-}
-.temp-btn {
-    width: 32px; height: 32px; border-radius: var(--radius-md);
-    border: 1px solid var(--hairline);
-    background: var(--canvas-raised);
-    color: var(--body-strong);
-    font-size: 15px;
-    display: flex; align-items: center; justify-content: center;
-    transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
-    -webkit-user-select: none; user-select: none;
-}
-.temp-btn:hover { background: var(--hairline-strong); color: var(--ink); }
-.temp-btn:active { background: var(--ember-tint); color: var(--ember-text); transform: scale(0.97); }
-.temp-value {
-    font-size: 17px; font-weight: 600; min-width: 32px; text-align: center;
-    font-variant-numeric: tabular-nums;
-}
-.climate-humidity {
-    font-size: 10.5px; color: var(--mute); margin-top: 4px;
-    display: flex; align-items: center; gap: 4px; justify-content: center;
-}
-.climate-humidity svg, .climate-humidity i { width: 11px; height: 11px; }
-
-/* Icon-only mode pills — full-width row, big tap targets */
-.mode-row {
-    display: flex;
-    gap: 5px;
-    margin-top: 6px;
-}
-.mode-pill {
-    flex: 1 1 0;
-    min-width: 0;
-    height: 40px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--hairline);
-    background: var(--canvas-raised);
-    color: var(--body);
-    display: flex; align-items: center; justify-content: center;
-    transition: background-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard),
-        transform var(--dur-fast) var(--ease-standard);
-}
-.mode-pill:hover { background: var(--hairline-strong); color: var(--ink); }
-.mode-pill:active { transform: scale(0.97); }
-.mode-pill svg, .mode-pill i { width: 16px; height: 16px; }
-.mode-pill.active {
-    background: var(--ember-tint);
-    border-color: var(--ember);
-    color: var(--ember-text);
-}
-.mode-row .fan-off {
-    flex: 1;
-    height: 40px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10.5px;
+    padding: 7px 10px 0;
+    font-size: 10.5px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase;
     color: var(--mute);
-    background: var(--canvas);
-    border: 1px dashed var(--hairline);
+}
+.dw-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 6px 10px 8px; overflow: hidden; }
+.dw-quiet .dw-body { justify-content: center; }
+.dw-stale .dw-body { opacity: 0.45; }
+.dw-note { font-size: 12.5px; color: var(--mute); line-height: 1.4; }
+
+/* Shared pieces a widget script may use. */
+.dw-big { font-size: 30px; font-weight: 600; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.dw-sub { font-size: 12.5px; color: var(--body); line-height: 1.35; }
+.dw-mute { color: var(--mute); }
+.dw-list { list-style: none; display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: hidden; }
+.dw-item {
+    display: flex; align-items: center; gap: 8px; min-width: 0;
+    font-size: 13.5px; line-height: 1.3; padding: 3px 0;
+    border-bottom: 1px solid var(--hairline);
+}
+.dw-item:last-child { border-bottom: none; }
+.dw-item .dw-grow { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dw-item .dw-end { flex: 0 0 auto; font-size: 12px; color: var(--mute); font-variant-numeric: tabular-nums; }
+.dw-dot { flex: 0 0 auto; width: 7px; height: 7px; border-radius: var(--radius-full); background: var(--mute); }
+.dw-empty { font-size: 12.5px; color: var(--mute); padding: 4px 0; }
+.dw-rtl { direction: rtl; text-align: right; }
+.dw-pill {
+    display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+    min-width: 34px; height: 30px; padding: 0 8px;
     border-radius: var(--radius-md);
+    background: var(--canvas-raised); color: var(--body-strong);
+    font-size: 12px; font-weight: 600;
+    transition: transform var(--dur-fast) var(--ease-standard);
 }
+.dw-pill svg { width: 15px; height: 15px; }
+.dw-pill.active { background: var(--ember-tint); color: var(--ember-text); }
+.dw-pill:active, .dw-press:active { transform: scale(0.97); }
+.dw-bar { height: 5px; border-radius: var(--radius-full); background: var(--canvas-raised); overflow: hidden; }
+.dw-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--mute); }
 
-/* --- Battery Card --- */
-.battery-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
+/* --- No dashboard to show: a message or the user's tablets and TVs --- */
+.dash-message {
+    position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center;
+    max-width: 520px; margin: 0 auto; padding: 24px; gap: 10px;
 }
-.batt-top {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 4px;
+.dash-message[hidden] { display: none; }
+.dash-message h1 { font-size: 22px; }
+.dash-message p { color: var(--body); font-size: 14px; }
+.dash-message a { color: var(--ember-text); }
+.dash-message ul { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+.dash-message li a {
+    display: flex; justify-content: space-between; gap: 12px; padding: 12px 14px; color: var(--ink);
+    background: var(--canvas-soft); border: 1px solid var(--hairline); border-radius: var(--radius-card);
 }
-.batt-device {
-    font-size: 11px; color: var(--body);
-    display: flex; align-items: center; gap: 5px;
-}
-.batt-device svg, .batt-device i { width: 11px; height: 11px; color: var(--mute); }
-.batt-pct {
-    font-size: 11.5px; font-weight: 600;
-    font-variant-numeric: tabular-nums;
-}
-.battery-bar {
-    height: 5px; border-radius: 3px;
-    background: var(--hairline);
-    overflow: hidden;
-}
-.batt-fill {
-    height: 100%; border-radius: 3px;
-    transition: background-color 0.6s ease;
-}
-
-/* --- Tasks Card --- */
-.tasks-card {
-    min-height: 0;
-}
-.tasks-card .tasks-body {
-    overflow-y: auto;
-    padding: 4px 8px;
-    max-height: 116px;
-    min-height: 0;
-}
-.tasks-empty {
-    font-size: 11px; color: var(--mute); text-align: center;
-    padding: 6px 0;
-}
-.task-item {
-    display: flex; align-items: center; gap: 7px;
-    padding: 4px 7px;
-    margin-bottom: 3px;
-    background: var(--canvas-raised);
-    border-radius: 6px;
-    border-inline-start: 2px solid transparent;
-}
-.task-item:last-child { margin-bottom: 0; }
-.task-item.urgent { border-inline-start-color: var(--prio-high); }
-.task-item.high { border-inline-start-color: var(--prio-medium); }
-/* Hebrew: the row flows right-to-left, so the dot sits on the right and the
-   accent bar follows via the logical border-inline-start property. */
-.task-item.rtl { direction: rtl; }
-.task-dot {
-    width: 7px; height: 7px; border-radius: var(--radius-full); flex-shrink: 0;
-}
-.task-dot.urgent { background: var(--prio-high); }
-.task-dot.high { background: var(--prio-medium); }
-.task-title {
-    flex: 1 1 auto; min-width: 0;
-    font-size: 13px; font-weight: 500; line-height: 1.2;
-    color: var(--ink);
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.task-item.rtl .task-title { text-align: right; }
-.task-item.ltr .task-title { text-align: left; }
-
-/* Morning briefing on top of the tasks card (until noon). */
-.brief-item {
-    padding: 5px 8px; margin-bottom: 4px; border-radius: 6px;
-    background: var(--amber-tint); border-inline-start: 2px solid var(--amber);
-}
-.brief-item.rtl { direction: rtl; text-align: right; }
-.brief-head { font-size: 13px; font-weight: 600; color: var(--ink); line-height: 1.25; }
-.brief-pt { font-size: 12px; color: var(--body); line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* --- Calendar Strip ---
-   Takes all the height the camera row leaves (never less than --cal-h). */
-.cal-strip {
-    border-top: 1px solid var(--hairline);
-    padding: 8px 12px 10px;
-    background: var(--canvas-soft);
-    min-height: var(--cal-h, 150px);
-    display: flex;
-    flex-direction: column;
-}
-html[data-layout="normal"] { --cal-h: clamp(140px, 16vh, 210px); }
-html[data-layout="compact"] { --cal-h: clamp(110px, 15vh, 160px); }
-html[data-layout="tiny"] { --cal-h: clamp(96px, 14vh, 130px); }
-.cal-strip-label {
-    display: flex; align-items: center; gap: 6px; margin-bottom: 6px;
-    flex-shrink: 0;
-}
-.cal-week-label {
-    font-size: 10px; font-weight: 600; color: var(--mute);
-    text-transform: uppercase; letter-spacing: 0.06em;
-}
-.cal-row {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 5px;
-    flex: 1;
-    min-height: 0;
-}
-.cal-day {
-    display: flex; flex-direction: column; align-items: flex-start;
-    padding: 5px 6px; border-radius: var(--radius-md);
-    background: var(--canvas);
-    border: 1px solid transparent;
-    min-width: 0;
-    min-height: 0;
-    overflow: hidden;
-}
-.cal-day.today {
-    border-color: rgba(255, 106, 61, 0.45);
-    background: var(--canvas-raised);
-}
-.cal-day .cd-head {
-    display: flex; align-items: center; gap: 6px;
-    flex-shrink: 0; margin-bottom: 5px;
-}
-.cal-day .cd-name {
-    font-size: 13px; font-weight: 600; color: var(--mute);
-    text-transform: uppercase; letter-spacing: 0.04em;
-}
-.cal-day .cd-num {
-    font-size: 20px; font-weight: 600; color: var(--body-strong);
-    line-height: 1.1;
-    font-variant-numeric: tabular-nums;
-}
-.cal-day.today .cd-num {
-    background: var(--ember);
-    color: var(--on-accent);
-    width: 26px; height: 26px;
-    border-radius: var(--radius-full);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 15px;
-}
-.cal-day .cd-events {
-    display: flex; flex-direction: column; gap: 3px;
-    width: 100%; align-items: stretch;
-    min-height: 0;
-    overflow: hidden;
-    flex: 1;
-}
-/* Sized to be read from across the room: names wrap onto a second line
-   rather than being cut short. A day with more events than fit gets its
-   last cards shrunk to one compact line (fitCalStrip in dashboard.js). */
-.cal-day .cd-ev {
-    font-size: 15px; line-height: 1.25; padding: 5px 7px;
-    border-radius: 4px;
-    overflow: hidden;
-    color: var(--ink);
-    font-weight: 500;
-    flex-shrink: 0;
-    display: flex; align-items: baseline; gap: 6px;
-}
-.cal-day .cd-ev-name {
-    flex: 1 1 auto; min-width: 0;
-    overflow: hidden;
-    text-align: left;
-    display: -webkit-box;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
-    overflow-wrap: break-word;
-    hyphens: auto; -webkit-hyphens: auto;
-}
-.cal-day .cd-ev.compact {
-    font-size: 11.5px; line-height: 1.2; padding: 2px 6px;
-    font-weight: 400;
-}
-.cal-day .cd-ev.compact .cd-ev-name {
-    display: block;
-    white-space: nowrap; text-overflow: ellipsis;
-}
-.cal-day .cd-ev[hidden], .cal-day .cd-more[hidden] { display: none; }
-.cal-day .cd-more {
-    font-size: 12px; color: var(--mute); padding: 1px 6px; flex-shrink: 0;
-}
-/* Time pinned to the right edge in a stable-width column, so every event
-   name starts at the same x position. */
-.cal-day .cd-ev-time {
-    flex: 0 0 auto;
-    min-width: 2.9em;
-    text-align: right;
-    font-weight: 600;
-    font-variant-numeric: tabular-nums;
-    opacity: 0.7;
-}
-.cal-day .cd-empty {
-    font-size: 13px; color: var(--mute); opacity: 0.45;
-}
-/* Days that already happened — and events that already ended — recede so the
-   live part of the week stays the focus. */
-.cal-day.past { opacity: 0.42; }
-.cal-day .cd-ev.past { opacity: 0.45; }
-
-/* --- Full-screen calendar overlay (opened by tapping the strip) --- */
-.cal-overlay {
-    position: absolute;
-    inset: 8px;
-    z-index: 90;
-    background: var(--canvas-soft);
-    border: 1px solid var(--hairline-strong);
-    border-radius: var(--radius-card);
-    overflow: hidden;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.5);
-}
-.cal-overlay[hidden] { display: none; }
-.cal-overlay {
-    display: flex; flex-direction: column; gap: 10px;
-    padding: 10px 12px 12px;
-}
-.cal-ov-week {
-    flex: 1; min-height: 0;
-    display: flex; flex-direction: column;
-}
-.cal-ov-updated {
-    margin-left: auto;
-    font-size: 11px; color: var(--mute); opacity: 0.7;
-    font-variant-numeric: tabular-nums;
-}
-
-/* --- Spinner --- */
-.spinner-sm {
-    width: 18px; height: 18px;
-    border: 2px solid var(--hairline-strong);
-    border-top-color: var(--ink);
-    border-radius: 50%; animation: spin 0.7s linear infinite;
-}
-@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-/* --- Scrollbars --- */
-::-webkit-scrollbar { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 2px; }
-
-/* --- Responsive --- */
-@media (max-width: 1000px) {
-    .dash-main {
-        grid-template-columns: 1fr;
-        grid-template-rows: minmax(0, 1.25fr) auto minmax(0, 1fr);
-        align-items: stretch;
-        justify-content: stretch;
-    }
-    .cam-panel { justify-self: center; max-width: 100%; }
-    .dash-sidebar {
-        grid-template-columns: 1fr 1fr;
-        grid-template-rows: auto auto auto;
-    }
-    .dash-sidebar .clock-card { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; }
-    .dash-sidebar .tasks-card { grid-column: 1 / -1; }
-    .clock-card .clock-time { font-size: 28px; }
-    .tasks-card .tasks-body { max-height: 96px; }
-}
-
+.dash-message li span { color: var(--mute); text-transform: capitalize; }
 
 /* --- Night mode ---
-   Active between the hours given by ?night=START-END (default 22-7, "off"
-   disables). The camera and data keep running (bedside glance) — the page is
-   only dimmed by a black overlay (pure black = pixels off on AMOLED), seconds
-   are dropped from the clock and the layout drifts a few px every few minutes
-   against burn-in. A tap restores full brightness for a couple of minutes. */
-.dash-main { position: relative; left: var(--shift-x, 0px); top: var(--shift-y, 0px); }
+   The widgets keep running (a bedside glance); the page is dimmed (the kiosk dims the real backlight instead),
+   the clock drops its seconds, and the layout drifts a few px every few minutes against burn-in. A tap
+   restores full brightness for a couple of minutes. */
 #night-dim {
     position: fixed; inset: 0; z-index: 9999;
     background: #000; opacity: 0; pointer-events: none;
@@ -687,69 +179,9 @@ html[data-layout="tiny"] { --cal-h: clamp(96px, 14vh, 130px); }
 }
 html[data-night] #night-dim { opacity: var(--night-dim, 0.55); }
 
-
-/* --- Frigate events rail --- */
-.events-rail {
-    display: flex; flex-direction: column; gap: 6px;
-    min-width: 0; min-height: 0; overflow: hidden;
-}
-.events-title {
-    font-size: 11px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase;
-    color: rgba(247, 245, 240, 0.55); padding: 2px 2px 0;
-}
-.events-list {
-    /* Exactly EVENTS_LIMIT (3) equal rows, so the rail ends level with the camera. */
-    display: grid; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 8px;
-    min-height: 0; overflow: hidden; flex: 1;
-}
-.ev-card {
-    display: flex; flex-direction: column; min-height: 0;
-    width: 100%;
-    background: var(--canvas-soft); border: 1px solid var(--hairline);
-    border-radius: var(--radius-card); overflow: hidden;
-}
-.ev-card.ev-new { border-color: var(--connecting-amber); }
-.ev-media { flex: 1 1 auto; min-height: 0; background: #000; position: relative; }
-.ev-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.ev-card.ev-err .ev-media img { visibility: hidden; }
-.ev-meta {
-    display: flex; flex-direction: column; gap: 1px; padding: 5px 8px 6px;
-    line-height: 1.25; min-width: 0;
-}
-.ev-label { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ev-ago { font-size: 11px; color: rgba(247, 245, 240, 0.6); font-variant-numeric: tabular-nums; }
-.ev-card.ev-live .ev-ago { color: var(--connecting-amber); font-weight: 600; }
-.ev-card.ev-motion .ev-label { color: rgba(247, 245, 240, 0.7); font-weight: 500; }
-.events-empty { font-size: 12px; color: rgba(247, 245, 240, 0.45); padding: 6px 2px; }
-.events-rail[data-stale] .events-list { opacity: 0.45; }
-
-@media (max-width: 1000px) {
-    .events-rail { flex-direction: row; align-items: stretch; height: 134px; }
-    .events-title { display: none; }
-    .events-list { display: flex; flex-direction: row; flex-wrap: nowrap; }
-    .ev-card { width: 150px; }
-    .ev-media { flex: none; aspect-ratio: 16 / 9; }
-}
-
-/* --- Event clip overlay (tap a card) --- */
-.ev-card { cursor: pointer; }
-.clip-overlay {
-    position: fixed; inset: 0; z-index: 9000;
-    background: rgba(0, 0, 0, 0.85);
-    display: flex; align-items: center; justify-content: center; padding: 14px;
-}
-.clip-overlay[hidden] { display: none; }
-.clip-box {
-    display: flex; flex-direction: column; gap: 8px;
-    width: min(100%, calc((100vh - 80px) * 16 / 9)); max-width: 100%;
-}
-.clip-head { display: flex; align-items: center; justify-content: space-between; font-size: 14px; font-weight: 600; }
-.clip-head button { font-size: 28px; line-height: 1; padding: 2px 12px; color: var(--ink); }
-.clip-box video { width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: var(--radius-card); }
-
-/* --- Ask Dana (Dana Kiosk app only: window.DanaKiosk) --- */
+/* --- Ask Dana (the Dana Kiosk app only: window.DanaKiosk) --- */
 .ask-dana {
-    flex: 0 0 auto;
+    position: fixed; right: 18px; bottom: 18px; z-index: 50;
     width: 56px; height: 56px;
     border-radius: var(--radius-full);
     background: var(--canvas-raised);
@@ -761,8 +193,20 @@ html[data-night] #night-dim { opacity: var(--night-dim, 0.55); }
 .ask-dana svg { width: 26px; height: 26px; }
 .ask-dana:active { background: var(--canvas-soft); }
 
-/* A value that changed (not its first fill: dashboard.js setValue) crossfades in. The one motion on the
-   tablet besides presses and the live dot. */
+/* --- Spinner, scrollbars --- */
+.spinner-sm {
+    width: 18px; height: 18px;
+    border: 2px solid var(--hairline-strong);
+    border-top-color: var(--ink);
+    border-radius: 50%; animation: spin 0.7s linear infinite;
+}
+@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--hairline-strong); border-radius: 2px; }
+
+/* A value that changed after its first fill crossfades in (a widget's api.setValue): the
+   one motion besides presses and a camera's live dot. */
 @keyframes dash-changed { from { opacity: 0.25; } to { opacity: 1; } }
 .dash-changed { animation: dash-changed var(--dur-base) var(--ease-standard); }
 @media (prefers-reduced-motion: reduce) { .dash-changed { animation: none; } }

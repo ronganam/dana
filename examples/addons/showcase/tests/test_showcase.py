@@ -1,4 +1,4 @@
-"""The showcase example addon: every capability once (tools, approval, undo, blocked, settings rule, connection test, options, prompt, model, HTTP service, worker, job, service, event, channel, Now card and action, day item, briefing, review, search, self-check, context, provider, route, page, migration), for the users who have it only.
+"""The showcase example addon: every capability once (tools, approval, undo, blocked, settings rule, connection test, options, prompt, model, HTTP service, worker, job, service, event, channel, Now card and action, day item, briefing, review, search, self-check, context, provider, route, page, dashboard widget, migration), for the users who have it only.
 
 Run from server/: bin/dana addons test ../examples/addons/showcase (``tests/test_addon_kit.py``
 runs it in Dana's suite). Robin (the first admin) and Gal turn it on, Maya does not.
@@ -26,7 +26,8 @@ users.bootstrap()
 from core import weekly_review  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
-from core.addons import BriefingContext, ContextRequest, InvalidValue, NotConnected, NowContext  # noqa: E402
+from core.addons import (BriefingContext, ContextRequest, InvalidValue, NotConnected, NowContext,  # noqa: E402
+                         WidgetContext)
 from core.addons import loader, registry, scheduler, store  # noqa: E402
 from core.addons.addon import get_addon  # noqa: E402
 from core.addons.registry import ToolNotAvailable  # noqa: E402
@@ -239,10 +240,18 @@ async def composers() -> None:
     provider = registry.provider("showcase.thirsty_count", ROBIN)
     check("provide: a named capability for its users; None for Maya",
           provider is not None and provider.func(ROBIN) == 1 and registry.provider("showcase.thirsty_count", MAYA) is None)
+    widget = hook("widget", ROBIN, "plants_thirsty")
+    small = widget.func(ROBIN, WidgetContext(settings={"heading": "Water me"}, size="small", now=NOW))
+    check("widget: the user's thirsty plants under the heading they set; offered to its users only",
+          small == {"heading": "Water me", "plants": ["Monstera"]} and widget.option("sizes") == ("small", "medium")
+          and hook("widget", MAYA, "plants_thirsty") is None, small)
 
 
 async def web_parts() -> None:
     page = (dana_harness.ADDON / "web" / "plants.js").read_text(encoding="utf-8")
+    drawn = (dana_harness.ADDON / "web" / "widget.js").read_text(encoding="utf-8")
+    check("widget: its script registers its renderer with Dana.widget",
+          'Dana.widget("plants_thirsty"' in drawn and hook("widget", ROBIN, "plants_thirsty").option("script") == "widget.js")
     check("page: declared, its script registers with Dana.panel and reads its route",
           [p.id for p in get_addon("showcase").web] == ["plants"] and "Dana.panel(" in page
           and "/api/showcase/plants" in page)

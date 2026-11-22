@@ -1,7 +1,8 @@
 /**
  * The web shell's addon pages: the navigation built from a GET /api/addons payload (static/app-panels.js:
  * panelEntries, routeOf; an addon with several pages), and pages registering with the SDK (static/dana.js:
- * Dana.panel, Dana.load, two pages of one addon, the api a page gets, a core piece).
+ * Dana.panel, Dana.load, two pages of one addon, the api a page gets, a core piece; Dana.widget, a dashboard
+ * widget's renderer and its api).
  *
  * The payloads are the real ones captured in tests/fixtures/addons_web.json by
  * `WRITE_WEB_FIXTURE=1 bin/test test_addons_api`. dana.js runs against a small fake document that "runs"
@@ -233,6 +234,27 @@ check("a script that cannot be fetched fails its load", /could not load/.test(lo
 const before = appended.length;
 await Dana.load("shopping", "shopping", "/addons/shopping/web/shopping.js?v=7");
 check("a page loads once", appended.length === before);
+
+// ---------- dashboard widgets (Dana.widget) ----------
+const WIDGET = "https://dana.example/addons/tasks/web/widget.js?v=7";
+scripts.set(WIDGET, () => { Dana.widget("reminders", { bare: true, mount(el, w) { el.text = w.data.n; } }); });
+await Dana.loadScript(WIDGET);
+const wdef = Dana.widgetDef("reminders");
+check("Dana.widget: registers a widget's renderer for the addon whose web/ folder its script is in",
+      wdef && wdef.addon === "tasks" && wdef.url === WIDGET && wdef.def.bare === true && Dana.widgetDef("nope") === null, wdef);
+const wapi = Dana.widgetApi("tasks", WIDGET, { size: "medium", refresh() { return "again"; } });
+check("Dana.widgetApi: a page's api for the addon plus the dashboard's extras",
+      wapi.addon === "tasks" && wapi.base === "https://dana.example/addons/tasks/web/" && wapi.size === "medium"
+      && wapi.refresh() === "again" && typeof wapi.esc === "function");
+let wthrew = "";
+try { Dana.widget("loose", { mount() {} }); } catch (e) { wthrew = e.message; }
+check("Dana.widget: refused outside an addon's script", /not loaded from an addon/.test(wthrew), wthrew);
+fakeDocument.currentScript = { src: "https://dana.example/addons/tasks/web/again.js" };
+const attempt = (key, def) => { try { Dana.widget(key, def); return ""; } catch (e) { return e.message; } };
+check("Dana.widget: a key registers once; a renderer needs mount",
+      /already registered/.test(attempt("reminders", { mount() {} })) && Dana.widgetDef("reminders").url === WIDGET
+      && /mount\(el, w, api\) is required/.test(attempt("x", {})));
+fakeDocument.currentScript = null;
 
 console.log(`\n${failures.length ? `${failures.length} check(s) failed` : "All checks passed"} (${pass} passed)`);
 process.exit(failures.length ? 1 : 0);

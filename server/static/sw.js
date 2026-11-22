@@ -41,6 +41,7 @@ const SHELL = [
   "/static/addons.js",
   "/static/profile.js",
   "/static/devices.js",
+  "/static/dashboard-editor.js",
   "/static/household.js",
   "/static/demo.js",
   "/static/zones.js",

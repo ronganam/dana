@@ -1,0 +1,10 @@
+/* The tasks addon's dashboard widget (web/widget.js): Reminders. */
+.tw-brief { padding: 6px 8px; margin-bottom: 6px; border-radius: var(--radius-md); background: var(--amber-tint); }
+.tw-brief-head { font-size: 13px; font-weight: 600; color: #f6c477; margin-bottom: 2px; }
+.tw-timed { background: var(--amber); }
+.tw-overdue { background: var(--rose); }
+.tw-high { background: var(--rose); }
+.tw-medium { background: var(--amber); }
+.tw-low { background: var(--sky); }
+.tw-end-overdue { color: var(--rose); }
+.tw-end-timed { color: #f6c477; }

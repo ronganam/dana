@@ -7,8 +7,9 @@ and any installed addon's section); an addon they have not connected adds
 nothing. The model turns that into a headline + a few points, written for
 them (``core/user_profile.for_user``); if it fails, a plain version is
 written from the same data. One row per user and local date in ``briefings``;
-delivered through ``core.notify.send`` (``briefing``) and read by the widgets /
-bedroom dashboard from ``GET /api/briefing/today``.
+delivered through ``core.notify.send`` (``briefing``), read by the phone's
+widgets from ``GET /api/briefing/today`` and shown by the dashboards' Reminders
+widget in the morning (addons/tasks/hooks.py).
 
 Who gets one (:func:`available`): a user with a delivery channel (e.g. phone
 push), or with a Telegram chat and at least one briefing hook. If no wake is

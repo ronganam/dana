@@ -8,7 +8,9 @@
 - weekly review: money spending & savings summary;
 - context chats for ``transaction`` and ``saving``;
 - self-check: ``money`` (each bank/card source syncs cleanly);
-- providers: ``money_week_lines``, ``telegram_reply``.
+- providers: ``money_week_lines``, ``telegram_reply``;
+- the dashboard's Money widget (``money``: the month so far, where it is
+  heading, the bank balance forecast; drawn by ``web/widget.js``).
 """
 
 import asyncio
@@ -17,12 +19,13 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from core import cards, now as now_screen
-from core.addons import BriefingContext, Card, Check, ContextRequest, NowContext, Section, helpers, minutes, store
+from core import cards, now as now_screen, user_locale
+from core.addons import (BriefingContext, Card, Check, ContextRequest, NowContext, Section, WidgetContext, helpers,
+                         minutes, store)
 from core.db import get_db_connection
 from core.users import User
-from addons.money import (classify, config, insights, otp, providers, queries, savings, schedule,
-                          signals, store as money_store, sync)
+from addons.money import (classify, config, dashboard as money_dashboard, insights, otp, providers, queries,
+                          savings, schedule, signals, store as money_store, sync)
 from addons.money.addon import addon
 
 logger = logging.getLogger(__name__)
@@ -295,3 +298,23 @@ def check_money(user: User, now: datetime.datetime) -> Check:
                      why="New transactions are missing from the Money page and Dana's answers.",
                      blocks=[{"type": "facts", "label": "Banks and cards", "items": [p[1] for p in problems]}])
     return Check(True, f"synced {helpers.ago(latest, now) if latest else 'never'}", latest)
+
+
+@addon.widget("money", title="Money", script="widget.js", icon="wallet", refresh=900, sizes=("medium", "small"),
+              description="This month's spending so far and where it is heading, and the bank balance ahead")
+def money_widget(user: User, ctx: WidgetContext) -> Dict[str, Any]:
+    """The month in progress, one-offs left out (``month`` its name, ``spent``,
+    ``typical``, ``on_track`` or None before a week has passed), the bank
+    balance (``balance``) and the lowest point of the coming weeks (``low``:
+    ``{date, balance, days}``) when a bank balance is known; amounts in minor
+    units of ``currency``."""
+    book = money_dashboard.load(user)
+    month = money_dashboard.trends(book)
+    groups = month["groups"]
+    heading = [g["on_track"] for g in groups if g.get("on_track") is not None]
+    fc = money_dashboard.forecast(user, money_dashboard.SOON_DAYS, book)
+    return {"month": month["label"], "currency": user_locale.currency(user),
+            "spent": sum(g["total"] for g in groups), "typical": sum(g["typical"] or 0 for g in groups),
+            "on_track": sum(g["on_track"] if g.get("on_track") is not None else g["total"] for g in groups)
+            if heading else None,
+            "balance": fc["balance"] if fc else None, "low": fc["soon_low"] if fc else None}

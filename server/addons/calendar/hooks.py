@@ -2,7 +2,8 @@
 
 - self-check: ``calendar``;
 - morning briefing: ``events`` (today's events);
-- providers: ``events_today`` (Now screen cache) and ``events_between`` (meeting cards, weekly review).
+- providers: ``events_today`` (Now screen cache) and ``events_between`` (meeting cards, weekly review);
+- the dashboard's Calendar widget (``calendar``: today and tomorrow; drawn by ``web/widget.js``).
 """
 
 import asyncio
@@ -11,7 +12,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from core import clock
-from core.addons import BriefingContext, Check, Section, helpers, store
+from core.addons import BriefingContext, Check, Section, WidgetContext, helpers, store
 from core.db import get_db_connection
 from core.users import User
 from addons.calendar import config, events as calendar_events, today as calendar_today
@@ -83,3 +84,48 @@ async def provide_events_between(user: User, start: datetime.datetime, end: date
     if conn is None:
         return None
     return await asyncio.to_thread(calendar_events.list_events, conn, start, end, limit)
+
+
+@addon.widget("calendar", title="Calendar", script="widget.js", icon="calendar-days", refresh=300,
+              sizes=("medium", "small", "large"),
+              description="Today's and tomorrow's events from your selected calendars")
+def calendar_widget(user: User, ctx: WidgetContext) -> Dict[str, Any]:
+    """``days``: today and tomorrow (``{date, label, events}``; an event is
+    ``{id, title, start, end, all_day, location, calendar_id}``)."""
+    conn = store.require(user, config.ADDON)
+    start = ctx.now.replace(hour=0, minute=0, second=0, microsecond=0)
+    found = calendar_events.list_events(conn, start, start + datetime.timedelta(days=2), limit=60)
+    days = []
+    for offset, label in ((0, "Today"), (1, "Tomorrow")):
+        day = (start + datetime.timedelta(days=offset)).date()
+        days.append({"date": day.isoformat(), "label": label,
+                     "events": [{k: e.get(k) for k in ("id", "title", "start", "end", "all_day", "location",
+                                                       "calendar_id")}
+                                for e in found if _on_day(e, day, ctx.now.tzinfo)]})
+    return {"days": days}
+
+
+def _local_date(value: Any, tz: Any, end: bool = False) -> Optional[datetime.date]:
+    """The local date of an event's start / end (an end is exclusive: an all-day one, or one at midnight, is
+    the day before's)."""
+    text = str(value or "")
+    if not text:
+        return None
+    if len(text) == 10:
+        d = datetime.date.fromisoformat(text)
+        return d - datetime.timedelta(days=1) if end else d
+    moment = datetime.datetime.fromisoformat(text)
+    moment = (moment if moment.tzinfo is not None else moment.replace(tzinfo=tz)).astimezone(tz)
+    if end and moment.time() == datetime.time(0, 0):
+        return moment.date() - datetime.timedelta(days=1)   # ends at midnight: not on the next day
+    return moment.date()
+
+
+def _on_day(event: Dict[str, Any], day: datetime.date, tz: Any) -> bool:
+    """Whether ``event`` takes part of ``day`` (local)."""
+    try:
+        first = _local_date(event.get("start"), tz)
+        last = _local_date(event.get("end"), tz, end=True) or first
+    except ValueError:
+        return False
+    return first is not None and first <= day <= max(first, last or first)

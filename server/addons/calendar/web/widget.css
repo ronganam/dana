@@ -1,0 +1,11 @@
+/* The calendar addon's dashboard widget (web/widget.js): today and tomorrow. Calendars on the hues. */
+.cw-day + .cw-day { margin-top: 8px; }
+.cw-label { font-size: 12px; font-weight: 600; color: var(--body); margin-bottom: 2px; }
+.cw-label.cw-today { color: var(--ember-text); }
+.cw-past { opacity: 0.5; }
+.cw-sky { background: var(--sky); }
+.cw-plum { background: var(--plum); }
+.cw-teal { background: var(--teal); }
+.cw-sage { background: var(--sage); }
+.cw-amber { background: var(--amber); }
+.cw-rose { background: var(--rose); }
