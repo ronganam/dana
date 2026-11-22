@@ -32,13 +32,11 @@ from core import clock
 from core.text import redact_otp as redact
 from core.users import User
 from core.addons import store as connections
-from addons.money import classify, config, ingest, schedule, store
+from addons.money import classify, config, ingest, providers, schedule, store
 
 logger = logging.getLogger(__name__)
 
 WALLET_PACKAGE = "com.google.android.apps.walletnfcrel"
-# The card / bank apps whose pushes the phone sends here (never to the Inbox).
-CARD_APPS = ("com.onoapps.cal4u", "com.ideomobile.hapoalim", "com.max.android", "com.isracard.isracardapp")
 KEEP_DAYS = 60
 # A provisional row merges with a scraped one of the same amount this many days apart.
 MATCH_DAYS = 2
@@ -49,7 +47,7 @@ SAME_PAYMENT_MINUTES = 15
 # At signal time an already-scraped row is taken only this close to the notification (when both have a time).
 SCRAPED_HOURS = 12
 MAX_BATCH = 200
-# A provisional row also takes the category Cal gave the merchant's earlier rows.
+# A provisional row also takes the category the card company gave the merchant's earlier rows.
 PROVISIONAL_MEMORY = classify.MEMORY_SOURCES + ("bank",)
 
 
@@ -189,17 +187,15 @@ def parse_push(title: str, text: str) -> Optional[Payment]:
     return Payment(sign * found[0], found[1], card, merchant)
 
 
-# The packages whose notifications may become transactions; any other app's push the phone
-# sends is only stored (an app can name itself anything, but not another app's package).
-PAYMENT_PACKAGES = (WALLET_PACKAGE,) + CARD_APPS
-
-
-def parse(package: str, title: str, text: str) -> Optional[Payment]:
-    """The parser for a package: Google Wallet's, the generic one for the card /
-    bank apps, None for any other package."""
+# The packages whose notifications may become transactions: Google Wallet and the card / bank apps
+# of the user's providers (``providers.payment_apps``); any other app's push the phone sends is only
+# stored (an app can name itself anything, but not another app's package).
+def parse(user: User, package: str, title: str, text: str) -> Optional[Payment]:
+    """The parser for a package: Google Wallet's, the generic one for the user's providers'
+    card / bank apps, None for any other package."""
     if package == WALLET_PACKAGE:
         return parse_wallet(title, text)
-    return parse_push(title, text) if package in CARD_APPS else None
+    return parse_push(title, text) if package in providers.payment_apps(user) else None
 
 
 # --- Matching ---------------------------------------------------------------------------------
@@ -492,7 +488,7 @@ def _store(user: User, source: str, items: Iterable[Mapping[str, Any]]) -> Dict[
         for item in items:
             posted = _posted(item.get("posted_at"))
             package, title, text = item["package"], item["title"], item["text"]
-            payment = parse(package, title, text)
+            payment = parse(user, package, title, text)
             signal_id = uuid.uuid4().hex
             inserted = conn.execute(
                 "INSERT OR IGNORE INTO money_signals (id, user_id, source, notification_id, key, package, title, text, "

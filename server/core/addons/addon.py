@@ -259,7 +259,7 @@ class Addon:
         web: Its pages in the web app, any number: a tuple of
             :class:`~core.addons.hooks.Page` (files served from its ``web/``;
             page ids unique across addons).
-        worker: Its sidecar (:class:`~core.addons.hooks.Worker`), built from its ``worker/``.
+        worker: Its sidecar (:class:`~core.addons.hooks.Worker`): a published image, or built from its ``worker/``.
         modules: More modules of its folder the loader imports after
             ``addon.py`` and ``tools.py`` (dotted, relative: ``"calls.tools"``):
             where its other tools and hooks are declared. ``hooks.py`` is

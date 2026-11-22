@@ -100,7 +100,7 @@ def test_startup_without_key():
 # --- 2. Discovery and schemas -----------------------------------------------------------
 
 EXPECTED_ORDER = ["essentials", "tasks", "shopping", "knowledge", "about", "people", "phone", "homeassistant", "whatsapp",
-                  "calendar", "contacts", "gmail", "telegram_account", "money", "money_il", "cameras", "ops"]
+                  "calendar", "contacts", "gmail", "telegram_account", "money", "cameras", "ops"]
 
 
 def test_discovery():
@@ -110,9 +110,8 @@ def test_discovery():
     tools = all_tools()
     check("discovery: 99 tools", len(tools) == 99, str(len(tools)))
     check("discovery: tool names unique", len({t.name for t in tools}) == len(tools))
-    check("discovery: cameras and money_il (no tools) have none, every other addon has some",
-          not get_addon("cameras").tools and not get_addon("money_il").tools
-          and all(get_addon(k).tools for k in EXPECTED_ORDER if k not in ("cameras", "money_il")))
+    check("discovery: cameras (no tools) has none, every other addon has some",
+          not get_addon("cameras").tools and all(get_addon(k).tools for k in EXPECTED_ORDER if k != "cameras"))
     check("discovery: money tools", [t.name for t in get_addon("money").tools]
           == ["money_summary", "search_transactions", "money_overview", "recurring_charges", "money_forecast",
               "money_insights", "meal_card", "investment_portfolio", "categorize_transaction", "sync_money", "saving_opportunities",
@@ -402,8 +401,8 @@ def test_onboarding_words():
     lacking += [f"{a.name}.{f.name}: label/help" for a in official for f in (*a.credentials, *a.settings)
                 if not (f.label and f.help)]
     check("official addons: each has an icon, features and every field a label and help", not lacking, lacking)
-    check("official addons: whatever is set up outside Dana is said in steps (WAHA, Google, Telegram, the bank worker)",
-          all(get_addon(n).setup for n in ("whatsapp", "calendar", "contacts", "gmail", "telegram_account", "money_il")))
+    check("official addons: whatever is set up outside Dana is said in steps (WAHA, Google, Telegram, statements)",
+          all(get_addon(n).setup for n in ("whatsapp", "calendar", "contacts", "gmail", "telegram_account", "money")))
 
 
 def test_key():

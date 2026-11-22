@@ -234,6 +234,7 @@ def test_convert_9_0():
     expected = {t: rows for t, rows in _renamed(before).items() if t not in DROPPED}
     expected["sqlite_sequence"] = [r for r in expected["sqlite_sequence"] if r[0] not in DROPPED]
     expected["addon_state"] = []  # core m0002: the server-wide disabled addons
+    expected["money_import_maps"] = []  # money m0003: the CSV column mappings of statement imports
     # core m0004 adds users.languages / users.currency, empty (the server's defaults apply)
     expected["users"] = sorted(tuple(r) + ("''", "''") for r in expected["users"])
     changed = sorted(t for t in set(expected) | set(after) if expected.get(t) != after.get(t))

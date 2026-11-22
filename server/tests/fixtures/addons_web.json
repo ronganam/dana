@@ -1219,7 +1219,8 @@
      "requires": null,
      "settings": [],
      "setup": [
-      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+      "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
+      "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
      ],
      "source": "official",
      "state": "available",
@@ -1228,47 +1229,6 @@
      "web": [],
      "why_not": null,
      "worker": false
-    },
-    {
-     "account": null,
-     "can_change": true,
-     "check": true,
-     "connect_label": null,
-     "connect_url": null,
-     "connected": false,
-     "credentials": [],
-     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
-     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
-     "everyone": false,
-     "examples": [
-      "What's my bank balance?",
-      "How much is left on my meal card?"
-     ],
-     "features": [
-      "Reads your Israeli bank and card accounts into Money",
-      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
-      "Bank of Israel rates and price checks for ways to save"
-     ],
-     "icon": "landmark",
-     "name": "money_il",
-     "needs": [
-      "money"
-     ],
-     "options": false,
-     "pages": [],
-     "requires": null,
-     "settings": [],
-     "setup": [
-      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
-      "Turn it on here, then add each bank or card login on the Money page."
-     ],
-     "source": "official",
-     "state": "available",
-     "title": "Money (Israel)",
-     "version": "",
-     "web": [],
-     "why_not": null,
-     "worker": true
     },
     {
      "account": null,
@@ -2253,7 +2213,8 @@
      "requires": null,
      "settings": [],
      "setup": [
-      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+      "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
+      "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
      ],
      "source": "official",
      "state": "available",
@@ -2262,47 +2223,6 @@
      "web": [],
      "why_not": null,
      "worker": false
-    },
-    {
-     "account": null,
-     "can_change": true,
-     "check": true,
-     "connect_label": null,
-     "connect_url": null,
-     "connected": false,
-     "credentials": [],
-     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
-     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
-     "everyone": false,
-     "examples": [
-      "What's my bank balance?",
-      "How much is left on my meal card?"
-     ],
-     "features": [
-      "Reads your Israeli bank and card accounts into Money",
-      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
-      "Bank of Israel rates and price checks for ways to save"
-     ],
-     "icon": "landmark",
-     "name": "money_il",
-     "needs": [
-      "money"
-     ],
-     "options": false,
-     "pages": [],
-     "requires": null,
-     "settings": [],
-     "setup": [
-      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
-      "Turn it on here, then add each bank or card login on the Money page."
-     ],
-     "source": "official",
-     "state": "available",
-     "title": "Money (Israel)",
-     "version": "",
-     "web": [],
-     "why_not": null,
-     "worker": true
     },
     {
      "account": null,
@@ -3260,7 +3180,8 @@
      "requires": null,
      "settings": [],
      "setup": [
-      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+      "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
+      "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
      ],
      "source": "official",
      "state": "available",
@@ -3269,47 +3190,6 @@
      "web": [],
      "why_not": null,
      "worker": false
-    },
-    {
-     "account": null,
-     "can_change": true,
-     "check": true,
-     "connect_label": null,
-     "connect_url": null,
-     "connected": false,
-     "credentials": [],
-     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
-     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
-     "everyone": false,
-     "examples": [
-      "What's my bank balance?",
-      "How much is left on my meal card?"
-     ],
-     "features": [
-      "Reads your Israeli bank and card accounts into Money",
-      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
-      "Bank of Israel rates and price checks for ways to save"
-     ],
-     "icon": "landmark",
-     "name": "money_il",
-     "needs": [
-      "money"
-     ],
-     "options": false,
-     "pages": [],
-     "requires": null,
-     "settings": [],
-     "setup": [
-      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
-      "Turn it on here, then add each bank or card login on the Money page."
-     ],
-     "source": "official",
-     "state": "available",
-     "title": "Money (Israel)",
-     "version": "",
-     "web": [],
-     "why_not": null,
-     "worker": true
     },
     {
      "account": null,
@@ -4254,7 +4134,8 @@
      "requires": null,
      "settings": [],
      "setup": [
-      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+      "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
+      "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
      ],
      "source": "official",
      "state": "available",
@@ -4263,47 +4144,6 @@
      "web": [],
      "why_not": null,
      "worker": false
-    },
-    {
-     "account": null,
-     "can_change": true,
-     "check": true,
-     "connect_label": null,
-     "connect_url": null,
-     "connected": false,
-     "credentials": [],
-     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
-     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
-     "everyone": false,
-     "examples": [
-      "What's my bank balance?",
-      "How much is left on my meal card?"
-     ],
-     "features": [
-      "Reads your Israeli bank and card accounts into Money",
-      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
-      "Bank of Israel rates and price checks for ways to save"
-     ],
-     "icon": "landmark",
-     "name": "money_il",
-     "needs": [
-      "money"
-     ],
-     "options": false,
-     "pages": [],
-     "requires": null,
-     "settings": [],
-     "setup": [
-      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
-      "Turn it on here, then add each bank or card login on the Money page."
-     ],
-     "source": "official",
-     "state": "available",
-     "title": "Money (Israel)",
-     "version": "",
-     "web": [],
-     "why_not": null,
-     "worker": true
     },
     {
      "account": null,
@@ -5251,7 +5091,8 @@
      "requires": null,
      "settings": [],
      "setup": [
-      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+      "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
+      "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
      ],
      "source": "official",
      "state": "available",
@@ -5260,47 +5101,6 @@
      "web": [],
      "why_not": null,
      "worker": false
-    },
-    {
-     "account": null,
-     "can_change": true,
-     "check": true,
-     "connect_label": null,
-     "connect_url": null,
-     "connected": false,
-     "credentials": [],
-     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
-     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
-     "everyone": false,
-     "examples": [
-      "What's my bank balance?",
-      "How much is left on my meal card?"
-     ],
-     "features": [
-      "Reads your Israeli bank and card accounts into Money",
-      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
-      "Bank of Israel rates and price checks for ways to save"
-     ],
-     "icon": "landmark",
-     "name": "money_il",
-     "needs": [
-      "money"
-     ],
-     "options": false,
-     "pages": [],
-     "requires": null,
-     "settings": [],
-     "setup": [
-      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
-      "Turn it on here, then add each bank or card login on the Money page."
-     ],
-     "source": "official",
-     "state": "available",
-     "title": "Money (Israel)",
-     "version": "",
-     "web": [],
-     "why_not": null,
-     "worker": true
     },
     {
      "account": null,
@@ -6236,7 +6036,8 @@
      "requires": null,
      "settings": [],
      "setup": [
-      "Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the Money page."
+      "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
+      "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
      ],
      "source": "official",
      "state": "available",
@@ -6245,47 +6046,6 @@
      "web": [],
      "why_not": null,
      "worker": false
-    },
-    {
-     "account": null,
-     "can_change": true,
-     "check": true,
-     "connect_label": null,
-     "connect_url": null,
-     "connected": false,
-     "credentials": [],
-     "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money",
-     "disconnect_warning": "Your logins at its banks and cards are removed; their accounts and transactions stay in Money.",
-     "everyone": false,
-     "examples": [
-      "What's my bank balance?",
-      "How much is left on my meal card?"
-     ],
-     "features": [
-      "Reads your Israeli bank and card accounts into Money",
-      "Your Psagot Trade portfolio and the Pluxee (Cibus) meal card, read-only",
-      "Bank of Israel rates and price checks for ways to save"
-     ],
-     "icon": "landmark",
-     "name": "money_il",
-     "needs": [
-      "money"
-     ],
-     "options": false,
-     "pages": [],
-     "requires": null,
-     "settings": [],
-     "setup": [
-      "An admin runs the bank worker next to Dana (the money_il worker; docs/money-il.md).",
-      "Turn it on here, then add each bank or card login on the Money page."
-     ],
-     "source": "official",
-     "state": "available",
-     "title": "Money (Israel)",
-     "version": "",
-     "web": [],
-     "why_not": null,
-     "worker": true
     },
     {
      "account": null,

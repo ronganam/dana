@@ -71,13 +71,17 @@ class Page:
 
 @dataclass(frozen=True)
 class Worker:
-    """A sidecar process built from the addon's ``worker/`` folder (a
-    ``Dockerfile``): the port it listens on and the env variable that tells
-    Dana its URL. ``bin/deploy`` builds it as ``<image>-<addon>``;
-    ``compose.yaml`` runs it under a profile named after the addon
+    """A sidecar process next to Dana: the port it listens on and the env
+    variable that tells Dana its URL. ``image``: the published image it runs
+    (``ghcr.io/<owner>/<name>``, its repository building it; a tag of its own,
+    else ``bin/deploy`` pins it to the installed commit), the way for an addon
+    installed from the catalog; empty: ``bin/deploy`` builds the addon's
+    ``worker/`` folder (a ``Dockerfile``) as ``<image>-<addon>``, the way for a
+    site addon. ``compose.yaml`` runs it under a profile named after the addon
     (docs/operations.md, "Workers")."""
     port: int
     url_env: str
+    image: str = ""
 
 
 @dataclass(frozen=True)

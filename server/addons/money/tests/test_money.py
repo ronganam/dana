@@ -2,19 +2,21 @@
 Run: bin/test test_money
 
 Synthetic fixtures in money's ingest format (the ``israeli-bank-scrapers``
-accounts money_il's Hapoalim and Cal hand over), every value made up.
-Covers: transaction keys (Cal identifier + installment, Hapoalim's hash with
+accounts a provider's bank and card hand over: the made-up provider of
+moneyfakes.py, its conventions resembling an Israeli bank's), every value made up.
+Covers: transaction keys (a card company's identifier + installment, a bank's hash with
 an occurrence count so identical rows stay two) and re-ingest idempotency;
 pending rows replaced on every pull (provisional ones left alone); changed
 rows updated without touching a user's category / note; local dates and
 exact times from the scrapers' UTC instants; an installment's purchase
 date; currencies; bank balance and the card's next bill; scrubbing of ID,
-card and account numbers (text and raw); merchant keys; rules applied at
+card and account numbers (text and raw; personal numbers by the provider's
+rules); merchant keys; rules applied at
 ingest; per-user accounts; the category taxonomy and ``resolve``;
 ``set_category`` / ``set_note`` with Undo, scoped to the user; transaction
 reads; the slots (jitter, MONEY_SYNC_TIMES, quiet hours), ``request_soon``'s
-daily limit and ``sync_now``'s refusals. Sync flows with the fake worker and
-the API are in addons/money_il/tests/test_money_il_sync.py.
+daily limit and ``sync_now``'s refusals. Sync flows through a provider and
+the API are in test_money_providers.py.
 """
 
 import asyncio
@@ -39,6 +41,8 @@ db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import moneyfakes  # noqa: E402  (the made-up provider: moneyfakes.py)
 
 from core import clock, undo  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
@@ -59,9 +63,9 @@ ADMIN = users.first_admin()
 assert ADMIN is not None
 BOB = users.create("Bob")
 connections.connect(ADMIN, "money")
-connections.connect(ADMIN, "money_il")
+connections.connect(ADMIN, moneyfakes.PROVIDER)
 connections.connect(BOB, "money")
-connections.connect(BOB, "money_il")
+connections.connect(BOB, moneyfakes.PROVIDER)
 
 # --- Fixtures (made-up values, real shapes) ------------------------------------------------------
 
@@ -78,7 +82,7 @@ def poalim_txn(date: str, amount: float, description: str, memo: str = "", statu
                                              "currentBalance": 17710.51, **raw}}
 
 
-def hapoalim_accounts(pending: bool = True) -> List[Dict[str, Any]]:
+def bank_accounts(pending: bool = True) -> List[Dict[str, Any]]:
     txns = [
         {"type": "normal", "identifier": 8763, "date": "2026-11-14T22:00:00.000Z",
          "processedDate": "2026-11-14T22:00:00.000Z", "originalAmount": -8455.9, "originalCurrency": "ILS",
@@ -86,7 +90,7 @@ def hapoalim_accounts(pending: bool = True) -> List[Dict[str, Any]]:
          "rawTransaction": {"eventDate": 20261115, "valueDate": 20261115, "serialNumber": 2,
                             "eventActivityTypeCode": 2, "activityTypeCode": 491, "referenceNumber": 8763,
                             "eventAmount": 8455.9, "currentBalance": 17710.51, "englishActionDesc": "CAL"}},
-        # Two identical transfers on the same day (Hapoalim repeats identifier; only the row position differs).
+        # Two identical transfers on the same day (the bank repeats identifier; only the row position differs).
         poalim_txn("2026-11-09T22:00:00.000Z", -250, "העברה לחשבון", "לדני כהן", serial=3),
         poalim_txn("2026-11-09T22:00:00.000Z", -250, "העברה לחשבון", "לדני כהן", serial=4),
         poalim_txn("2026-11-09T22:00:00.000Z", 15000.0, "משכורת נוגה תעשיות בע\"מ", SALARY_MEMO, identifier=9001,
@@ -110,7 +114,7 @@ def cal_txn(identifier: Any, date: str, processed: str, charged: float, descript
          "rawTransaction": {"trnPurchaseDate": purchase or date[:19], "debCrdDate": processed[:10] + "T00:00:00",
                             "branchCodeDesc": category, "isAbroadTransaction": currency != "₪",
                             "walletProviderCode": 5}}
-    if installments:  # money_il's convert adds purchaseDate (Cal's trnPurchaseDate) to an installment
+    if installments:  # a provider adds purchaseDate (the purchase's local time) to an installment
         t["installments"] = installments
         t["purchaseDate"] = purchase
     return t
@@ -164,22 +168,22 @@ def apply(user, source, accounts) -> Dict[str, List[str]]:
 
 
 # Sources (no event loop runs here, so adding one starts no sync).
-POALIM = sources.add(ADMIN, "hapoalim", {"userCode": "AB12345", "password": "pw-poalim-1"})
-CAL = sources.add(ADMIN, "visaCal", {"username": "robin.cal", "password": "pw-cal-1"}, "My Cal")
-BOB_CAL = sources.add(BOB, "visaCal", {"username": "bob.cal", "password": "pw-cal-bob"})
+BANK_SOURCE = sources.add(ADMIN, "samplebank", {"userCode": "AB12345", "password": "pw-bank-1"})
+CAL = sources.add(ADMIN, "samplecard", {"username": "robin.cal", "password": "pw-cal-1"}, "My card")
+BOB_CAL = sources.add(BOB, "samplecard", {"username": "bob.cal", "password": "pw-cal-bob"})
 
 
 # --- 1. Keys, idempotency, dates -----------------------------------------------------------------
 
 def test_keys_and_dates() -> None:
-    out = apply(ADMIN, POALIM, hapoalim_accounts())
+    out = apply(ADMIN, BANK_SOURCE, bank_accounts())
     poalim = rows(ADMIN, account(ADMIN, "12-345-678901")["id"])
-    check("ingest: every Hapoalim row stored (the two identical transfers stay two)", len(poalim) == 6
+    check("ingest: every bank row stored (the two identical transfers stay two)", len(poalim) == 6
           and len(out["new"]) == 6 and not out["changed"], [r["description"] for r in poalim])
     transfers = by_desc(ADMIN, "העברה לחשבון")
     keys = sorted(t["ext_key"] for t in transfers)
-    check("keys: identical Hapoalim rows get occurrence 0 and 1 of one hash",
-          len(keys) == 2 and keys[0].startswith("poalim:") and keys[0].endswith(":0") and keys[1].endswith(":1")
+    check("keys: identical bank rows get occurrence 0 and 1 of one hash",
+          len(keys) == 2 and keys[0].startswith("sb:") and keys[0].endswith(":0") and keys[1].endswith(":1")
           and keys[0].rsplit(":", 1)[0] == keys[1].rsplit(":", 1)[0], keys)
     bill = by_desc(ADMIN, "כאל")[0]
     check("dates: a UTC instant of local midnight → the local date, no exact time",
@@ -190,25 +194,25 @@ def test_keys_and_dates() -> None:
     check("ingest: accounts are returned, the empty one included", len(out["accounts"]) == 2)
     empty = account(ADMIN, "12-345-99862")
     check("accounts: an account with no transactions and no balance is still stored",
-          empty.get("kind") == "bank" and empty.get("balance") is None and empty.get("source_id") == POALIM["id"]
+          empty.get("kind") == "bank" and empty.get("balance") is None and empty.get("source_id") == BANK_SOURCE["id"]
           and not rows(ADMIN, empty["id"]), empty)
     bank = account(ADMIN, "12-345-678901")
     check("accounts: the bank balance in agorot, with its time", bank["balance"] == 123456 and bank["balance_at"], bank)
 
-    again = apply(ADMIN, POALIM, hapoalim_accounts())
+    again = apply(ADMIN, BANK_SOURCE, bank_accounts())
     check("re-ingest: the same pull adds and changes nothing", again["new"] == [] and again["changed"] == []
           and len(rows(ADMIN)) == 6, again)
 
     out = apply(ADMIN, CAL, cal_accounts())
     card = account(ADMIN, "8763")
     cal = {r["description"]: r for r in rows(ADMIN, card["id"])}
-    check("Cal: all 7 rows stored", len(out["new"]) == 7 and len(cal) == 6, sorted(cal))
+    check("card: all 7 rows stored", len(out["new"]) == 7 and len(cal) == 6, sorted(cal))
     keys = sorted(r["ext_key"] for r in rows(ADMIN, card["id"]))
-    check("keys: Cal identifier + installment number (two payments of one purchase are two rows)",
-          {"cal:32580593492:0", "cal:40000000001:3", "cal:40000000001:2", "cal:32580593500:0"} <= set(keys), keys)
-    check("keys: a Cal row without an identifier gets a hash key", any(k.startswith("x:") for k in keys), keys)
+    check("keys: the card's identifier + installment number (two payments of one purchase are two rows)",
+          {"sc:32580593492:0", "sc:40000000001:3", "sc:40000000001:2", "sc:32580593500:0"} <= set(keys), keys)
+    check("keys: a card row without an identifier gets a hash key", any(k.startswith("x:") for k in keys), keys)
     foreign = cal["ONLINE COURSE CO"]
-    check("Cal: a real time in date → occurred_at (local, aware) and its local purchase date",
+    check("card: a real time in date → occurred_at (local, aware) and its local purchase date",
           foreign["occurred_at"] == "2026-11-03T17:07:18+02:00" and foreign["purchase_date"] == "2026-11-03"
           and foreign["charge_date"] == "2026-11-15", foreign)
     check("currencies: $ → USD with the original amount; the charge in shekels",
@@ -217,22 +221,22 @@ def test_keys_and_dates() -> None:
           cal["MUSEUM SHOP PARIS"]["orig_currency"] == "EUR" and cal["רמי לוי - יבנה"]["orig_currency"] == "ILS"
           and cal["LONDON BOOKS"]["orig_currency"] == "GBP")
     rami = cal["רמי לוי - יבנה"]
-    check("Cal: 10:58:17Z is 12:58:17 local", rami["occurred_at"] == "2026-11-17T12:58:17+02:00"
+    check("card: 10:58:17Z is 12:58:17 local", rami["occurred_at"] == "2026-11-17T12:58:17+02:00"
           and rami["purchase_date"] == "2026-11-17", rami)
     inst = [r for r in rows(ADMIN, card["id"]) if r["installment_number"] == 3][0]
     check("installments: the purchase date from purchaseDate (not the payment month), n/total kept",
           inst["purchase_date"] == "2026-08-24" and inst["occurred_at"] == "2026-08-24T15:00:00+03:00"
           and inst["installment_total"] == 4 and inst["charge_date"] == "2026-12-15", inst)
-    check("Cal: the next bill is the balance (positive agorot) on the first charge date from today",
+    check("card: the next bill is the balance (positive agorot) on the first charge date from today",
           card["next_charge"] == 345081 and card["next_charge_date"] == "2026-12-15" and card["balance"] is None
           and card["kind"] == "card", card)
-    check("categories: none from the bank at ingest (Cal's own category stays in raw)",
+    check("categories: none from the bank at ingest (the card company's own category stays in raw)",
           all(r["category"] is None and r["category_source"] is None for r in cal.values())
           and json.loads(rami["raw"])["category"] == "מזון ומשקאות"
           and json.loads(rami["raw"])["rawTransaction"]["branchCodeDesc"] == "מזון ומשקאות")
     check("merchant: the description until classification", rami["merchant"] == "רמי לוי - יבנה"
           and rami["merchant_key"] == "רמי לוי יבנה", rami["merchant_key"])
-    check("re-ingest: Cal's pull again changes nothing", apply(ADMIN, CAL, cal_accounts()) ==
+    check("re-ingest: the card's pull again changes nothing", apply(ADMIN, CAL, cal_accounts()) ==
           {"new": [], "changed": [], "accounts": [card["id"]]})
 
 
@@ -253,8 +257,8 @@ def test_pending_and_changes() -> None:
           and pending[0]["id"] != old_pending[0]["id"] and out["new"] == [pending[0]["id"]], pending)
     check("pending: a provisional (notification) row is left alone",
           any(r["ext_key"] == "notif:1" for r in rows(ADMIN, card["id"])))
-    apply(ADMIN, POALIM, hapoalim_accounts(pending=False))
-    check("pending: Hapoalim's pending row goes when the pull no longer has it",
+    apply(ADMIN, BANK_SOURCE, bank_accounts(pending=False))
+    check("pending: the bank's pending row goes when the pull no longer has it",
           not [r for r in rows(ADMIN, account(ADMIN, "12-345-678901")["id"]) if r["status"] == "pending"])
 
     foreign = by_desc(ADMIN, "ONLINE COURSE CO")[0]
@@ -283,8 +287,9 @@ def test_scrub_and_rules() -> None:
     card_memo = by_desc(ADMIN, "העברה מכרטיס")[0]["memo"]
     check("scrub: card and account numbers in a memo keep their last 3; a 9-digit non-ID stays",
           card_memo == "כרטיס ••••234 חשבון ••••789 אסמכתא 123456789", card_memo)
-    check("scrub: the checksum", ingest.israeli_id_valid("123456782") and not ingest.israeli_id_valid("123456789")
-          and ingest.scrub("id 000000018 here") == "id [id] here")
+    check("scrub: the provider's checksum decides (made-up rule), card numbers without any provider",
+          ingest.scrub("id 000000018 here") == "id [id] here" and ingest.scrub("id 000000019 here") == "id 000000019 here"
+          and ingest.scrub("4580 1234 1234 1234") == "••••234")
     check("scrub: integers that are an ID become [id]", ingest.scrub_value({"a": 123456782, "b": 5, "c": True}) ==
           {"a": "[id]", "b": 5, "c": True})
     check("merchant_key: lower case, punctuation and branch numbers out, quotes dropped",
@@ -422,11 +427,11 @@ def test_reads() -> None:
     check("get_transaction: the user's own with raw; another user's is missing",
           store.get_transaction(ADMIN, txn["id"])["raw"] is not None and store.get_transaction(BOB, txn["id"]) is None)
     check("get_source: another user's source is missing", store.get_source(BOB, CAL["id"]) is None
-          and store.get_source(ADMIN, CAL["id"])["label"] == "My Cal")
-    payload = store.source_payload(ADMIN, store.get_source(ADMIN, POALIM["id"]))
+          and store.get_source(ADMIN, CAL["id"])["label"] == "My card")
+    payload = store.source_payload(ADMIN, store.get_source(ADMIN, BANK_SOURCE["id"]))
     check("source payload: bank numbers masked to the last 3 digits, no credentials",
           sorted(a["number"] for a in payload["accounts"]) == ["••••862", "••••901"]
-          and payload["credentials_set"] is True and "pw-poalim-1" not in json.dumps(payload)
+          and payload["credentials_set"] is True and "pw-bank-1" not in json.dumps(payload)
           and "AB12345" not in json.dumps(payload), payload)
     with get_db_connection() as conn:
         hits = [r["id"] for r in conn.execute("SELECT id FROM money_transactions_fts WHERE money_transactions_fts "
@@ -440,7 +445,7 @@ def test_reads() -> None:
 # --- 7. Slots, signals, manual limits ---------------------------------------------------------------
 
 def test_slots() -> None:
-    sid = POALIM["id"]
+    sid = BANK_SOURCE["id"]
     j = slots.jitter(sid)
     check("jitter: stable and within ±20 minutes", j == slots.jitter(sid) and -20 <= j <= 20
           and len({slots.jitter(uuid.uuid4().hex) for _ in range(60)}) > 5)

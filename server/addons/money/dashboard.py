@@ -49,8 +49,8 @@ ONE_OFF_REFUND_DAYS = 120
 TYPICAL_MONTHS = 6
 FORECAST_DAYS = 180
 FORECAST_MAX_DAYS = 366
-# A card purchase is charged on the first billing day at least this many days later (Cal: the
-# cycle closes two days before the charge day).
+# A card purchase is charged on the first billing day at least this many days later (a card's
+# cycle commonly closes two days before the charge day).
 CARD_CUTOFF_DAYS = 2
 DEFAULT_BILLING_DAY = 10
 # A recurring payment this late is still expected (the next working day, a slow posting).

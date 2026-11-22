@@ -9,7 +9,7 @@
   "evidence": {
    "lines": [
     "₪69.00 a month until 10 Jul 2026, ₪109.00 since",
-    "Phone & internet · Cal 8763"
+    "Phone & internet · Sample Card 8763"
    ],
    "link": {
     "q": "סלולר הצפון",
@@ -226,7 +226,7 @@
   },
   "snooze_until": null,
   "status": "doing",
-  "status_at": "2026-11-18T20:15:20+00:00",
+  "status_at": "2026-11-18T07:30:00+00:00",
   "steps": [
    {
     "text": "Call סלולר הצפון and ask for the old price (₪69.00 a month) back",
@@ -260,7 +260,7 @@
    "evidence": {
     "lines": [
      "₪69.00 a month until 10 Jul 2026, ₪109.00 since",
-     "Phone & internet · Cal 8763"
+     "Phone & internet · Sample Card 8763"
     ],
     "link": {
      "q": "סלולר הצפון",
@@ -477,7 +477,7 @@
    },
    "snooze_until": null,
    "status": "doing",
-   "status_at": "2026-11-18T20:15:20+00:00",
+   "status_at": "2026-11-18T07:30:00+00:00",
    "steps": [
     {
      "text": "Call סלולר הצפון and ask for the old price (₪69.00 a month) back",
@@ -500,7 +500,7 @@
    "title": "סלולר הצפון went up ₪40 a month",
    "type": "bill"
   },
-  "undo_id": "62e3a725fd9b"
+  "undo_id": "8258cd630b08"
  },
  "savings": {
   "as_of": "2026-11-18",
@@ -754,7 +754,7 @@
     "script": null,
     "snooze_until": null,
     "status": "open",
-    "status_at": "2026-11-18T20:15:19+00:00",
+    "status_at": "2026-11-18T07:30:00+00:00",
     "steps": [
      {
       "text": "Ask ביטוח הדרום דירה for the renewal price before 28 Nov 2026",
@@ -1170,7 +1170,7 @@
     "math": [
      "₪40,800.00 − ₪6,087.40 (a month of fixed costs) = ₪34,712.60",
      "₪40,800.00 − ₪3,000.00 = ₪37,800.00",
-     "× 3.95% a year (the Bank of Israel rate 4.25% minus fees)"
+     "× 3.95% a year (the Bank of Example rate 4.25% minus fees)"
     ],
     "new": true,
     "outcome": null,
@@ -1216,7 +1216,7 @@
     },
     "evidence": {
      "lines": [
-      "₪25,000.00 cash in Psagot Trade ••••456 as of 18 Nov 2026",
+      "₪25,000.00 cash in Sample Invest ••••456 as of 18 Nov 2026",
       "No interest on it in the last 90 days"
      ],
      "link": {
@@ -1226,11 +1226,11 @@
     },
     "first_seen": "2026-11-18",
     "group": "save",
-    "key": "cash:ca73be55e2544f4bae039ea5b9defb4e",
+    "key": "cash:dfa59b2f818a48fe92449dfacc4627bc",
     "market": null,
     "math": [
      "₪25,000.00 × (4.25% − 0.3%) = ₪987.50 a year",
-     "Bank of Israel rate 4.25% on 18 Nov 2026"
+     "Bank of Example rate 4.25% on 18 Nov 2026"
     ],
     "new": true,
     "outcome": null,
@@ -1244,7 +1244,7 @@
     "script": null,
     "snooze_until": "2026-12-18",
     "status": "snoozed",
-    "status_at": "2026-11-18T20:15:18+00:00",
+    "status_at": "2026-11-18T07:30:00+00:00",
     "steps": [
      {
       "text": "You already hold קרן כספית הצפון: buy more of it with the cash",
@@ -1261,10 +1261,10 @@
     ],
     "subitems": null,
     "suggested_target": null,
-    "summary": "A money market fund pays about 3.95% a year now (the Bank of Israel rate minus fees): about ₪987.50 a year on it.",
+    "summary": "A money market fund pays about 3.95% a year now (the Bank of Example rate minus fees): about ₪987.50 a year on it.",
     "target": null,
     "timing": null,
-    "title": "₪25,000 cash earning nothing in Psagot Trade ••••456",
+    "title": "₪25,000 cash earning nothing in Sample Invest ••••456",
     "type": "cash"
    },
    {
@@ -1277,7 +1277,7 @@
     "evidence": {
      "lines": [
       "₪69.00 a month until 10 Jul 2026, ₪109.00 since",
-      "Phone & internet · Cal 8763"
+      "Phone & internet · Sample Card 8763"
      ],
      "link": {
       "q": "סלולר הצפון",
@@ -1494,7 +1494,7 @@
     },
     "snooze_until": null,
     "status": "doing",
-    "status_at": "2026-11-18T20:15:20+00:00",
+    "status_at": "2026-11-18T07:30:00+00:00",
     "steps": [
      {
       "text": "Call סלולר הצפון and ask for the old price (₪69.00 a month) back",
@@ -1637,7 +1637,7 @@
     "script": null,
     "snooze_until": null,
     "status": "done",
-    "status_at": "2026-11-18T20:15:17+00:00",
+    "status_at": "2026-11-18T07:30:00+00:00",
     "steps": [
      {
       "text": "Run a price check for the suppliers' current plans",
@@ -1748,7 +1748,7 @@
     },
     "snooze_until": null,
     "status": "dismissed",
-    "status_at": "2026-11-18T20:15:18+00:00",
+    "status_at": "2026-11-18T07:30:00+00:00",
     "steps": [
      {
       "text": "Call the bank and ask to waive the account fees",
@@ -1781,7 +1781,7 @@
     "evidence": {
      "lines": [
       "19 purchases in foreign currency in 12 months, ₪5,243.50 charged",
-      "3.02% over the Bank of Israel rate in total, median 3.06% a purchase"
+      "3.02% over the Bank of Example rate in total, median 3.06% a purchase"
      ],
      "link": {
       "view": "transactions"
@@ -1839,7 +1839,7 @@
     },
     "first_seen": "2026-11-18",
     "group": "save",
-    "key": "fx:cfd14d51b90045899084ac83f3bb234c",
+    "key": "fx:025adfc16d3948869ecd405ce05d2b3f",
     "market": {
      "checked_at": "2026-11-18T07:01:00+00:00",
      "error": null,
@@ -1891,7 +1891,7 @@
      "topic": "fx_card"
     },
     "math": [
-     "Charged ₪5,243.50 for purchases worth ₪5,090.00 at the Bank of Israel rate of each day",
+     "Charged ₪5,243.50 for purchases worth ₪5,090.00 at the Bank of Example rate of each day",
      "₪5,243.50 − ₪5,090.00 = ₪153.50 (3.02%)",
      "With כרטיס הצפון (0% fee, ₪0.00 a month): ₪153.50 − ₪0.00 = ₪153.50 a year"
     ],
@@ -1918,13 +1918,13 @@
       "url": null
      },
      {
-      "text": "Or ask the card company to waive the conversion fee (עמלת המרה) on Cal 8763",
+      "text": "Or ask the card company to waive the conversion fee (עמלת המרה) on Sample Card 8763",
       "url": null
      }
     ],
     "subitems": null,
     "suggested_target": null,
-    "summary": "19 purchases in EUR/USD on Cal 8763 cost 3% over the Bank of Israel rate: ₪153.50 in 12 months.",
+    "summary": "19 purchases in EUR/USD on Sample Card 8763 cost 3% over the Bank of Example rate: ₪153.50 in 12 months.",
     "target": null,
     "timing": null,
     "title": "₪154 a year in foreign-currency fees",
@@ -1940,7 +1940,7 @@
     "evidence": {
      "lines": [
       "משכנתא הצפון: ₪5,000.00 a month",
-      "Bank of Israel rate 4.25% now, 4.5% a year ago"
+      "Bank of Example rate 4.25% now, 4.5% a year ago"
      ],
      "link": {
       "category": "housing",
@@ -2012,7 +2012,7 @@
     "script": null,
     "snooze_until": null,
     "status": "open",
-    "status_at": "2026-11-18T20:15:20+00:00",
+    "status_at": "2026-11-18T07:30:00+00:00",
     "steps": [
      {
       "text": "Ask the bank for an early-repayment statement (דוח יתרות לסילוק)",
@@ -2292,7 +2292,7 @@
     "script": null,
     "snooze_until": null,
     "status": "accepted",
-    "status_at": "2026-11-18T20:15:18+00:00",
+    "status_at": "2026-11-18T07:30:00+00:00",
     "steps": [
      {
       "text": "Leave the cart until the morning before buying",
@@ -2595,11 +2595,11 @@
        "date": "2026-09-14"
       },
       {
-       "amount": 15000,
+       "amount": 9500,
        "date": "2026-09-15"
       },
       {
-       "amount": 9500,
+       "amount": 15000,
        "date": "2026-09-15"
       },
       {
@@ -2607,11 +2607,11 @@
        "date": "2026-09-16"
       },
       {
-       "amount": 6000,
+       "amount": 11000,
        "date": "2026-09-17"
       },
       {
-       "amount": 11000,
+       "amount": 6000,
        "date": "2026-09-17"
       }
      ]
@@ -2621,7 +2621,7 @@
     "key": "spree:חנות הצפון אונליין:2026-09-14",
     "market": null,
     "math": [
-     "₪120.00 + ₪150.00 + ₪95.00 + ₪80.00 + ₪60.00 + ₪110.00 = ₪615.00"
+     "₪120.00 + ₪95.00 + ₪150.00 + ₪80.00 + ₪110.00 + ₪60.00 = ₪615.00"
     ],
     "new": true,
     "outcome": null,
@@ -2635,7 +2635,7 @@
     "script": null,
     "snooze_until": null,
     "status": "accepted",
-    "status_at": "2026-11-18T20:15:20+00:00",
+    "status_at": "2026-11-18T07:30:00+00:00",
     "steps": [
      {
       "text": "Worth it? Mark it, or set a monthly limit for this shop",
@@ -2817,6 +2817,7 @@
    }
   ],
   "rate": {
+   "bank": "Bank of Example",
    "date": "2026-11-18",
    "policy": 4.25,
    "year_ago": 4.5,

@@ -25,7 +25,7 @@ addons/weather/
   api.py            HTTP routes: `setup(app)`      (registered automatically when present)
   migrations/       m0001_<name>.py, m0002_…        (its own tables, numbered per addon)
   web/              weather.js, weather.css        (its pages in the web app, when declared)
-  worker/           Dockerfile + code              (a sidecar process, when declared: e.g. scrapers)
+  worker/           Dockerfile + code              (a sidecar process, when declared and built from here)
   tests/            test_*.py, test_*.mjs          (found by bin/test)
   README.md         what it does, its settings, the events it emits (shown in the catalog)
   requirements.txt  extra Python packages, if any (installed into the image; missing = the addon fails to load, not the server)
@@ -115,7 +115,12 @@ Per-user data: every query filters by the acting user. Addons can use `core.addo
 
 ### Workers (sidecars)
 
-An addon with a `worker/` folder (a self-contained `Dockerfile` context) declares `worker=Worker(port=8090, url_env="MONEY_WORKER_URL")`. `bin/deploy` builds one image per worker (`<DANA_IMAGE>-<addon>`, same tag as Dana's; `DANA_WORKERS` picks them) and writes it to your GitOps values (`workers.<addon>.image`); `compose.yaml` runs it under a profile with the addon's name (`--profile money_il`); the app image leaves `worker/` folders out. Details: `server/docs/operations.md`, "Workers". The bank scrapers are the `money_il` provider addon's worker (`server/addons/money_il/worker/`).
+An addon with a sidecar process declares `worker=Worker(port=8090, url_env="EXAMPLE_WORKER_URL", image="")`; Dana reaches it at the URL in `url_env`. Two ways to get its image:
+
+- **Published** (a catalog addon): `image="ghcr.io/<owner>/<repo>-worker"` names the image its own repository builds and pushes (tagged with each commit, and `latest`). `bin/deploy` builds nothing for it: it pins the image to the tag the manifest names, else to the commit the addon was installed at (`.installed.json`; `core/addon_dirs.py` `worker_image`), and writes that into your GitOps values. `money_il` (Israeli banks, `github.com/ronganam/dana-addon-money-il`) works this way.
+- **Built** (a site addon): a `worker/` folder (a self-contained `Dockerfile` context) and no `image`: `bin/deploy` builds `<DANA_IMAGE>-<addon>` with Dana's tag (`DANA_WORKERS` picks them) and writes it to your GitOps values (`workers.<addon>.image`).
+
+`compose.yaml` runs a worker under a profile with the addon's name (`--profile money_il`); the app image leaves `worker/` folders out. Details: `server/docs/operations.md`, "Workers".
 
 ### LLM jobs
 

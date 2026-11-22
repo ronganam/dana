@@ -7,7 +7,7 @@
     "end": "2027-02-16",
     "events": [
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": 17300,
       "date": "2026-11-20",
       "estimated": false,
@@ -15,7 +15,7 @@
       "label": "קצבת ילדים"
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": -450000,
       "date": "2026-11-20",
       "estimated": false,
@@ -23,7 +23,7 @@
       "label": "משכנתא לאומי"
      },
      {
-      "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+      "account_id": "fbf29a37be844f5593565558e49e29bf",
       "amount": -120000,
       "date": "2026-11-25",
       "estimated": false,
@@ -43,7 +43,7 @@
       ]
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": 1500000,
       "date": "2026-12-10",
       "estimated": false,
@@ -51,7 +51,7 @@
       "label": "משכורת נוגה תעשיות"
      },
      {
-      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
       "amount": -386601,
       "date": "2026-12-10",
       "estimated": true,
@@ -68,7 +68,7 @@
        }
       ],
       "kind": "card_bill",
-      "label": "Cal 8763",
+      "label": "Sample Card 8763",
       "parts": {
        "everyday": 30530,
        "fixed": 4990,
@@ -82,7 +82,7 @@
       ]
      },
      {
-      "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+      "account_id": "fbf29a37be844f5593565558e49e29bf",
       "amount": -40000,
       "date": "2026-12-10",
       "estimated": false,
@@ -108,7 +108,7 @@
       ]
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": 17300,
       "date": "2026-12-20",
       "estimated": false,
@@ -116,7 +116,7 @@
       "label": "קצבת ילדים"
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": -450000,
       "date": "2026-12-20",
       "estimated": false,
@@ -124,7 +124,7 @@
       "label": "משכנתא לאומי"
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": 1500000,
       "date": "2027-01-10",
       "estimated": false,
@@ -132,7 +132,7 @@
       "label": "משכורת נוגה תעשיות"
      },
      {
-      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
       "amount": -120958,
       "date": "2027-01-10",
       "estimated": true,
@@ -149,7 +149,7 @@
        }
       ],
       "kind": "card_bill",
-      "label": "Cal 8763",
+      "label": "Sample Card 8763",
       "parts": {
        "everyday": 45068,
        "fixed": 4990,
@@ -163,7 +163,7 @@
       ]
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": 17300,
       "date": "2027-01-20",
       "estimated": false,
@@ -171,7 +171,7 @@
       "label": "קצבת ילדים"
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": -450000,
       "date": "2027-01-20",
       "estimated": false,
@@ -179,7 +179,7 @@
       "label": "משכנתא לאומי"
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": 1500000,
       "date": "2027-02-10",
       "estimated": false,
@@ -187,7 +187,7 @@
       "label": "משכורת נוגה תעשיות"
      },
      {
-      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
       "amount": -120958,
       "date": "2027-02-10",
       "estimated": true,
@@ -204,7 +204,7 @@
        }
       ],
       "kind": "card_bill",
-      "label": "Cal 8763",
+      "label": "Sample Card 8763",
       "parts": {
        "everyday": 45068,
        "fixed": 4990,
@@ -226,7 +226,7 @@
     },
     "plans": [
      {
-      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
       "amount": 70900,
       "dates": [
        "2027-01-10",
@@ -240,7 +240,7 @@
       "total": 283600
      },
      {
-      "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+      "account_id": "fbf29a37be844f5593565558e49e29bf",
       "amount": 40000,
       "dates": [
        "2026-12-10"
@@ -2318,7 +2318,7 @@
  "changes": {
   "body": {
    "changed": true,
-   "cursor": "907175e1596fefe6"
+   "cursor": "aec8645e9b09da45"
   },
   "request": "GET /api/money/changes",
   "status": 200
@@ -2326,17 +2326,17 @@
  "changes_after_patch": {
   "body": {
    "changed": false,
-   "cursor": "907175e1596fefe6"
+   "cursor": "aec8645e9b09da45"
   },
-  "request": "GET /api/money/changes?since=907175e1596fefe6",
+  "request": "GET /api/money/changes?since=aec8645e9b09da45",
   "status": 200
  },
  "changes_unchanged": {
   "body": {
    "changed": false,
-   "cursor": "907175e1596fefe6"
+   "cursor": "aec8645e9b09da45"
   },
-  "request": "GET /api/money/changes?since=907175e1596fefe6",
+  "request": "GET /api/money/changes?since=aec8645e9b09da45",
   "status": 200
  },
  "error_invalid": {
@@ -2360,7 +2360,7 @@
   "body": {
    "error": "not_found"
   },
-  "request": "GET /api/money/transactions/bfc343a9d9d44b319bf291d8ce2927f3",
+  "request": "GET /api/money/transactions/953ec7469d364e1f964b7090b02155b1",
   "status": 404
  },
  "insights": {
@@ -2444,7 +2444,7 @@
      "detail": "About 14× the usual ₪105.00 there.",
      "kind": "unusual",
      "link": {
-      "id": "303ba6dc4ce74abc8de40d5a5bcc4d29",
+      "id": "b5f401843c9c49a7a6f7753f085f3230",
       "view": "transactions"
      },
      "title": "₪1,500.00 at סופר פארם",
@@ -2455,7 +2455,7 @@
      "detail": "Charged twice within 4 minutes.",
      "kind": "unusual",
      "link": {
-      "id": "f0f1a8e8757a4ea093dd5ed2e602ee13",
+      "id": "1a9e0c7f5a194b71a4ce5f8f1a2d9c02",
       "view": "transactions"
      },
      "title": "₪200.00 at פז דלק",
@@ -3087,9 +3087,9 @@
   "body": {
    "attention": [
     {
-     "name": "Cal",
+     "name": "Sample Card",
      "reason": "bank worker not reachable",
-     "source_id": "1058da3d4a564b4ab2eda3cf21a60762",
+     "source_id": "8f57f091e3584f7cbb217a7dc6356666",
      "state": "failing"
     }
    ],
@@ -3097,19 +3097,19 @@
     {
      "balance": 1234567,
      "balance_at": "2026-11-18T05:01:00+00:00",
-     "company": "hapoalim",
-     "company_name": "Bank Hapoalim",
-     "id": "edba4736cb534f60b1270c0bbccd6c59",
-     "label": "Bank Hapoalim ••••901",
+     "company": "samplebank",
+     "company_name": "Sample Bank",
+     "id": "f8475d67ef6f491691d848122d135700",
+     "label": "Sample Bank ••••901",
      "number": "••••901"
     }
    ],
    "cards": [
     {
-     "billed_from_account_id": "edba4736cb534f60b1270c0bbccd6c59",
-     "company": "visaCal",
-     "company_name": "Cal",
-     "id": "c9698863ba3d4361b14f5305ef6fef09",
+     "billed_from_account_id": "f8475d67ef6f491691d848122d135700",
+     "company": "samplecard",
+     "company_name": "Sample Card",
+     "id": "fbf29a37be844f5593565558e49e29bf",
      "label": "Shared card",
      "next_charge": 120000,
      "next_charge_date": "2026-11-25",
@@ -3117,10 +3117,10 @@
     },
     {
      "billed_from_account_id": null,
-     "company": "visaCal",
-     "company_name": "Cal",
-     "id": "6ec40bbad482403aa8b4634c71e95e6b",
-     "label": "Cal 8763",
+     "company": "samplecard",
+     "company_name": "Sample Card",
+     "id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "label": "Sample Card 8763",
      "next_charge": 345081,
      "next_charge_date": "2026-12-10",
      "number": "8763"
@@ -3143,7 +3143,7 @@
     },
     "next": [
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": 17300,
       "date": "2026-11-20",
       "estimated": false,
@@ -3151,7 +3151,7 @@
       "label": "קצבת ילדים"
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": -450000,
       "date": "2026-11-20",
       "estimated": false,
@@ -3159,7 +3159,7 @@
       "label": "משכנתא לאומי"
      },
      {
-      "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+      "account_id": "fbf29a37be844f5593565558e49e29bf",
       "amount": -120000,
       "date": "2026-11-25",
       "estimated": false,
@@ -3179,7 +3179,7 @@
       ]
      },
      {
-      "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+      "account_id": "f8475d67ef6f491691d848122d135700",
       "amount": 1500000,
       "date": "2026-12-10",
       "estimated": false,
@@ -3216,25 +3216,25 @@
    "set_aside": 0,
    "sources": [
     {
-     "company": "hapoalim",
-     "company_name": "Bank Hapoalim",
-     "id": "2edc618f1aa749038283e03e851ea50c",
+     "company": "samplebank",
+     "company_name": "Sample Bank",
+     "id": "3d9505076e1346129c00b1ad404df48c",
      "label": null,
      "last_ok_at": "2026-11-18T05:01:00+00:00",
      "last_sync_at": "2026-11-18T05:01:00+00:00",
-     "name": "Bank Hapoalim",
+     "name": "Sample Bank",
      "next_sync_at": "2026-11-18T17:00:00+00:00",
      "state": "ok",
      "state_reason": null
     },
     {
-     "company": "visaCal",
-     "company_name": "Cal",
-     "id": "1058da3d4a564b4ab2eda3cf21a60762",
+     "company": "samplecard",
+     "company_name": "Sample Card",
+     "id": "8f57f091e3584f7cbb217a7dc6356666",
      "label": null,
      "last_ok_at": "2026-11-17T17:00:00+00:00",
      "last_sync_at": "2026-11-17T17:00:00+00:00",
-     "name": "Cal",
+     "name": "Sample Card",
      "next_sync_at": "2026-11-18T17:00:00+00:00",
      "state": "failing",
      "state_reason": "bank worker not reachable"
@@ -3267,9 +3267,9 @@
      "text": "₪1,500.00 at סופר פארם, about 14× the usual ₪105.00 there",
      "title": "₪1,500.00 at סופר פארם",
      "transaction": {
-      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
       "account_kind": "card",
-      "account_label": "Cal 8763",
+      "account_label": "Sample Card 8763",
       "amount": -150000,
       "badges": [],
       "category": "health",
@@ -3280,7 +3280,7 @@
       "flow": "purchase",
       "group": "health",
       "group_label": "Health",
-      "id": "303ba6dc4ce74abc8de40d5a5bcc4d29",
+      "id": "b5f401843c9c49a7a6f7753f085f3230",
       "memo": null,
       "merchant": "סופר פארם",
       "merchant_key": "סופר פארם",
@@ -3294,14 +3294,14 @@
      "why": "about 14× the usual ₪105.00 there"
     },
     {
-     "duplicate_of": "bd9692611464427fbac689b6212e4986",
+     "duplicate_of": "2a8687a1bc6f4b3493c595f3fc355262",
      "reason": "duplicate",
      "text": "₪200.00 at פז דלק, charged twice within 4 minutes",
      "title": "₪200.00 at פז דלק",
      "transaction": {
-      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
       "account_kind": "card",
-      "account_label": "Cal 8763",
+      "account_label": "Sample Card 8763",
       "amount": -20000,
       "badges": [],
       "category": "fuel",
@@ -3312,7 +3312,7 @@
       "flow": "purchase",
       "group": "transport",
       "group_label": "Transport",
-      "id": "f0f1a8e8757a4ea093dd5ed2e602ee13",
+      "id": "1a9e0c7f5a194b71a4ce5f8f1a2d9c02",
       "memo": null,
       "merchant": "פז דלק",
       "merchant_key": "פז דלק",
@@ -3329,9 +3329,9 @@
      "text": "₪2,836.00 at ביטוח רכב ישיר, the first charge from them",
      "title": "₪2,836.00 at ביטוח רכב ישיר",
      "transaction": {
-      "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
       "account_kind": "card",
-      "account_label": "Cal 8763",
+      "account_label": "Sample Card 8763",
       "amount": -70900,
       "badges": [
        {
@@ -3348,7 +3348,7 @@
       "flow": "purchase",
       "group": "bills",
       "group_label": "Bills",
-      "id": "5fad833899b3422fa2a5515897d80356",
+      "id": "625c7a3126064d6380e309133047907f",
       "memo": null,
       "merchant": "ביטוח רכב ישיר",
       "merchant_key": "ביטוח רכב ישיר",
@@ -3370,9 +3370,9 @@
   "body": {
    "attention": [
     {
-     "name": "Cal",
+     "name": "Sample Card",
      "reason": "bank worker not reachable",
-     "source_id": "1058da3d4a564b4ab2eda3cf21a60762",
+     "source_id": "8f57f091e3584f7cbb217a7dc6356666",
      "state": "failing"
     }
    ],
@@ -3380,19 +3380,19 @@
     {
      "balance": 1234567,
      "balance_at": "2026-11-18T05:01:00+00:00",
-     "company": "hapoalim",
-     "company_name": "Bank Hapoalim",
-     "id": "edba4736cb534f60b1270c0bbccd6c59",
-     "label": "Bank Hapoalim ••••901",
+     "company": "samplebank",
+     "company_name": "Sample Bank",
+     "id": "f8475d67ef6f491691d848122d135700",
+     "label": "Sample Bank ••••901",
      "number": "••••901"
     }
    ],
    "cards": [
     {
-     "billed_from_account_id": "edba4736cb534f60b1270c0bbccd6c59",
-     "company": "visaCal",
-     "company_name": "Cal",
-     "id": "c9698863ba3d4361b14f5305ef6fef09",
+     "billed_from_account_id": "f8475d67ef6f491691d848122d135700",
+     "company": "samplecard",
+     "company_name": "Sample Card",
+     "id": "fbf29a37be844f5593565558e49e29bf",
      "label": "Shared card",
      "next_charge": 120000,
      "next_charge_date": "2026-11-25",
@@ -3400,10 +3400,10 @@
     },
     {
      "billed_from_account_id": null,
-     "company": "visaCal",
-     "company_name": "Cal",
-     "id": "6ec40bbad482403aa8b4634c71e95e6b",
-     "label": "Cal 8763",
+     "company": "samplecard",
+     "company_name": "Sample Card",
+     "id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "label": "Sample Card 8763",
      "next_charge": 345081,
      "next_charge_date": "2026-12-10",
      "number": "8763"
@@ -3439,25 +3439,25 @@
    "set_aside": 0,
    "sources": [
     {
-     "company": "hapoalim",
-     "company_name": "Bank Hapoalim",
-     "id": "2edc618f1aa749038283e03e851ea50c",
+     "company": "samplebank",
+     "company_name": "Sample Bank",
+     "id": "3d9505076e1346129c00b1ad404df48c",
      "label": null,
      "last_ok_at": "2026-11-18T05:01:00+00:00",
      "last_sync_at": "2026-11-18T05:01:00+00:00",
-     "name": "Bank Hapoalim",
+     "name": "Sample Bank",
      "next_sync_at": "2026-11-18T17:00:00+00:00",
      "state": "ok",
      "state_reason": null
     },
     {
-     "company": "visaCal",
-     "company_name": "Cal",
-     "id": "1058da3d4a564b4ab2eda3cf21a60762",
+     "company": "samplecard",
+     "company_name": "Sample Card",
+     "id": "8f57f091e3584f7cbb217a7dc6356666",
      "label": null,
      "last_ok_at": "2026-11-17T17:00:00+00:00",
      "last_sync_at": "2026-11-17T17:00:00+00:00",
-     "name": "Cal",
+     "name": "Sample Card",
      "next_sync_at": "2026-11-18T17:00:00+00:00",
      "state": "failing",
      "state_reason": "bank worker not reachable"
@@ -3626,9 +3626,9 @@
   "body": {
    "changed": 1,
    "transaction": {
-    "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+    "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
     "account_kind": "card",
-    "account_label": "Cal 8763",
+    "account_label": "Sample Card 8763",
     "amount": -2500,
     "badges": [
      {
@@ -3646,7 +3646,7 @@
     "foreign": null,
     "group": "food",
     "group_label": "Food",
-    "id": "cc1c287dbb0646818cee159984b859b2",
+    "id": "0c9f33797ca54a68bd0eb60beacdf378",
     "installment": null,
     "kind": "everyday",
     "meal_cycle": null,
@@ -3666,12 +3666,12 @@
     "source": "notification",
     "spending": true,
     "status": "provisional",
-    "updated_at": "2026-11-21T11:18:38+00:00",
+    "updated_at": "2026-11-22T16:29:33+00:00",
     "yearly": null
    },
-   "undo_id": "c72f36430220"
+   "undo_id": "8949b312212c"
   },
-  "request": "PATCH /api/money/transactions/cc1c287dbb0646818cee159984b859b2",
+  "request": "PATCH /api/money/transactions/0c9f33797ca54a68bd0eb60beacdf378",
   "request_body": {
    "category": "restaurants",
    "for_merchant": true
@@ -3682,9 +3682,9 @@
   "body": {
    "changed": 0,
    "transaction": {
-    "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+    "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
     "account_kind": "card",
-    "account_label": "Cal 8763",
+    "account_label": "Sample Card 8763",
     "amount": -1594,
     "badges": [
      {
@@ -3707,7 +3707,7 @@
     },
     "group": "family",
     "group_label": "Family",
-    "id": "a557130906824d5c885cbdaecf1cb31a",
+    "id": "fd8760a6bd3e489a87e49f6395312305",
     "installment": null,
     "kind": null,
     "meal_cycle": null,
@@ -3727,12 +3727,12 @@
     "source": "scrape",
     "spending": false,
     "status": "completed",
-    "updated_at": "2026-11-21T11:18:38+00:00",
+    "updated_at": "2026-11-22T16:29:33+00:00",
     "yearly": null
    },
-   "undo_id": "f631873f4566"
+   "undo_id": "df63a3883e69"
   },
-  "request": "PATCH /api/money/transactions/a557130906824d5c885cbdaecf1cb31a",
+  "request": "PATCH /api/money/transactions/fd8760a6bd3e489a87e49f6395312305",
   "request_body": {
    "flow": "investment"
   },
@@ -3742,9 +3742,9 @@
   "body": {
    "changed": 0,
    "transaction": {
-    "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+    "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
     "account_kind": "card",
-    "account_label": "Cal 8763",
+    "account_label": "Sample Card 8763",
     "amount": -2500,
     "badges": [
      {
@@ -3762,7 +3762,7 @@
     "foreign": null,
     "group": null,
     "group_label": null,
-    "id": "cc1c287dbb0646818cee159984b859b2",
+    "id": "0c9f33797ca54a68bd0eb60beacdf378",
     "installment": null,
     "kind": "everyday",
     "meal_cycle": null,
@@ -3782,12 +3782,12 @@
     "source": "notification",
     "spending": true,
     "status": "provisional",
-    "updated_at": "2026-11-21T11:18:38+00:00",
+    "updated_at": "2026-11-22T16:29:33+00:00",
     "yearly": null
    },
-   "undo_id": "1609a0f3e8a5"
+   "undo_id": "006da487dac2"
   },
-  "request": "PATCH /api/money/transactions/cc1c287dbb0646818cee159984b859b2",
+  "request": "PATCH /api/money/transactions/0c9f33797ca54a68bd0eb60beacdf378",
   "request_body": {
    "note": "with Noa"
   },
@@ -3797,9 +3797,9 @@
   "body": {
    "changed": 1,
    "transaction": {
-    "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+    "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
     "account_kind": "card",
-    "account_label": "Cal 8763",
+    "account_label": "Sample Card 8763",
     "amount": -1594,
     "badges": [
      {
@@ -3822,7 +3822,7 @@
     },
     "group": "family",
     "group_label": "Family",
-    "id": "a557130906824d5c885cbdaecf1cb31a",
+    "id": "fd8760a6bd3e489a87e49f6395312305",
     "installment": null,
     "kind": "one_off",
     "meal_cycle": null,
@@ -3842,12 +3842,12 @@
     "source": "scrape",
     "spending": true,
     "status": "completed",
-    "updated_at": "2026-11-21T11:18:38+00:00",
+    "updated_at": "2026-11-22T16:29:33+00:00",
     "yearly": null
    },
-   "undo_id": "2483b4fe7b44"
+   "undo_id": "a22431d786ee"
   },
-  "request": "PATCH /api/money/transactions/a557130906824d5c885cbdaecf1cb31a",
+  "request": "PATCH /api/money/transactions/fd8760a6bd3e489a87e49f6395312305",
   "request_body": {
    "one_off": true
   },
@@ -3857,9 +3857,9 @@
   "body": {
    "income": [
     {
-     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_id": "f8475d67ef6f491691d848122d135700",
      "account_kind": "bank",
-     "account_label": "Bank Hapoalim ••••901",
+     "account_label": "Sample Bank ••••901",
      "amount": 1500000,
      "cadence": "monthly",
      "category": "salary",
@@ -3880,9 +3880,9 @@
      "variable": false
     },
     {
-     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_id": "f8475d67ef6f491691d848122d135700",
      "account_kind": "bank",
-     "account_label": "Bank Hapoalim ••••901",
+     "account_label": "Sample Bank ••••901",
      "amount": 17300,
      "cadence": "monthly",
      "category": "benefits",
@@ -3905,9 +3905,9 @@
    ],
    "items": [
     {
-     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_id": "f8475d67ef6f491691d848122d135700",
      "account_kind": "bank",
-     "account_label": "Bank Hapoalim ••••901",
+     "account_label": "Sample Bank ••••901",
      "amount": 450000,
      "cadence": "monthly",
      "category": "housing",
@@ -3928,9 +3928,9 @@
      "variable": false
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": 4990,
      "cadence": "monthly",
      "category": "subscriptions",
@@ -3955,9 +3955,9 @@
      "variable": false
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": 6000,
      "cadence": "yearly",
      "category": "subscriptions",
@@ -3981,7 +3981,7 @@
    "monthly_total": 455490,
    "yearly": [
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
      "amount": 283600,
      "category": "insurance",
@@ -3995,7 +3995,7 @@
      "next_date": "2027-11-16",
      "payments": 4,
      "row_ids": [
-      "5fad833899b3422fa2a5515897d80356"
+      "625c7a3126064d6380e309133047907f"
      ]
     }
    ],
@@ -4006,9 +4006,9 @@
  },
  "transaction_foreign": {
   "body": {
-   "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+   "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
    "account_kind": "card",
-   "account_label": "Cal 8763",
+   "account_label": "Sample Card 8763",
    "amount": -1594,
    "badges": [
     {
@@ -4031,7 +4031,7 @@
    },
    "group": "family",
    "group_label": "Family",
-   "id": "a557130906824d5c885cbdaecf1cb31a",
+   "id": "fd8760a6bd3e489a87e49f6395312305",
    "installment": null,
    "kind": "everyday",
    "meal_cycle": null,
@@ -4054,14 +4054,14 @@
    "updated_at": "2026-11-01T00:00:00+00:00",
    "yearly": null
   },
-  "request": "GET /api/money/transactions/a557130906824d5c885cbdaecf1cb31a",
+  "request": "GET /api/money/transactions/fd8760a6bd3e489a87e49f6395312305",
   "status": 200
  },
  "transaction_installment": {
   "body": {
-   "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+   "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
    "account_kind": "card",
-   "account_label": "Cal 8763",
+   "account_label": "Sample Card 8763",
    "amount": -70900,
    "badges": [
     {
@@ -4081,7 +4081,7 @@
    "foreign": null,
    "group": "bills",
    "group_label": "Bills",
-   "id": "5fad833899b3422fa2a5515897d80356",
+   "id": "625c7a3126064d6380e309133047907f",
    "installment": {
     "number": 1,
     "purchase_amount": -283600,
@@ -4108,14 +4108,14 @@
    "updated_at": "2026-11-01T00:00:00+00:00",
    "yearly": null
   },
-  "request": "GET /api/money/transactions/5fad833899b3422fa2a5515897d80356",
+  "request": "GET /api/money/transactions/625c7a3126064d6380e309133047907f",
   "status": 200
  },
  "transaction_provisional": {
   "body": {
-   "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+   "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
    "account_kind": "card",
-   "account_label": "Cal 8763",
+   "account_label": "Sample Card 8763",
    "amount": -2500,
    "badges": [
     {
@@ -4133,7 +4133,7 @@
    "foreign": null,
    "group": null,
    "group_label": null,
-   "id": "cc1c287dbb0646818cee159984b859b2",
+   "id": "0c9f33797ca54a68bd0eb60beacdf378",
    "installment": null,
    "kind": "everyday",
    "meal_cycle": null,
@@ -4156,17 +4156,17 @@
    "updated_at": "2026-11-01T00:00:00+00:00",
    "yearly": null
   },
-  "request": "GET /api/money/transactions/cc1c287dbb0646818cee159984b859b2",
+  "request": "GET /api/money/transactions/0c9f33797ca54a68bd0eb60beacdf378",
   "status": 200
  },
  "transactions": {
   "body": {
-   "next_cursor": "WyIyMDI2LTExLTEwIiwgIiIsICI4ZDI0ZjE4ZTgxY2M0YTIzYjU0MjhjYjJjNjcyMjQzOCJd",
+   "next_cursor": "WyIyMDI2LTExLTEwIiwgIiIsICIzYWFjNzEzNmRhOGU0NjA4OWVmOTQ2ODE5YmVhMWVkYyJd",
    "transactions": [
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -2500,
      "badges": [
       {
@@ -4181,7 +4181,7 @@
      "flow": "purchase",
      "group": null,
      "group_label": null,
-     "id": "cc1c287dbb0646818cee159984b859b2",
+     "id": "0c9f33797ca54a68bd0eb60beacdf378",
      "kind": "everyday",
      "memo": null,
      "merchant": "קפה קפה",
@@ -4193,9 +4193,9 @@
      "status": "provisional"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -150000,
      "badges": [],
      "category": "health",
@@ -4206,7 +4206,7 @@
      "flow": "purchase",
      "group": "health",
      "group_label": "Health",
-     "id": "303ba6dc4ce74abc8de40d5a5bcc4d29",
+     "id": "b5f401843c9c49a7a6f7753f085f3230",
      "kind": "everyday",
      "memo": null,
      "merchant": "סופר פארם",
@@ -4218,9 +4218,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -20000,
      "badges": [],
      "category": "fuel",
@@ -4231,7 +4231,7 @@
      "flow": "purchase",
      "group": "transport",
      "group_label": "Transport",
-     "id": "f0f1a8e8757a4ea093dd5ed2e602ee13",
+     "id": "1a9e0c7f5a194b71a4ce5f8f1a2d9c02",
      "kind": "everyday",
      "memo": null,
      "merchant": "פז דלק",
@@ -4243,9 +4243,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -20000,
      "badges": [],
      "category": "fuel",
@@ -4256,7 +4256,7 @@
      "flow": "purchase",
      "group": "transport",
      "group_label": "Transport",
-     "id": "bd9692611464427fbac689b6212e4986",
+     "id": "2a8687a1bc6f4b3493c595f3fc355262",
      "kind": "everyday",
      "memo": null,
      "merchant": "פז דלק",
@@ -4268,9 +4268,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -4500,
      "badges": [
       {
@@ -4285,7 +4285,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "e54581b2d1a14c9694812a4dcae58c96",
+     "id": "4d1f72c77d6e46bfa1f6ed4c857fee64",
      "kind": "everyday",
      "memo": null,
      "merchant": "WOLT",
@@ -4297,9 +4297,9 @@
      "status": "pending"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -70900,
      "badges": [
       {
@@ -4316,7 +4316,7 @@
      "flow": "purchase",
      "group": "bills",
      "group_label": "Bills",
-     "id": "5fad833899b3422fa2a5515897d80356",
+     "id": "625c7a3126064d6380e309133047907f",
      "kind": "yearly",
      "memo": null,
      "merchant": "ביטוח רכב ישיר",
@@ -4328,9 +4328,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -9900,
      "badges": [
       {
@@ -4345,7 +4345,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "0aa4c0d12d9d44cfa3ee4ecc74fd844a",
+     "id": "5b222365de7d47ae8fa0300a080c5ce1",
      "kind": null,
      "memo": null,
      "merchant": "WOLT",
@@ -4357,9 +4357,9 @@
      "status": "unmatched"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": 5000,
      "badges": [],
      "category": "groceries",
@@ -4370,7 +4370,7 @@
      "flow": "refund",
      "group": "food",
      "group_label": "Food",
-     "id": "de02a611ce9d4fbeb3577a670a301634",
+     "id": "9b2237aeb5ca4258b0052419c5163738",
      "kind": "everyday",
      "memo": null,
      "merchant": "שופרסל דיל",
@@ -4382,9 +4382,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -82000,
      "badges": [],
      "category": "restaurants",
@@ -4395,7 +4395,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "86d4f4305a3644c69641482c5ebf36ae",
+     "id": "d692fbdbd9f24325b09ab3e0e40e387a",
      "kind": "everyday",
      "memo": null,
      "merchant": "מסעדת הדג",
@@ -4407,9 +4407,9 @@
      "status": "completed"
     },
     {
-     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_id": "f8475d67ef6f491691d848122d135700",
      "account_kind": "bank",
-     "account_label": "Bank Hapoalim ••••901",
+     "account_label": "Sample Bank ••••901",
      "amount": -30000,
      "badges": [],
      "category": null,
@@ -4420,7 +4420,7 @@
      "flow": "other",
      "group": null,
      "group_label": null,
-     "id": "4af7c83cb8f04b42aaabaf9a5e21667e",
+     "id": "7b1ea26efdea437b8ac895cf4e758a24",
      "kind": null,
      "memo": null,
      "merchant": "משיכת מזומן",
@@ -4432,9 +4432,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -50000,
      "badges": [],
      "category": "groceries",
@@ -4445,7 +4445,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "237c8688b5b64e4bb4a54efd0fde9e83",
+     "id": "e80f8c0485624676b0734e3732138e84",
      "kind": "everyday",
      "memo": null,
      "merchant": "שופרסל דיל",
@@ -4457,9 +4457,9 @@
      "status": "completed"
     },
     {
-     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_id": "f8475d67ef6f491691d848122d135700",
      "account_kind": "bank",
-     "account_label": "Bank Hapoalim ••••901",
+     "account_label": "Sample Bank ••••901",
      "amount": 1500000,
      "badges": [],
      "category": "salary",
@@ -4470,7 +4470,7 @@
      "flow": "income",
      "group": "income",
      "group_label": "Income",
-     "id": "8d24f18e81cc4a23b5428cb2c6722438",
+     "id": "3aac7136da8e46089ef946819bea1edc",
      "kind": null,
      "memo": null,
      "merchant": "משכורת נוגה תעשיות",
@@ -4491,9 +4491,9 @@
    "next_cursor": null,
    "transactions": [
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -82000,
      "badges": [],
      "category": "restaurants",
@@ -4504,7 +4504,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "86d4f4305a3644c69641482c5ebf36ae",
+     "id": "d692fbdbd9f24325b09ab3e0e40e387a",
      "kind": "everyday",
      "memo": null,
      "merchant": "מסעדת הדג",
@@ -4516,9 +4516,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -50000,
      "badges": [],
      "category": "groceries",
@@ -4529,7 +4529,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "237c8688b5b64e4bb4a54efd0fde9e83",
+     "id": "e80f8c0485624676b0734e3732138e84",
      "kind": "everyday",
      "memo": null,
      "merchant": "שופרסל דיל",
@@ -4541,9 +4541,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -32000,
      "badges": [],
      "category": "groceries",
@@ -4554,7 +4554,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "a956e6412f604070b9c615abcf0535fe",
+     "id": "6a40750656bd4fa399815c222f191a6a",
      "kind": "everyday",
      "memo": null,
      "merchant": "רמי לוי - יבנה",
@@ -4566,9 +4566,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -20000,
      "badges": [],
      "category": "restaurants",
@@ -4579,7 +4579,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "8e9ca3cf4a4341469eb3431918810fe4",
+     "id": "faa9340511d6467d8da5d3b51a0d658d",
      "kind": "everyday",
      "memo": null,
      "merchant": "מסעדת הדג",
@@ -4592,7 +4592,7 @@
     }
    ]
   },
-  "request": "GET /api/money/transactions?period=last_30_days&category=food&account=6ec40bbad482403aa8b4634c71e95e6b&min=100",
+  "request": "GET /api/money/transactions?period=last_30_days&category=food&account=8b46f2c359c046bda5ca34a3a63daec2&min=100",
   "status": 200
  },
  "transactions_next": {
@@ -4600,7 +4600,7 @@
    "next_cursor": null,
    "transactions": [
     {
-     "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+     "account_id": "fbf29a37be844f5593565558e49e29bf",
      "account_kind": "card",
      "account_label": "Shared card",
      "amount": -6000,
@@ -4613,7 +4613,7 @@
      "flow": "purchase",
      "group": null,
      "group_label": null,
-     "id": "b6c46ac9f0ff485baa5e8fcdeec75521",
+     "id": "c580553db1984e149894c244a8efed5e",
      "kind": "everyday",
      "memo": null,
      "merchant": "חנות כלבו",
@@ -4625,7 +4625,7 @@
      "status": "completed"
     },
     {
-     "account_id": "c9698863ba3d4361b14f5305ef6fef09",
+     "account_id": "fbf29a37be844f5593565558e49e29bf",
      "account_kind": "card",
      "account_label": "Shared card",
      "amount": -12000,
@@ -4638,7 +4638,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "73bb114428c346ac8bb40f1ff640e5f6",
+     "id": "8e9c15368f0f486db6ea6828837eade6",
      "kind": "everyday",
      "memo": null,
      "merchant": "קפה לנדוור",
@@ -4650,9 +4650,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -1594,
      "badges": [
       {
@@ -4669,7 +4669,7 @@
      "flow": "purchase",
      "group": "family",
      "group_label": "Family",
-     "id": "a557130906824d5c885cbdaecf1cb31a",
+     "id": "fd8760a6bd3e489a87e49f6395312305",
      "kind": "everyday",
      "memo": null,
      "merchant": "ONLINE COURSE CO",
@@ -4681,9 +4681,9 @@
      "status": "completed"
     },
     {
-     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_id": "f8475d67ef6f491691d848122d135700",
      "account_kind": "bank",
-     "account_label": "Bank Hapoalim ••••901",
+     "account_label": "Sample Bank ••••901",
      "amount": -25000,
      "badges": [],
      "category": "transfers",
@@ -4694,7 +4694,7 @@
      "flow": "transfer_out",
      "group": "people",
      "group_label": "People",
-     "id": "d1381df082dd4d6f858948d8f82ccaa5",
+     "id": "c16b0f886e374e36b0b6e39e3d62c2f1",
      "kind": "everyday",
      "memo": "עבור כרטיסים להופעה",
      "merchant": "העברה לדני כהן",
@@ -4706,9 +4706,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -32000,
      "badges": [],
      "category": "groceries",
@@ -4719,7 +4719,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "a956e6412f604070b9c615abcf0535fe",
+     "id": "6a40750656bd4fa399815c222f191a6a",
      "kind": "everyday",
      "memo": null,
      "merchant": "רמי לוי - יבנה",
@@ -4731,9 +4731,9 @@
      "status": "completed"
     },
     {
-     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_id": "f8475d67ef6f491691d848122d135700",
      "account_kind": "bank",
-     "account_label": "Bank Hapoalim ••••901",
+     "account_label": "Sample Bank ••••901",
      "amount": -100000,
      "badges": [],
      "category": null,
@@ -4744,7 +4744,7 @@
      "flow": "own_transfer",
      "group": null,
      "group_label": null,
-     "id": "2559aadd237d400f93957e56ae9c2610",
+     "id": "f3a816296b174ea98ed2d9fde0a89775",
      "kind": null,
      "memo": null,
      "merchant": "העברה לחיסכון",
@@ -4756,9 +4756,9 @@
      "status": "completed"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -4990,
      "badges": [],
      "category": "subscriptions",
@@ -4769,7 +4769,7 @@
      "flow": "purchase",
      "group": "bills",
      "group_label": "Bills",
-     "id": "94dc0be643e04e5686cbc8f4a01ddce2",
+     "id": "cd1c41c30c2547c39730ab36a4bfe448",
      "kind": "fixed",
      "memo": null,
      "merchant": "NETFLIX.COM",
@@ -4781,9 +4781,9 @@
      "status": "completed"
     },
     {
-     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_id": "f8475d67ef6f491691d848122d135700",
      "account_kind": "bank",
-     "account_label": "Bank Hapoalim ••••901",
+     "account_label": "Sample Bank ••••901",
      "amount": -345000,
      "badges": [],
      "category": null,
@@ -4794,7 +4794,7 @@
      "flow": "card_bill",
      "group": null,
      "group_label": null,
-     "id": "c5e491214f8542e5aea36554f83203d5",
+     "id": "91fdaedd32ce4518ab04f4e2bfac5ee9",
      "kind": null,
      "memo": null,
      "merchant": "כאל",
@@ -4806,9 +4806,9 @@
      "status": "completed"
     },
     {
-     "account_id": "edba4736cb534f60b1270c0bbccd6c59",
+     "account_id": "f8475d67ef6f491691d848122d135700",
      "account_kind": "bank",
-     "account_label": "Bank Hapoalim ••••901",
+     "account_label": "Sample Bank ••••901",
      "amount": -1200,
      "badges": [],
      "category": "fees",
@@ -4819,7 +4819,7 @@
      "flow": "fee",
      "group": "finance",
      "group_label": "Finance",
-     "id": "d16f57c3fa3b4b65896b3cd14e314935",
+     "id": "e61321c64c314af1b55287096d1386e1",
      "kind": "everyday",
      "memo": null,
      "merchant": "עמלת פעולה",
@@ -4832,7 +4832,7 @@
     }
    ]
   },
-  "request": "GET /api/money/transactions?period=this_month&limit=12&cursor=WyIyMDI2LTExLTEwIiwgIiIsICI4ZDI0ZjE4ZTgxY2M0YTIzYjU0MjhjYjJjNjcyMjQzOCJd",
+  "request": "GET /api/money/transactions?period=this_month&limit=12&cursor=WyIyMDI2LTExLTEwIiwgIiIsICIzYWFjNzEzNmRhOGU0NjA4OWVmOTQ2ODE5YmVhMWVkYyJd",
   "status": 200
  },
  "transactions_search": {
@@ -4840,9 +4840,9 @@
    "next_cursor": null,
    "transactions": [
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -4500,
      "badges": [
       {
@@ -4857,7 +4857,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "e54581b2d1a14c9694812a4dcae58c96",
+     "id": "4d1f72c77d6e46bfa1f6ed4c857fee64",
      "kind": "everyday",
      "memo": null,
      "merchant": "WOLT",
@@ -4869,9 +4869,9 @@
      "status": "pending"
     },
     {
-     "account_id": "6ec40bbad482403aa8b4634c71e95e6b",
+     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
      "account_kind": "card",
-     "account_label": "Cal 8763",
+     "account_label": "Sample Card 8763",
      "amount": -9900,
      "badges": [
       {
@@ -4886,7 +4886,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "0aa4c0d12d9d44cfa3ee4ecc74fd844a",
+     "id": "5b222365de7d47ae8fa0300a080c5ce1",
      "kind": null,
      "memo": null,
      "merchant": "WOLT",
@@ -5827,7 +5827,7 @@
    "label": "Set קפה קפה and its merchant to Restaurants & cafés",
    "ok": true
   },
-  "request": "POST /api/undo/c72f36430220",
+  "request": "POST /api/undo/8949b312212c",
   "status": 200
  },
  "undo_flow": {
@@ -5835,7 +5835,7 @@
    "label": "Counted ONLINE COURSE CO as money set aside",
    "ok": true
   },
-  "request": "POST /api/undo/f631873f4566",
+  "request": "POST /api/undo/df63a3883e69",
   "status": 200
  },
  "undo_one_off": {
@@ -5843,7 +5843,7 @@
    "label": "Marked ONLINE COURSE CO a one-off",
    "ok": true
   },
-  "request": "POST /api/undo/2483b4fe7b44",
+  "request": "POST /api/undo/a22431d786ee",
   "status": 200
  }
 }

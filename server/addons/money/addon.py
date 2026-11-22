@@ -2,7 +2,8 @@
 
 The connection itself has no credentials: it is the on/off switch. Each bank
 or card login is a row of ``money_sources`` (``sources.py``) at a company a
-provider addon brings (``providers.py``: ``money_il`` for Israel). After each
+provider addon brings (``providers.py``; e.g. ``money_il`` from the catalog), or an
+account the user fills by importing statement files (``imports.py``). After each
 ingest, provisional rows from phone notifications are merged first (they
 carry their category), then classification runs; new phone notifications
 reach ``signals.observe`` through the phone addon's observers; the month's
@@ -60,8 +61,10 @@ addon = Addon(
     features=("Spending, income and balances in chat and on the Money page",
               "Subscriptions, card bills and your balance ahead",
               "Ways to save and spending worth watching"),
-    setup=("Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the "
-           "Money page.",),
+    setup=("On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you "
+           "download, into an account of yours.",
+           "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins "
+           "on the Money page: they then sync by themselves.",),
     examples=("How much did I spend on food this month?", "What subscriptions do I pay for?"),
     disconnect_warning="Your saved bank and card logins, accounts and transactions are deleted from Dana.",
     on_change=sources.on_change,

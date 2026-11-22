@@ -362,7 +362,7 @@ async def test_disable(c: TestClient) -> None:
 async def test_catalog(c: TestClient) -> None:
     shipped = catalog.parse(json.loads(catalog.BUNDLED.read_text(encoding="utf-8")))
     check("server/catalog.json (shipped in the image): every entry is valid, hello among them",
-          [e.name for e in shipped.entries] == ["hello", "israel_rail"] and shipped.problems == [], shipped.problems)
+          [e.name for e in shipped.entries] == ["hello", "israel_rail", "money_il"] and shipped.problems == [], shipped.problems)
     saved_file = os.environ.pop("DANA_CATALOG_FILE")
     os.environ["DANA_CATALOG_URL"] = "http://127.0.0.1:9/catalog.json"
     try:
@@ -371,7 +371,7 @@ async def test_catalog(c: TestClient) -> None:
         os.environ["DANA_CATALOG_FILE"] = saved_file
         del os.environ["DANA_CATALOG_URL"]
     check("catalog URL unreachable: the shipped copy is used, with a notice naming the URL",
-          [e.name for e in fallback.entries] == ["hello", "israel_rail"] and "127.0.0.1:9" in fallback.notice
+          [e.name for e in fallback.entries] == ["hello", "israel_rail", "money_il"] and "127.0.0.1:9" in fallback.notice
           and fallback.origin == "http://127.0.0.1:9/catalog.json", fallback.notice)
     check("catalog from a file: no notice", catalog.load(fresh=True).notice == "")
     src = {"repo": "https://example.invalid/r.git", "path": "", "ref": "c" * 40}
@@ -502,6 +502,29 @@ def test_cli() -> None:
     check("cli disable: essentials refused", rc == 1 and "every user has it" in err, err)
 
 
+def test_worker_image() -> None:
+    from core import addon_dirs
+    folder = SCRATCH / "workers" / "pinned"
+    folder.mkdir(parents=True)
+    manifest = folder / "addon.py"
+    manifest.write_text('from core.addons import Addon, Worker\naddon = Addon("pinned", needs=("money",), worker=Worker('
+                        'port=8099, url_env="PINNED_URL", image="ghcr.io/example/pinned-worker"))\n')
+    check("manifest: the worker's published image is read without running addon.py",
+          addon_dirs.read_manifest(manifest) == addon_dirs.Manifest("pinned", ("money",), "ghcr.io/example/pinned-worker"))
+    try:
+        addon_dirs.worker_image(folder)
+        check("worker image: no tag and no installed commit is refused", False)
+    except ValueError as e:
+        check("worker image: no tag and no installed commit is refused", "no tag" in str(e), str(e))
+    (folder / addon_dirs.INSTALLED_FILE).write_text(json.dumps({"name": "pinned", "commit": COMMIT2}))
+    check("worker image: pinned to the commit it was installed at",
+          addon_dirs.worker_image(folder) == f"ghcr.io/example/pinned-worker:{COMMIT2}")
+    manifest.write_text(manifest.read_text().replace("pinned-worker\"", "pinned-worker:2.1\""))
+    check("worker image: a tag the manifest names is kept", addon_dirs.worker_image(folder) == "ghcr.io/example/pinned-worker:2.1")
+    manifest.write_text('from core.addons import Addon, Worker\naddon = Addon("pinned", worker=Worker(port=8099, url_env="P"))\n')
+    check("worker image: a worker without an image is built from worker/ (None)", addon_dirs.worker_image(folder) is None)
+
+
 async def test_start_listener() -> None:
     """The real start (main.py's start_webhook_listener): routes, loops and the scheduler, then a clean stop."""
     sock = socket.socket()
@@ -529,6 +552,7 @@ async def main() -> None:
         await test_catalog(c)
         await test_install(c)
         test_cli()
+        test_worker_image()
         await test_restart(c)
     await test_start_listener()
 

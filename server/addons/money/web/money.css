@@ -497,6 +497,25 @@ button.mny-catchip:hover { color: var(--ink); border-color: var(--hairline-stron
   color: var(--body); font-weight: 500; font-size: 13.5px; width: 100%; }
 .mny-add-card:hover { color: var(--ink); border-color: var(--body); }
 .mny-add-card svg { width: 16px; height: 16px; }
+/* Statement files: an Import button on accounts, the import sheet (its preview, CSV columns). */
+.mny-src-accts li .mny-acct-name { flex: 1; }
+.mny-acct-imp { flex-shrink: 0; margin: -6px -6px -6px 0; color: var(--mute); }
+.mny-acct-imp:hover { color: var(--ink); }
+.mny-add-row { display: flex; gap: 10px; }
+.mny-sheet.t-import { width: min(640px, calc(100vw - 32px)); }
+.mny-imp-file { display: flex; gap: 6px; align-items: center; font-size: 12.5px; margin: -2px 0 6px; }
+.mny-imp-file svg { width: 14px; height: 14px; }
+.mny-imp-sum { font-size: 13px; font-weight: 600; color: var(--ink); margin: 6px 0; }
+.mny-imp-map { border: 1px solid var(--hairline); border-radius: var(--radius-card); padding: 8px 12px; margin: 6px 0; }
+.mny-imp-map summary { cursor: pointer; font-size: 13px; color: var(--body); font-weight: 500; }
+.mny-imp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 4px 12px; margin-top: 8px; }
+.mny-imp-map .mny-check input { accent-color: var(--ink); }
+.mny-imp-rows { max-height: 280px; overflow: auto; border: 1px solid var(--hairline); border-radius: var(--radius-card); margin: 6px 0; font-size: 12.5px; }
+.mny-imp-rows table { width: 100%; border-collapse: collapse; }
+.mny-imp-rows th { position: sticky; top: 0; background: var(--canvas-soft); text-align: left; font-weight: 500; color: var(--mute); padding: 6px 8px; border-bottom: 1px solid var(--hairline); }
+.mny-imp-rows td { padding: 6px 8px; border-bottom: 1px solid var(--hairline); vertical-align: top; color: var(--ink); }
+.mny-imp-rows .num { text-align: right; white-space: nowrap; }
+.mny-imp-rows > .mny-muted { padding: 6px 8px; }
 .mny-off, .mny-welcome { max-width: 560px; width: 100%; margin: 24px auto; text-align: center; padding: 32px 24px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .mny-off h2, .mny-welcome h2 { font-size: 18px; font-weight: 600; color: var(--ink); }
 .mny-off p, .mny-welcome p { font-size: 13.5px; color: var(--body); line-height: 1.55; max-width: 440px; }
@@ -545,6 +564,8 @@ button.mny-catchip:hover { color: var(--ink); border-color: var(--hairline-stron
   .mny-sheet { left: 0; right: 0; top: auto; bottom: 0; transform: none; width: 100%; max-height: 88vh;
     border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; padding-bottom: calc(20px + env(safe-area-inset-bottom)); border-bottom: 0; }
   .mny-sheet.t-detail { width: 100%; }
+  .mny-sheet.t-import { width: 100%; }
+  .mny-add-row { flex-direction: column; }
   .mny-search kbd { display: none; }
   .mny-fchips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -12px; padding: 0 12px 2px; }
   .mny-fchips::-webkit-scrollbar { display: none; }

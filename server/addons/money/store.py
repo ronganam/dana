@@ -20,6 +20,8 @@ from addons.money import categories, providers
 logger = logging.getLogger(__name__)
 
 SOURCE_STATES = ("new", "syncing", "needs_code", "ok", "failing", "needs_attention")
+# The company of an account filled only from statement files (imports.py): no source, no number shown.
+MANUAL = "manual"
 # Login problems after which the user's own "Sync now" may sign in once more (Dana's syncs never do):
 # a refused code, a sign-in with no clear answer, codes that twice did not come. The others need new
 # login details.
@@ -176,7 +178,7 @@ def get_account(user: User, account_id: str) -> Optional[Dict[str, Any]]:
 def account_payload(account: Dict[str, Any]) -> Dict[str, Any]:
     """``{id, kind, number, label, balance, balance_at, next_charge, next_charge_date}``; a bank
     account's number masked to its last 3 digits, a card's last 4 as the company gives them."""
-    number = account["number"]
+    number = "" if account.get("company") == MANUAL else account["number"]
     return {"id": account["id"], "kind": account["kind"],
             "number": mask_number(number) if account["kind"] in ("bank", "investment") else number,
             "label": account.get("label"), "balance": account.get("balance"), "balance_at": account.get("balance_at"),
@@ -301,14 +303,15 @@ def get_transaction(user: User, txn_id: str) -> Optional[Dict[str, Any]]:
 
 def delete_all(user: User) -> List[Dict[str, Any]]:
     """Delete every money row of the user (sources, accounts, transactions,
-    rules, aliases, phone signals, syncs, code requests, saving choices, price checks, meal card charges) and the
+    rules, aliases, phone signals, syncs, code requests, saving choices, price checks, meal card charges,
+    import mappings) and the
     Money section of their weekly reviews. Returns the removed sources (``{id, company}``)."""
     with db() as conn:
         removed = [{"id": r["id"], "company": r["company"]}
                    for r in conn.execute("SELECT id, company FROM money_sources WHERE user_id = ?", (user.id,))]
         for table in ("money_code_requests", "money_syncs", "money_signals", "money_transactions", "money_holdings",
                       "money_account_values", "money_trades", "money_meals", "money_accounts", "money_rules", "money_aliases",
-                      "money_savings", "money_market_checks", "money_sources"):
+                      "money_savings", "money_market_checks", "money_import_maps", "money_sources"):
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user.id,))
         # The weekly reviews' Money sections go too (the rest of a review stays).
         conn.execute("UPDATE weekly_reviews SET data = json_remove(data, '$.money') WHERE user_id = ? "
@@ -342,13 +345,20 @@ def shekels(agorot: Optional[int]) -> str:
 
 def account_label(company: Optional[str], kind: Optional[str], number: Optional[str],
                   label: Optional[str] = None) -> str:
-    """What to call an account: its label, else ``Cal 8763`` / ``Bank Hapoalim ••••901``."""
+    """What to call an account: its label, else ``Example Card 8763`` / ``Example Bank ••••901``."""
     if (label or "").strip():
         return label.strip()
     if not company:
         return "Unknown account"
+    if company == MANUAL:
+        return "Imported account"
     shown = mask_number(number or "") if kind in ("bank", "investment") else (number or "")
     return f"{providers.name_of(company)} {shown}".strip()
+
+
+def company_name(company: str) -> str:
+    """The display name of an account's company: the provider's, "Imported" for a manual account."""
+    return "Imported" if company == MANUAL else providers.name_of(company)
 
 
 def local_date(value: Any) -> Optional[datetime.date]:

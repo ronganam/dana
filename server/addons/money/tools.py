@@ -74,7 +74,7 @@ async def money_summary(conn: Connection, period: str = "this_month", start: Opt
         end: Last day (YYYY-MM-DD, inclusive) of a custom range; default today.
         category: A group (food, housing, transport, bills, health, shopping, leisure, family, people, finance, other, income), a category (groceries, restaurants, delivery, fuel, subscriptions, …), or "uncategorized".
         merchant: Part of a merchant's name, e.g. "wolt" or "רמי לוי".
-        account: An account: its card's last digits, its label, its company ("Cal", "Hapoalim") or "bank" / "card".
+        account: An account: its card's last digits, its label, its company's name or "bank" / "card".
         flow: spending (default: purchases, transfers to people, fees), income, or one flow.
         group_by: Break the total down by group, category, merchant, account, month, week or day. Default: by group (by category when the category is a group).
     """
@@ -323,10 +323,10 @@ def _quantity(value: Optional[float]) -> str:
 
 @addon.tool(untrusted_result=True)
 async def meal_card(conn: Connection) -> str:
-    """The user's meal card from work (Pluxee / Cibus): what is left of this cycle's budget and until when, the pace (when it runs out), what went on the user's own card beyond the budget, each past cycle, the places used most and the latest meals. The employer's budget is not the user's spending; only the part on their own card is."""
+    """The user's meal card from work: what is left of this cycle's budget and until when, the pace (when it runs out), what went on the user's own card beyond the budget, each past cycle, the places used most and the latest meals. The employer's budget is not the user's spending; only the part on their own card is."""
     data = await asyncio.to_thread(meals.meals, conn.user, 6, 10)
     if not data["accounts"]:
-        return "No meal card yet: add Pluxee on the Money page."
+        return "No meal card yet: add the meal card's login on the Money page (a provider addon brings it)."
     lines = []
     for a in data["accounts"]:
         c = a["current"]
@@ -358,10 +358,10 @@ async def meal_card(conn: Connection) -> str:
 
 @addon.tool()
 async def investment_portfolio(conn: Connection) -> str:
-    """The user's investment accounts (Psagot Trade): value, cash, today's change, profit against cost, every holding (value, share of the account, quantity, profit), how the value moved over the last month and year, and the latest activity (buys, sells, dividends, taxes). Read-only: Dana cannot trade."""
+    """The user's investment accounts: value, cash, today's change, profit against cost, every holding (value, share of the account, quantity, profit), how the value moved over the last month and year, and the latest activity (buys, sells, dividends, taxes). Read-only: Dana cannot trade."""
     data = portfolio.portfolio(conn.user, days=365, trades=10)
     if not data["accounts"]:
-        return "No investment account yet: add Psagot Trade on the Money page."
+        return "No investment account yet: add the investment house's login on the Money page (a provider addon brings it)."
     t = data["total"]
     lines = [f"Investments, as of {_when(t['as_of'])}:"]
     head = f"- Total {money_text(t['value'])}"

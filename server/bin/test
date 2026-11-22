@@ -11,7 +11,7 @@
     bin/test -j 4                at most 4 at a time (default: one per CPU, fewer when memory is short)
 
 Scripts live in tests/ (core), addons/<name>/tests/ (each addon), addons/<name>/worker/test/
-(an addon's worker: the money addon's bank worker .mjs) and the tests/ and worker/test/
+(an addon's worker's .mjs) and the tests/ and worker/test/
 folders of each site addon (the folders DANA_ADDON_DIRS names, else the site's addons/:
 docs/site.md). Each runs from this
 folder with it and tests/ on PYTHONPATH (so `import testenv` and the app's modules

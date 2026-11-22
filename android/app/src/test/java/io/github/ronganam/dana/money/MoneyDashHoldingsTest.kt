@@ -36,11 +36,11 @@ class MoneyDashHoldingsTest {
         assertEquals("Psagot Trade ••456", MoneyDashText.accountName(null, src.string("number"), "investment", "Psagot Trade"))
         val ov = MoneyDashFixture.web("overview")
         val cards = ov.arr("cards").objects()
-        assertEquals(listOf("Shared card ••4580", "Cal ••8763"), cards.map { c ->
+        assertEquals(listOf("Shared card ••4580", "Sample Card ••8763"), cards.map { c ->
             MoneyDashText.accountName(c.string("label"), c.string("number"), "card", c.string("company_name"))
         })
         val bank = ov.arr("banks").objects()[0]
-        assertEquals("Hapoalim ••901", MoneyDashText.accountName(bank.string("label"), bank.string("number"), "bank", bank.string("company_name")))
+        assertEquals("Sample Bank ••901", MoneyDashText.accountName(bank.string("label"), bank.string("number"), "bank", bank.string("company_name")))
     }
 
     @Test fun portfolioTiles() {

@@ -29,6 +29,9 @@
  *   GET    /api/money/companies                 the login form's fields
  *   POST / PATCH / DELETE /api/money/sources…   add, update login, remove; …/{id}/sync "Sync now"
  *   POST   /api/money/code-requests/{id}        the SMS sign-in code {code}
+ *   GET    /api/money/import/accounts           the accounts statement files can go into (Banks & cards, the import sheet)
+ *   POST   /api/money/import/preview            multipart {file, account?, mapping?}: what a file holds, its CSV columns
+ *   POST   /api/money/import                    multipart {file, account | new_label + new_kind, mapping?} → {added, duplicates}
  *   GET    /api/money/changes?since=            polled every 30 s while shown (5 s while a sync runs)
  *   POST   /api/chat/context {kind: "transaction", id}   "Ask Dana"
  *
@@ -69,8 +72,9 @@
     sheet: null,
     codeDrafts: {}, codeBusy: {}, codeError: {}, codeSent: {},
     syncBusy: {},
+    importAccts: null,   // GET /api/money/import/accounts
   };
-  let txSeq = 0, detailSeq = 0;
+  let txSeq = 0, detailSeq = 0, importSeq = 0;
   const fetchSeq = {};
   let pollTimer = null, tickTimer = null, searchTimer = null, toastTimer = null;
 
@@ -79,6 +83,19 @@
     try {
       r = await fetch(url, { method, cache: "no-store", headers: body !== undefined ? { "Content-Type": "application/json" } : {},
                              body: body !== undefined ? JSON.stringify(body) : undefined });
+    } catch (_) {
+      return { status: 0, body: null };
+    }
+    let data = null;
+    try { data = await r.json(); } catch (_) { /* empty */ }
+    return { status: r.status, body: data };
+  }
+
+  /** A multipart POST (a statement file): the same answer shape as request(). */
+  async function upload(url, form) {
+    let r;
+    try {
+      r = await fetch(url, { method: "POST", cache: "no-store", body: form });
     } catch (_) {
       return { status: 0, body: null };
     }
@@ -106,7 +123,7 @@
     || (S.sources || []).some((s) => (s.accounts || []).some((a) => a.kind === "meal"));
   /** A login's kind for its icon: its accounts', else its company's (bank, card, investment). */
   const sourceKind = (s) => ((s.accounts || [])[0] || {}).kind
-    || ((S.companies || []).find((c) => c.id === s.company) || {}).kind || (s.company === "hapoalim" ? "bank" : "card");
+    || ((S.companies || []).find((c) => c.id === s.company) || {}).kind || "card";
   const acctName = (t) => C.accountName(acctOf(t.account_id)) || t.account_label || "";
   const companyOf = (t) => (acctOf(t.account_id) || {}).company_name || "";
   const catLabel = (key) => C.categoryLabel(S.taxonomy, key);
@@ -227,8 +244,14 @@
   }
 
   async function loadSources() {
-    const r = await fetchOne("sources");
+    const [r] = await Promise.all([fetchOne("sources"), loadImportAccounts(), loadCompanies()]);
     if (r && r.status === 200) render();
+  }
+
+  async function loadImportAccounts() {
+    const r = await request("GET", "/api/money/import/accounts");
+    if (r.status === 200) S.importAccts = r.body.accounts;
+    return S.importAccts;
   }
 
   async function loadCompanies() {
@@ -479,12 +502,16 @@
   }
 
   function welcomeHtml() {
+    const logins = (S.companies || []).length > 0;
+    if (S.companies === null) loadCompanies().then((list) => { if (list && list.length) render(); });
     return `<div class="mny-welcome mny-card">
       <span class="mny-off-icon">${icon("wallet")}</span>
       <h2>Bring in your bank and cards</h2>
-      <p>Dana signs in for you twice a day, reads the transactions, sorts them into categories and keeps an eye out for
-         anything odd. Your login details are stored encrypted and are never shown again.</p>
-      <div class="mny-welcome-btns"><button class="btn-primary" data-act="add-source">${icon("plus")}<span>Add a bank or card</span></button></div>
+      <p>${logins ? `Dana can sign in for you twice a day and read the transactions (login details are stored encrypted and never
+         shown again), or you` : "You"} can import the statement your bank's or card company's site downloads: CSV, OFX or QIF.
+         Dana sorts the transactions into categories and keeps an eye out for anything odd.</p>
+      <div class="mny-welcome-btns">${logins ? `<button class="btn-primary" data-act="add-source">${icon("plus")}<span>Add a bank or card</span></button>` : ""}
+        <button class="${logins ? "btn-secondary" : "btn-primary"}" data-act="import">${icon("file-up")}<span>Import a statement file</span></button></div>
     </div>`;
   }
   function firstSyncHtml() {
@@ -769,7 +796,9 @@
           : a.kind === "bank" || a.kind === "investment"
           ? (a.balance != null ? `${C.moneyHtml(a.balance, a.kind === "investment" ? { cents: false } : {})}<em>${a.kind === "investment" ? "worth, " : ""}as of ${esc(C.when(a.balance_at, now))}</em>` : "")
           : (a.next_charge ? `${C.moneyHtml(a.next_charge, { sign: "none" })}<em>bill on ${esc(C.shortDate(a.next_charge_date, today()))}</em>` : `<em>no bill coming</em>`);
-        return `<li><span class="mny-acct-name">${icon(C.kindIcon(a.kind))}<span>${esc(name)}</span></span><span class="mny-acct-num">${right}</span></li>`;
+        const imp = a.kind === "bank" || a.kind === "card"
+          ? `<button class="icon-btn mny-acct-imp" data-import="${esc(a.id)}" title="Import a statement file" aria-label="Import a statement file into ${esc(name)}">${icon("file-up")}</button>` : "";
+        return `<li><span class="mny-acct-name">${icon(C.kindIcon(a.kind))}<span>${esc(name)}</span></span><span class="mny-acct-num">${right}</span>${imp}</li>`;
       }).join("");
       const times = [s.last_ok_at ? `Last good sync ${esc(C.when(s.last_ok_at, now))}` : "Never synced yet",
                      s.next_sync_at && !["syncing", "needs_attention"].includes(s.state) ? `next ${esc(C.when(s.next_sync_at, now))} (${esc(C.until(s.next_sync_at, now))})` : ""].filter(Boolean).join(" · ");
@@ -788,10 +817,29 @@
           <button class="btn-ghost-danger" data-remove-source="${esc(s.id)}">Remove</button>
         </div></section>`;
     }).join("");
-    el.innerHTML = `<div class="mny-src-intro"><p>Dana signs in to each of these twice a day and when your phone sees a payment. Login details are stored encrypted and never shown again.</p></div>
-      ${cards || welcomeHtml()}
-      ${list.length ? `<button class="mny-add-card" data-act="add-source">${icon("plus")}<span>Add a bank or card</span></button>` : ""}`;
+    const files = filesHtml(now);
+    el.innerHTML = `${list.length ? `<div class="mny-src-intro"><p>Dana signs in to each of these twice a day and when your phone sees a payment. Login details are stored encrypted and never shown again.</p></div>` : ""}
+      ${cards || (files ? "" : welcomeHtml())}
+      ${files}
+      ${list.length || files ? `<div class="mny-add-row">${(S.companies || []).length ? `<button class="mny-add-card" data-act="add-source">${icon("plus")}<span>Add a bank or card</span></button>` : ""}
+        <button class="mny-add-card" data-act="import">${icon("file-up")}<span>Import a statement file</span></button></div>` : ""}`;
     icons();
+  }
+
+  /** The accounts filled only from statement files (no login), each with its Import button. */
+  function filesHtml(now) {
+    const manual = (S.importAccts || []).filter((a) => a.manual);
+    if (!manual.length) return "";
+    const rows = manual.map((a) => {
+      const right = a.kind === "bank" && a.balance != null ? `${C.moneyHtml(a.balance)}<em>as of ${esc(C.when(a.balance_at, now))}</em>` : "";
+      return `<li><span class="mny-acct-name">${icon(C.kindIcon(a.kind))}<span><bdi dir="auto">${esc(a.label)}</bdi></span></span><span class="mny-acct-num">${right}</span>
+        <button class="icon-btn mny-acct-imp" data-import="${esc(a.id)}" title="Import a statement file" aria-label="Import a statement file into ${esc(a.label)}">${icon("file-up")}</button></li>`;
+    }).join("");
+    return `<section class="mny-card mny-src">
+      <div class="mny-src-top"><span class="mny-src-icon">${icon("file-text")}</span>
+        <div class="mny-src-titles"><div class="mny-src-name">Statement files</div>
+          <div class="mny-muted">Filled from the files you import: CSV, OFX or QIF</div></div></div>
+      <ul class="mny-src-accts">${rows}</ul></section>`;
   }
 
   // ---------- sheets: pickers, forms, the phone's detail ----------
@@ -818,6 +866,7 @@
     else if (s.type === "companies") html = companiesHtml(s);
     else if (s.type === "source-form") html = sourceFormHtml(s);
     else if (s.type === "remove") html = removeHtml(s);
+    else if (s.type === "import") html = importSheetHtml(s);
     sheet.className = `mny-sheet t-${s.type}`;
     keepFocus(() => { sheet.innerHTML = html; });
     scrim.classList.remove("hidden");
@@ -900,7 +949,7 @@
       <form class="mny-form" data-form="source" autocomplete="off">
         ${fields}
         <label class="ibx-field">Name (optional)<input class="form-control" name="label" type="text" value="${esc(source ? source.label || "" : "")}" placeholder="e.g. Joint account" dir="auto"></label>
-        ${company.id === "hapoalim" && !s.sourceId ? `<div class="mny-hint">${icon("message-square-lock")}<span>The bank sends an SMS code the first time Dana signs in. Your phone hands it over by itself; if not, a box for it shows up here.</span></div>` : ""}
+        ${company.sign_in_code && !s.sourceId ? `<div class="mny-hint">${icon("message-square-lock")}<span>${esc(company.name)} sends an SMS code the first time Dana signs in. Your phone hands it over by itself; if not, a box for it shows up here.</span></div>` : ""}
         <div class="mny-err" role="alert" data-form-error>${esc(s.error || "")}</div>
         <div class="mny-form-btns">${s.sourceId ? "" : `<button class="btn-secondary" type="button" data-act="back-companies">Back</button>`}
           <button class="btn-primary" type="submit" data-form-submit>${s.sourceId ? "Save and sync" : "Add and sync"}</button></div>
@@ -921,6 +970,152 @@
         <div class="mny-form-btns"><button class="btn-secondary" type="button" data-act="sheet-close">Cancel</button>
           <button class="btn-destructive-outline" type="submit" ${s.busy ? "disabled" : ""}>${s.busy ? "Removing…" : "Remove"}</button></div>
       </form>`;
+  }
+
+  // ---------- the import sheet: a file → a preview (its CSV columns) → import ----------
+
+  const DATE_ORDERS = [["dmy", "Day first (31/12/2026)"], ["mdy", "Month first (12/31/2026)"], ["ymd", "Year first (2026-12-31)"]];
+  const DECIMALS = [["auto", "As the file writes them"], [".", "1,234.50"], [",", "1.234,50"]];
+
+  async function openImport(accountId) {
+    openSheet({ type: "import", account: accountId || "", newLabel: "", newKind: "", file: null, preview: null, mapping: null,
+                mapTouched: false, mapOpen: false, busy: "", error: "" });
+    await loadImportAccounts();
+    const s = S.sheet;
+    if (s && s.type === "import") {
+      if (!s.account) s.account = ((S.importAccts || [])[0] || {}).id || "new";
+      renderSheet();
+    }
+  }
+
+  function importSheetHtml(s) {
+    const accts = S.importAccts || [];
+    const target = s.account || (accts.length ? "" : "new");
+    const p = s.preview;
+    const problem = s.mapping ? C.mappingProblem(s.mapping) : "";
+    const options = accts.map((a) => `<option value="${esc(a.id)}" ${target === a.id ? "selected" : ""}>${esc(a.label)} · ${esc(C.kindWord(a.kind))}</option>`).join("");
+    const kinds = [["", "As the file says"], ["bank", C.kindWord("bank")], ["card", C.kindWord("card")]]
+      .map(([v, l]) => `<option value="${v}" ${s.newKind === v ? "selected" : ""}>${esc(l)}</option>`).join("");
+    const label = s.busy === "import" ? "Importing…" : !p || !p.count ? "Import" : p.new ? `Import ${p.new} new` : "Nothing new";
+    return `${sheetHead("Import a statement file", "CSV, OFX (QFX) or QIF, as your bank's or card company's site downloads it")}
+      <form class="mny-form" data-form="import">
+        <label class="ibx-field">Into<select class="form-control" data-import-field="account" data-autofocus>${options}
+          <option value="new" ${target === "new" ? "selected" : ""}>A new account…</option></select></label>
+        ${target === "new" ? `<div class="ibx-row2">
+          <label class="ibx-field">Name<input class="form-control" type="text" data-keep="import-label" data-import-field="newLabel" value="${esc(s.newLabel)}" maxlength="60" placeholder="e.g. Everyday account" dir="auto"></label>
+          <label class="ibx-field">Kind<select class="form-control" data-import-field="newKind">${kinds}</select></label></div>` : ""}
+        <label class="ibx-field">File<input class="form-control" type="file" data-import-file accept=".csv,.ofx,.qfx,.qif,.txt,text/csv"></label>
+        ${s.file ? `<div class="mny-muted mny-imp-file">${icon("file-text")}<span>${esc(s.file.name)}</span></div>` : `<div class="mny-hint">${icon("info")}<span>Up to 5 MB. Rows already here (the same date, amount and description) are left out, so importing a file twice adds nothing.</span></div>`}
+        ${s.busy === "preview" ? `<div class="mny-empty">Reading the file…</div>` : ""}
+        ${p ? importPreviewHtml(s) : ""}
+        <div class="mny-err" role="alert">${esc(s.error || problem)}</div>
+        <div class="mny-form-btns"><button class="btn-secondary" type="button" data-act="sheet-close">Cancel</button>
+          <button class="btn-primary" type="submit" ${!p || !p.new || s.busy || problem ? "disabled" : ""}>${label}</button></div>
+      </form>`;
+  }
+
+  function importPreviewHtml(s) {
+    const p = s.preview, m = s.mapping;
+    const cols = (p.columns || []).map((name, i) => `<option value="${i}">${esc(name)}</option>`);
+    const pick = (role) => {
+      const opts = cols.map((o, i) => (m && m[role.key] === i ? o.replace("<option ", "<option selected ") : o)).join("");
+      return `<label class="ibx-field">${esc(role.label)}<select class="form-control" data-import-map="${role.key}">
+        <option value="" ${m && m[role.key] == null ? "selected" : ""}>${role.required ? "Choose…" : "—"}</option>${opts}</select></label>`;
+    };
+    const choice = (key, list) => list.map(([v, l]) => `<option value="${esc(v)}" ${m && String(m[key]) === v ? "selected" : ""}>${esc(l)}</option>`).join("");
+    const headers = (p.sample || []).slice(0, 15).map((r, i) => `<option value="${i}" ${m && m.header === i ? "selected" : ""}>Row ${i + 1}: ${esc(r.filter(Boolean).slice(0, 3).join(" · ").slice(0, 40))}</option>`).join("");
+    const columns = p.format === "csv" && m ? `<details class="mny-imp-map"${s.mapOpen ? " open" : ""}><summary>Columns</summary>
+        <div class="mny-imp-grid">${C.IMPORT_ROLES.map(pick).join("")}
+          <label class="ibx-field">Column names<select class="form-control" data-import-map="header"><option value="-1" ${m.header === -1 ? "selected" : ""}>None: the data starts at once</option>${headers}</select></label>
+          <label class="ibx-field">Dates<select class="form-control" data-import-map="date_format">${m.date_format === "auto" ? `<option value="auto" selected>As the file writes them</option>` : ""}${choice("date_format", DATE_ORDERS)}</select></label>
+          <label class="ibx-field">Decimals<select class="form-control" data-import-map="decimal">${choice("decimal", DECIMALS)}</select></label></div>
+        <label class="mny-check"><input type="checkbox" data-import-map="negate" ${m.negate ? "checked" : ""}><span>Money out is written as a positive amount (as card statements often do)</span></label>
+      </details>` : "";
+    const withBalance = (p.rows || []).some((r) => r.balance != null);
+    const rows = (p.rows || []).map((r) => `<tr><td>${esc(C.shortDate(r.date, today()))}</td><td><bdi dir="auto">${esc(r.description)}</bdi>${r.memo ? `<div class="mny-muted"><bdi dir="auto">${esc(r.memo)}</bdi></div>` : ""}</td>
+        <td class="num">${C.moneyHtml(r.amount)}</td>${withBalance ? `<td class="num mny-muted">${r.balance != null ? C.moneyHtml(r.balance) : ""}</td>` : ""}</tr>`).join("");
+    return `${p.count ? `<div class="mny-imp-sum">${esc(C.importSummary(p))}</div>` : ""}${columns}
+      ${rows ? `<div class="mny-imp-rows"><table><thead><tr><th>Date</th><th>Description</th><th class="num">Amount</th>${withBalance ? `<th class="num">Balance</th>` : ""}</tr></thead>
+        <tbody>${rows}</tbody></table>${p.count > p.rows.length ? `<div class="mny-muted">and ${p.count - p.rows.length} more</div>` : ""}</div>` : ""}`;
+  }
+
+  /** The form for a preview or an import: the file, its account (a new one only when importing) and,
+   *  for a CSV, the mapping (on a preview only once changed here, else the account's remembered one). */
+  function importForm(s, importing) {
+    const form = new FormData();
+    form.append("file", s.file, s.file.name);
+    if (s.account && s.account !== "new") form.append("account", s.account);
+    else if (importing) { form.append("new_label", s.newLabel || ""); form.append("new_kind", s.newKind || ""); }
+    if (s.mapping && s.preview && s.preview.format === "csv" && (importing || s.mapTouched)) form.append("mapping", JSON.stringify(s.mapping));
+    return form;
+  }
+
+  async function previewImport() {
+    const s = S.sheet;
+    if (!s || s.type !== "import" || !s.file) return;
+    const seq = ++importSeq;
+    s.busy = "preview"; s.error = ""; renderSheet();
+    const r = await upload("/api/money/import/preview", importForm(s, false));
+    if (S.sheet !== s || seq !== importSeq) return;
+    s.busy = "";
+    if (r.status === 200) { s.preview = r.body; s.mapping = r.body.mapping; }
+    else if (r.body && r.body.error === "bad_file" && r.body.columns) {
+      // A CSV whose columns could not be read: choose them by hand.
+      s.preview = { format: "csv", count: 0, new: 0, duplicates: 0, skipped: 0, rows: [], columns: r.body.columns, sample: r.body.sample };
+      s.mapping = s.mapTouched && s.mapping ? s.mapping : { date: null, description: null, amount: null, debit: null, credit: null, balance: null, memo: null,
+                                                           header: 0, delimiter: r.body.delimiter || ",", date_format: "auto", decimal: "auto", negate: false };
+      s.mapOpen = true;
+      s.error = r.body.message;
+    } else {
+      if (r.body && r.body.error === "bad_file") { s.preview = null; s.mapping = null; }
+      s.error = C.errorText(r.status, r.body);
+    }
+    renderSheet();
+  }
+
+  async function runImport() {
+    const s = S.sheet;
+    if (!s || s.type !== "import" || !s.preview || !s.file || s.busy) return;
+    if (s.account === "new" && !String(s.newLabel || "").trim()) { s.error = "Give the new account a name."; renderSheet(); return; }
+    s.busy = "import"; s.error = ""; renderSheet();
+    const r = await upload("/api/money/import", importForm(s, true));
+    if (S.sheet !== s) return;
+    s.busy = "";
+    if (r.status === 200) {
+      S.sheet = null; renderSheet();
+      toast(C.importResultText(r.body));
+      refresh();
+      loadSources();
+      return;
+    }
+    s.error = C.errorText(r.status, r.body);
+    renderSheet();
+  }
+
+  /** A change in the import sheet; true when it was one. */
+  function onImportChange(t) {
+    const s = S.sheet;
+    if (!s || s.type !== "import") return false;
+    if (t.dataset.importFile !== undefined) {
+      Object.assign(s, { file: (t.files && t.files[0]) || null, preview: null, mapping: null, mapTouched: false, error: "" });
+      if (s.file) previewImport(); else renderSheet();
+      return true;
+    }
+    if (t.dataset.importField) {
+      s[t.dataset.importField] = t.value;
+      if (t.dataset.importField === "account") {
+        Object.assign(s, { mapping: null, mapTouched: false });
+        if (s.file) previewImport(); else renderSheet();
+      }
+      return true;
+    }
+    if (t.dataset.importMap) {
+      s.mapping = C.setMapping(s.mapping, t.dataset.importMap, t.type === "checkbox" ? t.checked : t.value);
+      s.mapTouched = true; s.mapOpen = true;
+      if (C.mappingProblem(s.mapping)) renderSheet(); else previewImport();
+      return true;
+    }
+    return false;
   }
 
   // ---------- actions ----------
@@ -1305,6 +1500,8 @@
     if ((n = t.closest("[data-sync]"))) { syncNow(n.dataset.sync); return; }
     if ((n = t.closest("[data-edit-source]"))) { openEdit(n.dataset.editSource); return; }
     if ((n = t.closest("[data-remove-source]"))) { openSheet({ type: "remove", sourceId: n.dataset.removeSource }); return; }
+    if ((n = t.closest("[data-import]"))) { openImport(n.dataset.import); return; }
+    if (t.closest(".mny-imp-map > summary") && S.sheet && S.sheet.type === "import") { S.sheet.mapOpen = !S.sheet.mapOpen; return; }
     if ((n = t.closest("[data-open-txn]"))) {
       if (t.closest("button, a, textarea, input") && !t.closest("button[data-open-txn]")) return;
       const id = n.dataset.openTxn;
@@ -1369,6 +1566,7 @@
       case "ask": askDana(); break;
       case "sheet-close": closeSheet(); break;
       case "add-source": openAdd(); break;
+      case "import": openImport(""); break;
       case "back-companies": openSheet({ type: "companies" }); break;
       case "view-sources": setView("sources"); break;
       default: break;
@@ -1377,6 +1575,7 @@
   /** The flow picker in the detail ("Counts as"). */
   function onChange(ev) {
     const t = ev.target;
+    if (t.closest && t.closest("#mny-sheet") && onImportChange(t)) return;
     if (t.dataset && t.dataset.flowFor && t.value) patchTxn(t.dataset.flowFor, { flow: t.value }, C.flowText);
   }
 
@@ -1399,6 +1598,7 @@
       return;
     }
     if (t.dataset.codeInput) { S.codeDrafts[t.dataset.codeInput] = t.value; return; }
+    if (t.dataset.importField === "newLabel" && S.sheet && S.sheet.type === "import") { S.sheet.newLabel = t.value; return; }
     if (t.dataset.saveDraft) { S.saveDraft[t.dataset.saveDraft] = t.value; return; }
     if (t.dataset.noteFor) {
       S.noteDraft[t.dataset.noteFor] = t.value;
@@ -1428,7 +1628,8 @@
       return;
     }
     if (form.dataset.form === "source") { ev.preventDefault(); submitSource(form); return; }
-    if (form.dataset.form === "remove") { ev.preventDefault(); submitRemove(form); }
+    if (form.dataset.form === "remove") { ev.preventDefault(); submitRemove(form); return; }
+    if (form.dataset.form === "import") { ev.preventDefault(); runImport(); }
   }
 
   function onKey(ev) {

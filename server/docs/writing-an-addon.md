@@ -249,7 +249,7 @@ A page uses only its own elements and `api`. It builds on the shell's tokens and
 
 ### Workers
 
-`worker=Worker(port=8091, url_env="TIDES_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained; the app image leaves it out); the addon reaches it at the URL in `url_env`. `bin/dana addons new tides --worker` writes a small standard-library server and a tool that calls it. Deploying and running workers: `operations.md`, "Workers".
+`worker=Worker(port=8091, url_env="TIDES_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained; the app image leaves it out); the addon reaches it at the URL in `url_env`. An addon published in its own repository (a catalog addon) builds its worker image there instead (a workflow pushing `ghcr.io/<owner>/<repo>-worker:<commit>`) and names it, `Worker(port, url_env, image="ghcr.io/<owner>/<repo>-worker")`: deployments then run that image at the installed commit and build nothing. `bin/dana addons new tides --worker` writes a small standard-library server and a tool that calls it. Deploying and running workers: `operations.md`, "Workers".
 
 ### Testing
 

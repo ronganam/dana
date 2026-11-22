@@ -419,7 +419,7 @@ def transaction(user: User, txn_id: str) -> Dict[str, Any]:
 
 def find_account(user: User, term: str) -> Dict[str, Any]:
     """The one account of the user a word names: its id, its last digits ("8763",
-    "901"), its label, its company ("Cal", "Hapoalim") or its kind ("card", "bank").
+    "901"), its label, its company ("Example Card") or its kind ("card", "bank").
 
     Raises:
         NotFound: none matches.
@@ -434,8 +434,8 @@ def find_account(user: User, term: str) -> Dict[str, Any]:
 
     def matches(a: Dict[str, Any]) -> bool:
         digits = re.sub(r"\D", "", text)
-        number = re.sub(r"\D", "", a["number"] or "")
-        name = providers.name_of(a["company"]).casefold()
+        number = re.sub(r"\D", "", store.account_payload(a)["number"] if a["company"] == store.MANUAL else a["number"] or "")
+        name = store.company_name(a["company"]).casefold()
         return bool((digits and len(digits) >= 3 and number.endswith(digits))
                     or (a.get("label") and norm == a["label"].strip().casefold())
                     or (norm and (norm == a["company"].casefold() or norm in name))
@@ -487,7 +487,7 @@ def overview(user: User, month: Optional[str] = None) -> Dict[str, Any]:
     def base(a: Dict[str, Any]) -> Dict[str, Any]:
         shown = store.account_payload(a)
         return {"id": a["id"], "label": store.account_label(a["company"], a["kind"], a["number"], a.get("label")),
-                "number": shown["number"], "company": a["company"], "company_name": providers.name_of(a["company"])}
+                "number": shown["number"], "company": a["company"], "company_name": store.company_name(a["company"])}
 
     cards = [{**base(a), "next_charge": a.get("next_charge"), "next_charge_date": a.get("next_charge_date"),
               "billed_from_account_id": a.get("billed_from_account_id")} for a in accounts if a["kind"] == "card"]

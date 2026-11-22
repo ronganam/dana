@@ -46,6 +46,8 @@ db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import moneyfakes  # noqa: E402  (the made-up provider: moneyfakes.py)
 
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
@@ -70,14 +72,14 @@ assert ADMIN is not None
 BOB = users.create("Bob")
 CARL = users.create("Carl")
 connections.connect(ADMIN, "money")
-connections.connect(ADMIN, "money_il")
+connections.connect(ADMIN, moneyfakes.PROVIDER)
 connections.connect(BOB, "money")
-connections.connect(BOB, "money_il")
+connections.connect(BOB, moneyfakes.PROVIDER)
 TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ADMIN, BOB, CARL)}
 
 # Sources are added before the event loop runs, so no sync starts.
-CAL = sources.add(ADMIN, "visaCal", {"username": "robin.cal", "password": "pw-cal-1"})
-BOB_CAL = sources.add(BOB, "visaCal", {"username": "bob.cal", "password": "pw-cal-bob"})
+CAL = sources.add(ADMIN, "samplecard", {"username": "robin.cal", "password": "pw-cal-1"})
+BOB_CAL = sources.add(BOB, "samplecard", {"username": "bob.cal", "password": "pw-cal-bob"})
 
 TZ = clock.get_timezone()
 NOW = clock.now()
@@ -267,9 +269,9 @@ async def test_api(client: TestClient) -> None:
     SOON.clear()
     at = NOW - datetime.timedelta(minutes=1)
     items = [
-        {"key": "0|com.onoapps.cal4u|1|null|10", "package": "com.onoapps.cal4u", "app_name": "Cal", "title": "Cal",
+        {"key": "0|com.example.samplecard|1|null|10", "package": "com.example.samplecard", "app_name": "Cal", "title": "Cal",
          "text": "בוצעה עסקה ב-קפה נואר בסך 42.00 ש\"ח בכרטיס 8763", "posted_at": ms(at)},
-        {"key": "0|com.onoapps.cal4u|2|null|10", "package": "com.onoapps.cal4u", "app_name": "Cal", "title": "Cal",
+        {"key": "0|com.example.samplecard|2|null|10", "package": "com.example.samplecard", "app_name": "Cal", "title": "Cal",
          "text": "דף הפירוט החודשי שלך מוכן לצפייה", "posted_at": ms(at)},
         {"key": "0|com.ideomobile.hapoalim|3|null|10", "package": "com.ideomobile.hapoalim", "title": "הפועלים",
          "text": "קוד אימות 482913 לכניסה לחשבון", "posted_at": ms(at)},
@@ -287,7 +289,7 @@ async def test_api(client: TestClient) -> None:
     check("api: a parsed push on the user's card → a provisional row and a sooner sync",
           len(cafe) == 1 and cafe[0]["status"] == "provisional" and cafe[0]["merchant"] == "קפה נואר"
           and cafe[0]["notification_id"] is None and SOON == [(ADMIN.id, CAL["id"], 30, "signal")], (cafe, SOON))
-    statement = stored.get("0|com.onoapps.cal4u|2|null|10") or {}
+    statement = stored.get("0|com.example.samplecard|2|null|10") or {}
     check("api: a push that does not parse is only stored",
           statement.get("parsed") == 0 and statement.get("transaction_id") is None and statement.get("text"), statement)
     code = (stored.get("0|com.ideomobile.hapoalim|3|null|10") or {}).get("text", "")
@@ -311,7 +313,7 @@ async def test_api(client: TestClient) -> None:
 
     # Wallet and Cal's app announcing one payment → one provisional row.
     status, body = await post(client, ADMIN, {"notifications": [
-        {"key": "0|com.onoapps.cal4u|5|null|10", "package": "com.onoapps.cal4u", "title": "Cal",
+        {"key": "0|com.example.samplecard|5|null|10", "package": "com.example.samplecard", "title": "Cal",
          "text": "בוצעה עסקה ב-רמי לוי בסך 350.30 ש\"ח בכרטיס 8763", "posted_at": ms(NOW - datetime.timedelta(minutes=2))}]})
     rami = by_amount(ADMIN, -35030)
     linked = [s for s in sigs(ADMIN) if s["amount"] == -35030]
@@ -321,9 +323,9 @@ async def test_api(client: TestClient) -> None:
     # Bob: another card number is only a signal; his own card gets his own row.
     SOON.clear()
     status, body = await post(client, BOB, {"notifications": [
-        {"key": "b1", "package": "com.onoapps.cal4u", "title": "Cal", "text": "עסקה ב-קפה נואר בסך 42.00 ש\"ח בכרטיס 8763",
+        {"key": "b1", "package": "com.example.samplecard", "title": "Cal", "text": "עסקה ב-קפה נואר בסך 42.00 ש\"ח בכרטיס 8763",
          "posted_at": ms(at)},
-        {"key": "b2", "package": "com.onoapps.cal4u", "title": "Cal", "text": "עסקה ב-מאפייה בסך 18.00 ש\"ח בכרטיס 4411",
+        {"key": "b2", "package": "com.example.samplecard", "title": "Cal", "text": "עסקה ב-מאפייה בסך 18.00 ש\"ח בכרטיס 4411",
          "posted_at": ms(at)}]})
     check("api per user: Bob's pushes are his (a card he lacks → only a signal; his card → his row)",
           body == {"accepted": 2, "duplicates": 0} and len(sigs(BOB)) == 2 and len(by_amount(BOB, -1800, "4411")) == 1
@@ -430,7 +432,7 @@ async def test_unmatched_and_retention() -> None:
     with get_db_connection() as conn:
         for user, sid in ((ADMIN, "old-admin"), (BOB, "old-bob")):
             conn.execute("INSERT INTO money_signals (id, user_id, source, key, package, title, text, created_at) "
-                         "VALUES (?, ?, 'phone_app', ?, 'com.onoapps.cal4u', 'Cal', 'old', ?)", (sid, user.id, sid, old))
+                         "VALUES (?, ?, 'phone_app', ?, 'com.example.samplecard', 'Cal', 'old', ?)", (sid, user.id, sid, old))
         conn.commit()
     await asyncio.to_thread(signals.record_push, ADMIN, [])
     left = {s["id"] for s in sigs(ADMIN) + sigs(BOB)}

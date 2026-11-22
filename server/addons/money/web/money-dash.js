@@ -607,7 +607,7 @@
         return;
       }
       if (!p.accounts.length) {
-        el.innerHTML = `<section class="mny-card"><div class="mny-empty">No investment account yet. Add Psagot Trade under Banks &amp; cards:
+        el.innerHTML = `<section class="mny-card"><div class="mny-empty">No investment account yet. Add your investment account under Banks &amp; cards (a provider addon brings it):
           its holdings, their value and the account's activity show up here after the first sync.</div></section>`;
         return;
       }
@@ -728,7 +728,7 @@
       }
       const t = C.mealTiles(m, today());
       if (!t) {
-        el.innerHTML = `<section class="mny-card"><div class="mny-empty">No meal card yet. Add Pluxee under Banks &amp; cards:
+        el.innerHTML = `<section class="mny-card"><div class="mny-empty">No meal card yet. Add your meal card under Banks &amp; cards (a provider addon brings it):
           its budget, what is left and every meal show up here after the first sync.</div></section>`;
         return;
       }

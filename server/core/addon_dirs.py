@@ -60,15 +60,18 @@ class Source:
 
 @dataclass(frozen=True)
 class Manifest:
-    """What an ``addon.py`` declares, read without running it: the name and the ``needs``."""
+    """What an ``addon.py`` declares, read without running it: the name, the ``needs`` and the
+    worker's published image (``worker=Worker(..., image="...")``; "" without one)."""
     name: str
     needs: Tuple[str, ...] = ()
+    worker_image: str = ""
 
 
 def read_manifest(addon_py: Path) -> Optional[Manifest]:
-    """The name and ``needs`` that ``addon.py`` declares (``addon = Addon("<name>", needs=(...), ...)``),
-    read with :mod:`ast`, never run; None when no such declaration is found. ``needs`` must be a
-    literal tuple / list of strings to be read (anything else reads as none)."""
+    """The name, ``needs`` and worker image that ``addon.py`` declares (``addon = Addon("<name>",
+    needs=(...), worker=Worker(..., image="..."), ...)``), read with :mod:`ast`, never run; None when
+    no such declaration is found. ``needs`` must be a literal tuple / list of strings and ``image`` a
+    literal string to be read (anything else reads as none)."""
     try:
         tree = ast.parse(addon_py.read_text(encoding="utf-8"))
     except (OSError, SyntaxError, ValueError):
@@ -91,7 +94,12 @@ def read_manifest(addon_py: Path) -> Optional[Manifest]:
                     value = ()
                 if isinstance(value, (tuple, list)) and all(isinstance(v, str) for v in value):
                     needs = tuple(value)
-        return Manifest(args[0].value, needs)
+        image = ""
+        for k in call.keywords:
+            if k.arg == "worker" and isinstance(k.value, ast.Call):
+                image = next((w.value.value for w in k.value.keywords if w.arg == "image"
+                              and isinstance(w.value, ast.Constant) and isinstance(w.value.value, str)), "")
+        return Manifest(args[0].value, needs, image)
     return None
 
 
@@ -160,3 +168,24 @@ def installed_info(path: Path) -> Optional[Dict[str, Any]]:
     except (OSError, ValueError):
         return None
     return data if isinstance(data, dict) else None
+
+
+def worker_image(path: Path) -> Optional[str]:
+    """The image reference the worker of the addon in ``path`` runs, pinned: the manifest's
+    ``Worker(image=...)`` as written when it names a tag or digest, else tagged with the commit
+    it was installed at (its :data:`INSTALLED_FILE`); None when it declares no image (a ``worker/``
+    folder is built instead: docs/operations.md, "Workers").
+
+    Raises:
+        ValueError: an image without a tag in a folder that records no commit.
+    """
+    manifest = read_manifest(path / "addon.py")
+    image = manifest.worker_image if manifest else ""
+    if not image:
+        return None
+    if "@" in image or ":" in image.rsplit("/", 1)[-1]:
+        return image
+    commit = str((installed_info(path) or {}).get("commit") or "")
+    if not commit:
+        raise ValueError(f"{path.name}: the worker image {image} has no tag and the addon records no installed commit")
+    return f"{image}:{commit}"

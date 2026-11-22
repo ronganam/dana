@@ -2,8 +2,8 @@
 Run: bin/test test_money_dashboard
 
 A synthetic year, every value made up, with today fixed at Wed 18 Nov 2026
-09:30 (Asia/Jerusalem). Robin (the first admin) has a Hapoalim account and a
-Cal card billed on the 15th: a salary on the 1st whose amount varies (on
+09:30 (Asia/Jerusalem). Robin (the first admin) has a bank account and a
+card billed on the 15th: a salary on the 1st whose amount varies (on
 Sunday 2 Aug when the 1st was a Saturday), a mortgage, groceries every
 Friday and restaurants twice a month, Netflix monthly with a price change,
 electricity every ~2 months on drifting days, a car insurance once a year, a
@@ -50,6 +50,8 @@ db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import moneyfakes  # noqa: E402  (the made-up provider: moneyfakes.py)
 
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
@@ -92,7 +94,7 @@ def account(user, kind: str, number: str, **kw: Any) -> str:
         conn.execute("INSERT INTO money_accounts (id, user_id, source_id, company, kind, number, balance, balance_at, "
                      "next_charge, next_charge_date, billed_from_account_id, created_at, updated_at) "
                      "VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                     (aid, user.id, "hapoalim" if kind == "bank" else "visaCal", kind, number, kw.get("balance"),
+                     (aid, user.id, "samplebank" if kind == "bank" else "samplecard", kind, number, kw.get("balance"),
                       kw.get("balance_at"), kw.get("next_charge"), kw.get("next_charge_date"), kw.get("billed_from"),
                       STAMP, STAMP))
     return aid
@@ -183,7 +185,7 @@ T["sofa_2"] = txn(ROBIN, CARD, D(2026, 10, 5), -120_000, "רהיטי הבית", 
                   inst=(2, 4), orig=-480_000)
 T["gift"] = txn(ROBIN, BANK, D(2026, 9, 21), -1_200_000, "העב' לאחר-נייד", "gifts_donations", "transfer_out",
                 memo="לטובת: דנה ויואב. עבור: חתונה.", merchant="דנה ויואב")
-T["psagot"] = txn(ROBIN, BANK, D(2026, 4, 9), -4_000_000, "העב' לאחר-נייד", "investments", "investment",
+T["invest"] = txn(ROBIN, BANK, D(2026, 4, 9), -4_000_000, "העב' לאחר-נייד", "investments", "investment",
                   memo="לטובת: בית ההשקעות הראשון בע\"מ. עבור: השקעה.", merchant="בית ההשקעות הראשון")
 # The card bills on the bank: what was charged on each 15th (from December on).
 charged: Dict[D, int] = {}
@@ -216,7 +218,7 @@ def test_kinds_and_detection() -> None:
     check("kinds: one-offs — the car (₪35,000 is a purchase, not a yearly renewal), the laptop and its refund, "
           "every payment of the furniture plan (its total counts), the gift",
           [kind(k) for k in ("car", "laptop", "laptop_refund", "sofa_1", "sofa_2", "gift")] == ["one_off"] * 6)
-    check("kinds: money set aside and income are not spending", kind("psagot") is None and kind("salary_2026-10") is None)
+    check("kinds: money set aside and income are not spending", kind("invest") is None and kind("salary_2026-10") is None)
     rec = {i["merchant"]: i for i in BOOK.recurring}
     sal = rec.get("משכורת נוגה תעשיות בע\"מ")
     check("recurring: the salary is found though its amount varies (median of the last three), due on the 1st",
@@ -242,7 +244,7 @@ def test_kinds_and_detection() -> None:
         return {"id": uuid.uuid4().hex, "purchase_date": day, "amount": amount, "merchant_key": key,
                 "merchant": kw.pop("merchant", key), "status": "completed", "occurred_at": None,
                 "installment_total": kw.pop("installment_total", None), "installment_number": None,
-                "account_kind": "card", "account_company": "visaCal", "account_number": "1", "account_id": "a",
+                "account_kind": "card", "account_company": "samplecard", "account_number": "1", "account_id": "a",
                 "category": kw.pop("category", "utilities"), "eff_flow": "purchase", "description": key, **kw}
     water = [r("2026-07-16", -79_000, "מי העיר בעמ", merchant="מי העיר"),
              r("2026-09-10", -33_000, "מי העיר בעמ הק", merchant="מי העיר"),

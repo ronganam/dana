@@ -69,7 +69,7 @@ class MoneySaveTest {
         assertEquals("₪2,281–₪2,548", t.could)
         assertEquals("a year · 4 ideas", t.couldSub)
         assertEquals("≈ ₪359 a year", t.savedSub)
-        assertEquals("Bank of Israel rate 4.25% (18 Nov) · amounts from your charges", t.source)
+        assertEquals("Bank of Example rate 4.25% (18 Nov) · amounts from your charges", t.source)
         assertEquals("+₪14/yr" to "save", MoneySave.savingChip(svi(arnona))!!.let { it.text to it.kind })
         assertEquals("+₪768–₪888/yr", MoneySave.savingChip(svi(bill))!!.text)
         assertEquals("₪60,000/yr at stake" to "stake", MoneySave.savingChip(svi("mortgage"))!!.let { it.text to it.kind })

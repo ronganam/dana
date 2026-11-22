@@ -251,8 +251,8 @@ private fun LoginFields(money: MoneyController, f: LoginForm) {
             label = "Name (optional)",
             onDone = { ledger.submitLogin() }
         )
-        if (company.id == "hapoalim" && f.sourceId == null) {
-            Muted("The bank sends an SMS code the first time Dana signs in. Your phone hands it over by itself; if not, a box for it shows up here.")
+        if (company.signInCode && f.sourceId == null) {
+            Muted("${company.name} sends an SMS code the first time Dana signs in. Your phone hands it over by itself; if not, a box for it shows up here.")
         }
         f.error?.let { Text(it, color = Danger, style = MaterialTheme.typography.bodySmall) }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

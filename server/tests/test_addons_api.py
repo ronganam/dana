@@ -250,8 +250,7 @@ async def test_me_and_list(client: TestClient) -> None:
           and addons["whatsapp"]["setup"][0].startswith("Run a WAHA server")
           and isinstance(ha["title"], str) and ha["source"] == "official" and ha["state"] == "on"
           and ha["needs"] == [] and ha["everyone"] is False and ha["web"] == [] and ha["worker"] is False
-          and addons["money"]["worker"] is False and addons["money_il"]["worker"] is True
-          and addons["money_il"]["needs"] == ["money"]
+          and addons["money"]["worker"] is False and addons["money"]["needs"] == []
           and ha["connect_url"] is None and addons["calendar"]["connect_url"] == "/api/google/connect"
           and ha["connect_label"] is None and addons["calendar"]["connect_label"] is None
           and addons["telegram_account"]["connect_label"] == "Connect Telegram"
@@ -648,7 +647,7 @@ async def test_welcome(client: TestClient) -> None:
           bob["show"] is True and bob["dismissed"] is False and bob["suggested"][:3] == ["homeassistant", "whatsapp",
                                                                                      "calendar"]
           and len(bob["suggested"]) <= addons_api.WELCOME_SUGGESTIONS
-          and not {"cameras", "ops", "money_il", "tasks", "essentials"} & set(bob["suggested"]), bob)
+          and not {"cameras", "ops", "tasks", "essentials"} & set(bob["suggested"]), bob)
     check("welcome: Carl too", welcome["carl"]["show"] is True, welcome["carl"])
     store.connect(CARL, "tasks")  # an addon every new user gets does not count
     status, body = await call(client, "GET", "/api/addons", CARL_AUTH)

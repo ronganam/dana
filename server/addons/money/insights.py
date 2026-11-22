@@ -230,8 +230,8 @@ def recurring(user: User, today: Optional[datetime.date] = None) -> Dict[str, An
 # --- Yearly charges -------------------------------------------------------------------------
 
 def plan_total(r: Dict[str, Any]) -> int:
-    """What a row stands for, positive agorot: an installment plan's total (Cal gives
-    it as the original amount), else the row's own amount."""
+    """What a row stands for, positive agorot: an installment plan's total (card
+    companies give it as the original amount), else the row's own amount."""
     n = r.get("installment_total") or 0
     if n > 1:
         if r.get("orig_amount") and (r.get("orig_currency") or "ILS") == "ILS":
