@@ -56,6 +56,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
 
     val appUpdateInfo by viewModel.appUpdateInfo.collectAsState()
     val updateCheckDone by viewModel.updateCheckDone.collectAsState()
+    val updateCheckFailed by viewModel.updateCheckFailed.collectAsState()
     val wearVersionInfo by viewModel.wearVersionInfo.collectAsState()
     val wearUpdateInfo by viewModel.wearUpdateInfo.collectAsState()
 
@@ -211,10 +212,15 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
 
                     val update = appUpdateInfo
                     when {
-                        update == null && !updateCheckDone -> Text(
+                        !updateCheckDone -> Text(
                             "Checking for updates…",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        update == null && updateCheckFailed -> Text(
+                            "Couldn't check for updates: the server didn't answer",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error
                         )
                         update == null -> Text(
                             "You're on the latest version",
@@ -278,7 +284,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                             viewModel.checkForAppUpdate()
                             viewModel.fetchWearVersion()
                         },
-                        enabled = downloadProgress !in 0..99,
+                        enabled = downloadProgress !in 0..99 && updateCheckDone,
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
                     ) { Text("Check for updates") }
                 }

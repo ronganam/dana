@@ -273,16 +273,23 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val _wearUpdateInfo = MutableStateFlow<AppVersionInfo?>(null)
     val wearUpdateInfo: StateFlow<AppVersionInfo?> = _wearUpdateInfo.asStateFlow()
 
-    /** Check the server for a newer phone-app version (silent). */
+    private val _updateCheckFailed = MutableStateFlow(false)
+    /** True when the last check could not read the server's version list. */
+    val updateCheckFailed: StateFlow<Boolean> = _updateCheckFailed.asStateFlow()
+
+    /** Check the server for a newer phone-app version; Settings shows "Checking…" until it ends. */
     fun checkForAppUpdate() {
+        _updateCheckDone.value = false
         viewModelScope.launch {
             try {
                 val info = UpdateManager.checkForUpdate(serverConfig.url, "phone")
+                _updateCheckFailed.value = info == null
                 _appUpdateInfo.value = info?.takeIf { UpdateManager.isNewer(it, BuildConfig.VERSION_CODE) }
                 _wearUpdateInfo.value = UpdateManager.checkForUpdate(serverConfig.url, "wear")
             } catch (e: Exception) {
                 if (e is kotlinx.coroutines.CancellationException) throw e
                 android.util.Log.w("MainViewModel", "Update check failed: $e")
+                _updateCheckFailed.value = true
             } finally {
                 _updateCheckDone.value = true
             }

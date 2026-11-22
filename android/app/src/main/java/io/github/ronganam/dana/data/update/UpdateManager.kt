@@ -27,7 +27,7 @@ data class AppVersionInfo(
     val releaseNotes: String
 )
 
-/** One artifact's entry of `GET /api/app/version` (its version keys are camelCase). */
+/** One artifact's entry of `GET /api/app/version` (its version keys are camelCase, `release_notes` is not). */
 @Serializable
 private data class VersionEntry(
     @SerialName("versionName") val versionName: String = "",
@@ -35,7 +35,7 @@ private data class VersionEntry(
     val file: String = "",
     val sha256: String = "",
     val size: Long = 0,
-    val releaseNotes: String = ""
+    @SerialName("release_notes") val releaseNotes: String = ""
 ) {
     fun toInfo(artifact: String) = AppVersionInfo(artifact, versionName, versionCode, file, sha256, size, releaseNotes)
 }
