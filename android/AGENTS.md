@@ -119,7 +119,8 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 | `docs/people.md` | Caller card, People / weekly review screens, briefing / meeting / review pushes, home-screen widgets |
 | `docs/wear.md` | Watch app: pairing (its own device, through the phone or a typed code), performance rules, hands-free turns, phone bridge, alarm, tiles / complications, the Shopping screen (and its debug fake phone) |
 | `docs/kiosk.md` | Wall-tablet kiosk, wake word, voice turn tuning |
-| `docs/tv.md` | Dana TV: home override, key service, camera PiP, TCL/MTK quirks |
+| `docs/tv.md` | Dana TV: home override, key service, camera PiP, Dashboard row, TCL/MTK quirks |
+| `docs/hardware.md` | Tablets and TVs Dana is tested on, which flavor to install, what the wake word needs (mic, always-on power, Android 8+) |
 | `docs/permissions.md` | Every permission and special access, per flavor; distribution (sideload / your server, not Play); call recordings opt-in |
 | `docs/release.md` | Releases (the tag workflow, signing secrets, release assets, `versions.json`), setup (SDK, JDK), HTTPS / cleartext, signing, in-app updates, R8/AOT, local defaults (Firebase config, server URL, TV defaults) |
 | `DESIGN.md` | "Ink & Paper" design system |
