@@ -67,8 +67,9 @@ misconfigured URL cannot reach a real service.
 Not stubbed: **Google Calendar** (unreachable: calendar reads come back empty,
 `POST /api/addons/calendar/test` answers `ok: false`), **FCM** (not
 configured: push events queue and the phone fetches them with `GET
-/api/phone/events`), **TypeSafe** (no key: notifications stay untriaged),
-web search, kubectl.
+/api/phone/events`), **TypeSafe** (no key: triage asks the model stub, whose
+minimal structured reply judges nothing, so notifications stay pending and end
+`failed`), web search, kubectl.
 
 ## The env file
 

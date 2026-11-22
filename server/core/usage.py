@@ -10,7 +10,7 @@ Capture costs the calling code nothing:
   sent to a provider): :func:`meta` builds it from the call's ``purpose`` /
   ``ref`` / ``source`` and the surrounding :func:`scope`.
 * **Calls outside LiteLLM** call :func:`record` themselves: TypeSafe
-  (``addons/phone/notifications/triage.py``, priced per input token by :func:`decision_cost`) and the
+  (``addons/phone/notifications/judges.py``, priced per input token by :func:`decision_cost`) and the
   OpenAI realtime WebSocket (``core/realtime.py``, priced from LiteLLM's price
   table by :func:`realtime_cost`).
 

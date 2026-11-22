@@ -1,15 +1,21 @@
 """Processing a user's new notifications: triage → suggestions → escalation.
 
 :func:`schedule` first hands the new ids to the other addons' observers
-(:mod:`.observers`, e.g. money's payment signals), then queues each new
-notification for :func:`process_notification` (run as its user), which
-triages it with TypeSafe (:mod:`.triage`) →
-``category``, ``priority``, ``bucket``. A failed triage leaves
-``triage_status='failed'`` and ``bucket='normal'``. When the triage finds
-something to do, the model extracts it into task / event suggestions (the
-``call_suggestions`` table, ``source_type='notification'``), with the user's
-own context (open tasks, zones, task groups), accepted only by them like call
-suggestions. Urgent ones are announced on the user's phone (:mod:`.escalation`).
+(``phone.notification.ingested``, e.g. money's payment signals), then queues
+them for triage. Each user has one queue; a worker takes up to the judge's
+batch size (:mod:`.judges`: the LLM, or TypeSafe) at a time, at most
+``CONCURRENCY`` batches at once across users, so notifications that arrive
+while a call is running go together in the next one. :func:`process_batch`
+(run as the user) asks the judge, then :func:`triage.decide` →
+``category``, ``priority``, ``bucket``. A notification the judge did not
+answer stays ``triage_status='pending'`` (``bucket='normal'``, never a guessed
+answer) with its attempts counted in ``triage``; :func:`retry_pending` tries
+it again later, and after :data:`MAX_ATTEMPTS` it is ``failed``. When the
+triage finds something to do, the model extracts it into task / event
+suggestions (the ``call_suggestions`` table, ``source_type='notification'``),
+with the user's own context (open tasks, zones, task groups), accepted only by
+them like call suggestions. Urgent ones are announced on the user's phone
+(:mod:`.escalation`).
 """
 from __future__ import annotations
 
@@ -17,9 +23,7 @@ import asyncio
 import datetime
 import json
 import logging
-from typing import Any, Dict, Iterable, List, Optional, Set
-
-import httpx
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
 from core import clock, events, llm, user_profile, users
 from core.db import get_db_connection
@@ -28,15 +32,22 @@ from addons.phone import popups, suggestions
 from addons.phone.calls.analysis import analysis_schema, normalize_analysis
 from addons.phone.calls.context import feedback_prompt, gather_context
 from addons.phone.calls.suggest import replace_pending_suggestions, suggestions_from_analysis
-from addons.phone.notifications import escalation, rules, triage
+from addons.phone.notifications import escalation, judges, rules, triage
 from addons.phone.notifications.values import (CONCURRENCY, ESCALATE_MAX_AGE_SECONDS, EXTRACT_MAX_AGE_HOURS,
                                                      age_seconds, row)
 
 logger = logging.getLogger(__name__)
 
+# A notification the judge did not answer this many times is marked failed.
+MAX_ATTEMPTS = 3
+# retry_pending leaves alone what was tried less than this long ago.
+RETRY_AFTER_SECONDS = 120
+
 _sem: Optional[asyncio.Semaphore] = None
 _scheduled: Set[str] = set()
 _tasks: Set[asyncio.Task] = set()
+_queues: Dict[str, Dict[str, None]] = {}   # user id → ids waiting for triage, in order
+_workers: Dict[str, asyncio.Task] = {}     # user id → the task draining their queue
 
 
 def _semaphore() -> asyncio.Semaphore:
@@ -62,88 +73,163 @@ def _start(user: User, coro) -> Optional[asyncio.Task]:
 
 def schedule(user: User, ids: Iterable[str]) -> int:
     """Emit ``phone.notification.ingested`` for other addons (e.g. money's
-    payment signals), then queue background triage."""
+    payment signals), then queue background triage. Returns how many were queued."""
     ids = [i for i in dict.fromkeys(ids or []) if isinstance(i, str) and i]
     if ids:
         events.emit("phone.notification.ingested", user, ids=ids)
+    return _enqueue(user, ids)
+
+
+def _enqueue(user: User, ids: Sequence[str]) -> int:
+    """Queue ``user``'s ``ids`` for triage (those not already queued or running)."""
     try:
-        asyncio.get_running_loop()
+        loop = asyncio.get_running_loop()
     except RuntimeError:
         return 0
+    queue = _queues.setdefault(user.id, {})
     n = 0
     for nid in ids:
         if nid in _scheduled:
             continue
         _scheduled.add(nid)
-        _start(user, _run(user, nid))
+        queue[nid] = None
         n += 1
+    worker = _workers.get(user.id)
+    if queue and (worker is None or worker.done() or worker.get_loop() is not loop):
+        started = _start(user, _drain(user))
+        if started is not None:
+            _workers[user.id] = started
     return n
 
 
-async def _run(user: User, nid: str) -> None:
+async def _drain(user: User) -> None:
+    """Hand ``user``'s queue to the judge a batch at a time, waiting for a free slot
+    before taking each batch (so what arrives meanwhile joins it)."""
+    queue = _queues.get(user.id)
+    while queue:
+        await _semaphore().acquire()
+        chunk = list(queue)[:judges.judge().batch_size]
+        if not chunk:
+            _semaphore().release()
+            break
+        for nid in chunk:
+            del queue[nid]
+        if _start(user, _run(user, chunk)) is None:
+            _semaphore().release()
+            break
+
+
+async def _run(user: User, ids: List[str]) -> None:
     try:
-        async with _semaphore():
-            await process_notification(user, nid)
+        await process_batch(user, ids)
     except Exception as e:
-        logger.error(f"Notification {nid} processing failed: {e}", exc_info=True)
+        logger.error(f"Notifications {ids} processing failed: {e}", exc_info=True)
     finally:
-        _scheduled.discard(nid)
+        _semaphore().release()
+        for nid in ids:
+            _scheduled.discard(nid)
 
 
-async def process_notification(user: User, nid: str, *,
-                               client: Optional[httpx.AsyncClient] = None) -> Optional[Dict[str, Any]]:
-    """Triage ``user``'s notification ``nid`` (as ``user``), then extract / escalate. None when not found or failed."""
+async def process_notification(user: User, nid: str) -> Optional[Dict[str, Any]]:
+    """Triage ``user``'s notification ``nid`` now (as ``user``), then extract / escalate.
+    None when not found or not judged."""
+    return (await process_batch(user, [nid])).get(nid)
+
+
+async def process_batch(user: User, ids: Sequence[str]) -> Dict[str, Dict[str, Any]]:
+    """Triage ``user``'s notifications ``ids`` (as ``user``; ids that are not theirs are
+    skipped), then extract / escalate. Returns the decision per notification judged."""
     with users.acting_as(user):
-        return await _process(user, nid, client)
+        return await _process(user, ids)
 
 
-async def _process(user: User, nid: str, client: Optional[httpx.AsyncClient]) -> Optional[Dict[str, Any]]:
+async def _process(user: User, ids: Sequence[str]) -> Dict[str, Dict[str, Any]]:
+    todo: List[Dict[str, Any]] = []
     with get_db_connection() as conn:
-        n = row(conn, user, nid)
-        if not n:
-            return None
-        rule = rules.rule_for(conn, user, n["package"], n.get("sender") or "")
-        low = rules.is_low_engagement(rules.engagement(conn, user, n["package"]))
+        for nid in dict.fromkeys(ids):
+            n = row(conn, user, nid)
+            if not n:
+                continue
+            n["_rule"] = rules.rule_for(conn, user, n["package"], n.get("sender") or "")
+            n["_low"] = rules.is_low_engagement(rules.engagement(conn, user, n["package"]))
+            todo.append(n)
 
-    if rule == "mute":
-        decision = triage.decide_rule_only(rule)
-        status = "skipped"
-    else:
+    decided: Dict[str, Dict[str, Any]] = {}
+    for n in [n for n in todo if n["_rule"] == "mute"]:
+        decided[n["id"]] = _store(user, n, triage.decide_rule_only("mute"), "skipped", "")
+    ask = [n for n in todo if n["_rule"] != "mute"]
+    if ask:
+        judge = judges.judge()
         who = user_profile.for_user(user)
-        state = triage.build_state(n, who.name, who.context)
-        try:
-            answers = await triage.ask(state, me=who.first_name, pronoun=who.pronoun, client=client, ref=f"notification:{nid}")
-        except triage.TriageError as e:
-            logger.warning(f"Triage failed for notification {nid}: {e}")
-            with get_db_connection() as conn:
-                # scoped: row(conn, user, nid) checked above
-                conn.execute("UPDATE notifications SET triage_status = 'failed', triage = ?, "
-                             "updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                             (json.dumps({"error": str(e)[:300]}), nid))
-                conn.commit()
-            return None
-        decision = triage.decide(answers, rule=rule, low_engagement=low)
-        status = "done"
+        for i in range(0, len(ask), judge.batch_size):
+            part = ask[i:i + judge.batch_size]
+            error = "not judged"
+            try:
+                answers = await judge.judge(who, part)
+            except triage.TriageError as e:
+                answers, error = {}, str(e)
+                logger.warning(f"Triage failed for {len(part)} notification(s) of user {user.id}: {e}")
+            for n in part:
+                if n["id"] in answers:
+                    d = triage.decide(answers[n["id"]], rule=n["_rule"], low_engagement=n["_low"])
+                    decided[n["id"]] = _store(user, n, d, "done", judge.model())
+                else:
+                    _not_judged(user, n, error)
 
+    for n in todo:
+        if n["id"] in decided:
+            await _follow_up(user, n["id"], decided[n["id"]])
+    return decided
+
+
+def _store(user: User, n: Dict[str, Any], decision: Dict[str, Any], status: str, model: str) -> Dict[str, Any]:
+    """Write ``decision`` on ``user``'s notification ``n``."""
     with get_db_connection() as conn:
         conn.execute(
-            # scoped: row(conn, user, nid) checked above
             "UPDATE notifications SET triage_status = ?, category = ?, priority = ?, priority_score = ?, bucket = ?, "
-            "triage = ?, action_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+            "triage = ?, action_status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND user_id = ?",
             (status, decision["category"], decision["priority"], decision["priority_score"], decision["bucket"],
-             json.dumps({"model": triage.MODEL, "low_engagement": low, "rule": rule, **decision["signals"]},
+             json.dumps({"model": model, "low_engagement": n["_low"], "rule": n["_rule"], **decision["signals"]},
                         ensure_ascii=False),
-             "pending" if decision["extract"] else "none", nid))
+             "pending" if decision["extract"] else "none", n["id"], user.id))
         conn.commit()
-        n = row(conn, user, nid)
+    return decision
 
+
+def _attempts(n: Dict[str, Any]) -> int:
+    """How many times the judge has failed ``n`` so far (kept in ``triage`` while it is unanswered)."""
+    if n.get("triage_status") not in ("pending", "failed"):
+        return 0
+    try:
+        return int((json.loads(n.get("triage") or "{}") or {}).get("attempts") or 0)
+    except (TypeError, ValueError, AttributeError):
+        return 0
+
+
+def _not_judged(user: User, n: Dict[str, Any], error: str) -> None:
+    """``n`` got no answer: pending for a later try, failed after :data:`MAX_ATTEMPTS`."""
+    attempts = _attempts(n) + 1
+    with get_db_connection() as conn:
+        conn.execute("UPDATE notifications SET triage_status = ?, triage = ?, updated_at = CURRENT_TIMESTAMP "
+                     "WHERE id = ? AND user_id = ?",
+                     ("failed" if attempts >= MAX_ATTEMPTS else "pending",
+                      json.dumps({"error": error[:300], "attempts": attempts}), n["id"], user.id))
+        conn.commit()
+
+
+async def _follow_up(user: User, nid: str, decision: Dict[str, Any]) -> None:
+    """Escalate / extract suggestions for a freshly triaged notification."""
+    with get_db_connection() as conn:
+        n = row(conn, user, nid)
+    if not n:
+        return
     # The first sync after access is granted (and a phone that was offline)
     # delivers old notifications: announcing them now, or suggesting work from
     # days ago, is noise.
-    age = age_seconds(n.get("posted_at") if n else None)
-    if decision["escalate"] and n and n["status"] == "active" and age <= ESCALATE_MAX_AGE_SECONDS:
+    age = age_seconds(n.get("posted_at"))
+    if decision["escalate"] and n["status"] == "active" and age <= ESCALATE_MAX_AGE_SECONDS:
         await escalation.escalate(user, n)
-    if decision["extract"] and n:
+    if decision["extract"]:
         if age <= EXTRACT_MAX_AGE_HOURS * 3600:
             made = await extract_suggestions(user, n)
             if made and age <= popups.SUGGESTION_POPUP_MAX_AGE_HOURS * 3600:
@@ -152,10 +238,23 @@ async def _process(user: User, nid: str, client: Optional[httpx.AsyncClient]) ->
                                                   f"From {n.get('app_name')}" + (f" · {who}" if who and who != n.get("app_name") else ""))
         else:
             with get_db_connection() as conn:
-                # scoped: row(conn, user, nid) checked above
-                conn.execute("UPDATE notifications SET action_status = 'none' WHERE id = ?", (nid,))
+                conn.execute("UPDATE notifications SET action_status = 'none' WHERE id = ? AND user_id = ?",
+                             (nid, user.id))
                 conn.commit()
-    return decision
+
+
+def retry_pending(user: User, max_age_hours: int = 24) -> int:
+    """Queue ``user``'s recent notifications still pending (not answered yet, under
+    :data:`MAX_ATTEMPTS`, not tried in the last :data:`RETRY_AFTER_SECONDS`). Returns how many."""
+    since = (clock.now() - datetime.timedelta(hours=max_age_hours)).isoformat(timespec="seconds")
+    before = (datetime.datetime.now(datetime.timezone.utc)
+              - datetime.timedelta(seconds=RETRY_AFTER_SECONDS)).strftime("%Y-%m-%d %H:%M:%S")
+    with get_db_connection() as conn:
+        rows = [dict(r) for r in conn.execute(
+            "SELECT id, triage, triage_status FROM notifications WHERE user_id = ? AND triage_status = 'pending' "
+            "AND posted_at >= ? AND updated_at <= ? ORDER BY posted_at DESC LIMIT 300",
+            (user.id, since, before)).fetchall()]
+    return _enqueue(user, [r["id"] for r in rows if _attempts(r) < MAX_ATTEMPTS])
 
 
 def resume_unfinished(user: User, max_age_hours: int = 24) -> int:

@@ -1,4 +1,4 @@
-"""Notification triage with TypeSafe (Jev): typed judgments in, decisions in code.
+"""Notification triage: typed judgments in, decisions in code.
 
 Every question asked about a notification lives in this module, together with
 the truth table that turns the answers into what the app shows:
@@ -6,32 +6,20 @@ the truth table that turns the answers into what the app shows:
 * ``category``  (Choice) — what kind of notification it is.
 * ``priority``  (Score)  — how much it matters to the user, 0 (noise) … 4 (now).
 * ``needs_action`` / ``from_person`` / ``time_sensitive`` / ``promotional``
-  (Nouls) — the atomic facts the decisions hang on.
+  (Nouls: probability of yes) — the atomic facts the decisions hang on, plus
+  the to-do gate (``owner_wrote_it`` … ``self_clearing``).
 
-:func:`decide` maps the answers (plus the user's rules and how they usually treat the
-app) to ``priority``, ``bucket`` (``needs_you`` | ``normal`` | ``dismiss``),
-``extract`` (worth asking Gemini for a task/event) and ``escalate``.
-
-All questions about one notification go in one request (they share the state).
-A failed call raises :class:`TriageError`; callers store the notification as
-untriaged instead of guessing.
+A judge (:mod:`.judges`: TypeSafe or the LLM) answers the questions; :func:`decide`
+maps the answers (plus the user's rules and how they usually treat the app) to
+``priority``, ``bucket`` (``needs_you`` | ``normal`` | ``dismiss``), ``extract``
+(worth asking the model for a task/event) and ``escalate``, the same whichever
+judge answered.
 """
 from __future__ import annotations
 
-import asyncio
-import logging
-import os
-import time
 from typing import Any, Dict, List, Optional
 
-import httpx
-
-from core import clock, usage, user_profile
-
-logger = logging.getLogger(__name__)
-
-API_URL = os.getenv("TYPESAFE_API_URL", "https://api.typesafe.ai").rstrip("/") + "/v1/systemone"
-MODEL = os.getenv("TYPESAFE_MODEL", "jev-latest")
+from core import clock, user_profile
 
 # Noul bands (TypeSafe's suggested starting point): ≥ YES reads as yes, ≤ NO as no.
 YES = 0.7
@@ -186,18 +174,19 @@ def questions(me: str, pronoun: str = "they") -> Dict[str, Any]:
 # The questions' ids (the same for everyone).
 QUESTION_IDS = tuple(questions(""))
 CATEGORIES = tuple(categories(""))
+NOUL_QUESTIONS = tuple(q for q, spec in questions("").items() if spec["type"] == "noul")
 
-# Asked in the same request, but older recorded answers (and tests) may lack
-# them; a missing one counts as unsettled.
+# Asked in the same request, but older recorded answers may lack them; a
+# missing one counts as unsettled.
 OPTIONAL_QUESTIONS = ("urgent_request", "owner_wrote_it", "addressed_to_owner", "tracked_elsewhere", "record_only", "self_clearing")
 
 
 class TriageError(RuntimeError):
-    pass
+    """A judge could not answer (the call failed or came back unusable)."""
 
 
-def build_state(n: Dict[str, Any], owner_name: str, owner_about: str) -> Dict[str, Any]:
-    """What a person would look at: who the user is, the time, and the notification."""
+def note_state(n: Dict[str, Any]) -> Dict[str, Any]:
+    """The notification as a judge sees it: app, title, text, sender, conversation, time."""
     posted = n.get("posted_at") or ""
     note: Dict[str, Any] = {"app": n.get("app_name") or n.get("package")}
     for key, label in (("title", "title"), ("text", "text"), ("sub_text", "subtext"),
@@ -209,76 +198,21 @@ def build_state(n: Dict[str, Any], owner_name: str, owner_about: str) -> Dict[st
         note["group_conversation"] = True
     if posted:
         note["posted_at"] = str(posted)[:16].replace("T", " ")
+    return note
+
+
+def now_text() -> str:
+    """The time line of the judges' state ("Sunday 2026-11-22 09:30")."""
+    return clock.now().strftime("%A %Y-%m-%d %H:%M")
+
+
+def build_state(n: Dict[str, Any], owner_name: str, owner_about: str) -> Dict[str, Any]:
+    """What a person would look at: who the user is, the time, and the notification."""
     return {
         "owner": {"name": owner_name, "about": owner_about},
-        "now": clock.now().strftime("%A %Y-%m-%d %H:%M"),
-        "notification": note,
+        "now": now_text(),
+        "notification": note_state(n),
     }
-
-
-async def ask(state: Dict[str, Any], *, me: str, pronoun: str = "they", api_key: Optional[str] = None,
-              client: Optional[httpx.AsyncClient] = None, retries: int = 3, ref: str = "") -> Dict[str, Any]:
-    """POST the bundled questions (worded for ``me``, the user's first name, and their ``pronoun``);
-    returns the ``answers`` dict. Raises TriageError.
-    The request is tracked in core/usage.py (``ref``: what it was for, ``notification:<id>``);
-    TypeSafe bills input tokens only and reports none, so they are estimated from the request."""
-    if not (api_key or os.getenv("TYPESAFE_API_KEY", "")):
-        return await _ask(state, me=me, pronoun=pronoun, api_key=api_key, client=client,
-                          retries=retries)  # raises, nothing was sent
-    started = time.perf_counter()
-    tokens = usage.estimate_tokens({"state": state, "questions": questions(me, pronoun)})
-
-    def track(ok: bool, error: str = "") -> None:
-        usage.record(kind="decision", purpose="notification_triage", source="phone", ref=ref, provider="typesafe",
-                     model=MODEL, input_tokens=tokens, cost=usage.decision_cost(tokens) if ok else None, ok=ok,
-                     error=error, ms=int((time.perf_counter() - started) * 1000))
-
-    try:
-        answers = await _ask(state, me=me, pronoun=pronoun, api_key=api_key, client=client, retries=retries)
-    except Exception as e:
-        track(False, str(e))
-        raise
-    track(True)
-    return answers
-
-
-async def _ask(state: Dict[str, Any], *, me: str, pronoun: str, api_key: Optional[str],
-               client: Optional[httpx.AsyncClient], retries: int) -> Dict[str, Any]:
-    key = api_key or os.getenv("TYPESAFE_API_KEY", "")
-    if not key:
-        raise TriageError("TYPESAFE_API_KEY is not set")
-    payload = {"model": MODEL, "state": state, "questions": questions(me, pronoun)}
-    logger.debug("TypeSafe request: %s", payload)
-    last: Optional[str] = None
-    own = client is None
-    client = client or httpx.AsyncClient(timeout=30.0)
-    try:
-        for attempt in range(retries):
-            try:
-                resp = await client.post(API_URL, json=payload, headers={"Authorization": f"Bearer {key}"})
-            except httpx.HTTPError as e:
-                last = f"network: {e}"
-                await asyncio.sleep(1.0 * (attempt + 1))
-                continue
-            if resp.status_code == 429 or resp.status_code >= 500:
-                last = f"HTTP {resp.status_code}"
-                try:
-                    wait = float(resp.headers.get("retry-after", "")) or 0
-                except ValueError:
-                    wait = 0
-                await asyncio.sleep(min(30.0, wait or 1.5 * (attempt + 1)))
-                continue
-            if resp.status_code != 200:
-                raise TriageError(f"TypeSafe HTTP {resp.status_code}: {resp.text[:300]}")
-            answers = (resp.json() or {}).get("answers") or {}
-            missing = [q for q in QUESTION_IDS if q not in answers and q not in OPTIONAL_QUESTIONS]
-            if missing:
-                raise TriageError(f"TypeSafe answer missing {missing}")
-            return answers
-    finally:
-        if own:
-            await client.aclose()
-    raise TriageError(f"TypeSafe failed after {retries} attempts ({last})")
 
 
 def _noul(answers: Dict[str, Any], name: str) -> float:
@@ -367,7 +301,7 @@ def decide(answers: Dict[str, Any], *, rule: Optional[str] = None,
         "priority": priority,
         "priority_score": round(score, 3),
         "bucket": bucket,
-        # Ask Gemini for a concrete task/event only when there is one to find.
+        # Ask the model for a concrete task/event only when there is one to find.
         # (A calendar reminder is already in the calendar; a new event would duplicate it.)
         "extract": worth_a_task and rule != "mute" and cat not in ("security", "promotion", "calendar_reminder"),
         # A calendar reminder is already the alarm; announcing it twice is noise.

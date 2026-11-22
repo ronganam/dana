@@ -15,7 +15,7 @@ Every model is a LiteLLM id (`provider/model`: `anthropic/claude-haiku-5-5`, `ge
 | `MODEL` | Telegram + trigger agent runs, small helpers (task emoji/group, WhatsApp name matching, voice-note and media summaries) |
 | `BACKGROUND_MODEL` | default for the structured jobs below |
 | `CALL_ANALYSIS_MODEL` | call analysis (→ `BACKGROUND_MODEL`) |
-| `NOTIFICATION_MODEL` | notification → task/event extraction and Inbox summaries (→ `BACKGROUND_MODEL`) |
+| `NOTIFICATION_MODEL` | notification triage (the LLM judge), notification → task/event extraction and Inbox summaries (→ `BACKGROUND_MODEL`) |
 | `BRIEFING_MODEL` | people briefs, wake briefing, weekly review (→ `BACKGROUND_MODEL`) |
 | `SHOPPING_MODEL` | the shopping aisle of new item names (→ `BACKGROUND_MODEL`; without its key items stay under Other, `docs/shopping.md`) |
 | `MONEY_MODEL` | money transaction categories and clean merchant names (→ `BACKGROUND_MODEL`; without its key, rows the rules cannot settle stay uncategorized, `docs/money.md`) |
@@ -75,11 +75,12 @@ Two values: an LLM key (`ANTHROPIC_API_KEY` with the default models) and `API_TO
 | `OWNER_LANGUAGES` / `OWNER_CURRENCY` | the first user's languages (comma list of codes, the first is the default reply language, e.g. `he,en`) and currency (ISO 4217, e.g. `ILS`); read once when that user is created, a malformed value is skipped with a warning. Unset: the server's `DEFAULT_LANGUAGES` / `CURRENCY` apply. Later: the web Profile card or `bin/dana users update --languages / --currency` |
 | `DEFAULT_LANGUAGES` | the languages of a user who chose none (default `en`; a comma list, e.g. `he,en`): they word the agent's language rule and the transcription prompt (`core/user_locale.py`) |
 | `CURRENCY` | the currency of a user who chose none (default `USD`; ISO 4217): what money values mean in Projects (budgets, prices). The money addon keeps its banks' own currency |
-| `TYPESAFE_API_KEY` | TypeSafe (Jev) key for notification triage (`addons/phone/notifications/triage.py`), server-wide (every user's triage uses it); unset = notifications stay untriaged |
+| `TYPESAFE_API_KEY` | optional: TypeSafe (Jev) key; set, notification triage asks TypeSafe instead of the model (cheaper, calibrated probabilities; `addons/phone/notifications/judges.py`), server-wide (every user's triage uses it). Unset, triage runs on the model (`NOTIFICATION_MODEL`, `docs/notifications.md` → Judges) |
 | `TYPESAFE_MODEL` | TypeSafe model (default `jev-latest`) |
 | `TYPESAFE_COST_PER_MTOK` | USD per million TypeSafe input tokens for the Usage screen (`core/usage.py`); default 0.042 (Jev's published price) |
 | `USAGE_RAW_DAYS` / `USAGE_FLUSH_SECONDS` | Usage tracking: days of per-call rows kept before they are folded into daily totals (60); seconds between buffered writes (3) |
 | `NOTIFICATION_RETENTION_DAYS` | days notifications are kept (default 30; ones a task came from are kept) |
+| `NOTIFICATION_TRIAGE_BATCH` / `NOTIFICATION_TRIAGE_CONCURRENCY` | notification triage: notifications per model call (10; TypeSafe always takes one per request), triage calls running at once across users (4) |
 | `NOTIFICATION_DIGEST_TIMES` | comma-separated `HH:MM` digest times (default `08:30,20:30`; empty = off) |
 | `NOTIFICATION_ESCALATE` / `NOTIFICATION_ESCALATIONS_PER_HOUR` | re-announce urgent notifications on the phone (default on, 6/h) |
 | `NOTIFICATION_ALERT_STYLE` | `screen` (default: full-screen alert on the phone, push event `alert`) or `notify` (a `⚡ Dana:` notification) |

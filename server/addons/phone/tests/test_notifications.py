@@ -1,5 +1,5 @@
 """Notifications pipeline: batch ingest (dedupe, redaction, loop guards) →
-TypeSafe triage (mocked) → buckets / escalation → model suggestions (mocked)
+TypeSafe-judged triage (mocked) → buckets / escalation → model suggestions (mocked)
 → accept (task linked to the notification) / bulk dismiss, shade sync
 (removals + cancel_keys), rules, search, agent tools, digest, retention, and
 the truth table in addons/phone/notifications/triage.decide.
@@ -49,7 +49,7 @@ from core.db import get_db_connection
 from core.addons import registry, store
 from addons.phone import notification_tools as phone_tools, popups, push as phone_push
 from addons.phone.notifications import digest, escalation, ingest, processing, retention, rules, shade
-from addons.phone.notifications import summary as ns, triage, values
+from addons.phone.notifications import judges, summary as ns, triage, values
 
 results = []
 
@@ -173,7 +173,7 @@ def pushes(type_):
 async def no_sleep(*_a, **_k):
     return None
 
-triage.asyncio.sleep = no_sleep  # retries without waiting
+judges.asyncio.sleep = no_sleep  # retries without waiting
 
 
 async def fake_zones(conn):
@@ -235,10 +235,11 @@ def note(key, text, title="Title", package="com.whatsapp", app="WhatsApp", **kw)
 
 
 async def settle():
+    # asyncio.sleep is patched to return at once (above): wait on the tasks themselves.
     for _ in range(200):
         if not processing._tasks:
             return
-        await asyncio.sleep(0.02)
+        await asyncio.wait(set(processing._tasks), timeout=0.02)
 
 
 def row(nid):
@@ -338,8 +339,9 @@ async def main():
         check("triage: courier → urgent", door["priority"] == "urgent", door)
         check("triage: news → normal", news["bucket"] == "normal", news)
         broken = row(ids["k8"])
-        check("triage failure → failed + normal (no guess)",
-              broken["triage_status"] == "failed" and broken["bucket"] == "normal", broken)
+        check("triage failure → still pending, attempt counted, normal (no guess)",
+              broken["triage_status"] == "pending" and broken["bucket"] == "normal"
+              and json.loads(broken["triage"])["attempts"] == 1, broken)
 
         def wolt_alerts():
             return [p for p in pushes("alert") if p["data"].get("app") == "Wolt"]

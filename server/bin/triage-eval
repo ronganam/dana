@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Compare the notification triage judges on made-up notifications.
+
+    bin/triage-eval                  every judge whose key is set
+    bin/triage-eval --only llm       one judge (llm | typesafe)
+    bin/triage-eval --show           also print every notification's buckets
+
+Runs the judges of addons/phone/notifications/judges.py over the fixed set in
+tests/fixtures/triage_eval.json (made-up people, apps and amounts; an
+``expect`` bucket per notification), turns each judge's answers into buckets
+with ``triage.decide()`` and prints, per bucket: how often each judge matches
+the expected bucket and how often the two judges agree, then the
+disagreements and the tokens / cost per notification.
+
+It calls the real APIs (TypeSafe when ``TYPESAFE_API_KEY`` is set, the LLM
+judge when the triage model's provider key is set: ``MODEL_NOTIFICATION_TRIAGE``
+→ ``NOTIFICATION_MODEL`` → ``BACKGROUND_MODEL``), from the environment or
+server/.env, and costs a few cents. Not a test: bin/test never runs it.
+Nothing is written: the database is a temporary one, removed at exit.
+"""
+
+from __future__ import annotations
+
+import argparse
+import asyncio
+import collections
+import datetime
+import json
+import os
+import shutil
+import sys
+import tempfile
+import time
+from pathlib import Path
+from typing import Any, Dict, List
+
+SERVER = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(SERVER))
+
+# Dana's own .env, and LiteLLM kept from loading any, before anything else of Dana (core/env_file.py).
+from core import env_file  # noqa: E402
+env_file.load()
+_tmp = tempfile.mkdtemp(prefix="dana-triage-eval-")
+os.environ["DATABASE_PATH"] = str(Path(_tmp) / "db.sqlite3")  # never the real database
+os.environ.setdefault("TIMEZONE", "Asia/Jerusalem")  # the fixture's people live in Israel (no database to ask)
+
+from core import clock, llm, purposes, usage  # noqa: E402
+from core.user_profile import Profile  # noqa: E402
+from addons.phone.addon import addon as phone_addon  # noqa: E402
+from addons.phone.notifications import judges, triage  # noqa: E402
+
+FIXTURE = SERVER / "tests" / "fixtures" / "triage_eval.json"
+BUCKETS = ("needs_you", "normal", "dismiss")
+CONCURRENCY = 4
+
+
+def load() -> tuple:
+    """(the owner's profile, the notifications with ``posted_at`` set from ``minutes_ago``)."""
+    data = json.loads(FIXTURE.read_text(encoding="utf-8"))
+    o = data["owner"]
+    who = Profile(name=o["name"], first_name=o["first_name"], context=o["context"], called=o["first_name"],
+                  pronoun=o["pronoun"], referent=o["first_name"])
+    now = clock.now()
+    notes = []
+    for n in data["notifications"]:
+        n = dict(n)
+        n["posted_at"] = (now - datetime.timedelta(minutes=n.pop("minutes_ago", 0))).isoformat(timespec="seconds")
+        notes.append(n)
+    return who, notes
+
+
+def llm_ready(model: str) -> bool:
+    names = llm.PROVIDER_KEYS.get(llm.provider(model))
+    return bool(names) and any(os.getenv(n, "").strip() for n in names)
+
+
+def available(only: str) -> Dict[str, judges.Judge]:
+    found: Dict[str, judges.Judge] = {}
+    key = os.getenv("TYPESAFE_API_KEY", "").strip()
+    if key and only in ("", "typesafe"):
+        found["typesafe"] = judges.TypeSafeJudge(key)
+    lj = judges.LlmJudge()
+    if only in ("", "llm"):
+        if llm_ready(lj.model()):
+            found["llm"] = lj
+        else:
+            print(f"llm: skipped, no API key for {lj.model()}")
+    if only in ("", "typesafe") and not key:
+        print("typesafe: skipped, TYPESAFE_API_KEY is not set")
+    return found
+
+
+async def run(judge: judges.Judge, who: Profile, notes: List[Dict[str, Any]]) -> Dict[str, Dict[str, Any]]:
+    """Every notification's decision by ``judge`` (missing: not judged)."""
+    sem = asyncio.Semaphore(CONCURRENCY)
+    answers: Dict[str, Dict[str, Any]] = {}
+
+    async def part(chunk: List[Dict[str, Any]]) -> None:
+        async with sem:
+            try:
+                answers.update(await judge.judge(who, chunk))
+            except triage.TriageError as e:
+                print(f"  {judge.name}: a call failed: {e}")
+
+    size = judge.batch_size
+    await asyncio.gather(*(part(notes[i:i + size]) for i in range(0, len(notes), size)))
+    return {nid: triage.decide(a) for nid, a in answers.items()}
+
+
+def pct(a: int, b: int) -> str:
+    return f"{100 * a / b:3.0f}%" if b else "  - "
+
+
+def report(notes: List[Dict[str, Any]], results: Dict[str, Dict[str, Dict[str, Any]]], show: bool) -> None:
+    names = list(results)
+    bucket = {name: {nid: d["bucket"] for nid, d in r.items()} for name, r in results.items()}
+    print("\nAgainst the expected bucket (share of the notifications expected there that the judge put there):")
+    print(f"  {'bucket':<10} {'n':>3}  " + "  ".join(f"{n:>9}" for n in names))
+    for b in BUCKETS + ("all",):
+        group = [n for n in notes if b == "all" or n["expect"] == b]
+        cells = [pct(sum(1 for n in group if bucket[name].get(n["id"]) == n["expect"]), len(group)) for name in names]
+        print(f"  {b:<10} {len(group):>3}  " + "  ".join(f"{c:>9}" for c in cells))
+
+    if len(names) == 2:
+        a, b2 = names
+        both = [n for n in notes if n["id"] in bucket[a] and n["id"] in bucket[b2]]
+        print(f"\nAgreement between the judges ({len(both)} judged by both), per bucket of {a}:")
+        for b in BUCKETS + ("all",):
+            group = [n for n in both if b == "all" or bucket[a][n["id"]] == b]
+            same = sum(1 for n in group if bucket[a][n["id"]] == bucket[b2][n["id"]])
+            print(f"  {b:<10} {len(group):>3}  agree {same:>3}  {pct(same, len(group))}")
+        print(f"\nConfusion (rows: {a}, columns: {b2}):")
+        print(f"  {'':<10} " + " ".join(f"{c:>9}" for c in BUCKETS))
+        for r in BUCKETS:
+            print(f"  {r:<10} " + " ".join(f"{sum(1 for n in both if bucket[a][n['id']] == r and bucket[b2][n['id']] == c):>9}"
+                                           for c in BUCKETS))
+
+    print("\nDisagreements (with each other or with the expected bucket):" if not show else "\nEvery notification:")
+    for n in notes:
+        got = {name: bucket[name].get(n["id"], "-") for name in names}
+        if show or len(set(got.values()) | {n["expect"]}) > 1:
+            text = f"{n.get('title', '')}: {n.get('text', '')}".replace("\n", " ")[:60]
+            print(f"  {n['id']:<20} expect {n['expect']:<9} " + " ".join(f"{k} {v:<9}" for k, v in got.items())
+                  + f" {text}")
+    for name in names:
+        missing = [n["id"] for n in notes if n["id"] not in bucket[name]]
+        if missing:
+            print(f"\n{name}: not judged: {', '.join(missing)}")
+
+
+def usage_summary(count: int) -> None:
+    by: Dict[str, Dict[str, float]] = collections.defaultdict(lambda: collections.defaultdict(float))
+    for r in list(usage._buffer):
+        if r.get("purpose") != judges.PURPOSE:
+            continue
+        s = by[r.get("provider") or r.get("model") or "?"]
+        s["calls"] += 1
+        s["input"] += r.get("input_tokens") or 0
+        s["output"] += r.get("output_tokens") or 0
+        s["cost"] += r.get("cost") or 0
+    if by:
+        print("\nUsage:")
+    for who, s in by.items():
+        print(f"  {who}: {int(s['calls'])} calls, {s['input'] / count:.0f} input + {s['output'] / count:.0f} output "
+              f"tokens per notification, ${s['cost']:.4f} in all (${s['cost'] / count * 1000:.3f} per 1000)")
+
+
+async def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--only", choices=("llm", "typesafe"), default="")
+    ap.add_argument("--show", action="store_true", help="print every notification's buckets")
+    args = ap.parse_args()
+    for name, job in phone_addon.llm_jobs.items():
+        purposes.register(name, job.profile, job.label, addon=phone_addon.name)
+    usage.install()
+    found = available(args.only)
+    if not found:
+        print("No judge has its key: set TYPESAFE_API_KEY and/or the triage model's provider key.")
+        return 1
+    who, notes = load()
+    print(f"Triage judges on {len(notes)} made-up notifications ({FIXTURE.relative_to(SERVER)})")
+    results: Dict[str, Dict[str, Dict[str, Any]]] = {}
+    for name, judge in found.items():
+        started = time.perf_counter()
+        results[name] = await run(judge, who, notes)
+        print(f"  {name}: {judge.model()}, {len(results[name])} of {len(notes)} judged, "
+              f"batches of {judge.batch_size}, {time.perf_counter() - started:.1f} s")
+    report(notes, results, args.show)
+    usage_summary(len(notes))
+    return 0
+
+
+if __name__ == "__main__":
+    try:
+        sys.exit(asyncio.run(main()))
+    finally:
+        shutil.rmtree(_tmp, ignore_errors=True)
