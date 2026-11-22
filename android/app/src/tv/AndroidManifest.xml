@@ -57,6 +57,15 @@
             </intent-filter>
         </activity>
 
+        <!-- The TV's device dashboard (a WebView), opened from the home screen; Back returns home. -->
+        <activity
+            android:name=".tv.TvDashboardActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="landscape"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboard|keyboardHidden|navigation|density|uiMode"
+            android:theme="@style/Theme.Dana" />
+
         <!-- Own task: closing Dana returns to the app that was playing. -->
         <activity
             android:name=".tv.AssistantActivity"

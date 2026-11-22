@@ -1,6 +1,7 @@
 package io.github.ronganam.dana.kiosk
 
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.network.WebSignIn
 import io.github.ronganam.dana.data.pairing.DevicePairing
 import io.github.ronganam.dana.data.pairing.PairingClient
 import io.github.ronganam.dana.data.pairing.PairingFlow
@@ -64,10 +65,10 @@ import io.github.ronganam.dana.wake.WakeBus
 import io.github.ronganam.dana.wake.WakePrefs
 import io.github.ronganam.dana.wake.WakeWordService
 import kotlinx.coroutines.launch
-import java.net.URLEncoder
 
 /**
- * The wall tablet's home screen: the bedroom dashboard in a full-screen
+ * The wall tablet's home screen: its own device dashboard (the preset and
+ * widgets chosen on the web, Devices → the tablet) in a full-screen
  * WebView, with Dana's assistant sheet (the same FloatingAssistantOverlay as
  * the phone's power-button assistant) opening on "Hey Dana".
  *
@@ -364,10 +365,18 @@ class KioskActivity : ComponentActivity() {
             }
 
             override fun onPageFinished(view: WebView, url: String) {
-                // Landed on the login form: the device was removed (or its token revoked) on the server.
-                if (url.contains("/login") && paired) {
-                    Log.w(TAG, "Dashboard asked for login; this tablet is no longer paired")
-                    unpair()
+                if (!paired) return
+                when (WebSignIn.landing(ServerConfig.load(this@KioskActivity).url, url)) {
+                    WebSignIn.LoginLanding.NONE -> {}
+                    // The cookie went stale: sign in with the token again (once; then retry later).
+                    WebSignIn.LoginLanding.SIGN_IN_AGAIN -> if (lastLoadSignedIn) scheduleReload(view) else {
+                        CookieManager.getInstance().removeAllCookies { loadDashboard(view) }
+                    }
+                    // `/login` refused the token: the device was removed (or its token revoked) on the server.
+                    WebSignIn.LoginLanding.REFUSED -> {
+                        Log.w(TAG, "The server refused this tablet's token; it is no longer paired")
+                        unpair()
+                    }
                 }
             }
 
@@ -412,16 +421,17 @@ class KioskActivity : ComponentActivity() {
         }, 15_000)
     }
 
+    /** Whether the last load signed in with the token (then a login page is not met by signing in again). */
+    private var lastLoadSignedIn = false
+
     private fun loadDashboard(view: WebView) {
         val (server, token) = ServerConfig.load(this)
-        val path = KioskPrefs.dashboardPath(this)
-        val hasSession = CookieManager.getInstance().getCookie(server)?.contains("$SESSION_COOKIE=") == true
-        if (token.isNotEmpty() && !hasSession) {
-            // Exchange the API token for the dashboard's long-lived session cookie.
-            val body = "token=" + URLEncoder.encode(token, "UTF-8") + "&next=" + URLEncoder.encode(path, "UTF-8")
-            view.postUrl("$server/login", body.toByteArray())
-        } else {
-            view.loadUrl(server + path)
+        val load = WebSignIn.load(server, token, KioskPrefs.dashboardPath(this), CookieManager.getInstance().getCookie(server))
+        lastLoadSignedIn = load is WebSignIn.Load.Post
+        when (load) {
+            // Exchange the device token for the dashboard's long-lived session cookie.
+            is WebSignIn.Load.Post -> view.postUrl(load.url, load.body.toByteArray())
+            is WebSignIn.Load.Get -> view.loadUrl(load.url)
         }
     }
 
@@ -449,7 +459,5 @@ class KioskActivity : ComponentActivity() {
 
     companion object {
         private const val TAG = "KioskActivity"
-        /** The web session cookie `/login` sets (server `server/core/auth.py`); without it the kiosk signs in with its token. */
-        private const val SESSION_COOKIE = "dana_session"
     }
 }
