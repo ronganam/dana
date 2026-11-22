@@ -689,10 +689,21 @@ async def main():
         check("summaries: points cleaned, joined by newlines, listed in the API",
               sm["apps"]["com.slack"]["points"][1] == "second point" and sm["apps"]["com.slack"]["summary"].count("\n") == 1,
               sm["apps"]["com.slack"])
-        check("summaries: language decided per app",
-              ns.language([{"title": "גל", "text": "דחוף תתרגם לי את זה, PR"}]) == "Hebrew"
-              and ns.language([{"title": "Dana", "text": "Deploy is blocked, can you approve? תודה"}]) == "English"
-              and "Write the points in English" in slack_prompt)
+        check("summaries: in the user's first language (Robin: Hebrew, for English notifications too)",
+              ns.language(OWNER) == "he" and "Write the points in natural, short Hebrew" in slack_prompt, slack_prompt[-600:])
+        hebrew_items = [{"id": "h1", "package": "p", "app_name": "Chat", "sender": "גל", "title": "גל",
+                         "text": "דחוף תתרגם לי את זה, PR", "bucket": "normal", "posted_at": "2026-11-14T10:00:00"}]
+        german = users.create("Maya")
+        german = users.update(german.id, languages="de, en")
+        de_prompt = ns.app_prompt(german, hebrew_items)
+        de_brief = ns.overall_prompt(german, {"p": hebrew_items}, {})
+        check("summaries: a German-first user gets German, whatever the notifications' language",
+              ns.language(german) == "de" and "short German, whatever language" in de_prompt
+              and "short German" in de_brief and "English" not in de_prompt.split("Write the points")[1].split("\n")[0],
+              de_prompt[-600:])
+        check("summaries: a language change rewrites the cached summaries",
+              ns._signature(hebrew_items, "de") != ns._signature(hebrew_items, "en")
+              and ns._overall_signature({"p": hebrew_items}, "de") != ns._overall_signature({"p": hebrew_items}, "en"))
         check("summaries: unchanged inbox → no new call", len(seen["summary_prompts"]) == calls and not (await r.json())["refreshing"])
         prev_wa = (sm["apps"].get("com.whatsapp") or {}).get("summary")
         await client.post("/api/notifications/batch", json={"posted": [

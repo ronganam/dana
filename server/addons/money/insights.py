@@ -7,12 +7,12 @@
   of one purchase, never a subscription.
 - :func:`yearly`: charges that come once a year — an insurance renewal, the
   car licence, an annual subscription (:data:`YEARLY_CATEGORIES`, at least
-  ₪300 and at most ₪10,000, the merchant not a monthly or bimonthly series), or a charge the
+  300 and at most 10,000, the merchant not a monthly or bimonthly series), or a charge the
   user marked yearly. One renewal may be several rows (an installment plan,
   a second policy days later); seen once, it is expected a year later.
 - :func:`unusual`: charges since a date that are much larger than usual for
-  the merchant (≥ 3× the median of ≥ 4 earlier charges, at least ₪200), a
-  first charge from a merchant over ₪500 (not in the first
+  the merchant (≥ 3× the median of ≥ 4 earlier charges, at least 200), a
+  first charge from a merchant over 500 (not in the first
   :data:`WARMUP_DAYS` of history, when every merchant is new), or the same
   amount at the same merchant twice within 10 minutes (an installment plan's
   payments are not duplicates).
@@ -46,7 +46,7 @@ VARIABLE_CATEGORIES = frozenset({"utilities", "insurance", "phone_internet", "su
 VARIABLE_TYPICAL_OF = 3
 LARGE_FACTOR = 3
 LARGE_MIN_EARLIER = 4
-# A charge below this is never "much larger than usual" (₪15 at a café that is usually ₪5 is not news).
+# A charge below this is never "much larger than usual" (15 at a café that is usually 5 is not news).
 LARGE_MIN_AGOROT = 20_000
 FIRST_TIME_MIN_AGOROT = 50_000
 # In the first days of history every merchant is new: no "first charge from them" then.
@@ -234,7 +234,7 @@ def plan_total(r: Dict[str, Any]) -> int:
     it as the original amount), else the row's own amount."""
     n = r.get("installment_total") or 0
     if n > 1:
-        if r.get("orig_amount") and (r.get("orig_currency") or "ILS") == "ILS":
+        if r.get("orig_amount") and (r.get("orig_currency") or store.home_currency()) == store.home_currency():
             return abs(r["orig_amount"])
         return abs(r["amount"]) * n
     return abs(r["amount"])
@@ -344,8 +344,8 @@ def find_unusual(candidates: Iterable[Dict[str, Any]], history: Iterable[Dict[st
     earlier money-out row of the same merchants; the candidates may be in it);
     ``first_date``: the user's first transaction (no first-time flags in the warm-up).
     One entry per charge, newest first: ``{transaction, reason ("duplicate" |
-    "large" | "first_time"), title ("₪1,240.00 at X"), why ("about 4× the usual
-    ₪300.00 there"), text (both), typical?, duplicate_of?}``."""
+    "large" | "first_time"), title ("1,240.00 at X"), why ("about 4× the usual
+    300.00 there"), text (both), typical?, duplicate_of?}``."""
     by_key: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for r in history:
         if r.get("merchant_key") and r["status"] != "unmatched" and r["amount"] < 0:
@@ -380,13 +380,13 @@ def find_unusual(candidates: Iterable[Dict[str, Any]], history: Iterable[Dict[st
             typical = int(statistics.median(earlier))
             if typical and amount >= LARGE_FACTOR * typical:
                 found = {"reason": "large", "typical": typical,
-                         "why": f"about {amount / typical:.0f}× the usual {store.shekels(typical)} there"}
+                         "why": f"about {amount / typical:.0f}× the usual {store.money_text(typical)} there"}
         warm = first_date is not None and (datetime.date.fromisoformat(c["purchase_date"]) - first_date).days < WARMUP_DAYS
         if (found is None and not warm and amount > FIRST_TIME_MIN_AGOROT
                 and not any(_order(o) <= _order(c) and plan_key(o) != plan_key(c) for o in others)):
             found = {"reason": "first_time", "why": "the first charge from them"}
         if found is not None:
-            title = f"{store.shekels(amount)} at {item['merchant']}"
+            title = f"{store.money_text(amount)} at {item['merchant']}"
             out.append({"transaction": item, "title": title, "text": f"{title}, {found['why']}", **found})
     return out
 

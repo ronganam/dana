@@ -27,7 +27,7 @@ MONEY_GUIDE = (
     "meal card from work: budget left, pace, past cycles). Pass a period name (today, yesterday, this_week, last_week, this_month, last_month, "
     "last_30_days, this_year, last_year, YYYY-MM) or start/end dates; never add up amounts or work out dates "
     "yourself.\n"
-    "  2. Amounts are in ₪. \"Spent\" means purchases, transfers to people and fees; card bills on the bank account "
+    "  2. Amounts are in {currency}. \"Spent\" means purchases, transfers to people and fees; card bills on the bank account "
     "and moves between {user}'s own accounts never count, and refunds reduce it; money set aside (investments, "
     "savings) is not spending. One-offs (a car, a flight) are left out of \"typical\" and the forecast. Say the "
     "comparison the tool gives (\"at this point last month: …\").\n"
@@ -60,8 +60,8 @@ addon = Addon(
     features=("Spending, income and balances in chat and on the Money page",
               "Subscriptions, card bills and your balance ahead",
               "Ways to save and spending worth watching"),
-    setup=("Turn on a provider for your banks and cards too (Money (Israel)), then add your logins on the "
-           "Money page.",),
+    setup=("Turn on a provider addon for your banks and cards too (such as Money (Israel)), then add your logins "
+           "on the Money page.",),
     examples=("How much did I spend on food this month?", "What subscriptions do I pay for?"),
     disconnect_warning="Your saved bank and card logins, accounts and transactions are deleted from Dana.",
     on_change=sources.on_change,

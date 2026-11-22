@@ -107,7 +107,7 @@ def _merchant_clause(term: str) -> Tuple[str, List[Any]]:
 
 
 def _amount_query(text: str) -> Optional[int]:
-    """A search that is only an amount ("709", "₪709.00", "1,234.5") → agorot."""
+    """A search that is only an amount ("709", "709.00", "1,234.5") → agorot."""
     m = re.fullmatch(r"\s*[₪$€]?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?\s*(?:₪|ש\"?ח|nis|ils)?\s*",
                      text or "", re.I)
     if not m:
@@ -139,7 +139,7 @@ def _where(user: User, *, period: Optional[Period] = None, start: Optional[datet
         sql.append("t.purchase_date < ?")
         args.append(end_exclusive.isoformat())
     if totals:
-        # A ₪0 line (a card company's notice row) is listed but never counted.
+        # A 0 line (a card company's notice row) is listed but never counted.
         sql.append("t.status != 'unmatched' AND t.amount != 0")
     if category:
         keys, uncategorized, _ = category_filter(category)
@@ -341,7 +341,7 @@ def search(user: User, *, query: Optional[str] = None, period: Optional[Period] 
     """The user's transactions, newest first: ``{transactions: [store.txn_item],
     next_cursor}``. ``query`` is full-text (merchant, description, memo, note;
     every word a prefix), or an amount when it is only a number ("709");
-    ``min_amount`` / ``max_amount`` are absolute shekels. Unmatched rows are listed
+    ``min_amount`` / ``max_amount`` are absolute whole units of the user's currency. Unmatched rows are listed
     (badged), never counted.
 
     Raises:
@@ -410,7 +410,7 @@ def transaction(user: User, txn_id: str) -> Dict[str, Any]:
     installment = ({"number": r.get("installment_number"), "total": r["installment_total"],
                     "purchase_amount": r.get("orig_amount")} if (r.get("installment_total") or 0) > 1 else None)
     foreign = ({"amount": r["orig_amount"], "currency": r["orig_currency"]}
-               if r.get("orig_currency") and r["orig_currency"] != "ILS" and r.get("orig_amount") is not None else None)
+               if store.is_foreign(r) else None)
     return {**item, "source": r["source"], "notification_id": r.get("notification_id"),
             "installment": installment, "foreign": foreign, "bank_category": bank_category,
             "created_at": r["created_at"], "updated_at": r["updated_at"], "same_merchant": same,
@@ -606,17 +606,17 @@ def _min_count(cadence: str) -> int:
 
 
 def week_lines(w: Dict[str, Any]) -> List[str]:
-    """:func:`week` in a few short lines ("Spent ₪1,240.00 this week (a usual week: ₪980.00)", …), with the
+    """:func:`week` in a few short lines ("Spent 1,240.00 this week (a usual week: 980.00)", …), with the
     savings line the weekly review adds (``savings``) last."""
-    lines = [f"Spent {store.shekels(w['spent'])} this week"
-             + (f" (a usual week: {store.shekels(w['usual'])})" if w["usual"] is not None else "")]
+    lines = [f"Spent {store.money_text(w['spent'])} this week"
+             + (f" (a usual week: {store.money_text(w['usual'])})" if w["usual"] is not None else "")]
     if w["top"]:
-        lines.append("Most on " + ", ".join(f"{t['label']} {store.shekels(t['total'])}" for t in w["top"]))
+        lines.append("Most on " + ", ".join(f"{t['label']} {store.money_text(t['total'])}" for t in w["top"]))
     for i in w["new_recurring"]:
-        lines.append(f"New recurring charge: {i['merchant']} {store.shekels(i['amount'])} {insights.cadence_text(i['cadence'])}")
+        lines.append(f"New recurring charge: {i['merchant']} {store.money_text(i['amount'])} {insights.cadence_text(i['cadence'])}")
     for i in w["price_changes"]:
         ch = i["price_change"]
-        lines.append(f"Price change: {i['merchant']} {store.shekels(ch['from'])} → {store.shekels(ch['to'])}")
+        lines.append(f"Price change: {i['merchant']} {store.money_text(ch['from'])} → {store.money_text(ch['to'])}")
     if w.get("savings"):
         lines.append(w["savings"])
     return lines
@@ -633,7 +633,7 @@ def chat_context(user: User, txn_id: str) -> Dict[str, Any]:
     t = transaction(user, txn_id)
     when = periods.short_date(datetime.date.fromisoformat(t["purchase_date"]))
     return {"kind": "transaction", "ref_id": t["id"], "call_id": None, "emoji": "💳",
-            "title": f"{t['merchant']} · {store.shekels(abs(t['amount']))}"[:80],
+            "title": f"{t['merchant']} · {store.money_text(abs(t['amount']))}"[:80],
             "subtitle": " · ".join([t["account_label"], when, t["category_label"]]),
             "quick_prompts": ["What is this charge?", "Is this more than usual?", "Change its category",
                               "Show the other charges from them"]}
@@ -650,7 +650,7 @@ def context_prompt(user: User, txn_id: str) -> Optional[str]:
     except NotFound:
         return None
     direction = "money out" if t["amount"] < 0 else "money in"
-    facts = [f"{store.shekels(abs(t['amount']))} ({direction})", f"bought {t['purchase_date']}",
+    facts = [f"{store.money_text(abs(t['amount']))} ({direction})", f"bought {t['purchase_date']}",
              f"charged {t['charge_date'] or 'unknown'}", f"account {t['account_label']}",
              f"category {t['category_label']}" + (f" (set by {t['category_source']})" if t["category_source"] else ""),
              f"status {t['status']}", f"flow {t['flow']}" + ("" if t["spending"] else " (not counted as spending)")]
@@ -661,7 +661,7 @@ def context_prompt(user: User, txn_id: str) -> Optional[str]:
     same = t["same_merchant"]
     lines = [f"## Opened from a transaction\nTransaction {t['id']}: " + "; ".join(facts) + ".",
              f"All transactions with this merchant: {same['count']}, "
-             f"{store.shekels(abs(same['total']))} in total since {same['first_date'] or '-'}."]
+             f"{store.money_text(abs(same['total']))} in total since {same['first_date'] or '-'}."]
     if t["note"]:
         lines.append(f"Note: {t['note']}")
     # Fences with a random nonce (new every turn), so text inside cannot close them.

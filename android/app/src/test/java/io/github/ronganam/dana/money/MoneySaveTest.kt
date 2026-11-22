@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.money.Effort
 import io.github.ronganam.dana.data.money.EmptyJson
 import io.github.ronganam.dana.data.money.EvidenceLink
@@ -31,6 +32,8 @@ import java.time.ZoneId
  * (synthetic), the same assertions as `server/addons/money/tests/test_web_money.mjs`.
  */
 class MoneySaveTest {
+    init { MoneyFormat.use("ILS") }  // the fixtures' user pays in shekels
+
     private val f = jsonObjectOf(MoneySaveTest::class.java.classLoader!!.getResource("money_savings_web.json")!!.readText())
     private val sv = SavingsOverview.parse(f.obj("savings")!!)
     private val dayIso = f.obj("savings")!!.string("as_of").take(10)

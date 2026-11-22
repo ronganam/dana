@@ -33,7 +33,7 @@ import io.github.ronganam.dana.ui.components.serverImageRequest
 import io.github.ronganam.dana.ui.screens.MarkdownText
 import io.github.ronganam.dana.ui.screens.TypingIndicator
 import coil.compose.AsyncImage
-import java.util.Locale
+import io.github.ronganam.dana.data.voice.useVoiceFor
 import io.github.ronganam.dana.R
 
 /** A TextToSpeech for "tap a reply to hear it", shut down with the composable. */
@@ -97,8 +97,7 @@ fun ChatBubble(
                             onTap = {
                                 if (!msg.isThinking) {
                                     val cleanText = msg.message.replace(Regex("[*#`_\\-]"), "").trim()
-                                    val textHebrew = cleanText.any { it in '\u0590'..'\u05FF' }
-                                    tts?.language = if (textHebrew) Locale.forLanguageTag("he-IL") else Locale.US
+                                    tts?.useVoiceFor(cleanText, context)
                                     tts?.speak(cleanText, TextToSpeech.QUEUE_FLUSH, null, null)
                                 }
                             },

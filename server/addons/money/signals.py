@@ -28,7 +28,7 @@ from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Set, Tuple
 
-from core import clock
+from core import clock, user_locale
 from core.text import redact_otp as redact
 from core.users import User
 from core.addons import store as connections
@@ -430,8 +430,9 @@ def _provisional(conn: sqlite3.Connection, user: User, signal_id: str, payment: 
     """Turn a stored signal into a provisional transaction (or link it to the
     payment it repeats / the scraped row already there). Returns the source id
     to sync sooner when a new provisional row was made."""
-    if payment.amount >= 0 or payment.currency != "ILS":
-        return None  # a refund, or a foreign amount whose shekel charge is not known yet
+    home = user_locale.currency(user)
+    if payment.amount >= 0 or payment.currency != home:
+        return None  # a refund, or a foreign amount whose charge in the user's currency is not known yet
     account = _card_account(conn, user, payment.card_last4)
     if account is None:
         return None
@@ -474,8 +475,8 @@ def _provisional(conn: sqlite3.Connection, user: User, signal_id: str, payment: 
         "INSERT INTO money_transactions (id, user_id, account_id, ext_key, source, status, occurred_at, purchase_date, "
         "amount, orig_amount, orig_currency, description, merchant, merchant_key, category, category_source, flow, "
         "notification_id, created_at, updated_at) VALUES (?, ?, ?, ?, 'notification', 'provisional', ?, ?, ?, ?, "
-        "'ILS', ?, ?, ?, ?, ?, 'purchase', ?, ?, ?)",
-        (txn_id, user.id, account["id"], f"n:{signal_id}", occurred, day, payment.amount, payment.amount,
+        "?, ?, ?, ?, ?, ?, 'purchase', ?, ?, ?)",
+        (txn_id, user.id, account["id"], f"n:{signal_id}", occurred, day, payment.amount, payment.amount, home,
          description or None, known["merchant"] or description or None, key or None, category,
          "memory" if category else None, notification_id, now, now))
     # scoped: the user's signal, stored for them before this call

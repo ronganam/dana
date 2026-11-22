@@ -89,7 +89,7 @@ def savings_cards(user: User, now: datetime.datetime, hidden: Dict[str, Any]) ->
     except Exception as e:
         logger.warning(f"Now savings cards for user {user.id} failed: {e}")
         return []
-    sh = money_store.shekels
+    sh = money_store.money_text
     saves: List[Card] = []
     targets: List[Card] = []
     for i in items:

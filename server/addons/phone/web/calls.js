@@ -49,7 +49,7 @@
             <div class="form-group"><label class="form-label" for="call-receiver">Receiver</label><input type="text" class="form-control" id="call-receiver" placeholder="Me"></div>
           </div>
           <div class="form-group"><label class="form-label" for="call-instructions">Custom Instructions (Optional)</label>
-            <textarea class="form-control" id="call-instructions" rows="2" placeholder="e.g. summarize in Hebrew, focus on action items..."></textarea></div>
+            <textarea class="form-control" id="call-instructions" rows="2" placeholder="e.g. focus on action items, keep it short..."></textarea></div>
         </form>
         <div class="modal-footer"><button class="btn-secondary" data-close="call-upload-modal">Cancel</button><button class="btn-primary" id="btn-call-upload-submit">Upload & Analyze</button></div>
       </div>

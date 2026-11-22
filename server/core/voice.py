@@ -7,8 +7,8 @@ logger = logging.getLogger(__name__)
 
 _SUMMARY_PROMPT = (
     "You summarize a transcribed WhatsApp voice message.\n"
-    "- Reply in the same language as the transcript (Hebrew -> Hebrew, English -> English; "
-    "for mixed speech use the dominant language, keeping names/terms as spoken).\n"
+    "- Reply in the same language as the transcript (for mixed speech the dominant language, "
+    "keeping names/terms as spoken).\n"
     "- Be concise: 1-3 sentences, or up to 4 short bullet lines if the message covers several points.\n"
     "- Keep concrete details people need: requests, tasks, dates/times, amounts, addresses, names.\n"
     "- Add nothing that is not in the transcript. No preamble, no headings, no commentary.\n"

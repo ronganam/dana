@@ -32,7 +32,7 @@ const FIXTURE = process.argv[2] || path.join(SERVER, "tests", "fixtures", "money
 const F = JSON.parse(fs.readFileSync(FIXTURE, "utf8"));
 const src = fs.readFileSync(path.join(SERVER, "addons/money/web/money-core.js"), "utf8");
 
-const sandbox = { console, Set, Map, JSON, Object, Array, String, Number, Boolean, RegExp, Math, Date, Error, encodeURIComponent, decodeURIComponent, isFinite };
+const sandbox = { console, Set, Map, JSON, Object, Array, String, Number, Boolean, RegExp, Math, Date, Error, Intl, encodeURIComponent, decodeURIComponent, isFinite };
 vm.createContext(sandbox);
 vm.runInContext(src, sandbox, { filename: "addons/money/web/money-core.js" });
 const C = sandbox.DanaMoneyCore;
@@ -57,6 +57,15 @@ const NOW = Date.parse("2026-11-18T07:01:00Z");
 const M = C.MINUS;
 
 // --- money ------------------------------------------------------------------------------------------
+check("currency: USD in en-US until the page sets the user's", C.currency() === "USD" && C.money(-2500) === `${C.MINUS}$25.00`);
+C.setCurrency("eur", "de-DE");
+check("currency: a German user's euros in the German way", C.currency() === "EUR" && C.money(-123450) === `${C.MINUS}1.234,50\u00a0€`
+      && C.money(123450, { cents: false }) === "1.235\u00a0€" && C.compact(480000) === "€4.8k" && C.currencySymbol() === "€", C.money(-123450));
+C.setCurrency("CHF", "en-US");
+check("currency: a currency without a narrow symbol keeps its code", C.money(8000) === "CHF\u00a080.00" && C.foreignText(500, "usd") === "$5.00", C.money(8000));
+C.setCurrency("??", "no-such-locale-!!");
+check("currency: a malformed code or locale falls back to USD / en-US", C.money(100) === "$1.00", C.money(100));
+C.setCurrency("ILS", "en-US");  // the fixtures' user (Robin) pays in shekels
 check("money: money out with a real minus sign, thousands and agorot", C.money(-150000) === `${M}₪1,500.00` && C.money(-2500) === `${M}₪25.00`);
 check("money: money in plain or with +, a refund as + too", C.money(1500000) === "₪15,000.00" && C.money(1500000, { sign: "plus" }) === "+₪15,000.00"
       && C.money(5000, { sign: "plus" }) === "+₪50.00");
@@ -71,7 +80,7 @@ check("compact: axis values ₪0, ₪850, ₪4.8k, ₪20k, ₪1.5M", C.compact(0
 const foreignRow = monthList.find((t) => t.badges.some((b) => b.type === "foreign"));
 const fb = foreignRow.badges.find((b) => b.type === "foreign");
 check("foreign: the fixture's USD payment reads $5.00; € and an unknown currency", C.foreignText(fb.amount, fb.currency) === "$5.00"
-      && C.foreignText(-3500, "EUR") === "€35.00" && C.foreignText(500, "CHF") === "5.00 CHF" && C.foreignText(123456, "GBP") === "£1,234.56");
+      && C.foreignText(-3500, "EUR") === "€35.00" && C.foreignText(500, "CHF") === "CHF\u00a05.00" && C.foreignText(123456, "GBP") === "£1,234.56");
 check("isolate: text of either direction in FSI … PDI", C.isolate("קפה קפה") === `${C.FSI}קפה קפה${C.PDI}`);
 
 // --- dates and months --------------------------------------------------------------------------------
@@ -417,7 +426,7 @@ check("investments: percentages, units and unit prices",
       && C.pctText(2.5, { sign: "none" }) === "2.5%" && C.pctText(2) === "+2%" && C.pctText(null) === "" && C.pctText(NaN) === ""
       && C.quantityText(120) === "120" && C.quantityText(15.5) === "15.5" && C.quantityText(1234.25) === "1,234.25" && C.quantityText(null) === ""
       && C.unitPrice(250, "ILS") === "₪250.00" && C.unitPrice(150, "USD") === "$150.00" && C.unitPrice(0.5, "ILS") === "₪0.50"
-      && C.unitPrice(0.12345, "NIS") === "₪0.1235" && C.unitPrice(12.5, "CHF") === "12.50 CHF" && C.unitPrice(null, "ILS") === "");
+      && C.unitPrice(0.12345, "NIS") === "₪0.1235" && C.unitPrice(12.5, "CHF") === "CHF\u00a012.50" && C.unitPrice(null, "ILS") === "");
 const vg = C.valueGeometry(pf.history, { width: 600, height: 220 });
 check("investments: the value chart — one point a day, ticks around the range (not from zero), the change since the first day",
       vg && vg.points.length === pf.history.length && vg.points[0].x === vg.L && vg.points[vg.points.length - 1].x === vg.W - vg.R

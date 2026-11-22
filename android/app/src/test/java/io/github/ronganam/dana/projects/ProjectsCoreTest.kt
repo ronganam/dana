@@ -18,6 +18,8 @@ import java.time.LocalDate
 
 /** The port of the web panel's projects-core.js: numbers, best values, order, states, countdown, budget, editor payloads. */
 class ProjectsCoreTest {
+    init { MoneyFormat.use("ILS") }  // the fixtures' user pays in shekels
+
 
     private val items get() = ProjectsJson.items(ProjectsFixture.text("items_owner"))
 

@@ -14,7 +14,8 @@ summary (the notification says it already).
 
 Per user: each user's summaries cover only their notifications, are cached
 under their id, refreshed in their own background task (with its own
-back-off) and written by prompts that name them (core/user_profile.py).
+back-off) and written by prompts that name them (core/user_profile.py), in
+their first language (core/user_locale.py); names and quotes stay as written.
 """
 from __future__ import annotations
 
@@ -27,7 +28,7 @@ import time
 import sqlite3
 from typing import Any, Dict, List, Optional
 
-from core import clock, llm, user_profile, users
+from core import clock, llm, user_locale, user_profile, users
 from core.db import get_db_connection
 from core.user_profile import Profile
 from core.users import User
@@ -40,11 +41,10 @@ PER_APP = 40          # newest notifications per app sent to the model
 TEXT_CHARS = 400      # per notification
 OVERALL = "_overall"
 # Part of every signature: bump when the output format changes so cached
-# summaries are rewritten (2 = bullet points, Hebrew or English per summary;
-# 3 = no "[needs <name>]" tag in the prompt, which the model sometimes echoed).
-STYLE_VERSION = "3"
-_HEBREW = re.compile(r"[\u0590-\u05FF]")
-_LATIN = re.compile(r"[A-Za-z]")
+# summaries are rewritten (2 = bullet points; 3 = no "[needs <name>]" tag in
+# the prompt, which the model sometimes echoed; 4 = in the user's first language).
+# The language is part of it too, so changing it rewrites the summaries.
+STYLE_VERSION = "4"
 
 # Per user id: the refresh lock, the running refresh and when the last one started.
 _locks: Dict[str, asyncio.Lock] = {}
@@ -76,23 +76,20 @@ def active_by_app(conn: sqlite3.Connection, user: User) -> Dict[str, List[Dict[s
     return out
 
 
-def _signature(items: List[Dict[str, Any]]) -> str:
-    h = hashlib.sha1(STYLE_VERSION.encode())
+def _signature(items: List[Dict[str, Any]], lang: str) -> str:
+    h = hashlib.sha1(f"{STYLE_VERSION}:{lang}".encode())
     for n in sorted(items, key=lambda n: n["id"]):
         h.update(f"{n['id']}:{n.get('content_hash') or ''}|".encode())
     return h.hexdigest()[:16]
 
 
-def _overall_signature(apps: Dict[str, List[Dict[str, Any]]]) -> str:
-    return hashlib.sha1(STYLE_VERSION.encode() + "|".join(f"{p}:{_signature(l)}" for p, l in sorted(apps.items())).encode()).hexdigest()[:16]
+def _overall_signature(apps: Dict[str, List[Dict[str, Any]]], lang: str) -> str:
+    return hashlib.sha1(STYLE_VERSION.encode() + "|".join(f"{p}:{_signature(l, lang)}" for p, l in sorted(apps.items())).encode()).hexdigest()[:16]
 
 
-def language(items: List[Dict[str, Any]]) -> str:
-    """Hebrew when Hebrew is ≥ 40% of the letters in the notifications' text (English tech words
-    inside Hebrew messages don't flip it), else English. Decided here: the model alone ignored it."""
-    text = " ".join(f"{n.get('title') or ''} {n.get('text') or ''}" for n in items[:PER_APP])
-    heb, lat = len(_HEBREW.findall(text)), len(_LATIN.findall(text))
-    return "Hebrew" if heb and heb >= 0.4 * (heb + lat) else "English"
+def language(user: Optional[User]) -> str:
+    """The language code ``user``'s summaries are written in: their first language."""
+    return user_locale.languages(user)[0]
 
 
 def _me(user: Optional[User]) -> str:
@@ -116,6 +113,7 @@ def _cached(conn: sqlite3.Connection, user: User) -> Dict[str, Dict[str, Any]]:
 def _state(user: User) -> Dict[str, Any]:
     """What is cached for ``user``, and which scopes no longer match their Inbox."""
     me = _me(user)
+    lang = language(user)
     with get_db_connection() as conn:
         apps = active_by_app(conn, user)
         cache = _cached(conn, user)
@@ -125,7 +123,7 @@ def _state(user: User) -> Dict[str, Any]:
         if len(items) < MIN_ITEMS:
             continue
         c = cache.get(pkg)
-        fresh = bool(c and c["signature"] == _signature(items))
+        fresh = bool(c and c["signature"] == _signature(items, lang))
         if not fresh:
             stale.append(pkg)
         pts = points(c["summary"] if c else None, me)
@@ -138,7 +136,7 @@ def _state(user: User) -> Dict[str, Any]:
     overall = None
     if total >= MIN_ITEMS:
         c = cache.get(OVERALL)
-        fresh = bool(c and c["signature"] == _overall_signature(apps))
+        fresh = bool(c and c["signature"] == _overall_signature(apps, lang))
         if not fresh:
             stale.append(OVERALL)
         pts = points(c["summary"] if c else None, me)
@@ -202,12 +200,12 @@ def _style(me: str) -> str:
 
 
 def _lang_rule(lang: str) -> str:
-    if lang == "Hebrew":
-        return ("Write the points in natural, short Hebrew. Keep product and tech words as they are "
-                "(GitHub, PR, deploy, Jira) and names as written.\n"
-                "Example: [\"נועה שואלת אם להזיז את השיחה של חמישי\", \"אבי שלח את החוזה\", \"קבוצת המשפחה מתכננת שבת\"]")
-    return ("Write the points in English. Keep Hebrew names, chat names and short quotes as written.\n"
-            "Example: [\"Noa asks to move Thursday's call\", \"Avi sent the contract\", \"Family group planning Saturday\"]")
+    """How to word the points in the language ``lang`` (a code), whatever language the notifications are in."""
+    name = user_locale.language_name(lang, native=False)
+    return (f"Write the points in natural, short {name}, whatever language the notifications are in. "
+            "Keep names, chat names, short quotes and product or tech words (GitHub, PR, deploy) as written.\n"
+            "The shape (in English): [\"Noa asks to move Thursday's call\", \"Avi sent the contract\", "
+            "\"Family group planning Saturday\"]")
 
 
 def _sections(items: List[Dict[str, Any]], me: str) -> str:
@@ -234,7 +232,7 @@ def app_prompt(user: User, items: List[Dict[str, Any]]) -> str:
 {_sections(items[:PER_APP], who.first_name)}
 
 Return `summary`: 1–3 points, most important first (fewer is better when there's little to say).
-{_lang_rule(language(items))}
+{_lang_rule(language(user))}
 {_style(who.first_name)}
 """
 
@@ -252,8 +250,6 @@ def overall_prompt(user: User, apps: Dict[str, List[Dict[str, Any]]], summaries:
     needs = [n for items in apps.values() for n in items if n.get("bucket") == "needs_you"]
     urgent = [f"{_line(n).strip()[2:]} (app {n.get('app_name')})" for n in needs[:15]]
     need = (f"\nWaiting for {me}:\n" + "\n".join(f"- {u}" for u in urgent) + "\n") if urgent else ""
-    # The language of what matters most: the needs-you ones, else everything.
-    lang = language(needs or [n for items in apps.values() for n in items])
     return f"""Write the at-a-glance briefing of the notifications waiting on {who.name}'s phone.
 
 {who.about()}Now: {clock.describe_now()}
@@ -262,7 +258,7 @@ By app:
 {chr(10).join(lines)}
 {need}
 Return `overall`: 2–4 points — first what needs {me} (who wants what), then one point for the rest ("PR reviews, login alerts, news").
-{_lang_rule(lang)}
+{_lang_rule(language(user))}
 {_style(me)}
 """
 
@@ -302,6 +298,7 @@ async def refresh_now(user: User, force: bool = False) -> Dict[str, Any]:
 
 async def _refresh(user: User, force: bool) -> Dict[str, Any]:
     me = _me(user)
+    lang = language(user)
     async with _locks.setdefault(user.id, asyncio.Lock()):
         _last_runs[user.id] = time.monotonic()
         st = _state(user)
@@ -326,13 +323,13 @@ async def _refresh(user: User, force: bool) -> Dict[str, Any]:
         updated = 0
         for pkg, text in texts.items():
             if text:
-                _save(user, pkg, _signature(changed[pkg]), text, len(changed[pkg]))
+                _save(user, pkg, _signature(changed[pkg], lang), text, len(changed[pkg]))
                 updated += 1
         if with_overall:
             current = {p: a["summary"] for p, a in st["apps"].items() if a.get("summary")}
             current.update({p: t for p, t in texts.items() if t})
             try:
-                _save(user, OVERALL, _overall_signature(apps),
+                _save(user, OVERALL, _overall_signature(apps, lang),
                       await _summarize(overall_prompt(user, apps, current), "overall", me, "app:all"),
                       sum(len(l) for l in apps.values()))
                 updated += 1

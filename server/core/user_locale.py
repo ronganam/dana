@@ -6,8 +6,9 @@
   ``DEFAULT_LANGUAGES`` (default ``en``). They word the agent's language rule
   (core/agent.py) and the transcription prompt (core/llm.py).
 - **Currency**: the user's own (``users.currency``, ISO 4217), else the
-  server's ``CURRENCY`` (default ``USD``): what money values mean where an
-  addon does not know better (knowledge's budgets and prices).
+  server's ``CURRENCY`` (default ``USD``): what money values mean (money's
+  amounts, knowledge's budgets and prices). :func:`format_money` writes an
+  amount in it ("€1,234.50", "CHF 80.00").
 - **Country code**: ``DEFAULT_COUNTRY_CODE`` (server-wide, no default): a
   phone number typed with a leading 0 gets it in place of the 0; unset, a
   number stays as given (people, WhatsApp).
@@ -39,6 +40,10 @@ NAMES = {
     "hu": ("Hungarian", "magyar"), "th": ("Thai", "ไทย"), "vi": ("Vietnamese", "Tiếng Việt"),
     "id": ("Indonesian", "Bahasa Indonesia"),
 }
+# Currency code -> its narrow symbol; a code not listed is written before the amount ("CHF 80.00").
+SYMBOLS = {"USD": "$", "EUR": "€", "GBP": "£", "ILS": "₪", "JPY": "¥", "CNY": "¥", "INR": "₹", "KRW": "₩",
+           "RUB": "₽", "UAH": "₴", "TRY": "₺", "PLN": "zł ", "BRL": "R$", "CAD": "CA$", "AUD": "A$", "NZD": "NZ$",
+           "MXN": "MX$", "PHP": "₱", "VND": "₫", "THB": "฿", "NGN": "₦"}
 # Scripts worth naming in a transcription prompt ("transcribe in Hebrew letters").
 SCRIPTS = {"he": "Hebrew letters", "yi": "Hebrew letters", "ar": "Arabic letters", "fa": "Persian (Arabic) letters",
            "ru": "Cyrillic letters", "uk": "Cyrillic letters", "el": "Greek letters", "hi": "Devanagari",
@@ -109,6 +114,27 @@ def currency(user: Optional[object]) -> str:
     except ValueError:
         own = ""
     return own or server_currency()
+
+
+def currency_symbol(code: str) -> str:
+    """"€" for EUR, "₪" for ILS; a code without a symbol here as "CHF " (with its space)."""
+    code = (code or "").upper()
+    return SYMBOLS.get(code, f"{code} " if code else "")
+
+
+def format_money(hundredths: Optional[int], code: str, *, cents: bool = True) -> str:
+    """An amount kept in hundredths of the unit (cents, agorot) in the currency
+    ``code``: "€1,234.50", "-$50.00", "CHF 80.00"; ``cents=False`` rounds to
+    whole units ("€1,235"); "—" for None."""
+    if hundredths is None:
+        return "—"
+    sign = "-" if hundredths < 0 else ""
+    value = abs(int(hundredths))
+    sym = currency_symbol(code)
+    if not cents:
+        return f"{sign}{sym}{(value + 50) // 100:,}"
+    whole, rest = divmod(value, 100)
+    return f"{sign}{sym}{whole:,}.{rest:02d}"
 
 
 def language_name(code: str, native: bool = True) -> str:

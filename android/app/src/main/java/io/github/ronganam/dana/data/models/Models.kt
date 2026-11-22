@@ -317,7 +317,7 @@ data class NotificationCounts(
 data class InboxSummary(
     val summary: String?,
     val count: Int,
-    /** Short bullet points (Hebrew or English each); older servers send only [summary]. */
+    /** Short bullet points in the user's first language; older servers send only [summary]. */
     val points: List<String> = summary?.split('\n')?.filter { it.isNotBlank() }.orEmpty(),
     /** The notifications changed since it was written; a rewrite is on its way. */
     val stale: Boolean

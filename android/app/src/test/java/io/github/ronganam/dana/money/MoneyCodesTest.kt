@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.money.EmptyJsonArray
 import io.github.ronganam.dana.data.money.MoneyCodes
 import io.github.ronganam.dana.data.money.MoneyCodes.Message
@@ -21,6 +22,8 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class MoneyCodesTest {
+    init { MoneyFormat.use("ILS") }  // the fixtures' user pays in shekels
+
     private val now = 1_800_000_000_000L
     /** The server's regex for Bank Hapoalim, as JSON delivers it. */
     private val hapoalimRegex = "קוד האימות הוא:?\\s*(\\d{4,8})"

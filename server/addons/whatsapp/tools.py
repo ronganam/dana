@@ -336,14 +336,14 @@ async def send_whatsapp_message(conn: Connection, chat_id: str, text: str, reply
 
     The chat_id can be:
       - An existing contact/group name from your WhatsApp (e.g. 'John', 'ענבל', 'Family') — auto-resolved.
-      - A properly formatted chat ID (e.g. '972500000301@c.us') — use this for new/newly-validated numbers.
+      - A properly formatted chat ID (e.g. '15550100301@c.us') — use this for new/newly-validated numbers.
 
     WhatsApp chat IDs ALWAYS include a suffix: '@c.us' for individuals, '@g.us' for groups.
     Bare phone numbers like '0500000302' are NOT valid chat IDs.
 
     If you only have a bare phone number (not in your contacts/chats yet):
       1. First call check_whatsapp_number(phone) to validate it and get the chat ID.
-      2. Then pass the returned chat ID (e.g. '972500000302@c.us') here.
+      2. Then pass the returned chat ID (e.g. '15550100302@c.us') here.
 
     The tool supports bilingual matching (Hebrew <-> English translations/transliterations, e.g. 'ענבל' matches 'Inbal Cohen'), nicknames, and partial searches.
     When a name matches multiple contacts, the tool automatically prefers the most recently active one.
@@ -395,12 +395,12 @@ async def check_whatsapp_number(conn: Connection, phone: str) -> str:
     The returned chat ID (in the format 'XXXXXXXXX@c.us') can then be passed directly to send_whatsapp_message.
 
     Args:
-        phone: The phone number to check (e.g. '+972500000301' or '972500000301').
+        phone: The phone number to check (e.g. '+15550100301' or '15550100301').
     """
     url, headers, session = waha.config(conn)
     endpoint = waha.api_url(conn, "contacts", "check-exists")
 
-    # Normalize to international format (e.g. 052... -> 97252...)
+    # Normalize to international format (a leading 0 → DEFAULT_COUNTRY_CODE when set)
     cleaned_phone = waha.normalize_to_international(phone)
 
     params = {
@@ -446,7 +446,7 @@ async def send_whatsapp_file(
 
     The chat_id can be:
       - An existing contact/group name from your WhatsApp — auto-resolved.
-      - A properly formatted chat ID (e.g. '972500000301@c.us') — use for new/newly-validated numbers.
+      - A properly formatted chat ID (e.g. '15550100301@c.us') — use for new/newly-validated numbers.
 
     WhatsApp chat IDs ALWAYS include a suffix: '@c.us' for individuals, '@g.us' for groups.
     Bare phone numbers are NOT valid chat IDs.
@@ -512,14 +512,14 @@ async def forward_whatsapp_message(conn: Connection, chat_id: str, message_id: s
 
     Args:
         chat_id: Where to forward it: chat ID (with @c.us/@g.us suffix), contact name, or group name.
-        message_id: The full id of the message to forward, exactly as shown (e.g. 'false_972501234567@c.us_3EB0C0FFEE').
+        message_id: The full id of the message to forward, exactly as shown (e.g. 'false_15550101234@c.us_3EB0C0FFEE').
         what: A few words on what is being forwarded, shown to the user on the approval card (e.g. "Ori's price quote PDF").
     """
     url, headers, session = waha.config(conn)
     message_id = (message_id or "").strip().strip("`")
     if "_" not in message_id or "@" not in message_id:
         return ("Error: message_id must be a message's full id as shown by read_chat_messages / "
-                "get_latest_messages (e.g. 'false_972501234567@c.us_3EB0C0FFEE'). Read the chat first.")
+                "get_latest_messages (e.g. 'false_15550101234@c.us_3EB0C0FFEE'). Read the chat first.")
     try:
         resolved_id, resolved_name = await resolve.resolve_chat_id_and_name(conn, chat_id)
     except ValueError as ve:
@@ -557,8 +557,8 @@ async def edit_whatsapp_message(conn: Connection, chat_id: str, message_id: str,
     they explicitly ask you to rewrite it.
 
     Args:
-        chat_id: The WhatsApp chat ID (e.g. '972500000301@c.us') or contact/group name (e.g. 'John', 'ORA').
-        message_id: The id of your own message to edit, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_972500000301@c.us_3EB01234567890').
+        chat_id: The WhatsApp chat ID (e.g. '15550100301@c.us') or contact/group name (e.g. 'John', 'ORA').
+        message_id: The id of your own message to edit, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_15550100301@c.us_3EB01234567890').
         new_text: The new text content for the message.
     """
     url, headers, session = waha.config(conn)
@@ -592,8 +592,8 @@ async def delete_whatsapp_message(conn: Connection, chat_id: str, message_id: st
     """Delete (revoke) a sent message from a WhatsApp chat.
 
     Args:
-        chat_id: The WhatsApp chat ID (e.g. '972500000301@c.us') or contact/group name (e.g. 'John', 'ORA').
-        message_id: The id of your own message to delete, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_972500000301@c.us_3EB01234567890').
+        chat_id: The WhatsApp chat ID (e.g. '15550100301@c.us') or contact/group name (e.g. 'John', 'ORA').
+        message_id: The id of your own message to delete, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_15550100301@c.us_3EB01234567890').
     """
     url, headers, session = waha.config(conn)
     try:

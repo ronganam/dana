@@ -67,7 +67,7 @@ def check(name: str, condition: Any, detail: Any = "") -> None:
 
 ADMIN = users.first_admin()
 assert ADMIN is not None
-BOB = users.create("Bob")
+BOB = users.update(users.create("Bob").id, currency="ILS")  # his cards notify in shekels
 CARL = users.create("Carl")
 connections.connect(ADMIN, "money")
 connections.connect(ADMIN, "money_il")
@@ -458,7 +458,8 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    with users.acting_as(ADMIN):  # as in production: money text is in the acting user's currency
+        asyncio.run(main())
     passed = sum(1 for _, ok in results if ok)
     print(f"\n{passed}/{len(results)} passed")
     raise SystemExit(0 if passed == len(results) else 1)

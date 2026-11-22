@@ -32,7 +32,7 @@ import re
 import time
 from typing import Any, Dict, FrozenSet, List, Optional
 
-from core import clock, composers, llm, notify as notify_mod, user_profile, users
+from core import clock, composers, llm, notify as notify_mod, user_locale, user_profile, users
 from core.addons import BriefingContext, Section, registry, store
 from core.db import get_db_connection
 from core.notify import notify
@@ -40,7 +40,6 @@ from core.users import User
 
 logger = logging.getLogger(__name__)
 
-LANGUAGE = os.getenv("BRIEFING_LANGUAGE", "English")
 FALLBACK_TIME = os.getenv("BRIEFING_FALLBACK_TIME", "10:00")
 BRIEFING_TELEGRAM = os.getenv("BRIEFING_TELEGRAM", "0") == "1"
 MEETING_CARD_MINUTES = int(os.getenv("MEETING_CARD_MINUTES", "10"))
@@ -237,6 +236,7 @@ def briefing_prompt(d: Dict[str, Any], user: Optional[User]) -> str:
     """The model prompt for ``user``'s briefing, written for them (their name, pronoun and context)."""
     who = user_profile.for_user(user)
     his = who.possessive
+    language = user_locale.language_name(user_locale.languages(user)[0], native=False)
     return f"""Write {who.name}'s morning briefing. {who.pronoun.capitalize()} just woke up and will glance at it on {his} phone, watch and bedroom tablet.
 
 {who.about()}Now: {clock.describe_now()}
@@ -248,7 +248,7 @@ Today's data (JSON):
 Return:
 - `headline`: 3–8 words capturing the shape of the day ("Busy morning, free after 2", "Quiet Friday, two things due").
 - `points`: 3–6 short fragments (4–12 words), most useful first: the first event and anything time-critical, what's due or overdue, what needs {who.obj} in the Inbox, weather only if it matters (rain, heat, cold), birthdays, one person to reach out to. Skip empty categories; never pad.
-Fragments, not sentences; no trailing periods; no emoji; no advice beyond the facts. Use 24h times. Write in {LANGUAGE}; keep names, event titles and task titles as written (Hebrew stays Hebrew)."""
+Fragments, not sentences; no trailing periods; no emoji; no advice beyond the facts. Use 24h times. Write in {language}; keep names, event titles and task titles as written, in their own language."""
 
 
 _SCHEMA = {"type": "object", "properties": {"headline": {"type": "string"},

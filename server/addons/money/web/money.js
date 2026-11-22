@@ -681,7 +681,7 @@
       const i = full.installment;
       facts.push(["Installments", `Payment ${i.number} of ${i.total}${i.purchase_amount ? ` · ${C.moneyHtml(i.purchase_amount, { sign: "none" })} in all` : ""}`]);
     }
-    if (full && full.foreign && full.foreign.currency !== "ILS") facts.push(["Paid in", `<bdi dir="ltr">${esc(C.foreignText(full.foreign.amount, full.foreign.currency))}</bdi> → ${C.moneyHtml(t.amount, { sign: "none" })}`]);
+    if (full && full.foreign && C.currencyCode(full.foreign.currency) !== C.currency()) facts.push(["Paid in", `<bdi dir="ltr">${esc(C.foreignText(full.foreign.amount, full.foreign.currency))}</bdi> → ${C.moneyHtml(t.amount, { sign: "none" })}`]);
     if (full && full.bank_category) facts.push([`${company || "Card"}'s category`, `<bdi dir="auto">${esc(full.bank_category)}</bdi>`]);
     if (full && full.same_merchant && full.same_merchant.count > 1) {
       const sm = full.same_merchant;
@@ -872,8 +872,8 @@
     return `${sheetHead("Amount", "Absolute shekels: money out and in alike")}
       <form class="mny-form" data-form="amount">
         <div class="ibx-row2">
-          <label class="ibx-field">At least (₪)<input class="form-control" name="min" type="number" min="0" step="1" inputmode="decimal" value="${esc(S.f.min)}" data-autofocus></label>
-          <label class="ibx-field">At most (₪)<input class="form-control" name="max" type="number" min="0" step="1" inputmode="decimal" value="${esc(S.f.max)}"></label>
+          <label class="ibx-field">At least (${esc(C.currencySymbol())})<input class="form-control" name="min" type="number" min="0" step="1" inputmode="decimal" value="${esc(S.f.min)}" data-autofocus></label>
+          <label class="ibx-field">At most (${esc(C.currencySymbol())})<input class="form-control" name="max" type="number" min="0" step="1" inputmode="decimal" value="${esc(S.f.max)}"></label>
         </div>
         <div class="mny-form-btns"><button class="btn-secondary" type="button" data-clear="amount">Clear</button><button class="btn-primary" type="submit">Show</button></div>
       </form>`;
@@ -1537,6 +1537,7 @@
     start(api) {
       A = api;
       C = window.DanaMoneyCore;
+      C.setCurrency(api.me && api.me.currency, navigator.language);   // amounts in the user's currency
       D = window.DanaMoneyDash({ S, C, got, esc, icon, icons, today, isCurrent, seriesCls, acctOf, catLabel });
       S.month = C.monthOf();
       S.f = { ...C.EMPTY_FILTERS };

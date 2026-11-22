@@ -42,7 +42,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
-import java.util.Locale
+import io.github.ronganam.dana.data.voice.useVoiceFor
 import androidx.core.content.edit
 
 class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(context),
@@ -132,9 +132,7 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
     }
 
     override fun onInit(status: Int) {
-        if (status == TextToSpeech.SUCCESS) {
-            tts?.language = Locale.US
-        }
+        if (status != TextToSpeech.SUCCESS) android.util.Log.w("DanaVoiceSession", "TTS init failed: $status")
     }
 
     override fun onCreateContentView(): View {
@@ -250,7 +248,10 @@ class DanaVoiceInteractionSession(context: Context) : VoiceInteractionSession(co
                     val msg = messages[i]
                     if (!isSpeakable(msg) || msg.message.trim() in spokenReplies) continue
                     rememberSpoken(msg.message)
-                    if (!isMuted) tts?.speak(msg.message, TextToSpeech.QUEUE_ADD, null, "dana_response")
+                    if (!isMuted) tts?.run {
+                        useVoiceFor(msg.message, context)
+                        speak(msg.message, TextToSpeech.QUEUE_ADD, null, "dana_response")
+                    }
                 }
             }
         }

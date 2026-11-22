@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.data.voice
 
+import io.github.ronganam.dana.data.network.Me
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
@@ -9,6 +10,7 @@ import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import java.util.Locale
 
 /**
  * Push-to-talk transcription with the phone's own speech recognizer (on the
@@ -16,8 +18,10 @@ import android.util.Log
  * is still talking and the recognizer detects the end of speech itself, so the
  * reply can start without the server-side transcription round trip.
  *
- * Hebrew is recognised online (Google offers no offline Hebrew model), with
- * automatic Hebrew/English switching so mixed sentences come out right.
+ * It listens in the user's languages (`/api/me`, the first one the main
+ * language; the phone's locale when they have none: [SpeechLocales]) and
+ * recognises online (Google has no offline model for many languages, Hebrew
+ * among them), switching between them so mixed sentences come out right.
  *
  * Must be created and driven on the main thread. One instance per utterance.
  */
@@ -114,25 +118,24 @@ class DeviceSpeech(
     }
 
     private fun buildIntent() = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+        val languages = ArrayList(SpeechLocales.forRecognizer(Me.cached(context)?.languages.orEmpty(), Locale.getDefault()))
         putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-        putExtra(RecognizerIntent.EXTRA_LANGUAGE, PRIMARY_LANGUAGE)
+        putExtra(RecognizerIntent.EXTRA_LANGUAGE, languages.first())
         putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
         putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, false)
         putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
         putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        if (languages.size > 1 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, true)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, LANGUAGES)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, languages)
             putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_SWITCH, RecognizerIntent.LANGUAGE_SWITCH_BALANCED)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, LANGUAGES)
+            putExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, languages)
         }
     }
 
     companion object {
         private const val TAG = "DeviceSpeech"
         const val PREF_KEY = "live_transcription"
-        private const val PRIMARY_LANGUAGE = "he-IL"
-        private val LANGUAGES = arrayListOf("he-IL", "en-US")
 
         /**
          * Errors that mean "this recognizer can't serve us right now" (no
@@ -152,7 +155,7 @@ class DeviceSpeech(
             SpeechRecognizer.ERROR_LANGUAGE_UNAVAILABLE,
         )
 
-        /** The kiosk and TV always stream to the server: Gemini handles Hebrew + English far-field speech. */
+        /** The kiosk and TV always stream to the server, which transcribes far-field speech in the user's languages. */
         fun isEnabled(context: Context): Boolean =
             !io.github.ronganam.dana.BuildConfig.KIOSK && !io.github.ronganam.dana.BuildConfig.TV &&
                 ServerConfig.prefs(context).getBoolean(PREF_KEY, true)

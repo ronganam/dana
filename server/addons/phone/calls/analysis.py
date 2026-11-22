@@ -91,10 +91,10 @@ def build_analysis_prompt(user: Optional[User], transcript: str, call: Dict[str,
 {about}Saved contacts / people:
 {people}
 
-The call: with "{call.get('contact')}"{phone}, {_direction_text(user, call.get('direction'))}, on {when_text} (Israel time), duration {dur_text}.
+The call: with "{call.get('contact')}"{phone}, {_direction_text(user, call.get('direction'))}, on {when_text} ({clock.get_timezone().key} time), duration {dur_text}.
 
 Return JSON matching the schema. Rules:
-- Language: write title, summary, roles, key facts and action items in the transcript's main language (Hebrew transcript → Hebrew). Keep names as spoken.
+- Language: write title, summary, roles, key facts and action items in the transcript's main language (a Spanish call → Spanish). Keep names as spoken.
 - Speakers: one side is {me}, the other is normally "{call.get('contact')}". Do NOT invent names for the speakers; if a name isn't clearly said, use "{me}" / the contact name / "the other side". A business contact name means a representative of that business.
 - title: 3-7 words, specific (what was decided/asked), no quotes.
 - summary: 2-6 short markdown bullet lines starting with "- ". Concrete: decisions, agreements, numbers, dates, addresses. No headings, no fluff.

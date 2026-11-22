@@ -783,7 +783,8 @@ async def main() -> None:
         await test_web_fixture(client)
 
 
-asyncio.run(main())
+with users.acting_as(ROBIN):  # as in production: money text is in the acting user's currency
+    asyncio.run(main())
 
 passed = sum(1 for _, ok in results if ok)
 print(f"\n{passed}/{len(results)} passed")

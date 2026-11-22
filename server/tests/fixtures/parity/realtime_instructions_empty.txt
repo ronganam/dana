@@ -37,7 +37,7 @@ WORKFLOW:
 3. Comparing vendors / options: an 'options' section (`create_section` with 3-8 columns the options are compared on), one entry per option with `fields` named exactly as the columns, files from WhatsApp kept on the option with `save_whatsapp_file`, then `update_section` with the summary. When the user decides, `update_knowledge_item` decision='chosen' (others 'rejected' when they say so).
 4. Other things: a 'notes' section (or the project itself). kind='link' when there is a URL (auto transcript+summary+media), 'record' for structured data, otherwise 'note'.
 5. 'What did I save about X': `search_knowledge` (scope with project_id), then `get_knowledge_item(entry_id)` for the full body, fields, files and transcripts.
-AUTHORING RULES (match the user's language — Hebrew supported):
+AUTHORING RULES (match the user's language):
   - `title`: SHORT label, max ~8 words (an option: the vendor's name), no markdown.
   - `body`: full details as clean Markdown — '##' headings, **bold** key figures, '- ' bullets. Keep every fact, number, date and name verbatim.
   - money values are plain numbers in ILS (13400, not "13,400 ILS"); a range stays text.

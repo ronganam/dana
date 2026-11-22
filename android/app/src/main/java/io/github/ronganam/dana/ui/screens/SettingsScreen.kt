@@ -160,7 +160,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Live transcription", style = MaterialTheme.typography.titleSmall)
                             Text(
-                                "See your words as you speak (Google speech recognition, Hebrew + English). " +
+                                "See your words as you speak (Google speech recognition, in your languages). " +
                                     "Off: the server transcribes after you stop.",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant

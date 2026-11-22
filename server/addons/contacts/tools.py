@@ -60,7 +60,7 @@ def _not_read_yet(conn: Connection) -> Optional[str]:
 
 @addon.tool()
 def search_contacts(conn: Connection, query: str, limit: int = 10) -> str:
-    """Search the user's Google Contacts by name (Hebrew or English, partial is fine), phone number or email address. Use it to find someone's phone number or email instead of asking the user.
+    """Search the user's Google Contacts by name (in any language or script, partial is fine), phone number or email address. Use it to find someone's phone number or email instead of asking the user.
 
     Args:
         query: A name or part of it, a phone number or an email address.

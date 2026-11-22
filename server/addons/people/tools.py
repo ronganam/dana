@@ -58,7 +58,7 @@ async def list_people(conn: Connection, query: Optional[str] = None, sort: str =
     """List the people the user talks to (built from calls and messages), e.g. who he talked to lately or who he hasn't talked to in a while.
 
     Args:
-        query: Optional name, relation or phone number to filter by (Hebrew or English).
+        query: Optional name, relation or phone number to filter by (in any language or script).
         sort: 'recent' (last contact first), 'drifting' (only people he talks to regularly but not lately), 'pinned' or 'name'.
         limit: Max people to return (default 15).
     """
@@ -73,7 +73,7 @@ async def get_person(conn: Connection, person: str) -> str:
     """Everything Dana knows about one person: relation, notes, birthday, how often they talk, the AI brief (what's going on, open loops), recent calls with summaries, recent messages from them and open tasks involving them.
 
     Args:
-        person: The person's name (Hebrew or English, partial is fine), phone number or id.
+        person: The person's name (in any language or script, partial is fine), phone number or id.
     """
     pid = store.resolve(conn.user, person)
     if not pid:
@@ -130,7 +130,7 @@ async def update_person(conn: Connection, person: str, relation: Optional[str] =
         notes: Replace the free-text notes.
         append_note: Add a line to the notes (keeps what's there).
         birthday: YYYY-MM-DD, or MM-DD when the year is unknown.
-        add_alias: Another name they go by (e.g. the Hebrew or English spelling, a nickname).
+        add_alias: Another name they go by (e.g. their name in another script, a nickname).
         add_phone: Another phone number for them.
         pinned: Pin (true) or unpin (false) them in the People list and the home-screen widget.
         rename_to: A new display name.

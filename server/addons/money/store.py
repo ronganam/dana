@@ -1,7 +1,9 @@
 """Reads of a user's money data and the payloads the API returns (docs/money.md).
 
 Every query is scoped to the user: another user's id answers like a missing
-one. Times are stored as ISO UTC (:func:`iso`), amounts as integer agorot.
+one. Times are stored as ISO UTC (:func:`iso`), amounts as integer hundredths
+(agorot, cents) of the user's currency (:func:`home_currency`, written by
+:func:`money_text`).
 Credentials never leave this module except as the encrypted token
 (:func:`credentials_token`, read only by ``sync.py``)."""
 
@@ -12,7 +14,7 @@ import logging
 import sqlite3
 from typing import Any, Dict, Iterator, List, Mapping, Optional, Sequence
 
-from core import clock
+from core import clock, user_locale, users
 from core.db import get_db_connection
 from core.users import User
 from addons.money import categories, providers
@@ -331,13 +333,20 @@ TXN_SELECT = (f"SELECT t.*, ({FLOW_SQL}) AS eff_flow, a.kind AS account_kind, a.
 TXN_ORDER = "t.purchase_date DESC, COALESCE(t.occurred_at, '') DESC, t.id DESC"
 
 
-def shekels(agorot: Optional[int]) -> str:
-    """``₪1,234.50`` (``-₪50.00`` for a negative amount; ``—`` for none)."""
-    if agorot is None:
-        return "—"
-    sign = "-" if agorot < 0 else ""
-    whole, cents = divmod(abs(int(agorot)), 100)
-    return f"{sign}₪{whole:,}.{cents:02d}"
+def home_currency() -> str:
+    """The currency the acting user's amounts are in: theirs (core/user_locale.py)."""
+    return user_locale.currency(users.current())
+
+
+def money_text(amount: Optional[int], *, cents: bool = True) -> str:
+    """An amount in the acting user's currency: ``€1,234.50`` (``-€50.00`` for a
+    negative one; ``cents=False``: ``€1,235``; ``—`` for none)."""
+    return user_locale.format_money(amount, home_currency(), cents=cents)
+
+
+def is_foreign(row: Mapping[str, Any]) -> bool:
+    """Whether a transaction row was paid in another currency than the user's (with its amount there)."""
+    return bool(row.get("orig_currency")) and row["orig_currency"] != home_currency() and row.get("orig_amount") is not None
 
 
 def account_label(company: Optional[str], kind: Optional[str], number: Optional[str],
@@ -369,7 +378,7 @@ def txn_item(row: Any) -> Dict[str, Any]:
         badges.append({"type": r["status"]})
     if (r.get("installment_total") or 0) > 1:
         badges.append({"type": "installment", "number": r.get("installment_number"), "total": r["installment_total"]})
-    if r.get("orig_currency") and r["orig_currency"] != "ILS" and r.get("orig_amount") is not None:
+    if is_foreign(r):
         badges.append({"type": "foreign", "amount": r["orig_amount"], "currency": r["orig_currency"]})
     flow = r.get("eff_flow") or r.get("flow")
     return {"id": r["id"], "account_id": r.get("account_id"), "account_kind": r.get("account_kind"),

@@ -22,7 +22,6 @@ BRIEF_BATCH = int(os.getenv("PEOPLE_BRIEF_BATCH", "6"))
 DRIFT_MIN_DAYS = int(os.getenv("PEOPLE_DRIFT_MIN_DAYS", "14"))
 BRIEF_STYLE = "1"
 UNKNOWN_NAMES = {"", "unknown", "me", "private number", "מספר חסוי", "חסוי", "no caller id"}
-LATIN = re.compile(r"[A-Za-z]")
 
 
 def now_iso() -> str:

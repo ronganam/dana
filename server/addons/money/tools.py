@@ -1,6 +1,6 @@
 """Dana's money tools (docs/money.md, "Agent tools"): thin wrappers over
 :mod:`.queries`, :mod:`.insights` and :mod:`.dashboard` that answer in short text with amounts as
-``₪1,234.50``. Periods are resolved here (``periods.resolve``), never by the
+``€1,234.50`` in the user's currency (``store.money_text``). Periods are resolved here (``periods.resolve``), never by the
 model. Read-only except ``categorize_transaction`` (runs at once with Undo:
 ``rules.set_category`` registers it), ``update_saving`` (``savings.update``,
 with Undo) and ``sync_money`` (starts a sync, rate limited by
@@ -26,7 +26,7 @@ Flow = Literal["spending", "income", "purchase", "refund", "transfer_out", "tran
                "card_bill", "own_transfer", "investment", "other"]
 MAX_BREAKDOWN = 8
 MAX_ROWS = 30
-money_text = store.shekels
+money_text = store.money_text
 
 
 def _period(period: Optional[str], start: Optional[str], end: Optional[str]) -> Period:
@@ -149,8 +149,8 @@ async def search_transactions(conn: Connection, query: Optional[str] = None, per
         start: First day (YYYY-MM-DD) of a custom range.
         end: Last day (YYYY-MM-DD, inclusive) of a custom range.
         category: A group, a category or "uncategorized".
-        min_amount: Smallest amount in ₪ (absolute, e.g. 500).
-        max_amount: Largest amount in ₪ (absolute).
+        min_amount: Smallest amount in the user's currency (absolute, e.g. 500).
+        max_amount: Largest amount in the user's currency (absolute).
         account: An account: its card's last digits, its label, its company or "bank" / "card".
     """
     user = conn.user
@@ -572,7 +572,7 @@ async def update_saving(conn: Connection, key: str, status: Optional[SavingStatu
     Args:
         key: The item's key in brackets from saving_opportunities, e.g. "fees" or "creep:eating_out".
         status: Ways to save: doing (on it), done, dismissed (not for them), snoozed (30 days), open (back to Dana). Spending to watch: accepted (worth it), watching (with a target), open.
-        monthly_target: Spending to watch only: the most to spend on it a month, in ₪ (sets status watching).
+        monthly_target: Spending to watch only: the most to spend on it a month, in the user's currency (sets status watching).
     """
     target: Any = None
     if monthly_target is not None:
