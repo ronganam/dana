@@ -125,7 +125,24 @@ check("steps: the setup sentences are shown in one first step, the optional key 
 const haDetail = C.renderDetail(admin.homeassistant, {}, true);
 check("detail: what it adds (the manifest's features)", haDetail.includes("What it adds") && admin.homeassistant.features.every((f) => haDetail.includes(C.esc(f))));
 check("detail: a page it adds is named", C.renderAdds(member.calendar).includes("<strong>Calendar</strong> page"));
-check("detail: what it builds on", C.renderAdds(fresh.money_il).includes("Works together with: Money"));
+const ilNeeds = C.renderNeeds(fresh.money_il, F.list_new_user.body.addons);
+check("needs: another addon it needs, by its title, required", /Addon<\/span>[\s\S]*<strong dir="auto">Money<\/strong>/.test(ilNeeds)
+      && !/<strong dir="auto">Money<\/strong> <em>optional/.test(ilNeeds));
+const gNeeds = plain(C.needLines(admin.gmail, F.list_admin.body.addons));
+check("needs: required first; an env value as code; optional ones marked; every one with its why",
+      gNeeds[0].kind === "env" && gNeeds[0].code === true && gNeeds[0].what === "GOOGLE_CLIENT_ID"
+      && gNeeds.findIndex((n) => n.optional) === gNeeds.length - 1 && gNeeds.every((n) => n.why)
+      && gNeeds.some((n) => n.kind === "account" && n.what === "A Google account"), JSON.stringify(gNeeds));
+const haNeeds = C.renderNeeds(admin.homeassistant, F.list_admin.body.addons);
+check("detail: Needs and May touch, from the payload",
+      haDetail.includes("<h4>Needs</h4>") && haDetail.includes("<h4>May touch</h4>")
+      && haNeeds.includes("Connects to your Home Assistant server") && haNeeds.includes("Acts for you outside Dana")
+      && haNeeds.includes("Keeps passwords, tokens or sign-ins") && haNeeds.includes("<em>optional</em>"));
+check("may touch: other addons' data by their titles; nothing declared says so; unknown (did not load) shows nothing",
+      plain(C.touchLines(admin.tasks.touches, F.list_admin.body.addons)).join() === "Reads your data from Home Assistant, People, Phone"
+      && plain(C.touchLines(admin.shopping.touches)).join() === "Nothing beyond Dana's own data"
+      && C.renderNeeds(admin.broken, []) === "" && plain(C.touchLines(null)).length === 0);
+check("needs: an addon needing nothing says so", C.renderNeeds(admin.essentials, []).includes("Nothing beyond Dana itself"));
 check("detail: once on, its settings with suggestions, Test again and Disconnect",
       haDetail.includes(">Settings<") && haDetail.includes('data-name="person"') && haDetail.includes('data-act="test"')
       && haDetail.includes('data-act="disconnect"') && haDetail.includes('list="itg-dl-homeassistant-person"'));
@@ -266,10 +283,24 @@ check("catalog: an unreadable catalog says so with a retry", /Couldn't read the 
 check("catalog: a homepage that is not http(s) is not linked", !C.renderCatalogEntry({ ...weatherEntry, homepage: "javascript:alert(1)" }, {}).includes("javascript:"));
 check("install form: a full commit is required", C.installBody({ repo: "https://x/r.git", ref: "main" }).error
       && JSON.stringify(plain(C.installBody({ repo: " https://x/r.git ", path: "/addons/w/", ref: "A".repeat(40) }))) === JSON.stringify({ repo: "https://x/r.git", path: "addons/w", ref: "a".repeat(40) }));
-const conf = C.renderConfirm(C.installConfirm(weatherEntry.source, "weather", false));
+const conf = C.renderConfirm(C.installConfirm(weatherEntry.source, "weather", false, weatherEntry.touches));
 check("install confirm: the repository, the folder, the commit, the full-access warning and the restart after",
       conf.includes(weatherEntry.source.repo) && conf.includes(weatherEntry.source.path) && conf.includes(weatherEntry.source.ref)
       && conf.includes(C.esc(C.FULL_ACCESS)) && conf.includes("restart") && conf.includes(">Install<"));
+check("install confirm: what the entry says it may touch, before Install",
+      conf.includes("It may touch") && conf.includes("Connects to api.weather.example") && conf.includes("Keeps passwords")
+      && !conf.includes("Acts for you"));
+check("install confirm: an entry that does not say what it touches says Dana checks the code",
+      C.renderConfirm(C.installConfirm(weatherEntry.source, "weather", false, null)).includes(C.esc("reads it from the addon's code")));
+check("catalog: an entry's touches on its row", C.renderCatalogEntry(weatherEntry, {}).includes("May touch: Connects to api.weather.example"));
+const more = { hosts: [], acts_outside: true, stores_credentials: false, reads: [] };
+const ask = C.renderConfirm(C.touchesConfirm("weather", { ...weatherEntry.touches, acts_outside: true }, more, true));
+check("update that adds a touch: asks again with only what is new",
+      ask.includes("may touch more") && ask.includes("New in this version") && ask.includes("Acts for you outside Dana")
+      && !ask.includes("api.weather.example") && ask.includes(">Update<"));
+const fresh409 = C.renderConfirm(C.touchesConfirm("weather", weatherEntry.touches, weatherEntry.touches, false));
+check("install the code says touches more (409): asks with everything it touches", fresh409.includes("Its code says it may touch")
+      && fresh409.includes("api.weather.example") && fresh409.includes(">Install<"));
 check("install refused: the server's sentence", F.install_refused.status === 400 && C.errorText(F.install_refused.status, F.install_refused.body).message.includes("40-character"));
 check("restart banner: only when needed; Restart now for admins only",
       C.renderRestartBanner({}) === "" && C.renderRestartBanner({ restartNeeded: true, canManage: true }).includes("data-restart")

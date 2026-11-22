@@ -13,6 +13,15 @@ imported or run here: the server loads the addon at its next start, which is
 why a restart is needed. An installed addon runs with the server's full
 access; only admins install, and the page says so before.
 
+**Touches** (``Touches(...)`` in the manifest, read without running it):
+installing asks first when the addon may touch something the admin has not
+agreed to. Agreed is the version being replaced (an update) plus ``accept``
+(what the admin was shown: the catalog entry's touches, or what an earlier
+refusal returned). When the fetched manifest declares more,
+:class:`ConfirmTouches` is raised with all its touches and the new ones, and
+nothing is written; an update that adds nothing goes ahead without asking. A
+manifest whose ``touches=`` is not written with plain values is refused.
+
 Refused: a ref that is not a full 40-character commit hash, a name that is an
 official addon or an addon of another source (two addons with one name stop
 the start), a reserved name, a path leaving the repository, a folder without
@@ -33,6 +42,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Iterable, List, Optional
 
 from core import addon_dirs
+from core.addons.hooks import Touches
 
 FULL_COMMIT = re.compile(r"^[0-9a-f]{40}$")
 # Names that would shadow the Addons API's own paths (/api/addons/catalog, /install).
@@ -46,6 +56,17 @@ _lock = threading.Lock()
 
 class InstallError(ValueError):
     """An install or remove that is refused or failed; the message says why in a sentence."""
+
+
+class ConfirmTouches(InstallError):
+    """The addon may touch more than the admin agreed to: ``touches`` is all it
+    declares, ``added`` what is new; install again with ``accept=touches``."""
+
+    def __init__(self, name: str, touches: Touches, added: Touches) -> None:
+        super().__init__(f"{name} may touch more than you agreed to; look at what it touches and confirm.")
+        self.name = name
+        self.touches = touches
+        self.added = added
 
 
 @dataclass(frozen=True)
@@ -63,6 +84,7 @@ class Installed:
     folder: Path
     source: Source
     replaced: bool
+    touches: Touches = Touches()
 
 
 def check_ref(ref: str) -> str:
@@ -159,12 +181,40 @@ def fetch(source: Source, into: Path) -> Path:
     return folder
 
 
-def install(source: Source, root: Path, *, name: Optional[str] = None, by: str = "") -> Installed:
-    """Install the addon at ``source`` into ``root/<name>`` (replacing an earlier
-    install of it there). ``name``: the name it must have (a catalog entry's);
-    ``by``: who installs it (kept in the folder's record).
+def manifest_touches(addon_py: Path) -> Touches:
+    """The touches ``addon_py`` declares, read without running it (none declared: touches nothing).
 
     Raises:
+        InstallError: ``touches=`` is not written with plain values, or is not valid.
+    """
+    manifest = addon_dirs.read_manifest(addon_py)
+    raw = manifest.touches if manifest is not None else {}
+    if raw is None:
+        raise InstallError("touches= in addon.py must be written with plain values (strings, True / False, "
+                           "tuples), so it can be read before installing.")
+    try:
+        return Touches(**{k: tuple(v) if isinstance(v, list) else v for k, v in raw.items()})
+    except (TypeError, ValueError) as e:
+        raise InstallError(f"touches= in addon.py is not valid: {e}") from e
+
+
+def installed_touches(folder: Path) -> Touches:
+    """What the addon in ``folder`` declares it touches; touches nothing when it cannot be read."""
+    try:
+        return manifest_touches(folder / "addon.py")
+    except InstallError:
+        return Touches()
+
+
+def install(source: Source, root: Path, *, name: Optional[str] = None, by: str = "",
+            accept: Optional[Touches] = None) -> Installed:
+    """Install the addon at ``source`` into ``root/<name>`` (replacing an earlier
+    install of it there). ``name``: the name it must have (a catalog entry's);
+    ``by``: who installs it (kept in the folder's record); ``accept``: the
+    touches the admin agreed to, beyond the replaced version's.
+
+    Raises:
+        ConfirmTouches: it may touch more than agreed (nothing was written).
         InstallError: refused (see the module docstring) or git failed.
     """
     source = Source(check_repo(source.repo), check_path(source.path), check_ref(source.ref))
@@ -180,11 +230,17 @@ def install(source: Source, root: Path, *, name: Optional[str] = None, by: str =
         if name is not None and declared != name:
             raise InstallError(f"The manifest at that commit declares {declared!r}, not {name!r}.")
         check_name(declared, root)
+        touches = manifest_touches(folder / "addon.py")
+        target = root / declared
+        added = touches.added_since(installed_touches(target) if target.is_dir() else Touches())
+        if accept is not None:
+            added = added.added_since(accept)
+        if not added.empty:
+            raise ConfirmTouches(declared, touches, added)
         links = _symlinks(folder)
         if links:
             raise InstallError(f"The addon folder has symbolic links ({', '.join(links[:3])}); they are not installed.")
         root.mkdir(parents=True, exist_ok=True)
-        target = root / declared
         staging = root / f".{declared}.new"
         old = root / f".{declared}.old"
         for leftover in (staging, old):
@@ -199,7 +255,7 @@ def install(source: Source, root: Path, *, name: Optional[str] = None, by: str =
             target.rename(old)
         staging.rename(target)
         shutil.rmtree(old, ignore_errors=True)
-    return Installed(declared, target, source, replaced)
+    return Installed(declared, target, source, replaced, touches)
 
 
 def remove(name: str, root: Path) -> Path:

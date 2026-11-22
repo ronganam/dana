@@ -7,7 +7,10 @@ job, a service, an event handler, a notify channel, a Now card and action, a
 route and a ``web/`` folder; ``mkplus`` needs it; ``mkbroken`` fails to load.
 A local git repository (made here) holds addons at two commits; ``greeter``
 is installed from its first commit into ``<data dir>/addons`` before the
-server loads. The catalog is a local file (``DANA_CATALOG_FILE``). The first
+server loads. ``watcher`` declares a host at the first commit and also acting
+outside Dana at the second (an update that adds a touch asks again);
+``samey`` declares the same touches at both; ``vague`` writes its touches
+with a name, not plain values. The catalog is a local file (``DANA_CATALOG_FILE``). The first
 admin and Bob have ``mk``; Carl has nothing. No network.
 """
 
@@ -112,8 +115,8 @@ write(SITE / "mk" / "web" / "sub" / "deep.js", "// deep\n")
 write(SCRATCH / "outside.txt", "OUTSIDE-SECRET\n")
 os.symlink(SCRATCH / "outside.txt", SITE / "mk" / "web" / "link.js")
 write(SITE / "mkplus" / "addon.py", '''\
-    from core.addons import Addon
-    addon = Addon("mkplus", description="Needs mk", needs=("mk",))
+    from core.addons import Addon, Need
+    addon = Addon("mkplus", description="Needs mk", needs=(Need("addon", "mk", "Its data"),))
     ''')
 write(SITE / "mkbroken" / "addon.py", "raise RuntimeError('mkbroken is broken on purpose')\n")
 
@@ -125,8 +128,13 @@ def git(*args: str, cwd: Path = REPO) -> str:
                           check=True, capture_output=True, text=True).stdout.strip()
 
 
-def addon_py(name: str, version: str, declared: str = "") -> str:
-    return f"from core.addons import Addon\naddon = Addon({(declared or name)!r}, description='From git', version={version!r})\n"
+def addon_py(name: str, version: str, declared: str = "", touches: str = "") -> str:
+    return (f"from core.addons import Addon, Touches\naddon = Addon({(declared or name)!r}, description='From git', "
+            f"version={version!r}{', touches=' + touches if touches else ''})\n")
+
+
+WATCH_HOST = 'Touches(hosts=("api.example.com",))'
+WATCH_MORE = 'Touches(hosts=("api.example.com",), acts_outside=True)'
 
 
 REPO.mkdir()
@@ -140,10 +148,15 @@ write(REPO / "addons" / "noaddon" / "README.md", "no addon.py here\n")
 write(REPO / "addons" / "linky" / "addon.py", addon_py("linky", "1.0.0"))
 os.symlink("/etc/hostname", REPO / "addons" / "linky" / "host.txt")
 write(REPO / "addons" / "future" / "addon.py", addon_py("future", "1.0.0"))
+write(REPO / "addons" / "watcher" / "addon.py", addon_py("watcher", "1.0.0", touches=WATCH_HOST))
+write(REPO / "addons" / "samey" / "addon.py", addon_py("samey", "1.0.0", touches=WATCH_HOST))
+write(REPO / "addons" / "vague" / "addon.py", "HOSTS = ('api.example.com',)\n" + addon_py("vague", "1.0.0", touches="Touches(hosts=HOSTS)"))
 git("add", "-A")
 git("commit", "-qm", "one")
 COMMIT1 = git("rev-parse", "HEAD")
 write(REPO / "addons" / "greeter" / "addon.py", addon_py("greeter", "1.1.0"))
+write(REPO / "addons" / "watcher" / "addon.py", addon_py("watcher", "1.1.0", touches=WATCH_MORE))
+write(REPO / "addons" / "samey" / "addon.py", addon_py("samey", "1.1.0", touches=WATCH_HOST))
 git("commit", "-qam", "two")
 COMMIT2 = git("rev-parse", "HEAD")
 
@@ -160,6 +173,9 @@ CATALOG.write_text(json.dumps({"addons": [
     entry("greeter", COMMIT1),
     entry("mismatch", COMMIT1),
     entry("future", COMMIT1, min_dana="99.0"),
+    entry("watcher", COMMIT2, touches={"hosts": ["api.example.com"], "acts_outside": True}),
+    entry("samey", COMMIT2, touches={"hosts": ["api.example.com"]}),
+    entry("badtouch", COMMIT1, touches={"hosts": "api.example.com"}),
 ]}), encoding="utf-8")
 os.environ["DANA_CATALOG_FILE"] = str(CATALOG)
 os.environ["DANA_ADDON_DIRS"] = f"{SITE}{os.pathsep}{DATA_ADDONS}"
@@ -229,11 +245,24 @@ async def test_list(c: TestClient) -> None:
     check("list: loaded addons with their source (official, site, installed) and the failed one",
           status == 200 and items["tasks"]["source"] == "official" and mk.get("source") == "site"
           and greeter.get("source") == "installed" and broken.get("state") == "failed", list(items))
-    check("list: mk's shape (title, version, state, needs, web URLs and nav while on, no worker)",
+    check("list: mk's shape (title, version, state, needs, touches, web URLs and nav while on, no worker)",
           mk["title"] == "Market test" and mk["version"] == "1.2.3" and mk["state"] == "on" and mk["needs"] == []
+          and mk["touches"] == {"hosts": [], "acts_outside": False, "stores_credentials": False, "reads": []}
           and mk["web"] == [{"id": "mk", "panel": "/addons/mk/web/panel.js", "style": "/addons/mk/web/panel.css",
                              "nav": {"label": "Market", "icon": "store", "order": 70, "primary": False}}] and mk["worker"] is False, mk)
-    check("list: needs are listed", items["mkplus"]["needs"] == ["mk"])
+    check("list: needs are listed with their kind, why and whether optional",
+          items["mkplus"]["needs"] == [{"kind": "addon", "what": "mk", "why": "Its data", "optional": False}],
+          items["mkplus"]["needs"])
+    wa = items["whatsapp"]
+    check("list: an official addon's needs and touches (WhatsApp: a WAHA server, optional keys; its server, "
+          "acting outside, stored credentials, other addons' data)",
+          [n["kind"] for n in wa["needs"] if not n["optional"]] == ["hardware", "account"]
+          and {"kind": "env", "what": "WAHA_WEBHOOK_SECRET", "optional": True}.items() <= next(
+              n for n in wa["needs"] if n["what"] == "WAHA_WEBHOOK_SECRET").items()
+          and wa["touches"] == {"hosts": ["your WAHA server"], "acts_outside": True, "stores_credentials": True,
+                                "reads": ["knowledge", "people"]}, wa)
+    check("list: an addon that did not load has no touches", broken.get("touches", "missing") is None
+          and broken.get("needs") == [], broken)
     check("list: the admin sees where an installed addon came from",
           greeter["installed"] == {"repo": str(REPO), "path": "addons/greeter", "commit": COMMIT1}
           and greeter["version"] == "1.0.0" and greeter["state"] == "available", greeter)
@@ -385,16 +414,23 @@ async def test_catalog(c: TestClient) -> None:
     status, body = await call(c, "GET", "/api/addons/catalog", ADMIN_AUTH)
     entries = {e["name"]: e for e in body.get("entries", [])}
     check("catalog: valid entries kept, the others skipped with a reason",
-          status == 200 and list(entries) == ["greeter", "mismatch", "future"] and body["origin"] == str(CATALOG)
-          and len(body["problems"]) == 3 and any("hello" in p for p in body["problems"])
+          status == 200 and list(entries) == ["greeter", "mismatch", "future", "watcher", "samey"]
+          and body["origin"] == str(CATALOG)
+          and len(body["problems"]) == 4 and any("hello" in p for p in body["problems"])
+          and any(p.startswith("badtouch:") and "hosts" in p for p in body["problems"])
           and any("Bad-Name" in p for p in body["problems"]) and any("twice" in p for p in body["problems"]), body)
     g = entries.get("greeter", {})
     check("catalog: merged with what is installed (commit, loaded, update available)",
-          g.get("installed") == {"commit": COMMIT1, "loaded": True, "version": "1.0.0"} and g["update_available"] is True
+          g.get("installed") == {"commit": COMMIT1, "loaded": True, "version": "1.0.0", "touches": NOTHING}
+          and g["update_available"] is True and g["touches"] is None and g["touches_added"] is None
           and g["present"] == "installed" and g["official"] is False and g["compatible"] is True
           and g["source"] == {"repo": str(REPO), "path": "addons/greeter", "ref": COMMIT2} and g["tags"] == ["demo"], g)
     check("catalog: an entry for a newer Dana is not compatible", entries["future"]["compatible"] is False
           and entries["future"]["installed"] is None)
+    check("catalog: an entry's touches are shown before installing (missing parts: none)",
+          entries["watcher"]["touches"] == {"hosts": ["api.example.com"], "acts_outside": True,
+                                            "stores_credentials": False, "reads": []}
+          and entries["watcher"]["installed"] is None and entries["watcher"]["touches_added"] is None, entries["watcher"])
 
 
 # --- 5. Install, update, remove ---------------------------------------------------------------------
@@ -456,6 +492,58 @@ async def test_install(c: TestClient) -> None:
           {"name": "greeter", "change": "remove"} in body["pending"], body.get("pending"))
 
 
+NOTHING = {"hosts": [], "acts_outside": False, "stores_credentials": False, "reads": []}
+HOST_ONLY = {**NOTHING, "hosts": ["api.example.com"]}
+ACTS_ONLY = {**NOTHING, "acts_outside": True}
+
+
+async def test_touches(c: TestClient) -> None:
+    status, body = await call(c, "POST", "/api/addons/install", ADMIN_AUTH,
+                              {"repo": str(REPO), "path": "addons/watcher", "ref": COMMIT1})
+    check("install: an addon that touches something is not installed until the admin agrees (409 with its touches)",
+          status == 409 and body.get("error") == "confirm_touches" and body["name"] == "watcher"
+          and body["touches"] == HOST_ONLY and body["added"] == HOST_ONLY and not (DATA_ADDONS / "watcher").exists(), body)
+    status, body = await call(c, "POST", "/api/addons/install", ADMIN_AUTH,
+                              {"repo": str(REPO), "path": "addons/watcher", "ref": COMMIT1, "accept": body["touches"]})
+    check("install: agreed to what it touches → installed, its touches in the answer",
+          status == 201 and body["touches"] == HOST_ONLY and (DATA_ADDONS / "watcher" / "addon.py").is_file(), body)
+    status, body = await call(c, "GET", "/api/addons/catalog", ADMIN_AUTH)
+    w = next(e for e in body["entries"] if e["name"] == "watcher")
+    check("catalog: an update whose entry adds a touch says which (touches_added), with what is installed",
+          w["update_available"] is True and w["installed"]["touches"] == HOST_ONLY and w["touches_added"] == ACTS_ONLY, w)
+    status, body = await call(c, "POST", "/api/addons/install", ADMIN_AUTH, {"name": "watcher"})
+    record = json.loads((DATA_ADDONS / "watcher" / ".installed.json").read_text())
+    check("update: a new touch asks again (409: added = only what is new), nothing replaced",
+          status == 409 and body.get("error") == "confirm_touches" and body["added"] == ACTS_ONLY
+          and body["touches"] == {**HOST_ONLY, "acts_outside": True} and record["commit"] == COMMIT1, body)
+    status, body = await call(c, "POST", "/api/addons/install", ADMIN_AUTH, {"name": "watcher", "accept": HOST_ONLY})
+    check("update: agreeing to less than it now touches still asks", status == 409 and body["added"] == ACTS_ONLY, body)
+    status, body = await call(c, "POST", "/api/addons/install", ADMIN_AUTH,
+                              {"name": "watcher", "accept": w["touches"]})
+    check("update: agreed to the new touch → updated", status == 201 and body["commit"] == COMMIT2
+          and json.loads((DATA_ADDONS / "watcher" / ".installed.json").read_text())["commit"] == COMMIT2, body)
+
+    status, body = await call(c, "POST", "/api/addons/install", ADMIN_AUTH,
+                              {"repo": str(REPO), "path": "addons/samey", "ref": COMMIT1, "accept": HOST_ONLY})
+    check("install: samey at its first commit, its touches agreed", status == 201, body)
+    status, body = await call(c, "GET", "/api/addons/catalog", ADMIN_AUTH)
+    sm = next(e for e in body["entries"] if e["name"] == "samey")
+    check("catalog: an update with the same touches adds none", sm["update_available"] is True
+          and sm["touches_added"] is None, sm)
+    status, body = await call(c, "POST", "/api/addons/install", ADMIN_AUTH, {"name": "samey"})
+    check("update: the same touches → no question, updated", status == 201 and body["commit"] == COMMIT2
+          and body["replaced"] is True, body)
+
+    status, body = await call(c, "POST", "/api/addons/install", ADMIN_AUTH,
+                              {"repo": str(REPO), "path": "addons/vague", "ref": COMMIT1})
+    check("install: touches not written as plain values are refused", status == 400
+          and "plain values" in body.get("message", "") and not (DATA_ADDONS / "vague").exists(), body)
+    status, body = await call(c, "POST", "/api/addons/install", ADMIN_AUTH, {"name": "samey", "accept": {"hosts": "x"}})
+    check("install: a malformed accept is refused", status == 400 and "accept" in body.get("message", ""), body)
+    for name in ("watcher", "samey"):
+        await call(c, "POST", f"/api/addons/{name}/remove", ADMIN_AUTH)
+
+
 async def test_restart(c: TestClient) -> None:
     status, _ = await call(c, "POST", "/api/server/restart", BOB_AUTH)
     check("restart: admins only", status == 403 and not lifecycle.restart_requested())
@@ -488,6 +576,18 @@ def test_cli() -> None:
     check("cli install: a branch is refused", rc == 1 and "neither a catalog name" in err, err)
     rc, out, err = run("addons", "install", f"{REPO}@{COMMIT1}:addons/tasks", "--dir", str(target))
     check("cli install: an official name is refused", rc == 1 and "official addon" in err, err)
+    rc, out, err = run("addons", "install", f"{REPO}@{COMMIT2}:addons/watcher", "--dir", str(target))
+    check("cli install: an addon that touches something asks first; no answer → not installed",
+          rc == 1 and "watcher may touch:" in out and "connects to api.example.com" in out
+          and "acts for you outside Dana" in out and "Not installed" in err and not (target / "watcher").exists(),
+          out + err)
+    rc, out, err = run("addons", "install", f"{REPO}@{COMMIT2}:addons/watcher", "--dir", str(target), "--yes")
+    check("cli install: --yes agrees to what it touches", rc == 0 and (target / "watcher" / "addon.py").is_file(),
+          out + err)
+    rc, out, err = run("addons", "table")
+    check("cli table: a Markdown table of the official addons (not site or installed ones)", rc == 0
+          and out.startswith("| Feature | What it does | Required | Optional | Region |") and "\n| Tasks |" in out
+          and "Market test" not in out and "`GOOGLE_CLIENT_ID`" in out, out[:800])
     rc, out, err = run("addons", "remove", "fresh", "--dir", str(target))
     check("cli remove", rc == 0 and not (target / "fresh").exists(), err)
     rc, out, err = run("addons", "disable", "mk")
@@ -528,6 +628,7 @@ async def main() -> None:
         await test_disable(c)
         await test_catalog(c)
         await test_install(c)
+        await test_touches(c)
         test_cli()
         await test_restart(c)
     await test_start_listener()

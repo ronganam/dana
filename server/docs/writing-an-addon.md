@@ -86,7 +86,7 @@ The loader imports `addon.py`, then `tools.py`, `hooks.py`, the modules named in
 ### The manifest
 
 ```python
-from core.addons import Addon, Field, Nav, Page, PromptPart, Worker
+from core.addons import Addon, Field, Nav, Need, Page, PromptPart, Touches, Worker
 
 addon = Addon("tides", title="Tides", description="Tide times for your beaches", version="1.0.0",
               settings=(Field("beach", "Your usual beach", default="Main beach"),),   # per user, plain JSON
@@ -95,12 +95,15 @@ addon = Addon("tides", title="Tides", description="Tide times for your beaches",
               llm_jobs={"tides_summary": "fast"},
               web=(Page("tides", panel="tides.js", style="tides.css", nav=Nav("Tides", icon="waves")),),
               worker=Worker(port=8091, url_env="TIDES_WORKER_URL"),
-              needs=())
+              needs=(Need("account", "a tide service account", "Its API key gives the tide tables"),
+                     Need("addon", "homeassistant", "Your home's location, for the nearest beach", optional=True)),
+              touches=Touches(hosts=("api.tides.example",), stores_credentials=True))
 ```
 
 Every field and its meaning: the `Addon` docstring in `core/addons/addon.py`; the table in `../../docs/addons.md`, "The manifest".
 
 - **Prompt slots**: `PromptPart(slot, text, rank)`; the slots are `SLOTS` in `core/agent.py`, each with its joiner (`tools` lists "a, b, and c", `guides` are paragraphs). `{user}` becomes the user's name, `{currency}` their currency. An unknown slot fails the load.
+- **Needs and touches**: say what running it takes and what it may touch, so people see it before turning it on (the Addons page, `bin/dana addons table`, the README for official addons; `../../docs/addons.md`, "Needs and touches"). `Need(kind, what, why, optional=False)`: `env` (the variable's name), `account`, `hardware` (a device or a server you run), `app` (the Dana Android app), `region`, `addon` (another addon's name; required ones are loaded first and must be on). `Touches(hosts, acts_outside, stores_credentials, reads)`: the hosts it contacts, whether it sends or changes things for the user outside Dana, whether it keeps credentials (required when it declares `credentials`), other addons whose data it reads. Write them with plain values (strings, tuples, True / False): the server reads `touches=` from `addon.py` without running it before installing, and an update whose touches grew asks the admin again. They are a disclosure, not a sandbox.
 - **LLM jobs**: each purpose passed to `core.llm.complete(purpose=...)` is declared in `llm_jobs` with its default profile (`fast` / `balanced` / `deep`, or `LlmJob("fast", "Label")`); `MODEL_<PURPOSE>` in env overrides it.
 
 ### Make it easy to set up

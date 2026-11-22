@@ -1,6 +1,6 @@
 """The ``gmail`` addon (the user's Gmail in chat; docs/gmail.md)."""
 
-from core.addons import Field, Addon, PromptPart
+from core.addons import Field, Addon, PromptPart, Need, Touches
 from addons.gmail import client
 from addons.gmail.config import ADDON
 from addons.google_account import oauth
@@ -31,6 +31,11 @@ addon = Addon(
     ADDON, order=120,
     title="Gmail", icon="mail",
     credentials=(Field("refresh_token", "Google OAuth refresh token", label=oauth.TOKEN_LABEL, help=oauth.TOKEN_HELP),),
+    needs=(Need("env", "GOOGLE_CLIENT_ID", "The server's Google OAuth client, for the Google sign-in"),
+           Need("env", "GOOGLE_CLIENT_SECRET", "That Google OAuth client's secret"),
+           Need("account", "a Google account", "Your mailbox"),
+           Need("env", "PUBLIC_URL", "The sign-in's return address, when requests reach Dana through a proxy", optional=True)),
+    touches=Touches(hosts=("gmail.googleapis.com", "oauth2.googleapis.com"), acts_outside=True, stores_credentials=True),
     description="Search, read and write your mail in chat",
     features=("Search and read your mail",
               "Write new mail and replies (asks you before sending)",

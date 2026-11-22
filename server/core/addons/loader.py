@@ -10,9 +10,9 @@ folders of every source (core/addon_dirs.py), and for each one imports, as
    manifest names (``modules=``), when present, then ``api.py`` (its routes,
    registered by core/server.py through :func:`apis`).
 
-Order: an addon comes after every addon in its ``needs``; among those free to
-go, official addons first by their ``order=`` (then name), then the others by
-name. That order is the order of every tool list and hook result.
+Order: an addon comes after every addon it ``depends`` on (its required addon
+``needs``); among those free to go, official addons first by their ``order=``
+(then name), then the others by name. That order is the order of every tool list and hook result.
 
 Each addon is checked on its own, after its modules are imported: its prompt
 slots exist, every ``needs`` of its tools and prompt parts names a loaded
@@ -190,7 +190,8 @@ def _manifest(folder: AddonFolder) -> Optional[Addon]:
 
 
 def _ordered(manifests: Dict[str, Addon]) -> List[str]:
-    """``manifests`` in load order (needs first); addons whose needs are missing or circular are failed."""
+    """``manifests`` in load order (what each depends on first); addons whose required addons are missing or
+    circular are failed."""
     def rank(name: str) -> Tuple[int, int, str]:
         a, f = manifests[name], _folders[name]
         return (0, a.order if a.order is not None else 10_000, name) if f.source.official else (1, 0, name)
@@ -198,16 +199,16 @@ def _ordered(manifests: Dict[str, Addon]) -> List[str]:
     placed: List[str] = []
     waiting = dict(manifests)
     while waiting:
-        free = [n for n, a in waiting.items() if all(d in placed for d in a.needs)]
+        free = [n for n, a in waiting.items() if all(d in placed for d in a.depends)]
         if not free:
             break
         name = min(free, key=rank)
         placed.append(name)
         del waiting[name]
     for name, a in sorted(waiting.items()):
-        missing = [d for d in a.needs if d not in manifests]
+        missing = [d for d in a.depends if d not in manifests]
         _fail(_folders[name], f"needs {', '.join(missing)}, which is not loaded" if missing
-              else f"its needs ({', '.join(a.needs)}) form a cycle")
+              else f"its needs ({', '.join(a.depends)}) form a cycle")
     return placed
 
 
@@ -254,7 +255,7 @@ def _dependents(name: str, among: List[str]) -> List[str]:
         changed = False
         for n in among:
             if n not in out and n != name and any(d == name or d in out
-                                                  for d in addon_registry.get_addon(n).needs):
+                                                  for d in addon_registry.get_addon(n).depends):
                 out.append(n)
                 changed = True
     return out
@@ -329,7 +330,7 @@ def _load() -> Tuple[str, ...]:
     loaded: List[str] = []
     for name in order:
         f, a = _folders[name], manifests[name]
-        lost = [d for d in a.needs if d not in loaded]
+        lost = [d for d in a.depends if d not in loaded]
         if lost:
             _fail(f, f"needs {', '.join(lost)}, which failed to load")
             continue

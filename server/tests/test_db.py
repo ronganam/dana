@@ -143,11 +143,13 @@ def refused(path: str) -> str:
 
 
 def write_addon(root: str, name: str, files: dict, needs: tuple = ()) -> None:
-    """An addon folder ``root/name`` with ``addon.py`` (declaring ``needs``) and the given ``migrations/`` files."""
+    """An addon folder ``root/name`` with ``addon.py`` (needing the addons ``needs``) and the given ``migrations/`` files."""
     folder = os.path.join(root, name, "migrations")
     os.makedirs(folder, exist_ok=True)
     with open(os.path.join(root, name, "addon.py"), "w", encoding="utf-8") as f:
-        f.write(f"from core.addons import Addon\naddon = Addon(name={name!r}, description='Test addon.', needs={needs!r})\n")
+        need_list = "".join(f"Need('addon', {n!r}, 'Its tables'), " for n in needs)
+        f.write(f"from core.addons import Addon, Need\naddon = Addon(name={name!r}, description='Test addon.', "
+                f"needs=({need_list}))\n")
     for file, body in files.items():
         with open(os.path.join(folder, file), "w", encoding="utf-8") as f:
             f.write(textwrap.dedent(body))

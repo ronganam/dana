@@ -1,6 +1,6 @@
 """The ``phone`` addon (Phone)."""
 
-from core.addons import Addon, PromptPart, LlmJob, Page, Nav
+from core.addons import Addon, PromptPart, LlmJob, Page, Nav, Need, Touches
 
 CALLS_GUIDE = (
     "When asked to retrieve details from past calls or voice memos:\n"
@@ -13,7 +13,15 @@ CALLS_GUIDE = (
 )
 
 addon = Addon("phone", web=(Page("inbox", panel="inbox.js", style="inbox.css", nav=Nav("Inbox", icon="inbox", order=30, primary=True)),
-                   Page("calls", panel="calls.js", style="calls.css", nav=Nav("Calls", icon="phone", order=90))), order=70, default_on=True, modules=('calls.tools', 'notification_tools'), llm_jobs={"call_transcript": LlmJob("fast", "Call transcription"), "call_analysis": LlmJob("fast", "Call analysis"), "notification_triage": LlmJob("fast", "Notification sorting"), "notification_extract": LlmJob("fast", "Notification → task / event"), "notification_summary": LlmJob("fast", "Inbox summaries")}, title="Phone", icon="smartphone", description="The Android phone: notifications Inbox, calls and suggestions, push",
+                   Page("calls", panel="calls.js", style="calls.css", nav=Nav("Calls", icon="phone", order=90))), order=70, default_on=True, modules=('calls.tools', 'notification_tools'), llm_jobs={"call_transcript": LlmJob("fast", "Call transcription"), "call_analysis": LlmJob("fast", "Call analysis"), "notification_triage": LlmJob("fast", "Notification sorting"), "notification_extract": LlmJob("fast", "Notification → task / event"), "notification_summary": LlmJob("fast", "Inbox summaries")}, title="Phone", icon="smartphone",
+    needs=(Need("app", "Dana for Android on your phone, with notification access", "Sends your notifications and call recordings, gets Dana's push"),
+           Need("hardware", "a dialer that saves call recordings to Recordings/Call (Samsung's)", "Call transcripts and the tasks and events suggested from them", optional=True),
+           Need("env", "GEMINI_API_KEY", "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)", optional=True),
+           Need("env", "FCM_SERVICE_ACCOUNT_JSON", "Direct push to the phone (a Firebase project); without it events wait for the app's next check", optional=True),
+           Need("env", "TYPESAFE_API_KEY", "Sorts notifications in the Inbox; without it they stay unsorted", optional=True)),
+    touches=Touches(hosts=("fcm.googleapis.com", "oauth2.googleapis.com", "api.typesafe.ai"), acts_outside=True,
+                    reads=("calendar", "homeassistant", "knowledge", "people", "tasks", "whatsapp")),
+    description="The Android phone: notifications Inbox, calls and suggestions, push",
                     features=("Your phone's notifications sorted in an Inbox, with summaries",
                               "Call recordings transcribed, with suggested tasks and events",
                               "Push notifications from Dana on your phone"),

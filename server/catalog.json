@@ -1,5 +1,5 @@
 {
- "about": "Dana's addon catalog (docs/addons.md, \"The catalog\"). Each source.ref is a full commit hash: an entry is exactly one version of its addon. Entries that are not valid are skipped by servers, with the reason in their log. Servers read this file from GitHub, and use the copy shipped in their image when that cannot be read.",
+ "about": "Dana's addon catalog (docs/addons.md, \"The catalog\"). Each source.ref is a full commit hash: an entry is exactly one version of its addon; touches (optional) is what that version declares it may touch, shown before installing. Entries that are not valid are skipped by servers, with the reason in their log. Servers read this file from GitHub, and use the copy shipped in their image when that cannot be read.",
  "addons": [
   {
    "name": "hello",
@@ -10,6 +10,7 @@
    "homepage": "https://github.com/ronganam/dana/tree/master/examples/addons/hello",
    "tags": ["example"],
    "min_dana": "9.0.0",
+   "touches": {"hosts": [], "acts_outside": false, "stores_credentials": false, "reads": []},
    "source": {
     "repo": "https://github.com/ronganam/dana",
     "path": "examples/addons/hello",

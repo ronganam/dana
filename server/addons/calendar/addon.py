@@ -1,6 +1,6 @@
 """The ``calendar`` addon (Google Calendar)."""
 
-from core.addons import Field, Addon, PromptPart, Page, Nav
+from core.addons import Field, Addon, PromptPart, Page, Nav, Need, Touches
 from addons.calendar import client
 from addons.calendar.config import DEFAULT_CALENDAR, ADDON, SELECTED
 from addons.google_account import oauth
@@ -18,6 +18,11 @@ addon = Addon(
               Field(SELECTED, "Calendars shown and searched (ids); none chosen: the default calendar",
                     label="Calendars Dana reads",
                     help="Pick from the suggestions, separated by commas; empty: only your main calendar.")),
+    needs=(Need("env", "GOOGLE_CLIENT_ID", "The server's Google OAuth client, for the Google sign-in"),
+           Need("env", "GOOGLE_CLIENT_SECRET", "That Google OAuth client's secret"),
+           Need("account", "a Google account", "Your calendars"),
+           Need("env", "PUBLIC_URL", "The sign-in's return address, when requests reach Dana through a proxy", optional=True)),
+    touches=Touches(hosts=("www.googleapis.com", "oauth2.googleapis.com"), acts_outside=True, stores_credentials=True),
     description="Your events in chat, on the Now screen and in the briefing",
     features=("Your events in chat, on the Now screen, in the morning briefing and the weekly review",
               "Add and move events, with Undo (asks first when it invites people)"),

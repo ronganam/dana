@@ -1,6 +1,6 @@
 """The ``whatsapp`` addon (WhatsApp through WAHA)."""
 
-from core.addons import ADDRESS, NAME, TELEGRAM_CHAT, Field, Addon, PromptPart, LlmJob
+from core.addons import ADDRESS, NAME, TELEGRAM_CHAT, Field, Addon, PromptPart, LlmJob, Need, Touches
 from addons.whatsapp import accounts, client
 from addons.whatsapp.config import ADDON, VOICE_CHAT
 
@@ -26,6 +26,12 @@ addon = Addon(
               help="Optional: your Telegram user id, to get the voice notes you receive as text from Dana's bot.",
               placeholder="123456789"),
     ),
+    needs=(Need("hardware", "a WAHA server (a WhatsApp Web bridge) Dana's server can reach", "Dana reads and sends WhatsApp through it"),
+           Need("account", "a WhatsApp account, linked to WAHA", "Your chats; WAHA signs in as a linked device"),
+           Need("env", "WAHA_WEBHOOK_SECRET", "Voice notes you receive turned into text (WAHA signs its webhooks with it)", optional=True),
+           Need("env", "GEMINI_API_KEY", "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)", optional=True),
+           Need("env", "TELEGRAM_BOT_TOKEN", "Sends the voice-note transcripts to your Telegram", optional=True)),
+    touches=Touches(hosts=("your WAHA server",), acts_outside=True, stores_credentials=True, reads=("knowledge", "people")),
     description="Read and send WhatsApp messages, voice notes as text",
     features=("Read your chats and find messages and files",
               "Send messages and forward files (asks you first)",

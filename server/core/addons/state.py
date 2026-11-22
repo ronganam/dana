@@ -7,7 +7,7 @@ leaves it out for every user, so its tools, prompt parts, prompt section,
 event handlers, notify channels, composer hooks and jobs are gone; its
 services are stopped (core/addons/scheduler.py), its routes answer 404
 ``addon_disabled`` (core/server.py) and its web files are not served
-(core/addons_api.py). An addon whose ``needs`` include a disabled addon is
+(core/addons_api.py). An addon that ``depends`` on a disabled addon is
 disabled with it. ``everyone`` addons (``essentials``) cannot be disabled.
 
 The set is read from the database and kept for :data:`CACHE_TTL_SECONDS`, so
@@ -57,13 +57,13 @@ def _read() -> FrozenSet[str]:
 
 
 def _with_dependents(explicit: FrozenSet[str]) -> FrozenSet[str]:
-    """``explicit`` plus every addon whose ``needs`` (transitively) include one of them."""
+    """``explicit`` plus every addon that ``depends`` (transitively) on one of them."""
     out = set(explicit)
     changed = True
     while changed:
         changed = False
         for a in all_addons():
-            if a.name not in out and not a.everyone and any(n in out for n in a.needs):
+            if a.name not in out and not a.everyone and any(n in out for n in a.depends):
                 out.add(a.name)
                 changed = True
     return frozenset(out)
@@ -90,7 +90,7 @@ def disabled() -> FrozenSet[str]:
 
 
 def disabled_by_admin() -> FrozenSet[str]:
-    """The addons an admin disabled themselves (not those disabled through ``needs``)."""
+    """The addons an admin disabled themselves (not those disabled through ``depends``)."""
     return _current()[0]
 
 

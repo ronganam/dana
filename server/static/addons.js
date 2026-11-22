@@ -11,13 +11,16 @@
  *   manage_server only:
  *   POST   /api/addons/{addon}/disable|enable   for everyone on this server
  *   GET    /api/addons/catalog                  the catalog merged with what is installed
- *   POST   /api/addons/install                  {name} or {repo, path, ref}: fetch one commit (restart to load)
+ *   POST   /api/addons/install                  {name} or {repo, path, ref}, + accept: the touches agreed to; fetch one
+ *                                               commit (restart to load); 409 confirm_touches when it may touch more
  *   POST   /api/addons/{addon}/remove           delete an installed addon's folder
  *   POST   /api/server/restart                  the server exits and its supervisor starts it again
  *
  * The page is an onboarding flow. The list groups the addons: On, Available, Not available (an admin's
  * choice, off on the server, did not load), and for admins the Catalog. Opening one shows what it adds (its
- * manifest's features, pages and needs) and, until it is on, numbered steps: what to do outside Dana (the
+ * manifest's features and pages), what it needs (keys, accounts, hardware, the app, a region, other addons;
+ * required or optional) and what it may touch (hosts, acting for you outside Dana, stored credentials, other
+ * addons' data) and, until it is on, numbered steps: what to do outside Dana (the
  * manifest's setup), the sign-in button or the fields with their help, link and example, then Connect, which
  * runs the connection check by itself and says in plain words whether it works and what to fix; then "Try
  * asking Dana" with the manifest's examples. Settings, Test again and Disconnect stay on the same view.
@@ -27,6 +30,11 @@
  * welcome over the screen it opens on, suggesting addons to set up; closing it dismisses it for good on the
  * server, and the Addons page offers it again ("Show the welcome again"). The suggestions stay listed under
  * Available either way.
+ *
+ * Installing from the catalog shows what the addon may touch before Install (the entry's touches; the server
+ * checks them against the fetched code and answers 409 confirm_touches when it declares more, and the page
+ * asks again with what it really touches). An update whose entry adds a touch asks again; one that adds
+ * nothing updates at once.
  *
  * Two parts: DanaAddonsCore (pure: view models, HTML, request bodies, error text; no DOM, exercised by
  * test_web_addons.mjs against payloads captured from the API) and the controller below it
@@ -182,13 +190,54 @@
     return { repo, path, ref };
   }
 
-  /** The install / update confirmation: what is fetched, the full-access warning, and what comes next. */
-  function installConfirm(source, name, update) {
+  const NEED_KINDS = { env: "Server setting", account: "Account", hardware: "Hardware", app: "App", region: "Region", addon: "Addon" };
+
+  /** An addon's name for people from the list, else its name in words. */
+  function addonTitle(name, items) {
+    return displayName((items || []).find((i) => i.name === name) || { name });
+  }
+
+  /** What an addon needs, required first: [{kind, label, what, code, why, optional}]. */
+  function needLines(item, items) {
+    const needs = (item && item.needs) || [];
+    return [...needs.filter((n) => !n.optional), ...needs.filter((n) => n.optional)].map((n) => ({
+      kind: n.kind, label: NEED_KINDS[n.kind] || n.kind, code: n.kind === "env", why: n.why || "", optional: Boolean(n.optional),
+      what: n.kind === "addon" ? addonTitle(n.what, items) : n.kind === "env" ? n.what : String(n.what || "").replace(/^./, (c) => c.toUpperCase()),
+    }));
+  }
+
+  /** What touches declare, a sentence each (none: one saying so; null: unknown, no lines). */
+  function touchLines(t, items) {
+    if (!t) return [];
+    const out = [];
+    if ((t.hosts || []).length) out.push(`Connects to ${t.hosts.join(", ")}`);
+    if (t.acts_outside) out.push("Acts for you outside Dana: sends messages or mail, or changes things at a service or on your devices");
+    if (t.stores_credentials) out.push("Keeps passwords, tokens or sign-ins for it (encrypted)");
+    if ((t.reads || []).length) out.push(`Reads your data from ${t.reads.map((n) => addonTitle(n, items)).join(", ")}`);
+    return out.length ? out : ["Nothing beyond Dana's own data"];
+  }
+
+  /** The install / update confirmation: what is fetched, what it may touch, the full-access warning, what comes next. */
+  function installConfirm(source, name, update, touches) {
     return {
       title: `${update ? "Update" : "Install"} ${name || "this addon"}?`,
       rows: [["Repository", source.repo], ["Folder", source.path || "(the repository's root)"], ["Commit", source.ref]],
+      listTitle: "It may touch",
+      list: touches ? touchLines(touches) : ["Not said here: Dana reads it from the addon's code when it fetches it, and asks you again if there is anything"],
       warning: FULL_ACCESS,
       after: "Dana fetches exactly this commit. It starts working after a restart, which this page offers next.",
+      button: update ? "Update" : "Install",
+    };
+  }
+
+  /** Asking again: the addon may touch more than what was agreed (409 confirm_touches, or an update's new touches). */
+  function touchesConfirm(name, touches, added, update) {
+    return {
+      title: `${name || "This addon"} may touch more`,
+      body: update ? "This version may touch things the installed one didn't:" : "Its code says it may touch:",
+      listTitle: update ? "New in this version" : "It may touch",
+      list: touchLines(update ? added : touches),
+      warning: FULL_ACCESS,
       button: update ? "Update" : "Install",
     };
   }
@@ -478,9 +527,21 @@
   function renderAdds(item) {
     const lines = (item.features || []).map((f) => `<li dir="auto">${esc(f)}</li>`);
     const pages = (item.pages || []).map((p) => `<li>A <strong>${esc(p)}</strong> page in the app</li>`);
-    const needs = (item.needs || []).length ? `<p class="itg-needs">Works together with: ${(item.needs || []).map((n) => esc(words(n))).join(", ")} (turned on first).</p>` : "";
-    if (!lines.length && !pages.length && !needs) return "";
-    return `<section class="itg-section"><h4>What it adds</h4>${lines.length || pages.length ? `<ul class="itg-adds">${lines.join("")}${pages.join("")}</ul>` : ""}${needs}</section>`;
+    if (!lines.length && !pages.length) return "";
+    return `<section class="itg-section"><h4>What it adds</h4><ul class="itg-adds">${lines.join("")}${pages.join("")}</ul></section>`;
+  }
+
+  /** "Needs" and "May touch": what running it takes and what it may reach (nothing for an addon that did not load). */
+  function renderNeeds(item, items) {
+    if (item.state === "failed") return "";
+    const needs = needLines(item, items);
+    const rows = needs.length ? `<ul class="itg-needs">${needs.map((n) => `<li><span class="itg-need-kind">${esc(n.label)}</span>
+        <span class="itg-need-text"><strong dir="auto">${n.code ? `<code>${esc(n.what)}</code>` : esc(n.what)}</strong>${n.optional ? ` <em>optional</em>` : ""}
+        <span class="itg-need-why" dir="auto">${esc(n.why)}</span></span></li>`).join("")}</ul>` : `<p class="itg-muted">Nothing beyond Dana itself.</p>`;
+    const touches = touchLines(item.touches, items);
+    const note = item.source && item.source !== "official" ? `<p class="itg-muted">${esc(item.title || item.name)} says so itself; ${esc(FULL_ACCESS.charAt(0).toLowerCase() + FULL_ACCESS.slice(1))}</p>` : "";
+    return `<section class="itg-section" data-needs><h4>Needs</h4>${rows}</section>
+      ${touches.length ? `<section class="itg-section" data-touches><h4>May touch</h4><ul class="itg-touches">${touches.map((t) => `<li dir="auto">${esc(t)}</li>`).join("")}</ul>${note}</section>` : ""}`;
   }
 
   function renderExamples(item) {
@@ -498,7 +559,7 @@
       <div class="itg-actions">${acts.map((a) => `<button class="chip${a.act === "remove" ? " itg-danger" : ""}" data-act="${a.act}" data-addon="${esc(item.name)}"${busy ? " disabled" : ""}>${esc(a.label)}</button>`).join("")}</div></section>`;
   }
 
-  function renderDetail(item, ui, canManage) {
+  function renderDetail(item, ui, canManage, items) {
     ui = ui || {};
     const st = statusOf(item, ui);
     const busy = ui.busy || "";
@@ -537,6 +598,7 @@
       </header>
       ${reason}${status}
       ${renderAdds(item)}
+      ${renderNeeds(item, items)}
       ${renderSteps(item, ui)}
       ${settings}
       ${renderExamples(item)}
@@ -553,10 +615,11 @@
     const home = e.homepage && /^https?:\/\//.test(e.homepage) ? `<a class="itg-link" href="${esc(e.homepage)}" target="_blank" rel="noopener noreferrer">Homepage</a>` : "";
     const status = ui && ui.status ? `<div class="itg-status ${esc(ui.status.tone || "")} itg-row-status" role="status">${esc(ui.status.text)}</div>` : "";
     const icon = /^[a-z0-9-]+$/.test(e.icon || "") ? e.icon : "package";
+    const touches = e.touches ? `<span class="itg-row-touches" dir="auto">May touch: ${esc(touchLines(e.touches).join("; "))}</span>` : "";
     return `<div class="itg-entry" data-entry="${esc(e.name)}"><div class="itg-entry-head">
         <span class="itg-icon"><i data-lucide="${esc(icon)}"></i></span>
         <span class="itg-row-text"><span class="itg-row-name">${esc(e.title || e.name)}</span>
-          <span class="itg-row-desc" dir="auto">${esc(e.description || "")}</span>
+          <span class="itg-row-desc" dir="auto">${esc(e.description || "")}</span>${touches}
           ${meta.length || home ? `<span class="itg-row-meta">${meta.map((m) => `<span dir="auto">${esc(m)}</span>`).join("")}${home}</span>` : ""}</span>
         <span class="itg-state ${st.key === "installed" ? "on" : st.key === "update" ? "setup" : ""}"><span class="itg-dot"></span>${esc(st.label)}</span>
         <span class="itg-entry-actions">${action}${remove}</span></div>${status}</div>`;
@@ -591,16 +654,17 @@
   /** Everything under the header: the list, or one addon's view. */
   function renderBody(s) {
     const item = s.open && (s.items || []).find((i) => i.name === s.open);
-    if (item) return renderDetail(item, (s.ui || {})[item.name], s.canManage);
+    if (item) return renderDetail(item, (s.ui || {})[item.name], s.canManage, s.items);
     return renderList(s);
   }
 
-  /** The confirmation dialog's HTML (installs show the repository, folder, commit and the warning). */
+  /** The confirmation dialog's HTML (installs show the repository, folder, commit, what it may touch and the warning). */
   function renderConfirm(c) {
     const rows = (c.rows || []).length ? `<dl class="itg-facts">${c.rows.map(([k, v]) => `<dt>${esc(k)}</dt><dd dir="ltr">${esc(v)}</dd>`).join("")}</dl>` : "";
+    const list = (c.list || []).length ? `<h4>${esc(c.listTitle || "")}</h4><ul class="itg-touches">${c.list.map((l) => `<li dir="auto">${esc(l)}</li>`).join("")}</ul>` : "";
     const warning = c.warning ? `<div class="itg-note warn"><i data-lucide="shield-alert"></i><span>${esc(c.warning)}</span></div>` : "";
     return `<div class="ibx-modal-card itg-confirm" role="dialog" aria-modal="true" aria-labelledby="itg-confirm-title">
-      <h3 id="itg-confirm-title">${esc(c.title)}</h3>${c.body ? `<p>${esc(c.body)}</p>` : ""}${rows}${warning}${c.after ? `<p>${esc(c.after)}</p>` : ""}
+      <h3 id="itg-confirm-title">${esc(c.title)}</h3>${c.body ? `<p>${esc(c.body)}</p>` : ""}${rows}${list}${warning}${c.after ? `<p>${esc(c.after)}</p>` : ""}
       <div class="itg-actions end"><button class="btn-secondary" data-confirm="no">Cancel</button>
         <button class="${c.danger ? "btn-destructive-outline" : "btn-primary"}" data-confirm="yes">${esc(c.button || "OK")}</button></div></div>`;
   }
@@ -608,8 +672,8 @@
   const core = { FULL_ACCESS, KEY_TEXT, esc, displayName, iconOf, safeUrl, fieldLabel, isService, needsSetup, accountText,
                  statusOf, groupItems, connectFields, stepsFor, fieldModel, typedValue, buildChanges, path, errorText,
                  checkFailedText, testText, connectedText, disconnectText, welcomeModel, sourceLabel, serverActions,
-                 catalogState, installBody, installConfirm, renderHeader, renderRow, renderWelcome, renderList,
-                 renderField, renderSteps, renderAdds, renderExamples, renderDetail, renderBody, renderRestartBanner,
+                 catalogState, installBody, installConfirm, touchesConfirm, needLines, touchLines, renderHeader, renderRow,
+                 renderWelcome, renderList, renderField, renderSteps, renderAdds, renderNeeds, renderExamples, renderDetail, renderBody, renderRestartBanner,
                  renderCatalog, renderCatalogEntry, renderConfirm };
   (typeof window !== "undefined" ? window : globalThis).DanaAddonsCore = core;
   if (typeof document === "undefined") return;
@@ -815,8 +879,16 @@
     }
   }
 
-  function askInstall(source, name, update) {
-    ask({ ...installConfirm(source, name, update), run: () => doInstall(name && !source.fromForm ? { name } : { repo: source.repo, path: source.path, ref: source.ref }, name) });
+  /** Install or update: a catalog entry (an update that adds no touch goes ahead at once) or the git form. */
+  function askInstall(source, name, update, entry) {
+    const body = name && !source.fromForm ? { name } : { repo: source.repo, path: source.path, ref: source.ref };
+    if (entry && update) {
+      if (!entry.touches_added) { doInstall(body, name); return; }
+      ask({ ...touchesConfirm(name, entry.touches, entry.touches_added, true), run: () => doInstall({ ...body, accept: entry.touches }, name) });
+      return;
+    }
+    const touches = entry ? entry.touches : null;
+    ask({ ...installConfirm(source, name, update, touches), run: () => doInstall(touches ? { ...body, accept: touches } : body, name) });
   }
 
   function askRestart() {
@@ -891,6 +963,14 @@
     render();
     const r = await request("POST", "/api/addons/install", body);
     if (fromForm) S.gitBusy = false;
+    if (r.status === 409 && r.body && r.body.error === "confirm_touches") {
+      // It may touch more than agreed: ask again with what its code says.
+      if (!fromForm) S.catalogUi[name] = {};
+      render();
+      const update = Boolean(body.name && (((S.catalog || {}).entries || []).find((e) => e.name === body.name) || {}).installed);
+      ask({ ...touchesConfirm(r.body.name, r.body.touches, r.body.added, update), run: () => doInstall({ ...body, accept: r.body.touches }, name) });
+      return;
+    }
     const done = r.status === 201 || r.status === 200;
     const text = done ? `${r.body.replaced ? "Updated" : "Installed"} ${r.body.name} at ${String(r.body.commit).slice(0, 12)}. Restart Dana to finish.`
       : `Not installed. ${errorText(r.status, r.body).message}`;
@@ -952,7 +1032,7 @@
       else if (t.closest("[data-welcome-again]")) setWelcome(false);
       else if ((n = t.closest("[data-install]"))) {
         const e = ((S.catalog || {}).entries || []).find((x) => x.name === n.dataset.install);
-        if (e) askInstall(e.source, e.name, catalogState(e).action === "update");
+        if (e) askInstall(e.source, e.name, catalogState(e).action === "update", e);
       } else if (t.closest("[data-git-install]")) {
         const b = installBody(S.gitForm);
         if (b.error) { S.gitStatus = { tone: "bad", text: b.error }; render(); return; }

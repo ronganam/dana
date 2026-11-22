@@ -105,7 +105,7 @@ def ordered_folders() -> Tuple[List[AddonFolder], Dict[str, str]]:
     folders: Dict[str, AddonFolder] = {}
     for f in addon_dirs.addon_folders():
         folders.setdefault(f.name, f)
-    needs = {name: f.needs for name, f in folders.items()}
+    needs = {name: f.depends for name, f in folders.items()}
     placed: List[AddonFolder] = []
     done: Set[str] = set()
     waiting = list(folders.values())

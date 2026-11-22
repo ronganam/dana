@@ -1,6 +1,6 @@
 """The ``homeassistant`` addon (Home Assistant)."""
 
-from core.addons import ADDRESS, Field, Addon, PromptPart
+from core.addons import ADDRESS, Field, Addon, PromptPart, Need, Touches
 from addons.homeassistant import client, home_map, options, watcher
 from addons.homeassistant.config import (BATTERY_SENSOR, CAR_DEVICE, CAR_SENSOR, DEFAULT_WEATHER_ENTITY, ADDON,
                                                NOTIFY_SERVICE, PERSON, SCREEN_SENSOR, TV, TV_CHANNEL, WEATHER)
@@ -49,6 +49,10 @@ addon = Addon(
               "provider app's deep link); unset: no channel changes", label="TV channel command",
               help="Optional, for changing channels: a command with {channel} where the number goes."),
     ),
+    needs=(Need("hardware", "a Home Assistant server Dana's server can reach", "Lights, devices, zones and the weather come from it"),
+           Need("account", "a Home Assistant long-lived access token", "Dana signs in to Home Assistant with it"),
+           Need("app", "the Home Assistant phone app", "Arrive, leave, car and wake reminders use its sensors", optional=True)),
+    touches=Touches(hosts=("your Home Assistant server",), acts_outside=True, stores_credentials=True),
     description="Lights, devices and the TV, reminders when you arrive or get in the car",
     features=("Turn lights, the AC, gates and other devices on and off",
               "Reminders when you arrive at a place, leave it or get in the car",

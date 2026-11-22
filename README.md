@@ -48,6 +48,39 @@ cp .env.example .env                         # set ANTHROPIC_API_KEY and API_TOK
 
 At the first start the server creates you as its admin, turns on the addons that need no account (tasks, shopping, projects, people, phone…) and, unless `CREDENTIALS_KEY` is set, generates the key that encrypts addon credentials into `credentials.key` next to the database: back it up with the database. Then connect the rest on the web UI (Settings → Addons) or with `bin/dana addons connect`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
 
+## What each feature needs
+
+Each feature is an addon you turn on per user. Before you turn one on, this says what it needs from you; the Addons page says the same for each addon, with why, and what it may touch (the hosts it contacts, whether it acts for you outside Dana, whether it keeps credentials, which other addons' data it reads). The table is generated from the addons' declarations (`server/bin/dana addons table`).
+
+<!-- addons-table:start -->
+| Feature | What it does | Required | Optional | Region |
+|---|---|---|---|---|
+| Essentials | The time, asking you to pick, web search | — | — | Any |
+| Tasks | Task lists, reminders and their triggers | — | the Home Assistant addon; the Phone addon | Any |
+| Shopping | Your shopping list, sorted by aisle and shared live | — | the Phone addon | Any |
+| Projects | Projects, decisions and saved notes, links and files | — | `GEMINI_API_KEY` | Any |
+| About you | What Dana remembers about you | — | — | Any |
+| People | The people you talk to and a brief on each | — | the Google Contacts addon; the Phone addon | Any |
+| Phone | The Android phone: notifications Inbox, calls and suggestions, push | Dana for Android on your phone, with notification access | a dialer that saves call recordings to Recordings/Call (Samsung's); `GEMINI_API_KEY`; `FCM_SERVICE_ACCOUNT_JSON`; `TYPESAFE_API_KEY` | Any |
+| Home Assistant | Lights, devices and the TV, reminders when you arrive or get in the car | a Home Assistant server Dana's server can reach; a Home Assistant long-lived access token | the Home Assistant phone app | Any |
+| WhatsApp | Read and send WhatsApp messages, voice notes as text | a WAHA server (a WhatsApp Web bridge) Dana's server can reach; a WhatsApp account, linked to WAHA | `WAHA_WEBHOOK_SECRET`; `GEMINI_API_KEY`; `TELEGRAM_BOT_TOKEN` | Any |
+| Google Calendar | Your events in chat, on the Now screen and in the briefing | `GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET`; a Google account | `PUBLIC_URL` | Any |
+| Google Contacts | Names, numbers and birthdays of the people you know | `GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET`; a Google account | `PUBLIC_URL` | Any |
+| Gmail | Search, read and write your mail in chat | `GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET`; a Google account | `PUBLIC_URL` | Any |
+| Telegram account | Your own Telegram chats and channels, read-only | `TELEGRAM_API_ID`; `TELEGRAM_API_HASH`; a Telegram account | — | Any |
+| Money | Your bank and card spending, balances and ways to save | — | the Money (Israel) addon; the Phone addon | Any |
+| Money (Israel) | Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money | the Money addon | — | Any |
+| Cameras | Your Frigate cameras on the dashboard | a Frigate server with your cameras | the Home Assistant addon | Any |
+| Ops | Read-only kubectl and Python run on the server (asks first; not a sandbox) | Dana running in Kubernetes, with a service account allowed to read | — | Any |
+<!-- addons-table:end -->
+
+Some parts need something without being an addon:
+
+- **The Android apps** (phone, watch, wall tablet, TV): built from [`android/`](android/) with JDK 21 and the Android SDK ([Build the apps](#build-the-apps)), pointed at your server's address. The watch pairs with the phone app.
+- **Direct push** to the phone: your own Firebase project, its `google-services.json` in the app build and `FCM_SERVICE_ACCOUNT_JSON` on the server. Without it the app still works and catches up when it syncs.
+- **Telegram**: `TELEGRAM_BOT_TOKEN` for chatting with Dana in Telegram and for the messages Dana sends there.
+- **Voice**: `OPENAI_API_KEY` for realtime voice calls; the transcription model's key (`GEMINI_API_KEY` by default) for voice messages and push-to-talk.
+
 ## Your own deployment
 
 Run Dana as upstream ships it and keep what is yours in a **site** folder beside it: deploy settings, your own addons, the apps' server address and TV setup, and notes for you and your coding agents. Start from `site.example/`. Updating is then `git pull`, and your deployment never drifts from Dana: [`docs/site.md`](docs/site.md).

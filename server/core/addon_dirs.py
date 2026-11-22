@@ -21,7 +21,7 @@ Folders that do not exist are skipped. An addon folder is a sub-folder with an
 import ast
 import json
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -58,17 +58,69 @@ class Source:
         return SITE if self.kind == EXTRA else self.kind
 
 
+# Touches(...)'s fields in order (core/addons/hooks.py), for a manifest read without running it.
+TOUCHES_FIELDS = ("hosts", "acts_outside", "stores_credentials", "reads")
+_MISSING = object()
+
+
 @dataclass(frozen=True)
 class Manifest:
-    """What an ``addon.py`` declares, read without running it: the name and the ``needs``."""
+    """What an ``addon.py`` declares, read without running it: the name, the
+    addons it ``depends`` on (its required ``Need("addon", ...)``) and its
+    ``touches`` as plain values (``Touches(...)``'s keywords; ``{}`` when it
+    declares none, None when they are not written as plain values)."""
     name: str
-    needs: Tuple[str, ...] = ()
+    depends: Tuple[str, ...] = ()
+    touches: Optional[Dict[str, Any]] = field(default_factory=dict)
+
+
+def _call_name(node: ast.AST) -> str:
+    return getattr(getattr(node, "func", None), "id", "") or getattr(getattr(node, "func", None), "attr", "")
+
+
+def _literal(node: Optional[ast.AST], default: Any) -> Any:
+    if node is None:
+        return default
+    try:
+        return ast.literal_eval(node)
+    except ValueError:
+        return _MISSING
+
+
+def _depends(value: ast.AST) -> Tuple[str, ...]:
+    """The required addon names of a ``needs=(Need(...), ...)`` written with plain values."""
+    if not isinstance(value, (ast.Tuple, ast.List)):
+        return ()
+    out: List[str] = []
+    for item in value.elts:
+        if not (isinstance(item, ast.Call) and _call_name(item) == "Need"):
+            continue
+        given: Dict[str, Optional[ast.AST]] = dict(zip(("kind", "what", "why", "optional"), item.args))
+        given.update({k.arg: k.value for k in item.keywords if k.arg})
+        kind, what, optional = (_literal(given.get("kind"), None), _literal(given.get("what"), None),
+                                _literal(given.get("optional"), False))
+        if kind == "addon" and isinstance(what, str) and optional is False:
+            out.append(what)
+    return tuple(out)
+
+
+def _touches(value: ast.AST) -> Optional[Dict[str, Any]]:
+    """The keywords of ``touches=Touches(...)`` when every value is plain, else None."""
+    if not (isinstance(value, ast.Call) and _call_name(value) == "Touches") or len(value.args) > len(TOUCHES_FIELDS):
+        return None
+    given: Dict[str, Optional[ast.AST]] = dict(zip(TOUCHES_FIELDS, value.args))
+    for k in value.keywords:
+        if k.arg is None:
+            return None
+        given[k.arg] = k.value
+    out = {name: _literal(node, None) for name, node in given.items()}
+    return None if any(v is _MISSING for v in out.values()) else out
 
 
 def read_manifest(addon_py: Path) -> Optional[Manifest]:
-    """The name and ``needs`` that ``addon.py`` declares (``addon = Addon("<name>", needs=(...), ...)``),
-    read with :mod:`ast`, never run; None when no such declaration is found. ``needs`` must be a
-    literal tuple / list of strings to be read (anything else reads as none)."""
+    """What ``addon.py`` declares (``addon = Addon("<name>", needs=(...), touches=Touches(...), ...)``),
+    read with :mod:`ast`, never run; None when no such declaration is found. Only ``Need(...)``
+    entries written with plain values count towards ``depends``."""
     try:
         tree = ast.parse(addon_py.read_text(encoding="utf-8"))
     except (OSError, SyntaxError, ValueError):
@@ -77,21 +129,15 @@ def read_manifest(addon_py: Path) -> Optional[Manifest]:
         if not (isinstance(node, ast.Assign) and any(isinstance(t, ast.Name) and t.id == "addon" for t in node.targets)):
             continue
         call = node.value
-        if not (isinstance(call, ast.Call) and getattr(call.func, "id", getattr(call.func, "attr", "")) == "Addon"):
+        if not (isinstance(call, ast.Call) and _call_name(call) == "Addon"):
             continue
         args: List[Any] = list(call.args[:1]) + [k.value for k in call.keywords if k.arg == "name"]
         if not (args and isinstance(args[0], ast.Constant) and isinstance(args[0].value, str)):
             continue
-        needs: Tuple[str, ...] = ()
-        for k in call.keywords:
-            if k.arg == "needs":
-                try:
-                    value = ast.literal_eval(k.value)
-                except ValueError:
-                    value = ()
-                if isinstance(value, (tuple, list)) and all(isinstance(v, str) for v in value):
-                    needs = tuple(value)
-        return Manifest(args[0].value, needs)
+        keywords = {k.arg: k.value for k in call.keywords if k.arg}
+        depends = _depends(keywords["needs"]) if "needs" in keywords else ()
+        touches = _touches(keywords["touches"]) if "touches" in keywords else {}
+        return Manifest(args[0].value, depends, touches)
     return None
 
 
@@ -108,10 +154,10 @@ class AddonFolder:
         return self.path / "migrations"
 
     @property
-    def needs(self) -> Tuple[str, ...]:
-        """The ``needs`` its ``addon.py`` declares, read without importing it (:func:`read_manifest`)."""
+    def depends(self) -> Tuple[str, ...]:
+        """The addons its ``addon.py`` depends on, read without importing it (:func:`read_manifest`)."""
         manifest = read_manifest(self.path / "addon.py")
-        return manifest.needs if manifest else ()
+        return manifest.depends if manifest else ()
 
 
 def installed_dir() -> Path:

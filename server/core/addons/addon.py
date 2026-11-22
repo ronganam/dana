@@ -26,7 +26,7 @@ from typing import (Any, Awaitable, Callable, Collection, Dict, List, Mapping, O
 
 from core.access import CAPABILITIES
 from core.users import User
-from core.addons.hooks import Channel, Handler, Hook, Job, LlmJob, Page, Service, Worker
+from core.addons.hooks import ADDON as ADDON_NEED, Channel, Handler, Hook, Job, LlmJob, Need, Page, Service, Touches, Worker
 from core.addons.schema import generate_schema
 
 logger = logging.getLogger(__name__)
@@ -238,9 +238,16 @@ class Addon:
         title: Its name for people ("Home Assistant"); default: the name, capitalised.
         description: What it does, in a sentence.
         version: Its own version ("1.0.0").
-        needs: Other addons it builds on: loaded (and their migrations run)
-            before it; a site / installed addon whose ``needs`` are missing is
-            not loaded.
+        needs: What running it takes, a :class:`~core.addons.hooks.Need`
+            each: env values, accounts, hardware, the phone app, a region,
+            other addons (required or ``optional``). The required addon needs
+            are :attr:`depends`: loaded (and their migrations run) before it,
+            on for a user before it is active for them; a site / installed
+            addon whose required addons are missing is not loaded.
+        touches: What it may touch beyond Dana's own data
+            (:class:`~core.addons.hooks.Touches`: hosts, acting for the user
+            outside Dana, stored credentials, other addons' data). An addon
+            with ``credentials`` must say it stores them.
         credentials: Fields needed to connect, stored encrypted.
         settings: Per-user choices, stored as plain JSON (defaults allowed).
         default_on: New users get it turned on (it must need no credentials):
@@ -325,7 +332,8 @@ class Addon:
     """
 
     def __init__(self, name: str, *, title: str = "", description: str = "", version: str = "",
-                 needs: Sequence[str] = (), credentials: Sequence[Field] = (), settings: Sequence[Field] = (),
+                 needs: Sequence[Need] = (), touches: Touches = Touches(),
+                 credentials: Sequence[Field] = (), settings: Sequence[Field] = (),
                  default_on: bool = False, everyone: bool = False, requires: Optional[str] = None,
                  prompt_parts: Sequence[PromptPart] = (), llm_jobs: Optional[Mapping[str, Union[str, LlmJob]]] = None,
                  web: Sequence[Page] = (), worker: Optional[Worker] = None, modules: Sequence[str] = (),
@@ -366,11 +374,25 @@ class Addon:
         page_ids = [p.id for p in web]
         if len(set(page_ids)) != len(page_ids):
             raise ValueError(f"Addon {name!r} declares a page id twice: {page_ids}")
+        if isinstance(needs, Need) or not all(isinstance(n, Need) for n in needs):
+            raise TypeError(f"{owner}: needs= takes a tuple of Need: needs=(Need(\"addon\", \"tasks\", \"why\"),)")
+        seen = [(n.kind, n.what) for n in needs]
+        if len(set(seen)) != len(seen):
+            raise ValueError(f"{owner}: needs names one thing twice")
+        if (ADDON_NEED, name) in seen:
+            raise ValueError(f"{owner}: needs itself")
+        if not isinstance(touches, Touches):
+            raise TypeError(f"{owner}: touches= takes a Touches(...)")
+        if credentials and not touches.stores_credentials:
+            raise ValueError(f"{owner}: it declares credentials, so touches= must say stores_credentials=True")
         self.name = name
         self.title = title or name.replace("_", " ").capitalize()
         self.description = description
         self.version = version
-        self.needs: Tuple[str, ...] = tuple(needs)
+        self.needs: Tuple[Need, ...] = tuple(needs)
+        self.touches = touches
+        # The addons it cannot work without: loaded first, on for a user before it is active for them.
+        self.depends: Tuple[str, ...] = tuple(n.what for n in needs if n.kind == ADDON_NEED and not n.optional)
         self.credentials: Tuple[Field, ...] = tuple(credentials)
         self.settings: Tuple[Field, ...] = tuple(settings)
         self.default_on = default_on
