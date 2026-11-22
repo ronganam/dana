@@ -234,7 +234,8 @@ def render() -> str:
     out.append("Declared with a decorator on the `addon` object, in any module the loader imports. Composer "
                "hooks (`now_cards`, `day_items`, `review`, `search`, `selfcheck`, `context*`) are plain functions; "
                "jobs, services, handlers, channels and the action hooks are `async`; `briefing` and `provide` may "
-               "be either. Keys (a card prefix, a section, a check, a provider) are unique across addons.\n")
+               "be either. Keys (a card prefix, a section, a check) are unique across addons; a provider key may "
+               "be declared by several, ranked.\n")
     for name, keys, see in HOOKS:
         out.append(f"### `{decorator_signature(name)}`\n")
         out.append(md(inspect.cleandoc(getattr(Addon, name).__doc__ or "")) + "\n")

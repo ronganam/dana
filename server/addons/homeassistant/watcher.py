@@ -1,5 +1,5 @@
-"""Dana watches each user's Home Assistant entities itself and fires their
-location / car triggers (docs/access.md, "Home Assistant triggers").
+"""Dana watches each user's Home Assistant entities itself: their location /
+car signals from Home Assistant (docs/signals.md).
 
 One watcher per user who has the addon connected and a person entity or a car
 sensor (with the car's Bluetooth name) set, over that user's own WebSocket
@@ -27,9 +27,10 @@ self-checks need is written by :mod:`.status`.
 
 The addon never imports the tasks addon: whoever starts :class:`Watchers`
 gives it what to do with a transition; the addon's service (``hooks.py``)
-emits it as the event ``homeassistant.location.changed`` /
-``homeassistant.car.changed`` (data: ``action``, ``target``), which the
-``tasks`` addon handles.
+delivers it as the ``location`` / ``car`` signal from the ``homeassistant``
+source (core/signals.py), which emits ``core.signal.location`` /
+``core.signal.car`` unless Dana's phone app is the active source; the
+``tasks`` addon handles those.
 """
 
 import asyncio

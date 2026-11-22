@@ -4,8 +4,9 @@ Several parts of Dana fail silently: the wake signal was dead for almost three
 months before anyone noticed. Each check reads a stored timestamp (no network
 calls) and says whether the signal still arrives:
 
-- ``wake`` / ``briefing``: core's own checks (confirmed wakes in ``wake_log``,
-  today's briefing in ``briefings``);
+- ``signals`` / ``wake`` / ``briefing``: core's own checks (a source of the
+  wake, car and place signals: core/signals.py; confirmed wakes in
+  ``wake_log``; today's briefing in ``briefings``);
 - every addon's ``@addon.selfcheck`` (phone's ``push``, ``notification_sync``,
   ``triage``, ``calls``; Home Assistant's ``location``, ``car``, ``ha_entities``,
   ``ha_watcher``; tasks' ``reminders``; calendar's ``calendar``; money's
@@ -30,7 +31,7 @@ import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from core import briefing, clock, now_hidden, undo, users, wake
+from core import briefing, clock, now_hidden, signals, undo, users, wake, wake_window
 from core.addons import helpers, registry
 from core.addons.helpers import parse_time
 from core.addons.hooks import Check, Hook
@@ -42,6 +43,7 @@ logger = logging.getLogger(__name__)
 WAKE_DAYS = int(os.getenv("CHECK_WAKE_DAYS", "3"))
 
 LABELS: Dict[str, str] = {
+    "signals": "Wake, car and place signals",
     "wake": "Wake signal",
     "briefing": "Morning briefing",
 }
@@ -50,6 +52,7 @@ SERVER_CAPABILITY = "see_everyone"
 
 # Which user core's own checks apply to (a user without their prerequisites does not see them).
 APPLIES: Dict[str, Callable[[User], bool]] = {
+    "signals": lambda user: _uses_signals(user),
     "wake": lambda user: wake.available(user),
     "briefing": lambda user: briefing.available(user),
 }
@@ -117,6 +120,7 @@ def _result(key: str, ok: bool, detail: str, since: Optional[datetime.datetime],
 def wake_week(conn, now: datetime.datetime, user: User) -> List[Dict[str, Any]]:
     """``user``'s last 7 mornings, oldest first: {label, value, ok} (ok None = today, not yet)."""
     times: Dict[str, str] = {}
+    window = wake_window.get(user)
     start = (now.date() - datetime.timedelta(days=6)).isoformat()
     for r in conn.execute("SELECT date, created_at FROM briefings WHERE user_id = ? AND trigger = 'wake' AND date >= ?",
                           (user.id, start)).fetchall():
@@ -133,7 +137,7 @@ def wake_week(conn, now: datetime.datetime, user: User) -> List[Dict[str, Any]]:
     for i in range(6, -1, -1):
         d = now.date() - datetime.timedelta(days=i)
         v = times.get(d.isoformat())
-        pending = i == 0 and not v and now.hour < wake.WAKE_WINDOW[1]
+        pending = i == 0 and not v and now.time() < window.end_time
         cells.append({"label": d.strftime("%a"), "value": v or "–", "ok": None if pending else bool(v)})
     return cells
 
@@ -148,15 +152,12 @@ def _check_wake(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str,
             last_date = datetime.date.fromisoformat(row["d"])
         except ValueError:
             last_date = None
-    signal = dict(conn.execute("SELECT * FROM system_marks WHERE key = ?",
-                               (f"{wake.SIGNAL_MARK}:{user.id}",)).fetchone() or {})
-    sig_at = parse_time(signal.get("last_at"))
     blocks: List[Dict[str, Any]] = [{"type": "week", "label": "Last 7 mornings", "cells": wake_week(conn, now, user)}]
-    facts = []
-    if sig_at:
-        facts.append(f"Last wake signal ({signal.get('detail') or 'unlock'}) {ago(sig_at, now)}")
-    else:
-        facts.append("No unlock reported by the phone since this check started")
+    window = wake_window.get(user)
+    facts = [f"Wake window {window.start}–{window.end}" + (" (learned)" if window.learned else "")]
+    for s in signals.sources(user, "wake"):
+        facts.append(f"{s.label}: last wake signal ({s.detail}) {ago(s.last_at, now)}" if s.last_at
+                     else f"{s.label}: no wake signal yet" + (f" ({s.missing})" if s.missing else ""))
     blocks.append({"type": "facts", "label": "Signals", "items": facts})
     since = datetime.datetime.combine(last_date, datetime.time(0, 0), clock.get_timezone()) if last_date else None
     why = "Morning reminders and the briefing depend on it."
@@ -168,6 +169,37 @@ def _check_wake(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str,
                        title=f"No wake signal for {days} days", why=why, blocks=blocks)
     return _result("wake", True, "confirmed today" if days == 0 else
                    ("confirmed yesterday" if days == 1 else f"confirmed {days} days ago"), since, blocks=blocks)
+
+
+_SIGNAL_WORDS = {"wake": "wake up", "car": "drive", "location": "arrive somewhere"}
+
+
+def _uses_signals(user: User) -> bool:
+    """``user`` has something that listens to the car / place signals (reminders) or a delivery channel."""
+    return bool(registry.handlers("core.signal.location", user) or registry.handlers("core.signal.car", user)
+                or registry.channels(user))
+
+
+def _check_signals(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
+    if user is None or not _uses_signals(user):
+        return _result("signals", True, "not connected", None)
+    facts = []
+    for signal in signals.NEEDED:
+        states = signals.sources(user, signal)
+        current = signals.active(user, signal)
+        label = next((s.label for s in states if s.source == current), None)
+        facts.append(f"{signal.capitalize()}: " + (label or "no source yet"))
+    missing = signals.missing(user)
+    if not missing:
+        return _result("signals", True, "every signal has a source", None,
+                       blocks=[{"type": "facts", "label": "Sources", "items": facts}])
+    words = [_SIGNAL_WORDS[s] for s in missing]
+    phrase = words[0] if len(words) == 1 else ", ".join(words[:-1]) + " or " + words[-1]
+    return _result("signals", False, f"no source for {', '.join(missing)}", None,
+                   title=f"Dana can't tell when you {phrase}",
+                   why="Wake briefings and car and place reminders need a source: pair Dana's phone app "
+                       "(Settings → Devices), or connect Home Assistant.",
+                   blocks=[{"type": "facts", "label": "Sources", "items": facts}])
 
 
 def _check_briefing(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
@@ -186,6 +218,7 @@ def _check_briefing(conn, now: datetime.datetime, user: Optional[User]) -> Dict[
 
 
 _CHECKS = {
+    "signals": _check_signals,
     "wake": _check_wake,
     "briefing": _check_briefing,
 }

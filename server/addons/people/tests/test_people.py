@@ -51,8 +51,8 @@ ensure_default_groups_for_everyone()
 from core import sessions_api
 from addons.tasks import api as tasks_api
 from core.auth import setup_auth
-from core import briefing, briefing_api, clock, context_chats, wake, weekly_review
-from addons.phone import push as phone_push
+from core import briefing, briefing_api, clock, context_chats, wake, wake_window, weekly_review
+from addons.phone import api as phone_api, push as phone_push
 from addons.people import api as people_api, briefs as people_briefs, cadence, detail, linking, merge
 from addons.people import store as people_store, values as people_values
 from core.db import get_db_connection
@@ -207,7 +207,7 @@ def build_app():
     briefing_api.setup(app)
     app.router.add_post("/api/chat/context", sessions_api.start_context_chat_api)
     app.router.add_post("/api/tasks/{id}/snooze", tasks_api.snooze_task_api)
-    app.router.add_post("/api/phone/unlock", briefing_api.phone_unlock_api)
+    app.router.add_post("/api/signals", phone_api.post_signals_api)
     app.router.add_post("/api/tasks/{id}/links", tasks_api.add_task_link_api)
     app.router.add_get("/api/tasks", tasks_api.get_tasks_api)
     return app
@@ -455,7 +455,7 @@ async def main():
             conn.execute("DELETE FROM briefings")
             conn.commit()
         add_task("t-wake", "Take vitamins", triggers={"wake": True})
-        wake.WAKE_WINDOW = (0, 24)
+        wake_window.set_window(OWNER, {"start": "00:00", "end": "23:59"})
 
         def clear_wake():
             with get_db_connection() as conn:
@@ -464,7 +464,7 @@ async def main():
 
         # Unlock, then the screen was on only 30 s (dismissed the alarm, back to sleep).
         seen["history"] = [(40, "off"), (30, "on"), (0, "off")]
-        status = await wake.handle_wake(OWNER, source="unlock")
+        status = await wake.unlock(OWNER)
         await asyncio.sleep(0.05)
         check("wake: unlock but screen barely on → nothing fired", status == "confirming" and not pushes("reminder") and not pushes("briefing"))
         check("wake: not recorded, so the next unlock retries", not wake.done_today(OWNER, clock.now().date().isoformat()))
@@ -473,8 +473,9 @@ async def main():
         check("wake: alarm-length screen doesn't trip the fallback", not await wake.check_wake_fallback(OWNER))
         # Next unlock through the API: screen on 4 min since → up.
         seen["history"] = [(400, "off"), (300, "on"), (60, "off"), (40, "on"), (0, "on")]
-        r = await client.post("/api/phone/unlock", json={"at": int((time.time() - 300) * 1000)})
-        check("api: phone unlock → confirming", (await r.json())["status"] == "confirming")
+        r = await client.post("/api/signals", json={"events": [{"type": "unlock", "at": int((time.time() - 300) * 1000)}]})
+        check("api: the phone's unlock signal → accepted",
+              (await r.json()) == {"accepted": 1, "rejected": []})
         for _ in range(100):
             if pushes("briefing") and (briefing.get_today(OWNER) or {}).get("delivered_at"):
                 break
@@ -484,27 +485,33 @@ async def main():
         check("wake: awake → wake task fired and briefing pushed", len(rem) == 1 and len(bp) == 1, (rem, bp))
         check("wake: briefing used the model", bp and bp[0]["data"]["headline"] == "Busy morning, free after 2"
               and bp[0]["data"]["next_event"] == "09:00 Standup")
-        check("wake: once a day", await wake.handle_wake(OWNER, source="unlock") == "done"
+        check("wake: once a day", await wake.unlock(OWNER) == "done"
               and not await wake.check_wake_fallback(OWNER))
         check("wake: briefing marked delivered", briefing.get_today(OWNER)["delivered_at"])
         # Fallback poll: several real sessions in the last 30 min → up, without any signal.
         clear_wake()
         seen["history"] = [(1700, "on"), (1500, "off"), (900, "on"), (700, "off"), (300, "on"), (100, "off")]
+        check("wake: Home Assistant's screen is not the wake while the phone delivers it",
+              not await wake.check_wake_fallback(OWNER))
+        with get_db_connection() as conn:  # the phone quiet for days: Home Assistant's screen counts again
+            conn.execute("UPDATE signal_sources SET last_at = '2000-01-01T00:00:00+00:00' WHERE user_id = ?", (OWNER.id,))
+            conn.commit()
         check("wake: fallback poll fires on real use", await wake.check_wake_fallback(OWNER))
         check("wake: fallback recorded today's wake", wake.done_today(OWNER, clock.now().date().isoformat()))
         # HA down: an unlock is trusted.
         clear_wake()
         seen["history"] = None
-        await wake.handle_wake(OWNER, source="unlock")
+        await wake.unlock(OWNER)
         for _ in range(100):
             if wake.done_today(OWNER, clock.now().date().isoformat()):
                 break
             await asyncio.sleep(0.02)
         check("wake: no HA history → unlock trusted", wake.done_today(OWNER, clock.now().date().isoformat()))
         seen["history"] = []
-        wake.WAKE_WINDOW = (25, 26)
         clear_wake()
-        check("wake: outside the window ignored", await wake.handle_wake(OWNER) == "outside_window")
+        wake_window.set_window(OWNER, {"start": "00:00", "end": "01:00"} if clock.now().hour >= 2
+                               else {"start": "22:00", "end": "23:00"})
+        check("wake: outside the window ignored", await wake.unlock(OWNER) == "outside_window")
         # on_wake after a fallback briefing rebuilds it with fresh data and pushes it once.
         with get_db_connection() as conn:
             conn.execute("UPDATE briefings SET trigger = 'fallback', delivered_at = NULL")

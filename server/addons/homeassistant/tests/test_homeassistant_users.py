@@ -229,12 +229,12 @@ async def test_reads() -> None:
     clear()
     since = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
     HA_B.history = [{"state": "on", "last_changed": since.isoformat()}]
-    sessions = await wake._screen_sessions(BOB, since, datetime.datetime.now(datetime.timezone.utc))
+    source, sessions = await wake.screen_sessions(BOB, since, datetime.datetime.now(datetime.timezone.utc))
     check("wake: Bob's screen history from B, his own sensor",
-          sessions and sessions[0] > 500 and HA_B.service_calls == [("history", {"entity": "binary_sensor.b_screen"})]
+          source == "homeassistant" and sessions and sessions[0] > 500 and HA_B.service_calls == [("history", {"entity": "binary_sensor.b_screen"})]
           and not HA_A.requests, (sessions, HA_B.service_calls))
     check("wake: a user without Home Assistant is skipped",
-          await wake.handle_wake(CARL) == "unavailable" and not await wake.check_wake_fallback(CARL))
+          await wake.unlock(CARL) == "unavailable" and not await wake.check_wake_fallback(CARL))
 
 
 # --- 4. HTTP endpoints ---------------------------------------------------------------------------

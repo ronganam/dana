@@ -1,10 +1,7 @@
-"""REST routes for the wake signal, the wake briefing and the weekly review
-(composers: docs/people.md); ``setup(app)`` registers them. The people routes
-are the people addon's (addons/people/api.py).
-
-``POST /api/phone/unlock {at?}`` is the phone's unlock: the caller's wake
-signal (core/wake.py), ``{"status": "unavailable"}`` without ``phone`` and
-Home Assistant.
+"""REST routes for the morning briefing and the weekly review (composers:
+docs/people.md); ``setup(app)`` registers them. The people routes are the
+people addon's (addons/people/api.py); the wake signal comes with the phone's
+other signals (``POST /api/signals``, docs/signals.md).
 
 Every route answers for the request's user. Read paths the clients poll
 (``GET /api/briefing/today``, ``GET /api/review/latest``) answer null for a
@@ -14,12 +11,11 @@ another user's review id 404.
 """
 from __future__ import annotations
 
-import datetime
 import logging
 
 from aiohttp import web
 
-from core import briefing, wake, weekly_review
+from core import briefing, weekly_review
 from core.auth import request_user
 
 logger = logging.getLogger(__name__)
@@ -33,28 +29,7 @@ async def _json(request: web.Request) -> dict:
         return {}
 
 
-# --- Wake signal and briefing -------------------------------------------------
-
-async def phone_unlock_api(request: web.Request) -> web.Response:
-    """POST /api/phone/unlock {at?: epoch ms} — the caller's phone was unlocked (their wake
-    signal). ``{"status": "unavailable"}`` without ``phone`` and Home Assistant (core/wake.py)."""
-    try:
-        data = await request.json()
-    except Exception:
-        data = {}
-    signal = None
-    try:
-        if data.get("at"):
-            signal = datetime.datetime.fromtimestamp(int(data["at"]) / 1000, tz=datetime.timezone.utc)
-            now = datetime.datetime.now(datetime.timezone.utc)
-            if signal > now or (now - signal).total_seconds() > 3600:
-                signal = None  # clock skew or a stale retry: measure from now
-    except (TypeError, ValueError):
-        signal = None
-    status = await wake.handle_wake(request_user(request), source="unlock", signal_utc=signal)
-    return web.json_response({"status": status})
-
-
+# --- Briefing ----------------------------------------------------------------
 
 async def briefing_today_api(request: web.Request) -> web.Response:
     """GET /api/briefing/today?generate=1 — the caller's briefing of today; with
@@ -131,7 +106,6 @@ async def review_dismiss_api(request: web.Request) -> web.Response:
 
 def setup(app: web.Application) -> None:
     r = app.router
-    r.add_post("/api/phone/unlock", phone_unlock_api)
     r.add_get("/api/briefing/today", briefing_today_api)
     r.add_post("/api/briefing/generate", briefing_generate_api)
     r.add_get("/api/review/latest", review_latest_api)

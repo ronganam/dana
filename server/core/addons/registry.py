@@ -15,9 +15,12 @@ for a user come only from the addons the user has *active*
 addon ``depends`` on connected too); those asked without a user (``None``:
 the server's own view, e.g. its self-checks) from every addon enabled on the
 server. Composers look hooks up only through :func:`hooks` and
-:func:`hook_for`. The scheduler checks jobs and services itself.
+:func:`hook_for`; providers (``@addon.provide``) through :func:`providers`,
+:func:`provider` and :func:`answer`, ranked: several addons may provide one
+key. The scheduler checks jobs and services itself.
 """
 
+import asyncio
 import inspect
 import logging
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Tuple
@@ -307,10 +310,42 @@ def hook_for(kind: str, key: str, user: Optional[User]) -> Optional[Hook]:
     return owner
 
 
+def providers(key: str, user: Optional[User]) -> List[Hook]:
+    """Every ``@addon.provide(key)`` hook of the addons active for ``user``
+    (``user`` None: of every addon enabled on the server), ranked: lower
+    ``rank`` first, ties in the fixed addon order."""
+    found = [h for h in hooks("provide", user) if h.key == key]
+    return sorted(found, key=lambda h: h.option("rank", 50))
+
+
 def provider(key: str, user: Optional[User]) -> Optional[Hook]:
-    """The ``@addon.provide(key)`` hook when active for ``user`` (None when no
-    enabled addon declares it or it is not active for ``user``)."""
-    try:
-        return hook_for("provide", key, user)
-    except store.NotConnected:
-        return None
+    """The highest-ranked ``@addon.provide(key)`` hook active for ``user``
+    (None when there is none). A key several addons answer is read with
+    :func:`answer`, which falls back to the next one."""
+    ranked = providers(key, user)
+    return ranked[0] if ranked else None
+
+
+def source_of(hook: Hook) -> str:
+    """The source a provider hook answers as (its ``source=``, else its addon's name)."""
+    return str(hook.option("source", "") or hook.addon)
+
+
+async def answer(key: str, user: User, *args: Any, **kwargs: Any) -> Tuple[Optional[Hook], Any]:
+    """Ask ``user``'s providers of ``key`` in rank order and return the first
+    that answers (anything but None) with its answer; (None, None) when none
+    does. A sync provider runs in a worker thread; one that raises is logged
+    and the next is asked."""
+    for hook in providers(key, user):
+        try:
+            if inspect.iscoroutinefunction(hook.func):
+                value = await hook.func(user, *args, **kwargs)
+            else:
+                value = await asyncio.to_thread(hook.func, user, *args, **kwargs)
+        except Exception:
+            logger.warning(f"provider {key} of {hook.addon} failed for user {user.id}; asking the next",
+                           exc_info=True)
+            continue
+        if value is not None:
+            return hook, value
+    return None, None

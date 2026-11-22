@@ -140,7 +140,7 @@ check("detail: Needs and May touch, from the payload",
       && haNeeds.includes("Connects to your Home Assistant server") && haNeeds.includes("Acts for you outside Dana")
       && haNeeds.includes("Keeps passwords, tokens or sign-ins") && haNeeds.includes("<em>optional</em>"));
 check("may touch: other addons' data by their titles; nothing declared says so; unknown (did not load) shows nothing",
-      plain(C.touchLines(admin.tasks.touches, F.list_admin.body.addons)).join() === "Reads your data from Home Assistant, People, Phone"
+      plain(C.touchLines(admin.tasks.touches, F.list_admin.body.addons)).join() === "Reads your data from People, Phone"
       && plain(C.touchLines(admin.shopping.touches)).join() === "Nothing beyond Dana's own data"
       && C.renderNeeds(admin.broken, []) === "" && plain(C.touchLines(null)).length === 0);
 check("needs: an addon needing nothing says so", C.renderNeeds(admin.essentials, []).includes("Nothing beyond Dana itself"));
