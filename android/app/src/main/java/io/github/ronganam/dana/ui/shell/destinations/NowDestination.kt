@@ -33,6 +33,9 @@ import java.time.format.DateTimeFormatter
  * strip's Now cell shows the rest of today instead). On the cover screen a
  * tap opens a row in place, so Now never drills down.
  *
+ * The cover screen's cards swipe: towards the start = dismiss, towards the
+ * end = the card's own snooze (both server actions, so both answer with Undo).
+ *
  * Client actions are done here: `open` (approval → its thread, notification →
  * its app, review → the review screen, else the evidence), `reply` (the reply
  * box under the evidence), "Ask Dana about this" (a context chat).
@@ -50,6 +53,7 @@ fun rememberNowDestination(viewModel: MainViewModel): Destination {
     val loading by nc.loading.collectAsState()
     val failed by nc.failed.collectAsState()
     val fresh by nc.fresh.collectAsState()
+    val updatedAt by nc.updatedAt.collectAsState()
     val quietOpen by shell.quietOpen.collectAsState()
     val events by viewModel.dayController.events.collectAsState()
     val tasks by viewModel.tasksController.tasks.collectAsState()
@@ -61,7 +65,7 @@ fun rememberNowDestination(viewModel: MainViewModel): Destination {
     val quietTotal = (payload?.quietTotal ?: 0) - (payload?.quiet.orEmpty().size - quiet.size)
     val later = remember(events, tasks, now) { laterToday(events, tasks, now) }
 
-    // Fresh while on screen: on resume and every 30 s (plus pushes and actions, see MainViewModel).
+    // Fresh while on screen: on open / resume and every 60 s, stopped in the background (plus pushes and actions, see MainViewModel).
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val obs = LifecycleEventObserver { _, e ->
@@ -141,7 +145,7 @@ fun rememberNowDestination(viewModel: MainViewModel): Destination {
         fresh = fresh,
         quietOpen = quietOpen,
         now = now,
-        later = later
+        updatedAt = updatedAt
     )
     val listActions = remember(viewModel) {
         NowListActions(
@@ -152,8 +156,8 @@ fun rememberNowDestination(viewModel: MainViewModel): Destination {
                 if (a != null) nc.actQuiet(q, a)
             },
             quietDismissAll = { nc.dismissAllQuiet() },
-            clearNoise = { viewModel.notificationOverviewController.clearNoise() },
-            openNotifications = { shell.go(Place.NOTIFICATIONS) }
+            openNotifications = { shell.go(Place.NOTIFICATIONS) },
+            openDay = { e -> e.taskId?.let { shell.openReminder(it) } }
         )
     }
     val selected = items.firstOrNull { it.id == pick?.id }

@@ -63,6 +63,10 @@ class NowController(
     /** The last refresh failed (server unreachable or erroring). */
     val failed: StateFlow<Boolean> = _failed.asStateFlow()
 
+    private val _updatedAt = MutableStateFlow<Long?>(null)
+    /** When the shown answer came from the server (epoch ms; the cache file's time until the first answer). */
+    val updatedAt: StateFlow<Long?> = _updatedAt.asStateFlow()
+
     private val pending = PendingRemovals()
     private val _hidden = MutableStateFlow<Set<String>>(emptySet())
     /** Rows (and quiet entries) acted on and hidden until the server agrees. */
@@ -82,7 +86,10 @@ class NowController(
             val cached = withContext(Dispatchers.IO) {
                 runCatching { if (cacheFile.exists()) NowApi.parse(cacheFile.readText()) else null }.getOrNull()
             }
-            if (cached != null && _payload.value == null) _payload.value = cached
+            if (cached != null && _payload.value == null) {
+                _payload.value = cached
+                if (_updatedAt.value == null) _updatedAt.value = withContext(Dispatchers.IO) { cacheFile.lastModified().takeIf { it > 0 } }
+            }
         }
     }
 
@@ -105,6 +112,7 @@ class NowController(
                     _payload.value = parsed
                     _fresh.value = true
                     _failed.value = false
+                    _updatedAt.value = System.currentTimeMillis()
                     pending.refreshed(token)
                     publishHidden()
                     withContext(Dispatchers.IO) { runCatching { cacheFile.writeText(raw) } }
@@ -120,13 +128,17 @@ class NowController(
         }
     }
 
-    /** While Now is on screen: refresh every 30 s (the server answers from its DB, no model call). */
+    /**
+     * While Now is on screen: refresh now and every 60 s (the server answers
+     * from its DB, no model call). The screen stops it when it leaves or the
+     * app goes to the background, so nothing polls there.
+     */
     fun startPolling() {
         if (pollJob?.isActive == true) return
         pollJob = ctx.scope.launch {
             while (true) {
                 refresh()
-                delay(30_000)
+                delay(POLL_MS)
             }
         }
     }
@@ -303,6 +315,10 @@ class NowController(
     private fun cancelAlert(notificationId: String) {
         (appContext.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager)
             .cancel("alert:$notificationId".hashCode())
+    }
+
+    companion object {
+        const val POLL_MS = 60_000L
     }
 
     private fun reason(e: Exception): String =

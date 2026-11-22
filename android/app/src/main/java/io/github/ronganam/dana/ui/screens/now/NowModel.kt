@@ -7,6 +7,7 @@ import io.github.ronganam.dana.data.models.NowNotification
 import io.github.ronganam.dana.data.models.NowRef
 import io.github.ronganam.dana.data.models.QuietEntry
 import io.github.ronganam.dana.ui.shell.DaySlot
+import io.github.ronganam.dana.ui.theme.Hue
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 
@@ -37,8 +38,10 @@ data class RowActions(
     val primary: NowAction?,
     val inline: List<NowAction>,
     val more: List<NowAction>,
-    /** What swiping left does (null: nothing). */
-    val dismiss: NowAction?
+    /** What swiping towards the start does (null: nothing). */
+    val dismiss: NowAction?,
+    /** What swiping towards the end does: the card's own first snooze (null: nothing). */
+    val snooze: NowAction? = null
 )
 
 /** The icon of a row's leading tile when it is not an app's own (see [NowModel.visual]). */
@@ -125,8 +128,64 @@ object NowModel {
         val inline = if (others.size <= 2) others else {
             listOfNotNull(others.firstOrNull { it !== dismiss }, dismiss.takeIf { it in others })
         }
-        return RowActions(item.primary, inline, others.filter { it !in inline }, dismiss)
+        return RowActions(item.primary, inline, others.filter { it !in inline }, dismiss, snoozeAction(item))
     }
+
+    /** The card's first `snooze` secondary (the shortest, server order); never invented for a kind that offers none. */
+    fun snoozeAction(item: NowItem): NowAction? = item.secondary.firstOrNull { it.action == "snooze" }
+
+    /**
+     * A card's hue, by `kind` only (never by addon name): approval ember,
+     * notification teal, suggestion plum (sage for one from a call), reminder
+     * amber, money rose for an unusual charge and sage for a saving / target,
+     * check rose, review sky; any other kind (an addon's, e.g. trains) sky.
+     */
+    fun hueOf(kind: String, refType: String?): Hue = when (kind) {
+        "approval" -> Hue.EMBER
+        "notification" -> Hue.TEAL
+        "suggestion" -> if (refType == "call") Hue.SAGE else Hue.PLUM
+        "reminder" -> Hue.AMBER
+        "money" -> if (refType == "transaction") Hue.ROSE else Hue.SAGE
+        "check" -> Hue.ROSE
+        "review" -> Hue.SKY
+        else -> Hue.SKY
+    }
+
+    fun hueOf(item: NowItem): Hue = hueOf(item.kind, item.ref?.type)
+    fun hueOf(q: QuietEntry): Hue = hueOf(q.kind, q.ref?.type)
+
+    /** A day-strip item's hue: events sky, reminders amber, anything else (an addon's) sky. */
+    fun dayHue(kind: String): Hue = if (kind == "reminder") Hue.AMBER else Hue.SKY
+
+    /**
+     * The header's line when the server sends no `lede`: "Nothing needs you
+     * right now." only when the queue is empty, else a calm line from the hour.
+     */
+    fun ledeFallback(hour: Int, queueEmpty: Boolean): String = when {
+        queueEmpty -> "Nothing needs you right now."
+        hour in 5..11 -> "Good morning."
+        hour in 12..17 -> "Good afternoon."
+        hour in 18..22 -> "Good evening."
+        else -> "Late night."
+    }
+
+    /** "Updated just now" / "Updated 2 min ago" / "Updated 3 h ago" / "Updated 2 days ago". */
+    fun updatedAgo(updatedAtMs: Long, nowMs: Long): String {
+        val min = ((nowMs - updatedAtMs).coerceAtLeast(0) / 60_000).toInt()
+        return when {
+            min < 1 -> "Updated just now"
+            min < 60 -> "Updated $min min ago"
+            min < 48 * 60 -> "Updated ${min / 60} h ago"
+            else -> "Updated ${min / (24 * 60)} days ago"
+        }
+    }
+
+    /** The notifications line: "17 notifications · 1 needs you · 11 noise" (zero parts left out). */
+    fun notificationsLine(total: Int, needsYou: Int, noise: Int): String = buildList {
+        add("$total notification${if (total == 1) "" else "s"}")
+        if (needsYou > 0) add("$needsYou need${if (needsYou == 1) "s" else ""} you")
+        if (noise > 0) add("$noise noise")
+    }.joinToString(" · ")
 
     fun choiceBlocks(item: NowItem): List<NowBlock.Choices> = item.blocks.filterIsInstance<NowBlock.Choices>()
     fun checkBlocks(item: NowItem): List<NowBlock.Checks> = item.blocks.filterIsInstance<NowBlock.Checks>()
@@ -225,5 +284,27 @@ class PendingRemovals {
         if (entries.isEmpty()) return items
         val hidden = entries.keys
         return items.filter { it.id !in hidden }
+    }
+}
+
+/**
+ * Which cards are new since the queue was last shown, so only those rise in:
+ * nothing on the first non-empty look (the first load has its own arrival),
+ * and a card seen before (back after Undo or a failed action) never again.
+ */
+class NewCards {
+    private val seen = HashSet<String>()
+    private var primed = false
+
+    fun fresh(ids: List<String>): Set<String> {
+        if (!primed) {
+            if (ids.isEmpty()) return emptySet()
+            primed = true
+            seen += ids
+            return emptySet()
+        }
+        val out = ids.filterTo(HashSet()) { it !in seen }
+        seen += ids
+        return out
     }
 }

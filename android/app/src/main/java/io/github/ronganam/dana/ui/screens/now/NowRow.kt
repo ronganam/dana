@@ -1,7 +1,6 @@
 package io.github.ronganam.dana.ui.screens.now
 
 import io.github.ronganam.dana.ui.theme.hues
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -23,7 +22,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
+import io.github.ronganam.dana.ui.components.startBar
+import io.github.ronganam.dana.ui.theme.Hue
+import io.github.ronganam.dana.ui.theme.Motion
+import kotlinx.coroutines.delay
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -46,7 +54,7 @@ import io.github.ronganam.dana.ui.shell.dragToDay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
-internal val NOW_GUTTER = 18.dp
+internal val NOW_GUTTER = 16.dp
 
 /** Everything a Now row or the stage can do; built once by the destination. */
 class NowHandlers(
@@ -65,12 +73,15 @@ class NowHandlers(
 )
 
 /**
- * A row of the queue: where it came from (mono), the title, why it is here,
- * the primary and one or two others. On the cover screen it swipes (right =
- * the primary, left = dismiss, the action showing underneath as it moves) and
- * a tap opens its evidence in place; unfolded, the selected row is
- * highlighted (its evidence is on the stage) and a schedulable row can be
- * long-pressed onto the day strip.
+ * A card of the queue: a 3dp start bar in its kind's hue ([NowModel.hueOf]),
+ * a small dot and the mono source in that hue, the title, why it is here, a
+ * filled primary and the quiet others. Its evidence (every block) waits
+ * behind "More" / a tap. On the cover screen it swipes: towards the start =
+ * dismiss, towards the end = the card's own snooze (each only when the card
+ * offers it; the revealed side says which; both answer with Undo). Unfolded,
+ * the selected card is highlighted (its evidence is on the stage) and a
+ * schedulable one can be long-pressed onto the day strip. Swipe, expand and
+ * the actions are also accessibility actions.
  */
 @Composable
 fun NowRow(
@@ -86,30 +97,43 @@ fun NowRow(
     val accent = MaterialTheme.colorScheme.primary
     val canvas = MaterialTheme.colorScheme.background
     val dismiss = actions.dismiss
+    val snooze = actions.snooze
     val density = LocalDensity.current
     val threshold = with(density) { 96.dp.toPx() }
     val offset = remember(item.id) { Animatable(0f) }
     val scope = rememberCoroutineScope()
-    val primaryLabel = NowModel.primaryLabel(item, draft)
+    val h = hues
+    val hue = h.of(remember(item) { NowModel.hueOf(item) })
+    val hasMore = item.blocks.isNotEmpty() || actions.more.isNotEmpty() || item.notification != null
 
-    val kindHue = hues.of(remember(item) { NowModel.visual(item) }.hue())
+    /** Swiped past the threshold: slide out, do it; snap back later only if the card is still here (failed / undone). */
+    fun swipeOut(action: NowAction, direction: Float, width: Float) {
+        scope.launch {
+            offset.animateTo(direction * width, Motion.leave())
+            handlers.perform(item, action, action === item.primary)
+            delay(Motion.COMPLETE + 200L)
+            offset.snapTo(0f)
+        }
+    }
+
     Column(modifier.fillMaxWidth()) {
-        Box(Modifier.fillMaxWidth().clipToBounds()) {
-            // What a swipe will do, revealed under the row as it moves (cover only).
+        BoxWithConstraints(Modifier.fillMaxWidth().clipToBounds()) {
+            val width = constraints.maxWidth.toFloat()
+            // What a swipe will do, revealed under the card as it moves (cover only).
             if (!wide && offset.value != 0f) {
                 Row(
-                    Modifier.matchParentSize().padding(horizontal = 14.dp),
+                    Modifier.matchParentSize().padding(horizontal = NOW_GUTTER),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    if (offset.value > 0f) Text(
-                        "✓ " + (primaryLabel ?: "Open"),
+                    if (offset.value > 0f && snooze != null) Text(
+                        "Snooze · " + snooze.label,
                         style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, textDirection = TextDirection.Content),
-                        color = accent
+                        color = h.text(Hue.AMBER)
                     )
                     Spacer(Modifier.weight(1f))
                     if (offset.value < 0f && dismiss != null) Text(
-                        dismiss.label + " ✕",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
+                        dismiss.label,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold, textDirection = TextDirection.Content),
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
@@ -120,12 +144,10 @@ fun NowRow(
                     .offset { IntOffset(offset.value.roundToInt(), 0) }
                     .then(
                         when {
-                            wide && selected -> Modifier.background(canvas).drawBehind {
-                                drawLine(accent, Offset(1.5.dp.toPx(), 0f), Offset(1.5.dp.toPx(), size.height), 3.dp.toPx())
-                            }
-                            wide -> Modifier
+                            wide && selected -> Modifier.background(canvas).startBar(accent)
+                            wide -> Modifier.startBar(hue)
                             // Canvas only while swiping (to cover what the swipe reveals), so the canvas glow shows through at rest.
-                            else -> Modifier.drawBehind { if (offset.value != 0f) drawRect(canvas) }
+                            else -> Modifier.drawBehind { if (offset.value != 0f) drawRect(canvas) }.startBar(hue)
                         }
                     )
                     .then(
@@ -135,57 +157,62 @@ fun NowRow(
                             state = rememberDraggableState { d ->
                                 scope.launch {
                                     val next = offset.value + d
-                                    // Without a dismiss there is nothing to the left; it only gives a little.
-                                    offset.snapTo(if (dismiss == null) next.coerceAtLeast(-threshold / 4) else next)
+                                    // A side with nothing behind it only gives a little.
+                                    val min = if (dismiss == null) -threshold / 4 else -width
+                                    val max = if (snooze == null) threshold / 4 else width
+                                    offset.snapTo(next.coerceIn(min, max))
                                 }
                             },
                             onDragStopped = {
                                 when {
-                                    offset.value > threshold -> {
-                                        offset.animateTo(0f)
-                                        val a = item.primary
-                                        if (a != null) handlers.perform(item, a, true)
-                                    }
-                                    offset.value < -threshold && dismiss != null -> {
-                                        handlers.perform(item, dismiss, dismiss === item.primary)
-                                        offset.snapTo(0f)
-                                    }
-                                    else -> offset.animateTo(0f)
+                                    offset.value > threshold && snooze != null -> swipeOut(snooze, 1f, width)
+                                    offset.value < -threshold && dismiss != null -> swipeOut(dismiss, -1f, width)
+                                    else -> offset.animateTo(0f, Motion.base())
                                 }
                             }
                         )
                     )
-                    .clickable { handlers.toggle(item) }
-                    .padding(horizontal = NOW_GUTTER)
-                    .padding(top = 13.dp, bottom = 12.dp)
+                    .semantics {
+                        isTraversalGroup = true
+                        customActions = buildList {
+                            if (hasMore && !wide) add(CustomAccessibilityAction(if (expanded) "Less" else "More") { handlers.toggle(item); true })
+                            if (snooze != null) add(CustomAccessibilityAction("Snooze · ${snooze.label}") { handlers.perform(item, snooze, false); true })
+                            if (dismiss != null) add(CustomAccessibilityAction(dismiss.label) { handlers.perform(item, dismiss, dismiss === item.primary); true })
+                        }
+                    }
+                    .clickable(onClickLabel = if (wide) "Open" else if (expanded) "Less" else "More") { handlers.toggle(item) }
+                    .padding(start = NOW_GUTTER + 3.dp, end = NOW_GUTTER)
+                    .padding(top = 14.dp, bottom = 13.dp)
             ) {
-                Row(Modifier.fillMaxWidth()) {
-                    // Where it came from at a glance; the text column carries the words.
-                    NowTile(item, modifier = Modifier.padding(top = 1.dp))
-                    Spacer(Modifier.width(NOW_TILE_GAP))
-                    Column(Modifier.weight(1f)) {
-                        if (item.source.isNotBlank()) Text(
-                            io.github.ronganam.dana.ui.screens.common.isolatedParts(item.source.uppercase()),
-                            style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Ltr),
-                            color = hues.text(kindHue),
-                            maxLines = 1,
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        )
-                        Text(
-                            item.title,
-                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 15.5.sp, lineHeight = 20.sp, textDirection = TextDirection.Content),
-                            color = MaterialTheme.colorScheme.onSurface,
-                            modifier = Modifier.fillMaxWidth().padding(top = 5.dp)
-                        )
-                        if (item.why.isNotBlank() && (!wide || selected)) Text(
-                            item.why,
-                            style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
-                        )
+                if (item.source.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(6.dp).clip(CircleShape).background(hue))
+                    Spacer(Modifier.width(7.dp))
+                    Text(
+                        io.github.ronganam.dana.ui.screens.common.isolatedParts(item.source.uppercase()),
+                        style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Ltr),
+                        color = h.text(hue),
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
+                Text(
+                    item.title,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 21.sp, textDirection = TextDirection.Content),
+                    color = MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp).semantics { heading() }
+                )
+                if (item.why.isNotBlank() && (!wide || selected)) Text(
+                    item.why,
+                    style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
+                )
+                Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.Top) {
+                    ActionButtons(item, draft, actions, handlers, Modifier.weight(1f), solidPrimary = true)
+                    if (hasMore && !wide) InkButton(if (expanded) "Less" else "More", emphasis = InkEmphasis.BARE, modifier = Modifier.padding(start = 6.dp)) {
+                        handlers.toggle(item)
                     }
                 }
-                ActionButtons(item, draft, actions, handlers, Modifier.padding(start = NOW_TILE + NOW_TILE_GAP, top = 10.dp))
                 if (expanded && !wide) Expanded(item, draft, actions.more, handlers)
             }
         }
@@ -193,7 +220,7 @@ fun NowRow(
     }
 }
 
-/** Primary (accent outline) + the inline others. */
+/** The primary (accent outline, or filled with [solidPrimary]) + the inline others as quiet buttons. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ActionButtons(
@@ -229,11 +256,14 @@ private fun Expanded(item: NowItem, draft: ItemDraft?, more: List<NowAction>, ha
             .background(MaterialTheme.colorScheme.surfaceContainerLow)
             .padding(horizontal = 12.dp)
             .padding(bottom = 10.dp)
-            .animateContentSize()
     ) {
         item.blocks.filterNot { it.isDecide() }.forEach { EvidenceBlock(it) }
         item.blocks.filter { it.isDecide() }.forEach { b ->
             DecideBlock(b, draft, { k, i -> handlers.choice(item, k, i) }, { k, i -> handlers.check(item, k, i) })
+        }
+        // The chosen option's confirmation, so the primary says what will happen.
+        NowModel.choiceBlocks(item).firstNotNullOfOrNull { b -> b.options.getOrNull(NowModel.chosenIndex(b, draft))?.message }?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
         }
         if (more.isNotEmpty()) {
             MoreActions(item, more, handlers)
