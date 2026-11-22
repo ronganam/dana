@@ -30,7 +30,7 @@
    "source": {
     "repo": "https://github.com/ronganam/dana-addon-israel-rail",
     "path": "israel_rail",
-    "ref": "f8c3ed200acb88c88b97acd3d00cd958ea7882e7"
+    "ref": "cb31cadde4272509fca307ae623cac1787baa21d"
    }
   },
   {
@@ -46,7 +46,7 @@
    "source": {
     "repo": "https://github.com/ronganam/dana-addon-money-il",
     "path": "money_il",
-    "ref": "PENDING"
+    "ref": "3ac563811a1875b04256ae05bc45ac122bf53834"
    }
   }
  ]
