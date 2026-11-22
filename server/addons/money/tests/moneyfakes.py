@@ -20,8 +20,8 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple
 
 from core.addons import Addon, Need
 from core.users import User
-from addons.money import ingest, providers, sources
-from addons.money.providers import Company, LoginField, Redaction, Statements, SyncJob, SyncResult
+from addons.money import ingest, providers, savings, sources
+from addons.money.providers import Company, LoginField, PushWords, Redaction, Statements, SyncJob, SyncResult
 
 PROVIDER = "money_sample"
 BANK, CARD, INVEST, MEAL = "samplebank", "samplecard", "sampleinvest", "samplemeal"
@@ -94,11 +94,43 @@ STATEMENTS = Statements(
                 Redaction(re.compile(r"(?<!\d)\d{9}(?!\d)"), lambda t: "[id]" if id_valid(t) else None)),
     card_issuers=("sample card", "כאל", "cal", "ישראכרט", "isracard", "לאומי קארד", "מקס", "max"),
     payment_apps=("com.example.samplecard",),
+    # Its card app writes pushes in Hebrew.
+    push=PushWords(
+        currencies=(("ש\"ח", "ILS"), ("ש״ח", "ILS"), ("שח", "ILS"), ("NIS", "ILS")),
+        card=(r"המסתיים\s+ב", r"המסתיימת\s+ב", r"שמסתיים\s+ב", r"מסתיים\s+ב", r"בכרטיס(?:\s+(?:מספר|שמספרו))?",
+              r"כרטיס(?:\s+(?:מספר|שמספרו))?"),
+        merchant=(r"(?:בבית\s+העסק|בבית\s+עסק|אצל)\s*[-:]?\s*(?P<m>[^\n,;.]+)", r"(?<!\w)ב-\s*(?P<m>[^\d\s\n,;.][^\n,;.]*)"),
+        merchant_end=("בסך", "בסכום", r"על\s+סך", "סך", "בכרטיס", "בתאריך", "בשעה", "ביום"),
+        refund=("זיכוי", "החזר"),
+        not_payment=(r"חיוב\s+(?:החודשי|הבא|צפוי)", r"החיוב\s+החודשי", r"דף\s+(?:ה)?פירוט", r"יחויב\s+ב")),
     classify_note="Sample note for the classification prompt.")
 
 
 def _changed(user: User) -> None:
     sources.provider_changed(user, PROVIDER)
+
+
+def _bill_script(merchant: str, before: int, after: int, cadence: str, offer: Optional[Dict[str, Any]]) -> str:
+    text = f"שלום, החיוב ב{merchant} עלה מ-{savings.exact(before)} ל-{savings.exact(after)}. אבקש לחזור למחיר הקודם."
+    if offer:
+        text += f" ל-{offer['provider']} יש {offer['plan']} ב-{savings.exact(offer['avg_12'])} לחודש."
+    return text
+
+
+def _fees_script(total: int) -> str:
+    return f"שלום, שילמתי {savings.exact(total)} בעמלות בשנה האחרונה. אבקש לבטל אותן או לעבור למסלול הבסיסי."
+
+
+# Its savings words, local names, pages and phone scripts (in Hebrew, like its statements).
+SAVINGS = providers.SavingsRules(
+    PROVIDER,
+    words={"penalty": ("קנס", "דוח חניה", "ריבית חובה", "ריבית פיגורים", "פיגור", "איחור", "עמלת משיכה"), "money_market_fund": ("כספית",),
+           "insurance": ("ביטוח",), "compulsory_insurance": ("חובה",)},
+    terms={"money_market_fund": "קרן כספית", "deposit": "פיקדון", "basic_track": "מסלול בסיסי",
+           "conversion_fee": "עמלת המרה", "early_repayment": "דוח יתרות לסילוק"},
+    links={"insurance_policies": ("the sample policy register", "https://policies.example.test"),
+           "car_insurance_prices": ("the sample price calculator", "https://car.example.test")},
+    scripts={"bill": _bill_script, "fees": _fees_script}, script_lang="he")
 
 
 def policy_rate(today: datetime.date) -> Optional[Dict[str, Any]]:
@@ -122,5 +154,6 @@ providers.register_company(Company(INVEST, NAMES[INVEST], "investment", (LoginFi
 providers.register_company(Company(MEAL, NAMES[MEAL], "meal", (LoginField("phone", "Mobile number"),), PROVIDER,
                                    _sync, card_line_words=("sample meals",)))
 providers.register_statements(STATEMENTS)
+providers.register_savings_rules(SAVINGS)
 RATES = providers.register_rates(providers.Rates(PROVIDER, policy_rate, fx_rates, frozenset({"USD", "EUR"}),
                                                  bank="Bank of Example"))

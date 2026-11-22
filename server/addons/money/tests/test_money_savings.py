@@ -4,21 +4,21 @@ Run: bin/test test_money_savings   (WRITE_WEB_FIXTURE=1 writes tests/fixtures/mo
 A synthetic 13 months, every name and amount made up, with today fixed at Wed
 18 Nov 2026 09:30 (Asia/Jerusalem). Robin (the first admin) has a bank account,
 a card and an investment account: a phone bill ₪69 → ₪109, a bimonthly
-חברת החשמל series, ₪25,000 idle cash and a "כספית" fund, AI subscriptions in
+utility, ₪25,000 idle cash and a "כספית" fund, AI subscriptions in
 dollars and a trip in euros (made-up central bank rates give a known
 markup), a monthly municipality, monthly and yearly insurance, other
 subscriptions, a mortgage, bank fees, eating out creeping up, a 6-orders-in-4-
 days spree, a small cloud bill rising, late-night purchases, a parking fine
 and a late fee. Bob has money and one card (a phone bill ₪50 → ₪80); Carl has
-no money. The rates and price checks come from the made-up provider
-(moneyfakes.py) with fakes: nothing touches the network.
+no money. The rates, price checks and savings rules (its words, local names,
+pages and phone scripts) come from the made-up provider (moneyfakes.py) with
+fakes: nothing touches the network.
 
 Covers: each detector's item and numbers; ranking; the lifecycle (each status,
 Undo, an item kept after its detector stops firing, "open" giving it back to
 Dana, snoozes ending); outcomes (confirmed / waiting / no_change, a cancelled
 subscription's missing charges, only a bill's own charges, a big drop
-confirmed by a second charge, a supplier's bill for electricity, money set
-aside for the cushion); targets (set / edit / remove, progress, saved, a
+confirmed by a second charge, money set aside for the cushion); targets (set / edit / remove, progress, saved, a
 past month judged by the target of its time); the check endpoint (the provider's
 start, needs_answer, 409 / 429 / 503, 400 without a
 check or for refused params, the telecom params, offers costed for the
@@ -27,7 +27,8 @@ from subscriptions only; every supported currency fetched or none; the
 saving context chat; isolation (two users with money, 404 for the
 other's keys and undo, 403 not_connected); the tools; Now cards and acting
 on them; the weekly review line; the Overview insight card; no rates leaving
-their items out; delete_all.
+their items out; a provider's detector and outcome; the generic words without a
+provider; delete_all.
 """
 
 import asyncio
@@ -180,8 +181,7 @@ def set_check(user, topic: str, params: Dict[str, Any], items: List[Dict[str, An
 
 
 # The made-up provider's price checks (the fakes); the same addon re-registers to swap them.
-IL_CHECKS = providers.PriceChecks(moneyfakes.PROVIDER, ("telecom", "electricity", "fx_card", "arnona"), fake_latest,
-                                  fake_start)
+IL_CHECKS = providers.PriceChecks(moneyfakes.PROVIDER, ("telecom", "fx_card"), fake_latest, fake_start)
 
 
 @contextmanager
@@ -206,14 +206,6 @@ TELECOM = [
      "avg_12": 4_500, "conditions": "", "source": SOURCE},
     {"provider": "קו הים", "plan": "מיני", "price": 6_000, "promo_price": None, "promo_months": None,
      "avg_12": 6_000, "conditions": "", "source": SOURCE},
-]
-ELECTRICITY = [
-    {"supplier": "חשמל הצפון", "plan": "כל היום", "discount_pct": 7.0, "hours": "24 שעות", "days": "כל השבוע",
-     "smart_meter": False, "source": SOURCE},
-    {"supplier": "אנרגיית הדרום", "plan": "לילה", "discount_pct": 20.0, "hours": "23:00–07:00", "days": "כל השבוע",
-     "smart_meter": True, "source": SOURCE},
-    {"supplier": "חשמל הגבעה", "plan": "יום", "discount_pct": 15.0, "hours": "07:00–17:00", "days": "א׳–ה׳",
-     "smart_meter": True, "source": SOURCE},
 ]
 FX_CARDS = [
     {"name": "כרטיס הצפון", "kind": "card", "fx_fee_pct": 0.0, "monthly_fee": 0, "conditions": "", "source": SOURCE},
@@ -394,7 +386,6 @@ def set_row(user, key: str, **values: Any) -> None:
 
 PHONE = "bill:סלולר הצפון"
 BOB_PHONE = "bill:סלולר הדרום"
-ARNONA = "arnona:עיריית גבעת אורנים:2027"
 RENEW_HOME = "renewal:ביטוח הדרום דירה:2026-11"
 RENEW_CAR = "renewal:ביטוח הדרום חובה:2026-12"
 SPREE_KEY = "spree:חנות הצפון אונליין:2026-09-14"
@@ -416,8 +407,7 @@ def test_no_rates() -> None:
     FETCH_FAILS["on"] = True
     found = items_of(savings.overview(ROBIN, D(2026, 11, 17)))
     check("reference: without the rate the items that need it are left out (cash, cushion), nothing guessed",
-          not any(k.startswith("cash:") or k == "cushion" for k in found) and "fees" in found
-          and found[ARNONA]["saving"] is None, sorted(found))
+          not any(k.startswith("cash:") or k == "cushion" for k in found) and "fees" in found, sorted(found))
     FETCH_FAILS["on"] = False
     with store.db() as conn:  # that read stored first sightings dated today: start clean
         conn.execute("DELETE FROM money_savings")
@@ -430,7 +420,7 @@ def test_detectors(data: Dict[str, Any]) -> None:
     check("overview: as of today, the policy rate now and a year ago, the bank's name",
           data["as_of"] == "2026-11-18" and data["rate"] == {"policy": 4.25, "date": "2026-11-18", "year_ago": 4.5,
                                                             "year_ago_date": "2025-11-18", "bank": "Bank of Example"}, data["rate"])
-    expected_save = {PHONE, "electricity", f"cash:{INV}", "cushion", f"fx:{CARD}", "fees", ARNONA, RENEW_HOME, RENEW_CAR,
+    expected_save = {PHONE, f"cash:{INV}", "cushion", f"fx:{CARD}", "fees", RENEW_HOME, RENEW_CAR,
                      "insurance_review", "subscriptions", "mortgage"}
     expected_watch = {"creep:eating_out", SPREE_KEY, "leak:ענן הצפון", "overlap:ai", "penalties", "late_night"}
     check("detectors: every way to save and every habit fires, nothing else",
@@ -455,10 +445,6 @@ def test_detectors(data: Dict[str, Any]) -> None:
           [q["id"] for q in p["questions"]] == ["service"] and p["questions"][0]["answer"] is None
           and p["market"]["topic"] == "telecom" and p["market"]["state"] == "none"
           and p["market"]["needs_answer"] == "service", p["market"])
-    e = items["electricity"]
-    check("electricity: the typical bill ₪575 × 6 bills a year = ₪3,450 at stake, no saving before a price check",
-          e["at_stake"] == 345_000 and e["saving"] is None and e["market"]["topic"] == "electricity"
-          and e["market"]["params"] == {} and len(e["evidence"]["series"]) == 6, (e["at_stake"], e["saving"]))
     c = items[f"cash:{INV}"]
     check("cash: ₪25,000 × (4.25% − 0.3%) = ₪987.50 a year, measured; names the כספית fund already held",
           c["saving"] == {"low": 98_750, "high": 98_750, "basis": "measured"}
@@ -469,7 +455,7 @@ def test_detectors(data: Dict[str, Any]) -> None:
     cu = items["cushion"]
     lo, hi = sorted((floor - fixed, floor - 300_000))
     check("cushion: the 90-day floor minus a month of fixed costs / ₪3,000, × 3.95%",
-          cu["saving"] == {"low": savings._r(max(0, lo) * 3.95 / 100), "high": savings._r(hi * 3.95 / 100),
+          cu["saving"] == {"low": savings.round_half(max(0, lo) * 3.95 / 100), "high": savings.round_half(hi * 3.95 / 100),
                            "basis": "measured"} and len(cu["evidence"]["series"]) == 91, (floor, fixed, cu["saving"]))
     f = items[f"fx:{CARD}"]
     base = sum(cents * (4.0 if cur == "EUR" else (3.70 if d < D(2026, 7, 1) else 3.60)) for d, _, cents, cur in FX)
@@ -480,21 +466,19 @@ def test_detectors(data: Dict[str, Any]) -> None:
                                          "3.02% over the Bank of Example rate in total, median 3.06% a purchase"],
           (f["saving"], f["evidence"]["lines"]))
     fe = items["fees"]
-    check("fees: 12 account fees, ₪130.80 (the late fee is a penalty, not here), with a Hebrew script",
+    check("fees: 12 account fees, ₪130.80 (the late fee is a penalty, not here), with the provider's Hebrew script",
           fe["saving"] == {"low": 13_080, "high": 13_080, "basis": "measured"} and "מסלול" in fe["script"]["text"], fe["saving"])
-    a = items[ARNONA]
-    check("arnona: monthly municipality in the Nov–Feb window → the 2027 check for גבעת אורנים, ₪7,200 at stake",
-          a["market"]["params"] == {"city": "גבעת אורנים", "year": 2027} and a["at_stake"] == 720_000
-          and a["saving"] is None and a["timing"]["from"] == "2026-11-01", a["market"]["params"])
     r1, r2 = items[RENEW_HOME], items[RENEW_CAR]
     check("renewal: due from 60 days before (home in 10 days, car in 40), last year's amount at stake",
           r1["timing"] == {"from": "2026-09-29", "until": "2026-11-28", "label": "Renews around 28 Nov 2026"}
           and r1["at_stake"] == 120_000 and r2["timing"]["until"] == "2026-12-28" and r2["at_stake"] == 240_000, r1["timing"])
-    check("renewal: compulsory car insurance links the regulator's calculator; the home policy doesn't",
-          any(s["url"] == "https://car.cma.gov.il" for s in r2["steps"]) and not any(s["url"] for s in r1["steps"]))
+    check("renewal: compulsory car insurance (the provider's word) links the provider's price calculator; the home policy doesn't",
+          any(s["url"] == "https://car.example.test" and s["text"].endswith("on the sample price calculator")
+              for s in r2["steps"]) and not any(s["url"] for s in r1["steps"]))
     ins = items["insurance_review"]
-    check("insurance review: ₪180 × 12 + ₪2,400 + ₪1,200 = ₪5,760 a year, with הר הביטוח",
-          ins["at_stake"] == 576_000 and ins["saving"] is None and ins["steps"][0]["url"] == "https://harb.cma.gov.il", ins["at_stake"])
+    check("insurance review: ₪180 × 12 + ₪2,400 + ₪1,200 = ₪5,760 a year, with the provider's policy register",
+          ins["at_stake"] == 576_000 and ins["saving"] is None and ins["steps"][0]["url"] == "https://policies.example.test"
+          and ins["summary"].startswith("3 policies. the sample policy register lists every policy"), (ins["at_stake"], ins["summary"]))
     s = items["subscriptions"]
     lines = {x["key"]: (x["amount"], x["cadence"], x["yearly"], x["choice"]) for x in s["subitems"]}
     check("subscriptions: 5 lines (monthly at the typical price, the yearly one), ₪3,219.60 a year",
@@ -528,8 +512,8 @@ def test_detectors(data: Dict[str, Any]) -> None:
     check("late night: 8 purchases after 23:00 in 90 days, ₪1,200 → ₪4,866.67 a year",
           ln["at_stake"] == 486_667 and ln["scope"]["hours"] == [23, 5], ln["at_stake"])
     order = [i["key"] for i in data["items"]]
-    check("ranking: due items first (arnona, the renewals), then savings by money per minute of effort",
-          order[:3] == [ARNONA, RENEW_CAR, RENEW_HOME] and order.index(f"cash:{INV}") < order.index(PHONE)
+    check("ranking: due items first (the renewals), then savings by money per minute of effort",
+          order[:2] == [RENEW_CAR, RENEW_HOME] and order.index(f"cash:{INV}") < order.index(PHONE)
           < order.index("fees") < order.index(f"fx:{CARD}") < order.index("insurance_review"), order[:8])
     t = data["totals"]
     open_save = [i for i in data["items"] if i["group"] == "save" and i["saving"]]
@@ -578,54 +562,40 @@ async def test_checks(client: TestClient) -> None:
           "תקשורת הדרום" in item["script"]["text"] and "₪35" in item["script"]["text"]
           and "תקשורת הדרום" in item["steps"][1]["text"] and item["steps"][1]["url"] == SOURCE["url"], item["steps"][1])
     CAPTURED["item_check"] = item
-    set_check(ROBIN, "electricity", {}, ELECTRICITY)
     set_check(ROBIN, "fx_card", {}, FX_CARDS)
-    set_check(ROBIN, "arnona", {"city": "גבעת אורנים", "year": 2027},
-              [{"found": True, "discount_pct": 2.0, "deadline": "2027-01-31", "method": "באתר העירייה", "source": SOURCE}])
     found = items_of(savings.overview(ROBIN))
-    check("electricity: ₪3,450 × 95% × 7% (all day, no smart meter) = ₪229.43 to × 20% (the best) = ₪655.50",
-          found["electricity"]["saving"] == {"low": 22_943, "high": 65_550, "basis": "market"}, found["electricity"]["saving"])
     check("fx: nets out each card's fee: the best saves all ₪153.50, the median ₪128.05",
           found[f"fx:{CARD}"]["saving"] == {"low": 12_805, "high": 15_350, "basis": "market"}, found[f"fx:{CARD}"]["saving"])
-    a = found[ARNONA]
-    check("arnona: 2% of ₪7,200 = ₪144 minus 5.5 months of 3.95% on it (₪130.35) = ₪13.65; the deadline",
-          a["saving"] == {"low": 1_365, "high": 1_365, "basis": "market"} and a["timing"]["until"] == "2027-01-31", a["saving"])
-    set_check(ROBIN, "arnona", {"city": "גבעת אורנים", "year": 2027},
-              [{"found": True, "discount_pct": 1.5, "deadline": "2027-01-31", "method": "", "source": SOURCE}])
-    a = items_of(savings.overview(ROBIN))[ARNONA]
-    check("arnona: a discount smaller than the interest → no saving, the card says it isn't worth it",
-          a["saving"] is None and "isn't worth it" in a["summary"], a["summary"])
-    set_check(ROBIN, "arnona", {"city": "גבעת אורנים", "year": 2027},
-              [{"found": True, "discount_pct": 2.0, "deadline": "2027-01-31", "method": "באתר העירייה", "source": SOURCE}])
+
 
 
 async def test_check_route(client: TestClient) -> None:
     """The route over the provider's ``start``."""
     STARTS.clear()
-    s, body = await call(client, "POST", url("electricity", "/check"), ROBIN)
+    s, body = await call(client, "POST", url(f"fx:{CARD}", "/check"), ROBIN)
     START_MODE["raise"] = providers.PriceCheckTooSoon(120)
-    s2, again = await call(client, "POST", url("electricity", "/check"), ROBIN)
+    s2, again = await call(client, "POST", url(f"fx:{CARD}", "/check"), ROBIN)
     START_MODE["raise"] = None
     check("check route: the provider's check starts → 202, for the user, the topic and its params",
-          s == 202 and body == {"state": "checking"} and STARTS == [(ROBIN.id, "electricity", {})], (s, body, STARTS))
+          s == 202 and body == {"state": "checking"} and STARTS == [(ROBIN.id, "fx_card", {})], (s, body, STARTS))
     check("check route: pressed again too soon → 429 with retry_after", s2 == 429 and again.get("retry_after") == 120, again)
     START_MODE["raise"] = ValueError("bad params (test)")
-    s, body = await call(client, "POST", url("electricity", "/check"), ROBIN)
+    s, body = await call(client, "POST", url(f"fx:{CARD}", "/check"), ROBIN)
     START_MODE["raise"] = None
     check("check route: params the price checks refuse → 400 invalid", s == 400 and body["error"] == "invalid", body)
 
-    def refuse_arnona(user, topic: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-        if topic == "arnona":
-            raise ValueError("a town the checks don't take (test)")
+    def refuse_fx(user, topic: str, params: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        if topic == "fx_card":
+            raise ValueError("params the checks don't take (test)")
         return fake_latest(user, topic, params)
 
-    with price_checks(refuse_arnona, fake_start):
+    with price_checks(refuse_fx, fake_start):
         s, data = await call(client, "GET", "/api/money/savings", ROBIN)
-        s2, body = await call(client, "POST", url(ARNONA, "/check"), ROBIN)
+        s2, body = await call(client, "POST", url(f"fx:{CARD}", "/check"), ROBIN)
     found = items_of(data) if s == 200 else {}
     check("check: params the checks refuse leave that item without a check; the rest of the page stands",
-          s == 200 and found[ARNONA]["market"]["params"] is None and found[ARNONA]["market"]["state"] == "none"
-          and {PHONE, "electricity", f"fx:{CARD}", "fees", "subscriptions"} <= set(found)
+          s == 200 and found[f"fx:{CARD}"]["market"]["params"] is None and found[f"fx:{CARD}"]["market"]["state"] == "none"
+          and {PHONE, f"fx:{CARD}", "fees", "subscriptions"} <= set(found)
           and (s2, body.get("error")) == (400, "no_check"), (s, s2, body))
 
 
@@ -652,7 +622,7 @@ def test_fixes() -> None:
     fee = like("ריבית פיגורים", **named("עמלת משיכה כספומט"), amount=-600, purchase_date="2026-10-02")
     pen = savings._penalties(with_rows(atm))
     check("penalties: ₪500 taken out at an ATM is not a penalty (even with 'עמלת משיכה' in its text); the ₪6 fee is",
-          not savings._is_penalty(atm) and savings._is_penalty(fee) and pen and pen[0]["at_stake"] == 11_240
+          not savings._is_penalty(ctx, atm) and savings._is_penalty(ctx, fee) and pen and pen[0]["at_stake"] == 11_240
           and savings._penalties(with_rows(atm, fee))[0]["at_stake"] == 11_840
           and not savings.in_scope(with_rows(atm), atm, pen[0]["scope"]), pen and pen[0]["at_stake"])
 
@@ -695,16 +665,6 @@ def test_fixes() -> None:
                               bill, since)
     check("bill outcome: two lower charges → confirmed, ₪59 × 2 saved, ₪708 a year",
           o == {"state": "confirmed", "saved": 11_800, "saved_yearly": 70_800, "detail": "Now ₪50.00 a month, was ₪109.00"}, o)
-
-    # Electricity outcome: a new utility that isn't a supplier is not a switch.
-    elec = {"saving_low": 22_943}
-    water = like("חברת החשמל לישראל", **named("תאגיד המים הגבעה"), amount=-15_000, purchase_date="2026-11-17")
-    supplier = like("חברת החשמל לישראל", **named("סלקום אנרגיה"), amount=-40_000, purchase_date="2026-11-17")
-    o1 = savings._electricity_outcome(with_rows(water), elec, since)
-    o2 = savings._electricity_outcome(with_rows(supplier), elec, since)
-    check("electricity outcome: a new water bill → still waiting; a private supplier's bill after the last IEC one → switched",
-          o1["state"] == "waiting" and o2 == {"state": "confirmed", "saved": 63, "saved_yearly": 22_943,
-                                              "detail": "Switched to סלקום אנרגיה"}, (o1, o2))
 
     # Cushion outcome: money set aside counts, a lower balance alone doesn't.
     cushion = {"idle_low": 500_000, "idle_high": 1_000_000, "yield": 3.95}
@@ -759,6 +719,48 @@ def test_fixes() -> None:
     check("fx rates: spent abroad → every supported currency fetched (not only the ones used); never abroad → none",
           robin_seen == sorted(FX_CURRENCIES) and set(robin_fx) == set(FX_CURRENCIES)
           and seen == [] and bob_fx == {}, (robin_seen, seen))
+
+
+def test_rules() -> None:
+    """A provider's savings rules: its own detector and outcome, a bill it handles; without one, plain English."""
+    ctx = savings.context(ROBIN)
+    pk = ingest.merchant_key("סלולר הצפון")
+
+    def utility(c: savings.Context) -> List[Dict[str, Any]]:
+        return [savings.make_item("sample:utility", "sample_utility", savings.SAVE, "A local way to save", "Made up.",
+                                  saving=savings.saving_range(1_000, 2_000, "market"), at_stake=5_000,
+                                  baseline={"yearly": 5_000})]
+
+    def utility_outcome(c: savings.Context, baseline: Dict[str, Any], since: D) -> Dict[str, Any]:
+        return savings.make_outcome("confirmed", 100, baseline["yearly"], "Measured by the provider")
+
+    rules = providers.SavingsRules("money_sample", detectors=(utility,), outcomes={"sample_utility": utility_outcome},
+                                   own_bills=lambda c: c["merchant_key"] == pk)
+    found = {i["key"]: i for i in savings.detect(dataclasses.replace(ctx, rules=[rules]))}
+    check("rules: a provider's detector adds its item; a bill it handles is left to it",
+          "sample:utility" in found and found["sample:utility"]["saving"] == {"low": 1_000, "high": 2_000, "basis": "market"}
+          and PHONE not in found and "fees" in found, sorted(found))
+    o = savings.outcome(dataclasses.replace(ctx, rules=[rules]), found["sample:utility"],
+                        {"status": "done", "done_at": "2026-11-01T00:00:00+00:00", "baseline": json.dumps({"yearly": 5_000})})
+    check("rules: its outcome measures its items", o == {"state": "confirmed", "saved": 100, "saved_yearly": 5_000,
+                                                          "detail": "Measured by the provider"}, o)
+    plain = {i["key"]: i for i in savings.detect(dataclasses.replace(ctx, rules=[]))}
+    fe, ins, car = plain["fees"], plain["insurance_review"], plain[RENEW_CAR]
+    check("no rules: English only — no script, no local names, generic steps, no calculator",
+          fe["script"] is None and plain[PHONE]["script"] is None
+          and fe["summary"].endswith("or move to the bank's basic track.")
+          and ins["steps"][0] == {"text": "List every policy you pay for, from your insurers' and your employer's papers", "url": None}
+          and not any(st["url"] for st in car["steps"])
+          and plain[f"cash:{INV}"]["steps"][0]["text"] == "Buy a money market fund with the cash in " + plain[f"cash:{INV}"]["title"].split(" in ", 1)[1],
+          (fe["summary"], ins["steps"][0], plain[f"cash:{INV}"]["steps"][0]))
+    check("no rules: the provider's penalty words don't count (the parking fine in Hebrew), English ones do",
+          plain["penalties"]["at_stake"] < items_of(savings.overview(ROBIN))["penalties"]["at_stake"]
+          if "penalties" in plain else True, plain.get("penalties", {}).get("at_stake"))
+    late = {"description": "LATE FEE", "merchant": "LATE FEE", "merchant_key": "late fee", "memo": "", "flow": "fee",
+            "eff_flow": "fee", "amount": -1_000}
+    check("penalty words: English whole words without a provider", savings._is_penalty(dataclasses.replace(ctx, rules=[]), late)
+          and not savings._is_penalty(dataclasses.replace(ctx, rules=[]), {**late, "description": "FINE DINING",
+                                                                           "merchant": "FINEDINING", "merchant_key": "finedining"}))
 
 
 def test_chat() -> None:
@@ -828,8 +830,8 @@ async def test_lifecycle(client: TestClient) -> None:
           b and b["outcome"] == {"state": "confirmed", "saved": 6_000, "saved_yearly": 36_000,
                                  "detail": "Now ₪50.00 a month, was ₪80.00"}
           and bob["totals"]["saved"] == 6_000 and bob["totals"]["saved_yearly"] == 36_000, b and b["outcome"])
-    s, body = await call(client, "PATCH", url("electricity"), ROBIN, {"status": "done"})
-    check("outcome: electricity done today → waiting for the next bill",
+    s, body = await call(client, "PATCH", url(f"fx:{CARD}"), ROBIN, {"status": "done"})
+    check("outcome: foreign-currency fees done today → waiting for purchases to judge by",
           body["item"]["outcome"]["state"] == "waiting", body["item"]["outcome"])
     # Statuses, validation.
     bad = [(await call(client, "PATCH", url(k), ROBIN, b))[0] for k, b in (
@@ -1042,7 +1044,7 @@ async def test_tools_and_cards() -> None:
     check("tool: the habits, this month's targets, what was acted on, and the user's choices",
           "- [overlap:ai] 2 AI assistants at once" in text
           and "- [creep:eating_out] Eating out: ₪300.00 of ₪700.00 (on track, 12 days left); saved ₪200.00 so far" in text
-          and "- [electricity] Switch electricity supplier (done): waiting to see" in text
+          and f"- [fx:{CARD}] ₪154 a year in foreign-currency fees (done): waiting to see" in text
           and "— not for them" in text.split("The user's choices:")[-1] and "snoozed until 18 Dec" in text
           and "— worth it" in text, text)
     with undo.collect() as ids, users.acting_as(ROBIN):
@@ -1102,7 +1104,7 @@ async def fixture(client: TestClient) -> None:
     inactive = {i["status"] for i in data["items"] if not i["active"]}
     check("fixture: every type, every status, inactive dismissed / accepted / snoozed ones, a watched target, "
           "a market check that is ok",
-          types == {"bill", "electricity", "cash", "cushion", "fx", "fees", "arnona", "renewal", "insurance_review",
+          types == {"bill", "cash", "cushion", "fx", "fees", "renewal", "insurance_review",
                     "subscriptions", "mortgage", "creep", "spree", "leak", "overlap", "penalties", "late_night"}
           and statuses == set(savings.STATUSES) and {"dismissed", "accepted", "snoozed"} <= inactive
           and any(i["target"] for i in data["items"]) and item["market"]["state"] == "ok", (types, statuses, inactive))
@@ -1128,6 +1130,7 @@ async def main() -> None:
     async with TestClient(TestServer(app)) as client:
         await test_api(client)
         test_fixes()
+        test_rules()
         test_chat()
         await test_check_route(client)
         await test_checks(client)

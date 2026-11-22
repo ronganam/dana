@@ -41,7 +41,10 @@ class MoneySaveTest {
     private val zone = ZoneId.of("Asia/Jerusalem")
     private fun svi(k: String) = sv.items.first { it.key == k }
     private val bill = "bill:סלולר הצפון"
-    private val arnona = "arnona:עיריית גבעת אורנים:2027"
+    private val renew = "renewal:ביטוח הדרום חובה:2026-12"
+    // A provider add-on's price checks (the Israeli one's electricity and arnona topics), as such an add-on returns them.
+    private val electricityMarket = SavingItem.parse(jsonObjectOf("""{"key": "electricity", "type": "electricity", "group": "save", "status": "open", "title": "electricity", "market": {"checked_at": "2026-11-18T07:01:00+00:00", "error": null, "items": [{"days": "כל השבוע", "discount_pct": 7.0, "hours": "24 שעות", "plan": "כל היום", "smart_meter": false, "source": {"title": "דוגמה", "url": "https://example.com/offer"}, "supplier": "חשמל הצפון"}, {"days": "כל השבוע", "discount_pct": 20.0, "hours": "23:00–07:00", "plan": "לילה", "smart_meter": true, "source": {"title": "דוגמה", "url": "https://example.com/offer"}, "supplier": "אנרגיית הדרום"}, {"days": "א׳–ה׳", "discount_pct": 15.0, "hours": "07:00–17:00", "plan": "יום", "smart_meter": true, "source": {"title": "דוגמה", "url": "https://example.com/offer"}, "supplier": "חשמל הגבעה"}], "needs_answer": null, "params": {}, "sources": [{"title": "השוואת מחירים לדוגמה", "url": "https://example.com/prices"}], "stale": false, "state": "ok", "topic": "electricity"}}""")).market!!
+    private val arnonaMarket = SavingItem.parse(jsonObjectOf("""{"key": "arnona", "type": "arnona", "group": "save", "status": "open", "title": "arnona", "market": {"checked_at": "2026-11-18T07:01:00+00:00", "error": null, "items": [{"deadline": "2027-01-31", "discount_pct": 2.0, "found": true, "method": "באתר העירייה", "source": {"title": "דוגמה", "url": "https://example.com/offer"}}], "needs_answer": null, "params": {"city": "גבעת אורנים", "year": 2027}, "sources": [{"title": "השוואת מחירים לדוגמה", "url": "https://example.com/prices"}], "stale": false, "state": "ok", "topic": "arnona"}}""")).market!!
     private val cash get() = sv.items.first { it.type == "cash" }.key
     private val fx get() = sv.items.first { it.type == "fx" }.key
     private val spree = "spree:חנות הצפון אונליין:2026-09-14"
@@ -54,14 +57,14 @@ class MoneySaveTest {
         assertEquals(listOf("save" to "Ways to save", "watch" to "Spending to watch"), parts.map { it.group to it.label })
         fun secs(g: String) = parts.first { it.group == g }.sections.associate { s -> s.key to s.items.map { it.key } }
         assertEquals(listOf("now", "doing", "done", "choices"), secs("save").keys.toList())
-        assertEquals(listOf(arnona, "renewal:ביטוח הדרום חובה:2026-12", "renewal:ביטוח הדרום דירה:2026-11", "cushion", fx, "mortgage", "insurance_review", "subscriptions"), secs("save")["now"])
+        assertEquals(listOf(renew, "renewal:ביטוח הדרום דירה:2026-11", "cushion", "mortgage", "insurance_review", "subscriptions"), secs("save")["now"])
         assertEquals(listOf(bill), secs("save")["doing"])
-        assertEquals(listOf("electricity"), secs("save")["done"])
+        assertEquals(listOf(fx), secs("save")["done"])
         assertEquals(listOf(cash, "fees"), secs("save")["choices"])
         assertEquals(mapOf("now" to listOf("overlap:ai", "leak:ענן הצפון", "penalties"), "watching" to listOf("creep:eating_out"), "choices" to listOf("late_night", spree)), secs("watch"))
         // The owner's rule: dismissed, accepted and snoozed always stay listed (as choices).
         sv.items.filter { it.status in setOf("dismissed", "accepted", "snoozed") }.forEach { assertEquals("choices", MoneySave.section(it, dayIso)) }
-        val later = svi(arnona).let { it.copy(timing = it.timing!!.copy(from = "2026-12-01")) }
+        val later = svi(renew).let { it.copy(timing = it.timing!!.copy(from = "2026-12-01")) }
         assertEquals("coming", MoneySave.section(later, dayIso))
         assertEquals("choices", MoneySave.section(svi("fees").copy(status = "paused"), dayIso))
     }
@@ -69,17 +72,17 @@ class MoneySaveTest {
     @Test
     fun tilesAndChips() {
         val t = MoneySave.tiles(sv, day)
-        assertEquals("₪2,281–₪2,548", t.could)
-        assertEquals("a year · 4 ideas", t.couldSub)
+        assertEquals("₪2,139–₪2,381", t.could)
+        assertEquals("a year · 2 ideas", t.couldSub)
         assertEquals("≈ ₪359 a year", t.savedSub)
         assertEquals("Bank of Example rate 4.25% (18 Nov) · amounts from your charges", t.source)
-        assertEquals("+₪14/yr" to "save", MoneySave.savingChip(svi(arnona))!!.let { it.text to it.kind })
+        assertEquals("+₪14/yr" to "save", MoneySave.savingChip(svi("cushion").copy(saving = svi("cushion").saving!!.copy(low = 1365, high = 1365)))!!.let { it.text to it.kind })
         assertEquals("+₪768–₪888/yr", MoneySave.savingChip(svi(bill))!!.text)
         assertEquals("₪60,000/yr at stake" to "stake", MoneySave.savingChip(svi("mortgage"))!!.let { it.text to it.kind })
         assertEquals("₪615 spent", MoneySave.savingChip(svi(spree))!!.text)
         assertEquals("20-min call", MoneySave.effortText(svi(bill).effort))
         assertEquals("10 min in the app", MoneySave.effortText(svi("cushion").effort))
-        assertEquals("15 min online", MoneySave.effortText(svi(arnona).effort))
+        assertEquals("20 min online", MoneySave.effortText(svi(fx).effort))
         assertEquals("1 h comparing", MoneySave.effortText(svi("mortgage").effort))
         assertEquals("10 min to review", MoneySave.effortText(svi("subscriptions").effort))
         assertEquals("1.5 h call", MoneySave.effortText(Effort(90, "call")))
@@ -96,18 +99,18 @@ class MoneySaveTest {
         assertEquals("Worth it to you · 18 Nov", MoneySave.statusLine(svi("late_night"), day, zone))
         assertEquals("Watching since 10 Sep", MoneySave.statusLine(svi("creep:eating_out"), day, zone))
         assertEquals("On it since 18 Nov", MoneySave.statusLine(svi(bill), day, zone))
-        assertEquals("Done 18 Nov", MoneySave.statusLine(svi("electricity"), day, zone))
-        assertEquals("", MoneySave.statusLine(svi(arnona), day, zone))
+        assertEquals("Done 18 Nov", MoneySave.statusLine(svi(fx), day, zone))
+        assertEquals("", MoneySave.statusLine(svi("cushion"), day, zone))
         // A body as sorted "k":v pairs, so key order does not matter.
         fun norm(o: JsonObject?) = o?.let { b -> "{" + b.keys.sorted().joinToString(",") { k -> "\"$k\":${b[k]}" } + "}" }
         fun acts(i: SavingItem) = MoneySave.actions(i).map { Triple(it.label, norm(it.body), it.input) }
         assertEquals(listOf(
             Triple("I'm on it", """{"status":"doing"}""", false), Triple("I did it", """{"status":"done"}""", false),
             Triple("Snooze a month", """{"snooze_days":30,"status":"snoozed"}""", false), Triple("Not for me", """{"status":"dismissed"}""", false)
-        ), acts(svi(arnona)))
+        ), acts(svi("cushion")))
         assertEquals(listOf(Triple("Cut back", null, true), Triple("Worth it", """{"status":"accepted"}""", false)), acts(svi("overlap:ai")))
         assertEquals(listOf(Triple("I did it", """{"status":"done"}""", false), Triple("Not doing it", """{"status":"open"}""", false)), acts(svi(bill)))
-        assertEquals(listOf(Triple("Not done", """{"status":"open"}""", false)), acts(svi("electricity")))
+        assertEquals(listOf(Triple("Not done", """{"status":"open"}""", false)), acts(svi(fx)))
         assertEquals(listOf(Triple("Flag again", """{"status":"open"}""", false)), acts(svi("fees")))
         assertEquals(listOf(Triple("Unsnooze", """{"status":"open"}""", false)), acts(svi(cash)))
         assertEquals(listOf(Triple("Edit target", null, true), Triple("Stop tracking", """{"target":null}""", false)), acts(svi("creep:eating_out")))
@@ -169,11 +172,11 @@ class MoneySaveTest {
         assertEquals(listOf(
             listOf("כרטיס הצפון", "Card", "0%", "None"), listOf("ארנק הדרום", "Wallet", "0.5%", "None"), listOf("בנק הגבעה", "Bank account", "1%", "₪9.90 a month")
         ), fxo.rows.map { r -> listOf(r.name) + r.cells.map { it.text } })
-        val elo = MoneySave.offerRows(svi("electricity").market, day)!!
+        val elo = MoneySave.offerRows(electricityMarket, day)!!
         assertEquals(listOf("Supplier", "Plan", "Discount", "Hours", "Meter", "Source"), elo.columns)
         assertEquals(listOf("7% off", "24 שעות · כל השבוע", "Any meter"), elo.rows[0].cells.map { it.text })
         assertEquals(listOf("20% off", "23:00–07:00 · כל השבוע", "Smart meter needed"), elo.rows[1].cells.map { it.text })
-        val aro = MoneySave.offerRows(svi(arnona).market, day)!!
+        val aro = MoneySave.offerRows(arnonaMarket, day)!!
         assertEquals(listOf("Result", "Discount", "Deadline", "How", "Source"), aro.columns)
         assertEquals("A discount for paying the year at once", aro.rows.single().name)
         assertEquals(listOf("2% off", "31 Jan 2027", "באתר העירייה"), aro.rows.single().cells.map { it.text })
@@ -197,7 +200,7 @@ class MoneySaveTest {
         mv(okm.copy(state = "failed", error = "the model did not search")).let { assertEquals("Check again", it.button); assertTrue(it.text.contains("the model did not search")) }
         assertEquals("Try again", mv(okm.copy(state = "failed", items = emptyList())).button)
         mv(okm.copy(state = "unavailable", items = emptyList())).let { assertNull(it.button); assertTrue(it.text.contains("aren't available")) }
-        assertTrue(mv(svi(arnona).market!!).checked.contains("municipality"))
+        assertTrue(mv(arnonaMarket).checked.contains("municipality"))
         assertNull(MoneySave.marketView(null, day))
         assertEquals("checking", MoneySave.checkReply(202, buildJsonObject { put("state", "checking") }).kind)
         assertEquals("checking", MoneySave.checkReply(409, buildJsonObject { put("error", "running") }).kind)

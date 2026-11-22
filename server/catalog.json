@@ -26,6 +26,7 @@
    "homepage": "https://github.com/ronganam/dana-addon-israel-rail",
    "tags": ["transport", "israel"],
    "min_dana": "10.0.0",
+   "touches": {"hosts": ["rail-api.rail.co.il"], "acts_outside": false, "stores_credentials": false, "reads": []},
    "source": {
     "repo": "https://github.com/ronganam/dana-addon-israel-rail",
     "path": "israel_rail",
@@ -41,6 +42,7 @@
    "homepage": "https://github.com/ronganam/dana-addon-money-il",
    "tags": ["money", "israel"],
    "min_dana": "10.0.0",
+   "touches": {"hosts": ["bankhapoalim.co.il", "cal-online.co.il", "trade.psagot.co.il", "trade1.psagot.co.il", "consumers.pluxee.co.il", "api.consumers.pluxee.co.il", "edge.boi.gov.il", "vertexaisearch.cloud.google.com", "the pages a price check you ask for found"], "acts_outside": false, "stores_credentials": true, "reads": ["money"]},
    "source": {
     "repo": "https://github.com/ronganam/dana-addon-money-il",
     "path": "money_il",

@@ -888,7 +888,7 @@
         <button role="radio" aria-checked="${!s.forMerchant}" class="${s.forMerchant ? "" : "on"}" data-pscope="one">Only this one</button></div>
         <div class="mny-hint">${s.forMerchant ? "Its other charges change too (unless you set them by hand), and new ones get it as they arrive." : "Only this transaction changes."}</div>` : "";
     return `${head}${scope}
-      <div class="mny-search in-sheet">${icon("search")}<input type="search" data-keep="picker-q" data-picker-q value="${esc(s.q || "")}" placeholder="Search — English or עברית" autocomplete="off" dir="auto" data-autofocus></div>
+      <div class="mny-search in-sheet">${icon("search")}<input type="search" data-keep="picker-q" data-picker-q value="${esc(s.q || "")}" placeholder="Search categories" autocomplete="off" dir="auto" data-autofocus></div>
       <div class="mny-pick-list" id="mny-pick-list">${pickerListHtml(s, t)}</div>`;
   }
   function pickerListHtml(s, t) {

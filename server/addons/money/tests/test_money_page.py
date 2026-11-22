@@ -236,6 +236,15 @@ def test_periods() -> None:
     check("periods: last_week is Sun 8 – Sat 14 Nov, compared with the week before",
           span(P("last_week")) == ("2026-11-08", "2026-11-14")
           and span(P("last_week").compare_to[0]) == ("2026-11-01", "2026-11-07"))
+    with patch.dict(os.environ, {"WEEK_START": "mon"}):
+        monday = span(P("this_week")), span(P("last_week")), dashboard.bank_day(datetime.date(2026, 11, 21))
+    with patch.dict(os.environ, {"WEEKLY_REVIEW_AT": "sun 18:00"}):
+        after_review = clock.week_start_day(), span(P("this_week"))
+    check("periods: WEEK_START moves the week (Monday: Mon 16 – Wed 18, last week Mon 9 – Sun 15; a Saturday "
+          "payment reaches the bank on Monday); unset, the week starts the day after the weekly review's day",
+          monday == (("2026-11-16", "2026-11-18"), ("2026-11-09", "2026-11-15"), datetime.date(2026, 11, 23))
+          and after_review == (0, ("2026-11-16", "2026-11-18")) and clock.week_start_day() == 6
+          and dashboard.bank_day(datetime.date(2026, 11, 21)) == datetime.date(2026, 11, 22), (monday, after_review))
     lm = P("last_month")
     check("periods: last_month is whole October, compared with whole September",
           span(lm) == ("2026-10-01", "2026-10-31") and not lm.in_progress

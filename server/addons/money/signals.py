@@ -6,7 +6,7 @@ bank apps' pushes the phone posts to ``/api/money/signals``
 (:func:`record_push`). Every one is stored in ``money_signals`` (kept
 :data:`KEEP_DAYS` days) so parsers can be written from real samples.
 
-A parsed shekel payment on one of the user's cards (by its last 4 digits)
+A parsed payment in the user's currency on one of the user's cards (by its last 4 digits)
 becomes a ``provisional`` transaction at once, named and categorised from
 the merchant memory, and pulls that card's sync earlier
 (``schedule.request_soon``). After every sync :func:`reconcile` (a hook that
@@ -19,6 +19,7 @@ becomes ``unmatched`` (declined or reversed: shown greyed, never counted).
 
 import asyncio
 import datetime
+import functools
 import logging
 import re
 import sqlite3
@@ -55,8 +56,8 @@ PROVISIONAL_MEMORY = classify.MEMORY_SOURCES + ("bank",)
 
 @dataclass(frozen=True)
 class Payment:
-    """What a notification says: ``amount`` signed agorot (a payment is
-    negative, a refund positive), ``currency`` (ILS, USD, EUR, GBP), the card's
+    """What a notification says: ``amount`` signed hundredths (a payment is
+    negative, a refund positive), ``currency`` (an ISO code), the card's
     last 4 digits and the merchant, when given."""
     amount: int
     currency: str
@@ -69,31 +70,52 @@ _BIDI = re.compile("[\u200e\u200f\u202a-\u202e\u2066-\u2069\u061c]")
 _NUMBER = (r"(?<![\d.,])(?:\d{1,3}(?:[,.]\d{3})+(?:[.,]\d{1,2})?|\d{1,3}(?: \d{3})+,\d{1,2}"
            r"|\d+(?:[.,]\d{1,2})?)(?!\d)")
 _SYMBOLS = {"₪": "ILS", "$": "USD", "€": "EUR", "£": "GBP"}
-_CODES = {"ש\"ח": "ILS", "ש״ח": "ILS", "שח": "ILS", "nis": "ILS", "ils": "ILS", "usd": "USD", "eur": "EUR",
-          "gbp": "GBP"}
-_CURRENCY_AFTER = r"[₪$€£]|ש[\"״]?ח|NIS|ILS|USD|EUR|GBP"
-_AMOUNTS = (
-    re.compile(rf"(?P<cur>[₪$€£])\s*(?P<num>{_NUMBER})"),
-    re.compile(rf"(?P<num>{_NUMBER})\s*(?P<cur>{_CURRENCY_AFTER})(?![A-Za-z])", re.I),
-    re.compile(rf"(?<![A-Za-z])(?P<cur>NIS|ILS|USD|EUR|GBP)\s*(?P<num>{_NUMBER})", re.I),
+_CODES = ("ILS", "USD", "EUR", "GBP")
+# English; a provider adds its pushes' language (providers.PushWords).
+ENGLISH = providers.PushWords(
+    card=(r"ending(?:\s+in)?", r"card(?:\s+no\.?)?"),
+    merchant=(r"\bat\s+(?P<m>[^\n,;]+?)(?=\s+(?:on|with|using|for|by)\b|[\n,;]|\.(?:\s|$)|$)",),
+    merchant_end=("on", "with", "using", "for", "by"),
+    refund=(r"\brefund", r"\breturned"),
+    not_payment=(r"\bstatement\b", r"\byour\s+bill\b", r"\bupcoming\s+charge\b"),
 )
-_CARD = (
-    re.compile(r"(?:[•·*●∙]{2,}|[xX]{2,})\s*(\d{4})(?!\d)"),
-    re.compile(r"(?:ending(?:\s+in)?|המסתיים\s+ב|המסתיימת\s+ב|שמסתיים\s+ב|מסתיים\s+ב|בכרטיס(?:\s+(?:מספר|שמספרו))?"
-               r"|כרטיס(?:\s+(?:מספר|שמספרו))?|card(?:\s+no\.?)?)\s*[-:]?\s*(\d{4})(?!\d)", re.I),
-)
-_MERCHANT = (
-    re.compile(r"(?:בבית\s+העסק|בבית\s+עסק|אצל)\s*[-:]?\s*(?P<m>[^\n,;.]+)"),
-    re.compile(r"\bat\s+(?P<m>[^\n,;]+?)(?=\s+(?:on|with|using|for|by)\b|[\n,;]|\.(?:\s|$)|$)", re.I),
-    re.compile(r"(?<!\w)ב-\s*(?P<m>[^\d\s\n,;.][^\n,;.]*)"),
-)
-# Where a merchant's name ends: an amount word, a date / card word, a digit or a currency sign.
-_MERCHANT_END = re.compile(r"\s+(?:בסך|בסכום|על\s+סך|סך|בכרטיס|בתאריך|בשעה|ביום|on|with|using|for|by)(?:\s|$)"
-                           r"|\s*[\d₪$€£]", re.I)
-_REFUND = re.compile(r"\brefund|\breturned|זיכוי|החזר", re.I)
-# A card app's notice about a bill or a statement, not a payment.
-_NOT_PAYMENT = re.compile(r"חיוב\s+(?:החודשי|הבא|צפוי)|החיוב\s+החודשי|דף\s+(?:ה)?פירוט|יחויב\s+ב|"
-                          r"\bstatement\b|\byour\s+bill\b|\bupcoming\s+charge\b", re.I)
+
+
+@dataclass(frozen=True)
+class _Grammar:
+    """The patterns of a set of :class:`providers.PushWords`, compiled once."""
+    amounts: Tuple["re.Pattern[str]", ...]
+    codes: Dict[str, str]
+    card: Tuple["re.Pattern[str]", ...]
+    merchant: Tuple["re.Pattern[str]", ...]
+    merchant_end: "re.Pattern[str]"
+    refund: "re.Pattern[str]"
+    not_payment: "re.Pattern[str]"
+
+
+@functools.lru_cache(maxsize=32)
+def _grammar(extra: Tuple[providers.PushWords, ...]) -> _Grammar:
+    sets = (ENGLISH, *extra)
+    codes = {c.casefold(): c for c in _CODES}
+    codes.update({w.casefold(): code for p in extra for w, code in p.currencies})
+    after = "|".join([re.escape(sym) for sym in _SYMBOLS]
+                     + sorted((re.escape(w) for w in codes), key=len, reverse=True))
+    amounts = (
+        re.compile(rf"(?P<cur>[{''.join(re.escape(sym) for sym in _SYMBOLS)}])\s*(?P<num>{_NUMBER})"),
+        re.compile(rf"(?P<num>{_NUMBER})\s*(?P<cur>{after})(?![A-Za-z])", re.I),
+        re.compile(rf"(?<![A-Za-z])(?P<cur>{'|'.join(_CODES)})\s*(?P<num>{_NUMBER})", re.I),
+    )
+    card_words = "|".join(w for p in sets for w in p.card)
+    card = (re.compile(r"(?:[•·*●∙]{2,}|[xX]{2,})\s*(\d{4})(?!\d)"),
+            re.compile(rf"(?:{card_words})\s*[-:]?\s*(\d{{4}})(?!\d)", re.I))
+    # The provider's merchant patterns first: its words are the pushes' own.
+    merchant = tuple(re.compile(m, re.I) for p in (*extra, ENGLISH) for m in p.merchant)
+    ends = "|".join(w for p in sets for w in p.merchant_end)
+    return _Grammar(
+        amounts=amounts, codes=codes, card=card, merchant=merchant,
+        merchant_end=re.compile(rf"\s+(?:{ends})(?:\s|$)|\s*[\d{''.join(re.escape(sym) for sym in _SYMBOLS)}]", re.I),
+        refund=re.compile("|".join(w for p in sets for w in p.refund), re.I),
+        not_payment=re.compile("|".join(w for p in sets for w in p.not_payment), re.I))
 
 
 def _clean(text: Any) -> str:
@@ -118,11 +140,13 @@ def _number(text: str) -> Optional[Decimal]:
         return None
 
 
-def find_amount(text: str) -> Optional[Tuple[int, str]]:
-    """The first money amount in ``text`` as ``(agorot > 0, currency)``, None when there is none."""
+def find_amount(text: str, words: Tuple[providers.PushWords, ...] = ()) -> Optional[Tuple[int, str]]:
+    """The first money amount in ``text`` as ``(hundredths > 0, currency)``, None when there is none
+    (``words``: the providers' currency words besides symbols and ISO codes)."""
+    g = _grammar(words)
     clean = _clean(text)
     best = None
-    for pattern in _AMOUNTS:
+    for pattern in g.amounts:
         m = pattern.search(clean)
         if m and (best is None or m.start() < best.start()):
             best = m
@@ -130,60 +154,62 @@ def find_amount(text: str) -> Optional[Tuple[int, str]]:
         return None
     value = _number(best.group("num"))
     cur = best.group("cur")
-    currency = _SYMBOLS.get(cur) or _CODES.get(cur.casefold()) or _CODES.get(cur)
+    currency = _SYMBOLS.get(cur) or g.codes.get(cur.casefold())
     if value is None or value <= 0 or currency is None:
         return None
     return int((value * 100).to_integral_value()), currency
 
 
-def find_card(text: str) -> Optional[str]:
-    """The card's last 4 digits a notification names (``••8763``, ``בכרטיס 8763``, ``ending in 8763``)."""
+def find_card(text: str, words: Tuple[providers.PushWords, ...] = ()) -> Optional[str]:
+    """The card's last 4 digits a notification names (``••8763``, ``ending in 8763``, or the providers' words)."""
     clean = _clean(text)
-    for pattern in _CARD:
+    for pattern in _grammar(words).card:
         m = pattern.search(clean)
         if m:
             return m.group(1)
     return None
 
 
-def _merchant(text: str) -> Optional[str]:
+def _merchant(text: str, words: Tuple[providers.PushWords, ...]) -> Optional[str]:
+    g = _grammar(words)
     clean = _clean(text)
-    for pattern in _MERCHANT:
+    for pattern in g.merchant:
         m = pattern.search(clean)
         if m:
-            name = _MERCHANT_END.split(m.group("m"), maxsplit=1)[0].strip(" -:\"'״")[:80]
+            name = g.merchant_end.split(m.group("m"), maxsplit=1)[0].strip(" -:\"'״")[:80]
             if name and not name.isdigit():
                 return name
     return None
 
 
-def parse_wallet(title: str, text: str) -> Optional[Payment]:
+def parse_wallet(title: str, text: str, words: Tuple[providers.PushWords, ...] = ()) -> Optional[Payment]:
     """A Google Wallet payment notification: the title is the merchant, the text
     the amount and card (``₪350.30 with Mastercard ••8763``, ``$12.00 with …``,
-    ``350.30 ₪ באמצעות … ••8763``). None when the text holds no amount."""
-    found = find_amount(text)
+    in the phone's language too). None when the text holds no amount."""
+    found = find_amount(text, words)
     if found is None:
         return None
-    agorot, currency = found
-    sign = 1 if _REFUND.search(_clean(text)) else -1
-    return Payment(sign * agorot, currency, find_card(text), _clean(title)[:120] or None)
+    amount, currency = found
+    sign = 1 if _grammar(words).refund.search(_clean(text)) else -1
+    return Payment(sign * amount, currency, find_card(text, words), _clean(title)[:120] or None)
 
 
-def parse_push(title: str, text: str) -> Optional[Payment]:
+def parse_push(title: str, text: str, words: Tuple[providers.PushWords, ...] = ()) -> Optional[Payment]:
     """Best effort for a card / bank app's push: an amount with its currency
-    and the card's last 4 digits or a merchant ("… ב-<merchant>", "at
-    <merchant>"). None when it does not read as a payment (no amount, or a
-    bill / statement notice)."""
+    and the card's last 4 digits or a merchant ("at <merchant>", or as the
+    providers' ``words`` say it). None when it does not read as a payment (no
+    amount, or a bill / statement notice)."""
+    g = _grammar(words)
     whole = f"{_clean(title)}\n{_clean(text)}"
-    if _NOT_PAYMENT.search(whole):
+    if g.not_payment.search(whole):
         return None
-    found = find_amount(whole)
+    found = find_amount(whole, words)
     if found is None:
         return None
-    card, merchant = find_card(whole), _merchant(whole)
+    card, merchant = find_card(whole, words), _merchant(whole, words)
     if card is None and merchant is None:
         return None
-    sign = 1 if _REFUND.search(whole) else -1
+    sign = 1 if g.refund.search(whole) else -1
     return Payment(sign * found[0], found[1], card, merchant)
 
 
@@ -192,10 +218,11 @@ def parse_push(title: str, text: str) -> Optional[Payment]:
 # stored (an app can name itself anything, but not another app's package).
 def parse(user: User, package: str, title: str, text: str) -> Optional[Payment]:
     """The parser for a package: Google Wallet's, the generic one for the user's providers'
-    card / bank apps, None for any other package."""
+    card / bank apps, None for any other package; both read the user's providers' words."""
+    words = providers.push_words(user)
     if package == WALLET_PACKAGE:
-        return parse_wallet(title, text)
-    return parse_push(title, text) if package in providers.payment_apps(user) else None
+        return parse_wallet(title, text, words)
+    return parse_push(title, text, words) if package in providers.payment_apps(user) else None
 
 
 # --- Matching ---------------------------------------------------------------------------------

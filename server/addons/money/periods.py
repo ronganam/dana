@@ -5,8 +5,9 @@ or explicit dates into a :class:`Period`: the local dates it covers (``start``
 inclusive, ``end_exclusive``), a label, and the periods to compare it with. A
 period still in progress ends after today and compares with the same elapsed
 span of the previous one ("at this point last month"); a whole past period
-compares with the whole one before it. Weeks start on Sunday (Israel). Every
-"today" comes from ``core.clock``.
+compares with the whole one before it. Weeks start on the server's first day of
+the week (``core.clock.week_start``: Sunday by default). Every "today" comes from
+``core.clock``.
 """
 
 import calendar
@@ -71,11 +72,6 @@ def add_months(d: datetime.date, months: int) -> datetime.date:
 
 def month_end_exclusive(d: datetime.date) -> datetime.date:
     return add_months(month_start(d), 1)
-
-
-def week_start(d: datetime.date) -> datetime.date:
-    """The Sunday on or before ``d``."""
-    return d - datetime.timedelta(days=(d.weekday() + 1) % 7)
 
 
 def short_date(d: datetime.date, year: bool = True) -> str:
@@ -167,11 +163,11 @@ def resolve(name: Optional[str] = None, *, start: Any = None, end: Any = None,
         y = now - one
         return Period(y, now, "yesterday", key, False, (_whole(y - one, y, "the day before"),))
     if key == "this_week":
-        first = week_start(now)
+        first = clock.week_start(now)
         return Period(first, tomorrow, "this week", key, True,
                       (_whole(first - 7 * one, tomorrow - 7 * one, "at this point last week"),))
     if key == "last_week":
-        first = week_start(now) - 7 * one
+        first = clock.week_start(now) - 7 * one
         return Period(first, first + 7 * one, "last week", key, False,
                       (_whole(first - 7 * one, first, "the week before"),))
     if key == "this_month":

@@ -477,7 +477,10 @@ const SV = JSON.parse(fs.readFileSync(path.join(SERVER, "tests", "fixtures", "mo
 const sv = SV.savings;
 const DAY = sv.as_of;
 const svi = (k) => sv.items.find((i) => i.key === k);
-const BILL = "bill:סלולר הצפון", ARNONA = "arnona:עיריית גבעת אורנים:2027";
+const BILL = "bill:סלולר הצפון", RENEW = "renewal:ביטוח הדרום חובה:2026-12";
+// A provider add-on's price checks (the Israeli one's electricity and arnona topics): their payloads, as such an add-on returns them.
+const ELECTRICITY_MARKET = {"checked_at": "2026-11-18T07:01:00+00:00", "error": null, "items": [{"days": "כל השבוע", "discount_pct": 7.0, "hours": "24 שעות", "plan": "כל היום", "smart_meter": false, "source": {"title": "דוגמה", "url": "https://example.com/offer"}, "supplier": "חשמל הצפון"}, {"days": "כל השבוע", "discount_pct": 20.0, "hours": "23:00–07:00", "plan": "לילה", "smart_meter": true, "source": {"title": "דוגמה", "url": "https://example.com/offer"}, "supplier": "אנרגיית הדרום"}, {"days": "א׳–ה׳", "discount_pct": 15.0, "hours": "07:00–17:00", "plan": "יום", "smart_meter": true, "source": {"title": "דוגמה", "url": "https://example.com/offer"}, "supplier": "חשמל הגבעה"}], "needs_answer": null, "params": {}, "sources": [{"title": "השוואת מחירים לדוגמה", "url": "https://example.com/prices"}], "stale": false, "state": "ok", "topic": "electricity"};
+const ARNONA_MARKET = {"checked_at": "2026-11-18T07:01:00+00:00", "error": null, "items": [{"deadline": "2027-01-31", "discount_pct": 2.0, "found": true, "method": "באתר העירייה", "source": {"title": "דוגמה", "url": "https://example.com/offer"}}], "needs_answer": null, "params": {"city": "גבעת אורנים", "year": 2027}, "sources": [{"title": "השוואת מחירים לדוגמה", "url": "https://example.com/prices"}], "stale": false, "state": "ok", "topic": "arnona"};
 const CASH = sv.items.find((i) => i.type === "cash").key, FX = sv.items.find((i) => i.type === "fx").key;  // account ids: new on each regeneration
 const SPREE = "spree:חנות הצפון אונליין:2026-09-14";
 const parts = plain(C.saveSections(sv.items, DAY));
@@ -528,8 +531,8 @@ check("save: every item is listed once — the parts' sections add up to the lis
       && same(parts.map((p) => [p.group, p.label, p.count]), [["save", "Ways to save", sv.items.filter((i) => i.group === "save").length], ["watch", "Spending to watch", sv.items.filter((i) => i.group === "watch").length]]));
 check("save: Ways to save — Now (open, due or untimed), In progress, Done, Your choices; the server's order inside each",
       same(Object.keys(secs("save")), ["now", "doing", "done", "choices"])
-      && same(secs("save").now, [ARNONA, "renewal:ביטוח הדרום חובה:2026-12", "renewal:ביטוח הדרום דירה:2026-11", "cushion", FX, "mortgage", "insurance_review", "subscriptions"])
-      && same(secs("save").doing, [BILL]) && same(secs("save").done, ["electricity"]) && same(secs("save").choices, [CASH, "fees"])
+      && same(secs("save").now, [RENEW, "renewal:ביטוח הדרום דירה:2026-11", "cushion", "mortgage", "insurance_review", "subscriptions"])
+      && same(secs("save").doing, [BILL]) && same(secs("save").done, [FX]) && same(secs("save").choices, [CASH, "fees"])
       && Object.values(secs("save")).every(order), JSON.stringify(secs("save")));
 check("save: Spending to watch — Now, Watching (with a target), Your choices",
       same(secs("watch"), { now: ["overlap:ai", "leak:ענן הצפון", "penalties"], watching: ["creep:eating_out"], choices: ["late_night", SPREE] }), JSON.stringify(secs("watch")));
@@ -539,36 +542,36 @@ check("save: dismissed, accepted and snoozed items — active or not — always 
 check("save: an open item waits in Coming up while its timing starts later; an unknown status is still listed (as a choice)",
       C.saveSection({ status: "open", timing: { from: "2026-12-01" } }, DAY) === "coming" && C.saveSection({ status: "open", timing: { from: DAY } }, DAY) === "now"
       && C.saveSection({ status: "open", timing: null }, DAY) === "now" && C.saveSection({ status: "paused" }, DAY) === "choices"
-      && same(plain(C.saveSections([{ ...svi(ARNONA), timing: { ...svi(ARNONA).timing, from: "2026-12-01" } }], DAY))[0].sections.map((s) => s.key), ["coming"])
+      && same(plain(C.saveSections([{ ...svi(RENEW), timing: { ...svi(RENEW).timing, from: "2026-12-01" } }], DAY))[0].sections.map((s) => s.key), ["coming"])
       && same(plain(C.saveSections([], DAY)).map((p) => [p.count, p.sections.length]), [[0, 0], [0, 0]]));
 const svt = plain(C.saveTiles(sv, DAY));
 check("save: tiles — could save low–high a year with the count, saved so far ≈ a year, the rate's source line",
-      svt.could.text === "₪2,281–₪2,548" && svt.could.sub === "a year · 4 ideas" && svt.saved.value === sv.totals.saved && svt.saved.sub === "≈ ₪359 a year"
+      svt.could.text === "₪2,139–₪2,381" && svt.could.sub === "a year · 2 ideas" && svt.saved.value === sv.totals.saved && svt.saved.sub === "≈ ₪359 a year"
       && svt.source === "Bank of Example rate 4.25% (18 Nov) · amounts from your charges"
       && C.saveTiles({ totals: { low: 0, high: 0, count: 0, saved: 0 }, rate: null }, DAY).source === "Amounts from your charges"
       && C.saveTiles({ totals: { low: 50000, high: 50000, count: 1 } }, DAY).could.text === "₪500", JSON.stringify(svt));
 check("save: the money chip — a saving a year (one amount or a range), else the money at stake, a spree's total spent",
-      C.savingChip(svi(ARNONA)).text === "+₪14/yr" && C.savingChip(svi(ARNONA)).kind === "save" && C.savingChip(svi(BILL)).text === "+₪768–₪888/yr"
+      C.savingChip({ saving: { low: 1365, high: 1365 } }).text === "+₪14/yr" && C.savingChip({ saving: { low: 1365, high: 1365 } }).kind === "save" && C.savingChip(svi(BILL)).text === "+₪768–₪888/yr"
       && C.savingChip(svi("mortgage")).text === "₪60,000/yr at stake" && C.savingChip(svi("mortgage")).kind === "stake"
       && C.savingChip(svi(SPREE)).text === "₪615 spent" && C.savingChip({ saving: null, at_stake: null }) === null);
 check("save: effort and basis chips", C.effortText(svi(BILL).effort) === "20-min call" && C.effortText(svi("cushion").effort) === "10 min in the app"
-      && C.effortText(svi(ARNONA).effort) === "15 min online" && C.effortText(svi("mortgage").effort) === "1 h comparing" && C.effortText(svi("subscriptions").effort) === "10 min to review"
+      && C.effortText(svi(FX).effort) === "20 min online" && C.effortText(svi("mortgage").effort) === "1 h comparing" && C.effortText(svi("subscriptions").effort) === "10 min to review"
       && C.effortText({ minutes: 90, how: "call" }) === "1.5 h call" && C.effortText(null) === "" && C.effortText(svi("creep:eating_out").effort) === ""
       && C.basisChip(svi("cushion")).text === "measured" && C.basisChip(svi(BILL)).text === "market" && C.basisChip({ saving: { basis: "increase" } }).text === "price rise"
       && C.basisChip(svi("mortgage")) === null);
 check("save: each choice says where it stands, with its date", C.statusLine(svi("fees"), DAY) === "Not for you · 18 Nov" && C.statusLine(svi(CASH), DAY) === "Snoozed until 18 Dec"
       && C.statusLine(svi("late_night"), DAY) === "Worth it to you · 18 Nov" && C.statusLine(svi("creep:eating_out"), DAY) === "Watching since 10 Sep"
-      && C.statusLine(svi(BILL), DAY) === "On it since 18 Nov" && C.statusLine(svi("electricity"), DAY) === "Done 18 Nov" && C.statusLine(svi(ARNONA), DAY) === "");
+      && C.statusLine(svi(BILL), DAY) === "On it since 18 Nov" && C.statusLine(svi(FX), DAY) === "Done 18 Nov" && C.statusLine(svi("cushion"), DAY) === "");
 const acts = (k) => plain(C.statusActions(typeof k === "string" ? svi(k) : k)).map((a) => [a.label, a.body, Boolean(a.input)]);
 check("save: the actions of each status and their PATCH bodies",
-      same(acts(ARNONA), [["I'm on it", { status: "doing" }, false], ["I did it", { status: "done" }, false], ["Snooze a month", { status: "snoozed", snooze_days: 30 }, false], ["Not for me", { status: "dismissed" }, false]])
+      same(acts("cushion"), [["I'm on it", { status: "doing" }, false], ["I did it", { status: "done" }, false], ["Snooze a month", { status: "snoozed", snooze_days: 30 }, false], ["Not for me", { status: "dismissed" }, false]])
       && same(acts("overlap:ai"), [["Cut back", null, true], ["Worth it", { status: "accepted" }, false]])
       && same(acts(BILL), [["I did it", { status: "done" }, false], ["Not doing it", { status: "open" }, false]])
-      && same(acts("electricity"), [["Not done", { status: "open" }, false]])
+      && same(acts(FX), [["Not done", { status: "open" }, false]])
       && same(acts("fees"), [["Flag again", { status: "open" }, false]]) && same(acts("late_night"), [["Flag again", { status: "open" }, false]])
       && same(acts(CASH), [["Unsnooze", { status: "open" }, false]])
       && same(acts("creep:eating_out"), [["Edit target", null, true], ["Stop tracking", { target: null }, false]])
-      && same(acts({ status: "paused", group: "save" }), [["Dana decides again", { status: "open" }, false]]), JSON.stringify(acts(ARNONA)));
+      && same(acts({ status: "paused", group: "save" }), [["Dana decides again", { status: "open" }, false]]), JSON.stringify(acts("cushion")));
 check("save: every choice the user made has a way back to Dana", sv.items.filter((i) => i.status !== "open").every((i) =>
       C.statusActions(i).some((a) => (a.body && (a.body.status === "open" || ("target" in a.body && a.body.target === null))))));
 const H = (s) => C.isolateHebrew(s);
@@ -593,12 +596,12 @@ const fxo = plain(C.offerRows(svi(FX).market, DAY));
 check("save: card offers — a column empty in every row (conditions) is left out; fee and monthly fee in words",
       same(fxo.columns, ["Card or wallet", "Kind", "Conversion fee", "Monthly fee", "Source"]) && !fxo.hasPlan
       && same(fxo.rows.map((r) => [r.name, ...r.cells.map((c) => c.text)]), [["כרטיס הצפון", "Card", "0%", "None"], ["ארנק הדרום", "Wallet", "0.5%", "None"], ["בנק הגבעה", "Bank account", "1%", "₪9.90 a month"]]), JSON.stringify(fxo));
-const elo = plain(C.offerRows(svi("electricity").market, DAY));
+const elo = plain(C.offerRows(ELECTRICITY_MARKET, DAY));
 check("save: electricity offers — discount, hours and days (Hebrew isolated in an English line), meter",
       same(elo.columns, ["Supplier", "Plan", "Discount", "Hours", "Meter", "Source"])
       && same(elo.rows.map((r) => r.cells.map((c) => c.text)), [["7% off", "24 שעות · כל השבוע", "Any meter"], ["20% off", "23:00–07:00 · כל השבוע", "Smart meter needed"], ["15% off", "07:00–17:00 · א׳–ה׳", "Smart meter needed"]])
       && elo.rows[0].cells[1].iso === true, JSON.stringify(elo.rows.map((r) => r.cells)));
-const aro = plain(C.offerRows(svi(ARNONA).market, DAY));
+const aro = plain(C.offerRows(ARNONA_MARKET, DAY));
 check("save: the arnona check — found, its discount, deadline and how", aro.rows.length === 1 && aro.rows[0].name === "A discount for paying the year at once"
       && same(aro.rows[0].cells.map((c) => c.text), ["2% off", "31 Jan 2027", "באתר העירייה"]) && same(aro.columns, ["Result", "Discount", "Deadline", "How", "Source"])
       && plain(C.offerRows({ topic: "arnona", items: [{ found: false, discount_pct: null, deadline: null, method: "", source: null }] }, DAY)).rows[0].name === "No discount found for paying at once");
@@ -616,7 +619,7 @@ check("save: price check states — none (Check prices), a question first, check
       && mv({ ...okm, stale: true }).stale === "prices may have changed"
       && mv({ ...okm, state: "failed", error: "the model did not search" }).button === "Check again" && /the model did not search/.test(mv({ ...okm, state: "failed", error: "the model did not search" }).text)
       && mv({ ...okm, state: "failed", items: [] }).button === "Try again" && mv({ ...okm, state: "unavailable", items: [] }).button === null
-      && /aren't available/.test(mv({ ...okm, state: "unavailable", items: [] }).text) && /municipality/.test(mv(svi(ARNONA).market).checked) && C.marketView(null) === null);
+      && /aren't available/.test(mv({ ...okm, state: "unavailable", items: [] }).text) && /municipality/.test(mv(ARNONA_MARKET).checked) && C.marketView(null) === null);
 const cr = (st, b) => plain(C.checkReply(st, b));
 check("save: Check prices answers — 202 / 409 poll, needs_answer shows the question, 429 waits in words, 503, no_check",
       cr(202, { state: "checking" }).kind === "checking" && cr(409, { error: "running" }).kind === "checking"

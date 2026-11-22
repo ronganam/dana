@@ -8,6 +8,11 @@ One timezone for the whole server (a server setting). Resolution (first
 match wins, resolved once and cached): ``TIMEZONE`` env var → the first
 admin's Home Assistant (``/api/config``, when they have it connected) →
 ``TZ`` env var → UTC.
+
+The week (money's "this week", the weekly review's week) starts on one day
+for the whole server too (:func:`week_start_day`): ``WEEK_START`` ("mon",
+"sun", …), else the day after the weekly review's day (``WEEKLY_REVIEW_AT``,
+default "sat 20:00": the review closes the week, so weeks start on Sunday).
 """
 
 import datetime
@@ -20,6 +25,12 @@ from core import users
 from core.users import User
 
 logger = logging.getLogger(__name__)
+
+# Weekday names as settings write them (their first three letters), Monday first like ``date.weekday()``.
+DAYS = ("mon", "tue", "wed", "thu", "fri", "sat", "sun")
+WEEK_START_ENV = "WEEK_START"
+REVIEW_AT_ENV = "WEEKLY_REVIEW_AT"
+DEFAULT_REVIEW_AT = "sat 20:00"
 
 _timezone: Optional[zoneinfo.ZoneInfo] = None
 # How to ask a user's Home Assistant for its zone: registered by the
@@ -82,3 +93,23 @@ def describe_now() -> str:
     """Human-readable current local time for LLM prompts, including the zone."""
     current = now()
     return f"{current.strftime('%A, %B %d, %Y, %I:%M:%S %p')} ({current.tzinfo}, UTC{current.strftime('%z')[:3]}:{current.strftime('%z')[3:]})"
+
+
+def weekday_of(spec: str) -> Optional[int]:
+    """The weekday (Monday 0 … Sunday 6) a setting starts with ("sun", "Sunday", "sat 20:00"), None for none."""
+    word = (spec or "").strip().lower()[:3]
+    return DAYS.index(word) if word in DAYS else None
+
+
+def week_start_day() -> int:
+    """The weekday weeks start on: ``WEEK_START``, else the day after ``WEEKLY_REVIEW_AT``'s day (Sunday by default)."""
+    own = weekday_of(os.getenv(WEEK_START_ENV, ""))
+    if own is not None:
+        return own
+    review = weekday_of(os.getenv(REVIEW_AT_ENV, DEFAULT_REVIEW_AT))
+    return ((review if review is not None else DAYS.index("sat")) + 1) % 7
+
+
+def week_start(d: datetime.date) -> datetime.date:
+    """The first day of the week holding ``d`` (:func:`week_start_day`)."""
+    return d - datetime.timedelta(days=(d.weekday() - week_start_day()) % 7)

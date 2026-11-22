@@ -98,6 +98,7 @@ One value: an LLM key (`ANTHROPIC_API_KEY` with the default models). A server wi
 | `BRIEFING_FALLBACK_TIME` / `BRIEFING_TELEGRAM` | wake briefing (written in the user's first language): make-anyway time (10:00), also send to Telegram (0); the weather entity is the user's Home Assistant setting `weather_entity` |
 | `MEETING_CARDS` / `MEETING_CARD_MINUTES` | push a person's card before a meeting with them (on, 10 min) |
 | `WEEKLY_REVIEW_AT` / `REVIEW_STALE_DAYS` / `REVIEW_SNOOZE_MIN` / `REVIEW_SUGGESTION_DAYS` / `REVIEW_MAX_ITEMS` / `REVIEW_TELEGRAM` | weekly review: when (`sat 20:00`), item thresholds (21 days, 3 snoozes, 7 days), max items (25), Telegram message (on) |
+| `WEEK_START` | the first day of the week (`sun`…`sat`): money's weeks (this / last week, weekly insights), the weekly review's "next week" and the bank days of the balance forecast. Unset: the day after `WEEKLY_REVIEW_AT`'s day, so the default review on Saturday evening gives weeks from Sunday; set `WEEKLY_REVIEW_AT=sun 20:00` (or `WEEK_START=mon`) for weeks from Monday (`core/clock.py`) |
 | `THREAD_GAP_MINUTES` / `THREAD_KEEP_MESSAGES` | the shared thread (`session_id: "main"`): quiet gap after which the model's context starts fresh (20), messages kept for display (500) |
 | `SHORTCUTS` | `0` turns learned phrases off, both learning and use (default on) |
 | `UNDO_TTL_SECONDS` | how long an Undo stays usable, in memory (900) |

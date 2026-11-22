@@ -20,6 +20,7 @@ import re
 import statistics
 from typing import Any, Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 
+from core import clock
 from core.users import User
 from addons.money import categories, ingest, insights, meals, periods, portfolio, providers, store
 from addons.money.periods import Period
@@ -107,9 +108,10 @@ def _merchant_clause(term: str) -> Tuple[str, List[Any]]:
 
 
 def _amount_query(text: str) -> Optional[int]:
-    """A search that is only an amount ("709", "709.00", "1,234.5") → agorot."""
-    m = re.fullmatch(r"\s*[₪$€]?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?\s*(?:₪|ש\"?ח|nis|ils)?\s*",
-                     text or "", re.I)
+    """A search that is only an amount ("709", "709.00", "1,234.5", with a currency sign or code before or
+    after it: "₪709", "709 EUR") → hundredths."""
+    m = re.fullmatch(r"\s*(?:[^\w\s]{1,3}|[a-z]{3})?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\.(\d{1,2}))?\s*"
+                     r"(?:[^\w\s]{1,3}|[a-z]{3}|[^\W\d_][\"'״]?[^\W\d_])?\s*", text or "", re.I)
     if not m:
         return None
     whole = int(m.group(1).replace(",", ""))
@@ -213,12 +215,12 @@ def taxonomy() -> Dict[str, Any]:
 # --- Summary --------------------------------------------------------------------------------
 
 def _fold_time(rows: List[Dict[str, Any]], how: str) -> List[Dict[str, Any]]:
-    """Day rows (``k`` = purchase date) folded into weeks (Sunday) or months, oldest first."""
+    """Day rows (``k`` = purchase date) folded into weeks (from the server's first day of the week) or months, oldest first."""
     out: Dict[str, Dict[str, Any]] = {}
     for r in rows:
         d = datetime.date.fromisoformat(r["k"])
         if how == "week":
-            first = periods.week_start(d)
+            first = clock.week_start(d)
             key, label = first.isoformat(), f"week of {periods.short_date(first)}"
         elif how == "month":
             key, label = d.strftime("%Y-%m"), f"{d.strftime('%b')} {d.year}"
@@ -574,7 +576,7 @@ def changes(user: User, since: Optional[str] = None) -> Dict[str, Any]:
 # --- The weekly review ----------------------------------------------------------------------
 
 def week(user: User, now: Optional[datetime.date] = None, history: int = 8) -> Dict[str, Any]:
-    """This week (Sunday to today) for the weekly review: ``{start, end, spent,
+    """This week (its first day to today) for the weekly review: ``{start, end, spent,
     usual (median of the ``history`` whole weeks before that have data, None
     without any), weeks, top: [{key, label, total}] (3 groups), new_recurring,
     price_changes: [recurring items]}`` — recurring charges first seen as such

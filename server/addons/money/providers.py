@@ -19,7 +19,12 @@ e.g. ``money_il`` from the catalog for the Israeli banks) registers, when its
   savings' cards (none: the cards show checks as unavailable);
 - statements (:func:`register_statements`): how its country's statements are
   written: personal numbers to mask, the card companies a bank line pays,
-  the phone apps whose pushes are payments, a note for classification.
+  the phone apps whose pushes are payments and the words of those pushes,
+  a note for classification;
+- savings rules (:func:`register_savings_rules`): ways to save that exist
+  only where its banks are (their own detectors and outcomes), its words and
+  local names for savings' generic ones, public pages for their steps, and
+  what to say on the phone in its language.
 
 What a provider registers is offered to a user only while they have its addon
 (``addon``) on (connected, and enabled on the server); the one exception is
@@ -173,6 +178,27 @@ class Redaction:
 
 
 @dataclass(frozen=True)
+class PushWords:
+    """How a provider's card / bank apps word a payment push, in their language, as regular
+    expressions (case-insensitive; money's own cover English).
+
+    Args:
+        currencies: ``(word, ISO code)`` pairs: a currency as the pushes write it after an amount.
+        card: Patterns ending right before a card's last 4 digits ("ending in").
+        merchant: Patterns holding the merchant's name as the group ``m`` ("at <m>").
+        merchant_end: Words that end a merchant's name ("on", "with").
+        refund: Words that make a push a refund.
+        not_payment: Patterns of a bill or statement notice (never a payment).
+    """
+    currencies: Tuple[Tuple[str, str], ...] = ()
+    card: Tuple[str, ...] = ()
+    merchant: Tuple[str, ...] = ()
+    merchant_end: Tuple[str, ...] = ()
+    refund: Tuple[str, ...] = ()
+    not_payment: Tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class Statements:
     """How a provider's country writes bank and card statements, for synced and imported rows alike.
 
@@ -182,13 +208,55 @@ class Statements:
         card_issuers: Names of card companies as a bank line paying their bill starts with
             ("Example Card"): such a line is a ``card_bill``.
         payment_apps: Android packages of card / bank apps whose pushes are payments (the phone sends them).
+        push: How those pushes (and payment notifications in its language) are worded (:class:`PushWords`).
         classify_note: A paragraph added to the classification prompt (how its banks write transfers…).
     """
     addon: str
     redactions: Tuple[Redaction, ...] = ()
     card_issuers: Tuple[str, ...] = ()
     payment_apps: Tuple[str, ...] = ()
+    push: PushWords = PushWords()
     classify_note: str = ""
+
+
+# A savings detector: ``(context) -> [item]`` over ``savings.Context`` (``savings.make_item`` builds an item).
+SavingsDetector = Callable[[Any], List[Dict[str, Any]]]
+# How a way to save the user acted on turned out: ``(context, baseline, since) -> savings.make_outcome(...)``.
+SavingsOutcome = Callable[[Any, Dict[str, Any], datetime.date], Dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class SavingsRules:
+    """A provider's part in savings (docs/money.md, "Savings").
+
+    Args:
+        addon: The provider addon.
+        detectors: Ways to save that exist only where its banks are (a utility it knows, a local tax).
+        outcomes: Item type → how such an item the user acted on turned out.
+        own_bills: Whether a recurring charge is one of its detectors' (``(charge) -> bool``): the generic
+            "a bill went up" leaves it to them.
+        words: Words in its statements, merchant names and holdings, by meaning: ``penalty`` (fines, late
+            fees, interest on arrears), ``money_market_fund`` (a holding that is one), ``insurance`` (an
+            insurer's name), ``compulsory_insurance`` (compulsory car insurance).
+        terms: Local names of savings' generic things, written after them in brackets: ``money_market_fund``,
+            ``deposit``, ``basic_track`` (a bank's basic account plan), ``conversion_fee``, ``early_repayment``
+            (the statement a lender gives for paying a loan off).
+        links: Public pages for steps, as ``(name, url)``: ``insurance_policies`` (every policy in the user's
+            name), ``car_insurance_prices`` (compulsory car insurance prices compared).
+        scripts: What to say on the phone, in ``script_lang``: ``bill(merchant, before, after, cadence, offer)``
+            asks for a bill's old price back (amounts in hundredths; ``offer``: ``{provider, plan, avg_12}`` or
+            None); ``fees(total)`` asks to waive a year's fees.
+        script_lang: The scripts' language (a BCP 47 tag).
+    """
+    addon: str
+    detectors: Tuple[SavingsDetector, ...] = ()
+    outcomes: Mapping[str, SavingsOutcome] = field(default_factory=dict)
+    own_bills: Optional[Callable[[Mapping[str, Any]], bool]] = None
+    words: Mapping[str, Tuple[str, ...]] = field(default_factory=dict)
+    terms: Mapping[str, str] = field(default_factory=dict)
+    links: Mapping[str, Tuple[str, str]] = field(default_factory=dict)
+    scripts: Mapping[str, Callable[..., str]] = field(default_factory=dict)
+    script_lang: str = ""
 
 
 class PriceCheckUnavailable(Exception):
@@ -227,6 +295,7 @@ _companies: Dict[str, Company] = {}
 _rates: List[Rates] = []
 _checks: List[PriceChecks] = []
 _statements: List[Statements] = []
+_savings_rules: List[SavingsRules] = []
 
 
 def register_company(company: Company) -> Company:
@@ -261,6 +330,12 @@ def register_statements(statements: Statements) -> Statements:
     """Offer how a country's statements are written (a provider's ``addon.py``); one per addon."""
     _statements[:] = [s for s in _statements if s.addon != statements.addon] + [statements]
     return statements
+
+
+def register_savings_rules(rules: SavingsRules) -> SavingsRules:
+    """Offer a provider's part in savings (a provider's ``addon.py``); one per addon."""
+    _savings_rules[:] = [r for r in _savings_rules if r.addon != rules.addon] + [rules]
+    return rules
 
 
 def company(company_id: str) -> Optional[Company]:
@@ -320,6 +395,16 @@ def redactions() -> Tuple[Redaction, ...]:
 def statements(user: User) -> List[Statements]:
     """The statement conventions of the providers ``user`` has on."""
     return [s for s in _statements if connections.is_connected(user, s.addon)]
+
+
+def savings_rules(user: User) -> List[SavingsRules]:
+    """The savings rules of the providers ``user`` has on."""
+    return [r for r in _savings_rules if connections.is_connected(user, r.addon)]
+
+
+def push_words(user: User) -> Tuple[PushWords, ...]:
+    """How the payment pushes of ``user``'s providers are worded."""
+    return tuple(s.push for s in statements(user))
 
 
 def card_issuers(user: User) -> Tuple[str, ...]:

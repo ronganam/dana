@@ -34,10 +34,9 @@ from core.users import User
 
 logger = logging.getLogger(__name__)
 
-REVIEW_AT = os.getenv("WEEKLY_REVIEW_AT", "sat 20:00")
+REVIEW_AT = os.getenv(clock.REVIEW_AT_ENV, clock.DEFAULT_REVIEW_AT)
 MAX_ITEMS = int(os.getenv("REVIEW_MAX_ITEMS", "25"))
 REVIEW_TELEGRAM = os.getenv("REVIEW_TELEGRAM", "1") != "0"
-_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 # user id → the lock that keeps one generation of their review at a time.
 _locks: Dict[str, asyncio.Lock] = {}
 
@@ -75,9 +74,10 @@ def week_id(day: Optional[datetime.date] = None) -> str:
 
 def _parse_at(spec: str):
     m = re.match(r"\s*([a-z]{3})\w*\s+(\d{1,2}):(\d{2})", (spec or "").lower())
-    if not m or m.group(1) not in _DAYS:
+    day = clock.weekday_of(m.group(1)) if m else None
+    if m is None or day is None:
         return 5, 20, 0
-    return _DAYS.index(m.group(1)), int(m.group(2)), int(m.group(3))
+    return day, int(m.group(2)), int(m.group(3))
 
 
 def is_due(now: datetime.datetime) -> bool:
@@ -170,14 +170,14 @@ async def next_week(user: User, now: Optional[datetime.datetime] = None) -> Opti
 # ---------------------------------------------------------------------------
 
 def default_action(item: Dict[str, Any], today: datetime.date) -> Dict[str, Any]:
-    """The no-model proposal: reschedule overdue to Sunday, keep the rest unticked."""
+    """The no-model proposal: reschedule overdue to the next week's first day, keep the rest unticked."""
     if item["why"] == "overdue" and "reschedule" in actions_for(item["type"]):
-        return {"action": "reschedule", "due_date": next_weekday(today, 6).isoformat(),
+        return {"action": "reschedule", "due_date": next_weekday(today, clock.week_start_day()).isoformat(),
                 "reason": "Overdue — give it a fresh date"}
     if item["type"] == "suggestion":
         return {"action": "dismiss", "reason": "Pending for over a week"}
     if item["type"] == "person":
-        return {"action": "reach_out", "due_date": next_weekday(today, 6).isoformat(),
+        return {"action": "reach_out", "due_date": next_weekday(today, clock.week_start_day()).isoformat(),
                 "reason": "It's been longer than usual"}
     return {"action": "keep", "reason": ""}
 
@@ -231,7 +231,7 @@ def merge_proposals(c: Dict[str, Any], raw: Optional[Dict[str, Any]], today: dat
             "action": action, "reason": re.sub(r"\s+", " ", str(p.get("reason") or "")).strip()[:120]}
         if proposal["action"] in ("reschedule", "reach_out"):
             proposal["due_date"] = valid_future_date(p.get("due_date") or proposal.get("due_date"), today) \
-                or next_weekday(today, 6).isoformat()
+                or next_weekday(today, clock.week_start_day()).isoformat()
         if proposal["action"] == "move_group":
             g = groups_lower.get(str(p.get("group") or "").strip().lower())
             if not g or g == item.get("group"):

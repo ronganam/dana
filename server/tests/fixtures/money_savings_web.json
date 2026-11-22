@@ -222,7 +222,7 @@
   "scope": null,
   "script": {
    "lang": "he",
-   "text": "שלום, אני מתקשר/ת בקשר לחשבון שלי בסלולר הצפון. ראיתי שהחיוב עלה מ-₪69 ל-₪109 לחודש. אני לקוח/ה כבר תקופה ארוכה ומבקש/ת לחזור למחיר הקודם. מצאתי הצעה של תקשורת הדרום — בסיסי ב-₪35 לחודש בממוצע בשנה הראשונה. אם אין לכם הצעה טובה יותר, אשקול לעבור."
+   "text": "שלום, החיוב בסלולר הצפון עלה מ-₪69 ל-₪109. אבקש לחזור למחיר הקודם. ל-תקשורת הדרום יש בסיסי ב-₪35 לחודש."
   },
   "snooze_until": null,
   "status": "doing",
@@ -473,7 +473,7 @@
    "scope": null,
    "script": {
     "lang": "he",
-    "text": "שלום, אני מתקשר/ת בקשר לחשבון שלי בסלולר הצפון. ראיתי שהחיוב עלה מ-₪69 ל-₪109 לחודש. אני לקוח/ה כבר תקופה ארוכה ומבקש/ת לחזור למחיר הקודם. מצאתי הצעה של תקשורת הדרום — בסיסי ב-₪35 לחודש בממוצע בשנה הראשונה. אם אין לכם הצעה טובה יותר, אשקול לעבור."
+    "text": "שלום, החיוב בסלולר הצפון עלה מ-₪69 ל-₪109. אבקש לחזור למחיר הקודם. ל-תקשורת הדרום יש בסיסי ב-₪35 לחודש."
    },
    "snooze_until": null,
    "status": "doing",
@@ -500,155 +500,11 @@
    "title": "סלולר הצפון went up ₪40 a month",
    "type": "bill"
   },
-  "undo_id": "8258cd630b08"
+  "undo_id": "97942a4ac748"
  },
  "savings": {
   "as_of": "2026-11-18",
   "items": [
-   {
-    "active": true,
-    "at_stake": 720000,
-    "effort": {
-     "how": "online",
-     "minutes": 15
-    },
-    "evidence": {
-     "lines": [
-      "עיריית גבעת אורנים: ₪600.00 a month"
-     ],
-     "link": {
-      "q": "עיריית גבעת אורנים",
-      "view": "transactions"
-     },
-     "series": [
-      {
-       "amount": 60000,
-       "date": "2025-12-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-01-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-02-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-03-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-04-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-05-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-06-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-07-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-08-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-09-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-10-05"
-      },
-      {
-       "amount": 60000,
-       "date": "2026-11-05"
-      }
-     ]
-    },
-    "first_seen": "2026-11-18",
-    "group": "save",
-    "key": "arnona:עיריית גבעת אורנים:2027",
-    "market": {
-     "checked_at": "2026-11-18T07:01:00+00:00",
-     "error": null,
-     "items": [
-      {
-       "deadline": "2027-01-31",
-       "discount_pct": 2.0,
-       "found": true,
-       "method": "באתר העירייה",
-       "source": {
-        "title": "דוגמה",
-        "url": "https://example.com/offer"
-       }
-      }
-     ],
-     "needs_answer": null,
-     "params": {
-      "city": "גבעת אורנים",
-      "year": 2027
-     },
-     "sources": [
-      {
-       "title": "השוואת מחירים לדוגמה",
-       "url": "https://example.com/prices"
-      }
-     ],
-     "stale": false,
-     "state": "ok",
-     "topic": "arnona"
-    },
-    "math": [
-     "₪600.00 a month × 12 = ₪7,200.00 for 2027",
-     "2% off ₪7,200.00 = ₪144.00",
-     "− ₪7,200.00 × 3.95% × 5.5/12 = ₪130.35 interest given up by paying early",
-     "= ₪13.65"
-    ],
-    "new": true,
-    "outcome": null,
-    "questions": [],
-    "saving": {
-     "basis": "market",
-     "high": 1365,
-     "low": 1365
-    },
-    "scope": null,
-    "script": null,
-    "snooze_until": null,
-    "status": "open",
-    "status_at": null,
-    "steps": [
-     {
-      "text": "Run a price check for גבעת אורנים's discount for paying the year at once",
-      "url": null
-     },
-     {
-      "text": "Pay 2027 at once on the municipality's site or by phone before the deadline",
-      "url": null
-     },
-     {
-      "text": "Cancel the monthly standing order for the year (the bank's app)",
-      "url": null
-     }
-    ],
-    "subitems": null,
-    "suggested_target": null,
-    "summary": "2% off for paying 2027 at once: ₪13.65 after the interest the money would have earned.",
-    "target": null,
-    "timing": {
-     "from": "2026-11-01",
-     "label": "Pay 2027 by 31 Jan 2027",
-     "until": "2027-01-31"
-    },
-    "title": "Pay the 2027 arnona in one payment?",
-    "type": "arnona"
-   },
    {
     "active": true,
     "at_stake": 240000,
@@ -693,8 +549,8 @@
       "url": null
      },
      {
-      "text": "Compare compulsory car insurance prices on the regulator's calculator",
-      "url": "https://car.cma.gov.il"
+      "text": "Compare compulsory car insurance prices on the sample price calculator",
+      "url": "https://car.example.test"
      },
      {
       "text": "Get quotes from two other insurers for the same cover",
@@ -1226,7 +1082,7 @@
     },
     "first_seen": "2026-11-18",
     "group": "save",
-    "key": "cash:dfa59b2f818a48fe92449dfacc4627bc",
+    "key": "cash:8911a0cc896a48868cbc3996a2169815",
     "market": null,
     "math": [
      "₪25,000.00 × (4.25% − 0.3%) = ₪987.50 a year",
@@ -1490,7 +1346,7 @@
     "scope": null,
     "script": {
      "lang": "he",
-     "text": "שלום, אני מתקשר/ת בקשר לחשבון שלי בסלולר הצפון. ראיתי שהחיוב עלה מ-₪69 ל-₪109 לחודש. אני לקוח/ה כבר תקופה ארוכה ומבקש/ת לחזור למחיר הקודם. מצאתי הצעה של תקשורת הדרום — בסיסי ב-₪35 לחודש בממוצע בשנה הראשונה. אם אין לכם הצעה טובה יותר, אשקול לעבור."
+     "text": "שלום, החיוב בסלולר הצפון עלה מ-₪69 ל-₪109. אבקש לחזור למחיר הקודם. ל-תקשורת הדרום יש בסיסי ב-₪35 לחודש."
     },
     "snooze_until": null,
     "status": "doing",
@@ -1516,149 +1372,6 @@
     "timing": null,
     "title": "סלולר הצפון went up ₪40 a month",
     "type": "bill"
-   },
-   {
-    "active": true,
-    "at_stake": 345000,
-    "effort": {
-     "how": "online",
-     "minutes": 15
-    },
-    "evidence": {
-     "lines": [
-      "6 bills from חברת החשמל in the last 12 months, no private supplier"
-     ],
-     "link": {
-      "q": "חברת החשמל",
-      "view": "transactions"
-     },
-     "series": [
-      {
-       "amount": 61000,
-       "date": "2026-01-21"
-      },
-      {
-       "amount": 48000,
-       "date": "2026-03-19"
-      },
-      {
-       "amount": 45000,
-       "date": "2026-05-20"
-      },
-      {
-       "amount": 69000,
-       "date": "2026-07-22"
-      },
-      {
-       "amount": 72000,
-       "date": "2026-09-21"
-      },
-      {
-       "amount": 54000,
-       "date": "2026-11-16"
-      }
-     ]
-    },
-    "first_seen": "2026-11-18",
-    "group": "save",
-    "key": "electricity",
-    "market": {
-     "checked_at": "2026-11-18T07:01:00+00:00",
-     "error": null,
-     "items": [
-      {
-       "days": "כל השבוע",
-       "discount_pct": 7.0,
-       "hours": "24 שעות",
-       "plan": "כל היום",
-       "smart_meter": false,
-       "source": {
-        "title": "דוגמה",
-        "url": "https://example.com/offer"
-       },
-       "supplier": "חשמל הצפון"
-      },
-      {
-       "days": "כל השבוע",
-       "discount_pct": 20.0,
-       "hours": "23:00–07:00",
-       "plan": "לילה",
-       "smart_meter": true,
-       "source": {
-        "title": "דוגמה",
-        "url": "https://example.com/offer"
-       },
-       "supplier": "אנרגיית הדרום"
-      },
-      {
-       "days": "א׳–ה׳",
-       "discount_pct": 15.0,
-       "hours": "07:00–17:00",
-       "plan": "יום",
-       "smart_meter": true,
-       "source": {
-        "title": "דוגמה",
-        "url": "https://example.com/offer"
-       },
-       "supplier": "חשמל הגבעה"
-      }
-     ],
-     "needs_answer": null,
-     "params": {},
-     "sources": [
-      {
-       "title": "השוואת מחירים לדוגמה",
-       "url": "https://example.com/prices"
-      }
-     ],
-     "stale": false,
-     "state": "ok",
-     "topic": "electricity"
-    },
-    "math": [
-     "A typical bill ₪575.00 every 2 months × 6 = ₪3,450.00 a year",
-     "₪3,450.00 × 95% (the part a discount applies to) × 7% = ₪229.43 a year (חשמל הצפון, כל היום)",
-     "Up to 20%: ₪655.50 a year (אנרגיית הדרום, לילה, 23:00–07:00)"
-    ],
-    "new": true,
-    "outcome": {
-     "detail": "Waiting for the next electricity bill",
-     "saved": 0,
-     "saved_yearly": 0,
-     "state": "waiting"
-    },
-    "questions": [],
-    "saving": {
-     "basis": "market",
-     "high": 65550,
-     "low": 22943
-    },
-    "scope": null,
-    "script": null,
-    "snooze_until": null,
-    "status": "done",
-    "status_at": "2026-11-18T07:30:00+00:00",
-    "steps": [
-     {
-      "text": "Run a price check for the suppliers' current plans",
-      "url": null
-     },
-     {
-      "text": "Pick a plan for all hours if you don't want to move your use to set hours",
-      "url": null
-     },
-     {
-      "text": "Sign up on the supplier's site; the line and the meter stay as they are",
-      "url": null
-     }
-    ],
-    "subitems": null,
-    "suggested_target": null,
-    "summary": "About ₪3,450.00 a year to חברת החשמל; חשמל הצפון gives 7% off all day, up to 20% with אנרגיית הדרום.",
-    "target": null,
-    "timing": null,
-    "title": "Switch electricity supplier",
-    "type": "electricity"
    },
    {
     "active": false,
@@ -1744,7 +1457,7 @@
     "scope": null,
     "script": {
      "lang": "he",
-     "text": "שלום, ראיתי שבשנה האחרונה שילמתי ₪130.80 בעמלות. אבקש לבטל את העמלות האלה, או להעביר אותי למסלול הבסיסי אם הוא זול יותר עבורי."
+     "text": "שלום, שילמתי ₪130.80 בעמלות בשנה האחרונה. אבקש לבטל אותן או לעבור למסלול הבסיסי."
     },
     "snooze_until": null,
     "status": "dismissed",
@@ -1839,7 +1552,7 @@
     },
     "first_seen": "2026-11-18",
     "group": "save",
-    "key": "fx:025adfc16d3948869ecd405ce05d2b3f",
+    "key": "fx:f92b676f49294e4c9b755d0cc4ccf36d",
     "market": {
      "checked_at": "2026-11-18T07:01:00+00:00",
      "error": null,
@@ -1896,7 +1609,12 @@
      "With כרטיס הצפון (0% fee, ₪0.00 a month): ₪153.50 − ₪0.00 = ₪153.50 a year"
     ],
     "new": true,
-    "outcome": null,
+    "outcome": {
+     "detail": "Waiting for more purchases in foreign currency to compare",
+     "saved": 0,
+     "saved_yearly": 0,
+     "state": "waiting"
+    },
     "questions": [],
     "saving": {
      "basis": "market",
@@ -1906,8 +1624,8 @@
     "scope": null,
     "script": null,
     "snooze_until": null,
-    "status": "open",
-    "status_at": null,
+    "status": "done",
+    "status_at": "2026-11-18T07:30:00+00:00",
     "steps": [
      {
       "text": "Run a price check for cards and wallets without a conversion fee",
@@ -2072,8 +1790,8 @@
     "status_at": null,
     "steps": [
      {
-      "text": "Check הר הביטוח for every policy in your name",
-      "url": "https://harb.cma.gov.il"
+      "text": "Check the sample policy register for every policy in your name",
+      "url": "https://policies.example.test"
      },
      {
       "text": "Look for the same cover twice (health or life insurance through work and privately)",
@@ -2086,7 +1804,7 @@
     ],
     "subitems": null,
     "suggested_target": null,
-    "summary": "3 policies. הר הביטוח lists every policy in your name, so the same cover paid twice stands out.",
+    "summary": "3 policies. the sample policy register lists every policy in your name, so the same cover paid twice stands out.",
     "target": null,
     "timing": null,
     "title": "Review your insurance: ₪5,760 a year",
@@ -2607,11 +2325,11 @@
        "date": "2026-09-16"
       },
       {
-       "amount": 11000,
+       "amount": 6000,
        "date": "2026-09-17"
       },
       {
-       "amount": 6000,
+       "amount": 11000,
        "date": "2026-09-17"
       }
      ]
@@ -2621,7 +2339,7 @@
     "key": "spree:חנות הצפון אונליין:2026-09-14",
     "market": null,
     "math": [
-     "₪120.00 + ₪95.00 + ₪150.00 + ₪80.00 + ₪110.00 + ₪60.00 = ₪615.00"
+     "₪120.00 + ₪95.00 + ₪150.00 + ₪80.00 + ₪60.00 + ₪110.00 = ₪615.00"
     ],
     "new": true,
     "outcome": null,
@@ -2784,13 +2502,15 @@
     "saving": null,
     "scope": {
      "keywords": [
-      "קנס",
-      "דוח חניה",
-      "ריבית חובה",
-      "ריבית פיגורים",
-      "פיגור",
-      "איחור",
-      "עמלת משיכה"
+      "penalty",
+      "parking fine",
+      "traffic fine",
+      "parking ticket",
+      "late fee",
+      "late payment",
+      "overdraft interest",
+      "interest on arrears",
+      "withdrawal fee"
      ]
     },
     "script": null,
@@ -2824,9 +2544,9 @@
    "year_ago_date": "2025-11-18"
   },
   "totals": {
-   "count": 4,
-   "high": 254825,
-   "low": 228085,
+   "count": 2,
+   "high": 238110,
+   "low": 213915,
    "saved": 25980,
    "saved_yearly": 35880,
    "watch_count": 4

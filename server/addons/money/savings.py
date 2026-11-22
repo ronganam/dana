@@ -1,20 +1,19 @@
 """Saving opportunities (docs/money.md, "Savings").
 
 **Ways to save** (group ``save``): concrete savings in the user's own rows — a
-bill that went up, electricity from חברת החשמל without a private supplier,
-idle cash in an investment account or the bank, foreign-currency markups,
-bank and card fees, paying the arnona for the year, insurance and car
-renewals, an insurance review, subscriptions, the mortgage. **Spending to
+bill that went up, idle cash in an investment account or the bank,
+foreign-currency markups, bank and card fees, insurance and car renewals, an
+insurance review, subscriptions, the mortgage — plus the ways to save the
+user's providers bring (``providers.SavingsRules``: a local utility or tax). **Spending to
 watch** (group ``watch``): habits — a discretionary bucket creeping up, a
 spree at one merchant, small charges that add up, two services of one niche,
 fines and late fees, late-night shopping — each with an optional monthly
 target.
 
-Every number is computed here from the rows, the reference rates of the
+Every number is computed here (or by a provider's detector) from the rows, the reference rates of the
 user's provider (``providers.rates``: a central bank's, named ``Context.bank``) and
 the price checks the user asked for (``providers.price_checks``); without
-rates the items that need them (``cash``, ``cushion``, the arnona's net) are
-left out, without price checks an item's check reads ``unavailable``;
+rates the items that need them (``cash``, ``cushion``) are left out, without price checks an item's check reads ``unavailable``;
 each saving says its basis: ``measured``, ``increase`` or ``market``. Without
 a credible saving an item has ``at_stake`` (money a year) and ``saving: None``.
 
@@ -24,7 +23,13 @@ the user's choices: the status (never hidden — an item the user decided
 about stays listed after its detector stops firing, rendered from its
 snapshot with ``active: False``), the outcome measured from later rows, and
 the target's progress. Writes (:func:`update` and its wrappers) register an
-Undo (core/undo.py)."""
+Undo (core/undo.py).
+
+The text is English; a provider's ``SavingsRules`` adds the local names of
+generic things (:func:`term`), its words in statements (:func:`words`), public
+pages for steps (:func:`link`) and phone scripts in its language
+(:func:`script`). :func:`make_item`, :func:`make_outcome` and the helpers
+next to them are what a provider's detectors build with."""
 
 import calendar
 import datetime
@@ -74,10 +79,6 @@ SUBSCRIPTIONS_MIN = 30_000
 MORTGAGE_MIN = 200_000
 RENEWAL_LEAD_DAYS = 60
 RENEWAL_LATE_DAYS = 14
-# Paying the arnona for the year in January gives up about this many months of interest on it.
-ARNONA_MONTHS_EARLY = 5.5
-# The share of an electricity bill a supplier's discount applies to (the rest is fixed charges).
-ELECTRICITY_SHARE = 0.95
 # Spending to watch.
 DISCRETIONARY = ("restaurants", "delivery", "shopping", "electronics", "clothing", "entertainment", "subscriptions")
 BUCKETS = {"eating_out": ("restaurants", "delivery"), "shopping": ("shopping", "clothing", "electronics"),
@@ -101,19 +102,13 @@ NICHES: Dict[str, Tuple[str, ...]] = {
     "storage": ("google one", "icloud", "dropbox", "onedrive"),
 }
 NICHE_LABELS = {"ai": "AI assistants", "video": "video services", "music": "music services", "storage": "cloud storage"}
-PENALTY_WORDS = ("קנס", "דוח חניה", "ריבית חובה", "ריבית פיגורים", "פיגור", "איחור", "עמלת משיכה")
-
-_IEC_WORDS = ("חברת החשמל",)
-_IEC_TOKENS = ("חחי", "iec")
-_SUPPLIERS = ("סלקום אנרג", "cellcom energy", "פרטנר חשמל", "פרטנר אנרג", "partner power", "בזק אנרג",
-              "bezeq energy", "הוט אנרג", "hot energy", "אמישראגז חשמל", "פזגז חשמל", "דור אלון אנרג",
-              "אלקטרה פאוור", "electra power")
-# "אלקטרה פאוור סופרגז" sells cooking gas, not electricity.
-_NOT_SUPPLIERS = ("סופרגז", "supergas")
-_CITY_WORDS = {"עיריית", "עירית", "עירייה", "עיריה", "מועצה", "מקומית", "אזורית", "אזורי", "ארנונה", "תשלום", "חיוב",
-               "בעמ", "בע", "מ"}
-CAR_CALCULATOR = "https://car.cma.gov.il"
-INSURANCE_MOUNTAIN = "https://harb.cma.gov.il"
+# Words (whole words, English; a provider adds its own: SavingsRules.words) for fines and late fees,
+# an insurer, compulsory car insurance and a money market fund among the holdings.
+PENALTY_WORDS = ("penalty", "parking fine", "traffic fine", "parking ticket", "late fee", "late payment",
+                 "overdraft interest", "interest on arrears", "withdrawal fee")
+INSURANCE_WORDS = ("insurance", "insurer")
+COMPULSORY_WORDS = ("compulsory", "mandatory")
+FUND_WORDS = ("money market",)
 
 SERVICE_QUESTION = {"id": "service", "text": "What is this bill for?", "options": [
     {"value": "mobile", "label": "Mobile lines"}, {"value": "home_internet", "label": "Home internet"},
@@ -160,11 +155,12 @@ class Context:
     investments: List[Dict[str, Any]]                 # portfolio accounts with their holdings
     trades: List[Dict[str, Any]]                      # their recent activity
     rate: Optional[Dict[str, Any]]                    # providers.Rates.policy_rate
-    fx: Dict[str, Dict[str, float]]                   # currency → {date: shekels a unit}
+    fx: Dict[str, Dict[str, float]]                   # currency → {date: units of the user's currency a unit}
     answers: Dict[str, Dict[str, Any]]                # item key → the user's answers
     market: Optional[Callable[[str, Dict[str, Any]], Optional[Dict[str, Any]]]]  # None: no price checks
     unavailable: Set[str] = field(default_factory=set)  # price-check topics that said "unavailable"
     bank: str = "central bank"                        # providers.Rates.bank: whose rate it is
+    rules: List[providers.SavingsRules] = field(default_factory=list)  # the user's providers' savings rules
 
     @property
     def Bank(self) -> str:
@@ -184,12 +180,12 @@ class Context:
 sh = store.money_text
 
 
-def _r(x: float) -> int:
-    """Round half up to an integer (agorot)."""
+def round_half(x: float) -> int:
+    """Round half up to an integer (hundredths)."""
     return int(math.floor(x + 0.5))
 
 
-def _d(value: str) -> datetime.date:
+def as_date(value: str) -> datetime.date:
     return datetime.date.fromisoformat(value[:10])
 
 
@@ -198,29 +194,29 @@ def _whole(amount: Optional[int]) -> str:
     return sh(amount or 0, cents=False)
 
 
-def _exact(amount: int) -> str:
+def exact(amount: int) -> str:
     """``€109`` or ``€109.90`` (cents only when there are any), for the scripts to say."""
     return sh(abs(int(amount)), cents=bool(abs(int(amount)) % 100))
 
 
 def _range(low: int, high: int) -> str:
-    return _whole(high) if _r(low / 100) == _r(high / 100) else f"{_whole(low)}–{_whole(high)}"
+    return _whole(high) if round_half(low / 100) == round_half(high / 100) else f"{_whole(low)}–{_whole(high)}"
 
 
-def _pct(value: float) -> str:
+def percent(value: float) -> str:
     return f"{value:.2f}".rstrip("0").rstrip(".") + "%"
 
 
-def _day(value: Any) -> str:
-    d = value if isinstance(value, datetime.date) else _d(str(value))
+def day_text(value: Any) -> str:
+    d = value if isinstance(value, datetime.date) else as_date(str(value))
     return periods.short_date(d)
 
 
-def _merchant(r: Dict[str, Any]) -> str:
+def merchant_of(r: Dict[str, Any]) -> str:
     return r.get("merchant") or r.get("description") or ""
 
 
-def _norm(text: str) -> str:
+def norm(text: str) -> str:
     return ingest.merchant_key(text or "")
 
 
@@ -228,15 +224,15 @@ def _group(r: Dict[str, Any]) -> str:
     """The merchant a row belongs to for habits and subscriptions: its display name, normalised, so the
     spellings of one merchant count together (a cloud bill with an invoice code in every description has a
     new merchant key each month, one display name); the merchant key when there is no display name."""
-    return _norm(r.get("merchant") or "") or (r.get("merchant_key") or "")
+    return norm(r.get("merchant") or "") or (r.get("merchant_key") or "")
 
 
-def _text(r: Dict[str, Any]) -> str:
+def row_text(r: Dict[str, Any]) -> str:
     """Merchant, description and memo, normalised (quotes dropped, punctuation as spaces)."""
-    return _norm(" ".join(str(r.get(k) or "") for k in ("merchant_key", "merchant", "description", "memo")))
+    return norm(" ".join(str(r.get(k) or "") for k in ("merchant_key", "merchant", "description", "memo")))
 
 
-def _has_word(text: str, word: str) -> bool:
+def has_word(text: str, word: str) -> bool:
     return re.search(r"(?<!\w)" + re.escape(word) + r"(?!\w)", text) is not None
 
 
@@ -245,7 +241,7 @@ def _foreign(r: Dict[str, Any]) -> bool:
 
 
 def _spent(rows: Iterable[Dict[str, Any]]) -> int:
-    """What the rows spent, positive agorot (refunds reduce it)."""
+    """What the rows spent, positive hundredths (refunds reduce it)."""
     return -sum(r["amount"] for r in rows)
 
 
@@ -255,13 +251,9 @@ def _next_date(cadence: str, d: datetime.date) -> datetime.date:
     return periods.add_months(d, {"monthly": 1, "bimonthly": 2}.get(cadence, 12))
 
 
-def _per_text_he(cadence: str) -> str:
-    return {"weekly": "לשבוע", "monthly": "לחודש", "bimonthly": "לחודשיים", "yearly": "לשנה"}.get(cadence, "לחודש")
-
-
-def _round50(agorot: float) -> int:
+def _round50(amount: float) -> int:
     """Rounded to the nearest 50 units (half up)."""
-    return int(math.floor(agorot / 5_000 + 0.5)) * 5_000
+    return int(math.floor(amount / 5_000 + 0.5)) * 5_000
 
 
 def _monthly_series(rows: Iterable[Dict[str, Any]], months: Sequence[datetime.date]) -> List[Dict[str, Any]]:
@@ -277,52 +269,85 @@ def _last_months(today: datetime.date, n: int) -> List[datetime.date]:
     return [periods.add_months(first, -k) for k in range(n - 1, -1, -1)]
 
 
-def _yield(ctx: Context) -> Optional[float]:
+def fund_yield(ctx: Context) -> Optional[float]:
     """What a money market fund pays a year (percent), None without the policy rate."""
     if not ctx.rate or ctx.rate.get("rate") is None:
         return None
     return float(ctx.rate["rate"]) - FUND_FEE
 
 
-def _saving(low: float, high: float, basis: str) -> Optional[Dict[str, Any]]:
-    lo, hi = sorted((_r(low), _r(high)))
+def words(ctx: Context, meaning: str) -> Tuple[str, ...]:
+    """The user's providers' words for ``meaning`` (``SavingsRules.words``: ``penalty``, ``insurance``…)."""
+    return tuple(w for r in ctx.rules for w in r.words.get(meaning, ()))
+
+
+def term(ctx: Context, key: str, text: str) -> str:
+    """``text`` with the local name of the thing in brackets when a provider of the user's has one
+    ("a money market fund (fonds monétaire)"), else ``text``."""
+    local = next((r.terms[key] for r in ctx.rules if r.terms.get(key)), "")
+    return f"{text} ({local})" if local else text
+
+
+def link(ctx: Context, key: str) -> Optional[Tuple[str, str]]:
+    """A public page a provider of the user's names for a step: ``(name, url)``, None without one."""
+    return next((r.links[key] for r in ctx.rules if r.links.get(key)), None)
+
+
+def script(ctx: Context, name: str, *args: Any) -> Optional[Dict[str, str]]:
+    """What to say on the phone (``{lang, text}``) from a provider of the user's, None without one."""
+    for r in ctx.rules:
+        fn = r.scripts.get(name)
+        if fn is not None:
+            return {"lang": r.script_lang, "text": fn(*args)}
+    return None
+
+
+def _any_word(text: str, english: Sequence[str], local: Sequence[str]) -> bool:
+    """Whether ``text`` (normalised) holds one of the English words (whole words) or a provider's (anywhere:
+    languages that join words to their prefixes)."""
+    return any(has_word(text, norm(w)) for w in english) or any(norm(w) in text for w in local if norm(w))
+
+
+def saving_range(low: float, high: float, basis: str) -> Optional[Dict[str, Any]]:
+    lo, hi = sorted((round_half(low), round_half(high)))
     if hi <= 0:
         return None
     return {"low": max(0, lo), "high": hi, "basis": basis}
 
 
-def _evidence(lines: Sequence[str], series: Sequence[Dict[str, Any]] = (),
+def make_evidence(lines: Sequence[str], series: Sequence[Dict[str, Any]] = (),
               link: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     return {"lines": list(lines), "series": list(series), "link": link}
 
 
-def _step(text: str, url: Optional[str] = None) -> Dict[str, Any]:
+def make_step(text: str, url: Optional[str] = None) -> Dict[str, Any]:
     return {"text": text, "url": url}
 
 
-def _item(key: str, kind: str, group: str, title: str, summary: str, *, saving: Optional[Dict[str, Any]] = None,
+def make_item(key: str, kind: str, group: str, title: str, summary: str, *, saving: Optional[Dict[str, Any]] = None,
           at_stake: Optional[int] = None, effort: Optional[Dict[str, Any]] = None,
           timing: Optional[Dict[str, Any]] = None, evidence: Optional[Dict[str, Any]] = None,
-          math_lines: Sequence[str] = (), steps: Sequence[Dict[str, Any]] = (), script: Optional[str] = None,
+          math_lines: Sequence[str] = (), steps: Sequence[Dict[str, Any]] = (),
+          script: Optional[Dict[str, str]] = None,
           questions: Sequence[Dict[str, Any]] = (), market_info: Optional[Dict[str, Any]] = None,
           subitems: Optional[List[Dict[str, Any]]] = None, scope: Optional[Dict[str, Any]] = None,
           suggested_target: Optional[int] = None, baseline: Optional[Dict[str, Any]] = None,
           label: Optional[str] = None) -> Dict[str, Any]:
-    """One detected item (lifecycle fields are added by :func:`overview`); ``_baseline`` and
-    ``_label`` are kept in the snapshot, never returned."""
+    """One detected item (lifecycle fields are added by :func:`overview`); ``script``: :func:`script`'s;
+    ``_baseline`` and ``_label`` are kept in the snapshot, never returned."""
     return {"key": key, "type": kind, "group": group, "title": title, "summary": summary, "saving": saving,
-            "at_stake": at_stake, "effort": effort, "timing": timing, "evidence": evidence or _evidence([]),
+            "at_stake": at_stake, "effort": effort, "timing": timing, "evidence": evidence or make_evidence([]),
             "math": list(math_lines), "steps": list(steps),
-            "script": {"lang": "he", "text": script} if script else None, "questions": list(questions),
+            "script": script, "questions": list(questions),
             "market": market_info, "subitems": subitems, "scope": scope, "suggested_target": suggested_target,
             "_baseline": baseline or {}, "_label": label or title}
 
 
-def _effort(minutes: int, how: str) -> Dict[str, Any]:
+def make_effort(minutes: int, how: str) -> Dict[str, Any]:
     return {"minutes": minutes, "how": how}
 
 
-def _market(ctx: Context, topic: str, params: Dict[str, Any], needs_answer: Optional[str] = None) -> Dict[str, Any]:
+def market_state(ctx: Context, topic: str, params: Dict[str, Any], needs_answer: Optional[str] = None) -> Dict[str, Any]:
     """The item's price-check state: the newest check with these params (none while a question is unanswered)."""
     if ctx.market is None:
         return {"topic": topic, "params": params, "state": "unavailable", "checked_at": None, "stale": False,
@@ -344,29 +369,8 @@ def _market(ctx: Context, topic: str, params: Dict[str, Any], needs_answer: Opti
             "error": found.get("error"), "needs_answer": None}
 
 
-def _checked(m: Optional[Dict[str, Any]]) -> bool:
+def checked(m: Optional[Dict[str, Any]]) -> bool:
     return bool(m and m["state"] == "ok" and m["items"])
-
-
-def _is_iec(r: Dict[str, Any]) -> bool:
-    text = _text(r)
-    return any(w in text for w in _IEC_WORDS) or any(_has_word(text, t) for t in _IEC_TOKENS)
-
-
-def _is_supplier(r: Dict[str, Any]) -> bool:
-    text = _text(r)
-    return any(_norm(s) in text for s in _SUPPLIERS) and not any(w in text for w in _NOT_SUPPLIERS)
-
-
-def _is_municipality(text: str) -> bool:
-    t = _norm(text)
-    return "עירי" in t or "מועצה" in t
-
-
-def city_of(merchant: str) -> str:
-    """The town of a municipality's merchant name: ``עיריית גבעת אורנים - ארנונה`` → ``גבעת אורנים``."""
-    words = [w for w in _norm(merchant).split() if w not in _CITY_WORDS]
-    return " ".join(words)
 
 
 def _night(r: Dict[str, Any]) -> bool:
@@ -380,7 +384,7 @@ def _night(r: Dict[str, Any]) -> bool:
 
 
 def _habit(ctx: Context, r: Dict[str, Any]) -> bool:
-    """A discretionary purchase in shekels that is not a one-off (habit trends)."""
+    """A discretionary purchase in the user's currency that is not a one-off (habit trends)."""
     return (dashboard.is_spending(r) and r.get("category") in DISCRETIONARY and not _foreign(r)
             and ctx.book.kinds.get(r["id"]) != "one_off")
 
@@ -398,7 +402,7 @@ def in_scope(ctx: Context, r: Dict[str, Any], scope: Dict[str, Any]) -> bool:
         return False
     if scope.get("categories") and r.get("category") not in scope["categories"]:
         return False
-    if scope.get("keywords") and (dashboard.flow(r) == "cash" or not any(_norm(w) in _text(r) for w in scope["keywords"])):
+    if scope.get("keywords") and (dashboard.flow(r) == "cash" or not any(norm(w) in row_text(r) for w in scope["keywords"])):
         return False
     if scope.get("hours") and not _night(r):
         return False
@@ -407,16 +411,6 @@ def in_scope(ctx: Context, r: Dict[str, Any], scope: Dict[str, Any]) -> bool:
 
 # --- Ways to save -----------------------------------------------------------------------------
 
-def _bill_script(merchant: str, before: int, after: int, cadence: str, offer: Optional[Dict[str, Any]]) -> str:
-    per = _per_text_he(cadence)
-    text = (f"שלום, אני מתקשר/ת בקשר לחשבון שלי ב{merchant}. ראיתי שהחיוב עלה מ-{_exact(before)} ל-{_exact(after)} "
-            f"{per}. אני לקוח/ה כבר תקופה ארוכה ומבקש/ת לחזור למחיר הקודם.")
-    if offer:
-        text += (f" מצאתי הצעה של {offer['provider']} — {offer['plan']} ב-{_exact(offer['avg_12'])} לחודש בממוצע "
-                 f"בשנה הראשונה.")
-    return text + " אם אין לכם הצעה טובה יותר, אשקול לעבור."
-
-
 def _bills(ctx: Context) -> List[Dict[str, Any]]:
     out = []
     since_limit = periods.add_months(ctx.today, -BILL_MONTHS).isoformat()
@@ -424,7 +418,7 @@ def _bills(ctx: Context) -> List[Dict[str, Any]]:
         ch = c.get("price_change")
         if c.get("category") not in BILL_CATEGORIES or not ch or ch["to"] <= ch["from"] or ch["since"] < since_limit:
             continue
-        if _is_iec({"merchant_key": c["merchant_key"], "merchant": c["merchant"]}):
+        if any(r.own_bills is not None and r.own_bills(c) for r in ctx.rules):
             continue
         per = insights.per_month(c["cadence"])
         if ch["to"] < ch["from"] * (1 + BILL_MIN_SHARE) or (ch["to"] - ch["from"]) * per < BILL_MIN_MONTHLY:
@@ -441,10 +435,10 @@ def _bills(ctx: Context) -> List[Dict[str, Any]]:
         market_info = None
         offer = None
         math_lines = [f"{sh(ch['to'])} − {sh(ch['from'])} = {sh(ch['to'] - ch['from'])} more {every}",
-                      f"{sh(ch['to'] - ch['from'])} × {_r(12 * per)} = {sh(_r(increase))} a year"]
-        steps = [_step(f"Call {c['merchant']} and ask for the old price ({sh(ch['from'])} {every}) back"),
-                 _step("If they refuse, ask which cheaper plan gives you the same"),
-                 _step("Still no? Cancel or switch: the new price is what you'd keep paying")]
+                      f"{sh(ch['to'] - ch['from'])} × {round_half(12 * per)} = {sh(round_half(increase))} a year"]
+        steps = [make_step(f"Call {c['merchant']} and ask for the old price ({sh(ch['from'])} {every}) back"),
+                 make_step("If they refuse, ask which cheaper plan gives you the same"),
+                 make_step("Still no? Cancel or switch: the new price is what you'd keep paying")]
         if c["category"] == "phone_internet":
             answers = ctx.answers.get(key, {})
             service, lines = answers.get("service"), answers.get("lines")
@@ -453,45 +447,45 @@ def _bills(ctx: Context) -> List[Dict[str, Any]]:
                 questions.append({**LINES_QUESTION, "answer": lines})
             needs = "service" if not service else ("lines" if service in MOBILE and not lines else None)
             params = {"service": service, "lines": lines if service in MOBILE else None,
-                      "current_price": _r(current / 100)}
-            market_info = _market(ctx, "telecom", params, needs)
-            if _checked(market_info) and service != "mobile_and_internet":
+                      "current_price": round_half(current / 100)}
+            market_info = market_state(ctx, "telecom", params, needs)
+            if checked(market_info) and service != "mobile_and_internet":
                 # What each offer would cost for the user's lines (a mobile price is usually per line; an offer
                 # says how many lines its price covers); a bundle of mobile and internet has no fair comparison.
                 n = lines if service in MOBILE and lines else 1
-                costed = sorted(((_r(i["avg_12"] * n / (i.get("lines") or 1)) if service in MOBILE else i["avg_12"], i)
+                costed = sorted(((round_half(i["avg_12"] * n / (i.get("lines") or 1)) if service in MOBILE else i["avg_12"], i)
                                  for i in market_info["items"] if isinstance(i.get("avg_12"), int)),
                                 key=lambda pair: pair[0])
                 if costed:
                     avgs = [cost for cost, _ in costed]
                     ref = avgs[2] if len(avgs) >= 3 else statistics.median(avgs)
-                    saving = _saving((current - ref) * 12, (current - avgs[0]) * 12, "market")
+                    saving = saving_range((current - ref) * 12, (current - avgs[0]) * 12, "market")
                     if saving:
                         best, offer = costed[0]
                         lines_text = f" for {n} lines" if n > 1 else ""
                         math_lines.append(f"Best offer: {offer['provider']} {offer['plan']}, {sh(best)} a month{lines_text} "
-                                          f"over 12 months: ({sh(_r(current))} − {sh(best)}) × 12 = "
+                                          f"over 12 months: ({sh(round_half(current))} − {sh(best)}) × 12 = "
                                           f"{sh(saving['high'])} a year")
-                        steps[1] = _step(f"Tell them {offer['provider']} offers {offer['plan']} at "
+                        steps[1] = make_step(f"Tell them {offer['provider']} offers {offer['plan']} at "
                                          f"{sh(best)} a month{lines_text} (12-month average)",
                                          (offer.get("source") or {}).get("url"))
                         offer = {**offer, "avg_12": best}
-            elif _checked(market_info):
+            elif checked(market_info):
                 math_lines.append("A bundle of mobile and internet: compare the offers with what your bundle includes")
             else:
-                steps[1] = _step("Run a price check to see what other companies charge for the same")
+                steps[1] = make_step("Run a price check to see what other companies charge for the same")
         if saving is None:
-            saving = _saving(increase, increase, "increase")
-        out.append(_item(
+            saving = saving_range(increase, increase, "increase")
+        out.append(make_item(
             key, "bill", SAVE, f"{c['merchant']} went up {_whole((ch['to'] - ch['from']) * per)} a month",
-            f"From {sh(ch['from'])} to {sh(ch['to'])} {every} since {_day(ch['since'])}: "
-            f"{sh(_r(increase))} a year more. Ask for the old price back or switch.",
-            saving=saving, at_stake=_r(ch["to"] * 12 * per), effort=_effort(20, "call"),
-            evidence=_evidence([f"{sh(ch['from'])} {every} until {_day(ch['since'])}, {sh(ch['to'])} since",
+            f"From {sh(ch['from'])} to {sh(ch['to'])} {every} since {day_text(ch['since'])}: "
+            f"{sh(round_half(increase))} a year more. Ask for the old price back or switch.",
+            saving=saving, at_stake=round_half(ch["to"] * 12 * per), effort=make_effort(20, "call"),
+            evidence=make_evidence([f"{sh(ch['from'])} {every} until {day_text(ch['since'])}, {sh(ch['to'])} since",
                                 f"{c['category_label']} · {c['account_label']}"],
                                [{"date": r["purchase_date"], "amount": -r["amount"]} for r in rows],
                                {"view": "transactions", "q": c["merchant"]}),
-            math_lines=math_lines, steps=steps, script=_bill_script(c["merchant"], ch["from"], ch["to"], c["cadence"], offer),
+            math_lines=math_lines, steps=steps, script=script(ctx, "bill", c["merchant"], ch["from"], ch["to"], c["cadence"], offer),
             questions=questions, market_info=market_info,
             baseline={"amount": ch["to"], "from": ch["from"], "cadence": c["cadence"], "merchant_keys": keys,
                       "category": c["category"]},
@@ -499,63 +493,8 @@ def _bills(ctx: Context) -> List[Dict[str, Any]]:
     return out
 
 
-def _all_day(hours: Any) -> bool:
-    text = str(hours or "").casefold()
-    return any(w in text for w in ("24", "כל היום", "כל השעות", "all day", "any time"))
-
-
-def _electricity(ctx: Context) -> List[Dict[str, Any]]:
-    year_ago = ctx.since(365)
-    iec = [r for r in ctx.book.rows if dashboard.is_spending(r) and r["amount"] < 0 and _is_iec(r)]
-    recent = [r for r in iec if r["purchase_date"] >= year_ago]
-    if not recent or any(_is_supplier(r) for r in ctx.book.rows if r["purchase_date"] >= year_ago):
-        return []
-    keys = sorted({r["merchant_key"] for r in iec if r.get("merchant_key")})
-    # The typical bill × the bills a year: 12 months of data can hold 5 or 7 bimonthly bills, and a bill
-    # charged a few days late moves a whole bill out of the window.
-    cadence = next((c["cadence"] for c in ctx.book.charges
-                    if set(c.get("merchant_keys") or [c["merchant_key"]]) & set(keys)), "bimonthly")
-    yearly = _r(statistics.median(-r["amount"] for r in recent) * 12 * insights.per_month(cadence))
-    m = _market(ctx, "electricity", {})
-    saving = None
-    every = "every 2 months" if cadence == "bimonthly" else insights.cadence_text(cadence)
-    bills = round(12 * insights.per_month(cadence))
-    math_lines = [f"A typical bill {sh(_r(statistics.median(-r['amount'] for r in recent)))} {every} × {bills} = "
-                  f"{sh(yearly)} a year"]
-    summary = (f"About {sh(yearly)} a year to חברת החשמל. Private suppliers sell the same electricity at a "
-               f"discount; a price check lists their plans.")
-    if _checked(m):
-        plans = [i for i in m["items"] if isinstance(i.get("discount_pct"), (int, float))]
-        if plans:
-            best = max(plans, key=lambda i: i["discount_pct"])
-            easy = [i for i in plans if not i.get("smart_meter") and _all_day(i.get("hours"))]
-            simple = max(easy, key=lambda i: i["discount_pct"]) if easy else min(plans, key=lambda i: i["discount_pct"])
-            base = yearly * ELECTRICITY_SHARE
-            saving = _saving(base * simple["discount_pct"] / 100, base * best["discount_pct"] / 100, "market")
-            math_lines += [f"{sh(yearly)} × {ELECTRICITY_SHARE:.0%} (the part a discount applies to) × "
-                           f"{_pct(simple['discount_pct'])} = {sh(_r(base * simple['discount_pct'] / 100))} a year "
-                           f"({simple['supplier']}, {simple['plan']})",
-                           f"Up to {_pct(best['discount_pct'])}: {sh(_r(base * best['discount_pct'] / 100))} a year "
-                           f"({best['supplier']}, {best['plan']}, {best.get('hours') or ''})".replace(", )", ")")]
-            summary = (f"About {sh(yearly)} a year to חברת החשמל; {simple['supplier']} gives {_pct(simple['discount_pct'])} "
-                       f"off all day, up to {_pct(best['discount_pct'])} with {best['supplier']}.")
-    return [_item(
-        "electricity", "electricity", SAVE, "Switch electricity supplier", summary, saving=saving, at_stake=yearly,
-        effort=_effort(15, "online"),
-        evidence=_evidence([f"{len(recent)} bills from חברת החשמל in the last 12 months, no private supplier"],
-                           [{"date": r["purchase_date"], "amount": -r["amount"]} for r in recent],
-                           {"view": "transactions", "q": "חברת החשמל"}),
-        math_lines=math_lines,
-        steps=[_step("Run a price check for the suppliers' current plans"),
-               _step("Pick a plan for all hours if you don't want to move your use to set hours"),
-               _step("Sign up on the supplier's site; the line and the meter stay as they are")],
-        market_info=m, baseline={"yearly": yearly, "merchant_keys": keys,
-                                 "saving_low": saving["low"] if saving else None},
-        label="Electricity")]
-
-
 def _cash(ctx: Context) -> List[Dict[str, Any]]:
-    y = _yield(ctx)
+    y = fund_yield(ctx)
     if y is None or y <= 0:
         return []
     out = []
@@ -566,27 +505,28 @@ def _cash(ctx: Context) -> List[Dict[str, Any]]:
             continue
         if any(t.get("account_id") == a["id"] and t.get("kind") == "interest" and t["date"] >= quiet for t in ctx.trades):
             continue
-        funds = [h for h in a.get("holdings") or [] if "כספית" in (h.get("name") or "")]
+        funds = [h for h in a.get("holdings") or []
+                 if _any_word(norm(h.get("name") or ""), FUND_WORDS, words(ctx, "money_market_fund"))]
         value = cash * y / 100
-        first = (_step(f"You already hold {funds[0]['name']}: buy more of it with the cash") if funds else
-                 _step(f"Buy a money market fund (קרן כספית) with the cash in {a['label']}"))
-        out.append(_item(
+        first = (make_step(f"You already hold {funds[0]['name']}: buy more of it with the cash") if funds else
+                 make_step(f"Buy {term(ctx, 'money_market_fund', 'a money market fund')} with the cash in {a['label']}"))
+        out.append(make_item(
             f"cash:{a['id']}", "cash", SAVE, f"{_whole(cash)} cash earning nothing in {a['label']}",
-            f"A money market fund pays about {_pct(y)} a year now (the {ctx.bank} rate minus fees): "
-            f"about {sh(_r(value))} a year on it.",
-            saving=_saving(value, value, "measured"), at_stake=_r(value), effort=_effort(10, "app"),
-            evidence=_evidence([f"{sh(cash)} cash in {a['label']}" + (f" as of {_day(a['value_at'])}" if a.get("value_at") else ""),
+            f"A money market fund pays about {percent(y)} a year now (the {ctx.bank} rate minus fees): "
+            f"about {sh(round_half(value))} a year on it.",
+            saving=saving_range(value, value, "measured"), at_stake=round_half(value), effort=make_effort(10, "app"),
+            evidence=make_evidence([f"{sh(cash)} cash in {a['label']}" + (f" as of {day_text(a['value_at'])}" if a.get("value_at") else ""),
                                 f"No interest on it in the last {CASH_QUIET_DAYS} days"], [], {"view": "investments"}),
-            math_lines=[f"{sh(cash)} × ({_pct(ctx.rate['rate'])} − {_pct(FUND_FEE)}) = {sh(_r(value))} a year",
-                        f"{ctx.Bank} rate {_pct(ctx.rate['rate'])} on {_day(ctx.rate['date'])}"],
-            steps=[first, _step("Keep a little cash for fees and your next buy"),
-                   _step("A fund like that can be sold any trading day")],
+            math_lines=[f"{sh(cash)} × ({percent(ctx.rate['rate'])} − {percent(FUND_FEE)}) = {sh(round_half(value))} a year",
+                        f"{ctx.Bank} rate {percent(ctx.rate['rate'])} on {day_text(ctx.rate['date'])}"],
+            steps=[first, make_step("Keep a little cash for fees and your next buy"),
+                   make_step("A fund like that can be sold any trading day")],
             baseline={"cash": cash, "account_id": a["id"], "yield": y}, label=f"Cash in {a['label']}"))
     return out
 
 
 def _cushion(ctx: Context) -> List[Dict[str, Any]]:
-    y = _yield(ctx)
+    y = fund_yield(ctx)
     if y is None or y <= 0:
         return []
     history = [p for p in dashboard.balance_history(ctx.book, ctx.accounts, CUSHION_DAYS)
@@ -600,29 +540,31 @@ def _cushion(ctx: Context) -> List[Dict[str, Any]]:
     high_idle, low_idle = max(idle_fixed, idle_buffer), max(0, min(idle_fixed, idle_buffer))
     if high_idle < CUSHION_MIN_IDLE:
         return []
-    saving = _saving(low_idle * y / 100, high_idle * y / 100, "measured")
-    return [_item(
+    saving = saving_range(low_idle * y / 100, high_idle * y / 100, "measured")
+    return [make_item(
         "cushion", "cushion", SAVE, f"{_range(low_idle, high_idle)} sitting idle in the bank account",
         f"The balance never went below {sh(floor)} in the last {CUSHION_DAYS} days. Keeping a month of fixed "
         f"costs there and moving the rest to a money market fund or a deposit earns about "
         f"{_range(saving['low'], saving['high'])} a year." if saving else "",
-        saving=saving, at_stake=saving["high"] if saving else None, effort=_effort(10, "app"),
-        evidence=_evidence([f"Lowest balance in the last {CUSHION_DAYS} days: {sh(floor)} on {_day(low_point['date'])}",
+        saving=saving, at_stake=saving["high"] if saving else None, effort=make_effort(10, "app"),
+        evidence=make_evidence([f"Lowest balance in the last {CUSHION_DAYS} days: {sh(floor)} on {day_text(low_point['date'])}",
                             f"A month of fixed costs is about {sh(fixed)}"],
                            [{"date": p["date"], "amount": p["balance"]} for p in history], {"view": "cashflow"}),
         math_lines=[f"{sh(floor)} − {sh(fixed)} (a month of fixed costs) = {sh(idle_fixed)}",
                     f"{sh(floor)} − {sh(CUSHION_BUFFER)} = {sh(idle_buffer)}",
-                    f"× {_pct(y)} a year (the {ctx.bank} rate {_pct(ctx.rate['rate'])} minus fees)"],
-        steps=[_step(f"Keep about {sh(max(fixed, CUSHION_BUFFER))} in the account for the month's bills"),
-               _step("Move the rest to a money market fund (קרן כספית) or a short deposit (פיקדון) in the bank's app"),
-               _step("Take it back any time the balance runs low")],
+                    f"× {percent(y)} a year (the {ctx.bank} rate {percent(ctx.rate['rate'])} minus fees)"],
+        steps=[make_step(f"Keep about {sh(max(fixed, CUSHION_BUFFER))} in the account for the month's bills"),
+               make_step(f"Move the rest to {term(ctx, 'money_market_fund', 'a money market fund')} or "
+                         f"{term(ctx, 'deposit', 'a short deposit')} in the bank's app"),
+               make_step("Take it back any time the balance runs low")],
         baseline={"floor": floor, "idle_low": low_idle, "idle_high": high_idle, "yield": y,
                   "saving_low": saving["low"] if saving else 0},
         label="Idle money in the bank")]
 
 
 def _fx_lines(ctx: Context, rows: Iterable[Dict[str, Any]]) -> List[Tuple[Dict[str, Any], float, float]]:
-    """``(row, base, markup)`` for foreign purchases with a known rate (base: the BoI rate's shekels, agorot)."""
+    """``(row, base, markup)`` for foreign purchases with a known rate (base: at the central bank's rate, in
+    hundredths of the user's currency)."""
     out = []
     for r in rows:
         rate = providers.rate_on(ctx.fx.get((r.get("orig_currency") or "").upper(), {}), r["purchase_date"])
@@ -655,13 +597,13 @@ def _fx(ctx: Context) -> List[Dict[str, Any]]:
         median_pct = statistics.median(m / b * 100 for _, b, m in lines)
         currencies = sorted({(r.get("orig_currency") or "").upper() for r, _, _ in lines})
         label = labels.get(account_id, "your card")
-        m = _market(ctx, "fx_card", {})
-        saving = _saving(markup, markup, "measured")
-        math_lines = [f"Charged {sh(charged)} for purchases worth {sh(_r(base))} at the {ctx.bank} rate of each day",
-                      f"{sh(charged)} − {sh(_r(base))} = {sh(_r(markup))} ({_pct(round(total_pct, 2))})"]
-        summary = (f"{len(lines)} purchases in {'/'.join(currencies)} on {label} cost {_pct(round(total_pct, 1))} over "
-                   f"the {ctx.bank} rate: {sh(_r(markup))} in 12 months.")
-        if _checked(m):
+        m = market_state(ctx, "fx_card", {})
+        saving = saving_range(markup, markup, "measured")
+        math_lines = [f"Charged {sh(charged)} for purchases worth {sh(round_half(base))} at the {ctx.bank} rate of each day",
+                      f"{sh(charged)} − {sh(round_half(base))} = {sh(round_half(markup))} ({percent(round(total_pct, 2))})"]
+        summary = (f"{len(lines)} purchases in {'/'.join(currencies)} on {label} cost {percent(round(total_pct, 1))} over "
+                   f"the {ctx.bank} rate: {sh(round_half(markup))} in 12 months.")
+        if checked(m):
             nets = []
             for alt in m["items"]:
                 fee_pct = alt.get("fx_fee_pct") if isinstance(alt.get("fx_fee_pct"), (int, float)) else None
@@ -672,43 +614,42 @@ def _fx(ctx: Context) -> List[Dict[str, Any]]:
             if nets:
                 nets.sort(key=lambda n: -n[0])
                 best_net, best = nets[0]
-                saving = _saving(statistics.median(n for n, _ in nets), best_net, "market")
+                saving = saving_range(statistics.median(n for n, _ in nets), best_net, "market")
                 if saving:
-                    math_lines.append(f"With {best['name']} ({_pct(best['fx_fee_pct'])} fee, {sh(best.get('monthly_fee') or 0)} "
-                                      f"a month): {sh(_r(markup))} − {sh(_r(base * best['fx_fee_pct'] / 100 + (best.get('monthly_fee') or 0) * 12))} "
-                                      f"= {sh(_r(best_net))} a year")
+                    math_lines.append(f"With {best['name']} ({percent(best['fx_fee_pct'])} fee, {sh(best.get('monthly_fee') or 0)} "
+                                      f"a month): {sh(round_half(markup))} − {sh(round_half(base * best['fx_fee_pct'] / 100 + (best.get('monthly_fee') or 0) * 12))} "
+                                      f"= {sh(round_half(best_net))} a year")
                 else:
                     summary += " The price check found no card that would cost less."
-        out.append(_item(
+        out.append(make_item(
             f"fx:{account_id}", "fx", SAVE, f"{_whole(markup)} a year in foreign-currency fees", summary,
-            saving=saving, at_stake=_r(markup), effort=_effort(20, "online"),
-            evidence=_evidence([f"{len(lines)} purchases in foreign currency in 12 months, {sh(charged)} charged",
-                                f"{_pct(round(total_pct, 2))} over the {ctx.bank} rate in total, median "
-                                f"{_pct(round(median_pct, 2))} a purchase"],
+            saving=saving, at_stake=round_half(markup), effort=make_effort(20, "online"),
+            evidence=make_evidence([f"{len(lines)} purchases in foreign currency in 12 months, {sh(charged)} charged",
+                                f"{percent(round(total_pct, 2))} over the {ctx.bank} rate in total, median "
+                                f"{percent(round(median_pct, 2))} a purchase"],
                                _monthly_series([{"purchase_date": r["purchase_date"], "amount": -mk} for r, _, mk in lines],
                                                _last_months(ctx.today, 12)),
                                {"view": "transactions"}),
             math_lines=math_lines,
-            steps=[_step("Run a price check for cards and wallets without a conversion fee"),
-                   _step("Use one of them abroad and for purchases in dollars or euros online"),
-                   _step(f"Or ask the card company to waive the conversion fee (עמלת המרה) on {label}")],
+            steps=[make_step("Run a price check for cards and wallets without a conversion fee"),
+                   make_step("Use one of them abroad and for purchases in dollars or euros online"),
+                   make_step(f"Or ask the card company to waive {term(ctx, 'conversion_fee', 'the conversion fee')} on {label}")],
             market_info=m,
-            baseline={"markup": _r(markup), "base": _r(base), "pct": total_pct, "account_id": account_id},
+            baseline={"markup": round_half(markup), "base": round_half(base), "pct": total_pct, "account_id": account_id},
             label=f"Foreign-currency fees on {label}"))
     return out
 
 
-def _is_penalty(r: Dict[str, Any]) -> bool:
+def _is_penalty(ctx: Context, r: Dict[str, Any]) -> bool:
     """A fine, late fee, interest or withdrawal fee (never the cash taken out itself)."""
     if dashboard.flow(r) == "cash":
         return False
-    text = _text(r)
-    return any(_norm(w) in text for w in PENALTY_WORDS)
+    return _any_word(row_text(r), PENALTY_WORDS, words(ctx, "penalty"))
 
 
 def _fee_rows(ctx: Context, since: str) -> List[Dict[str, Any]]:
     return [r for r in ctx.book.rows if r["purchase_date"] >= since and r["amount"]
-            and (dashboard.flow(r) == "fee" or r.get("category") == "fees") and not _is_penalty(r)]
+            and (dashboard.flow(r) == "fee" or r.get("category") == "fees") and not _is_penalty(ctx, r)]
 
 
 def _fees(ctx: Context) -> List[Dict[str, Any]]:
@@ -716,111 +657,48 @@ def _fees(ctx: Context) -> List[Dict[str, Any]]:
     total = _spent(rows)
     if total < FEES_MIN:
         return []
-    names = sorted({_merchant(r) for r in rows if r["amount"] < 0})
-    return [_item(
+    names = sorted({merchant_of(r) for r in rows if r["amount"] < 0})
+    return [make_item(
         "fees", "fees", SAVE, f"{_whole(total)} in bank and card fees",
-        f"{sh(total)} in the last 12 months. Ask to waive them, or move to the bank's basic track (מסלול בסיסי).",
-        saving=_saving(total, total, "measured"), at_stake=total, effort=_effort(15, "call"),
-        evidence=_evidence([f"{sum(1 for r in rows if r['amount'] < 0)} fees in 12 months: {', '.join(names[:4])}"],
+        f"{sh(total)} in the last 12 months. Ask to waive them, or move to "
+        f"{term(ctx, 'basic_track', 'the bank\'s basic track')}.",
+        saving=saving_range(total, total, "measured"), at_stake=total, effort=make_effort(15, "call"),
+        evidence=make_evidence([f"{sum(1 for r in rows if r['amount'] < 0)} fees in 12 months: {', '.join(names[:4])}"],
                            _monthly_series(rows, _last_months(ctx.today, 12)), {"view": "transactions", "category": "fees"}),
         math_lines=[f"Fees in the last 12 months: {sh(total)}"],
-        steps=[_step("Call the bank and ask to waive the account fees"),
-               _step("Ask for the basic track (מסלול בסיסי) if your activity fits it"),
-               _step("For a card fee, ask the card company to waive it or switch to a card without one")],
-        script=(f"שלום, ראיתי שבשנה האחרונה שילמתי {_exact(total)} בעמלות. אבקש לבטל את העמלות האלה, או להעביר אותי "
-                f"למסלול הבסיסי אם הוא זול יותר עבורי."),
+        steps=[make_step("Call the bank and ask to waive the account fees"),
+               make_step(f"Ask for {term(ctx, 'basic_track', 'the basic track')} if your activity fits it"),
+               make_step("For a card fee, ask the card company to waive it or switch to a card without one")],
+        script=script(ctx, "fees", total),
         baseline={"fees": total, "monthly": total / 12}, label="Fees")]
-
-
-def _arnona_window(today: datetime.date) -> bool:
-    return today.month in (11, 12, 1) or (today.month == 2 and today.day <= 15)
-
-
-def _arnona(ctx: Context) -> List[Dict[str, Any]]:
-    if not _arnona_window(ctx.today):
-        return []
-    year = ctx.today.year + 1 if ctx.today.month >= 11 else ctx.today.year
-    y = _yield(ctx)
-    out = []
-    for c in ctx.book.charges:
-        if c["cadence"] != "monthly" or c.get("category") != "utilities" or not _is_municipality(c["merchant"] + " " + c["merchant_key"]):
-            continue
-        city = city_of(c["merchant"])
-        yearly = c["amount"] * 12
-        keys = c.get("merchant_keys") or [c["merchant_key"]]
-        m = _market(ctx, "arnona", {"city": city, "year": year})
-        saving, net, deadline = None, None, None
-        math_lines = [f"{sh(c['amount'])} a month × 12 = {sh(yearly)} for {year}"]
-        summary = (f"Some towns give a discount for paying the whole year at its start. A price check looks for "
-                   f"one in the {year} tax order of {city}.")
-        if _checked(m):
-            found = m["items"][0]
-            deadline = found.get("deadline")
-            if found.get("found") and isinstance(found.get("discount_pct"), (int, float)):
-                discount = yearly * found["discount_pct"] / 100
-                math_lines.append(f"{_pct(found['discount_pct'])} off {sh(yearly)} = {sh(_r(discount))}")
-                if y is None:
-                    summary = (f"{_pct(found['discount_pct'])} off ({sh(_r(discount))}) for paying {year} at once; the "
-                               f"interest it gives up is unknown right now.")
-                else:
-                    interest = yearly * y / 100 * ARNONA_MONTHS_EARLY / 12
-                    net = discount - interest
-                    math_lines.append(f"− {sh(yearly)} × {_pct(y)} × {ARNONA_MONTHS_EARLY}/12 = {sh(_r(interest))} interest "
-                                      f"given up by paying early")
-                    math_lines.append(f"= {sh(_r(net))}")
-                    if net > 0:
-                        saving = _saving(net, net, "market")
-                        summary = (f"{_pct(found['discount_pct'])} off for paying {year} at once: {sh(_r(net))} after the "
-                                   f"interest the money would have earned.")
-                    else:
-                        summary = (f"Only {_pct(found['discount_pct'])} off for paying {year} at once: less than the "
-                                   f"interest the money earns meanwhile, so it isn't worth it.")
-            else:
-                summary = f"No discount found for paying {year} at once in {city}."
-        timing = {"from": datetime.date(year - 1, 11, 1).isoformat(), "until": deadline,
-                  "label": f"Pay {year} by {_day(deadline)}" if deadline else f"Before {year}'s first payment"}
-        series = [{"date": r["purchase_date"], "amount": -r["amount"]} for r in ctx.book.rows
-                  if r.get("merchant_key") in keys and r["amount"] < 0 and r["purchase_date"] >= ctx.since(365)]
-        out.append(_item(
-            f"arnona:{c['merchant_key']}:{year}", "arnona", SAVE, f"Pay the {year} arnona in one payment?", summary,
-            saving=saving, at_stake=yearly, effort=_effort(15, "online"), timing=timing,
-            evidence=_evidence([f"{c['merchant']}: {sh(c['amount'])} a month"], series,
-                               {"view": "transactions", "q": c["merchant"]}),
-            math_lines=math_lines,
-            steps=[_step(f"Run a price check for {city}'s discount for paying the year at once"),
-                   _step(f"Pay {year} at once on the municipality's site or by phone before the deadline"),
-                   _step("Cancel the monthly standing order for the year (the bank's app)")],
-            market_info=m,
-            baseline={"yearly": yearly, "monthly": c["amount"], "merchant_keys": keys, "year": year,
-                      "saving": _r(net) if net and net > 0 else 0},
-            label=f"Arnona {year}"))
-    return out
 
 
 def _renewals(ctx: Context) -> List[Dict[str, Any]]:
     out = []
     for y in ctx.book.yearly:
-        text = _norm(y["merchant"] + " " + y["merchant_key"])
-        if not (y["category"] == "insurance" or (y["category"] == "car" and "ביטוח" in text)):
+        text = norm(y["merchant"] + " " + y["merchant_key"])
+        if not (y["category"] == "insurance"
+                or (y["category"] == "car" and _any_word(text, INSURANCE_WORDS, words(ctx, "insurance")))):
             continue
-        nd = _d(y["next_date"])
+        nd = as_date(y["next_date"])
         if ctx.today > nd + datetime.timedelta(days=RENEWAL_LATE_DAYS):
             continue
         start = nd - datetime.timedelta(days=RENEWAL_LEAD_DAYS)
-        steps = [_step(f"Ask {y['merchant']} for the renewal price before {_day(nd)}"),
-                 _step("Get quotes from two other insurers for the same cover"),
-                 _step("Tell them the best quote; switch if they won't match it")]
-        if "חובה" in text:
-            steps.insert(1, _step("Compare compulsory car insurance prices on the regulator's calculator", CAR_CALCULATOR))
+        steps = [make_step(f"Ask {y['merchant']} for the renewal price before {day_text(nd)}"),
+                 make_step("Get quotes from two other insurers for the same cover"),
+                 make_step("Tell them the best quote; switch if they won't match it")]
+        prices = link(ctx, "car_insurance_prices")
+        if prices and _any_word(text, COMPULSORY_WORDS, words(ctx, "compulsory_insurance")):
+            steps.insert(1, make_step(f"Compare compulsory car insurance prices on {prices[0]}", prices[1]))
         series = [{"date": r["purchase_date"], "amount": insights.plan_total(r)} for r in ctx.book.rows
                   if r.get("merchant_key") == y["merchant_key"] and r["amount"] < 0]
-        out.append(_item(
-            f"renewal:{y['merchant_key']}:{nd:%Y-%m}", "renewal", SAVE, f"{y['merchant']} renews around {_day(nd)}",
+        out.append(make_item(
+            f"renewal:{y['merchant_key']}:{nd:%Y-%m}", "renewal", SAVE, f"{y['merchant']} renews around {day_text(nd)}",
             f"Last year {sh(y['amount'])}" + (f" in {y['payments']} payments" if y["payments"] > 1 else "")
             + ". Compare quotes before it renews.",
-            at_stake=y["amount"], effort=_effort(30, "compare"),
-            timing={"from": start.isoformat(), "until": nd.isoformat(), "label": f"Renews around {_day(nd)}"},
-            evidence=_evidence([f"Last renewal {sh(y['amount'])} on {_day(y['last_date'])}"], series,
+            at_stake=y["amount"], effort=make_effort(30, "compare"),
+            timing={"from": start.isoformat(), "until": nd.isoformat(), "label": f"Renews around {day_text(nd)}"},
+            evidence=make_evidence([f"Last renewal {sh(y['amount'])} on {day_text(y['last_date'])}"], series,
                                {"view": "transactions", "q": y["merchant"]}),
             math_lines=[f"Last year: {sh(y['amount'])}"], steps=steps,
             baseline={"amount": y["amount"], "merchant_key": y["merchant_key"], "next_date": y["next_date"],
@@ -836,16 +714,20 @@ def _insurance_review(ctx: Context) -> List[Dict[str, Any]]:
     total = sum(p[1] for p in policies)
     if total < INSURANCE_MIN:
         return []
-    return [_item(
+    listing = link(ctx, "insurance_policies")
+    first = (make_step(f"Check {listing[0]} for every policy in your name", listing[1]) if listing else
+             make_step("List every policy you pay for, from your insurers' and your employer's papers"))
+    return [make_item(
         "insurance_review", "insurance_review", SAVE, f"Review your insurance: {_whole(total)} a year",
-        f"{len(policies)} policies. הר הביטוח lists every policy in your name, so the same cover paid twice stands out.",
-        at_stake=total, effort=_effort(30, "review"),
-        evidence=_evidence([f"{name}: {sh(yearly)} a year ({how})" for name, yearly, how in policies], [],
+        f"{len(policies)} policies. " + (f"{listing[0]} lists every policy in your name, so the same cover paid twice "
+                                         "stands out." if listing else "The same cover paid twice is money for nothing."),
+        at_stake=total, effort=make_effort(30, "review"),
+        evidence=make_evidence([f"{name}: {sh(yearly)} a year ({how})" for name, yearly, how in policies], [],
                            {"view": "transactions", "category": "insurance"}),
         math_lines=[" + ".join(sh(p[1]) for p in policies) + f" = {sh(total)} a year"],
-        steps=[_step("Check הר הביטוח for every policy in your name", INSURANCE_MOUNTAIN),
-               _step("Look for the same cover twice (health or life insurance through work and privately)"),
-               _step("Cancel the duplicate with the insurer that has it")],
+        steps=[first,
+               make_step("Look for the same cover twice (health or life insurance through work and privately)"),
+               make_step("Cancel the duplicate with the insurer that has it")],
         baseline={"total": total}, label="Insurance")]
 
 
@@ -863,7 +745,7 @@ def _sub_lines(ctx: Context) -> List[Dict[str, Any]]:
     # The rest by merchant (display name): one service's spellings and invoice codes are one line.
     taken = {k for c in ctx.book.charges if c["merchant_key"] in lines for k in c.get("merchant_keys") or [c["merchant_key"]]}
     taken |= set(lines)
-    named = {_norm(l["merchant"]) for l in lines.values()}
+    named = {norm(l["merchant"]) for l in lines.values()}
     rest: Dict[str, List[Dict[str, Any]]] = defaultdict(list)
     for r in ctx.book.rows:
         if (r.get("category") == "subscriptions" and r["amount"] < 0 and r["purchase_date"] >= ctx.since(365)
@@ -872,7 +754,7 @@ def _sub_lines(ctx: Context) -> List[Dict[str, Any]]:
             rest[_group(r)].append(r)
     for key, rows in rest.items():
         if len(rows) >= 2:
-            lines[key] = {"key": key, "merchant": _merchant(rows[-1]), "amount": -rows[-1]["amount"], "cadence": None,
+            lines[key] = {"key": key, "merchant": merchant_of(rows[-1]), "amount": -rows[-1]["amount"], "cadence": None,
                           "yearly": _spent(rows), "next_date": None}
     return sorted(lines.values(), key=lambda l: (-l["yearly"], l["merchant"]))
 
@@ -899,18 +781,18 @@ def _subscriptions(ctx: Context) -> List[Dict[str, Any]]:
                              "next_date": value.get("next_date"), "choice": value.get("choice"), "active": False})
     cancel = sum(s["yearly"] or 0 for s in subitems if s["choice"] == "cancel" and s["active"])
     every = {"monthly": "a month", "bimonthly": "every 2 months", "weekly": "a week", "yearly": "a year"}
-    return [_item(
+    return [make_item(
         "subscriptions", "subscriptions", SAVE, f"Subscriptions: {_whole(total)} a year",
         f"{len(lines)} subscriptions. Mark the ones to cancel" + (f": {sh(cancel)} a year marked so far." if cancel else "."),
-        saving=_saving(cancel, cancel, "measured") if cancel else None, at_stake=total, effort=_effort(10, "review"),
-        evidence=_evidence([f"{l['merchant']}: {sh(l['amount'])} {every.get(l['cadence'] or '', 'now and then')}"
+        saving=saving_range(cancel, cancel, "measured") if cancel else None, at_stake=total, effort=make_effort(10, "review"),
+        evidence=make_evidence([f"{l['merchant']}: {sh(l['amount'])} {every.get(l['cadence'] or '', 'now and then')}"
                             for l in lines],
                            _monthly_series([r for r in ctx.book.rows if r.get("category") == "subscriptions"
                                             and dashboard.is_spending(r)], _last_months(ctx.today, 12)),
                            {"view": "transactions", "category": "subscriptions"}),
         math_lines=[" + ".join(sh(l["yearly"]) for l in lines) + f" = {sh(total)} a year"],
-        steps=[_step("Mark each subscription keep or cancel"),
-               _step("Cancel in each service's app or site (the card stops being charged from the next cycle)")],
+        steps=[make_step("Mark each subscription keep or cancel"),
+               make_step("Cancel in each service's app or site (the card stops being charged from the next cycle)")],
         subitems=subitems, baseline={"total": total}, label="Subscriptions")]
 
 
@@ -923,26 +805,26 @@ def _mortgage(ctx: Context) -> List[Dict[str, Any]]:
     lines = [f"{c['merchant']}: {sh(c['amount'])} a month" for c in loans]
     rate = ctx.rate
     if rate and rate.get("year_ago") is not None:
-        lines.append(f"{ctx.Bank} rate {_pct(rate['rate'])} now, {_pct(rate['year_ago'])} a year ago")
+        lines.append(f"{ctx.Bank} rate {percent(rate['rate'])} now, {percent(rate['year_ago'])} a year ago")
     elif rate:
-        lines.append(f"{ctx.Bank} rate {_pct(rate['rate'])} now")
+        lines.append(f"{ctx.Bank} rate {percent(rate['rate'])} now")
     summary = f"{sh(monthly)} a month, {sh(monthly * 12)} a year."
     if rate and rate.get("year_ago") is not None and rate["rate"] < rate["year_ago"]:
-        summary += (f" Rates are lower than a year ago ({_pct(rate['rate'])} vs {_pct(rate['year_ago'])}): offers from "
+        summary += (f" Rates are lower than a year ago ({percent(rate['rate'])} vs {percent(rate['year_ago'])}): offers from "
                     f"other banks may be worth a look.")
     else:
         summary += " Worth comparing offers once in a while."
-    return [_item(
+    return [make_item(
         "mortgage", "mortgage", SAVE, "Mortgage: worth checking", summary, at_stake=monthly * 12,
-        effort=_effort(60, "compare"),
-        evidence=_evidence(lines, [{"date": r["purchase_date"], "amount": -r["amount"]} for r in ctx.book.rows
+        effort=make_effort(60, "compare"),
+        evidence=make_evidence(lines, [{"date": r["purchase_date"], "amount": -r["amount"]} for r in ctx.book.rows
                                    if r.get("merchant_key") in {k for c in loans for k in c.get("merchant_keys") or [c["merchant_key"]]}
                                    and r["amount"] < 0 and r["purchase_date"] >= ctx.since(365)],
                            {"view": "transactions", "category": "housing"}),
         math_lines=[f"{sh(monthly)} × 12 = {sh(monthly * 12)} a year"],
-        steps=[_step("Ask the bank for an early-repayment statement (דוח יתרות לסילוק)"),
-               _step("Get offers from two other banks or a mortgage advisor for the balance"),
-               _step("Mind the early-repayment fee on fixed-rate tracks before switching")],
+        steps=[make_step(f"Ask the bank for {term(ctx, 'early_repayment', 'an early-repayment statement')}"),
+               make_step("Get offers from two other banks or a mortgage advisor for the balance"),
+               make_step("Mind the early-repayment fee on fixed-rate tracks before switching")],
         baseline={"monthly": monthly}, label="Mortgage")]
 
 
@@ -974,20 +856,20 @@ def _creep(ctx: Context) -> List[Dict[str, Any]]:
             continue
         new_avg, old_avg = s_new / span, s_old / span
         label = BUCKET_LABELS[bucket]
-        at_stake = _r((new_avg - old_avg) * 12)
+        at_stake = round_half((new_avg - old_avg) * 12)
         top = max(by_cat, key=lambda k: by_cat[k]) if by_cat else cats[0]
-        out.append(_item(
+        out.append(make_item(
             f"creep:{bucket}", "creep", WATCH, f"{label} is up: {_whole(new_avg)} a month",
-            f"{sh(_r(new_avg))} a month in the last {span} months, {sh(_r(old_avg))} in the {span} before: "
+            f"{sh(round_half(new_avg))} a month in the last {span} months, {sh(round_half(old_avg))} in the {span} before: "
             f"{sh(at_stake)} a year more at this pace.",
             at_stake=at_stake,
-            evidence=_evidence([f"Last {span} months: {sh(s_new)}", f"The {span} before: {sh(s_old)}"],
+            evidence=make_evidence([f"Last {span} months: {sh(s_new)}", f"The {span} before: {sh(s_old)}"],
                                _monthly_series(rows, shown), {"view": "transactions", "category": top}),
-            math_lines=[f"{sh(s_new)} ÷ {span} = {sh(_r(new_avg))} a month", f"{sh(s_old)} ÷ {span} = {sh(_r(old_avg))} a month",
-                        f"({sh(_r(new_avg))} − {sh(_r(old_avg))}) × 12 = {sh(at_stake)} a year"],
-            steps=[_step(f"Set a monthly target: halfway back is {_whole(_round50((old_avg + new_avg) / 2))}")],
+            math_lines=[f"{sh(s_new)} ÷ {span} = {sh(round_half(new_avg))} a month", f"{sh(s_old)} ÷ {span} = {sh(round_half(old_avg))} a month",
+                        f"({sh(round_half(new_avg))} − {sh(round_half(old_avg))}) × 12 = {sh(at_stake)} a year"],
+            steps=[make_step(f"Set a monthly target: halfway back is {_whole(_round50((old_avg + new_avg) / 2))}")],
             scope={"categories": list(cats)}, suggested_target=_round50((old_avg + new_avg) / 2),
-            baseline={"pace": _r(new_avg), "old_pace": _r(old_avg)}, label=label))
+            baseline={"pace": round_half(new_avg), "old_pace": round_half(old_avg)}, label=label))
     return out
 
 
@@ -1002,8 +884,8 @@ def _sprees(ctx: Context) -> List[Dict[str, Any]]:
         rows.sort(key=lambda r: (r["purchase_date"], r.get("occurred_at") or "", r["id"]))
         clusters: List[List[int]] = []
         for i, r in enumerate(rows):
-            end = _d(r["purchase_date"]) + datetime.timedelta(days=SPREE_DAYS - 1)
-            window = [j for j in range(i, len(rows)) if _d(rows[j]["purchase_date"]) <= end]
+            end = as_date(r["purchase_date"]) + datetime.timedelta(days=SPREE_DAYS - 1)
+            window = [j for j in range(i, len(rows)) if as_date(rows[j]["purchase_date"]) <= end]
             if len(window) < SPREE_ORDERS or _spent(rows[j] for j in window) < SPREE_MIN:
                 continue
             if clusters and window[0] <= clusters[-1][-1]:
@@ -1014,20 +896,20 @@ def _sprees(ctx: Context) -> List[Dict[str, Any]]:
             continue
         spree = [rows[j] for j in clusters[-1]]
         total = _spent(spree)
-        start, end = _d(spree[0]["purchase_date"]), _d(spree[-1]["purchase_date"])
+        start, end = as_date(spree[0]["purchase_date"]), as_date(spree[-1]["purchase_date"])
         days = (end - start).days + 1
-        name = _merchant(spree[-1])
+        name = merchant_of(spree[-1])
         year_total = _spent(rows)
-        out.append(_item(
+        out.append(make_item(
             f"spree:{key}:{start.isoformat()}", "spree", WATCH, f"{len(spree)} orders at {name} in {days} days",
-            f"{sh(total)} between {_day(start)} and {_day(end)}.",
+            f"{sh(total)} between {day_text(start)} and {day_text(end)}.",
             at_stake=total,
-            evidence=_evidence([f"{len(spree)} orders, {sh(total)}", f"{sh(year_total)} there in 12 months"],
+            evidence=make_evidence([f"{len(spree)} orders, {sh(total)}", f"{sh(year_total)} there in 12 months"],
                                [{"date": r["purchase_date"], "amount": -r["amount"]} for r in spree],
                                {"view": "transactions", "q": name}),
             math_lines=[" + ".join(sh(-r["amount"]) for r in spree) + f" = {sh(total)}"],
-            steps=[_step("Worth it? Mark it, or set a monthly limit for this shop")],
-            scope={"merchants": [key]}, baseline={"pace": _r(year_total / 12)}, label=name))
+            steps=[make_step("Worth it? Mark it, or set a monthly limit for this shop")],
+            scope={"merchants": [key]}, baseline={"pace": round_half(year_total / 12)}, label=name))
     return out
 
 
@@ -1057,20 +939,20 @@ def _leaks(ctx: Context) -> List[Dict[str, Any]]:
             rising = prev3 > 0 and last3 >= 1.5 * prev3 and last3 - prev3 >= LEAK_RISE_MIN
         if not (small or rising):
             continue
-        name = _merchant(rows[-1])
-        lines = [f"{len(charges)} charges, {sh(total)} in 12 months (median {sh(_r(statistics.median(charges)))})"]
+        name = merchant_of(rows[-1])
+        lines = [f"{len(charges)} charges, {sh(total)} in 12 months (median {sh(round_half(statistics.median(charges)))})"]
         if rising:
             lines.append(f"The last 3 months {sh(last3)}, the 3 before {sh(prev3)}")
-        out.append(_item(
+        out.append(make_item(
             f"leak:{key}", "leak", WATCH,
             f"{name} is growing" if rising else f"Small charges at {name} add up",
             f"{sh(total)} in 12 months" + (f"; {sh(last3)} in the last 3 months against {sh(prev3)} before." if rising
                                            else f" in {len(charges)} charges."),
             at_stake=total,
-            evidence=_evidence(lines, _monthly_series(rows, _last_months(ctx.today, 12)), {"view": "transactions", "q": name}),
+            evidence=make_evidence(lines, _monthly_series(rows, _last_months(ctx.today, 12)), {"view": "transactions", "q": name}),
             math_lines=[f"12 months at {name}: {sh(total)}"],
-            steps=[_step("Worth it? Mark it, or set a monthly limit for it")],
-            scope={"merchants": [key]}, baseline={"pace": _r(total / 12)}, label=name))
+            steps=[make_step("Worth it? Mark it, or set a monthly limit for it")],
+            scope={"merchants": [key]}, baseline={"pace": round_half(total / 12)}, label=name))
     return out
 
 
@@ -1087,9 +969,9 @@ def _overlaps(ctx: Context) -> List[Dict[str, Any]]:
             if (r["purchase_date"] < year_ago or r["amount"] >= 0 or not dashboard.is_spending(r)
                     or r.get("category") not in OVERLAP_CATEGORIES):
                 continue
-            text = _norm((r.get("merchant_key") or "") + " " + _merchant(r))
-            if any(_has_word(text, token) for token in tokens):
-                s = services.setdefault(_group(r), {"keys": set(), "rows": [], "name": _merchant(r)})
+            text = norm((r.get("merchant_key") or "") + " " + merchant_of(r))
+            if any(has_word(text, token) for token in tokens):
+                s = services.setdefault(_group(r), {"keys": set(), "rows": [], "name": merchant_of(r)})
                 s["keys"].add(r.get("merchant_key"))
                 s["rows"].append(r)
         services = {g: s for g, s in services.items() if max(r["purchase_date"] for r in s["rows"]) >= since}
@@ -1104,35 +986,35 @@ def _overlaps(ctx: Context) -> List[Dict[str, Any]]:
         total = sum(yearly.values())
         names = sorted(yearly)
         groups = sorted(services)
-        out.append(_item(
+        out.append(make_item(
             f"overlap:{niche}", "overlap", WATCH, f"{len(names)} {NICHE_LABELS[niche]} at once",
             f"{' and '.join(names)}: {sh(total)} a year together. Do you need both?",
             at_stake=total,
-            evidence=_evidence([f"{n}: {sh(yearly[n])} {how[n]}" for n in names],
+            evidence=make_evidence([f"{n}: {sh(yearly[n])} {how[n]}" for n in names],
                                [{"date": r["purchase_date"], "amount": -r["amount"]}
                                 for s in services.values() for r in s["rows"]], {"view": "transactions"}),
             math_lines=[" + ".join(sh(yearly[n]) for n in names) + f" = {sh(total)} a year"],
-            steps=[_step("Keep the one you use most; cancel the other in its app or site")],
-            scope={"merchants": groups}, baseline={"pace": _r(total / 12)}, label=NICHE_LABELS[niche].capitalize()))
+            steps=[make_step("Keep the one you use most; cancel the other in its app or site")],
+            scope={"merchants": groups}, baseline={"pace": round_half(total / 12)}, label=NICHE_LABELS[niche].capitalize()))
     return out
 
 
 def _penalties(ctx: Context) -> List[Dict[str, Any]]:
     rows = [r for r in ctx.book.rows if r["purchase_date"] >= ctx.since(365) and r["amount"] < 0
-            and dashboard.is_spending(r) and _is_penalty(r)]
+            and dashboard.is_spending(r) and _is_penalty(ctx, r)]
     total = _spent(rows)
     if total < 100:
         return []
-    return [_item(
+    return [make_item(
         "penalties", "penalties", WATCH, f"{_whole(total)} in fines and late fees",
         f"{len(rows)} charges in the last 12 months: fines, late-payment interest or ATM fees.",
         at_stake=total,
-        evidence=_evidence([f"{_day(r['purchase_date'])}: {_merchant(r)} {sh(-r['amount'])}" for r in rows[-6:]],
+        evidence=make_evidence([f"{day_text(r['purchase_date'])}: {merchant_of(r)} {sh(-r['amount'])}" for r in rows[-6:]],
                            [{"date": r["purchase_date"], "amount": -r["amount"]} for r in rows], {"view": "transactions"}),
         math_lines=[" + ".join(sh(-r["amount"]) for r in rows) + f" = {sh(total)}"],
-        steps=[_step("Set standing orders or reminders for the bills that came late"),
-               _step("Withdraw cash at your own bank's machines")],
-        scope={"keywords": list(PENALTY_WORDS)}, baseline={"pace": _r(total / 12)}, label="Fines and late fees")]
+        steps=[make_step("Set standing orders or reminders for the bills that came late"),
+               make_step("Withdraw cash at your own bank's machines")],
+        scope={"keywords": list(PENALTY_WORDS)}, baseline={"pace": round_half(total / 12)}, label="Fines and late fees")]
 
 
 def _late_night(ctx: Context) -> List[Dict[str, Any]]:
@@ -1142,32 +1024,33 @@ def _late_night(ctx: Context) -> List[Dict[str, Any]]:
     total = _spent(rows)
     if len(rows) < LATE_COUNT and total < LATE_MIN:
         return []
-    yearly = _r(total * 365 / LATE_DAYS)
-    return [_item(
+    yearly = round_half(total * 365 / LATE_DAYS)
+    return [make_item(
         "late_night", "late_night", WATCH, f"Late-night shopping: {_whole(total)} in {LATE_DAYS} days",
         f"{len(rows)} purchases between 23:00 and 05:00: about {sh(yearly)} a year at this pace.",
         at_stake=yearly,
-        evidence=_evidence([f"{len(rows)} purchases, {sh(total)}"],
+        evidence=make_evidence([f"{len(rows)} purchases, {sh(total)}"],
                            [{"date": r["purchase_date"], "amount": -r["amount"]} for r in rows], {"view": "transactions"}),
         math_lines=[f"{sh(total)} × 365 ÷ {LATE_DAYS} = {sh(yearly)} a year"],
-        steps=[_step("Leave the cart until the morning before buying")],
-        scope={"categories": list(DISCRETIONARY), "hours": list(NIGHT)}, baseline={"pace": _r(yearly / 12)},
+        steps=[make_step("Leave the cart until the morning before buying")],
+        scope={"categories": list(DISCRETIONARY), "hours": list(NIGHT)}, baseline={"pace": round_half(yearly / 12)},
         label="Late-night shopping")]
 
 
 DETECTORS: Tuple[Callable[[Context], List[Dict[str, Any]]], ...] = (
-    _bills, _electricity, _cash, _cushion, _fx, _fees, _arnona, _renewals, _insurance_review, _subscriptions,
+    _bills, _cash, _cushion, _fx, _fees, _renewals, _insurance_review, _subscriptions,
     _mortgage, _creep, _sprees, _leaks, _overlaps, _penalties, _late_night)
 
 
 def detect(ctx: Context) -> List[Dict[str, Any]]:
-    """Every item the detectors find in ``ctx`` (without the user's choices); a failing detector is logged."""
+    """Every item the detectors (savings' and the user's providers') find in ``ctx`` (without the user's
+    choices); a failing detector is logged."""
     out: List[Dict[str, Any]] = []
-    for fn in DETECTORS:
+    for fn in (*DETECTORS, *(d for r in ctx.rules for d in r.detectors)):
         try:
             out += fn(ctx)
         except Exception as e:
-            logger.error(f"Savings detector {fn.__name__} failed: {e}", exc_info=True)
+            logger.error(f"Savings detector {getattr(fn, '__name__', fn)} failed: {e}", exc_info=True)
     return out
 
 
@@ -1217,7 +1100,8 @@ def context(user: User, today: Optional[datetime.date] = None, book: Optional[da
                    rate=rates.policy_rate(today) if rates else None, fx=fx,
                    answers={k: _answers(r) for k, r in rows.items()},
                    market=(lambda topic, params: checks.latest(user, topic, params)) if checks else None,
-                   unavailable=unavailable, bank=rates.bank if rates else "central bank")
+                   unavailable=unavailable, bank=rates.bank if rates else "central bank",
+                   rules=providers.savings_rules(user))
 
 
 def _snapshot(item: Dict[str, Any]) -> str:
@@ -1260,9 +1144,9 @@ def _since(row: Dict[str, Any], baseline: Dict[str, Any]) -> Optional[datetime.d
     return store.local_date(stamp)
 
 
-def _outcome(state: str, saved: float = 0, yearly: float = 0, detail: str = "") -> Dict[str, Any]:
-    return {"state": state, "saved": max(0, _r(saved)) if state == "confirmed" else 0,
-            "saved_yearly": max(0, _r(yearly)) if state == "confirmed" else 0, "detail": detail}
+def make_outcome(state: str, saved: float = 0, yearly: float = 0, detail: str = "") -> Dict[str, Any]:
+    return {"state": state, "saved": max(0, round_half(saved)) if state == "confirmed" else 0,
+            "saved_yearly": max(0, round_half(yearly)) if state == "confirmed" else 0, "detail": detail}
 
 
 def _bill_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[str, Any]:
@@ -1276,39 +1160,22 @@ def _bill_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict
         if latest <= amount * 0.97:
             # A drop of more than 40% is confirmed by a second lower charge (a one-time credit looks the same).
             if latest < amount * 0.6 and not (len(after) >= 2 and -after[-2]["amount"] <= amount * 0.97):
-                return _outcome("waiting", detail=f"{sh(latest)} on {_day(after[-1]['purchase_date'])}: waiting for "
+                return make_outcome("waiting", detail=f"{sh(latest)} on {day_text(after[-1]['purchase_date'])}: waiting for "
                                                   f"the next charge to confirm")
-            return _outcome("confirmed", sum(max(0, amount + r["amount"]) for r in after), (amount - latest) * 12 * per,
+            return make_outcome("confirmed", sum(max(0, amount + r["amount"]) for r in after), (amount - latest) * 12 * per,
                             f"Now {sh(latest)} {insights.cadence_text(cadence)}, was {sh(amount)}")
-        return _outcome("no_change", detail=f"Still {sh(latest)} (charged {_day(after[-1]['purchase_date'])})")
+        return make_outcome("no_change", detail=f"Still {sh(latest)} (charged {day_text(after[-1]['purchase_date'])})")
     new = [c for c in ctx.book.charges if c.get("category") == b.get("category") and c["first_date"] > since.isoformat()
            and not set(c.get("merchant_keys") or [c["merchant_key"]]) & set(keys)]
     if new:
         c = min(new, key=lambda c: c["monthly_cost"])
         diff = amount * per - c["monthly_cost"]
         if diff > 0:
-            days = (ctx.today - _d(c["first_date"])).days
-            return _outcome("confirmed", diff * 12 * days / 365, diff * 12,
+            days = (ctx.today - as_date(c["first_date"])).days
+            return make_outcome("confirmed", diff * 12 * days / 365, diff * 12,
                             f"Switched to {c['merchant']} at {sh(c['amount'])} {insights.cadence_text(c['cadence'])}")
-        return _outcome("no_change", detail=f"Switched to {c['merchant']} at {sh(c['amount'])}")
-    return _outcome("waiting", detail="Waiting for the next charge")
-
-
-def _electricity_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[str, Any]:
-    s = since.isoformat()
-    before = {r.get("merchant_key") for r in ctx.book.rows if r["purchase_date"] <= s}
-    iec_after = [r for r in ctx.book.rows if r["purchase_date"] > s and r["amount"] < 0 and _is_iec(r)]
-    new = [r for r in ctx.book.rows if r["purchase_date"] > s and r["amount"] < 0 and _is_supplier(r)
-           and r.get("merchant_key") not in before]
-    if new:
-        first = new[0]
-        if not any(r["purchase_date"] > first["purchase_date"] for r in iec_after):
-            yearly = b.get("saving_low") or 0
-            days = (ctx.today - _d(first["purchase_date"])).days
-            return _outcome("confirmed", yearly * days / 365, yearly, f"Switched to {_merchant(first)}")
-    if iec_after and (ctx.today - since).days > 70:
-        return _outcome("no_change", detail=f"חברת החשמל still bills you ({_day(iec_after[-1]['purchase_date'])})")
-    return _outcome("waiting", detail="Waiting for the next electricity bill")
+        return make_outcome("no_change", detail=f"Switched to {c['merchant']} at {sh(c['amount'])}")
+    return make_outcome("waiting", detail="Waiting for the next charge")
 
 
 def _cash_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[str, Any]:
@@ -1317,10 +1184,10 @@ def _cash_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict
     if account is not None and b.get("cash") and (account.get("cash") or 0) < 0.25 * b["cash"]:
         moved = b["cash"] - (account.get("cash") or 0)
         yearly = moved * (b.get("yield") or 0) / 100
-        return _outcome("confirmed", yearly * days / 365, yearly, f"{sh(moved)} of the cash is invested now")
+        return make_outcome("confirmed", yearly * days / 365, yearly, f"{sh(moved)} of the cash is invested now")
     if days >= 30:
-        return _outcome("no_change", detail=f"Still {sh(account.get('cash') if account else None)} in cash")
-    return _outcome("waiting", detail="Waiting for the investment account's next sync")
+        return make_outcome("no_change", detail=f"Still {sh(account.get('cash') if account else None)} in cash")
+    return make_outcome("waiting", detail="Waiting for the investment account's next sync")
 
 
 def _cushion_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[str, Any]:
@@ -1332,10 +1199,10 @@ def _cushion_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> D
                      and r.get("account_kind") == "bank" and dashboard.flow(r) in ("investment", "own_transfer"))
         if moved > 0 and moved >= 0.5 * max(b.get("idle_low") or 0, CUSHION_MIN_IDLE):
             yearly = min(moved, b.get("idle_high") or moved) * (b.get("yield") or 0) / 100
-            return _outcome("confirmed", yearly * days / 365, yearly, f"{sh(moved)} set aside from the account since")
+            return make_outcome("confirmed", yearly * days / 365, yearly, f"{sh(moved)} set aside from the account since")
     if days >= 30:
-        return _outcome("no_change", detail="The balance stayed as high as before")
-    return _outcome("waiting", detail="Waiting for the bank's next sync")
+        return make_outcome("no_change", detail="The balance stayed as high as before")
+    return make_outcome("waiting", detail="Waiting for the bank's next sync")
 
 
 def _fx_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[str, Any]:
@@ -1345,59 +1212,46 @@ def _fx_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[s
     base, markup = sum(x[1] for x in lines), sum(x[2] for x in lines)
     if base < FX_OUTCOME_MIN:
         if not lines and (ctx.today - since).days > 120:
-            return _outcome("no_change", detail="No purchase in foreign currency on that card since: if they moved to "
+            return make_outcome("no_change", detail="No purchase in foreign currency on that card since: if they moved to "
                                                 "another card, the saving can't be measured here")
-        return _outcome("waiting", detail="Waiting for more purchases in foreign currency to compare")
+        return make_outcome("waiting", detail="Waiting for more purchases in foreign currency to compare")
     pct = markup / base * 100 if base else 0
     if b.get("pct") and pct <= b["pct"] * 0.5:
-        return _outcome("confirmed", base * b["pct"] / 100 - markup, (b.get("markup") or 0) * (1 - pct / b["pct"]),
-                        f"{_pct(round(pct, 2))} over the rate since, was {_pct(round(b['pct'], 2))}")
-    return _outcome("no_change", detail=f"Still {_pct(round(pct, 2))} over the {ctx.bank} rate")
+        return make_outcome("confirmed", base * b["pct"] / 100 - markup, (b.get("markup") or 0) * (1 - pct / b["pct"]),
+                        f"{percent(round(pct, 2))} over the rate since, was {percent(round(b['pct'], 2))}")
+    return make_outcome("no_change", detail=f"Still {percent(round(pct, 2))} over the {ctx.bank} rate")
 
 
 def _fees_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[str, Any]:
     days = (ctx.today - since).days
     if days < 35:
-        return _outcome("waiting", detail="Waiting for the next month's fees")
+        return make_outcome("waiting", detail="Waiting for the next month's fees")
     spent = _spent(_fee_rows(ctx, (since + datetime.timedelta(days=1)).isoformat()))
     monthly_now = spent / days * 30.44
     if monthly_now <= (b.get("monthly") or 0) * 0.5:
         yearly = ((b.get("monthly") or 0) - monthly_now) * 12
-        return _outcome("confirmed", yearly * days / 365, yearly, f"{sh(spent)} in fees since, about {sh(_r(monthly_now))} a month")
-    return _outcome("no_change", detail=f"{sh(spent)} in fees since")
-
-
-def _arnona_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[str, Any]:
-    year = b.get("year") or ctx.today.year
-    lo, hi = f"{year}-01-01", f"{year}-03-01"
-    paid = [r for r in ctx.book.rows if r.get("merchant_key") in (b.get("merchant_keys") or []) and lo <= r["purchase_date"] < hi
-            and -r["amount"] >= 0.8 * (b.get("yearly") or 0)]
-    if paid:
-        return _outcome("confirmed", b.get("saving") or 0, b.get("saving") or 0,
-                        f"Paid {year} at once: {sh(-paid[0]['amount'])} on {_day(paid[0]['purchase_date'])}")
-    if ctx.today.isoformat() >= hi:
-        return _outcome("no_change", detail=f"No payment for all of {year} in January or February")
-    return _outcome("waiting", detail=f"Waiting for the payment for {year}")
+        return make_outcome("confirmed", yearly * days / 365, yearly, f"{sh(spent)} in fees since, about {sh(round_half(monthly_now))} a month")
+    return make_outcome("no_change", detail=f"{sh(spent)} in fees since")
 
 
 def _renewal_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[str, Any]:
-    nd = _d(b["next_date"]) if b.get("next_date") else ctx.today
+    nd = as_date(b["next_date"]) if b.get("next_date") else ctx.today
     lo = max((nd - datetime.timedelta(days=insights.YEARLY_CLUSTER_DAYS)).isoformat(),
-             (_d(b["last_date"]) + datetime.timedelta(days=insights.YEARLY_CLUSTER_DAYS)).isoformat()
+             (as_date(b["last_date"]) + datetime.timedelta(days=insights.YEARLY_CLUSTER_DAYS)).isoformat()
              if b.get("last_date") else "")
     rows = [r for r in ctx.book.rows if r.get("merchant_key") == b.get("merchant_key") and r["amount"] < 0
             and r["purchase_date"] >= lo]
     if not rows:
         if ctx.today > nd + datetime.timedelta(days=45):
-            return _outcome("no_change", detail=f"No renewal charge since {_day(nd)}: if you moved to another insurer, "
+            return make_outcome("no_change", detail=f"No renewal charge since {day_text(nd)}: if you moved to another insurer, "
                                                 f"the saving can't be measured here")
-        return _outcome("waiting", detail=f"Renews around {_day(nd)}")
+        return make_outcome("waiting", detail=f"Renews around {day_text(nd)}")
     plans = {insights.plan_key(r): r for r in rows}
     amount = sum(insights.plan_total(r) for r in plans.values())
     last = b.get("amount") or 0
     if amount < last:
-        return _outcome("confirmed", last - amount, last - amount, f"Renewed at {sh(amount)}, {sh(last)} last year")
-    return _outcome("no_change", detail=f"Renewed at {sh(amount)}, {sh(last)} last year")
+        return make_outcome("confirmed", last - amount, last - amount, f"Renewed at {sh(amount)}, {sh(last)} last year")
+    return make_outcome("no_change", detail=f"Renewed at {sh(amount)}, {sh(last)} last year")
 
 
 def _missed_charges(ctx: Context, key: str, line: Dict[str, Any]) -> Optional[int]:
@@ -1409,7 +1263,7 @@ def _missed_charges(ctx: Context, key: str, line: Dict[str, Any]) -> Optional[in
         return None
     if line.get("cadence") not in ("weekly", "monthly", "bimonthly", "yearly") or not line.get("next_date"):
         return 0
-    d, missed = _d(line["next_date"]), 0
+    d, missed = as_date(line["next_date"]), 0
     while d <= ctx.today - datetime.timedelta(days=5):
         if d > at:
             missed += 1
@@ -1438,15 +1292,15 @@ def _subscriptions_outcome(ctx: Context, answers: Dict[str, Any]) -> Optional[Di
         detail = "No charge since you cancelled: " + ", ".join(stopped)
         if charged:
             detail += "; still charging: " + ", ".join(charged)
-        return _outcome("confirmed", saved, yearly, detail)
+        return make_outcome("confirmed", saved, yearly, detail)
     if charged and not waiting:
-        return _outcome("no_change", detail="Still charging: " + ", ".join(charged))
-    return _outcome("waiting", detail="Waiting for the next expected charge")
+        return make_outcome("no_change", detail="Still charging: " + ", ".join(charged))
+    return make_outcome("waiting", detail="Waiting for the next expected charge")
 
 
 _OUTCOMES: Dict[str, Callable[[Context, Dict[str, Any], datetime.date], Dict[str, Any]]] = {
-    "bill": _bill_outcome, "electricity": _electricity_outcome, "cash": _cash_outcome, "cushion": _cushion_outcome,
-    "fx": _fx_outcome, "fees": _fees_outcome, "arnona": _arnona_outcome, "renewal": _renewal_outcome}
+    "bill": _bill_outcome, "cash": _cash_outcome, "cushion": _cushion_outcome,
+    "fx": _fx_outcome, "fees": _fees_outcome, "renewal": _renewal_outcome}
 
 
 def outcome(ctx: Context, item: Dict[str, Any], row: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -1455,7 +1309,8 @@ def outcome(ctx: Context, item: Dict[str, Any], row: Dict[str, Any]) -> Optional
     there is nothing to measure."""
     if item["type"] == "subscriptions":
         return _subscriptions_outcome(ctx, _answers(row))
-    fn = _OUTCOMES.get(item["type"])
+    fn = _OUTCOMES.get(item["type"]) or next((r.outcomes[item["type"]] for r in ctx.rules
+                                               if item["type"] in r.outcomes), None)
     if fn is None or row["status"] not in ("doing", "done"):
         return None
     baseline = _json(row.get("baseline"))
@@ -1673,7 +1528,7 @@ def update(user: User, key: str, *, status: Optional[str] = None, answers: Optio
     """Change one of the user's items in one step with one Undo: ``status`` (its group's: open / doing /
     done / dismissed / snoozed, or open / accepted / watching), ``answers`` (question id → an option's
     value, None to clear), ``snooze_days`` (with ``snoozed``; default 30), ``target`` (watch items:
-    agorot a month, None to remove — setting one makes it ``watching``), ``subitem`` (subscriptions:
+    hundredths a month, None to remove — setting one makes it ``watching``), ``subitem`` (subscriptions:
     ``{key, choice: keep | cancel | None}``).
 
     Returns:
@@ -1701,7 +1556,7 @@ def update(user: User, key: str, *, status: Optional[str] = None, answers: Optio
         if group != WATCH:
             raise Invalid("target", "only spending to watch takes a monthly target")
         if target is not None and (isinstance(target, bool) or not isinstance(target, int) or not 0 <= target <= 10**10):
-            raise Invalid("target", "target must be agorot a month (a whole number) or null")
+            raise Invalid("target", "target must be hundredths of the currency a month (a whole number) or null")
         if target is not None and status is not None and status != "watching":
             raise Invalid("target", "a target goes with status watching")
     new_answers = _answers(row)
@@ -1812,7 +1667,7 @@ def set_answers(user: User, key: str, answers: Dict[str, Any]) -> Dict[str, Any]
 
 
 def set_target(user: User, key: str, monthly: Optional[int]) -> Dict[str, Any]:
-    """Set (agorot a month) or remove (None) a watch item's target (:func:`update`)."""
+    """Set (hundredths a month) or remove (None) a watch item's target (:func:`update`)."""
     return update(user, key, target=monthly)
 
 

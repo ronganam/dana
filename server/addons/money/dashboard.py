@@ -18,7 +18,7 @@
   card charges falling in its cycle, and everyday spending at its usual
   rate: the mean of the last :data:`TYPICAL_MONTHS` whole months without the
   busiest and the quietest, with a band from the quietest to the busiest.
-  A payment due on a Saturday reaches the bank on Sunday.
+  A payment due on a weekend day reaches the bank on the next working day (:func:`bank_day`).
 - :func:`trends`, :func:`merchants`, :func:`everyday_pace` and :func:`month_insights` (the rules in
   :func:`insights_for`, plus the cards registered with :func:`on_insights` for the month in progress).
 
@@ -36,6 +36,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
+from core import clock
 from core.users import User
 from addons.money import categories, insights, periods, store
 
@@ -286,8 +287,12 @@ def bill_date(purchase: datetime.date, billing_day: int) -> datetime.date:
 
 
 def bank_day(d: datetime.date) -> datetime.date:
-    """The day a payment due on ``d`` reaches the bank account: a Saturday's on Sunday."""
-    return d + datetime.timedelta(days=1) if d.weekday() == 5 else d
+    """The day a payment due on ``d`` reaches the bank account: a weekend day's on the next working day. The
+    weekend is Saturday, and Sunday too unless weeks start on Sunday (``core.clock.week_start_day``)."""
+    weekend = {5} if clock.week_start_day() == 6 else {5, 6}
+    while d.weekday() in weekend:
+        d += datetime.timedelta(days=1)
+    return d
 
 
 def _occurrences(item: Dict[str, Any], as_of: datetime.date, end: datetime.date) -> List[datetime.date]:

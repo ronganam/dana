@@ -238,7 +238,7 @@ def _own_transfers(conn: sqlite3.Connection, user: User, rows: List[Dict[str, An
 
 
 def _card_moves(conn: sqlite3.Connection, user: User, rows: List[Dict[str, Any]]) -> int:
-    """A card company moving charges to a replacement card ("העברת חיובים לכרטיס תחליפי"):
+    """A card company moving charges to a replacement card:
     equal and opposite rows of one merchant on two of the user's cards the same day →
     both ``own_transfer``, no category (otherwise a purchase and a refund that only cancel out)."""
     by_id = {r["id"]: r for r in rows}

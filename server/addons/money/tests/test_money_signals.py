@@ -4,8 +4,8 @@ Run: bin/test test_money_signals
 Made-up merchants, amounts and cards. The first admin and Bob have
 ``money`` (a Cal card each); Carl has not. Covers: the Google Wallet parser
 (₪ / $ / € / the Hebrew-locale form with bidi marks / thousands, a refund, a
-non-payment) and the generic card-app parser (Hebrew and English, a bill
-notice, nothing to go on); the phone addon's notification observers called
+non-payment) and the generic card-app parser (English, and the provider's words
+in its language only for users with it; a bill notice, nothing to go on); the phone addon's notification observers called
 from ``processing.schedule`` for every user, ``signals.observe`` acting only
 for users with ``money`` and only on their own notifications; a Wallet
 payment → a provisional row on the card with those digits (time, date,
@@ -160,6 +160,7 @@ class FakeModel:
 
 def test_parsers() -> None:
     P = signals.Payment
+    he = (moneyfakes.STATEMENTS.push,)  # the sample provider's pushes are in Hebrew
     shapes = {
         ("RAMI LEVI", "₪350.30 with Mastercard Gold business ••8763"): P(-35030, "ILS", "8763", "RAMI LEVI"),
         ("Corner Shop", "$12.00 with Visa ••1234"): P(-1200, "USD", "1234", "Corner Shop"),
@@ -174,7 +175,20 @@ def test_parsers() -> None:
         check(f"wallet parser: {text!r}", got == expected, got)
     check("wallet parser: a notification without an amount is not a payment",
           signals.parse_wallet("Google Wallet", "Your card is ready to use") is None)
+    check("wallet parser: a refund in the provider's words",
+          signals.parse_wallet("חנות", "זיכוי של ₪20.00 לכרטיס ••8763", he) == P(2000, "ILS", "8763", "חנות")
+          and signals.parse_wallet("חנות", "זיכוי של ₪20.00 לכרטיס ••8763") == P(-2000, "ILS", "8763", "חנות"))
 
+    english = {
+        ("Card", "Purchase of ₪42.00 at CAFE NOIR on card ending in 8763"): P(-4200, "ILS", "8763", "CAFE NOIR"),
+        ("Card", "$9.99 at Corner Shop with card no. 1234"): P(-999, "USD", "1234", "Corner Shop"),
+        ("Card", "Refund: 20.00 EUR at Book Shop, card ending in 1111"): P(2000, "EUR", "1111", "Book Shop"),
+    }
+    for (title, text), expected in english.items():
+        got = signals.parse_push(title, text)
+        check(f"push parser (English): {text!r}", got == expected, got)
+    check("push parser: a statement notice is not a payment",
+          signals.parse_push("Card", "Your statement of ₪3,450.81 for card ending in 8763 is ready") is None)
     pushes = {
         ("Cal", "בוצעה עסקה ב-קפה נואר בסך 42.00 ש\"ח בכרטיס 8763"): P(-4200, "ILS", "8763", "קפה נואר"),
         ("Cal", "Purchase of ₪42.00 at CAFE NOIR on card ending in 8763"): P(-4200, "ILS", "8763", "CAFE NOIR"),
@@ -182,13 +196,19 @@ def test_parsers() -> None:
         ("Cal", "קוד אימות [code] לעסקה בסך 120.00 ש״ח בכרטיס המסתיים ב-8763"): P(-12000, "ILS", "8763", None),
     }
     for (title, text), expected in pushes.items():
-        got = signals.parse_push(title, text)
-        check(f"push parser: {text!r}", got == expected, got)
-    check("push parser: a bill notice is not a payment",
-          signals.parse_push("Cal", "החיוב החודשי בכרטיס 8763 יעמוד על 3,450.81 ש\"ח") is None)
+        got = signals.parse_push(title, text, he)
+        check(f"push parser (the provider's words): {text!r}", got == expected, got)
+    check("push parser: without the provider's words a push in its language is not read",
+          signals.parse_push("Cal", "בוצעה עסקה ב-קפה נואר בסך 42.00 ש\"ח בכרטיס 8763") is None)
+    check("push parser: a bill notice in the provider's words is not a payment",
+          signals.parse_push("Cal", "החיוב החודשי בכרטיס 8763 יעמוד על 3,450.81 ש\"ח", he) is None)
     check("push parser: an amount with neither a card nor a merchant is not read",
-          signals.parse_push("Hapoalim", "יתרה: 1,000.00 ש\"ח") is None)
-    check("push parser: no amount, nothing", signals.parse_push("Cal", "Your new card is on its way") is None)
+          signals.parse_push("Hapoalim", "יתרה: 1,000.00 ש\"ח", he) is None)
+    check("push parser: no amount, nothing", signals.parse_push("Cal", "Your new card is on its way", he) is None)
+    check("parse: the user's providers' words (Bob has the sample provider, Carl has not)",
+          signals.parse(BOB, "com.example.samplecard", "Cal", "בוצעה עסקה ב-קפה נואר בסך 42.00 ש\"ח בכרטיס 4411")
+          == P(-4200, "ILS", "4411", "קפה נואר")
+          and signals.parse(CARL, "com.example.samplecard", "Cal", "בוצעה עסקה ב-קפה נואר בסך 42.00 ש\"ח בכרטיס 4411") is None)
 
 
 # --- The observer and Wallet ---------------------------------------------------------------------

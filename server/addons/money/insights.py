@@ -29,6 +29,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
 
+from core import clock
 from core.users import User
 from addons.money import categories, periods, store
 
@@ -79,7 +80,7 @@ class Cadence:
 CADENCES: Tuple[Cadence, ...] = (
     Cadence("weekly", (6, 8), 4, 17, 52 / 12),
     Cadence("monthly", (26, 35), 3, 45, 1.0),
-    # Israeli utilities and the municipality often bill every two months.
+    # Utilities and the municipality often bill every two months.
     Cadence("bimonthly", (50, 80), 3, 90, 0.5),
     Cadence("yearly", (350, 380), 2, 400, 1 / 12),
 )
@@ -97,7 +98,7 @@ def cadence_text(cadence: str) -> str:
 
 def _bucket(cadence: str, d: datetime.date) -> Any:
     if cadence == "weekly":
-        return periods.week_start(d)
+        return clock.week_start(d)
     if cadence in ("monthly", "bimonthly"):
         return (d.year, d.month)
     return d.year

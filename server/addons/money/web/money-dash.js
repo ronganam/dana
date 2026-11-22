@@ -902,7 +902,7 @@
           s.url && C.hostOf(s.url) ? ` <a class="mny-sv-ext" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(C.hostOf(s.url))}${icon("external-link")}</a>` : ""}</li>`).join("")}</ol>`));
       }
       if (it.script && it.script.text) {
-        out.push(sec("What to say", `<div class="mny-sv-script"><p dir="rtl" lang="${esc(it.script.lang || "he")}">${esc(it.script.text)}</p>
+        out.push(sec("What to say", `<div class="mny-sv-script"><p dir="auto" lang="${esc(it.script.lang || "")}">${esc(it.script.text)}</p>
           <button class="btn-secondary" data-save-copy="${esc(it.key)}">${icon("copy")}<span>Copy</span></button></div>`));
       }
       out.push(`<div class="mny-sv-actions">${actionsHtml(it, false)}</div>`);
