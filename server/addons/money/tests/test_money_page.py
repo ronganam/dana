@@ -2,8 +2,8 @@
 Run: bin/test test_money_page
 
 A synthetic dataset, every value made up, with today fixed at Wed 18 Nov
-2026 09:30 (Asia/Jerusalem): Robin (the first admin) has a Hapoalim account
-and two Cal cards with rows from Dec 2024 to today; Bob has one card; Carl
+2026 09:30 (Asia/Jerusalem): Robin (the first admin) has a bank account
+and two cards with rows from Dec 2024 to today; Bob has one card; Carl
 has no ``money``. Covers: every period name, explicit dates and the
 comparisons ("at this point last month", the whole month before, month
 lengths); spending totals asserted exactly (card bills, own transfers and
@@ -47,6 +47,8 @@ db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import moneyfakes  # noqa: E402  (the made-up provider: moneyfakes.py)
 
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
@@ -129,11 +131,11 @@ def txn(user, aid: Optional[str], date: str, amount: int, desc: str, *, category
     return tid
 
 
-S_BANK = source(ROBIN, "hapoalim")
-S_CAL = source(ROBIN, "visaCal", "failing", "bank worker not reachable", last_ok="2026-11-17T17:00:00+00:00")
-BANK = account(ROBIN, S_BANK, "hapoalim", "bank", "12-345-678901", balance=1_234_567, balance_at="2026-11-18T05:01:00+00:00")
-C1 = account(ROBIN, S_CAL, "visaCal", "card", "8763", next_charge=345_081, next_charge_date="2026-12-10")
-C2 = account(ROBIN, S_CAL, "visaCal", "card", "4580", label="Shared card", next_charge=120_000,
+S_BANK = source(ROBIN, "samplebank")
+S_CAL = source(ROBIN, "samplecard", "failing", "bank worker not reachable", last_ok="2026-11-17T17:00:00+00:00")
+BANK = account(ROBIN, S_BANK, "samplebank", "bank", "12-345-678901", balance=1_234_567, balance_at="2026-11-18T05:01:00+00:00")
+C1 = account(ROBIN, S_CAL, "samplecard", "card", "8763", next_charge=345_081, next_charge_date="2026-12-10")
+C2 = account(ROBIN, S_CAL, "samplecard", "card", "4580", label="Shared card", next_charge=120_000,
              next_charge_date="2026-11-25", billed_from=BANK)
 
 T: Dict[str, str] = {}
@@ -196,8 +198,8 @@ T["dani"] = txn(ROBIN, BANK, "2026-11-06", -25_000, "העברה לדני כהן"
 txn(ROBIN, BANK, "2026-11-01", -1_200, "עמלת פעולה", category="fees", flow="fee")
 T["cash"] = txn(ROBIN, BANK, "2026-11-11", -30_000, "משיכת מזומן")  # bank row, no flow: not spending
 
-S_BOB = source(BOB, "visaCal")
-BOB_CARD = account(BOB, S_BOB, "visaCal", "card", "1111", next_charge=10_000, next_charge_date="2026-12-02")
+S_BOB = source(BOB, "samplecard")
+BOB_CARD = account(BOB, S_BOB, "samplecard", "card", "1111", next_charge=10_000, next_charge_date="2026-12-02")
 T["bob_rami"] = txn(BOB, BOB_CARD, "2026-11-05", -10_000, "רמי לוי - יבנה", category="groceries", flow="purchase")
 
 # November 1–18 spending (agorot): every counted row of Robin's.
@@ -330,8 +332,8 @@ def test_summary() -> None:
           and queries.summary(ROBIN, P("this_month"), account_id=BANK)["total"] == 26_200)
     by_account = {b["label"]: b["total"]
                   for b in queries.summary(ROBIN, P("this_month"), group_by="account")["breakdown"]}
-    check("summary: by account, labelled", by_account == {"Cal 8763": NOV_SPENT - 18_000 - 26_200,
-                                                           "Shared card": 18_000, "Bank Hapoalim ••••901": 26_200},
+    check("summary: by account, labelled", by_account == {"Sample Card 8763": NOV_SPENT - 18_000 - 26_200,
+                                                           "Shared card": 18_000, "Sample Bank ••••901": 26_200},
           by_account)
     by_merchant = queries.summary(ROBIN, P("this_month"), group_by="merchant")["breakdown"]
     check("summary: by merchant (merchant key, display name)", by_merchant[0]["label"] == "סופר פארם"
@@ -370,7 +372,7 @@ def test_search() -> None:
           and by_amount[0]["badges"] == [{"type": "installment", "number": 1, "total": 4}])
     course = queries.search(ROBIN, query="course")["transactions"][0]
     check("search: a foreign charge carries its original amount", course["badges"]
-          == [{"type": "foreign", "amount": -500, "currency": "USD"}] and course["account_label"] == "Cal 8763"
+          == [{"type": "foreign", "amount": -500, "currency": "USD"}] and course["account_label"] == "Sample Card 8763"
           and course["category_label"] == "Education" and course["group_label"] == "Family")
     memo = queries.search(ROBIN, query="כרטיסים")["transactions"]
     check("search: a transfer note is searched too", [t["id"] for t in memo] == [T["dani"]])
@@ -442,7 +444,7 @@ def test_overview() -> None:
           and o["income"]["total"] == 1_500_000 and o["month"] == "2026-11")
     check("overview: each card's next bill, the bank's balance (masked number)",
           [(c["label"], c["next_charge"], c["next_charge_date"]) for c in o["cards"]]
-          == [("Shared card", 120_000, "2026-11-25"), ("Cal 8763", 345_081, "2026-12-10")]
+          == [("Shared card", 120_000, "2026-11-25"), ("Sample Card 8763", 345_081, "2026-12-10")]
           and [(b["number"], b["balance"]) for b in o["banks"]] == [("••••901", 1_234_567)], (o["cards"], o["banks"]))
     fc = o["forecast"]
     check("overview: the forecast from the bank's balance — the benefit and the mortgage on 20 Nov, the shared "
@@ -455,8 +457,8 @@ def test_overview() -> None:
           fc)
     check("overview: recurring monthly total, uncategorized count, sources and what needs attention",
           o["recurring_monthly"] == 450_000 + 4_990 + 500 and o["uncategorized"] == 2
-          and [s["company"] for s in o["sources"]] == ["hapoalim", "visaCal"]
-          and o["attention"] == [{"source_id": S_CAL, "name": "Cal", "state": "failing",
+          and [s["company"] for s in o["sources"]] == ["samplebank", "samplecard"]
+          and o["attention"] == [{"source_id": S_CAL, "name": "Sample Card", "state": "failing",
                                   "reason": "bank worker not reachable"}]
           and o["last_sync_at"] == "2026-11-18T05:01:00+00:00", (o["recurring_monthly"], o["attention"]))
     past = {**queries.overview(ROBIN, "2026-10"), **dashboard.tiles(ROBIN, "2026-10")}
@@ -502,7 +504,7 @@ def row(day: str, amount: int, key: str, **kw: Any) -> Dict[str, Any]:
     return {"id": kw.pop("id", uuid.uuid4().hex), "purchase_date": day, "amount": amount, "merchant_key": key,
             "merchant": kw.pop("merchant", key), "status": kw.pop("status", "completed"),
             "occurred_at": kw.pop("occurred_at", None), "installment_total": kw.pop("installment_total", None),
-            "installment_number": None, "account_kind": "card", "account_company": "visaCal",
+            "installment_number": None, "account_kind": "card", "account_company": "samplecard",
             "account_number": "8763", "account_id": "acc", "category": kw.pop("category", None),
             "eff_flow": kw.pop("flow", "purchase"), "description": key, **kw}
 
@@ -591,9 +593,9 @@ def test_insights_db() -> None:
     check("recurring (Robin): the mortgage, Netflix and the yearly domain; groceries, installments and card bills not",
           set(items) == {"משכנתא לאומי", "NETFLIX.COM", "NAMECHEAP"} and rec["monthly_total"] == 455_490, set(items))
     n = items["NETFLIX.COM"]
-    check("recurring: Netflix ₪39.90 → ₪49.90 since 3 Nov, next 3 Dec, on Cal 8763",
+    check("recurring: Netflix ₪39.90 → ₪49.90 since 3 Nov, next 3 Dec, on Sample Card 8763",
           n["price_change"] == {"from": 3_990, "to": 4_990, "since": "2026-11-03"} and n["next_date"] == "2026-12-03"
-          and n["account_label"] == "Cal 8763" and n["category_label"] == "Subscriptions & software"
+          and n["account_label"] == "Sample Card 8763" and n["category_label"] == "Subscriptions & software"
           and items["משכנתא לאומי"]["next_date"] == "2026-11-20" and items["NAMECHEAP"]["cadence"] == "yearly", n)
     check("recurring: income (salary, the benefit)", sorted(i["merchant"] for i in rec["income"])
           == sorted(["משכורת נוגה תעשיות", "קצבת ילדים"]))

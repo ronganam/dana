@@ -90,7 +90,7 @@ One value: an LLM key (`ANTHROPIC_API_KEY` with the default models). A server wi
 | `ASSISTANT_DEFAULT_MODEL` | catalog id used when a chat request names no model (default: first entry, `fast`) |
 | `DEFAULT_COUNTRY_CODE` | calling code (e.g. `972`, `44`) that replaces the leading 0 of a local phone number in People, Contacts and the WhatsApp tools; server-wide, no default (unset: a number stays as typed) |
 | `CONTACTS_SYNC_MINUTES` | minutes between two syncs of every user's Google Contacts copy (60; `docs/contacts.md`) |
-| `MONEY_WORKER_URL` | the bank-worker sidecar (default `http://127.0.0.1:8090`: the same pod; `docs/money.md`). Its token is a file Dana creates, `money/worker-token` next to the DB, not an env value |
+| `MONEY_WORKER_URL` | the `money_il` catalog addon's bank worker (default `http://127.0.0.1:8090`: the same pod; that addon's README). Its token is a file Dana creates, `money/worker-token` next to the DB, not an env value |
 | `MONEY_SYNC_TIMES` | comma-separated local `HH:MM` slots when every money source syncs (default `07:00,19:00`; each source moved by a stable ±20 min) |
 | `PEOPLE_BRIEF_INTERVAL_SECONDS` / `PEOPLE_BRIEF_BATCH` / `PEOPLE_DRIFT_MIN_DAYS` | people briefs: loop interval (600), rewrites per pass per user (6); minimum days before someone counts as drifting (14) |
 | `WAKE_CONFIRM_SECONDS` / `WAKE_MIN_SCREEN_SECONDS` / `WAKE_WINDOW_START_HOUR` / `WAKE_WINDOW_END_HOUR` | wake: check delay after an unlock (600), screen-on needed since it (90), window (5–12) |

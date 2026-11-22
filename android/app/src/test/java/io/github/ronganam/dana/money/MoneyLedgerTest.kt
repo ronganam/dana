@@ -186,11 +186,11 @@ class MoneyLedgerTest {
     fun accountsAndSources() {
         val ov = body("overview")
         val cards = ov.arr("cards").objects()
-        assertEquals(listOf("Shared card ••4580", "Cal ••8763"), cards.map {
+        assertEquals(listOf("Shared card ••4580", "Sample Card ••8763"), cards.map {
             MoneyLedger.accountName("card", it.str("number"), it.str("label"), it.str("company_name"))
         })
         val bank = ov.arr("banks").objects()[0]
-        assertEquals("Hapoalim ••901", MoneyLedger.accountName("bank", bank.str("number"), bank.str("label"), bank.str("company_name")))
+        assertEquals("Sample Bank ••901", MoneyLedger.accountName("bank", bank.str("number"), bank.str("label"), bank.str("company_name")))
         val src = ov.arr("sources").objects()
         val ok = src[0]
         val fail = src[1]

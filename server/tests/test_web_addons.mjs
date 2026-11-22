@@ -75,8 +75,8 @@ const st = (item, ui) => plain(C.statusOf(item, ui));
 check("status: on", st(admin.homeassistant).key === "on" && st(admin.homeassistant).label === "On");
 check("status: essentials is always on", st(admin.essentials).label === "Always on");
 check("status: a service not set up needs setup; an addon without fields is just off",
-      st(fresh.homeassistant).key === "setup" && st(fresh.calendar).key === "setup" && st(fresh.money_il).key === "setup"
-      && st(fresh.tasks).key === "off", JSON.stringify([st(fresh.tasks), st(fresh.money_il)]));
+      st(fresh.homeassistant).key === "setup" && st(fresh.calendar).key === "setup" && st(fresh.money).key === "setup"
+      && st(fresh.tasks).key === "off", JSON.stringify([st(fresh.tasks), st(fresh.money)]));
 check("status: an admin's choice says so", st(fresh.cameras).key === "locked" && st(fresh.cameras).reason === "Set by an admin");
 const conflict = st(carl.whatsapp);
 check("status: the conflict is an error with the number and what to do",
@@ -125,7 +125,8 @@ check("steps: the setup sentences are shown in one first step, the optional key 
 const haDetail = C.renderDetail(admin.homeassistant, {}, true);
 check("detail: what it adds (the manifest's features)", haDetail.includes("What it adds") && admin.homeassistant.features.every((f) => haDetail.includes(C.esc(f))));
 check("detail: a page it adds is named", C.renderAdds(member.calendar).includes("<strong>Calendar</strong> page"));
-const ilNeeds = C.renderNeeds(fresh.money_il, F.list_new_user.body.addons);
+const ilNeeds = C.renderNeeds({ ...fresh.money, name: "money_example", needs: [{ kind: "addon", what: "money", why: "Its accounts", optional: false }] },
+                              F.list_new_user.body.addons);
 check("needs: another addon it needs, by its title, required", /Addon<\/span>[\s\S]*<strong dir="auto">Money<\/strong>/.test(ilNeeds)
       && !/<strong dir="auto">Money<\/strong> <em>optional/.test(ilNeeds));
 const gNeeds = plain(C.needLines(admin.gmail, F.list_admin.body.addons));

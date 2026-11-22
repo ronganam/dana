@@ -138,12 +138,13 @@ data class BadgeText(val type: String, val text: String, val title: String)
 data class SourceStatus(val tone: String, val label: String, val detail: String)
 
 /** A login in the add / update form: `GET companies`. */
-data class MoneyCompany(val id: String, val name: String, val kind: String, val fields: List<CompanyField>) {
+data class MoneyCompany(val id: String, val name: String, val kind: String, val fields: List<CompanyField>, val signInCode: Boolean = false) {
     companion object {
         fun parseAll(o: JsonObject): List<MoneyCompany> = o.arr("companies").objects().map { c ->
             MoneyCompany(
                 id = c.string("id"), name = c.string("name"), kind = c.string("kind"),
-                fields = c.arr("fields").objects().map { CompanyField(it.string("name"), it.string("label"), it.flag("secret")) }
+                fields = c.arr("fields").objects().map { CompanyField(it.string("name"), it.string("label"), it.flag("secret")) },
+                signInCode = c.flag("sign_in_code")
             )
         }
     }
@@ -501,7 +502,7 @@ object MoneyLedger {
 
     fun kindWord(kind: String?): String = KIND_WORDS[kind] ?: "Card"
 
-    /** "Cal ••8763", "Shared card ••4580" (a label of the user's own), "Hapoalim ••901". */
+    /** "Sample Card ••8763", "Shared card ••4580" (a label of the user's own), "Sample Bank ••901". */
     fun accountName(kind: String, number: String?, label: String?, companyName: String?): String {
         val digits = (number ?: "").filter { it.isDigit() }
         val short = kind == "bank" || kind == "investment"

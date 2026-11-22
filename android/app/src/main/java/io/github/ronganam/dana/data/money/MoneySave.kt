@@ -154,7 +154,7 @@ data class SavingItem(
 }
 
 data class SaveTotals(val low: Long, val high: Long, val count: Int, val saved: Long, val savedYearly: Long)
-data class SaveRate(val policy: Double?, val date: String?)
+data class SaveRate(val policy: Double?, val date: String?, val bank: String?)
 
 /** `GET /api/money/savings`. */
 data class SavingsOverview(val asOf: String?, val rate: SaveRate?, val totals: SaveTotals, val items: List<SavingItem>) {
@@ -166,7 +166,7 @@ data class SavingsOverview(val asOf: String?, val rate: SaveRate?, val totals: S
             val t = o.obj("totals") ?: EmptyJson
             return SavingsOverview(
                 asOf = o.str("as_of"),
-                rate = o.obj("rate")?.let { SaveRate(if (it.absent("policy")) null else it.doubleValue("policy"), it.str("date")) },
+                rate = o.obj("rate")?.let { SaveRate(if (it.absent("policy")) null else it.doubleValue("policy"), it.str("date"), it.str("bank")) },
                 totals = SaveTotals(t.longValue("low"), t.longValue("high"), t.intValue("count"), t.longValue("saved"), t.longValue("saved_yearly")),
                 items = o.arr("items").objects().map { SavingItem.parse(it) }
             )
@@ -255,7 +255,7 @@ object MoneySave {
                 t.saved != 0L -> ""
                 else -> "Counted once something you did shows in your charges"
             },
-            source = if (r?.policy != null) "Bank of Israel rate ${pctText(r.policy, signed = false)}${r.date?.let { " (${shortDate(it, today)})" } ?: ""} · amounts from your charges"
+            source = if (r?.policy != null) "${r.bank ?: "Central bank"} rate ${pctText(r.policy, signed = false)}${r.date?.let { " (${shortDate(it, today)})" } ?: ""} · amounts from your charges"
             else "Amounts from your charges"
         )
     }

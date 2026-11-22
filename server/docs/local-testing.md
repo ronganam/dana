@@ -45,7 +45,6 @@ user, so run `reset` before running it again.
 | `app` | the image `dana-local/app:latest` (the repo's `Dockerfile`, built from the files git tracks or would add, like `bin/deploy`'s clean checkout), `python main.py`, data volume at `/app/db`, env from `tests/local_env/.state/app.env` |
 | `stubs` | `tests/local_env/stubs.py` (same image, the directory mounted read-only): every outside service, each on its own port, plus a control API |
 | `gateway` | `tests/local_env/gateway.py`: forwards `127.0.0.1:18080` to the app and `127.0.0.1:18090` to the stubs' control API |
-| `bank-worker` | only with `DANA_LOCAL_MONEY=1` (`compose.money.yaml`): money_il's bank-worker sidecar built from `addons/money_il/worker/`, in the app's network namespace and on its data volume, as in the pod. Signing in to the real bank sites also needs `DANA_LOCAL_EGRESS=1`, and real bank logins (`docs/money-il.md`) |
 
 The app and the stubs are only on an internal Docker network with no route out
 of the machine (`compose.yaml`, `internal: true`); the gateway is the one

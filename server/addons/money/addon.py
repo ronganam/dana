@@ -2,7 +2,8 @@
 
 The connection itself has no credentials: it is the on/off switch. Each bank
 or card login is a row of ``money_sources`` (``sources.py``) at a company a
-provider addon brings (``providers.py``: ``money_il`` for Israel). After each
+provider addon brings (``providers.py``; e.g. ``money_il`` from the catalog), or an
+account the user fills by importing statement files (``imports.py``). After each
 ingest, provisional rows from phone notifications are merged first (they
 carry their category), then classification runs; new phone notifications
 reach ``signals.observe`` through the phone addon's observers; the month's
@@ -56,15 +57,16 @@ def accounts_section(user: User) -> str:
 addon = Addon(
     ADDON, web=(Page("money", panel="money.js", style="money.css", nav=Nav("Money", icon="wallet", order=20)),), order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories")},
     title="Money", icon="wallet",
-    needs=(Need("addon", "money_il", "Brings the banks and cards to sync (Israel); without a provider there is nothing to sync", optional=True),
-           Need("addon", "phone", "Sign-in codes from your SMS, and charges from card notifications before the bank shows them", optional=True)),
+    needs=(Need("addon", "phone", "Sign-in codes from your SMS, and charges from card notifications before the bank shows them", optional=True),),
     touches=Touches(stores_credentials=True, reads=("phone",)),
     description="Your bank and card spending, balances and ways to save",
     features=("Spending, income and balances in chat and on the Money page",
               "Subscriptions, card bills and your balance ahead",
               "Ways to save and spending worth watching"),
-    setup=("Turn on a provider addon for your banks and cards too (such as Money (Israel)), then add your logins "
-           "on the Money page.",),
+    setup=("On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you "
+           "download, into an account of yours.",
+           "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins "
+           "on the Money page: they then sync by themselves.",),
     examples=("How much did I spend on food this month?", "What subscriptions do I pay for?"),
     disconnect_warning="Your saved bank and card logins, accounts and transactions are deleted from Dana.",
     on_change=sources.on_change,

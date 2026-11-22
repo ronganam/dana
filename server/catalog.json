@@ -31,6 +31,21 @@
     "path": "israel_rail",
     "ref": "f8c3ed200acb88c88b97acd3d00cd958ea7882e7"
    }
+  },
+  {
+   "name": "money_il",
+   "title": "Money (Israel)",
+   "description": "Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money, synced by a bank worker next to Dana.",
+   "icon": "landmark",
+   "author": "ronganam",
+   "homepage": "https://github.com/ronganam/dana-addon-money-il",
+   "tags": ["money", "israel"],
+   "min_dana": "10.0.0",
+   "source": {
+    "repo": "https://github.com/ronganam/dana-addon-money-il",
+    "path": "money_il",
+    "ref": "PENDING"
+   }
   }
  ]
 }

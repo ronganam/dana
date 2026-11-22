@@ -47,7 +47,7 @@ internal fun InvestmentsView(d: Dash) {
             SkelTiles(d.twoCols)
             DashSections(d.twoCols, listOf(0 to { DashSection("Portfolio value") { SkelChart() } }, 1 to { DashSection("Allocation") { SkelRows(4) } }))
         }
-        p.accounts.isEmpty() -> Empty("No investment account yet. Add Psagot Trade under Accounts: its holdings, their value and the account's activity show up here after the first sync.")
+        p.accounts.isEmpty() -> Empty("No investment account yet. Add your investment account under Accounts (a provider addon brings it): its holdings, their value and the account's activity show up here after the first sync.")
         else -> InvestmentsLoaded(d, p)
     }
 }
@@ -200,7 +200,7 @@ internal fun MealsView(d: Dash) {
             SkelTiles(d.twoCols)
             DashSections(d.twoCols, listOf(0 to { DashSection("Cycles") { SkelRows(6) } }, 1 to { DashSection("Places") { SkelRows(5) } }))
         }
-        tiles == null -> Empty("No meal card yet. Add Pluxee under Accounts: its budget, what is left and every meal show up here after the first sync.")
+        tiles == null -> Empty("No meal card yet. Add your meal card under Accounts (a provider addon brings it): its budget, what is left and every meal show up here after the first sync.")
         else -> MealsLoaded(d, m, tiles)
     }
 }

@@ -11,13 +11,15 @@
 # site's addons (site/addons/, or the folders in DANA_IMAGE_ADDONS) copied into the
 # image's /app/addons-site, tagged "<VERSION>-<short commit>", plus "-a<addons hash>"
 # when there are site addons, so a change to one alone is a new release (the RELEASE build arg
-# writes the name into the image's VERSION: /api/health shows it); and every addon worker
-# (an official addon's or a built-in site addon's worker/Dockerfile) as
-# "$DANA_IMAGE-<addon>" with the same tag (DANA_WORKERS: all, none, or the addon names).
-# Pushes the images (and Dana's `latest`). With DANA_GITOPS_REPO set it then writes the
-# release into DANA_GITOPS_VALUES in that repo (every `tag:` line, and every
-# `image: <DANA_IMAGE>-<addon>:<tag>` of a worker) and pushes it, for a GitOps tool (ArgoCD,
-# Flux) to roll the pod. That commit is made in a private clone (~/.cache/dana-deploy/gitops),
+# writes the name into the image's VERSION: /api/health shows it). Addon workers (DANA_WORKERS:
+# all, none, or the addon names): one whose manifest names a published image
+# (Worker(image=...): an addon installed from the catalog) is pinned to that image's tag, else
+# to the commit it was installed at, and not built; a worker/Dockerfile otherwise (a site
+# addon's) is built as "$DANA_IMAGE-<addon>" with the same tag.
+# Pushes the images it built (and Dana's `latest`). With DANA_GITOPS_REPO set it then writes the
+# release into DANA_GITOPS_VALUES in that repo (every `tag:` line, every
+# `image: <DANA_IMAGE>-<addon>:<tag>` of a built worker and every `image: <published image>:<tag>`
+# of a pinned one) and pushes it, for a GitOps tool (ArgoCD, Flux) to roll the pod. That commit is made in a private clone (~/.cache/dana-deploy/gitops),
 # never in your own checkout.
 # It runs no tests: the pre-push hook runs them before it calls this.
 # DANA_DEPLOY_CHECKOUT=<dir>: build from that checkout of the commit (the hook's).
@@ -50,7 +52,7 @@ ref=HEAD
 for arg in "$@"; do
   case "$arg" in
     --wait) wait_pod=1 ;;
-    -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) ref="$arg" ;;
   esac
 done
@@ -94,15 +96,26 @@ for addon in "${site_addons[@]}"; do
   find "$staging/$(basename "$addon")" -name __pycache__ -prune -exec rm -rf {} +
 done
 
-# Addon workers (docs/operations.md, "Workers"): <addon>/worker/Dockerfile of the commit's official
-# addons and of the site addons built in; each is its own image, "$DANA_IMAGE-<addon>".
-workers=()
+# Addon workers (docs/operations.md, "Workers") of the commit's official addons and of the site addons
+# built in: a published image the manifest names is pinned (core/addon_dirs.py worker_image, read
+# without importing the addon); a worker/Dockerfile is built as its own image, "$DANA_IMAGE-<addon>".
+workers=()   # name=folder to build
+pinned=()    # name=image:tag
 if [ "$DANA_WORKERS" != "none" ]; then
-  for dir in "$context"addons/*/worker "${site_addons[@]/%//worker}"; do
-    [ -f "$dir/Dockerfile" ] || continue
-    name="$(basename "$(dirname "$dir")")"
+  for dir in "$context"addons/*/ "${site_addons[@]/%//}"; do
+    dir="${dir%/}"
+    [ -f "$dir/addon.py" ] || continue
+    name="$(basename "$dir")"
     if [ "$DANA_WORKERS" != "all" ] && [[ " ${DANA_WORKERS//,/ } " != *" $name "* ]]; then continue; fi
-    workers+=("$name=$dir")
+    image="$(PYTHONPATH="$context" python3 -c 'import sys
+from pathlib import Path
+from core import addon_dirs
+print(addon_dirs.worker_image(Path(sys.argv[1])) or "")' "$dir")" || { echo "deploy: cannot pin the $name worker" >&2; exit 1; }
+    if [ -n "$image" ]; then
+      pinned+=("$name=$image")
+    elif [ -f "$dir/worker/Dockerfile" ]; then
+      workers+=("$name=$dir/worker")
+    fi
   done
 fi
 
@@ -118,6 +131,9 @@ docker push -q "$DANA_IMAGE:$release" >/dev/null
 docker push -q "$DANA_IMAGE:latest" >/dev/null
 for worker in "${workers[@]}"; do
   docker push -q "$DANA_IMAGE-${worker%%=*}:$release" >/dev/null
+done
+for worker in "${pinned[@]}"; do
+  echo "deploy: the ${worker%%=*} worker runs ${worker#*=} (published by the addon's repository, not built)"
 done
 
 if [ -z "$DANA_GITOPS_REPO" ]; then
@@ -139,6 +155,12 @@ else
     # Each worker's image (workers.<addon>.image: "<DANA_IMAGE>-<addon>:<tag>"; any key naming that image works).
     for worker in "${workers[@]}"; do
       sed -i -E -e "s#(image:\s*\"?$DANA_IMAGE-${worker%%=*}:)[^\"[:space:]]*#\1$release#" "$GITOPS/$DANA_GITOPS_VALUES"
+    done
+    # Each pinned worker's image (any key naming that repository: "<image>:<tag>" or "<image>@<digest>").
+    for worker in "${pinned[@]}"; do
+      image="${worker#*=}"
+      repo="${image%@*}"; [ "$repo" = "$image" ] && repo="${image%:*}"
+      sed -i -E -e "s#(image:\s*\"?)$repo[:@][^\"[:space:]]*#\1$image#" "$GITOPS/$DANA_GITOPS_VALUES"
     done
     if git -C "$GITOPS" diff --quiet -- "$DANA_GITOPS_VALUES"; then
       echo "deploy: $DANA_GITOPS_VALUES already runs $release"

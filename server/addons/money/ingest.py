@@ -7,10 +7,10 @@ format"): ``accountNumber``, ``balance`` and ``txns`` (the shape of
 stores them for one source in one transaction: accounts upserted by
 ``(user, company, number)``, transactions by ``(account, ext_key)``, the
 account's ``pending`` rows not in this pull removed. Text is scrubbed before
-it is stored (ID numbers, card and account numbers); amounts become signed
-agorot; dates (instants; a scraper's UTC instant of local midnight) become
-local dates. A category comes only from the user's rules here;
-classification runs later, from a hook."""
+it is stored (card numbers, and the personal numbers providers register);
+amounts become signed agorot; dates (instants; a scraper's UTC instant of
+local midnight) become local dates. A category comes only from the user's
+rules here; classification runs later, from a hook."""
 
 import datetime
 import hashlib
@@ -37,51 +37,44 @@ _SCRAPED = ("status", "occurred_at", "purchase_date", "charge_date", "amount", "
 
 # --- Scrubbing ------------------------------------------------------------------------------
 
-_ACCOUNT = re.compile(r"(?<!\d)\d{2}-\d{3}-\d{4,9}(?!\d)")
 _CARD = re.compile(r"(?<!\d)\d{4}([ -]?)\d{4}\1\d{4}\1\d{4}(?!\d)")
-_NINE = re.compile(r"(?<!\d)\d{9}(?!\d)")
 
 
-def israeli_id_valid(digits: str) -> bool:
-    """Whether 9 digits pass the Israeli ID number checksum."""
-    if len(digits) != 9 or not digits.isdigit():
-        return False
-    total = 0
-    for i, ch in enumerate(digits):
-        n = int(ch) * (1 + i % 2)
-        total += n - 9 if n > 9 else n
-    return total % 10 == 0
-
-
-def _keep_last3(match: "re.Match[str]") -> str:
-    digits = re.sub(r"\D", "", match.group(0))
+def keep_last3(text: str) -> str:
+    """A number as ``••••`` + its last 3 digits."""
+    digits = re.sub(r"\D", "", text)
     return "••••" + digits[-3:]
 
 
+def _redact(text: str, redaction: providers.Redaction) -> str:
+    def one(match: "re.Match[str]") -> str:
+        masked = redaction.mask(match.group(0))
+        return match.group(0) if masked is None else masked
+    return redaction.pattern.sub(one, text)
+
+
 def scrub(text: str) -> str:
-    """``text`` without ID numbers (→ ``[id]``), card numbers and account
-    numbers (→ ``••••`` + their last 3 digits). Names stay."""
+    """``text`` without card numbers (→ ``••••`` + their last 3 digits) and the personal
+    numbers loaded providers mask (``providers.redactions``: ID numbers, account numbers). Names stay."""
     if not text:
         return text
-    text = _ACCOUNT.sub(_keep_last3, text)
-    text = _CARD.sub(_keep_last3, text)
-    return _NINE.sub(lambda m: "[id]" if israeli_id_valid(m.group(0)) else m.group(0), text)
+    text = _CARD.sub(lambda m: keep_last3(m.group(0)), text)
+    for redaction in providers.redactions():
+        text = _redact(text, redaction)
+    return text
 
 
 def scrub_value(value: Any) -> Any:
     """:func:`scrub` applied to every string in a JSON value (and to integers
-    that are an ID or a card number)."""
+    that are a card number or a masked personal number)."""
     if isinstance(value, str):
         return scrub(value)
     if isinstance(value, bool):
         return value
     if isinstance(value, int):
         s = str(value)
-        if len(s) == 9 and israeli_id_valid(s):
-            return "[id]"
-        if len(s) == 16:
-            return "••••" + s[-3:]
-        return value
+        masked = scrub(s)
+        return masked if masked != s else value
     if isinstance(value, dict):
         return {k: scrub_value(v) for k, v in value.items()}
     if isinstance(value, list):
@@ -105,19 +98,20 @@ def merchant_key(text: str) -> str:
     return " ".join(t for t in s.split() if not t.isdigit())
 
 
-# Hapoalim's note on a transfer the user sent: "לטובת: <payee>. עבור: <purpose>." (the purpose is optional).
-_TRANSFER_NOTE = re.compile(r"^\s*לטובת:\s*(?P<payee>.+?)\s*(?:\.\s*עבור:\s*(?P<purpose>.*?))?\s*\.?\s*$", re.S)
 PAYEE_MAX = 60
 
 
-def transfer_payee(memo: Optional[str]) -> Optional[Tuple[str, str]]:
-    """``(payee, purpose)`` from a bank transfer's note ("לטובת: בית ההשקעות הראשון בע"מ. עבור: השקעה."),
-    None when the note is not one. The user typed both in the bank's app when sending the money."""
-    m = _TRANSFER_NOTE.match(memo or "")
-    if not m:
+def transfer_payee(company: Optional[providers.Company], memo: Optional[str]) -> Optional[Tuple[str, str]]:
+    """``(payee, purpose)`` from a bank transfer's note, as the company's ``transfer_note`` reads it
+    (the user typed both in the bank's app when sending the money); None when the company reads none
+    or the note is not one."""
+    if company is None or company.transfer_note is None or not memo:
         return None
-    payee = " ".join(m.group("payee").split())[:PAYEE_MAX].strip()
-    purpose = " ".join((m.group("purpose") or "").split())[:120].strip()
+    found = company.transfer_note(memo)
+    if not found:
+        return None
+    payee = " ".join(found[0].split())[:PAYEE_MAX].strip()
+    purpose = " ".join((found[1] or "").split())[:120].strip()
     return (payee, purpose) if payee and merchant_key(payee) else None
 
 
@@ -187,7 +181,7 @@ def _int(value: Any) -> Optional[int]:
 _NOT_RAW = ("purchaseDate",)
 
 
-def _row(txn: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
+def _row(txn: Mapping[str, Any], company: Optional[providers.Company] = None) -> Optional[Dict[str, Any]]:
     """The stored fields of one scraped transaction (no ext_key yet); None when it has no date or amount."""
     when = _instant(txn.get("date"))
     amount = agorot(txn.get("chargedAmount"))
@@ -203,9 +197,9 @@ def _row(txn: Mapping[str, Any]) -> Optional[Dict[str, Any]]:
     charged = _instant(txn.get("processedDate"))
     description = scrub(str(txn.get("description") or "")).strip()
     memo = scrub(str(txn.get("memo") or "")).strip()
-    # A transfer the user sent is about its payee, not the bank's generic "העב' לאחר-נייד": the payee is
+    # A transfer the user sent is about its payee, not the bank's generic line: the payee is
     # its merchant (memory and "always for this payee" rules then work per payee).
-    payee = transfer_payee(memo) if amount < 0 else None
+    payee = transfer_payee(company, memo) if amount < 0 else None
     key = merchant_key(payee[0]) if payee else merchant_key(description)
     return {
         "status": "pending" if txn.get("status") == "pending" else "completed",
@@ -291,8 +285,7 @@ def apply(user: User, source: Mapping[str, Any], accounts: Sequence[Mapping[str,
     now = store.now_iso()
     out: Dict[str, List[str]] = {"new": [], "changed": [], "accounts": []}
     with store.db() as conn:
-        rules = {r["merchant_key"]: dict(r) for r in conn.execute(
-            "SELECT merchant_key, category, merchant, flow FROM money_rules WHERE user_id = ?", (user.id,))}
+        rules = rules_of(conn, user)
         for account in accounts:
             if company.kind == "investment":
                 account_id = portfolio.store_account(conn, user, str(source["id"]), company, account, now)
@@ -308,7 +301,7 @@ def apply(user: User, source: Mapping[str, Any], accounts: Sequence[Mapping[str,
             if not number:
                 logger.warning(f"Money ingest for source {source['id']}: an account without a number was skipped")
                 continue
-            rows = [r for r in (_row(t) for t in account.get("txns") or []) if r is not None]
+            rows = [r for r in (_row(t, company) for t in account.get("txns") or []) if r is not None]
             skipped = len(account.get("txns") or []) - len(rows)
             if skipped:
                 logger.warning(f"Money ingest for source {source['id']}: {skipped} row(s) without a date or amount")
@@ -330,6 +323,33 @@ def apply(user: User, source: Mapping[str, Any], accounts: Sequence[Mapping[str,
     return out
 
 
+def insert_row(conn, user: User, account_id: str, row: Mapping[str, Any], rules: Mapping[str, Dict[str, Any]],
+               now: str) -> str:
+    """Insert one statement row (the fields :func:`_row` gives, with its ``ext_key``) into ``account_id``,
+    with the category and name of the user's rule for its merchant key when there is one; returns its id.
+    The caller checked the account is the user's."""
+    txn_id = uuid.uuid4().hex
+    rule = rules.get(row["merchant_key"]) if row["merchant_key"] else None
+    category = rule["category"] if rule and rule.get("category") else None
+    conn.execute(
+        "INSERT INTO money_transactions (id, user_id, account_id, ext_key, source, status, occurred_at, "
+        "purchase_date, charge_date, amount, orig_amount, orig_currency, description, merchant, merchant_key, "
+        "memo, category, category_source, flow, installment_number, installment_total, raw, created_at, "
+        "updated_at) VALUES (?, ?, ?, ?, 'scrape', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+        (txn_id, user.id, account_id, row["ext_key"], row["status"], row["occurred_at"], row["purchase_date"],
+         row["charge_date"], row["amount"], row["orig_amount"], row["orig_currency"], row["description"],
+         (rule or {}).get("merchant") or clean_payee(row.get("payee") or "") or row["description"], row["merchant_key"],
+         row["memo"], category, "rule" if category else None, (rule or {}).get("flow"), row["installment_number"],
+         row["installment_total"], row["raw"], now, now))
+    return txn_id
+
+
+def rules_of(conn, user: User) -> Dict[str, Dict[str, Any]]:
+    """The user's merchant rules by merchant key (applied to new rows)."""
+    return {r["merchant_key"]: dict(r) for r in conn.execute(
+        "SELECT merchant_key, category, merchant, flow FROM money_rules WHERE user_id = ?", (user.id,))}
+
+
 def _store_rows(conn, user: User, account_id: str, rows: Sequence[Dict[str, Any]], rules: Mapping[str, Dict[str, Any]],
                 now: str, out: Dict[str, List[str]]) -> None:
     pending = [r["ext_key"] for r in rows if r["status"] == "pending"]
@@ -347,21 +367,7 @@ def _store_rows(conn, user: User, account_id: str, rows: Sequence[Dict[str, Any]
     for row in rows:
         old = existing.get(row["ext_key"])
         if old is None:
-            txn_id = uuid.uuid4().hex
-            rule = rules.get(row["merchant_key"]) if row["merchant_key"] else None
-            category = rule["category"] if rule and rule.get("category") else None
-            conn.execute(
-                "INSERT INTO money_transactions (id, user_id, account_id, ext_key, source, status, occurred_at, "
-                "purchase_date, charge_date, amount, orig_amount, orig_currency, description, merchant, merchant_key, "
-                "memo, category, category_source, flow, installment_number, installment_total, raw, created_at, "
-                "updated_at) VALUES (?, ?, ?, ?, 'scrape', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (txn_id, user.id, account_id, row["ext_key"], row["status"], row["occurred_at"], row["purchase_date"],
-                 row["charge_date"], row["amount"], row["orig_amount"], row["orig_currency"], row["description"],
-                 (rule or {}).get("merchant") or clean_payee(row.get("payee") or "") or row["description"], row["merchant_key"],
-                 row["memo"], category,
-                 "rule" if category else None, (rule or {}).get("flow"), row["installment_number"],
-                 row["installment_total"], row["raw"], now, now))
-            out["new"].append(txn_id)
+            out["new"].append(insert_row(conn, user, account_id, row, rules, now))
             continue
         changes = {k: row[k] for k in _SCRAPED if old.get(k) != row[k]}
         if changes:

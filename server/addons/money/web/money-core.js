@@ -10,7 +10,8 @@
  * query string and the #money hash and back, and words the tiles, coming up, recurring charges by their
  * cadence, a source's state, badges, the "counts as" choices and errors; for the Save view it sorts the
  * ways to save and spending to watch into sections and words their chips, actions, price checks,
- * targets and outcomes (only formatting: every number is the server's). Tested by test_web_money.mjs
+ * targets and outcomes (only formatting: every number is the server's); for statement files it words a
+ * preview and an import and edits a CSV column mapping. Tested by test_web_money.mjs
  * against the payloads captured from the real API (tests/fixtures/money_web.json, written by
  * test_money_page.py; money_portfolio_web.json; money_savings_web.json).
  */
@@ -750,7 +751,7 @@
       could: { text: whole(lo) === whole(hi) ? whole(hi) : `${whole(lo)}–${whole(hi)}`, sub: n ? `a year · ${plural(n, "idea")}` : "No open idea with a saving right now" },
       saved: { value: t.saved || 0, sub: t.saved_yearly ? `≈ ${whole(t.saved_yearly)} a year` : t.saved ? "" : "Counted once something you did shows in your charges" },
       source: r && r.policy != null
-        ? `Bank of Israel rate ${pctText(r.policy, { sign: "none" })}${r.date ? ` (${shortDate(r.date, today)})` : ""} · amounts from your charges`
+        ? `${r.bank || "Central bank"} rate ${pctText(r.policy, { sign: "none" })}${r.date ? ` (${shortDate(r.date, today)})` : ""} · amounts from your charges`
         : "Amounts from your charges",
     };
   }
@@ -1015,7 +1016,7 @@
 
   // ---------- accounts ----------
 
-  /** "Cal ••8763","Shared card ••4580" (a label of the user's own), "Hapoalim ••901". */
+  /** "Example Card ••8763", "Shared card ••4580" (a label of the user's own), "Example ••901" (a bank without "Bank"). */
   function accountName(a) {
     if (!a) return "";
     const digits = String(a.number || "").replace(/\D/g, "");
@@ -1062,7 +1063,7 @@
     return t.spending ? "out" : "muted";
   }
 
-  /** The row's badges: [{type, text, title}]. `company` names the card company ("Cal"). */
+  /** The row's badges: [{type, text, title}]. `company` names the card company ("Example Card"). */
   function badges(t, company) {
     const who = company || "the card company";
     const out = [];
@@ -1364,6 +1365,61 @@
   /** The toast after PATCH {flow}. */
   const flowText = (body) => `${isolate(((body && body.transaction) || {}).merchant)} now counts as ${flowLabel(((body && body.transaction) || {}).flow)}`;
 
+  // ---------- statement files ----------
+
+  // The CSV columns a mapping names, in the order the import sheet asks for them (required first).
+  const IMPORT_ROLES = [
+    { key: "date", label: "Date", required: true }, { key: "description", label: "Description", required: true },
+    { key: "amount", label: "Amount" }, { key: "debit", label: "Money out (debit)" }, { key: "credit", label: "Money in (credit)" },
+    { key: "balance", label: "Balance" }, { key: "memo", label: "Memo" },
+  ];
+  const IMPORT_FORMATS = { csv: "CSV", ofx: "OFX", qif: "QIF" };
+
+  /** A preview (POST /api/money/import/preview) in words: "CSV · 24 transactions: 20 new, 4 already here ·
+   *  1 line skipped (no date or amount)". */
+  function importSummary(p) {
+    if (!p) return "";
+    const parts = [`${IMPORT_FORMATS[p.format] || String(p.format || "").toUpperCase()} · ${plural(p.count, "transaction")}`
+      + (p.duplicates ? `: ${p.new} new, ${p.duplicates} already here` : "")];
+    if (p.skipped) parts.push(`${plural(p.skipped, "line")} skipped (no date or amount)`);
+    return parts.join(" · ");
+  }
+
+  /** An import's answer as a toast line. */
+  function importResultText(r) {
+    if (!r || !r.account) return "Imported";
+    const name = isolate(r.account.label);
+    if (!r.added) return r.duplicates ? `Nothing new: all ${r.duplicates} were already in ${name}` : `Nothing to add to ${name}`;
+    return `Added ${plural(r.added, "transaction")} to ${name}` + (r.duplicates ? ` · ${r.duplicates} already there` : "");
+  }
+
+  /** A CSV mapping with one field changed (`value`: a column index, "" for none, or the setting's value);
+   *  an amount column clears debit / credit and the other way round, as a file has one or the other. */
+  function setMapping(mapping, field, value) {
+    const m = { ...(mapping || {}) };
+    const column = IMPORT_ROLES.some((r) => r.key === field);
+    if (column) {
+      const n = value === "" || value == null ? null : Number(value);
+      m[field] = n != null && isFinite(n) ? n : null;
+      if (field === "amount" && m.amount != null) { m.debit = null; m.credit = null; }
+      if ((field === "debit" || field === "credit") && m[field] != null) m.amount = null;
+    } else if (field === "header") {
+      const n = Number(value);
+      m.header = isFinite(n) && n >= -1 ? Math.floor(n) : 0;
+    } else if (field === "negate") m.negate = Boolean(value);
+    else m[field] = value;
+    return m;
+  }
+
+  /** What a mapping still lacks before importing ("" when complete). */
+  function mappingProblem(m) {
+    if (!m) return "";
+    if (m.date == null) return "Choose the date column.";
+    if (m.description == null) return "Choose the description column.";
+    if (m.amount == null && m.debit == null && m.credit == null) return "Choose the amount column, or the debit and credit columns.";
+    return "";
+  }
+
   /** A PATCH's answer as a toast line. */
   function undoText(body, label, forMerchant) {
     const t = body && body.transaction;
@@ -1403,6 +1459,7 @@
     planText, priceChangeText,
     isolateHebrew, netTile, everydayTile, balanceTile, fixedTile, vsTypical, cardBillParts, upcoming, cashflowTotalsText, forecastNote,
     kindBadge, flowLabel, flowChoices, markState, kindText, markText, flowText,
+    IMPORT_ROLES, importSummary, importResultText, setMapping, mappingProblem,
     undoText, errorText,
   };
   (typeof window !== "undefined" ? window : globalThis).DanaMoneyCore = core;

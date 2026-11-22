@@ -68,8 +68,7 @@ Each feature is an addon you turn on per user. Before you turn one on, this says
 | Google Contacts | Names, numbers and birthdays of the people you know | `GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET`; a Google account | `PUBLIC_URL` | Any |
 | Gmail | Search, read and write your mail in chat | `GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET`; a Google account | `PUBLIC_URL` | Any |
 | Telegram account | Your own Telegram chats and channels, read-only | `TELEGRAM_API_ID`; `TELEGRAM_API_HASH`; a Telegram account | — | Any |
-| Money | Your bank and card spending, balances and ways to save | — | the Money (Israel) addon; the Phone addon | Any |
-| Money (Israel) | Israeli banks and cards, Psagot Trade and the Pluxee meal card for Money | the Money addon | — | Any |
+| Money | Your bank and card spending, balances and ways to save | — | the Phone addon | Any |
 | Cameras | Your Frigate cameras on the dashboard | a Frigate server with your cameras | the Home Assistant addon | Any |
 | Ops | Read-only kubectl and Python run on the server (asks first; not a sandbox) | Dana running in Kubernetes, with a service account allowed to read | — | Any |
 <!-- addons-table:end -->

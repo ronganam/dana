@@ -2,8 +2,8 @@
 (docs/money.md, "Providers").
 
 money signs in nowhere itself. A **provider** addon (``Need("addon", "money", ...)``;
-``money_il`` brings the Israeli banks) registers, when its ``addon.py`` is
-imported:
+e.g. ``money_il`` from the catalog for the Israeli banks) registers, when its
+``addon.py`` is imported:
 
 - companies (:func:`register_company`): each bank, card, investment house or
   meal card it can read, with its login form, its kind, how its SMS sign-in
@@ -16,13 +16,18 @@ imported:
   FX rates, which savings compares with (no rates: those parts of savings are
   left out);
 - price checks (:func:`register_price_checks`): current offers on the web for
-  savings' cards (none: the cards show checks as unavailable).
+  savings' cards (none: the cards show checks as unavailable);
+- statements (:func:`register_statements`): how its country's statements are
+  written: personal numbers to mask, the card companies a bank line pays,
+  the phone apps whose pushes are payments, a note for classification.
 
 What a provider registers is offered to a user only while they have its addon
-(``addon``) on (connected, and enabled on the server). money never imports a
-provider."""
+(``addon``) on (connected, and enabled on the server); the one exception is
+masking (:func:`redactions`), applied to every stored text while the addon is
+loaded. money never imports a provider."""
 
 import datetime
+import re
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable, Dict, FrozenSet, List, Mapping, Optional, Tuple
 
@@ -87,6 +92,12 @@ class SyncResult:
 
 SyncFn = Callable[[SyncJob], Awaitable[SyncResult]]
 ForgetFn = Callable[[List[str]], Awaitable[None]]
+# A bank's note on a transfer the user sent → (payee, purpose), None when the memo is not one.
+TransferNoteFn = Callable[[str], Optional[Tuple[str, str]]]
+# A bank line's raw row → (flow, category) from the site's own codes, None when unknown.
+LineKindFn = Callable[[Mapping[str, Any]], Optional[Tuple[str, Optional[str]]]]
+# A card row's raw row → (the card company's own category text, Dana's category or None).
+OwnCategoryFn = Callable[[Mapping[str, Any]], Tuple[str, Optional[str]]]
 
 
 @dataclass(frozen=True)
@@ -94,8 +105,8 @@ class Company:
     """A bank, card company, investment house or meal card a provider can read.
 
     Args:
-        id: Stable id, stored on sources and accounts (``"visaCal"``); unique across providers.
-        name: Its name for people ("Cal").
+        id: Stable id, stored on sources and accounts (``"examplecard"``); unique across providers.
+        name: Its name for people ("Example Card").
         kind: ``bank`` | ``card`` | ``investment`` | ``meal`` (:data:`KINDS`).
         fields: Its login form; every field is required, secret ones are password inputs.
         addon: The provider addon that brings it (a user needs it on).
@@ -103,12 +114,17 @@ class Company:
         sms_senders: Who sends its SMS sign-in codes (the phone reads them).
         code_regex: The code's pattern in that SMS (its first group is the code).
         id_key: Prefix of a transaction's key made from the site's own ``identifier``
-            (``"cal"``); empty: the site's identifiers are not stable, rows are keyed by a hash.
+            (``"ec"``); empty: the site's identifiers are not stable, rows are keyed by a hash.
         hash_key: Prefix of a hashed key (``"x"``).
         card_line_words: A meal card's: words of the merchant key of the user's card line that
             pays a cycle's overflow.
         forget: Called with source ids that were removed: drop what the provider keeps for them
             (browser profiles); best-effort.
+        transfer_note: A bank's: the payee and purpose of a transfer the user sent, from its memo
+            (the row is then named after the payee).
+        line_kind: A bank's: a line's flow and category from the site's own codes in the raw row.
+        own_category: A card company's: its own category of a row (text, and Dana's category when
+            it maps to one), the classifier's hint and fallback.
     """
     id: str
     name: str
@@ -122,11 +138,16 @@ class Company:
     hash_key: str = "x"
     card_line_words: Tuple[str, ...] = ()
     forget: Optional[ForgetFn] = None
+    transfer_note: Optional[TransferNoteFn] = None
+    line_kind: Optional[LineKindFn] = None
+    own_category: Optional[OwnCategoryFn] = None
 
     def payload(self) -> Dict[str, Any]:
-        """``{id, name, kind, fields: [{name, label, secret}]}`` for clients."""
+        """``{id, name, kind, fields: [{name, label, secret}], sign_in_code}`` for clients (``sign_in_code``:
+        it texts a code when Dana signs in, which the phone hands over)."""
         return {"id": self.id, "name": self.name, "kind": self.kind,
-                "fields": [{"name": f.name, "label": f.label, "secret": f.secret} for f in self.fields]}
+                "fields": [{"name": f.name, "label": f.label, "secret": f.secret} for f in self.fields],
+                "sign_in_code": bool(self.sms_senders)}
 
 
 @dataclass(frozen=True)
@@ -134,11 +155,40 @@ class Rates:
     """Reference rates from a central bank. ``policy_rate(today)`` → ``{rate, date, year_ago,
     year_ago_date}`` (percent; None when unknown); ``fx_rates(currency, start, end)`` → ``{ISO date:
     units of the home currency per unit}`` for each of ``currencies`` (``{}`` when unknown). Both may
-    fetch (they run in a worker thread) and must cache."""
+    fetch (they run in a worker thread) and must cache. ``bank``: the central bank's name as savings
+    writes it after "the" ("Bank of Example")."""
     addon: str
     policy_rate: Callable[[datetime.date], Optional[Dict[str, Any]]]
     fx_rates: Callable[[str, datetime.date, datetime.date], Dict[str, float]]
     currencies: FrozenSet[str] = field(default_factory=frozenset)
+    bank: str = "central bank"
+
+
+@dataclass(frozen=True)
+class Redaction:
+    """Personal numbers a country writes on statements (an ID number): every match of ``pattern``
+    for which ``mask(text)`` returns a string is replaced by it (None: left as it is)."""
+    pattern: "re.Pattern[str]"
+    mask: Callable[[str], Optional[str]]
+
+
+@dataclass(frozen=True)
+class Statements:
+    """How a provider's country writes bank and card statements, for synced and imported rows alike.
+
+    Args:
+        addon: The provider addon.
+        redactions: Personal numbers masked in every stored text (:class:`Redaction`).
+        card_issuers: Names of card companies as a bank line paying their bill starts with
+            ("Example Card"): such a line is a ``card_bill``.
+        payment_apps: Android packages of card / bank apps whose pushes are payments (the phone sends them).
+        classify_note: A paragraph added to the classification prompt (how its banks write transfers…).
+    """
+    addon: str
+    redactions: Tuple[Redaction, ...] = ()
+    card_issuers: Tuple[str, ...] = ()
+    payment_apps: Tuple[str, ...] = ()
+    classify_note: str = ""
 
 
 class PriceCheckUnavailable(Exception):
@@ -176,6 +226,7 @@ class UnknownCompany(ValueError):
 _companies: Dict[str, Company] = {}
 _rates: List[Rates] = []
 _checks: List[PriceChecks] = []
+_statements: List[Statements] = []
 
 
 def register_company(company: Company) -> Company:
@@ -206,13 +257,19 @@ def register_price_checks(checks: PriceChecks) -> PriceChecks:
     return checks
 
 
+def register_statements(statements: Statements) -> Statements:
+    """Offer how a country's statements are written (a provider's ``addon.py``); one per addon."""
+    _statements[:] = [s for s in _statements if s.addon != statements.addon] + [statements]
+    return statements
+
+
 def company(company_id: str) -> Optional[Company]:
     """The company ``company_id`` whoever has it (names, keys, card lines), None when no provider brings it."""
     return _companies.get(company_id)
 
 
 def name_of(company_id: str) -> str:
-    """The company's display name ("Bank Hapoalim"); the id itself when unknown."""
+    """The company's display name ("Example Bank"); the id itself when unknown."""
     c = _companies.get(company_id)
     return c.name if c else company_id
 
@@ -252,6 +309,27 @@ def rates(user: User) -> Optional[Rates]:
 def price_checks(user: User) -> Optional[PriceChecks]:
     """The price checks ``user`` has, None without."""
     return next((c for c in _checks if connections.is_connected(user, c.addon)), None)
+
+
+def redactions() -> Tuple[Redaction, ...]:
+    """Every loaded provider's personal-number masks (for every user: masking more is always safe,
+    and text is scrubbed where there is no user, such as a sync's error)."""
+    return tuple(r for s in _statements for r in s.redactions)
+
+
+def statements(user: User) -> List[Statements]:
+    """The statement conventions of the providers ``user`` has on."""
+    return [s for s in _statements if connections.is_connected(user, s.addon)]
+
+
+def card_issuers(user: User) -> Tuple[str, ...]:
+    """The card company names a bank line of ``user``'s may pay (their providers')."""
+    return tuple(name for s in statements(user) for name in s.card_issuers)
+
+
+def payment_apps(user: User) -> Tuple[str, ...]:
+    """The phone apps whose pushes are payments for ``user`` (their providers')."""
+    return tuple(app for s in statements(user) for app in s.payment_apps)
 
 
 def rate_on(values: Mapping[str, float], day: str) -> Optional[float]:

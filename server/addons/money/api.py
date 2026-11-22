@@ -16,6 +16,9 @@ requests (docs/money.md, "API").
 - Investments (portfolio.py): ``GET /api/money/portfolio?days=&trades=``; meal cards (meals.py): ``GET /api/money/meals?months=``
 - Savings (savings.py): ``GET /api/money/savings``, ``GET|PATCH /api/money/savings/{key}``,
   ``POST /api/money/savings/{key}/check`` (keys contain ":"; clients URL-encode them)
+- Statement files (imports.py): ``GET /api/money/import/accounts``, ``POST /api/money/import/preview`` and
+  ``POST /api/money/import`` (multipart ``file``, ``account`` or ``new_label`` + ``new_kind``, ``mapping`` JSON)
+  → 400 ``bad_file`` / ``bad_mapping`` with a ``message``, 413 ``too_large``
 
 Every route answers for the request's user, who must have ``money``
 connected (else 403 ``not_connected`` from the middleware). Another user's
@@ -34,8 +37,8 @@ from core import undo, users
 from core.auth import request_user
 from core.users import User
 from core.addons import crypto, store as connections
-from addons.money import (categories, config, dashboard, insights, meals, otp, periods, portfolio, providers, queries,
-                          rules, savings, schedule, signals, sources, store)
+from addons.money import (categories, config, dashboard, imports, insights, meals, otp, periods, portfolio, providers,
+                          queries, rules, savings, schedule, signals, sources, store)
 
 logger = logging.getLogger(__name__)
 
@@ -513,6 +516,87 @@ async def post_saving_check(request: web.Request) -> web.Response:
     return web.json_response({**result, "state": result.get("state") or "checking"}, status=202)
 
 
+# --- Statement files ----------------------------------------------------------------------------
+
+async def _import_form(request: web.Request) -> Dict[str, Any]:
+    """The multipart import form: ``file`` (bytes, at most :data:`imports.MAX_BYTES`), ``account``,
+    ``new_label``, ``new_kind`` and ``mapping`` (a CSV column mapping as JSON, or None)."""
+    if not request.content_type.startswith("multipart/"):
+        raise web.HTTPBadRequest(text='{"error": "invalid", "message": "send the file as multipart form data"}',
+                                 content_type="application/json")
+    form: Dict[str, Any] = {"file": None, "account": "", "new_label": "", "new_kind": "", "mapping": None}
+    reader = await request.multipart()
+    async for part in reader:
+        if part.name == "file":
+            chunks, size = [], 0
+            while chunk := await part.read_chunk():
+                size += len(chunk)
+                if size > imports.MAX_BYTES:
+                    raise web.HTTPRequestEntityTooLarge(
+                        max_size=imports.MAX_BYTES, actual_size=size,
+                        text=json.dumps({"error": "too_large", "message": f"The file is over "
+                                         f"{imports.MAX_BYTES // (1024 * 1024)} MB."}),
+                        content_type="application/json")
+                chunks.append(chunk)
+            form["file"] = b"".join(chunks)
+        elif part.name in ("account", "new_label", "new_kind"):
+            form[part.name] = (await part.text())[:200].strip()
+        elif part.name == "mapping":
+            text = (await part.text())[:4000].strip()
+            if text:
+                try:
+                    form["mapping"] = imports.ColumnMap.from_json(json.loads(text))
+                except ValueError as e:
+                    raise web.HTTPBadRequest(text=json.dumps({"error": "bad_mapping", "message": str(e)}),
+                                             content_type="application/json") from None
+    if not form["file"]:
+        raise web.HTTPBadRequest(text='{"error": "bad_file", "message": "Choose a statement file."}',
+                                 content_type="application/json")
+    return form
+
+
+async def get_import_accounts(request: web.Request) -> web.Response:
+    """GET /api/money/import/accounts → ``{accounts: [{id, label, kind, number, manual, balance, balance_at,
+    mapping}]}``: the bank and card accounts statement files can go into."""
+    user = _money_user(request)
+    return web.json_response({"accounts": await asyncio.to_thread(imports.accounts, user)})
+
+
+async def post_import_preview(request: web.Request) -> web.Response:
+    """POST /api/money/import/preview (multipart ``file``, optional ``account``, ``mapping``) → what importing
+    would add, nothing stored (:func:`imports.preview`); a CSV whose columns could not be read answers 400
+    ``bad_file`` with its ``columns``, ``sample`` and ``delimiter``, to choose them by hand."""
+    user = _money_user(request)
+    form = await _import_form(request)
+    try:
+        result = await asyncio.to_thread(imports.preview, user, form["file"], form["account"] or None, form["mapping"])
+    except imports.BadFile as e:
+        return _error(400, "bad_file", message=str(e), **(e.layout or {}))
+    except imports.BadMapping as e:
+        return _error(400, "bad_mapping", message=str(e))
+    except LookupError:
+        return _error(404, "not_found")
+    return web.json_response(result)
+
+
+async def post_import(request: web.Request) -> web.Response:
+    """POST /api/money/import (multipart ``file``, ``account`` or ``new_label`` + ``new_kind``, optional
+    ``mapping``) → ``{format, account {id, label, kind, manual}, added, duplicates, skipped}``; the new rows are
+    then categorized like a sync's."""
+    user = _money_user(request)
+    form = await _import_form(request)
+    try:
+        result = await imports.run(user, form["file"], account_id=form["account"] or None,
+                                   new_label=form["new_label"], new_kind=form["new_kind"], mapping=form["mapping"])
+    except imports.BadFile as e:
+        return _error(400, "bad_file", message=str(e))
+    except imports.BadMapping as e:
+        return _error(400, "bad_mapping", message=str(e))
+    except LookupError:
+        return _error(404, "not_found")
+    return web.json_response(result)
+
+
 def setup(app: web.Application) -> None:
     """Register the money routes."""
     app.router.add_get("/api/money/companies", get_companies)
@@ -546,3 +630,6 @@ def setup(app: web.Application) -> None:
     app.router.add_get("/api/money/savings/{key}", get_saving)
     app.router.add_patch("/api/money/savings/{key}", patch_saving)
     app.router.add_post("/api/money/savings/{key}/check", post_saving_check)
+    app.router.add_get("/api/money/import/accounts", get_import_accounts)
+    app.router.add_post("/api/money/import/preview", post_import_preview)
+    app.router.add_post("/api/money/import", post_import)

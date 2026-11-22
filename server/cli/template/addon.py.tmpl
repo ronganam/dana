@@ -25,6 +25,7 @@ addon = Addon(
     prompt_parts=(PromptPart("guides", "When the user asks to greet someone, use {{name}}_hello.", rank=90),),
 {{#web}}    # A page in the web app: web/{{name}}.js and web/{{name}}.css, a button in the navigation.
     web=(Page("{{page}}", panel="{{name}}.js", style="{{name}}.css", nav=Nav("{{title}}", icon="sparkles", order=80)),),
-{{/web}}{{#worker}}    # A sidecar built from worker/ (its Dockerfile); Dana reaches it at the URL in {{env}}.
+{{/web}}{{#worker}}    # A sidecar built from worker/ (its Dockerfile) by bin/deploy; Dana reaches it at the URL in {{env}}.
+    # Published from the addon's own repository instead: Worker(..., image="ghcr.io/<owner>/<repo>-worker").
     worker=Worker(port=8091, url_env="{{env}}"),
 {{/worker}})

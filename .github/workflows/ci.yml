@@ -41,7 +41,6 @@ jobs:
             docker:
               - 'server/Dockerfile'
               - 'server/requirements.*'
-              - 'server/addons/money_il/worker/**'
               - '.github/workflows/ci.yml'
 
   server:
@@ -131,9 +130,3 @@ jobs:
           push: false
           cache-from: type=gha,scope=server
           cache-to: type=gha,scope=server,mode=min
-      - uses: docker/build-push-action@v6
-        with:
-          context: server/addons/money_il/worker
-          push: false
-          cache-from: type=gha,scope=money-il-worker
-          cache-to: type=gha,scope=money-il-worker,mode=min

@@ -10,10 +10,11 @@
  * words (tiles, vs typical, coming up and card bill parts, recurring charges by cadence — a bimonthly one
  * never "/ month" —, installment plans, the forecast note), filters and the view ↔ the API's query string
  * and the #money hash, the category picker, "counts as" choices and the one-off / yearly marks, source
- * states, undo and error words; the Investments view from tests/fixtures/money_portfolio_web.json
- * (`WRITE_WEB_FIXTURE=1 bin/test test_money_il_portfolio`): the tab only with an investment account, tiles,
+ * states, undo and error words, statement files (a preview and an import in words, the CSV column mapping);
+ * the Investments view from tests/fixtures/money_portfolio_web.json (written by the money_il addon's
+ * test_money_il_portfolio.py with `WRITE_WEB_FIXTURE=1`): the tab only with an investment account, tiles,
  * the value chart, allocation, holdings and activity words; the Meal card view from tests/fixtures/money_meals_web.json
- * (test_money_il_meals.py: tiles, pace, cycle bars, the tab); the Save view from tests/fixtures/money_savings_web.json
+ * (the money_il addon's test_money_il_meals.py: tiles, pace, cycle bars, the tab); the Save view from tests/fixtures/money_savings_web.json
  * (`WRITE_WEB_FIXTURE=1 bin/test test_money_savings`): the tab and its hash, sections (the user's choices always
  * listed), tiles, chips, the actions of each status and their PATCH bodies, the toasts, price check states and
  * offer rows, check answers, outcomes, target progress, subscription lines, links and the sparkline.
@@ -101,8 +102,8 @@ check("months: shift across years, labels, bounds (February)", C.shiftMonth("202
 
 // --- accounts ----------------------------------------------------------------------------------------
 check("account names: a card's last 4, the user's own label kept, a bank's last 3 without 'Bank'",
-      same(ov.cards.map((a) => C.accountName({ ...a, kind: "card" })), ["Shared card ••4580", "Cal ••8763"])
-      && C.accountName({ ...ov.banks[0], kind: "bank" }) === "Hapoalim ••901" && C.accountName(null) === "");
+      same(ov.cards.map((a) => C.accountName({ ...a, kind: "card" })), ["Shared card ••4580", "Sample Card ••8763"])
+      && C.accountName({ ...ov.banks[0], kind: "bank" }) === "Sample Bank ••901" && C.accountName(null) === "");
 
 // --- the list: days, tones, badges -------------------------------------------------------------------
 check("pages merge without repeats (a refetch may overlap)", monthList.length === 21
@@ -130,8 +131,8 @@ check("tones: out, in (salary, refund), muted (card bill, own transfer, unmatche
       tone("סופר פארם") === "out" && tone("משכורת נוגה תעשיות") === "in" && C.amountTone(monthList.find((t) => t.flow === "refund")) === "in"
       && tone("כאל") === "muted" && tone("העברה לחיסכון") === "muted" && tone("משיכת מזומן") === "muted"
       && C.amountTone(monthList.find((t) => t.status === "unmatched")) === "muted");
-const badgeOf = (t) => plain(C.badges(t, "Cal")).map((b) => [b.type, b.text]);
-check("badges: provisional waits for the card company", same(badgeOf(byMerchant("קפה קפה")[0]), [["provisional", "Waiting for Cal"]]));
+const badgeOf = (t) => plain(C.badges(t, "Sample Card")).map((b) => [b.type, b.text]);
+check("badges: provisional waits for the card company", same(badgeOf(byMerchant("קפה קפה")[0]), [["provisional", "Waiting for Sample Card"]]));
 check("badges: pending, unmatched", same(badgeOf(monthList.find((t) => t.status === "pending")), [["pending", "Pending"]])
       && same(badgeOf(monthList.find((t) => t.status === "unmatched")), [["unmatched", "Not charged?"]]));
 check("badges: installment n/total, foreign amount, refund", same(badgeOf(byMerchant("ביטוח רכב ישיר")[0]), [["installment", "1/4"]])
@@ -140,10 +141,10 @@ check("badges: without a company name they still read", C.badges(byMerchant("ק�
 check("flow chips: card bill and own transfer instead of a category", C.flowChip(byMerchant("כאל")[0]) === "Card bill"
       && C.flowChip(byMerchant("העברה לחיסכון")[0]) === "Between your accounts" && C.flowChip(byMerchant("סופר פארם")[0]) === null);
 check("explanations: provisional (time, company), unmatched, card bill, own transfer, a plain purchase has none",
-      /at 08:10/.test(C.statusExplain(body("transaction_provisional"), "Cal")) && /when Cal lists it/.test(C.statusExplain(body("transaction_provisional"), "Cal"))
-      && /isn't counted/.test(C.statusExplain(monthList.find((t) => t.status === "unmatched"), "Cal"))
+      /at 08:10/.test(C.statusExplain(body("transaction_provisional"), "Sample Card")) && /when Sample Card lists it/.test(C.statusExplain(body("transaction_provisional"), "Sample Card"))
+      && /isn't counted/.test(C.statusExplain(monthList.find((t) => t.status === "unmatched"), "Sample Card"))
       && /counted twice/.test(C.statusExplain(byMerchant("כאל")[0])) && /own accounts/.test(C.statusExplain(byMerchant("העברה לחיסכון")[0]))
-      && C.statusExplain(body("transaction_foreign"), "Cal") === "");
+      && C.statusExplain(body("transaction_foreign"), "Sample Card") === "");
 check("category sources in words", C.categorySourceLabel("user") === "set by you" && C.categorySourceLabel("model") === "Dana's guess" && C.categorySourceLabel(null) === "");
 
 // --- everyday pace -------------------------------------------------------------------------------
@@ -330,7 +331,7 @@ check("hash: another tab's hash is not ours; a bad month, amount or view is drop
       && same(C.TABS, ["overview", "spending", "cashflow", "save", "investments", "meals", "transactions"]) && C.TAB_LABELS.cashflow === "Cash flow");
 const chips = C.filterChips({ q: "wolt", category: "food", account: ov.cards[1].id, min: "100", max: "500" },
                             { categoryLabel: (k) => C.categoryLabel(taxonomy, k), accountLabel: (id) => C.accountName({ ...ov.cards.find((a) => a.id === id), kind: "card" }) });
-check("chips: the active filters in words", same(chips.map((c) => [c.key, c.label]), [["q", "“wolt”"], ["category", "Food"], ["account", "Cal ••8763"], ["amount", "₪100 – ₪500"]]));
+check("chips: the active filters in words", same(chips.map((c) => [c.key, c.label]), [["q", "“wolt”"], ["category", "Food"], ["account", "Sample Card ••8763"], ["amount", "₪100 – ₪500"]]));
 check("chips: one-sided amounts, uncategorized", C.filterChips({ min: "100" })[0].label === "₪100 or more" && C.filterChips({ max: "49.9" })[0].label === "up to ₪49.90"
       && C.categoryLabel(taxonomy, "uncategorized") === "Uncategorized" && C.hasFilters({ all: true }) === false && C.hasFilters({ min: "1" }));
 check("taxonomy: labels and groups of categories", C.categoryLabel(taxonomy, "restaurants") === "Restaurants & cafés" && C.categoryLabel(taxonomy, "food") === "Food"
@@ -352,8 +353,8 @@ check("sources: ok says when it synced; failing says why and the last good sync"
       && C.sourceStatus(failSrc, NOW).tone === "warn" && C.sourceStatus(failSrc, NOW).label === "Last sync failed"
       && C.sourceStatus(failSrc, NOW).detail === "bank worker not reachable · last good sync 14 h ago");
 check("sources: code, login problem, syncing, first sync", C.sourceStatus({ state: "needs_code" }, NOW).label === "Waiting for the SMS code"
-      && C.sourceStatus({ state: "needs_attention", state_reason: "Cal wants a new password" }, NOW).tone === "bad"
-      && C.sourceStatus({ state: "needs_attention", state_reason: "Cal wants a new password", can_sync: false }, NOW).label === "Login needs fixing"
+      && C.sourceStatus({ state: "needs_attention", state_reason: "Sample Card wants a new password" }, NOW).tone === "bad"
+      && C.sourceStatus({ state: "needs_attention", state_reason: "Sample Card wants a new password", can_sync: false }, NOW).label === "Login needs fixing"
       && C.sourceStatus({ state: "needs_attention", error_type: "LOGIN_UNKNOWN", can_sync: true }, NOW).label === "Stopped: sign in again yourself"
       && C.sourceStatus({ state: "syncing", last_ok_at: null }, NOW).tone === "busy" && C.sourceStatus({ state: "new" }, NOW).tone === "busy");
 check("header: the last good sync, and how many need attention", same(plain(C.headerStatus(ov.sources, NOW)), { tone: "warn", text: "Synced 2 h ago · 1 needs attention" })
@@ -394,7 +395,7 @@ check("undo text: several rows changed, only this one, a note", /\(3 charges\)$/
       && C.undoText({ transaction: { note: "" } }, null) === "Note removed");
 check("errors: the server's message, not connected, too soon, offline", C.errorText(400, body("error_invalid")) === body("error_invalid").message
       && /turned off/.test(C.errorText(403, body("error_not_connected"))) && C.errorText(429, { error: "too_soon", retry_after: 420 }) === "Synced a moment ago. Try again in 7 min."
-      && C.errorText(409, { error: "needs_attention", reason: "Cal wants a new password" }) === "Cal wants a new password" && /Can't reach Dana/.test(C.errorText(0, null))
+      && C.errorText(409, { error: "needs_attention", reason: "Sample Card wants a new password" }) === "Sample Card wants a new password" && /Can't reach Dana/.test(C.errorText(0, null))
       && /4 to 8 digits/.test(C.errorText(400, { error: "bad_code" })) && C.errorText(500, null) === "Something went wrong (HTTP 500).");
 
 // ---------- Investments (tests/fixtures/money_portfolio_web.json) ----------
@@ -488,7 +489,7 @@ check("save: the tab sits between Cash flow and Investments, #money/save, not ti
       && C.stateToHash({ month: "2026-11", view: "page", tab: "save", f: {} }, "2026-11") === "#money/save" && C.stateFromHash("#money/save").tab === "save"
       && !C.usesMonth("save") && !C.usesMonth("investments") && ["overview", "spending", "cashflow", "transactions"].every(C.usesMonth));
 
-// ---- Meal card (tests/fixtures/money_meals_web.json, from test_money_il_meals.py) ----
+// ---- Meal card (tests/fixtures/money_meals_web.json, from the money_il addon's test_money_il_meals.py) ----
 const ML = JSON.parse(fs.readFileSync(path.join(SERVER, "tests", "fixtures", "money_meals_web.json"), "utf8"));
 const ml = ML.meals.body;
 const mcur = ml.accounts[0].current;
@@ -543,7 +544,7 @@ check("save: an open item waits in Coming up while its timing starts later; an u
 const svt = plain(C.saveTiles(sv, DAY));
 check("save: tiles — could save low–high a year with the count, saved so far ≈ a year, the rate's source line",
       svt.could.text === "₪2,281–₪2,548" && svt.could.sub === "a year · 4 ideas" && svt.saved.value === sv.totals.saved && svt.saved.sub === "≈ ₪359 a year"
-      && svt.source === "Bank of Israel rate 4.25% (18 Nov) · amounts from your charges"
+      && svt.source === "Bank of Example rate 4.25% (18 Nov) · amounts from your charges"
       && C.saveTiles({ totals: { low: 0, high: 0, count: 0, saved: 0 }, rate: null }, DAY).source === "Amounts from your charges"
       && C.saveTiles({ totals: { low: 50000, high: 50000, count: 1 } }, DAY).could.text === "₪500", JSON.stringify(svt));
 check("save: the money chip — a saving a year (one amount or a range), else the money at stake, a spree's total spent",
@@ -649,6 +650,29 @@ check("save: the evidence sparkline — every point by date, from zero, the date
       spk && spk.count === 14 && spk.line.startsWith("M3,") && spk.last.x === 177 && spk.line.split(" ").length === 14 && spk.area.endsWith("Z")
       && spk.range === "10 Oct 2025 – 10 Nov" && spk.last.y < Number(spk.line.split(" ")[0].split(",")[1])
       && C.seriesSpark(svi("renewal:ביטוח הדרום חובה:2026-12").evidence.series) === null && C.seriesSpark([]) === null, JSON.stringify(spk));
+
+// ---- Statement files (the answers of POST /api/money/import/preview and /api/money/import, test_money_import.py) ----
+check("import: a preview in words — format, count, new and already here, skipped lines",
+      C.importSummary({ format: "csv", count: 24, new: 20, duplicates: 4, skipped: 1 }) === "CSV · 24 transactions: 20 new, 4 already here · 1 line skipped (no date or amount)"
+      && C.importSummary({ format: "ofx", count: 1, new: 1, duplicates: 0, skipped: 0 }) === "OFX · 1 transaction" && C.importSummary(null) === "");
+check("import: the answer as a toast — added, already there, nothing new",
+      C.importResultText({ account: { label: "Everyday account" }, added: 3, duplicates: 2 }) === "Added 3 transactions to \u2068Everyday account\u2069 · 2 already there"
+      && C.importResultText({ account: { label: "Travel card" }, added: 1, duplicates: 0 }) === "Added 1 transaction to \u2068Travel card\u2069"
+      && C.importResultText({ account: { label: "Travel card" }, added: 0, duplicates: 5 }) === "Nothing new: all 5 were already in \u2068Travel card\u2069"
+      && C.importResultText(null) === "Imported");
+const map0 = { date: 0, description: 1, amount: 2, debit: null, credit: null, balance: null, memo: null, header: 0, delimiter: ",", date_format: "mdy", decimal: "auto", negate: false };
+const mDebit = plain(C.setMapping(map0, "debit", "3"));
+const mBack = plain(C.setMapping(mDebit, "amount", "2"));
+check("import: the column mapping — an amount column or debit / credit, none, header, negate; the original untouched",
+      mDebit.debit === 3 && mDebit.amount === null && mBack.amount === 2 && mBack.debit === null && mBack.credit === null
+      && plain(C.setMapping(map0, "memo", "4")).memo === 4 && plain(C.setMapping(map0, "balance", "")).balance === null
+      && plain(C.setMapping(map0, "header", "-1")).header === -1 && plain(C.setMapping(map0, "negate", true)).negate === true
+      && plain(C.setMapping(map0, "date_format", "dmy")).date_format === "dmy" && map0.amount === 2 && map0.debit === null);
+check("import: what a mapping still lacks",
+      C.mappingProblem(map0) === "" && C.mappingProblem({ ...map0, date: null }) === "Choose the date column."
+      && C.mappingProblem({ ...map0, description: null }) === "Choose the description column."
+      && /amount column/.test(C.mappingProblem({ ...map0, amount: null })) && C.mappingProblem({ ...map0, amount: null, credit: 3 }) === ""
+      && plain(C.IMPORT_ROLES).filter((r) => r.required).map((r) => r.key).join() === "date,description");
 
 console.log(`\n${pass}/${pass + failures.length} passed`);
 if (failures.length) process.exit(1);

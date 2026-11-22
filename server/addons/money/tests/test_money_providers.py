@@ -1,4 +1,4 @@
-"""Money providers: a made-up provider addon's companies, sync, code, device, investment and meal formats, rates, per user; the money_il connect migration.
+"""Money providers: a made-up provider addon's companies, sync, code, device, investment and meal formats, rates, statement conventions, per user.
 Run: bin/test test_money_providers
 
 A provider addon defined here, ``money_test`` (``Need("addon", "money", ...)``), brings
@@ -18,16 +18,16 @@ a login error from the provider (``needs_attention``); the investment shape
 forgotten when dropped); the meal shape; rates for Alice only (Bob's savings
 have none, and no price checks); a source whose company nobody brings any
 more (no Sync now, not due, 409 ``unavailable``); turning the provider off
-(its logins removed and forgotten, accounts kept). Then money's m0002 on a
-database with money connected: users with an Israeli source or only an
-Israeli account get ``money_il``; one with another company's source, one
-without money and one that has it already are left as they are.
+(its logins removed and forgotten, accounts kept); statement conventions
+(card companies, payment apps, the classification note) only for users who
+have the provider, masking for everyone.
 """
 
 import asyncio
 import datetime
 import json
 import os
+import re
 import sys
 from typing import Any, Callable, Dict, List, Optional, Tuple
 from unittest.mock import AsyncMock, patch
@@ -55,7 +55,7 @@ from core import clock  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import Addon, Need, store as connections  # noqa: E402
-from addons.money import (api as money_api, config, meals, otp, portfolio, providers, savings, schedule,  # noqa: E402
+from addons.money import (api as money_api, config, ingest, meals, otp, portfolio, providers, savings, schedule,  # noqa: E402
                           sources, store, sync)
 from addons.money.providers import Company, LoginField, SyncError, SyncJob, SyncResult  # noqa: E402
 
@@ -201,12 +201,23 @@ def test_register() -> None:
         check("register: an unknown kind is refused", False)
     except ValueError:
         check("register: an unknown kind is refused", providers.company("testcrypto") is None)
+    Addon("money_other", needs=(Need("addon", "money", "Its sources"),), title="Money (other test)", description="Another made-up provider")
+    providers.register_company(Company("othercard", "Other Card", "card", (), "money_other", bank_sync))
     try:
-        providers.register_company(Company("hapoalim", "Not Hapoalim", "bank", (), PROVIDER, bank_sync))
+        providers.register_company(Company("othercard", "Not Other", "card", (), PROVIDER, bank_sync))
         check("register: another addon's company id is refused", False)
     except ValueError as e:
-        check("register: another addon's company id is refused (money_il keeps it)",
-              "money_il" in str(e) and providers.company("hapoalim").addon == "money_il", str(e))
+        check("register: another addon's company id is refused (the first keeps it)",
+              "money_other" in str(e) and providers.company("othercard").addon == "money_other", str(e))
+    providers.register_statements(providers.Statements(
+        PROVIDER, redactions=(providers.Redaction(re.compile(r"\bTEST-\d{4}\b"), lambda s: "[test]"),),
+        card_issuers=("test card co",), payment_apps=("com.example.testbank",), classify_note="Test banks note."))
+    check("statements: masking applies to every text, whoever it belongs to",
+          ingest.scrub("ref TEST-1234 here") == "ref [test] here")
+    check("statements: card companies and payment apps only for users with the provider",
+          providers.card_issuers(ALICE) == ("test card co",) and providers.payment_apps(ALICE) == ("com.example.testbank",)
+          and providers.card_issuers(BOB) == () and providers.payment_apps(BOB) == ()
+          and [s.classify_note for s in providers.statements(ALICE)] == ["Test banks note."])
     renamed = providers.register_company(Company("testbank", "Test Bank Renamed", "bank", BANK.fields, PROVIDER, bank_sync))
     check("register: the same addon replaces its own company",
           providers.name_of("testbank") == "Test Bank Renamed" and providers.company("testbank") is renamed)
@@ -218,16 +229,16 @@ def test_register() -> None:
 
 async def test_per_user(client: TestClient) -> None:
     status, body = await call(client, "GET", "/api/money/companies", ALICE)
-    check("companies: Alice gets her provider's three, with their login forms (not money_il's)",
+    check("companies: Alice gets her provider's three, with their login forms and whether they text a code",
           status == 200 and body["companies"] == [
               {"id": "testbank", "name": "Test Bank", "kind": "bank", "fields": [
                   {"name": "login", "label": "Login", "secret": False},
-                  {"name": "password", "label": "Password", "secret": True}]},
+                  {"name": "password", "label": "Password", "secret": True}], "sign_in_code": True},
               {"id": "testinvest", "name": "Test Invest", "kind": "investment", "fields": [
                   {"name": "login", "label": "Login", "secret": False},
-                  {"name": "password", "label": "Password", "secret": True}]},
+                  {"name": "password", "label": "Password", "secret": True}], "sign_in_code": False},
               {"id": "testmeal", "name": "Test Meal", "kind": "meal", "fields": [
-                  {"name": "phone", "label": "Phone", "secret": False}]}], body)
+                  {"name": "phone", "label": "Phone", "secret": False}], "sign_in_code": False}], body)
     status, body = await call(client, "GET", "/api/money/companies", BOB)
     check("companies: Bob (money only) has none", status == 200 and body == {"companies": []}, body)
     status, body = await call(client, "GET", "/api/money/companies", CARL)
@@ -396,46 +407,6 @@ def test_secrets() -> None:
     check("secrets: no credential or device key in any API response", not [s for s in SECRETS if s in every])
 
 
-# --- 6. money's m0002: connecting money_il --------------------------------------------------------
-
-def test_migration() -> None:
-    now = store.now_iso()
-    eve, finn, gil, hana, ido = (users.create(n) for n in ("Eve", "Finn", "Gil", "Hana", "Ido"))
-    for u in (eve, finn, gil, ido):
-        connections.connect(u, "money")
-    connections.connect(ido, "money_il")
-    with get_db_connection() as conn:
-        conn.execute("INSERT INTO money_sources (id, user_id, company, credentials, state, next_sync_at, created_at, "
-                     "updated_at) VALUES ('eve-src', ?, 'visaCal', 'x', 'ok', ?, ?, ?)", (eve.id, now, now, now))
-        conn.execute("INSERT INTO money_accounts (id, user_id, company, kind, number, created_at, updated_at) "
-                     "VALUES ('finn-acc', ?, 'pluxee', 'meal', '1234', ?, ?)", (finn.id, now, now))
-        conn.execute("INSERT INTO money_sources (id, user_id, company, credentials, state, created_at, updated_at) "
-                     "VALUES ('gil-src', ?, 'testbank', 'x', 'ok', ?, ?)", (gil.id, now, now))
-        conn.execute("INSERT INTO money_accounts (id, user_id, company, kind, number, created_at, updated_at) "
-                     "VALUES ('hana-acc', ?, 'hapoalim', 'bank', '12-345-000000', ?, ?)", (hana.id, now, now))
-        conn.execute("DELETE FROM schema_migrations WHERE addon = 'money' AND version = 2")
-        conn.commit()
-        before = {r[0]: r[1] for r in conn.execute("SELECT user_id, created_at FROM connections WHERE addon = 'money_il'")}
-    db.migrate()
-    connections.invalidate()
-    with get_db_connection() as conn:
-        after = {r[0]: r[1] for r in conn.execute("SELECT user_id, created_at FROM connections WHERE addon = 'money_il'")}
-        applied = conn.execute("SELECT name FROM schema_migrations WHERE addon = 'money' AND version = 2").fetchone()
-    check("migration: m0002 ran again and is recorded", applied is not None and applied[0] == "money_il", applied)
-    check("migration: an Israeli source → money_il connected", connections.is_connected(eve, "money_il"))
-    check("migration: only an Israeli account (no source) → connected", connections.is_connected(finn, "money_il"))
-    check("migration: another provider's source only → not connected", not connections.is_connected(gil, "money_il"))
-    check("migration: no money → not connected, whatever rows", not connections.is_connected(hana, "money_il"))
-    check("migration: one who had it already keeps the same connection", after.get(ido.id) == before.get(ido.id)
-          and ido.id in after)
-    check("migration: nobody else gained it", set(after) - set(before) == {eve.id, finn.id}, (set(after) - set(before)))
-    check("migration: the migrated source can sync and is due",
-          providers.available(eve, "visaCal") and [s["id"] for s in schedule.due_sources(eve)] == ["eve-src"])
-    check("migration: money_il's connection carries no credentials",
-          rows("SELECT credentials, settings FROM connections WHERE addon = 'money_il' AND user_id = ?", eve.id)
-          == [{"credentials": None, "settings": "{}"}])
-
-
 async def main() -> None:
     test_register()
     app = web.Application()
@@ -448,7 +419,6 @@ async def main() -> None:
             await test_invest_and_meal(client)
             await test_gone_and_off(client)
     test_secrets()
-    test_migration()
 
 
 if __name__ == "__main__":

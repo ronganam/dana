@@ -11,7 +11,7 @@ fines and late fees, late-night shopping — each with an optional monthly
 target.
 
 Every number is computed here from the rows, the reference rates of the
-user's provider (``providers.rates``: the Bank of Israel's with money_il) and
+user's provider (``providers.rates``: a central bank's, named ``Context.bank``) and
 the price checks the user asked for (``providers.price_checks``); without
 rates the items that need them (``cash``, ``cushion``, the arnona's net) are
 left out, without price checks an item's check reads ``unavailable``;
@@ -164,6 +164,12 @@ class Context:
     answers: Dict[str, Dict[str, Any]]                # item key → the user's answers
     market: Optional[Callable[[str, Dict[str, Any]], Optional[Dict[str, Any]]]]  # None: no price checks
     unavailable: Set[str] = field(default_factory=set)  # price-check topics that said "unavailable"
+    bank: str = "central bank"                        # providers.Rates.bank: whose rate it is
+
+    @property
+    def Bank(self) -> str:
+        """The central bank's name at the start of a sentence."""
+        return self.bank[:1].upper() + self.bank[1:]
 
     @property
     def fixed(self) -> Set[str]:
@@ -566,13 +572,13 @@ def _cash(ctx: Context) -> List[Dict[str, Any]]:
                  _step(f"Buy a money market fund (קרן כספית) with the cash in {a['label']}"))
         out.append(_item(
             f"cash:{a['id']}", "cash", SAVE, f"{_whole(cash)} cash earning nothing in {a['label']}",
-            f"A money market fund pays about {_pct(y)} a year now (the Bank of Israel rate minus fees): "
+            f"A money market fund pays about {_pct(y)} a year now (the {ctx.bank} rate minus fees): "
             f"about {sh(_r(value))} a year on it.",
             saving=_saving(value, value, "measured"), at_stake=_r(value), effort=_effort(10, "app"),
             evidence=_evidence([f"{sh(cash)} cash in {a['label']}" + (f" as of {_day(a['value_at'])}" if a.get("value_at") else ""),
                                 f"No interest on it in the last {CASH_QUIET_DAYS} days"], [], {"view": "investments"}),
             math_lines=[f"{sh(cash)} × ({_pct(ctx.rate['rate'])} − {_pct(FUND_FEE)}) = {sh(_r(value))} a year",
-                        f"Bank of Israel rate {_pct(ctx.rate['rate'])} on {_day(ctx.rate['date'])}"],
+                        f"{ctx.Bank} rate {_pct(ctx.rate['rate'])} on {_day(ctx.rate['date'])}"],
             steps=[first, _step("Keep a little cash for fees and your next buy"),
                    _step("A fund like that can be sold any trading day")],
             baseline={"cash": cash, "account_id": a["id"], "yield": y}, label=f"Cash in {a['label']}"))
@@ -606,7 +612,7 @@ def _cushion(ctx: Context) -> List[Dict[str, Any]]:
                            [{"date": p["date"], "amount": p["balance"]} for p in history], {"view": "cashflow"}),
         math_lines=[f"{sh(floor)} − {sh(fixed)} (a month of fixed costs) = {sh(idle_fixed)}",
                     f"{sh(floor)} − {sh(CUSHION_BUFFER)} = {sh(idle_buffer)}",
-                    f"× {_pct(y)} a year (the Bank of Israel rate {_pct(ctx.rate['rate'])} minus fees)"],
+                    f"× {_pct(y)} a year (the {ctx.bank} rate {_pct(ctx.rate['rate'])} minus fees)"],
         steps=[_step(f"Keep about {sh(max(fixed, CUSHION_BUFFER))} in the account for the month's bills"),
                _step("Move the rest to a money market fund (קרן כספית) or a short deposit (פיקדון) in the bank's app"),
                _step("Take it back any time the balance runs low")],
@@ -651,10 +657,10 @@ def _fx(ctx: Context) -> List[Dict[str, Any]]:
         label = labels.get(account_id, "your card")
         m = _market(ctx, "fx_card", {})
         saving = _saving(markup, markup, "measured")
-        math_lines = [f"Charged {sh(charged)} for purchases worth {sh(_r(base))} at the Bank of Israel rate of each day",
+        math_lines = [f"Charged {sh(charged)} for purchases worth {sh(_r(base))} at the {ctx.bank} rate of each day",
                       f"{sh(charged)} − {sh(_r(base))} = {sh(_r(markup))} ({_pct(round(total_pct, 2))})"]
         summary = (f"{len(lines)} purchases in {'/'.join(currencies)} on {label} cost {_pct(round(total_pct, 1))} over "
-                   f"the Bank of Israel rate: {sh(_r(markup))} in 12 months.")
+                   f"the {ctx.bank} rate: {sh(_r(markup))} in 12 months.")
         if _checked(m):
             nets = []
             for alt in m["items"]:
@@ -677,7 +683,7 @@ def _fx(ctx: Context) -> List[Dict[str, Any]]:
             f"fx:{account_id}", "fx", SAVE, f"{_whole(markup)} a year in foreign-currency fees", summary,
             saving=saving, at_stake=_r(markup), effort=_effort(20, "online"),
             evidence=_evidence([f"{len(lines)} purchases in foreign currency in 12 months, {sh(charged)} charged",
-                                f"{_pct(round(total_pct, 2))} over the Bank of Israel rate in total, median "
+                                f"{_pct(round(total_pct, 2))} over the {ctx.bank} rate in total, median "
                                 f"{_pct(round(median_pct, 2))} a purchase"],
                                _monthly_series([{"purchase_date": r["purchase_date"], "amount": -mk} for r, _, mk in lines],
                                                _last_months(ctx.today, 12)),
@@ -917,9 +923,9 @@ def _mortgage(ctx: Context) -> List[Dict[str, Any]]:
     lines = [f"{c['merchant']}: {sh(c['amount'])} a month" for c in loans]
     rate = ctx.rate
     if rate and rate.get("year_ago") is not None:
-        lines.append(f"Bank of Israel rate {_pct(rate['rate'])} now, {_pct(rate['year_ago'])} a year ago")
+        lines.append(f"{ctx.Bank} rate {_pct(rate['rate'])} now, {_pct(rate['year_ago'])} a year ago")
     elif rate:
-        lines.append(f"Bank of Israel rate {_pct(rate['rate'])} now")
+        lines.append(f"{ctx.Bank} rate {_pct(rate['rate'])} now")
     summary = f"{sh(monthly)} a month, {sh(monthly * 12)} a year."
     if rate and rate.get("year_ago") is not None and rate["rate"] < rate["year_ago"]:
         summary += (f" Rates are lower than a year ago ({_pct(rate['rate'])} vs {_pct(rate['year_ago'])}): offers from "
@@ -1211,7 +1217,7 @@ def context(user: User, today: Optional[datetime.date] = None, book: Optional[da
                    rate=rates.policy_rate(today) if rates else None, fx=fx,
                    answers={k: _answers(r) for k, r in rows.items()},
                    market=(lambda topic, params: checks.latest(user, topic, params)) if checks else None,
-                   unavailable=unavailable)
+                   unavailable=unavailable, bank=rates.bank if rates else "central bank")
 
 
 def _snapshot(item: Dict[str, Any]) -> str:
@@ -1346,7 +1352,7 @@ def _fx_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[s
     if b.get("pct") and pct <= b["pct"] * 0.5:
         return _outcome("confirmed", base * b["pct"] / 100 - markup, (b.get("markup") or 0) * (1 - pct / b["pct"]),
                         f"{_pct(round(pct, 2))} over the rate since, was {_pct(round(b['pct'], 2))}")
-    return _outcome("no_change", detail=f"Still {_pct(round(pct, 2))} over the Bank of Israel rate")
+    return _outcome("no_change", detail=f"Still {_pct(round(pct, 2))} over the {ctx.bank} rate")
 
 
 def _fees_outcome(ctx: Context, b: Dict[str, Any], since: datetime.date) -> Dict[str, Any]:
@@ -1576,7 +1582,7 @@ def _totals(items: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
 
 
 def overview(user: User, today: Optional[datetime.date] = None, book: Optional[dashboard.Book] = None) -> Dict[str, Any]:
-    """``GET /api/money/savings``: ``{as_of, rate {policy, date, year_ago, year_ago_date} | None, totals {low,
+    """``GET /api/money/savings``: ``{as_of, rate {policy, date, year_ago, year_ago_date, bank} | None, totals {low,
     high, count, saved, saved_yearly, watch_count}, items}`` (ranked: due first, then saving per minute
     of effort, then the money at stake)."""
     ctx = context(user, today, book, rows={})
@@ -1584,7 +1590,7 @@ def overview(user: User, today: Optional[datetime.date] = None, book: Optional[d
     rate = ctx.rate
     return {"as_of": ctx.today.isoformat(),
             "rate": {"policy": rate["rate"], "date": rate["date"], "year_ago": rate["year_ago"],
-                     "year_ago_date": rate["year_ago_date"]} if rate else None,
+                     "year_ago_date": rate["year_ago_date"], "bank": ctx.Bank} if rate else None,
             "totals": _totals(items), "items": items}
 
 

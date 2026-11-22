@@ -20,8 +20,6 @@
 #   DANA_LOCAL_EGRESS=1      let the app reach the internet (needed for a real model key)
 #   DANA_LOCAL_SOURCE=1      run the working tree's code (mounted read-only) instead of the image's
 #                            copy; `up` builds only when the image is missing, `restart` reloads code
-#   DANA_LOCAL_MONEY=1       also run money_il's bank-worker sidecar (built from addons/money_il/worker/); the real
-#                            bank sites need DANA_LOCAL_EGRESS=1 as well (docs/money-il.md)
 #
 # Nothing here talks to production: no registry push, no kubectl; the app has no
 # route out of the machine unless DANA_LOCAL_EGRESS=1.
@@ -42,9 +40,6 @@ compose() {
     if [[ "${DANA_LOCAL_SOURCE:-}" == "1" ]]; then
         files+=(-f "$ENV_DIR/compose.source.yaml")
     fi
-    if [[ "${DANA_LOCAL_MONEY:-}" == "1" ]]; then
-        files+=(-f "$ENV_DIR/compose.money.yaml")
-    fi
     docker compose "${files[@]}" "$@"
 }
 
@@ -58,14 +53,6 @@ build() {
     git ls-files -z --cached --others --exclude-standard \
         | tar --null --ignore-failed-read -T - -cf - 2>/dev/null \
         | docker build -t "$IMAGE" -f Dockerfile -
-    build_worker
-}
-
-build_worker() {
-    [[ "${DANA_LOCAL_MONEY:-}" == "1" ]] || return 0
-    local image="${DANA_LOCAL_WORKER_IMAGE:-dana-local/bank-worker:latest}"
-    echo "==> Building $image from addons/money_il/worker/"
-    docker build -q -t "$image" "$ROOT/addons/money_il/worker" >/dev/null
 }
 
 in_image() {
@@ -198,7 +185,6 @@ _connect() {
 up() {
     if [[ "${DANA_LOCAL_SOURCE:-}" == "1" ]] && docker image inspect "$IMAGE" >/dev/null 2>&1; then
         echo "==> Using the existing $IMAGE with the working tree's code (DANA_LOCAL_SOURCE=1)"
-        build_worker
     else
         build
     fi
@@ -223,7 +209,6 @@ case "${1:-}" in
     ps) compose ps ;;
     down) compose down -v --remove-orphans; rm -rf "$STATE"; echo "==> Removed containers, networks, volume and $STATE" ;;
     reset) compose down -v --remove-orphans; rm -rf "$STATE"; up ;;
-    # The worker shares the app's network namespace: it restarts with it.
-    restart) compose restart app; [[ "${DANA_LOCAL_MONEY:-}" == "1" ]] && compose restart bank-worker; wait_healthy ;;
+    restart) compose restart app; wait_healthy ;;
     *) sed -n '2,26p' "$0"; exit 2 ;;
 esac

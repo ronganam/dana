@@ -1,17 +1,17 @@
-"""Money savings: every detector with exact numbers, the lifecycle and Undo, outcomes, targets, price checks, the API, the tools, Now, the weekly review line, the insight card and the Bank of Israel data.
+"""Money savings: every detector with exact numbers, the lifecycle and Undo, outcomes, targets, price checks, the API, the tools, Now, the weekly review line and the insight card.
 Run: bin/test test_money_savings   (WRITE_WEB_FIXTURE=1 writes tests/fixtures/money_savings_web.json)
 
 A synthetic 13 months, every name and amount made up, with today fixed at Wed
 18 Nov 2026 09:30 (Asia/Jerusalem). Robin (the first admin) has a bank account,
 a card and an investment account: a phone bill ₪69 → ₪109, a bimonthly
 חברת החשמל series, ₪25,000 idle cash and a "כספית" fund, AI subscriptions in
-dollars and a trip in euros (a fake Bank of Israel table gives a known
+dollars and a trip in euros (made-up central bank rates give a known
 markup), a monthly municipality, monthly and yearly insurance, other
 subscriptions, a mortgage, bank fees, eating out creeping up, a 6-orders-in-4-
 days spree, a small cloud bill rising, late-night purchases, a parking fine
 and a late fee. Bob has money and one card (a phone bill ₪50 → ₪80); Carl has
-no money. Price checks and the Bank of Israel fetcher are fakes: nothing
-touches the network.
+no money. The rates and price checks come from the made-up provider
+(moneyfakes.py) with fakes: nothing touches the network.
 
 Covers: each detector's item and numbers; ranking; the lifecycle (each status,
 Undo, an item kept after its detector stops firing, "open" giving it back to
@@ -19,15 +19,15 @@ Dana, snoozes ending); outcomes (confirmed / waiting / no_change, a cancelled
 subscription's missing charges, only a bill's own charges, a big drop
 confirmed by a second charge, a supplier's bill for electricity, money set
 aside for the cushion); targets (set / edit / remove, progress, saved, a
-past month judged by the target of its time); the check endpoint (the real
-market.start on the event loop, needs_answer, 409 / 429 / 503, 400 without a
+past month judged by the target of its time); the check endpoint (the provider's
+start, needs_answer, 409 / 429 / 503, 400 without a
 check or for refused params, the telecom params, offers costed for the
 user's lines, a bundle not compared); ATM cash never a penalty; overlaps
 from subscriptions only; every supported currency fetched or none; the
 saving context chat; isolation (two users with money, 404 for the
 other's keys and undo, 403 not_connected); the tools; Now cards and acting
-on them; the weekly review line; the Overview insight card; Bank of Israel
-parsing, caching and a failed fetch leaving its items out; delete_all.
+on them; the weekly review line; the Overview insight card; no rates leaving
+their items out; delete_all.
 """
 
 import asyncio
@@ -41,7 +41,7 @@ import uuid
 from contextlib import contextmanager
 from typing import Any, Dict, Iterator, List, Optional, Tuple
 from unittest.mock import patch
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import quote
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("money_savings_test")
@@ -59,6 +59,8 @@ db.migrate()
 users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import moneyfakes  # noqa: E402  (the made-up provider: moneyfakes.py)
 
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
@@ -70,7 +72,6 @@ from core.addons import store as connections  # noqa: E402
 from core.addons import registry  # noqa: E402
 from core.addons.store import NotConnected  # noqa: E402
 from addons.money import api as money_api, dashboard, ingest, providers, queries, savings, store, tools  # noqa: E402
-from addons.money_il import market, reference  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
 
@@ -96,14 +97,14 @@ assert ROBIN is not None
 BOB = users.update(users.create("Bob").id, currency="ILS")  # his bills are in shekels
 CARL = users.create("Carl")
 connections.connect(ROBIN, "money")
-connections.connect(ROBIN, "money_il")
+connections.connect(ROBIN, moneyfakes.PROVIDER)
 connections.connect(BOB, "money")
-connections.connect(BOB, "money_il")
+connections.connect(BOB, moneyfakes.PROVIDER)
 TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ROBIN, BOB, CARL)}
 STAMP = "2026-11-01T00:00:00+00:00"
 WEB_FIXTURE = os.path.join(testenv.FIXTURES, "money_savings_web.json")
 
-# --- Fakes: the Bank of Israel and the price checks --------------------------------------------------
+# --- Fakes: the rates and the price checks -----------------------------------------------------------
 
 FETCHES: List[str] = []
 FETCH_FAILS = {"on": False}
@@ -118,30 +119,38 @@ def _business_days(start: D, end: D) -> List[D]:
     return out
 
 
-def fake_fetch(url: str) -> str:
-    """A made-up Bank of Israel table: policy rate 4.5% until 4 Jan 2026, then 4.25%; USD 3.70 until
-    30 Jun 2026, then 3.60; EUR 4.00 (business days only, so a weekend uses Friday's)."""
-    FETCHES.append(url)
+# Made-up rates: the policy rate 4.5% until 4 Jan 2026, then 4.25%; USD 3.70 until 30 Jun 2026, then 3.60;
+# EUR 4.00 (business days only, so a weekend uses Friday's). GBP is supported and never quoted.
+FX_CURRENCIES = frozenset({"USD", "EUR", "GBP"})
+
+
+def fake_policy(today: D) -> Optional[Dict[str, Any]]:
+    FETCHES.append("policy")
     if FETCH_FAILS["on"]:
-        raise OSError("network down (test)")
-    q = parse_qs(urlparse(url).query)
-    start, end = D.fromisoformat(q["startperiod"][0]), D.fromisoformat(q["endperiod"][0])
-    lines = ["﻿DATAFLOW,SERIES_CODE,TIME_PERIOD,OBS_VALUE,UNIT_MEASURE"]
+        return None
+
+    def on(day: D) -> Tuple[float, D]:
+        d = _business_days(day - datetime.timedelta(days=7), day)[-1]
+        return (4.5 if d < D(2026, 1, 5) else 4.25), d
+    (rate, d), (old, d0) = on(today), on(today - datetime.timedelta(days=365))
+    return {"rate": rate, "date": d.isoformat(), "year_ago": old, "year_ago_date": d0.isoformat()}
+
+
+def fake_fx(currency: str, start: D, end: D) -> Dict[str, float]:
+    FETCHES.append(currency)
+    if FETCH_FAILS["on"]:
+        return {}
+    out = {}
     for d in _business_days(start, end):
-        if "MNT_RIB_BOI_D" in url:
-            value = 4.5 if d < D(2026, 1, 5) else 4.25
-        elif "RER_USD_ILS" in url:
-            value = 3.70 if d < D(2026, 7, 1) else 3.60
-        elif "RER_EUR_ILS" in url:
-            value = 4.00
-        else:
-            continue
-        lines.append(f"BOI.STATISTICS:X(1.0),S,{d.isoformat()},{value},ILS")
-    return "\n".join(lines) + "\n"
+        if currency.upper() == "USD":
+            out[d.isoformat()] = 3.70 if d < D(2026, 7, 1) else 3.60
+        elif currency.upper() == "EUR":
+            out[d.isoformat()] = 4.00
+    return out
 
 
-_fetch = patch.object(reference, "fetch_csv", fake_fetch)
-_fetch.start()
+RATES = providers.register_rates(providers.Rates(moneyfakes.PROVIDER, fake_policy, fake_fx, FX_CURRENCIES,
+                                                 bank="Bank of Example"))
 
 CHECKS: Dict[Tuple[str, str], Dict[str, Any]] = {}   # (topic, params json) → the latest check
 STARTS: List[Tuple[str, str, Dict[str, Any]]] = []
@@ -170,14 +179,14 @@ def set_check(user, topic: str, params: Dict[str, Any], items: List[Dict[str, An
         "sources": [{"title": "השוואת מחירים לדוגמה", "url": "https://example.com/prices"}], "error": None}
 
 
-# money_il's price checks and rates, as registered; the fakes replace them (the same addon re-registers).
-IL_CHECKS, IL_RATES = providers.price_checks(ROBIN), providers.rates(ROBIN)
-assert IL_CHECKS is not None and IL_RATES is not None
+# The made-up provider's price checks (the fakes); the same addon re-registers to swap them.
+IL_CHECKS = providers.PriceChecks(moneyfakes.PROVIDER, ("telecom", "electricity", "fx_card", "arnona"), fake_latest,
+                                  fake_start)
 
 
 @contextmanager
 def price_checks(latest: Any, start: Any) -> Iterator[None]:
-    """money_il's price checks with ``latest`` / ``start`` in place of the fakes for a while."""
+    """The price checks with ``latest`` / ``start`` in place of the fakes for a while."""
     providers.register_price_checks(dataclasses.replace(IL_CHECKS, latest=latest, start=start))
     try:
         yield
@@ -261,11 +270,11 @@ def months(start: D, end: D) -> List[D]:
 
 
 BANK = ""
-BANK = account(ROBIN, "bank", "12-345-678901", "hapoalim", balance=4_500_000, balance_at="2026-11-18T05:00:00+00:00")
-CARD = account(ROBIN, "card", "8763", "visaCal", billed_from=BANK)
-INV = account(ROBIN, "investment", "77-123456", "psagot", balance=3_500_000, balance_at="2026-11-18T05:00:00+00:00",
+BANK = account(ROBIN, "bank", "12-345-678901", "samplebank", balance=4_500_000, balance_at="2026-11-18T05:00:00+00:00")
+CARD = account(ROBIN, "card", "8763", "samplecard", billed_from=BANK)
+INV = account(ROBIN, "investment", "77-123456", "sampleinvest", balance=3_500_000, balance_at="2026-11-18T05:00:00+00:00",
               details={"value": 3_500_000, "cash": 2_500_000})
-BOB_CARD = account(BOB, "card", "4580", "visaCal")
+BOB_CARD = account(BOB, "card", "4580", "samplecard")
 with store.db() as conn:
     conn.execute("INSERT INTO money_holdings (id, user_id, account_id, security, name, quantity, price, currency, value, "
                  "cost, profit, profit_pct, weight, raw, updated_at) VALUES (?, ?, ?, '5111111', 'קרן כספית הצפון', "
@@ -401,39 +410,15 @@ def balance_floor() -> int:
     return min(lows)
 
 
-# --- The Bank of Israel ---------------------------------------------------------------------------------
+# --- Without rates -------------------------------------------------------------------------------------
 
-def test_reference() -> None:
-    reference.clear_cache()
-    FETCHES.clear()
-    rate = reference.policy_rate(TODAY)
-    check("reference: the policy rate now and a year ago (the last business day on or before)",
-          rate == {"rate": 4.25, "date": "2026-11-18", "year_ago": 4.5, "year_ago_date": "2025-11-18"}, rate)
-    reference.policy_rate(TODAY)
-    check("reference: a second read comes from the cache", len(FETCHES) == 1, FETCHES)
-    check("reference: the cache file holds public data only, next to the DB", reference.cache_file().exists()
-          and "MNT_RIB_BOI_D" in reference.cache_file().read_text())
-    reference.clear_cache()
-    reference.policy_rate(TODAY)
-    check("reference: after a restart the day's answer is read from the file", len(FETCHES) == 1, FETCHES)
-    usd = reference.fx_rates("usd", D(2026, 7, 1), D(2026, 7, 6))
-    check("reference: FX rates per business day (BOM, extra columns), a weekend uses Friday's",
-          usd == {"2026-07-01": 3.6, "2026-07-02": 3.6, "2026-07-03": 3.6, "2026-07-06": 3.6}
-          and providers.rate_on(usd, "2026-07-05") == 3.6 and providers.rate_on(usd, "2026-06-20") is None, usd)
-    check("reference: an unsupported currency is left out (the yen is quoted per 100)",
-          reference.fx_rates("JPY", D(2026, 7, 1), D(2026, 7, 6)) == {})
-    reference.clear_cache()
+def test_no_rates() -> None:
     FETCH_FAILS["on"] = True
-    FETCHES.clear()
-    check("reference: a failed fetch gives None", reference.policy_rate(D(2026, 11, 17)) is None)
-    reference.policy_rate(D(2026, 11, 17))
-    check("reference: and is not retried at once", len(FETCHES) == 1, FETCHES)
     found = items_of(savings.overview(ROBIN, D(2026, 11, 17)))
     check("reference: without the rate the items that need it are left out (cash, cushion), nothing guessed",
           not any(k.startswith("cash:") or k == "cushion" for k in found) and "fees" in found
           and found[ARNONA]["saving"] is None, sorted(found))
     FETCH_FAILS["on"] = False
-    reference.clear_cache()
     with store.db() as conn:  # that read stored first sightings dated today: start clean
         conn.execute("DELETE FROM money_savings")
 
@@ -442,9 +427,9 @@ def test_reference() -> None:
 
 def test_detectors(data: Dict[str, Any]) -> None:
     items = items_of(data)
-    check("overview: as of today, the policy rate now and a year ago",
+    check("overview: as of today, the policy rate now and a year ago, the bank's name",
           data["as_of"] == "2026-11-18" and data["rate"] == {"policy": 4.25, "date": "2026-11-18", "year_ago": 4.5,
-                                                            "year_ago_date": "2025-11-18"}, data["rate"])
+                                                            "year_ago_date": "2025-11-18", "bank": "Bank of Example"}, data["rate"])
     expected_save = {PHONE, "electricity", f"cash:{INV}", "cushion", f"fx:{CARD}", "fees", ARNONA, RENEW_HOME, RENEW_CAR,
                      "insurance_review", "subscriptions", "mortgage"}
     expected_watch = {"creep:eating_out", SPREE_KEY, "leak:ענן הצפון", "overlap:ai", "penalties", "late_night"}
@@ -489,10 +474,10 @@ def test_detectors(data: Dict[str, Any]) -> None:
     f = items[f"fx:{CARD}"]
     base = sum(cents * (4.0 if cur == "EUR" else (3.70 if d < D(2026, 7, 1) else 3.60)) for d, _, cents, cur in FX)
     markup = sum(ch for _, ch, _, _ in FX) - base
-    check("fx: 19 purchases, ₪5,243.50 charged, ₪153.50 over the Bank of Israel rate of each day (3.02%, median 3.06%)",
+    check("fx: 19 purchases, ₪5,243.50 charged, ₪153.50 over the Bank of Example rate of each day (3.02%, median 3.06%)",
           round(markup) == 15_350 and f["saving"] == {"low": 15_350, "high": 15_350, "basis": "measured"}
           and f["evidence"]["lines"] == ["19 purchases in foreign currency in 12 months, ₪5,243.50 charged",
-                                         "3.02% over the Bank of Israel rate in total, median 3.06% a purchase"],
+                                         "3.02% over the Bank of Example rate in total, median 3.06% a purchase"],
           (f["saving"], f["evidence"]["lines"]))
     fe = items["fees"]
     check("fees: 12 account fees, ₪130.80 (the late fee is a penalty, not here), with a Hebrew script",
@@ -615,20 +600,15 @@ async def test_checks(client: TestClient) -> None:
 
 
 async def test_check_route(client: TestClient) -> None:
-    """The route with the real ``market.start`` (it needs the event loop) and a fake search."""
-    async def fake_find(topic: str, params: Dict[str, Any]) -> Tuple[List[Dict[str, Any]], List[Dict[str, str]]]:
-        return [dict(i) for i in ELECTRICITY], [dict(SOURCE)]
-
-    with price_checks(market.latest, market.start), patch.object(market, "_find", fake_find), patch.object(market.llm, "can_search", lambda: True):
-        s, body = await call(client, "POST", url("electricity", "/check"), ROBIN)
-        await asyncio.gather(*list(market._running.values()))  # (often done already)
-        stored = market.latest(ROBIN, "electricity", {})
-        s2, again = await call(client, "POST", url("electricity", "/check"), ROBIN)
-    check("check route: the real price check starts on the event loop → 202, and its result is stored",
-          s == 202 and body == {"state": "checking"} and stored and stored["state"] == "ok"
-          and [i["supplier"] for i in stored["items"]] == [i["supplier"] for i in ELECTRICITY]
-          and stored["sources"] == [SOURCE], (s, body, stored))
-    check("check route: pressed again at once → 429 with retry_after", s2 == 429 and again.get("retry_after", 0) > 0, again)
+    """The route over the provider's ``start``."""
+    STARTS.clear()
+    s, body = await call(client, "POST", url("electricity", "/check"), ROBIN)
+    START_MODE["raise"] = providers.PriceCheckTooSoon(120)
+    s2, again = await call(client, "POST", url("electricity", "/check"), ROBIN)
+    START_MODE["raise"] = None
+    check("check route: the provider's check starts → 202, for the user, the topic and its params",
+          s == 202 and body == {"state": "checking"} and STARTS == [(ROBIN.id, "electricity", {})], (s, body, STARTS))
+    check("check route: pressed again too soon → 429 with retry_after", s2 == 429 and again.get("retry_after") == 120, again)
     START_MODE["raise"] = ValueError("bad params (test)")
     s, body = await call(client, "POST", url("electricity", "/check"), ROBIN)
     START_MODE["raise"] = None
@@ -761,23 +741,23 @@ def test_fixes() -> None:
           and ov["evidence"]["lines"] == ["DISNEY PLUS: ₪79.80 in the last 12 months", "NETFLIX.COM: ₪149.70 in the last 12 months"],
           ov)
 
-    # Bank of Israel FX: every supported currency or none, so the fetches say nothing about where the user spent.
+    # FX rates: every supported currency or none, so the fetches say nothing about where the user spent.
     seen: List[str] = []
-    real_fx = reference.fx_rates
+    real_fx = fake_fx
 
     def recording(currency: str, start: D, end: D) -> Dict[str, float]:
         seen.append(currency)
         return real_fx(currency, start, end)
 
-    providers.register_rates(dataclasses.replace(IL_RATES, fx_rates=recording))
+    providers.register_rates(dataclasses.replace(RATES, fx_rates=recording))
     try:
         robin_fx = savings.context(ROBIN).fx
         robin_seen, seen[:] = sorted(seen), []
         bob_fx = savings.context(BOB).fx
     finally:
-        providers.register_rates(IL_RATES)
+        providers.register_rates(RATES)
     check("fx rates: spent abroad → every supported currency fetched (not only the ones used); never abroad → none",
-          robin_seen == sorted(reference.FX_CURRENCIES) and set(robin_fx) == set(reference.FX_CURRENCIES)
+          robin_seen == sorted(FX_CURRENCIES) and set(robin_fx) == set(FX_CURRENCIES)
           and seen == [] and bob_fx == {}, (robin_seen, seen))
 
 
@@ -1140,7 +1120,7 @@ async def fixture(client: TestClient) -> None:
 
 
 async def main() -> None:
-    test_reference()
+    test_no_rates()
     app = web.Application()
     setup_auth(app)
     money_api.setup(app)

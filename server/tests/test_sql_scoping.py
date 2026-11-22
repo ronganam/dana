@@ -32,7 +32,7 @@ DB_PATH = testenv.isolate("sql_scoping_test")
 from core import db  # noqa: E402
 
 SERVER = testenv.SERVER
-SKIP_DIRS = {"tests", "migrations", ".venv", "node_modules", "__pycache__", "scratch", "bank-worker", "static"}
+SKIP_DIRS = {"tests", "migrations", ".venv", "node_modules", "__pycache__", "scratch", "static"}
 SKIP_FILES = {"core/db/convert.py"}
 TABLE_REF = re.compile(r'\b(?:FROM|JOIN|INTO|UPDATE)\s+"?([A-Za-z_]\w*)')
 COMMENT = re.compile(r"#\s*scoped:\s*\S")
