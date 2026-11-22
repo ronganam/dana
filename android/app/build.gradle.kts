@@ -64,8 +64,8 @@ android {
         applicationId = "io.github.ronganam.dana"
         minSdk = 26
         targetSdk = 36
-        versionCode = 58
-        versionName = "8.6.1"
+        versionCode = 59
+        versionName = "8.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // The server address a fresh install of the kiosk / TV starts with ("": set it in the app).
         buildConfigField("String", "DEFAULT_SERVER_URL", quoted(siteValue("SERVER_URL")))
