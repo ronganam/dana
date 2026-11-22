@@ -44,7 +44,7 @@ users.bootstrap()
 OWNER = users.first_admin()
 ensure_default_groups_for_everyone()
 from core import clock, llm, runs, usage, usage_api
-from addons.phone.notifications import triage
+from addons.phone.notifications import judges, triage
 from core.auth import setup_auth
 from core.db import get_db_connection
 
@@ -200,7 +200,7 @@ async def test_decision_models():
         return httpx.Response(200, json={"answers": answers})
 
     client = httpx.AsyncClient(transport=httpx.MockTransport(handler))
-    await triage.ask({"x": 1}, me="Robin", api_key="k", client=client, ref="notification:5")
+    await judges.ask({"x": 1}, me="Robin", api_key="k", client=client, ref="notification:5")
     rows = stored()
     r = rows[0]
     check("a TypeSafe request is recorded as a decision",
@@ -214,7 +214,7 @@ async def test_decision_models():
 
     reset()
     os.environ["TYPESAFE_COST_PER_MTOK"] = "1.0"
-    await triage.ask({"x": 1}, me="Robin", api_key="k", client=client, ref="notification:6")
+    await judges.ask({"x": 1}, me="Robin", api_key="k", client=client, ref="notification:6")
     r = stored()[0]
     check("TYPESAFE_COST_PER_MTOK overrides the price", abs(r["cost"] - r["input_tokens"] / 1e6) < 1e-12, r)
     os.environ["TYPESAFE_COST_PER_MTOK"] = "oops"
@@ -226,16 +226,15 @@ async def test_decision_models():
     reset()
     bad = httpx.AsyncClient(transport=httpx.MockTransport(lambda r: httpx.Response(401, text="no")))
     try:
-        await triage.ask({"x": 1}, me="Robin", api_key="k", client=bad, ref="notification:7")
+        await judges.ask({"x": 1}, me="Robin", api_key="k", client=bad, ref="notification:7")
     except triage.TriageError:
         pass
     r = stored()[0]
     check("a failed request is recorded as failed, no cost", r["ok"] == 0 and r["cost"] is None and "401" in r["error"], r)
 
     reset()
-    os.environ.pop("TYPESAFE_API_KEY", None)
     try:
-        await triage.ask({"x": 1}, me="Robin", client=client)
+        await judges.ask({"x": 1}, me="Robin", api_key="", client=client)
     except triage.TriageError:
         pass
     check("no key: nothing was sent, nothing is recorded", stored() == [])

@@ -4,6 +4,7 @@
 - every 6 hours: drop call audio older than ``CALL_AUDIO_RETENTION_DAYS``
   (transcripts are kept) and notifications older than 30 days;
 - every minute: the notification digest at ``NOTIFICATION_DIGEST_TIMES``;
+- every 5 minutes: try again the notifications the triage judge did not answer;
 - every 30 seconds: re-nudge unseen alerts;
 - the ``push`` channel of ``core.notify.send``: a message's ``kind`` and
   ``data`` as a push event to the user's phone (addons/phone/push.py);
@@ -30,7 +31,7 @@ from addons.phone.addon import addon
 from addons.phone.calls import (actions as suggestion_actions, chat as phone_chat,
                                 processing as calls_processing, retention as calls_retention)
 from addons.phone.config import mark_key
-from addons.phone.notifications import (digest, escalation, format as notif_format,
+from addons.phone.notifications import (digest, escalation, format as notif_format, judges,
                                         processing as notification_processing, retention as notification_retention,
                                         store as notification_store, summary as notification_summary)
 
@@ -49,6 +50,12 @@ async def resume_unfinished(user: User) -> None:
     """Finish ``user``'s call processing and notification triage interrupted by a restart."""
     calls_processing.resume_unfinished(user)
     notification_processing.resume_unfinished(user)
+
+
+@addon.job(every=minutes(5))
+async def retry_triage(user: User) -> int:
+    """Queue ``user``'s notifications still waiting for a triage answer."""
+    return notification_processing.retry_pending(user)
 
 
 @addon.job(every=hours(6))
@@ -336,7 +343,7 @@ def check_triage(user: User, now: datetime.datetime) -> Check:
                                 "AND triage_status = 'failed'", (user.id,)).fetchone()
             return Check(False, f"{failed} of {total} failed in the last 24 h", helpers.parse_time(last["t"]),
                          title="Notification sorting is failing",
-                         why="TypeSafe calls fail, so nothing is marked as needing you or as noise.")
+                         why=f"Triage calls to {judges.judge().model()} fail, so nothing is marked as needing you or as noise.")
     return Check(True, f"{done} sorted in the last 24 h" if total else "nothing to sort")
 
 

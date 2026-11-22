@@ -284,16 +284,18 @@ async def complete(messages: List[Dict[str, Any]], *, job: Optional[str] = None,
 
 async def complete_json(prompt: str, schema: Dict[str, Any], *, job: Optional[str] = None, temperature: float = 0.2,
                         timeout: float = 60.0, attempts: int = 3, purpose: str = "", ref: str = "",
-                        source: str = "") -> Dict[str, Any]:
+                        source: str = "", effort: str = "") -> Dict[str, Any]:
     """Run ``prompt`` with structured output constrained to ``schema`` (standard JSON
     Schema) and return the parsed object. Retries network errors, 5xx/429, and empty or
     unparsable replies (a little warmer each time, so a stuck reply doesn't repeat).
+    ``effort``: Claude's ``output_config.effort`` for this call (default: the job's;
+    ignored by other providers).
     Raises RuntimeError when every attempt failed, ``purposes.UnknownPurpose``
     for an unknown purpose (model: :func:`model_for`)."""
     purpose, name = _call(purpose, job)
     response_format = {"type": "json_schema", "json_schema": {"name": "result", "schema": schema}}
     tag = usage.meta(purpose, ref, source)
-    extra = claude_kwargs(name, job or "", {})
+    extra = claude_kwargs(name, job or "", {"output_config": {"effort": effort}} if effort and is_claude(name) else {})
     last: Optional[BaseException] = None
     for attempt in range(attempts):
         try:
