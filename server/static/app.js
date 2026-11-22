@@ -19,7 +19,7 @@
  *   app-settings.js, app-debug.js   one screen each
  *   app.js           this file, last
  * index.html loads them in this order, `defer`, before the self-contained core screens (review.js,
- * usage.js, addons.js, profile.js, devices.js): Chat is open and window.danaSwitchTab is set before any of those asks
+ * usage.js, addons.js, profile.js, devices.js, household.js, demo.js): Chat is open and window.danaSwitchTab is set before any of those asks
  * for its own tab (`#review`, `#addons`). While it loads, a script only uses what the scripts before it
  * declared; functions may call any of them later. Addon pages are not listed here: each addon ships its
  * own from its web/ folder (server/docs/writing-an-addon.md, "Pages"). A new shell file goes in

@@ -2,7 +2,7 @@
 #
 #   cp .env.example .env            # fill in the LLM key
 #   docker compose up -d            # http://localhost:8080 (this machine only, see ports below)
-#   docker compose logs app | grep setup   # open the setup link to create your admin account
+#   docker compose logs dana | grep setup  # open the setup link to create your admin account
 #   docker compose --profile money_il up -d   # also money_il's worker: the Israeli bank syncs, once the
 #                                             # money_il addon is installed from the catalog
 #
@@ -14,7 +14,7 @@
 name: dana
 
 services:
-  app:
+  dana:
     build:
       context: .
       target: app
@@ -36,7 +36,7 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # The money_il addon's worker (github.com/ronganam/dana-addon-money-il): shares the app's network (Dana
+  # The money_il addon's worker (github.com/ronganam/dana-addon-money-il): shares the dana service's network (Dana
   # reaches it on 127.0.0.1:8090, MONEY_WORKER_URL) and only the money/ folder of the data, which
   # money-il-dir creates first. MONEY_IL_WORKER_TAG: the commit of money_il you installed.
   money-il-dir:
@@ -45,12 +45,12 @@ services:
     command: ["mkdir", "-p", "/data/money/profiles"]
     volumes:
       - data:/data
-    depends_on: [app]   # the app creates the volume first, owned by its user
+    depends_on: [dana]   # Dana creates the volume first, owned by its user
     restart: "no"
   money-il-worker:
     profiles: [money_il]
     image: ghcr.io/ronganam/dana-addon-money-il-worker:${MONEY_IL_WORKER_TAG:-latest}
-    network_mode: "service:app"
+    network_mode: "service:dana"
     environment:
       TZ: ${TIMEZONE:-UTC}   # the server's zone (from .env): the dates the sites are asked for
     volumes:
@@ -60,7 +60,7 @@ services:
         volume:
           subpath: money
     depends_on:
-      app:
+      dana:
         condition: service_started
       money-il-dir:
         condition: service_completed_successfully

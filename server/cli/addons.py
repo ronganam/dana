@@ -8,15 +8,19 @@
                                             a tool and its test; --web adds a page, --worker a sidecar
     addons install NAME|REPO@COMMIT[:PATH] [--dir DIR | --data] [--yes]
                                             fetch one commit of an addon (a catalog entry, or any git repository)
-                                            into the site's addons/ (default), DIR, or the data dir's addons/;
+                                            into the site's addons/ (default with a site), DIR, or the data
+                                            dir's addons/ (default without one: the container image);
                                             asks first when it may touch more than the version it replaces
                                             (--yes: agree without asking)
     addons remove NAME [--dir DIR | --data] delete an addon folder there (its tables stay)
     addons disable NAME / enable NAME       for everyone on this server (the running server sees it within 5 s)
 
-``install`` writes into the site's ``addons/`` by default: what ``bin/deploy``
-builds into the image. ``--data`` writes into ``<data dir>/addons`` like the
-Addons page does (then restart the server). Either way the addon runs with the
+``install`` writes into the site's ``addons/`` by default when there is a site
+folder: what ``bin/deploy`` builds into the image. Without one (the container
+image: ``docker compose exec dana dana addons install NAME``) and with
+``--data`` it writes into ``<data dir>/addons`` like the Addons page does,
+which lives in the data volume and survives image updates (then restart the
+server). Either way the addon runs with the
 server's full access: install only code you trust. The per-user commands
 (``show``, ``connect``, ``update``, ``disconnect``) are in cli/users.py.
 """
@@ -44,10 +48,18 @@ def _site_addons() -> Path:
     return addon_dirs.site_dir() / "addons"
 
 
+def default_root() -> Path:
+    """Where ``install`` / ``remove`` work without ``--dir`` / ``--data``: the
+    site's ``addons/`` when there is a site folder (a checkout that deploys
+    with ``bin/deploy``), else the data dir's (the container image, a plain
+    checkout: what the server loads at its next start, kept across image updates)."""
+    return _site_addons() if addon_dirs.site_dir().is_dir() else addon_dirs.installed_dir()
+
+
 def _root(args: argparse.Namespace) -> Path:
     if getattr(args, "data", False):
         return addon_dirs.installed_dir()
-    return Path(args.dir).expanduser().resolve() if getattr(args, "dir", None) else _site_addons()
+    return Path(args.dir).expanduser().resolve() if getattr(args, "dir", None) else default_root()
 
 
 # --- list ----------------------------------------------------------------------------------------
@@ -265,7 +277,8 @@ def cmd_enable(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
 
 def _where(p: argparse.ArgumentParser) -> None:
     group = p.add_mutually_exclusive_group()
-    group.add_argument("--dir", help="the addons folder to use (default: the site's addons/)")
+    group.add_argument("--dir", help="the addons folder to use (default: the site's addons/ when there is a site, "
+                                     "else the data dir's)")
     group.add_argument("--data", action="store_true", help="the data dir's addons/ (what the Addons page installs into)")
 
 

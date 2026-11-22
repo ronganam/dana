@@ -26,6 +26,7 @@
     <link rel="stylesheet" href="/static/usage.css">
     <link rel="stylesheet" href="/static/addons.css">
     <link rel="stylesheet" href="/static/devices.css">
+    <link rel="stylesheet" href="/static/household.css">
     <!-- Third-Party Libraries -->
     <!-- Vendored, exact versions (THIRD_PARTY.md): no script comes from a CDN -->
     <script src="/static/vendor/marked.min.js"></script>
@@ -51,6 +52,8 @@
     <script src="/static/addons.js" defer></script>
     <script src="/static/profile.js" defer></script>
     <script src="/static/devices.js" defer></script>
+    <script src="/static/household.js" defer></script>
+    <script src="/static/demo.js" defer></script>
 </head>
 <body>
     <div class="app-container">
@@ -69,6 +72,8 @@
 
             <!-- ════ NOW (static/app-now.js) — the screen the app opens on ════ -->
             <section class="screen-panel active" id="panel-now">
+                <!-- static/demo.js: the sample household's banner (admins) -->
+                <div class="demo-banner hidden" id="demo-banner" role="status" aria-live="polite"></div>
                 <div class="now-scroll" id="now-scroll">
                     <div class="now-inner" id="now-root"></div>
                 </div>
@@ -259,6 +264,10 @@
                                     <i data-lucide="smartphone"></i>
                                     <span>Devices</span>
                                 </button>
+                                <button class="settings-link-tile hidden" id="btn-open-household-tab">
+                                    <i data-lucide="users"></i>
+                                    <span>Household</span>
+                                </button>
                                 <button class="settings-link-tile" id="btn-open-addons-tab">
                                     <i data-lucide="plug"></i>
                                     <span>Addons</span>
@@ -314,6 +323,24 @@
                     </div>
                 </div>
                 <div class="ibx-modal hidden" id="dev-modal"></div>
+            </section>
+
+            <!-- ════ HOUSEHOLD (static/household.js) — opened from Settings or /#household ════ -->
+            <section class="screen-panel" id="panel-household">
+                <header class="top-bar">
+                    <span class="top-bar-title">Household</span>
+                    <div class="top-bar-actions">
+                        <button class="icon-btn" id="hh-refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
+                        <button class="btn-primary hidden" id="hh-add"><i data-lucide="user-plus"></i> Add someone</button>
+                    </div>
+                </header>
+                <div class="dev-scroll">
+                    <div class="dev-inner">
+                        <p class="dev-intro">Everyone who uses this Dana. Each has their own chats, lists and addons; invite someone to pair their phone or sign in a browser.</p>
+                        <div id="hh-list"></div>
+                    </div>
+                </div>
+                <div class="ibx-modal hidden" id="hh-modal"></div>
             </section>
 
             <!-- ════ USAGE & COST (static/usage.js) ════ -->

@@ -24,6 +24,9 @@ An authenticated request carries its :class:`core.users.User` in
 ``request["user"]`` (handlers read it with :func:`request_user`) and its
 :class:`core.devices.Device` in ``request["device"]`` (None for a token of no
 device: :func:`request_device`); the device's ``last_seen_at`` is refreshed.
+An admin viewing the demo household (core/demo.py) has the demo user as
+``request["user"]`` and themselves as ``request["viewer"]``
+(:func:`viewed_demo_user`).
 The handler runs with that user current (:func:`core.users.acting_as`), so
 undo entries, usage records and tools inside the request know whose they
 are. ``DANA_INSECURE_DEV=1`` without ``API_TOKEN`` (local development): a
@@ -56,6 +59,8 @@ Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
 logger = logging.getLogger(__name__)
 
 SESSION_COOKIE = "dana_session"
+# An admin viewing the app as a demo user (core/demo_api.py): that user's id.
+DEMO_VIEW_COOKIE = "dana_demo_view"
 # Browsers cap cookie lifetime at 400 days.
 SESSION_MAX_AGE = 400 * 24 * 3600
 
@@ -174,15 +179,30 @@ async def addon_middleware(request: web.Request, handler: Handler) -> web.Stream
         return not_connected_response(e)
 
 
+def viewed_demo_user(request: web.Request, user: User) -> Optional[User]:
+    """The demo user ``user`` is viewing the app as (the ``dana_demo_view``
+    cookie; core/demo_api.py), or None: only for a caller who may manage users,
+    only a demo user, never on ``/api/demo*`` (the admin's own way back)."""
+    wanted = request.cookies.get(DEMO_VIEW_COOKIE, "")
+    if not wanted or request.path.startswith("/api/demo") or not user.level.allows("manage_users"):
+        return None
+    found = users.get(wanted)
+    return found if found is not None and found.demo else None
+
+
 async def _as(identity: Identity, request: web.Request, handler: Handler) -> web.StreamResponse:
     user = identity.user
     device = devices.by_token_id(identity.token_id)
     if device is not None and device.user_id != user.id:
         device = None
-    request["user"] = user
-    request["device"] = device
     if device is not None:
         devices.touch(device)
+    viewed = viewed_demo_user(request, user)
+    if viewed is not None:
+        request["viewer"] = user
+        user, device = viewed, None
+    request["user"] = user
+    request["device"] = device
     with users.acting_as(user):
         return await handler(request)
 

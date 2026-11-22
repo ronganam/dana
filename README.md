@@ -30,12 +30,21 @@ An LLM key is the only value you need: `ANTHROPIC_API_KEY` with the default mode
 curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
 echo "ANTHROPIC_API_KEY=..." > .env     # your key, next to compose.yaml
 docker compose up -d
-docker compose logs app                 # open the setup link it prints
+docker compose logs dana                # open the setup link it prints
 ```
 
 The setup link (one-time, on this machine) creates you as the admin, in that browser; your phone and other devices are paired from there. The port is published on 127.0.0.1 only; to reach Dana from other devices, put a reverse proxy with HTTPS in front of it or use a VPN ([`server/docs/operations.md`](server/docs/operations.md)). Upgrade: `docker compose pull && docker compose up -d`.
 
 Headless (no browser at hand to open the link): also put `API_TOKEN` in `.env` (generate one: `openssl rand -hex 32`) before the first start, and sign in with it.
+
+Add-ons from the catalog install on the web (Settings → Addons) or with the `dana` command inside the container; either way they go into the `data` volume and survive upgrades:
+
+```bash
+docker compose exec dana dana addons install <name>   # from the catalog (or REPO@COMMIT[:PATH])
+docker compose restart dana                           # load it
+```
+
+The same command manages users: `docker compose exec dana dana users list`. The people in your household are added and invited in the browser (Settings → Household).
 
 ### Build from source
 

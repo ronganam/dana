@@ -65,7 +65,7 @@ DAILY = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 # a worker thread, next to their own database reads. ``FLEX_HOOKS`` accept either
 # sync or async functions (e.g. ``briefing`` sections that fetch weather, or ``provide``).
 SYNC_HOOKS = ("now_cards", "day_items", "review", "search", "selfcheck", "context", "context_card",
-              "context_block")
+              "context_block", "demo")
 FLEX_HOOKS = ("briefing", "provide")
 # Hooks declared for a key (a card prefix, a section key, a check key, an item
 # type, a context kind, a provider key): one addon per key and kind across every addon (the
@@ -686,6 +686,15 @@ class Addon:
         """``def f(user, ref_id) -> str``: a plain description of this addon's
         item of ``kind`` for another addon's context prompt (e.g. a task's source call)."""
         return self._hook("context_block", kind)
+
+    def demo(self, func: F) -> F:
+        """``def f(user, ctx: DemoContext) -> int``: write this addon's sample
+        data for ``user``, a member of the demo household (core/demo.py), and
+        return how many rows it wrote. Only into tables whose rows go with the
+        user (``user_id ... ON DELETE CASCADE``, or rows of such rows): removing
+        the demo deletes its users, and nothing else is cleaned up. Never
+        through the model or an outside service."""
+        return self._hook("demo")(func)
 
     def provide(self, key: str) -> Callable[[F], F]:
         """Register a named capability ``key`` (sync or async) that core composers

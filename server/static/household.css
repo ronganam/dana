@@ -1,0 +1,13 @@
+/* Settings → Household (static/household.js; the rows and dialogs reuse devices.css) and the demo banner on
+   the Now screen (static/demo.js). */
+
+.hh-invite { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+.hh-invite-part { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.hh-invite-part .dev-code { font-size: 24px; letter-spacing: 3px; }
+
+.demo-banner { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 12px; margin: 12px 16px 0;
+  padding: 10px 14px; border-radius: var(--radius-card); background: var(--amber-tint);
+  color: var(--amber-text); font-size: 13.5px; }
+.demo-text { flex: 1 1 220px; min-width: 0; }
+.demo-acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.demo-danger { color: var(--rose-text); }
