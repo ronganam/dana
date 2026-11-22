@@ -8,9 +8,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import io.github.ronganam.dana.data.network.ApiJson
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import java.io.File
 import java.security.MessageDigest
@@ -27,7 +27,17 @@ data class AppVersionInfo(
     val releaseNotes: String
 )
 
-/** One artifact's entry of `GET /api/app/version` (its version keys are camelCase, `release_notes` is not). */
+/**
+ * The update manifest's own JSON setup: its version keys are camelCase while the rest
+ * is snake_case, and ApiJson's snake_case naming would rename even `@SerialName` keys.
+ */
+private val ManifestJson = Json {
+    ignoreUnknownKeys = true
+    isLenient = true
+    coerceInputValues = true
+}
+
+/** One artifact's entry of `GET /api/app/version`. */
 @Serializable
 private data class VersionEntry(
     @SerialName("versionName") val versionName: String = "",
@@ -64,15 +74,19 @@ object UpdateManager {
                         Log.d(TAG, "version check HTTP ${response.code} for $base")
                         return@withContext null
                     }
-                    val body = response.body.string()
-                    val entry = (ApiJson.parseToJsonElement(body) as? JsonObject)?.get(artifact) as? JsonObject ?: return@withContext null
-                    ApiJson.decodeFromJsonElement(VersionEntry.serializer(), entry).toInfo(artifact)
+                    parseManifest(response.body.string(), artifact)
                 }
             } catch (e: Exception) {
                 Log.w(TAG, "Update check failed: ${e.message}")
                 null
             }
         }
+
+    /** The [artifact]'s entry of a `GET /api/app/version` body, or null when it has none. */
+    internal fun parseManifest(body: String, artifact: String): AppVersionInfo? {
+        val entry = (ManifestJson.parseToJsonElement(body) as? JsonObject)?.get(artifact) as? JsonObject ?: return null
+        return ManifestJson.decodeFromJsonElement(VersionEntry.serializer(), entry).toInfo(artifact)
+    }
 
     /** True when the server has a strictly newer version than [currentVersionCode]. */
     fun isNewer(info: AppVersionInfo, currentVersionCode: Int): Boolean =
