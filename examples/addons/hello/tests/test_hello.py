@@ -16,7 +16,7 @@ import testenv  # first: clean env, temp DB removed at exit, no .env (server/tes
 testenv.isolate("hello_example")
 HERE = Path(__file__).resolve().parents[1]  # this addon's folder
 os.environ["DANA_ADDON_DIRS"] = str(HERE.parent)  # examples/addons: hello is a site addon
-os.environ["API_TOKEN"] = "hello-test-env-token"  # a test value: with it set, Bearer tokens decide the user
+os.environ["API_TOKEN"] = "hello-test-env-token"  # a test value: the first admin's token (a headless install)
 
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402

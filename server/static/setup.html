@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <meta name="theme-color" content="#2b2521" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#f3ede1" media="(prefers-color-scheme: light)">
+    <script>try { var dt = localStorage.getItem("dana_theme"); if (dt === "light" || dt === "dark") document.documentElement.dataset.theme = dt; } catch (e) {}</script>
+    <title>Set up · Dana</title>
+    <link rel="icon" type="image/png" href="/static/favicon.png">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css">
+    <link rel="stylesheet" href="/static/kit.css">
+    <style>
+        html, body { height: auto; min-height: 100%; }
+        .setup { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+        .setup-card { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; }
+        .setup-kicker { font-family: var(--font-mono); font-size: 11px; letter-spacing: .7px; text-transform: uppercase; color: var(--accent-text); }
+        .setup-title { font-family: var(--font-serif); font-weight: 400; font-size: 38px; line-height: 1.1; color: var(--ink); margin: 0; }
+        .setup-lede { color: var(--body); font-size: 15px; margin: 0; }
+        .setup-steps { display: flex; gap: 6px; }
+        .setup-steps span { flex: 1; height: 3px; border-radius: var(--radius-full); background: var(--hairline-strong); }
+        .setup-steps span.on { background: var(--accent); }
+        .setup-form { display: flex; flex-direction: column; gap: 12px; }
+        .setup-form .btn-primary { align-self: flex-start; padding: 9px 20px; }
+        .setup-error { color: var(--rose-text); background: var(--rose-tint); border-radius: var(--radius-md); padding: 8px 12px; font-size: 13.5px; }
+        .setup-error:empty { display: none; }
+        .setup-note { color: var(--mute); font-size: 13px; margin: 0; }
+    </style>
+    <script src="/static/setup.js" defer></script>
+</head>
+<body>
+    <main class="setup">
+        <section class="setup-card" id="setup" aria-live="polite">
+            <p class="setup-note">Loading…</p>
+        </section>
+    </main>
+</body>
+</html>

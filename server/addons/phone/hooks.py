@@ -270,8 +270,8 @@ def _ago_or_never(dt: Optional[datetime.datetime], now: datetime.datetime) -> st
 def check_push(user: User, now: datetime.datetime) -> Check:
     with get_db_connection() as conn:
         devs = [dict(r) for r in conn.execute(
-            "SELECT device_id, name, app_version, updated_at, last_fetch_at FROM phone_devices WHERE user_id = ?",
-            (user.id,)).fetchall()]
+            "SELECT p.device_id, d.name, p.app_version, p.updated_at, p.last_fetch_at FROM phone_push p "
+            "JOIN devices d ON d.id = p.device_id WHERE p.user_id = ?", (user.id,)).fetchall()]
         m = dict(conn.execute("SELECT * FROM system_marks WHERE key = ?",
                               (mark_key("push", user.id),)).fetchone() or {})
     last_ok, last_fail = helpers.parse_time(m.get("last_ok_at")), helpers.parse_time(m.get("last_fail_at"))
@@ -292,7 +292,8 @@ def check_push(user: User, now: datetime.datetime) -> Check:
         return Check(False, "FCM key missing on the server", None, title="Push isn't configured", why=why, blocks=blocks)
     if not devs:
         return Check(False, "No phone registered", last_ok, title="No phone registered for push",
-                     why=why + " Open the Dana app once so it registers again.", blocks=blocks)
+                     why=why + " Open the paired Dana app once so it registers again "
+                     "(not paired yet: Devices → Pair a device).", blocks=blocks)
     if m.get("ok") == 0 and not (fetch and fetch > last_fail):
         return Check(False, f"Last push failed {_ago_or_never(last_fail, now)}", last_ok,
                      title="Push to the phone is failing", why=why, blocks=blocks)

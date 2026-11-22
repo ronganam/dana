@@ -9,7 +9,7 @@ import os
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("ha_states_test")
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: the test connection's token is encrypted

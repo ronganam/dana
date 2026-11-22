@@ -307,22 +307,24 @@ async def test_web_auth():
     os.environ["API_TOKEN"] = ""
     try:
         async with TestClient(TestServer(app)) as client:
-            status, body = await who(client)
-            check("web: no API_TOKEN and no DANA_INSECURE_DEV → every request refused (401)", status == 401, body)
-            check("web: no API_TOKEN → refused even with a member's DB token",
-                  (await who(client, headers={"Authorization": f"Bearer {raw}"}))[0] == 401)
-            check("startup: no API_TOKEN → the server refuses to start, saying how to fix it",
-                  "API_TOKEN" in (auth.startup_problem() or "") and "DANA_INSECURE_DEV" in (auth.startup_problem() or ""))
+            check("web: no API_TOKEN (users exist) → a request without credentials is refused (401)",
+                  (await who(client))[0] == 401)
+            check("web: no API_TOKEN → a member's DB token still works",
+                  await who(client, headers={"Authorization": f"Bearer {raw}"}) == (200, {"user": member.id}))
+            check("web: no API_TOKEN → the old env token is no token at all",
+                  (await who(client, headers={"Authorization": "Bearer env-token"}))[0] == 401)
+            check("startup: no API_TOKEN (users exist) → listening on every interface", auth.bind_host() == "0.0.0.0")
             os.environ["DANA_INSECURE_DEV"] = "1"
-            check("web: DANA_INSECURE_DEV=1 (local development) → every request is the first admin",
+            check("web: DANA_INSECURE_DEV=1 (local development) → no credentials is the first admin",
                   await who(client) == (200, {"user": admin.id}))
-            check("startup: DANA_INSECURE_DEV=1 → starts, listening on 127.0.0.1 only",
-                  auth.startup_problem() is None and auth.bind_host() == "127.0.0.1")
+            check("web: DANA_INSECURE_DEV=1 → a member's token is still the member",
+                  await who(client, headers={"Authorization": f"Bearer {raw}"}) == (200, {"user": member.id}))
+            check("startup: DANA_INSECURE_DEV=1 → listening on 127.0.0.1 only", auth.bind_host() == "127.0.0.1")
     finally:
         os.environ.pop("DANA_INSECURE_DEV", None)
         os.environ["API_TOKEN"] = "env-token"
-    check("startup: with API_TOKEN → starts, listening on every interface",
-          auth.startup_problem() is None and auth.bind_host() == "0.0.0.0")
+    check("startup: with API_TOKEN → listening on every interface (DANA_INSECURE_DEV ignored)",
+          auth.bind_host() == "0.0.0.0")
 
 
 def test_bootstrap_default_name():

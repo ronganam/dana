@@ -14,7 +14,7 @@ import sys  # noqa: E402
 import addons  # noqa: E402,F401
 from core.telegram_bot import TelegramBot  # noqa: E402
 from core.server import start_webhook_listener  # noqa: E402
-from core import auth, clock, db, lifecycle, llm, session_runner, users  # noqa: E402
+from core import auth, clock, db, lifecycle, llm, public_url, session_runner, setup, users  # noqa: E402
 from core.paths import DATA_DIR, ensure_data_dirs  # noqa: E402
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 from core.addons import loader, registry, store  # noqa: E402
@@ -32,11 +32,6 @@ logger = logging.getLogger("dana")
 
 async def main():
     logger.info("Initializing modular AI assistant...")
-    # Fail closed: no API_TOKEN means no authentication, allowed only for local development.
-    problem = auth.startup_problem()
-    if problem:
-        logger.error(problem)
-        sys.exit(1)
     ensure_data_dirs()
     logger.info(f"Data directory: {DATA_DIR}")
     # The schema (core's, then each loaded addon's), then the data every part
@@ -52,7 +47,11 @@ async def main():
         logger.info(f"Database migrated: {', '.join(applied)}")
     for name, why in applied.failed.items():
         logger.error(f"Addon {name} not loaded: {why}")
-    users.bootstrap()
+    # The first admin: from env on a headless install (API_TOKEN set) or in
+    # local development; otherwise a server without users waits in setup mode
+    # for the first admin to be created on the setup page (core/setup.py).
+    if not setup.required():
+        users.bootstrap()
     # Addons: the credentials key (generated into the data directory when
     # CREDENTIALS_KEY is unset), then the first admin's default addons (once).
     # A wrong key stops the start here.
@@ -91,6 +90,10 @@ async def main():
     
     # 5. The web server (with the background loops and the addons' jobs), then Telegram long polling
     webhook_port = int(os.getenv("PORT", "8080"))
+    setup_url = setup.begin(public_url.configured() or f"http://localhost:{webhook_port}")
+    if setup_url:
+        # The one line that carries the one-time setup code: whoever opens it creates the first admin.
+        logger.warning(f"Dana is not set up yet. Open {setup_url} to create the first admin.")
     
     runner = None
     try:

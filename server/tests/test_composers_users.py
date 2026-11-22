@@ -32,7 +32,7 @@ from typing import Any, Dict, List, Optional, Tuple
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("composers_users_test")
 ROOT = str(testenv.SERVER)
-os.environ["API_TOKEN"] = "composers-users-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "composers-users-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["ANTHROPIC_API_KEY"] = "test-key"  # a test value: LiteLLM only ever runs its offline mock here
 os.environ["FCM_SERVICE_ACCOUNT_JSON"] = '{"project_id": "dana-test"}'
 os.environ["TIMEZONE"] = "Asia/Jerusalem"
@@ -51,7 +51,7 @@ import litellm
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from core import db, users
+from core import db, devices, users
 
 db.migrate()
 users.bootstrap()
@@ -243,8 +243,8 @@ async def fake_fcm_token():
     return "fcm-test-token"
 
 push._access_token = fake_fcm_token
-push.register(ADMIN, "admin-phone", "tok-admin-phone", "Fold")
-push.register(BOB, "bob-phone", "tok-bob-phone", "Pixel")
+push.register(ADMIN, devices.create(ADMIN, "phone", "Fold")[1], "tok-admin-phone")
+push.register(BOB, devices.create(BOB, "phone", "Pixel")[1], "tok-bob-phone")
 
 
 class FakeTelegram:

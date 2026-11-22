@@ -34,7 +34,7 @@ from typing import Any, Dict, List, Tuple
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("knowledge_users_test")
 ROOT = str(testenv.SERVER)
-os.environ["API_TOKEN"] = "knowledge-users-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "knowledge-users-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()

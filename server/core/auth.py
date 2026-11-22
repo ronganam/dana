@@ -1,26 +1,33 @@
-"""Authentication for the web server: every request resolves to a user.
+"""Authentication for the web server: every request resolves to a user (and,
+when its token is a device's, to that device).
 
 Trust model
 -----------
-* **Apps / scripts** send ``Authorization: Bearer <token>``: ``API_TOKEN`` (env)
-  is the first admin user's; any other token is looked up (hashed) in the DB
-  (core/users.py).
-* **Browsers** sign in once at ``/login`` with any valid token; a long-lived
-  HttpOnly cookie (``dana_session``) holding an HMAC of the token (never the
-  token itself) is set.
+* **Apps / scripts** send ``Authorization: Bearer <token>``: a user's token,
+  looked up hashed in the DB (core/users.py): each app instance has its own,
+  made by pairing (core/devices.py), and a script may have one issued with
+  ``bin/dana users tokens issue``. ``API_TOKEN`` (env), when set, is the first
+  admin's (a headless install).
+* **Browsers** sign in once at ``/login`` with a pairing code (the browser
+  becomes a device) or any valid token; a long-lived HttpOnly cookie
+  (``dana_session``) holding an HMAC of the token (never the token itself) is
+  set.
 * **Inbound webhooks** (:data:`INBOUND_PATHS`: WAHA) may be called without
   credentials; their handler proves the sender itself (WAHA's HMAC signature
   with ``WAHA_WEBHOOK_SECRET``: addons/whatsapp/api.py) and finds its user
   from the payload, so auth sets no user. Every other path needs credentials.
+* **Setup mode** (core/setup.py): no users and no ``API_TOKEN``: only the
+  setup page, its API, ``/api/health`` and static files answer; everything
+  else is 503 ``setup_required``.
 
 An authenticated request carries its :class:`core.users.User` in
-``request["user"]`` (handlers read it with :func:`request_user`), and the
-handler runs with that user current (:func:`core.users.acting_as`), so undo
-entries, usage records and tools inside the request know whose they are. If
-``API_TOKEN`` is unset, the server does not start (main.py) unless
-``DANA_INSECURE_DEV=1`` (local development: it then listens on 127.0.0.1 only
-and every request is the first admin user); without that flag the middleware
-refuses every request too (fail closed).
+``request["user"]`` (handlers read it with :func:`request_user`) and its
+:class:`core.devices.Device` in ``request["device"]`` (None for a token of no
+device: :func:`request_device`); the device's ``last_seen_at`` is refreshed.
+The handler runs with that user current (:func:`core.users.acting_as`), so
+undo entries, usage records and tools inside the request know whose they
+are. ``DANA_INSECURE_DEV=1`` without ``API_TOKEN`` (local development): a
+request without credentials is the first admin.
 
 Access (docs/access.md, "Enforcement"): endpoints about the whole server are
 wrapped in :func:`requires` (403 ``{"error": "forbidden", "needs": <capability>}``
@@ -32,16 +39,16 @@ that needed an addon the user has not connected
 
 import functools
 import logging
-import os
 from pathlib import Path
 from typing import Awaitable, Callable, Optional
 
 from aiohttp import web
 from yarl import URL
 
-from core import users
+from core import devices, ratelimit, setup, users
 from core.access import CAPABILITIES
-from core.users import User
+from core.devices import Device, PairingError
+from core.users import Identity, User
 from core.addons.store import NotConnected
 
 Handler = Callable[[web.Request], Awaitable[web.StreamResponse]]
@@ -56,60 +63,50 @@ _STATIC_DIR = Path(__file__).resolve().parent.parent / "static"
 
 # Reachable without credentials. The app-update endpoints stay public so an
 # installed app can always fetch an update (the APK holds no secrets);
-# /api/app/upload is guarded by its own APP_PUBLISH_TOKEN.
+# /api/app/upload is guarded by its own APP_PUBLISH_TOKEN. /api/pair and the
+# setup API prove themselves with a code (rate-limited).
 _PUBLIC_PATHS = frozenset({
     "/login",
     "/api/health",
     "/api/app/version",
     "/api/app/upload",
+    "/api/pair",
+    "/api/setup",
+    "/api/setup/admin",
     "/sw.js",
     "/manifest.json",
 })
 _PUBLIC_PREFIXES = ("/static/", "/api/app/download/")
 
+# What answers while the server waits for its first admin (core/setup.py).
+_SETUP_PATHS = frozenset({"/setup", "/api/setup", "/api/setup/admin", "/api/health", "/sw.js", "/manifest.json"})
+
 # Inbound webhooks reachable without credentials: the handler verifies the
 # sender's signature (WAHA; Home Assistant posts nothing: Dana watches it).
 INBOUND_PATHS = frozenset({"/webhook/waha"})
-
-INSECURE_DEV_ENV = "DANA_INSECURE_DEV"
 
 # Paths answered with 401 rather than a redirect to the login page.
 _API_PREFIXES = ("/api/", "/webhook", "/media/")
 
 
-def insecure_dev() -> bool:
-    """``DANA_INSECURE_DEV=1``: no ``API_TOKEN`` is allowed (local development only)."""
-    return os.getenv(INSECURE_DEV_ENV, "").strip() == "1"
-
-
-def startup_problem() -> Optional[str]:
-    """Why the server must not start with this environment (None: it may):
-    no ``API_TOKEN`` without ``DANA_INSECURE_DEV=1``."""
-    if users.env_token() or insecure_dev():
-        return None
-    return ("API_TOKEN is not set, so anyone who reaches the server would be its admin. Set API_TOKEN "
-            "(e.g. `openssl rand -hex 32`) in server/.env, or for local development only set "
-            f"{INSECURE_DEV_ENV}=1 (the server then listens on 127.0.0.1 without authentication).")
-
-
 def bind_host() -> str:
-    """Where the web server listens: 127.0.0.1 without ``API_TOKEN`` (insecure
-    development), every interface otherwise."""
-    return "0.0.0.0" if users.env_token() else "127.0.0.1"
+    """Where the web server listens: 127.0.0.1 in insecure local development
+    (``DANA_INSECURE_DEV=1`` without ``API_TOKEN``), every interface otherwise."""
+    return "127.0.0.1" if users.insecure_dev() else "0.0.0.0"
 
 
 def _is_public(path: str) -> bool:
     return path in _PUBLIC_PATHS or path.startswith(_PUBLIC_PREFIXES)
 
 
-def _request_user(request: web.Request) -> Optional[User]:
-    """The user the request's credentials (Bearer token or session cookie) belong to."""
+def _request_identity(request: web.Request) -> Optional[Identity]:
+    """Who the request's credentials (Bearer token or session cookie) belong to."""
     auth = request.headers.get("Authorization", "")
     if auth.startswith("Bearer "):
-        user = users.by_token(auth[7:])
-        if user:
-            return user
-    return users.by_session_cookie(request.cookies.get(SESSION_COOKIE, ""))
+        found = users.identify_token(auth[7:])
+        if found:
+            return found
+    return users.identify_session_cookie(request.cookies.get(SESSION_COOKIE, ""))
 
 
 def _safe_next(target: str) -> str:
@@ -129,6 +126,12 @@ def request_user(request: web.Request) -> User:
     if user is None:
         raise web.HTTPUnauthorized(text='{"error": "Unauthorized"}', content_type="application/json")
     return user
+
+
+def request_device(request: web.Request) -> Optional[Device]:
+    """The device an authenticated request was made from (its own token), or
+    None (a token of no device, ``API_TOKEN``, local development)."""
+    return request.get("device")
 
 
 def requires(capability: str) -> Callable[[Handler], Handler]:
@@ -171,26 +174,50 @@ async def addon_middleware(request: web.Request, handler: Handler) -> web.Stream
         return not_connected_response(e)
 
 
-async def _as(user: User, request: web.Request, handler):
+async def _as(identity: Identity, request: web.Request, handler: Handler) -> web.StreamResponse:
+    user = identity.user
+    device = devices.by_token_id(identity.token_id)
+    if device is not None and device.user_id != user.id:
+        device = None
     request["user"] = user
+    request["device"] = device
+    if device is not None:
+        devices.touch(device)
     with users.acting_as(user):
         return await handler(request)
 
 
+_SETUP_PAGE = """<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport"
+content="width=device-width, initial-scale=1.0"><title>Dana · Set up</title><style>body{margin:0;min-height:100vh;
+display:grid;place-items:center;padding:16px;background:#2b2521;color:#f7f5f0;font:15px/1.5 Inter,system-ui,sans-serif}
+p{max-width:420px;color:#c9c0ad}</style></head><body><main><h1>Dana is not set up yet</h1><p>Open the setup link
+the server wrote to its log when it started (it ends in <code>/setup?code=…</code>).</p></main></body></html>"""
+
+
+def setup_required_response(request: web.Request) -> web.Response:
+    """503 while the server waits for its first admin: ``setup_required`` (a
+    page saying where the setup link is, for a browser opening a page)."""
+    if request.method == "GET" and not request.path.startswith(_API_PREFIXES):
+        return web.Response(text=_SETUP_PAGE, content_type="text/html", status=503)
+    return web.json_response({"error": "setup_required"}, status=503)
+
+
 @web.middleware
-async def auth_middleware(request: web.Request, handler):
+async def auth_middleware(request: web.Request, handler: Handler) -> web.StreamResponse:
+    if setup.required():
+        if request.path in _SETUP_PATHS or request.path.startswith("/static/"):
+            return await handler(request)
+        return setup_required_response(request)
     if _is_public(request.path):
         return await handler(request)
-    if not users.env_token():
-        if not insecure_dev():
-            return web.json_response({"error": "Unauthorized", "detail": "the server has no API_TOKEN"}, status=401)
-        user = users.first_admin()
-        if user:
-            return await _as(user, request, handler)
+    identity = _request_identity(request)
+    if identity:
+        return await _as(identity, request, handler)
+    if users.insecure_dev():
+        admin = users.first_admin()
+        if admin:
+            return await _as(Identity(admin, None), request, handler)
         return await handler(request)
-    user = _request_user(request)
-    if user:
-        return await _as(user, request, handler)
     if request.path in INBOUND_PATHS:
         return await handler(request)
 
@@ -204,26 +231,49 @@ async def login_page(request: web.Request) -> web.StreamResponse:
     return web.FileResponse(_STATIC_DIR / "login.html")
 
 
-async def login_submit(request: web.Request) -> web.StreamResponse:
-    """POST /login — exchange a valid API token for a session cookie."""
-    form = await request.post()
-    next_url = _safe_next(str(form.get("next") or request.query.get("next") or "/"))
-    submitted = str(form.get("token") or "").strip()
-
-    if not users.env_token() or users.by_token(submitted) is None:
-        logger.warning(f"Failed web login from {request.remote}")
-        raise web.HTTPFound(URL("/login").with_query(error=1, next=next_url))
-
-    response = web.HTTPFound(next_url)
+def set_session_cookie(request: web.Request, response: web.StreamResponse, token: str) -> None:
+    """Sign the browser in with ``token``: the ``dana_session`` cookie (an HMAC of it)."""
     response.set_cookie(
         SESSION_COOKIE,
-        users.session_cookie_value(submitted),
+        users.session_cookie_value(token),
         max_age=SESSION_MAX_AGE,
         httponly=True,
         samesite="Lax",
         secure=request.secure or request.headers.get("X-Forwarded-Proto") == "https",
         path="/",
     )
+
+
+async def login_submit(request: web.Request) -> web.StreamResponse:
+    """POST /login — a pairing code (this browser becomes a device of the
+    code's user) or a valid token, exchanged for a session cookie."""
+    form = await request.post()
+    next_url = _safe_next(str(form.get("next") or request.query.get("next") or "/"))
+    submitted = str(form.get("token") or "").strip()
+
+    def refused(error: str) -> web.HTTPFound:
+        return web.HTTPFound(URL("/login").with_query(error=error, next=next_url))
+
+    token = submitted
+    if devices.looks_like_code(submitted):
+        key = ratelimit.client_key(request)
+        if ratelimit.PAIRING_FAILURES.retry_after(key):
+            raise refused("limited")
+        try:
+            token, _, _ = devices.redeem(submitted, kind="browser",
+                                         name=devices.browser_name(request.headers.get("User-Agent", "")))
+        except PairingError as e:
+            if e.error == "wrong_kind":
+                raise refused("kind")
+            ratelimit.PAIRING_FAILURES.fail(key)
+            logger.warning(f"Failed web login (pairing code) from {key}")
+            raise refused("1")
+    elif users.identify_token(submitted) is None:
+        logger.warning(f"Failed web login from {request.remote}")
+        raise refused("1")
+
+    response = web.HTTPFound(next_url)
+    set_session_cookie(request, response, token)
     raise response
 
 
@@ -234,10 +284,6 @@ def setup_auth(app: web.Application) -> None:
     app.middlewares.append(addon_middleware)
     app.router.add_get("/login", login_page)
     app.router.add_post("/login", login_submit)
-    if users.env_token():
-        logger.info("API authentication enabled")
-    elif insecure_dev():
-        logger.warning("!!! API_TOKEN is not set and DANA_INSECURE_DEV=1: every request is the first admin, "
-                       "without authentication. Local development only (listening on 127.0.0.1). !!!")
-    else:
-        logger.error("API_TOKEN is not set: every request is refused")
+    if users.insecure_dev():
+        logger.warning("!!! DANA_INSECURE_DEV=1 without API_TOKEN: every request without credentials is the "
+                       "first admin. Local development only (listening on 127.0.0.1). !!!")

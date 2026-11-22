@@ -24,7 +24,7 @@ from cryptography.fernet import Fernet
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("people_test")
 os.environ["DEFAULT_COUNTRY_CODE"] = "972"  # local numbers (0…) in these tests are Israeli
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 os.environ["FCM_SERVICE_ACCOUNT_JSON"] = '{"project_id": "dana-test"}'
@@ -36,7 +36,7 @@ import litellm
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from core import db, users
+from core import db, devices, users
 from addons import bootstrap as addons_bootstrap
 from addons.tasks.groups import ensure_default_groups_for_everyone
 
@@ -171,7 +171,8 @@ async def fake_fcm_token():
     return "fcm-test-token"
 
 phone_push._access_token = fake_fcm_token
-phone_push.register(users.first_admin(), "phone-1", "tok-1", "Fold")
+_owner = users.first_admin()
+phone_push.register(_owner, devices.create(_owner, "phone", "Fold")[1], "tok-1")
 
 
 def fake_list_events(conn, time_min, time_max, limit=50):
@@ -201,7 +202,7 @@ def pushes(type_):
 
 def build_app():
     app = web.Application()
-    setup_auth(app)  # no API_TOKEN: every request is the first admin
+    setup_auth(app)  # no API_TOKEN: a request without credentials is the first admin
     people_api.setup(app)
     briefing_api.setup(app)
     app.router.add_post("/api/chat/context", sessions_api.start_context_chat_api)

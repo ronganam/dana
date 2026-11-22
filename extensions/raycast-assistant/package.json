@@ -217,10 +217,10 @@
     {
       "name": "apiToken",
       "title": "API Token",
-      "description": "The server's API_TOKEN, sent as a Bearer token. Leave empty if the server has no token.",
+      "description": "A token of yours (pair Raycast as a device on the web Devices page: README), sent as a Bearer token.",
       "type": "password",
       "required": false,
-      "placeholder": "API_TOKEN"
+      "placeholder": "Device token"
     },
     {
       "name": "defaultModel",

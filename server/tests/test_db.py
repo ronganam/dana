@@ -86,6 +86,14 @@ def dump_data(path: str) -> dict:
         conn.close()
 
 
+def without_device_ids(data: dict) -> dict:
+    """``data`` (:func:`dump_data`) with the ids of devices made by a migration left out (they are new each time)."""
+    out = dict(data)
+    for t in ("devices", "phone_push"):
+        out[t] = sorted(r[1:] for r in data.get(t, []))
+    return out
+
+
 def shape(path: str) -> dict:
     """Comparable schema: per table its columns in order, indexes, foreign keys;
     plus the triggers and the partial indexes."""
@@ -236,6 +244,18 @@ def test_convert_9_0():
     expected["addon_state"] = []  # core m0002: the server-wide disabled addons
     # core m0004 adds users.languages / users.currency, empty (the server's defaults apply)
     expected["users"] = sorted(tuple(r) + ("''", "''") for r in expected["users"])
+    # core m0005 + phone m0002: each phone_devices row is a core device (kind phone, no token, a new id)
+    # with its push registration keyed by it.
+    expected["device_pairings"] = []
+    moved = expected.pop("phone_devices")
+    wanted = sorted(((u, n, "'phone'", "''", "''", "None", c, lf if lf != "None" else up),
+                     (u, tok, ver, up, lf, seq)) for u, _, tok, n, ver, c, up, lf, seq in moved)
+    by_id = {r[0]: r for r in after.get("devices", [])}
+    got = sorted((by_id[p[0]][1:], p[1:]) for p in after.get("phone_push", []) if p[0] in by_id)
+    check("9.0: each phone_devices row is a core device with its push registration", moved and got == wanted,
+          str((got, wanted)))
+    if got == wanted and len(by_id) == len(moved):
+        expected["devices"], expected["phone_push"] = after["devices"], after["phone_push"]
     changed = sorted(t for t in set(expected) | set(after) if expected.get(t) != after.get(t))
     check("9.0: every row kept with every value (FTS and sqlite_sequence included)", not changed, str(changed))
     check("9.0: the fixture's rows are there", after["users"] and after["tasks"] and after["phone_calls"])
@@ -261,7 +281,8 @@ def test_convert_9_0():
     check("9.0 at 34: converts", db.migrate(p34) == LATER_LABELS
           and snapshots(p34)[:1] == ["at34-before-addons-from-0034.sqlite3"],
           str(snapshots(p34)))
-    check("9.0 at 34: same schema and rows", shape(p34) == shape(path) and dump_data(p34) == after)
+    check("9.0 at 34: same schema and rows (the moved devices' new ids aside)",
+          shape(p34) == shape(path) and without_device_ids(dump_data(p34)) == without_device_ids(after))
 
 
 def test_core_connections_renamed():

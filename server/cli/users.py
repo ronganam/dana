@@ -309,7 +309,8 @@ def cmd_add(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     has = ", ".join(["essentials", *defaults])
     print(f"Added {user.name} ({user.id}, {user.access}). They have {has} until "
           f"you connect others: bin/dana addons connect {user.id} <addon>. "
-          f"A token for their devices: bin/dana users tokens issue {user.id} --label phone", file=out)
+          "Their phone and other devices: pair them on the web Devices page (an admin can pair one for them).",
+          file=out)
 
 
 def cmd_update(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
@@ -526,11 +527,11 @@ def register(sub: Any) -> None:
                    help="really remove them and delete their data (without it: only say what would go)")
     p.set_defaults(func=cmd_remove)
 
-    tokens = sub.add_parser("tokens", help="API tokens (one per device)").add_subparsers(
+    tokens = sub.add_parser("tokens", help="API tokens (a paired device has its own; these are for scripts)").add_subparsers(
         dest="tokens_command", required=True, metavar="action")
     p = tokens.add_parser("issue", help="issue a token (printed once)")
     p.add_argument("user")
-    p.add_argument("--label", help="which device, e.g. phone")
+    p.add_argument("--label", help="what uses it, e.g. a script's name")
     p.set_defaults(func=cmd_tokens_issue)
     p = tokens.add_parser("list", help="stored tokens (never the tokens themselves)")
     p.add_argument("user", nargs="?")

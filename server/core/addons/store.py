@@ -430,6 +430,32 @@ def connect_defaults(user: User) -> List[str]:
     return done
 
 
+FIRST_ADMIN_DEFAULTS_MARK = "addons:first_admin_defaults"
+
+
+def connect_first_admin_defaults() -> List[str]:
+    """Give the first admin their default addons, once
+    (``system_marks['addons:first_admin_defaults']``), so one they turn off
+    later stays off. Run at startup (addons/bootstrap.py) and when setup
+    creates the first admin (core/setup.py). Returns the names turned on now
+    ([] with no admin yet, or when given before)."""
+    admin = users.first_admin()
+    if admin is None:
+        return []
+    with get_db_connection() as db:
+        if db.execute("SELECT 1 FROM system_marks WHERE key = ?", (FIRST_ADMIN_DEFAULTS_MARK,)).fetchone():
+            return []
+    turned_on = connect_defaults(admin)
+    now = user_rows.now_iso()
+    with get_db_connection() as db:
+        db.execute("INSERT OR IGNORE INTO system_marks (key, last_at, ok, last_ok_at, detail) VALUES (?, ?, 1, ?, ?)",
+                   (FIRST_ADMIN_DEFAULTS_MARK, now, now, (", ".join(turned_on) or "none")[:300]))
+        db.commit()
+    if turned_on:
+        logger.info(f"Default addons turned on for {admin.name}: {', '.join(turned_on)}")
+    return turned_on
+
+
 def connect(user: User, name: str, *, credentials: Optional[Mapping[str, Any]] = None,
             settings: Optional[Mapping[str, Any]] = None, account: Optional[str] = None,
             by: Optional[User] = None) -> Connection:

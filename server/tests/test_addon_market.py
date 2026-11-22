@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Tuple
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("addon_market_test")
-os.environ["API_TOKEN"] = "market-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "market-env-token"  # a test value: the first admin's token (a headless install)
 SCRATCH = Path(testenv.scratch_dir())
 SITE = SCRATCH / "site_addons"
 DATA_ADDONS = Path(DB_PATH).parent / "addons"   # core.paths.ADDONS_DIR for this database

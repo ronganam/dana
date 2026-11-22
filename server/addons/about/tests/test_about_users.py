@@ -38,7 +38,7 @@ from unittest.mock import AsyncMock, patch
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("about_users_test")
 ROOT = str(testenv.SERVER)
-os.environ["API_TOKEN"] = "about-users-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "about-users-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["ANTHROPIC_API_KEY"] = "test-key"  # a test value: LiteLLM only ever runs its offline mock here
 os.environ["OWNER_NAME"] = "Robin"
 os.environ["ALLOWED_TELEGRAM_USER_IDS"] = "111"

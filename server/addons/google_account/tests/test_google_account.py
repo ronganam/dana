@@ -22,7 +22,7 @@ from urllib.parse import parse_qs, urlsplit
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("google_account_test")
-os.environ["API_TOKEN"] = "google-account-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "google-account-test-env-token"  # a test value: the first admin's token (a headless install)
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
 os.environ["GOOGLE_CLIENT_ID"] = "server-client-id"  # the server's OAuth app (fake)

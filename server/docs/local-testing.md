@@ -136,8 +136,8 @@ proactive reminders to the right chat); usage per user; the security rules
 masks credentials, a member's cameras PUT / DELETE 403, refused addresses,
 a malformed entity id, Telegram chats and the admin's WAHA session refused,
 the webhook 403 with a member token, media named on another host fetched from
-the connection's own WAHA, registering the admin's device id leaves the
-admin's row); the second review's findings (a task the member moved out of
+the connection's own WAHA, a device id in a push registration's body ignored
+(the admin's registration stays theirs), a token of no device refused); the second review's findings (a task the member moved out of
 the admin's shared list and undid is the admin's again, and the undo is
 refused with 409 once the list is unshared; her WAHA session reporting the
 admin's account gets no account — conflict in the API, the CLI and the log,

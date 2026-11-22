@@ -45,7 +45,7 @@ Every colour is a token on `:root`; a screen never hardcodes one.
 ## Navigation (`static/app-places.js`, `static/app-nav.js`)
 
 The shell draws the navigation from **places**: the lead places Now and Chat, then every addon page with a
-`Nav` (the main places, in `Nav` order), and the core group (Settings, Addons, Usage, Debug for a user with `manage_server`, and the
+`Nav` (the main places, in `Nav` order), and the core group (Settings, Addons, Devices, Usage, Debug for a user with `manage_server`, and the
 Dash link to `/dashboard`), drawn quieter and last. The shell names no addon page: which pages appear, and
 in what order, comes from `GET /api/addons`.
 

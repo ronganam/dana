@@ -27,7 +27,7 @@ from cryptography.fernet import Fernet
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("now_test")
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
 os.environ["TYPESAFE_API_KEY"] = "test-typesafe"
@@ -40,7 +40,7 @@ import litellm
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from core import db, users
+from core import db, devices, users
 from addons import bootstrap as addons_bootstrap
 from addons.tasks.groups import ensure_default_groups_for_everyone
 
@@ -340,7 +340,7 @@ def seed():
 
 def build_app():
     app = web.Application()
-    setup_auth(app)  # no API_TOKEN: every request is the first admin
+    setup_auth(app)  # no API_TOKEN: a request without credentials is the first admin
     now_api.setup(app)
     actions_api.setup(app)  # POST /api/undo/{id}
     r = app.router
@@ -395,7 +395,8 @@ async def main():
             r = await client.post(f"/api/undo/{uid}")
             return r.status, await r.json()
 
-        await client.post("/api/phone/register", json={"device_id": "dev-1", "token": "tok", "name": "Phone"})
+        phone_token = devices.create(OWNER, "phone", "Phone")[0]
+        await client.post("/api/phone/register", headers={"Authorization": f"Bearer {phone_token}"}, json={"token": "tok"})
         await client.post("/api/notifications/batch", json={"posted": [], "removed": [], "active_keys": []})
 
         # --- GET /api/now -------------------------------------------------------------
@@ -1021,7 +1022,7 @@ async def main():
               p["day"]["calendar"] is True)
         seen["calendar_fail"] = False
         with get_db_connection() as conn:
-            conn.execute("DELETE FROM phone_devices")
+            conn.execute("DELETE FROM phone_push")
             conn.commit()
         cs = {c["key"]: c for c in checks.compute()}
         check("checks: no phone registered → push not ok", not cs["push"]["ok"]

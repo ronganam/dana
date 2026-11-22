@@ -19,7 +19,7 @@ from cryptography.fernet import Fernet
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("agent_actions_test")
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.pop("SHORTCUTS", None)
 
@@ -37,7 +37,7 @@ from addons.tasks.groups import ensure_default_groups_for_everyone
 db.migrate()
 users.bootstrap()
 addons_bootstrap.bootstrap()  # the first admin's default addons
-OWNER = users.first_admin()  # no API_TOKEN: every request is the first admin
+OWNER = users.first_admin()  # no API_TOKEN: a request without credentials is the first admin
 ensure_default_groups_for_everyone()
 from addons.homeassistant.addon import addon as homeassistant_addon
 from core.addons import registry, store

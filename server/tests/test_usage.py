@@ -24,7 +24,7 @@ import time
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("usage_test")
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 os.environ.setdefault("GEMINI_API_KEY", "test-key")  # transcription
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 os.environ["TIMEZONE"] = "Asia/Jerusalem"
@@ -463,7 +463,7 @@ async def test_api():
     put(day(0), cost=0.25, ref="session:main")
     put(day(2), cost=0.10, purpose="call_analysis", source="phone")
     app = web.Application()
-    setup_auth(app)  # no API_TOKEN: every request is the first admin
+    setup_auth(app)  # no API_TOKEN: a request without credentials is the first admin
     usage_api.setup(app)
     async with TestClient(TestServer(app)) as client:
         r = await client.get("/api/usage?range=7d")

@@ -38,7 +38,7 @@ from unittest.mock import patch
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("shopping_test")
 ROOT = str(testenv.SERVER)
-os.environ["API_TOKEN"] = "shopping-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "shopping-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["ANTHROPIC_API_KEY"] = "test-key"  # the aisle model's provider key (calls are LiteLLM's offline mock)
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()

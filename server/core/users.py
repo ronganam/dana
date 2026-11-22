@@ -9,8 +9,9 @@ who runs the server is the first user, created at startup with access
 
 Tokens are stored hashed: the SHA-256 of the token (Bearer lookups) and the
 SHA-256 of the web session cookie made from it (cookie lookups). A raw token
-is returned once, by :func:`issue_token`, and never stored. ``API_TOKEN``
-(env) is always a valid token of the first admin user and is not stored.
+is returned once, by :func:`issue_token` (or by pairing a device:
+core/devices.py), and never stored. ``API_TOKEN`` (env), when set, is always a
+valid token of the first admin user and is not stored.
 
 Lookups run on every request and every Telegram update, so they read an
 in-memory copy of the tables. Changes made through this module refresh it at
@@ -90,6 +91,14 @@ class Token:
     last_used_at: Optional[str]
 
 
+@dataclass(frozen=True)
+class Identity:
+    """Who a credential belongs to: the user and the stored token it matched
+    (None for ``API_TOKEN``, which is not stored)."""
+    user: User
+    token_id: Optional[str]
+
+
 @dataclass
 class _Snapshot:
     loaded_at: float
@@ -116,8 +125,17 @@ def session_cookie_value(token: str) -> str:
 
 
 def env_token() -> str:
-    """``API_TOKEN`` from the environment ("" when unset: local development)."""
+    """``API_TOKEN`` from the environment ("" when unset)."""
     return os.getenv("API_TOKEN", "").strip()
+
+
+INSECURE_DEV_ENV = "DANA_INSECURE_DEV"
+
+
+def insecure_dev() -> bool:
+    """``DANA_INSECURE_DEV=1`` without ``API_TOKEN``: local development, every
+    request without credentials is the first admin (core/auth.py)."""
+    return not env_token() and os.getenv(INSECURE_DEV_ENV, "").strip() == "1"
 
 
 _now_iso = user_rows.now_iso
@@ -198,38 +216,52 @@ def first_admin() -> Optional[User]:
     return snap.users.get(snap.first_admin_id) if snap.first_admin_id else None
 
 
-def by_token(token: str) -> Optional[User]:
-    """The user an API token belongs to: ``API_TOKEN`` is the first admin's."""
+def identify_token(token: str) -> Optional[Identity]:
+    """Who an API token belongs to: ``API_TOKEN`` is the first admin's (no
+    stored token), any other is looked up by its hash."""
     token = (token or "").strip()
     if not token:
         return None
     env = env_token()
     if env and hmac.compare_digest(token, env):
-        return first_admin()
-    hit = _current().token_by_hash.get(_hash(token))
-    return _resolve_token(hit)
+        admin = first_admin()
+        return Identity(admin, None) if admin else None
+    return _resolve_token(_current().token_by_hash.get(_hash(token)))
 
 
-def by_session_cookie(value: str) -> Optional[User]:
-    """The user a web session cookie was made for (see :func:`session_cookie_value`)."""
+def identify_session_cookie(value: str) -> Optional[Identity]:
+    """Who a web session cookie was made for (see :func:`session_cookie_value`)."""
     value = (value or "").strip()
     if not value:
         return None
     env = env_token()
     if env and hmac.compare_digest(value, session_cookie_value(env)):
-        return first_admin()
-    hit = _current().token_by_session.get(_hash(value))
-    return _resolve_token(hit)
+        admin = first_admin()
+        return Identity(admin, None) if admin else None
+    return _resolve_token(_current().token_by_session.get(_hash(value)))
 
 
-def _resolve_token(hit: Optional[Tuple[str, str]]) -> Optional[User]:
+def by_token(token: str) -> Optional[User]:
+    """The user an API token belongs to (:func:`identify_token`)."""
+    found = identify_token(token)
+    return found.user if found else None
+
+
+def by_session_cookie(value: str) -> Optional[User]:
+    """The user a web session cookie was made for (:func:`identify_session_cookie`)."""
+    found = identify_session_cookie(value)
+    return found.user if found else None
+
+
+def _resolve_token(hit: Optional[Tuple[str, str]]) -> Optional[Identity]:
     if not hit:
         return None
     token_id, user_id = hit
     user = get(user_id)
-    if user:
-        _touch(token_id)
-    return user
+    if user is None:
+        return None
+    _touch(token_id)
+    return Identity(user, token_id)
 
 
 def telegram_unlinked() -> bool:
@@ -432,30 +464,40 @@ def remove_telegram_id(telegram_user_id: int) -> bool:
     return cur.rowcount > 0
 
 
+def insert_token(conn: sqlite3.Connection, user_id: str, label: str = "") -> Tuple[str, Token]:
+    """Store a new API token for ``user_id`` on ``conn`` (no commit; call
+    :func:`invalidate` after committing). Returns ``(token, stored)``: the raw
+    token is shown once and never stored."""
+    raw = secrets.token_urlsafe(32)
+    token = Token(id=uuid.uuid4().hex[:12], user_id=user_id, label=(label or "").strip()[:100],
+                  created_at=_now_iso(), last_used_at=None)
+    conn.execute("INSERT INTO user_tokens (id, user_id, label, token_hash, session_hash, created_at) "
+                 "VALUES (?, ?, ?, ?, ?, ?)",
+                 (token.id, user_id, token.label, _hash(raw), _hash(session_cookie_value(raw)), token.created_at))
+    return raw, token
+
+
 def issue_token(user_id: str, label: str = "") -> Tuple[str, Token]:
-    """A new API token for ``user_id`` (one per device; ``label`` names it).
-    Returns ``(token, stored)``: the raw token is shown once and never stored.
+    """A new API token for ``user_id`` not tied to a device (scripts; an app
+    gets its own by pairing: core/devices.py). Returns ``(token, stored)``:
+    the raw token is shown once and never stored.
 
     Raises:
         LookupError: no such user.
     """
     if get(user_id) is None:
         raise LookupError(f"No user {user_id!r}")
-    raw = secrets.token_urlsafe(32)
-    token = Token(id=uuid.uuid4().hex[:12], user_id=user_id, label=(label or "").strip(), created_at=_now_iso(),
-                  last_used_at=None)
     with get_db_connection() as conn:
-        conn.execute("INSERT INTO user_tokens (id, user_id, label, token_hash, session_hash, created_at) "
-                     "VALUES (?, ?, ?, ?, ?, ?)",
-                     (token.id, user_id, token.label, _hash(raw), _hash(session_cookie_value(raw)), token.created_at))
+        result = insert_token(conn, user_id, label)
         conn.commit()
     invalidate()
-    return raw, token
+    return result
 
 
 def revoke_token(token_id: str) -> bool:
-    """Delete a stored token (its Bearer header and web logins stop working).
-    Returns False when there was no such token."""
+    """Delete a stored token (its Bearer header and web logins stop working;
+    a device paired with it goes with it: core/devices.py). Returns False
+    when there was no such token."""
     with get_db_connection() as conn:
         # scoped: the admin CLI revokes a token by its id (bin/dana)
         cur = conn.execute("DELETE FROM user_tokens WHERE id = ?", (token_id,))

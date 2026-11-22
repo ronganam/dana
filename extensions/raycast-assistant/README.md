@@ -34,7 +34,10 @@ to a single Dana chat called `raycast-ai`, which you can also open from **Search
 Preferences (Raycast Settings → Extensions → Dana):
 
 - **Server URL**: e.g. `https://dana.example.com`
-- **API Token**: the server's `API_TOKEN`. Sent as `Authorization: Bearer …`.
+- **API Token**: a token of yours, sent as `Authorization: Bearer …`. Pair Raycast as a device: on the web
+  Devices page choose **Pair a device** → **Other**, then exchange the code for a token:
+  `curl -X POST https://dana.example.com/api/pair -H 'Content-Type: application/json' -d '{"code": "<code>", "kind": "other", "name": "Raycast"}'`
+  (the answer's `token`). Or, on the server: `bin/dana users tokens issue <you> --label raycast`.
 - **Default Model**: model profile for new chats.
 - **Show Dana's reasoning and tool steps**: show the thinking and tool lines above each reply.
 

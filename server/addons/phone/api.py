@@ -18,6 +18,7 @@ from typing import Set
 from aiohttp import web
 
 from core.addons import store
+from core.auth import request_device
 from core.addons.store import NotConnected
 from addons.phone.access import phone_user
 from addons.phone.calls import api as calls_api
@@ -103,32 +104,41 @@ async def dismiss_suggestion_api(request: web.Request) -> web.Response:
 
 
 async def phone_register_api(request: web.Request) -> web.Response:
-    """POST /api/phone/register {device_id, token, name?, app_version?} — the app's FCM token, for the caller."""
+    """POST /api/phone/register {token, app_version?} — the FCM token of the
+    paired device making the request (400 ``device_required`` from a token of
+    no device)."""
     user = phone_user(request)
+    device = request_device(request)
+    if device is None:
+        return web.json_response({"error": "device_required",
+                                  "detail": "Register for push from a paired device (its own token)."}, status=400)
     try:
         data = await request.json()
     except Exception:
         return web.json_response({"error": "Invalid JSON"}, status=400)
+    if not isinstance(data, dict):
+        return web.json_response({"error": "Invalid JSON"}, status=400)
     try:
-        return web.json_response(phone_push.register(user, str(data.get("device_id") or ""),
-                                                     str(data.get("token") or ""), str(data.get("name") or ""),
+        return web.json_response(phone_push.register(user, device, str(data.get("token") or ""),
                                                      str(data.get("app_version") or "")))
     except ValueError as e:
         return web.json_response({"error": str(e)}, status=400)
 
 
 async def phone_events_api(request: web.Request) -> web.Response:
-    """GET /api/phone/events?after=<seq>&device_id= — the caller's events the phone hasn't handled yet."""
+    """GET /api/phone/events?after=<seq> — the caller's events the device hasn't
+    handled yet (``registered``: whether the request's device is still
+    registered for push; absent from a token of no device)."""
     user = phone_user(request)
     try:
         after = int(request.query.get("after", "0"))
     except ValueError:
         return web.json_response({"error": "after must be a number"}, status=400)
-    return web.json_response(phone_push.events_after(user, after, request.query.get("device_id", "")))
+    return web.json_response(phone_push.events_after(user, after, request_device(request)))
 
 
 async def phone_devices_api(request: web.Request) -> web.Response:
-    """GET /api/phone/devices — the caller's registered phones (no tokens) + whether FCM is configured."""
+    """GET /api/phone/devices — the caller's devices registered for push (no tokens) + whether FCM is configured."""
     user = phone_user(request)
     return web.json_response({"configured": phone_push.configured(), "latest_seq": phone_push.latest_seq(user),
                               "devices": phone_push.devices(user)})

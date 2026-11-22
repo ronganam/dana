@@ -38,7 +38,7 @@ from typing import Any, Dict, List, Tuple
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("calls_users_test")
 ROOT = str(testenv.SERVER)
-os.environ["API_TOKEN"] = "calls-users-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "calls-users-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["GEMINI_API_KEY"] = "test-key"  # a test value: LiteLLM only ever runs its offline mock here
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()

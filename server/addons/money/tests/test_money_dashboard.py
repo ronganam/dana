@@ -39,7 +39,7 @@ testenv.isolate("money_dashboard_test")
 ROOT = str(testenv.SERVER)
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
-os.environ["API_TOKEN"] = "money-dashboard-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "money-dashboard-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["TIMEZONE"] = "Asia/Jerusalem"
 os.environ["OWNER_NAME"] = "Robin"
 sys.path.insert(0, ROOT)

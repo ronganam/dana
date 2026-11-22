@@ -64,16 +64,23 @@
 <body>
     <form method="post" action="/login">
         <h1>Dana</h1>
-        <p>Enter the API token to sign in on this device.</p>
-        <div class="error" id="error" hidden>That token is not valid.</div>
-        <input type="password" name="token" placeholder="API token" autocomplete="current-password" required autofocus>
+        <p>Type the pairing code from a device that is signed in (Settings → Devices → Pair a device → Browser), or a token.</p>
+        <div class="error" id="error" role="alert" hidden></div>
+        <input type="password" name="token" placeholder="Pairing code or token" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" required autofocus>
         <input type="hidden" name="next" id="next" value="/">
         <button type="submit">Sign in</button>
     </form>
     <script>
         const params = new URLSearchParams(location.search);
         document.getElementById("next").value = params.get("next") || "/";
-        document.getElementById("error").hidden = params.get("error") !== "1";
+        const errors = {
+            "1": "That code or token is not valid.",
+            kind: "That code is for another kind of device. Pair a Browser to sign in here.",
+            limited: "Too many wrong codes. Wait a few minutes and try again.",
+        };
+        const error = document.getElementById("error");
+        error.textContent = errors[params.get("error")] || "";
+        error.hidden = !error.textContent;
     </script>
 </body>
 </html>

@@ -24,7 +24,7 @@ import time
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("run_stream_test")
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 
 import litellm
 from aiohttp import web
@@ -42,7 +42,7 @@ from core.runs import runs as _runs
 from core.session import get_history
 from addons.essentials.addon import addon as essentials_addon  # every user has it: the test tools go there
 
-OWNER = users.first_admin()  # no API_TOKEN: every request is the first admin
+OWNER = users.first_admin()  # no API_TOKEN: a request without credentials is the first admin
 
 
 class _OwnerRuns:
