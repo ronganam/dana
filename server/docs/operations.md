@@ -2,8 +2,17 @@
 
 ## Running it
 
+- **Quick start** (the published image, no checkout): `compose.yaml` at the repository root runs `ghcr.io/ronganam/dana:latest`, the image each release publishes (`.github/workflows/release.yml`; amd64 and arm64).
+
+  ```bash
+  curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
+  docker compose up -d
+  docker compose logs app     # open the setup link it prints
+  ```
+
+  The setup link creates the first admin and their token in the browser; settings go in an optional `.env` next to `compose.yaml` (`docs/configuration.md`). Headless (no browser at hand): put `API_TOKEN` in that `.env` before the first start. Upgrade: `docker compose pull && docker compose up -d`. The data lives in the `data` volume; the port is `127.0.0.1:8080` (reverse proxy or VPN to reach it from elsewhere, below).
 - **Locally**: `python main.py` (README). The web UI and API on `:8080`, Telegram if `TELEGRAM_BOT_TOKEN` is set. It needs `API_TOKEN` (or `DANA_INSECURE_DEV=1`: no authentication, `127.0.0.1` only) and an LLM key.
-- **Docker Compose**: `docker compose up -d` in `server/` builds the image and keeps the data in the `data` volume (`compose.yaml`; the bank-worker sidecar of the `money_il` addon: `docker compose --profile money_il up -d`). The port is published on `127.0.0.1:8080` only: to reach Dana from other machines, put a reverse proxy with HTTPS in front of it (Caddy, Traefik, nginx) or change the mapping knowingly. The healthcheck polls `/api/health`.
+- **Docker Compose from source** (contributors): `docker compose up -d` in `server/` builds the image and keeps the data in the `data` volume (`compose.yaml`; the bank-worker sidecar of the `money_il` addon: `docker compose --profile money_il up -d`). The port is published on `127.0.0.1:8080` only: to reach Dana from other machines, put a reverse proxy with HTTPS in front of it (Caddy, Traefik, nginx) or change the mapping knowingly. The healthcheck polls `/api/health`.
 - **Data to back up**: the database directory (`DATABASE_PATH`'s folder: the database, `recordings/`, `media/`, `uploads/`…) including `credentials.key` when `CREDENTIALS_KEY` is not set (the generated key: without it the stored addon credentials are lost).
 - **Kubernetes** (one replica: SQLite): the image (`Dockerfile`, `app` stage) runs as UID 1001 and keeps everything it writes in the directory holding the database (`DATABASE_PATH`, default `/app/db/db.sqlite3`; `core/paths.py`), so mount one volume there. Secrets come in as env vars (`docs/configuration.md`). Probes: TCP on 8080. The bank worker (`addons/money_il/worker/README.md`) runs as a sidecar on `127.0.0.1:8090` mounting only `<data dir>/money`. Backups: copy `<data dir>/snapshots/db.sqlite3` after `python3 -m core.db_snapshot` (a consistent copy; a raw copy of a live SQLite file can catch it mid-write), e.g. from a Velero pre-backup hook.
 
@@ -57,6 +66,13 @@ An addon that declares `worker=Worker(port, url_env)` (`core/addons/addon.py`) h
 ### Restarting
 
 Installing, updating or removing an addon (the web Addons page, `/api/addons/install`, `/api/addons/<name>/remove`) changes files on disk; the server loads addons only at start. `POST /api/server/restart` (admins: `manage_server`; the page's Restart button) makes `main.py` stop the bot and the web server and exit with status 0 (`core/lifecycle.py`); the **supervisor starts it again**: Docker's `restart: unless-stopped` (`compose.yaml`), Kubernetes' default `restartPolicy: Always`. Run by hand (`python main.py`) it just exits. Disabling or enabling an addon on the server needs no restart (`../docs/addons.md`).
+
+## App updates
+
+The server offers the Android phone and watch apps' updates (`core/app_updates.py`): the manifest `GET /api/app/version` (`{"phone": {...}, "wear": {...}}`) and the files `GET /api/app/download/{file}`, kept in `<data dir>/app-updates/`. The phone app checks it (and offers the watch app's update); the watch face, the tablet and the TV are installed by hand from a release. Two sources fill it; for each artifact the higher `versionCode` wins, whichever source it came from, and only that APK is kept:
+
+- **GitHub Releases**: at start and every 6 hours, the latest release of `APP_RELEASES_REPO` (default `ronganam/dana`, empty: off) through the public API (no token). Its `versions.json` asset says each artifact's `versionCode`; only a newer phone / wear APK is downloaded, checked against `versions.json`'s and `SHA256SUMS`' checksum (a mismatch installs nothing and logs a warning), and offered. A failed check is retried at the next one.
+- **Uploads** (your own builds): `android/bin/deploy-app.sh` → `POST /api/app/upload` with `APP_PUBLISH_TOKEN`. An upload with a lower `versionCode` than the one offered is refused (409).
 
 ## Database schema
 
@@ -192,6 +208,6 @@ The web server listens on port 8080. Every path but the public ones (`docs/acces
 | `POST /api/phone/unlock` | Phone unlocked (`{at}` epoch ms) — the wake signal; returns `confirming` / `done` / `outside_window` (`unavailable` for a user without Home Assistant) |
 | `GET /api/briefing/today` | Today's wake briefing (`?generate=1` makes it) |
 | `GET /api/review/latest` | The latest weekly review with its proposals |
-| `GET /api/app/version` | Latest published Android app versions (manifest in `<data dir>/app-updates/`) |
-| `GET /api/app/download/{filename}` | Download a published Android APK |
-| `POST /api/app/upload` | Publish an Android APK (Bearer `APP_PUBLISH_TOKEN`) |
+| `GET /api/app/version` | The Android app versions offered (from releases and uploads; manifest in `<data dir>/app-updates/`; App updates above) |
+| `GET /api/app/download/{filename}` | Download an offered Android APK |
+| `POST /api/app/upload` | Publish an Android APK you built (Bearer `APP_PUBLISH_TOKEN`; an older `versionCode` than the offered one: 409) |

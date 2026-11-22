@@ -1,12 +1,33 @@
 # Releases, signing, R8
 
-## Release signing & in-app updates
+## Releases
+
+A pushed tag `v<version>` runs `.github/workflows/release.yml` (or run it by hand with an existing tag). It fails unless the tag equals `server/VERSION` and the `versionName` of `:app` and `:wear` (bump them together; `:watchface` keeps its own version). Then:
+
+- the server image `ghcr.io/ronganam/dana:<version>` and `:latest` (linux/amd64 + linux/arm64);
+- the release APKs, built with **no site** (`DANA_SITE` is an empty folder, and no `google-services.json`): no server address, LAN DNS, cleartext permission, TV defaults or Firebase push are built in; each app starts with no server and is paired later;
+- signed with the project's release key from the repository secrets `ANDROID_KEYSTORE_BASE64` (the keystore file, base64), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (written into a `keystore.properties` in the runner and removed after the build; a missing secret fails the build rather than signing with a debug key). Every APK must carry the same certificate (the watch app must match the phone's, below);
+- the GitHub Release with these assets and the commits since the previous tag as its notes:
+
+| Asset | What |
+|---|---|
+| `dana-phone-<v>.apk` | `:app` phone flavor |
+| `dana-wear-<v>.apk` | `:wear`, the watch app |
+| `dana-watchface-<v>.apk` | `:watchface` |
+| `dana-tablet-<v>.apk` | `:app` kiosk flavor (wall tablet) |
+| `dana-tv-<v>.apk` | `:app` tv flavor |
+| `SHA256SUMS` | `sha256sum` of every APK |
+| `versions.json` | `{"<artifact>": {"versionName", "versionCode", "file", "sha256", "size"}}` for `phone`, `wear`, `watchface`, `tablet`, `tv` (read from each APK) |
+
+Servers offer the phone and watch APKs of the latest release as app updates by themselves (`APP_RELEASES_REPO`; `server/docs/operations.md` → App updates): no publishing step. The tablet, TV and watch face are installed from the release by hand (`adb install`).
+
+## Release signing & in-app updates (your own builds)
 
 Release builds of `:app` and `:wear` are signed with a dedicated keystore (e.g. `dana-release.keystore`, gitignored) configured via `keystore.properties` at the repo root (also gitignored — copy `keystore.properties.example` and fill in real values; `keyAlias` defaults to `dana`). When `keystore.properties` is absent, release builds fall back to debug signing so plain `assembleRelease` still works.
 
 **One-time migration note:** the release key differs from `~/.android/debug.keystore`, so the first release build must be installed with an uninstall first on both phone and watch (`adb uninstall io.github.ronganam.dana`), because `INSTALL_FAILED_UPDATE_INCOMPATIBLE` blocks cross-cert upgrades.
 
-Update flow (server side: `server/core/app_updates.py`):
+For apps you build and sign yourself, publish them to your server (server side: `server/core/app_updates.py`; the upload must have a higher `versionCode` than what the server offers, a release's included):
 
 ```bash
 # bump versions, build signed APKs, publish to the assistant server
@@ -17,7 +38,7 @@ bin/deploy-app.sh --install-phone
 bin/deploy-app.sh --watch-ip <watch-ip>:5555    # wear APK; uses adb wireless debugging
 ```
 
-- Published APKs live in the server's data dir (`app-updates/` next to the DB) (`/api/app/version`, `/api/app/download/{file}`; publish with `POST /api/app/upload` + `APP_PUBLISH_TOKEN`).
+- Offered APKs live in the server's data dir (`app-updates/` next to the DB) (`/api/app/version`, `/api/app/download/{file}`; publish with `POST /api/app/upload` + `APP_PUBLISH_TOKEN`, or from GitHub Releases).
 - The phone app checks `/api/app/version` on launch and in **Settings > App Update**, downloads to `cacheDir/updates/`, verifies sha256, then hands off to the system installer (`FileProvider` + `REQUEST_INSTALL_PACKAGES`).
 - Version tracking: `app` and `wear` `versionName`/`versionCode` are kept in sync by the script. The phone pushes its `version_code` in the `/dana_config` DataMap; the watch publishes its own version on the `/dana/version` data item (`WearVersionPublisher`). The watch itself cannot self-update — install over adb via the script.
 

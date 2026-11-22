@@ -1,0 +1,37 @@
+# Dana from the published image: the quick start (server/docs/operations.md, "Running it").
+#
+#   curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
+#   docker compose up -d
+#   docker compose logs app        # open the setup link it prints, on this machine
+#
+# Settings: an optional .env next to this file (server/docs/configuration.md); none are needed to start.
+# Upgrading: docker compose pull && docker compose up -d. Building from source instead: server/compose.yaml.
+#
+# Everything Dana writes (database, credentials key, recordings, uploads, app updates) lives in the
+# `data` volume: back it up.
+name: dana
+
+services:
+  app:
+    image: ghcr.io/ronganam/dana:latest
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_PATH: /app/db/db.sqlite3
+    ports:
+      # Only this machine can reach Dana. To reach it from elsewhere, put it behind a reverse proxy
+      # with TLS (Caddy, Traefik, nginx…) on the same host, or a VPN such as Tailscale.
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - data:/app/db
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    restart: unless-stopped
+
+volumes:
+  data:

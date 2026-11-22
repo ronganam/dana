@@ -62,7 +62,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 - **Agent actions**: reversible writes run at once with Undo (`core/undo.py`); only `confirm` tools ask; learned phrases (`core/shortcuts.py`); on-screen context (`core/device_screen.py`) → `docs/agent-actions.md`.
 - **LLM calls**: every non-chat call goes through `core/llm.py` (`complete()`, `complete_json()`, `transcribe()`, pass `purpose=`), one model env var per job → `docs/configuration.md`. Realtime voice (`core/realtime.py`, OpenAI's protocol) is the one exception. **Usage and cost** `core/usage.py` → `docs/usage.md`.
 - **Persona**: the assistant is **Dana**; the prompt is the acting user's (`core/user_profile.for_user(user)` for their name / pronoun / context), and an addon's words live in its `addon.py`.
-- **Android app updates**: the server hosts APKs (`core/app_updates.py`, `/api/app/*`); publishing happens from the Android repo (`bin/deploy-app.sh`).
+- **Android app updates**: the server offers the phone / watch APKs (`core/app_updates.py`, `/api/app/*`) from the latest GitHub Release of `APP_RELEASES_REPO` (checked every 6 h) and from uploads (`android/bin/deploy-app.sh`), the newest `versionCode` winning → `docs/operations.md` (App updates).
 
 ## Key conventions
 
