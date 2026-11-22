@@ -47,6 +47,10 @@ sys.path.insert(0, ROOT)
 _conn = sqlite3.connect(DB_PATH)
 with open(os.path.join(testenv.FIXTURES, "db_9_0.sql"), encoding="utf-8") as _f:
     _conn.executescript(_f.read())
+# The fixture's bought item was bought "just now" when it was written; keep it that recent (bought items
+# older than 12 hours are cleared from the list).
+_conn.execute("UPDATE shopping_items SET checked_at = strftime('%Y-%m-%dT%H:%M:%S+00:00', 'now', '-1 hour') WHERE checked = 1")
+_conn.commit()
 _conn.close()
 
 import litellm
