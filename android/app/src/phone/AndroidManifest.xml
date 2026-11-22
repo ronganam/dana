@@ -28,6 +28,20 @@
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <!-- Signals → "Detect driving": Activity Recognition transitions (data/signals/Driving.kt);
+         Play services' own permission before Android 10. -->
+    <uses-permission android:name="android.permission.ACTIVITY_RECOGNITION" />
+    <uses-permission android:name="com.google.android.gms.permission.ACTIVITY_RECOGNITION"
+        android:maxSdkVersion="28" />
+    <!-- Signals → "Wake from sleep data": Health Connect's sleep sessions, also from the
+         periodic run in the background (data/signals/HealthSleep.kt). -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+
+    <!-- Health Connect is an app on Android 9–13: let the app see it. -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+    </queries>
 
     <application>
         <!-- The launcher entry and share target (the activity itself is in main). -->
@@ -93,7 +107,7 @@
              by direct push (push/PushPing), not as exported
              broadcasts any app could send. -->
 
-        <!-- Restarts the call observer after a reboot or app update -->
+        <!-- After a reboot or app update: geofences, activity transitions, the call observer -->
         <receiver
             android:name=".BootReceiver"
             android:exported="false">
@@ -119,6 +133,32 @@
         <receiver
             android:name=".data.signals.PlacesReceiver"
             android:exported="false" />
+
+        <!-- Signals: in-a-vehicle transitions from Google Play services (data/signals/Driving.kt). -->
+        <receiver
+            android:name=".data.signals.DrivingReceiver"
+            android:exported="false" />
+
+        <!-- Why Dana reads sleep: Health Connect shows it from its permission screen and won't ask
+             without it (Android 13 and older: the action; 14+: the alias below). -->
+        <activity
+            android:name=".HealthPermissionsActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Dana">
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+        </activity>
+        <activity-alias
+            android:name="ViewPermissionUsageActivity"
+            android:exported="true"
+            android:targetActivity=".HealthPermissionsActivity"
+            android:permission="android.permission.START_VIEW_PERMISSION_USAGE">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity-alias>
 
         <!-- "Hide" on a coding-agent session's live notification -->
         <receiver

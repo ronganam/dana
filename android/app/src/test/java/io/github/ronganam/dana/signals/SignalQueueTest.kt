@@ -162,6 +162,8 @@ class SignalQueueTest {
             SignalEvent.Unlock(now - 5000),
             SignalEvent.Screen(now - 4000, now - 3000),
             SignalEvent.Car(enter = false, at = now - 2000, via = CarVia.ANDROID_AUTO),
+            SignalEvent.Car(enter = true, at = now - 1500, via = CarVia.ACTIVITY),
+            SignalEvent.Sleep(now - 30_000_000, now - 1200),
             SignalEvent.Zone(arrive = false, zoneId = "zone-1", at = now - 1000)
         )
         queue().add(events)
@@ -175,7 +177,9 @@ class SignalQueueTest {
             SignalEvent.Unlock(1795400000000),
             SignalEvent.Screen(1795400000000, 1795400090000),
             SignalEvent.Car(enter = true, at = 1795400000000, via = CarVia.BLUETOOTH),
-            SignalEvent.Zone(arrive = true, zoneId = "z1", at = 1795400000000)
+            SignalEvent.Zone(arrive = true, zoneId = "z1", at = 1795400000000),
+            SignalEvent.Car(enter = false, at = 1795400000000, via = CarVia.ACTIVITY),
+            SignalEvent.Sleep(1795370000000, 1795398000000)
         ))
         val events = (body["events"] as JsonArray).map { it as JsonObject }
 
@@ -186,6 +190,10 @@ class SignalQueueTest {
             events[2].mapValues { it.value.jsonPrimitive.content })
         assertEquals(mapOf("type" to "zone", "action" to "arrive", "zone_id" to "z1", "at" to "1795400000000"),
             events[3].mapValues { it.value.jsonPrimitive.content })
+        assertEquals(mapOf("type" to "car", "action" to "leave", "at" to "1795400000000", "via" to "activity"),
+            events[4].mapValues { it.value.jsonPrimitive.content })
+        assertEquals(mapOf("type" to "sleep", "start" to "1795370000000", "end" to "1795398000000", "via" to "health_connect"),
+            events[5].mapValues { it.value.jsonPrimitive.content })
     }
 
     @Test
@@ -200,7 +208,8 @@ class SignalQueueTest {
     @Test
     fun malformedQueuedEntriesAreSkipped() {
         val decoded = SignalsJson.decodeEvents(
-            """[{"type":"unlock"},{"type":"screen","start":5,"end":3},{"type":"car","action":"enter","at":1,"via":"activity"},
+            """[{"type":"unlock"},{"type":"screen","start":5,"end":3},{"type":"car","action":"enter","at":1,"via":"teleport"},
+               {"type":"sleep","start":1,"end":5},{"type":"sleep","start":1,"end":5,"via":"guess"},
                {"type":"zone","action":"arrive","at":2},{"type":"unlock","at":7},3,{"type":"martian","at":1}]"""
         )
         assertEquals(listOf(SignalEvent.Unlock(7)), decoded)

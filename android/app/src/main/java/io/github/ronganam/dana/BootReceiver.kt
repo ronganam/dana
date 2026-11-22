@@ -7,8 +7,8 @@ import android.util.Log
 import io.github.ronganam.dana.data.sync.CallUploadSettings
 
 /**
- * After a reboot or an app update: registers the geofences again (Android
- * dropped them; `PhoneSignals.onBoot`) and restarts the call-recording
+ * After a reboot or an app update: registers the geofences and the activity
+ * transitions again (Android dropped them; `PhoneSignals.onBoot`) and restarts the call-recording
  * observer (when the user turned call recordings on), which otherwise only
  * started when the app was opened.
  */

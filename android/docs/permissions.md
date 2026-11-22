@@ -21,7 +21,7 @@ P = phone, K = kiosk, T = TV, W = watch.
 | `FOREGROUND_SERVICE_SPECIAL_USE` | P | `CallRecordingObserverService` (`specialUse`, subtype in the manifest), only while call recordings are on. |
 | `FOREGROUND_SERVICE_DATA_SYNC` | P | WorkManager's `SystemForegroundService` (`dataSync`) for long uploads (call recordings). |
 | `FOREGROUND_SERVICE_MICROPHONE` | K T | `WakeWordService` ("Hey Dana", `src/wake`). |
-| `RECEIVE_BOOT_COMPLETED` | P K T | Phone: `BootReceiver` registers the geofences again (places on) and restarts the call-recording observer (when on). TV: `TvSystemReceiver` switches the button service back on (`KeyServiceGuard`) and, with the home override on, opens Dana TV over Google TV's launcher. The kiosk declares it through `main` but registers no receiver (it is the home screen, so Android relaunches it). |
+| `RECEIVE_BOOT_COMPLETED` | P K T | Phone: `BootReceiver` registers the geofences (places on) and the activity transitions (driving detection on) again and restarts the call-recording observer (when on). TV: `TvSystemReceiver` switches the button service back on (`KeyServiceGuard`) and, with the home override on, opens Dana TV over Google TV's launcher. The kiosk declares it through `main` but registers no receiver (it is the home screen, so Android relaunches it). |
 | `SYSTEM_ALERT_WINDOW` | P K T | "Display over other apps", granted by the user in system settings. Phone: urgent-alert and suggestion screens opened from the background (`NotificationAlertReceiver`, `SuggestionsReceiver`, `ReminderReceiver`), the caller card over the dialer (`CallerCard`). TV: the camera picture-in-picture over other apps (`CameraPip`). The kiosk declares it through `main` and does not use it. |
 | `VIBRATE` | P K W | Reminder and urgent alerts (`ReminderActivity`, `NotificationAlertActivity`), haptics; the watch's reminder alarm. |
 | `WAKE_LOCK` | P (*library*) K T W | WorkManager / Firebase (phone); `WakeWordService` keeps the CPU while listening (kiosk, TV); the watch's alarm. |
@@ -33,12 +33,17 @@ P = phone, K = kiosk, T = TV, W = watch.
 | `BLUETOOTH_CONNECT` (Android 12+) / `BLUETOOTH` (≤ 11, `maxSdkVersion=30`) | P | Signals → car: list the paired devices for "This is my car" and receive the car's `ACL_CONNECTED` / `ACL_DISCONNECTED` (`CarSignals`, `CarBluetoothReceiver`). Asked on Android 12+ only when the user picks the car ("Nearby devices"). |
 | `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` | P | Signals → places: Google Play services geofences for the user's zones need precise location (`Places`). Asked when the user turns "Place reminders" on. The app never reads a location itself; the server only hears arrive / leave with a zone id. |
 | `ACCESS_BACKGROUND_LOCATION` (Android 10+) | P | Places: geofences fire only with location "all the time". Asked as the second step, after a short explanation (Android 11+ grants it on its own settings page). |
+| `ACTIVITY_RECOGNITION` (Android 10+) / `com.google.android.gms.permission.ACTIVITY_RECOGNITION` (≤ 9, `maxSdkVersion=28`, granted at install) | P | Signals → car → "Detect driving": Google Play services' in-a-vehicle transitions count as getting in and out of a car without Bluetooth (`Driving`). Asked ("Physical activity") when the user turns it on. No location is read. |
+| `health.READ_SLEEP` | P | Signals → "Wake from sleep data": the sleep sessions a health app writes to Health Connect (`HealthSleep`); only start and end are sent. Asked on Health Connect's own permission screen when the user turns it on; Health Connect opens `HealthPermissionsActivity` (why Dana asks). |
+| `health.READ_HEALTH_DATA_IN_BACKGROUND` | P | The same, read by the periodic run while Dana is closed. Asked with `READ_SLEEP` only where Health Connect has background reads; without it sleep is read while Dana is open. |
 | `REQUEST_INSTALL_PACKAGES` | P | In-app updates from your server (`UpdateManager` → the system installer; FileProvider serves the APK). The user allows "Install unknown apps" for Dana once. |
 | `WRITE_SECURE_SETTINGS` | T | Granted over adb only (`bin/deploy-tv.sh`: `pm grant`): `KeyServiceGuard` switches the accessibility button service back on after an update. Without the grant the TV works; the service must then be re-enabled by hand after updates. |
 | `com.google.android.c2dm.permission.RECEIVE` | P (*library*: Firebase) | Direct push (FCM, `DanaMessagingService`); only does something when the build has a `google-services.json`. |
 | `<applicationId>.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION` | P K T W (*library*: AndroidX core) | Keeps runtime-registered receivers private to the app. |
 
 TV features: `leanback`, `touchscreen` and `microphone` are declared not required, so the TV build installs on TVs without a mic remote.
+
+Package visibility (phone): `<queries>` names Health Connect's app (`com.google.android.apps.healthdata`) so the app can tell on Android 9–13 whether it is installed and up to date.
 
 ## Special access (granted in system settings, not a runtime prompt)
 

@@ -10,9 +10,10 @@ import kotlinx.serialization.builtins.ListSerializer
 /**
  * The phone sources' switches and what they remember between runs, in the
  * app's prefs (`DanaPrefs`): wake from screen time, the car (its Bluetooth
- * device stays here: the server never sees the address), places, the last
- * wake window the server sent, where the screen history was last read, the
- * car state last sent, the geofences registered.
+ * device stays here: the server never sees the address), driving detection,
+ * places, wake from sleep data, the last wake window the server sent, where
+ * the screen history and the sleep sessions were last read, the car state
+ * last sent, the geofences registered.
  */
 object SignalSettings {
     private const val SCREEN_TIME = "signals_screen_time"
@@ -20,6 +21,9 @@ object SignalSettings {
     private const val CAR_ADDRESS = "signals_car_address"
     private const val CAR_NAME = "signals_car_name"
     private const val PLACES = "signals_places"
+    private const val DRIVING = "signals_driving"
+    private const val SLEEP = "signals_sleep"
+    private const val SLEEP_CURSOR = "signals_sleep_cursor"
     private const val WAKE_START = "signals_wake_start"
     private const val WAKE_END = "signals_wake_end"
     private const val WAKE_LEARNED = "signals_wake_learned"
@@ -49,6 +53,18 @@ object SignalSettings {
         if (address == null) { remove(CAR_ADDRESS); remove(CAR_NAME) } else { putString(CAR_ADDRESS, address); putString(CAR_NAME, name.orEmpty()) }
         remove(CAR_STATE + CarVia.BLUETOOTH.wire)
     }
+
+    /** "Detect driving": Activity Recognition's in-a-vehicle transitions count as the car (under the car switch). */
+    fun driving(context: Context): Boolean = prefs(context).getBoolean(DRIVING, false)
+    fun setDriving(context: Context, on: Boolean) = prefs(context).edit { putBoolean(DRIVING, on) }
+
+    /** "Wake from sleep data": Health Connect's sleep sessions are sent. */
+    fun sleep(context: Context): Boolean = prefs(context).getBoolean(SLEEP, false)
+    fun setSleep(context: Context, on: Boolean) = prefs(context).edit { putBoolean(SLEEP, on) }
+
+    /** The latest write time of the sleep sessions read so far ([SleepSessions.read]; 0 = never). */
+    fun sleepCursor(context: Context): Long = prefs(context).getLong(SLEEP_CURSOR, 0)
+    fun setSleepCursor(context: Context, at: Long) = prefs(context).edit { putLong(SLEEP_CURSOR, at) }
 
     fun places(context: Context): Boolean = prefs(context).getBoolean(PLACES, false)
     fun setPlaces(context: Context, on: Boolean) = prefs(context).edit { putBoolean(PLACES, on) }
@@ -85,6 +101,9 @@ object SignalSettings {
 
     fun setCarState(context: Context, via: CarVia, inCar: Boolean) =
         prefs(context).edit { putString(CAR_STATE + via.wire, if (inCar) "enter" else "leave") }
+
+    /** Forget the car state sent [via] it (Bluetooth took over from driving detection). */
+    fun clearCarState(context: Context, via: CarVia) = prefs(context).edit { remove(CAR_STATE + via.wire) }
 
     @Serializable
     private data class StoredFence(val id: String = "", val latitude: Double = 0.0, val longitude: Double = 0.0, val radiusM: Float = 0f)

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Health Connect's "why this app asks" page (HealthPermissionsActivity). -->
+<resources>
+    <string name="health_rationale_title">Sleep in Dana</string>
+    <string name="health_rationale_body">With \"Wake from sleep data\" on (Settings → Signals), Dana reads the sleep sessions your watch\'s or phone\'s health app writes to Health Connect. It sends your server only when each night\'s sleep started and ended: a night ending in your wake window tells Dana when you woke, so your morning briefing and wake reminders follow. Nothing else is read, and nothing is written to Health Connect. Turn the switch off, or remove Dana\'s access in Health Connect, to stop it.</string>
+    <string name="health_rationale_close">Close</string>
+</resources>

@@ -9,10 +9,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * The phone's signal work. Periodic (no mode): read the screen history,
- * compare car mode with what was sent, refresh the cached wake window once a
- * day, bring the geofences in line (afresh once a day), send the queue. The
- * one-time modes do one part: [MODE_SCREEN] after an unlock, [MODE_PLACES] /
+ * The phone's signal work. Periodic (no mode): read the screen history and
+ * the sleep sessions, compare car mode with what was sent, refresh the cached
+ * wake window once a day, bring the geofences in line (afresh once a day),
+ * send the queue. The one-time modes do one part: [MODE_SCREEN] after an
+ * unlock, [MODE_SLEEP] after an unlock and in the foreground, [MODE_PLACES] /
  * [MODE_PLACES_FULL] / [MODE_PLACES_OFF] for the geofences.
  */
 class SignalsWorker(appContext: Context, params: WorkerParameters) : CoroutineWorker(appContext, params) {
@@ -23,6 +24,7 @@ class SignalsWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
         if (!ServerConfig.load(context).isConfigured) return@withContext Result.success()
         when (mode) {
             MODE_SCREEN -> ScreenTime.read(context, now = true)
+            MODE_SLEEP -> HealthSleep.read(context)
             MODE_PLACES -> Places.refresh(context, full = false)
             MODE_PLACES_FULL -> Places.refresh(context, full = true)
             MODE_PLACES_OFF -> {
@@ -31,6 +33,7 @@ class SignalsWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
             }
             else -> {
                 ScreenTime.read(context, now = false)
+                HealthSleep.read(context)
                 CarSignals.reconcileCarMode(context)
                 refreshWakeWindow(context)
                 Places.refresh(context, full = false)
@@ -54,6 +57,7 @@ class SignalsWorker(appContext: Context, params: WorkerParameters) : CoroutineWo
     companion object {
         const val MODE = "mode"
         const val MODE_SCREEN = "screen"
+        const val MODE_SLEEP = "sleep"
         const val MODE_PLACES = "places"
         const val MODE_PLACES_FULL = "places_full"
         const val MODE_PLACES_OFF = "places_off"

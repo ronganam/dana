@@ -18,9 +18,14 @@ sealed interface SignalEvent {
         override val latest: Long get() = end
     }
 
-    /** Got in (`enter`) or out (`leave`) of the car, noticed [via] Bluetooth or Android Auto. */
+    /** Got in (`enter`) or out (`leave`) of the car, noticed [via] Bluetooth, Android Auto or driving detection. */
     data class Car(val enter: Boolean, val at: Long, val via: CarVia) : SignalEvent {
         override val latest: Long get() = at
+    }
+
+    /** A night's sleep from [start] to [end], read from Health Connect (`via: health_connect`). */
+    data class Sleep(val start: Long, val end: Long) : SignalEvent {
+        override val latest: Long get() = end
     }
 
     /** Arrived at (`arrive`) or left (`leave`) one of the user's zones (its `zones.id`). */
@@ -32,7 +37,9 @@ sealed interface SignalEvent {
 /** How the phone noticed the car (`car.via`). */
 enum class CarVia(val wire: String) {
     BLUETOOTH("bluetooth"),
-    ANDROID_AUTO("android_auto");
+    ANDROID_AUTO("android_auto"),
+    /** Activity Recognition saw the phone in a vehicle (driving detection, no Bluetooth needed). */
+    ACTIVITY("activity");
 
     companion object {
         fun of(wire: String?): CarVia? = entries.firstOrNull { it.wire == wire }

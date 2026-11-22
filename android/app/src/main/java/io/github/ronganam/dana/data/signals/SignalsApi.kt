@@ -21,6 +21,9 @@ import kotlinx.serialization.json.putJsonObject
  * queue's file: absent fields are left out (`ApiJson` drops nulls).
  */
 
+/** Where a sleep was read (`sleep.via`): the only source the phone has. */
+private const val SLEEP_VIA = "health_connect"
+
 @Serializable
 private data class EventWire(
     val type: String = "",
@@ -38,6 +41,7 @@ private data class EventWire(
             val via = CarVia.of(via)
             if (at != null && via != null && (action == "enter" || action == "leave")) SignalEvent.Car(action == "enter", at, via) else null
         }
+        "sleep" -> if (start != null && end != null && end > start && via == SLEEP_VIA) SignalEvent.Sleep(start, end) else null
         "zone" -> if (at != null && !zoneId.isNullOrEmpty() && (action == "arrive" || action == "leave")) SignalEvent.Zone(action == "arrive", zoneId, at) else null
         else -> null
     }
@@ -47,6 +51,7 @@ private fun SignalEvent.toWire(): EventWire = when (this) {
     is SignalEvent.Unlock -> EventWire("unlock", at = at)
     is SignalEvent.Screen -> EventWire("screen", start = start, end = end)
     is SignalEvent.Car -> EventWire("car", at = at, action = if (enter) "enter" else "leave", via = via.wire)
+    is SignalEvent.Sleep -> EventWire("sleep", start = start, end = end, via = SLEEP_VIA)
     is SignalEvent.Zone -> EventWire("zone", at = at, action = if (arrive) "arrive" else "leave", zoneId = zoneId)
 }
 

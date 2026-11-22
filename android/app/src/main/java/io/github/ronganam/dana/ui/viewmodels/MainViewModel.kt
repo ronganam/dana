@@ -229,6 +229,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         chatController.resyncIfIdle()
         TaskActionQueue.flushAsync(appContext)
         io.github.ronganam.dana.data.signals.SignalSync.flushAsync(appContext)
+        io.github.ronganam.dana.data.signals.PhoneSignals.onForeground(appContext)
         shoppingController.flush()
         shoppingController.fetchMe()
         callsController.fetchSuggestions()
