@@ -209,8 +209,10 @@ dependencies {
     implementation(project(":protocol"))
     // Retries for queued reminder actions and call-recording uploads.
     implementation("androidx.work:work-runtime-ktx:2.12.0")
-    // Phone only: direct push from the server (FCM wake-up pings).
+    // Phone only: direct push from the server. FCM wake-up pings for a build with your own
+    // Firebase project (google-services.json); UnifiedPush through a distributor app (ntfy) otherwise.
     "phoneImplementation"("com.google.firebase:firebase-messaging:26.0.2")
+    "phoneImplementation"("org.unifiedpush.android:connector:3.3.5")
     // Phone only: home-screen widgets (widgets/).
     "phoneImplementation"("androidx.glance:glance-appwidget:1.2.0")
     // Kiosk + TV: runs the openWakeWord models ("Hey Dana") on-device.

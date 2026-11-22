@@ -104,9 +104,11 @@ async def dismiss_suggestion_api(request: web.Request) -> web.Response:
 
 
 async def phone_register_api(request: web.Request) -> web.Response:
-    """POST /api/phone/register {token, app_version?} — the FCM token of the
+    """POST /api/phone/register {transport: "fcm", token} | {transport:
+    "unifiedpush", endpoint} (+ app_version?) — the push registration of the
     paired device making the request (400 ``device_required`` from a token of
-    no device)."""
+    no device; 400 ``fcm_not_configured`` / ``invalid_endpoint`` / ``invalid``
+    with a ``detail``)."""
     user = phone_user(request)
     device = request_device(request)
     if device is None:
@@ -118,11 +120,15 @@ async def phone_register_api(request: web.Request) -> web.Response:
         return web.json_response({"error": "Invalid JSON"}, status=400)
     if not isinstance(data, dict):
         return web.json_response({"error": "Invalid JSON"}, status=400)
+    transport = str(data.get("transport") or "")
+    address = str(data.get("endpoint" if transport == "unifiedpush" else "token") or "")
     try:
-        return web.json_response(phone_push.register(user, device, str(data.get("token") or ""),
+        return web.json_response(phone_push.register(user, device, transport, address,
                                                      str(data.get("app_version") or "")))
+    except phone_push.Refused as e:
+        return web.json_response({"error": e.code, "detail": str(e)}, status=400)
     except ValueError as e:
-        return web.json_response({"error": str(e)}, status=400)
+        return web.json_response({"error": "invalid", "detail": str(e)}, status=400)
 
 
 async def phone_events_api(request: web.Request) -> web.Response:
@@ -138,9 +144,10 @@ async def phone_events_api(request: web.Request) -> web.Response:
 
 
 async def phone_devices_api(request: web.Request) -> web.Response:
-    """GET /api/phone/devices — the caller's devices registered for push (no tokens) + whether FCM is configured."""
+    """GET /api/phone/devices — the caller's devices registered for push (transport, no tokens or endpoints) +
+    whether FCM is configured."""
     user = phone_user(request)
-    return web.json_response({"configured": phone_push.configured(), "latest_seq": phone_push.latest_seq(user),
+    return web.json_response({"fcm_configured": phone_push.configured(), "latest_seq": phone_push.latest_seq(user),
                               "devices": phone_push.devices(user)})
 
 

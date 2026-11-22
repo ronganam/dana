@@ -475,30 +475,32 @@ def test_phone_migration() -> None:
     conn.commit()
     conn.close()
     applied = db.migrate(path)
-    check("migration: core m0005 and the phone's m0002 run on a database with phone_devices rows",
-          "core:0005_devices" in applied and "phone:0002_push_on_devices" in applied, applied)
+    check("migration: core m0005 and the phone's m0002 / m0003 run on a database with phone_devices rows",
+          "core:0005_devices" in applied and "phone:0002_push_on_devices" in applied
+          and "phone:0003_push_transports" in applied, applied)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     try:
         tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
         rows = [dict(r) for r in conn.execute(
             "SELECT d.id, d.user_id, d.name, d.kind, d.room, d.role, d.token_id, d.created_at, d.last_seen_at, "
-            "p.device_id, p.user_id AS push_user, p.fcm_token, p.app_version, p.updated_at, p.last_fetch_at, p.last_seq "
+            "p.device_id, p.user_id AS push_user, p.transport, p.address, p.app_version, p.updated_at, p.last_fetch_at, p.last_seq "
             "FROM devices d LEFT JOIN phone_push p ON p.device_id = d.id ORDER BY d.created_at")]
     finally:
         conn.close()
     check("migration: phone_devices is gone, devices and phone_push are there",
           "phone_devices" not in tables and {"devices", "phone_push", "device_pairings"} <= tables, tables)
-    got = [(r["user_id"], r["name"], r["kind"], r["room"], r["role"], r["token_id"], r["last_seen_at"], r["fcm_token"],
-            r["app_version"], r["last_fetch_at"], r["last_seq"], r["push_user"] == r["user_id"]) for r in rows]
+    got = [(r["user_id"], r["name"], r["kind"], r["room"], r["role"], r["token_id"], r["last_seen_at"],
+            (r["transport"], r["address"]), r["app_version"], r["last_fetch_at"], r["last_seq"],
+            r["push_user"] == r["user_id"]) for r in rows]
     check("migration: every row is a core phone device of the same user (name, created, last seen) with its push "
-          "registration (FCM token, app version, last fetch, last seq)", got == [
-              (admin_id, "Old tablet", "phone", "", "", None, "2026-10-02T08:00:00+00:00", "fcm-tablet", "8.0.0",
-               None, None, True),
-              (admin_id, "Test phone", "phone", "", "", None, "2026-11-01T08:00:00+00:00", "fcm-token-sample", "8.1.0",
-               "2026-11-01T08:00:00+00:00", 1, True),
-              ("gal0000000001", "Phone", "phone", "", "", None, "2026-11-04T10:00:00+00:00", "fcm-gal", "8.1.0",
-               "2026-11-04T10:00:00+00:00", 7, True)], got)
+          "registration (an fcm one with its token, app version, last fetch, last seq)", got == [
+              (admin_id, "Old tablet", "phone", "", "", None, "2026-10-02T08:00:00+00:00",
+               ("fcm", "fcm-tablet"), "8.0.0", None, None, True),
+              (admin_id, "Test phone", "phone", "", "", None, "2026-11-01T08:00:00+00:00",
+               ("fcm", "fcm-token-sample"), "8.1.0", "2026-11-01T08:00:00+00:00", 1, True),
+              ("gal0000000001", "Phone", "phone", "", "", None, "2026-11-04T10:00:00+00:00",
+               ("fcm", "fcm-gal"), "8.1.0", "2026-11-04T10:00:00+00:00", 7, True)], got)
     check("migration: the old client-made device ids are not kept as ids",
           not {"tab1", "dev1"} & {r["id"] for r in rows} and len({r["id"] for r in rows}) == 3)
 

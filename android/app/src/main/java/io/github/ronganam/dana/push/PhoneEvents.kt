@@ -5,7 +5,6 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.os.Build
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import io.github.ronganam.dana.NotificationActionReceiver
@@ -15,6 +14,7 @@ import io.github.ronganam.dana.SuggestionsReceiver
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import io.github.ronganam.dana.data.network.PeopleApi
+import io.github.ronganam.dana.data.network.PushRegistered
 import io.github.ronganam.dana.data.network.long
 import io.github.ronganam.dana.data.network.text
 import kotlinx.serialization.json.JsonArray
@@ -29,10 +29,12 @@ import io.github.ronganam.dana.R
  * Direct push from the server (replaces the Home Assistant companion route).
  *
  * The server stores each event in a numbered outbox and wakes the phone with
- * a Firebase Cloud Messaging data message carrying only the number (phone
- * flavor: `DanaMessagingService`). [catchUp] then fetches every event after
- * the last one handled — with this app's token, so no content goes through
- * Google — and shows it. It also runs on app start and in the hourly sync, so
+ * a ping carrying only the number and type (phone flavor: a UnifiedPush
+ * message through the distributor app, `DanaUnifiedPushService`, or in a
+ * build with your own Firebase project an FCM data message,
+ * `DanaMessagingService`; both run [PushPing]). [catchUp] then fetches every
+ * event after the last one handled — with this app's token, so no content
+ * goes through the push service — and shows it. It also runs on app start and in the hourly sync, so
  * a lost ping only delays an event; the server drops expired ones (an old
  * urgent alert never pops up late).
  */
@@ -40,9 +42,12 @@ object PhoneEvents {
     private const val TAG = "PhoneEvents"
     private const val KEY_SEQ = "push_last_seq"
     private const val KEY_DEVICE = "push_device_id"
-    private const val KEY_TOKEN = "push_token"
+    private const val KEY_TRANSPORT = "push_transport"
+    private const val KEY_ADDRESS = "push_address"
     private const val KEY_REGISTERED_AT = "push_registered_at"
-    /** Firebase's advice: send the token again regularly so it never goes stale. */
+    private const val KEY_LAST_PING = "push_last_ping_at"
+    private const val KEY_PROBLEM = "push_problem"
+    /** Send the token / endpoint again regularly so the server's copy never goes stale. */
     private const val REFRESH_MS = 7L * 24 * 3600 * 1000
     private val lock = Mutex()
     /** Events that change what Now / Notifications show (they refresh when one arrives). */
@@ -57,28 +62,62 @@ object PhoneEvents {
 
     private fun configured(context: Context): Boolean = ServerConfig.load(context).isConfigured
 
-    /** Registered within the last week (else the sync registers again). */
-    fun isRegistered(context: Context): Boolean {
+    /** Registered for [transport] within the last week (else the sync registers again). */
+    fun isRegistered(context: Context, transport: PushTransport): Boolean {
         val prefs = ServerConfig.prefs(context)
-        return prefs.contains(KEY_TOKEN) &&
+        return prefs.contains(KEY_ADDRESS) && prefs.getString(KEY_TRANSPORT, null) == transport.wire &&
             System.currentTimeMillis() - prefs.getLong(KEY_REGISTERED_AT, 0) < REFRESH_MS
     }
 
-    /** Send the FCM token to the server (on start and when Firebase rotates it). */
-    suspend fun register(context: Context, token: String) {
+    /**
+     * Send this phone's push address to the server: an FCM token or a
+     * UnifiedPush endpoint (on start and whenever it changes). A refusal
+     * (the server has no FCM key, an endpoint it won't call) is kept as the
+     * [problem] Settings → Push shows.
+     */
+    suspend fun register(context: Context, transport: PushTransport, address: String) {
         if (!configured(context)) return
         val prefs = ServerConfig.prefs(context)
         try {
             val version = context.packageManager.getPackageInfo(context.packageName, 0).versionName.orEmpty()
-            val res = ServerConfig.load(context).api().devices.registerPush(deviceId(context), token, Build.MODEL, version)
-            prefs.edit { putString(KEY_TOKEN, token); putLong(KEY_REGISTERED_AT, System.currentTimeMillis()) }
-            // A fresh install starts from now instead of replaying old events.
-            if (!prefs.contains(KEY_SEQ)) prefs.edit { putLong(KEY_SEQ, res) }
-            Log.i(TAG, "Registered for push (latest $res)")
+            when (val res = ServerConfig.load(context).api().devices.registerPush(transport.wire, address, version)) {
+                is PushRegistered.Ok -> {
+                    prefs.edit {
+                        putString(KEY_TRANSPORT, transport.wire); putString(KEY_ADDRESS, address)
+                        putLong(KEY_REGISTERED_AT, System.currentTimeMillis()); remove(KEY_PROBLEM)
+                    }
+                    // A fresh install starts from now instead of replaying old events.
+                    if (!prefs.contains(KEY_SEQ)) prefs.edit { putLong(KEY_SEQ, res.latestSeq) }
+                    Log.i(TAG, "Registered for push over ${transport.wire} (latest ${res.latestSeq})")
+                }
+                is PushRegistered.Refused -> {
+                    setProblem(context, res.detail.ifBlank { "The server refused push (${res.error.ifBlank { "HTTP ${res.code}" }})." })
+                    Log.w(TAG, "Push registration refused: ${res.code} ${res.error}")
+                }
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Push registration failed", e)
         }
         catchUp(context)
+    }
+
+    /** The registration is gone (the distributor dropped it): register again when possible. */
+    fun forget(context: Context) {
+        ServerConfig.prefs(context).edit { remove(KEY_ADDRESS) }
+    }
+
+    fun noteLastPing(context: Context, at: Long) {
+        ServerConfig.prefs(context).edit { putLong(KEY_LAST_PING, at) }
+    }
+
+    /** When the last ping came (epoch ms); 0 = never. */
+    fun lastPingAt(context: Context): Long = ServerConfig.prefs(context).getLong(KEY_LAST_PING, 0)
+
+    /** Why push isn't working, for Settings → Push (null: nothing known). */
+    fun problem(context: Context): String? = ServerConfig.prefs(context).getString(KEY_PROBLEM, null)
+
+    fun setProblem(context: Context, problem: String?) {
+        ServerConfig.prefs(context).edit { if (problem == null) remove(KEY_PROBLEM) else putString(KEY_PROBLEM, problem) }
     }
 
     /** Fetch and show everything newer than the last handled event. */
@@ -101,7 +140,7 @@ object PhoneEvents {
                 // register again, otherwise pings would silently stop.
                 if (!res.registered) {
                     Log.w(TAG, "Server forgot this device; registering again")
-                    prefs.edit { remove(KEY_TOKEN) }
+                    prefs.edit { remove(KEY_ADDRESS) }
                     PushSetup.ensureRegistered(context)
                 }
                 val events = res.events

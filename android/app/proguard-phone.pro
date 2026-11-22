@@ -2,3 +2,7 @@
 -dontshrink
 -dontoptimize
 -dontobfuscate
+
+# UnifiedPush's connector brings Tink (Web Push decryption); Tink's KeysDownloader, which
+# the connector never uses, references google-http-client, which is not in the app.
+-dontwarn com.google.api.client.http.**

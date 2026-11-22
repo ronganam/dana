@@ -74,7 +74,7 @@
             android:windowSoftInputMode="adjustResize" />
 
         <!-- Alerts, suggestion pop-ups, reminders and web button presses arrive
-             by direct push (push/DanaMessagingService), not as exported
+             by direct push (push/PushPing), not as exported
              broadcasts any app could send. -->
 
         <!-- Restarts the call observer after a reboot or app update -->
@@ -156,12 +156,23 @@
             </intent-filter>
         </service>
 
-        <!-- Direct push from the server: FCM wake-up pings (push/PhoneEvents). -->
+        <!-- Direct push from the server: FCM wake-up pings in a build with your own
+             Firebase project (push/PhoneEvents). -->
         <service
             android:name=".push.DanaMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Direct push from the server through a UnifiedPush distributor (ntfy): new
+             endpoints and wake-up pings (push/PushSetup, push/PhoneEvents). -->
+        <service
+            android:name=".push.DanaUnifiedPushService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="org.unifiedpush.android.connector.PUSH_EVENT" />
             </intent-filter>
         </service>
 

@@ -302,12 +302,12 @@ async def main():
         # --- the paired phone registers for direct push ---
         phone_token, phone_device = devices.create(OWNER, "phone", "Pixel 8")
         phone = {"Authorization": f"Bearer {phone_token}"}
-        r = await client.post("/api/phone/register", headers=phone, json={"token": "tok-phone", "app_version": "7.11.0"})
+        r = await client.post("/api/phone/register", headers=phone, json={"transport": "fcm", "token": "tok-phone", "app_version": "7.11.0"})
         reg = await r.json()
         check("push: register → latest_seq", r.status == 200 and reg["latest_seq"] == 0, reg)
         r = await client.post("/api/phone/register", headers=phone, json={})
         check("push: register without a token → 400", r.status == 400)
-        r = await client.post("/api/phone/register", json={"token": "tok-phone"})
+        r = await client.post("/api/phone/register", json={"transport": "fcm", "token": "tok-phone"})
         check("push: register from no device → 400 device_required", r.status == 400
               and (await r.json()).get("error") == "device_required")
 
@@ -833,7 +833,7 @@ async def main():
         check("push: expired alerts aren't replayed", all(e["type"] != "alert" for e in (await r.json())["events"]))
         r = await client.get("/api/phone/devices")
         dv = await r.json()
-        check("push: devices list hides tokens", dv["configured"] and "token" not in json.dumps(dv["devices"]), dv)
+        check("push: devices list hides tokens", dv["fcm_configured"] and "token" not in json.dumps(dv["devices"]), dv)
 
         real_post = httpx.AsyncClient.post
 
@@ -851,12 +851,12 @@ async def main():
         check("push: no device → queued but not delivered", not await phone_push.notify(OWNER, "x", "y")
               and phone_push.latest_seq(OWNER) > evs["latest"])
         old_phone, new_phone = devices.create(OWNER, "phone", "Old")[1], devices.create(OWNER, "phone", "New")[1]
-        phone_push.register(OWNER, old_phone, "tok-old")
+        phone_push.register(OWNER, old_phone, "fcm", "tok-old")
         with get_db_connection() as conn:
             conn.execute("UPDATE phone_push SET updated_at = '2000-01-01T00:00:00+00:00' WHERE device_id = ?",
                          (old_phone.id,))
             conn.commit()
-        phone_push.register(OWNER, new_phone, "tok-new")
+        phone_push.register(OWNER, new_phone, "fcm", "tok-new")
         await phone_push.notify(OWNER, "x", "y")
         check("push: a device silent for 60 days loses its push registration (the device stays)",
               [d["device_id"] for d in phone_push.devices(OWNER)] == [new_phone.id]

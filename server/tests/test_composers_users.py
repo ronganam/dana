@@ -241,8 +241,8 @@ async def fake_fcm_token():
     return "fcm-test-token"
 
 push._access_token = fake_fcm_token
-push.register(ADMIN, devices.create(ADMIN, "phone", "Fold")[1], "tok-admin-phone")
-push.register(BOB, devices.create(BOB, "phone", "Pixel")[1], "tok-bob-phone")
+push.register(ADMIN, devices.create(ADMIN, "phone", "Fold")[1], "fcm", "tok-admin-phone")
+push.register(BOB, devices.create(BOB, "phone", "Pixel")[1], "fcm", "tok-bob-phone")
 
 
 class FakeTelegram:

@@ -13,7 +13,7 @@ Android clients of **Dana** (the assistant). The server is `../server` (its `AGE
 | `:watchface` | `io.github.ronganam.dana.watchface` (same signing key) | `watchface/` | Wear OS 4+ (Watch Face Format, resources only) | `bin/deploy-app.sh --watch-ip …` installs it too; its slots default to `:wear`'s complications (events / tasks 1–4) |
 | `:protocol` | Android library `io.github.ronganam.dana.protocol` | `protocol/` | | the phone ↔ watch Data Layer paths (`WearPaths`) and payloads (`WearPayloads.kt`), used by `:app` and `:wear` |
 
-- Flavor rules (by addition): `main` holds what every flavor has — code, and in `src/main/AndroidManifest.xml` only the permissions and components all three use. Phone-only manifest entries (call recordings, watch bridge, system assistant, notification Inbox, pop-ups, push, widgets, in-app updates, the launcher entry) are in `src/phone/AndroidManifest.xml`; the kiosk and TV manifests only add their own. Never add a component to `main` and strip it with `tools:node="remove"`. Phone-only code with its own dependencies or no shared callers goes in `src/phone` (Firebase push, widgets, the voice-interaction services), with a no-op twin in `src/nopush` for kiosk/TV when shared code calls it; wake word + hands-free session in `src/wake` (kiosk + TV). `BuildConfig.KIOSK` / `BuildConfig.TV` for small runtime differences. Every permission and why: `docs/permissions.md`.
+- Flavor rules (by addition): `main` holds what every flavor has — code, and in `src/main/AndroidManifest.xml` only the permissions and components all three use. Phone-only manifest entries (call recordings, watch bridge, system assistant, notification Inbox, pop-ups, push, widgets, in-app updates, the launcher entry) are in `src/phone/AndroidManifest.xml`; the kiosk and TV manifests only add their own. Never add a component to `main` and strip it with `tools:node="remove"`. Phone-only code with its own dependencies or no shared callers goes in `src/phone` (push: FCM and UnifiedPush, widgets, the voice-interaction services), with a no-op twin in `src/nopush` for kiosk/TV when shared code calls it; wake word + hands-free session in `src/wake` (kiosk + TV). `BuildConfig.KIOSK` / `BuildConfig.TV` for small runtime differences. Every permission and why: `docs/permissions.md`.
 - `docs/kiosk.md`, `docs/tv.md` and `docs/wear.md` name the device each flavor was tuned on and its quirks; check a change on your own hardware (or an emulator of the same form factor) for each flavor it touches.
 - Several devices or emulators may be attached at once: always pass `-s <serial>` to `adb` and the scripts.
 
@@ -57,7 +57,7 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 - Release builds run R8 (phone flavor: pass-through via `proguard-phone.pro`); kiosk/TV deploy scripts also force AOT compilation.
 - The Gradle daemon runs on JDK 21 (`gradle/gradle-daemon-jvm.properties`, downloaded through its `toolchainUrl.*` entries when the machine has none; regenerate them with `./gradlew updateDaemonJvm --jvm-version=21`); `gradle.properties` turns on the build cache, configuration cache and parallel builds; keep build logic configuration-cache safe (no `project` access at execution time).
 - Release builds reach the server over **HTTPS only**; debug builds also allow plain http (`src/debug`). A LAN server without TLS: `ALLOW_CLEARTEXT=true` in your site's `android.env` (`docs/release.md` → HTTPS).
-- A deployment's setup lives in its site, which the build reads when present: `../site/android.env` (`SERVER_URL`, `LAN_DNS_SERVERS`, `ALLOW_CLEARTEXT`), `tv-defaults.json`, `google-services.json` (direct push). Release signing stays in the gitignored `keystore.properties` — `docs/release.md` → Your site.
+- A deployment's setup lives in its site, which the build reads when present: `../site/android.env` (`SERVER_URL`, `LAN_DNS_SERVERS`, `ALLOW_CLEARTEXT`), `tv-defaults.json`, `google-services.json` (direct push through FCM; without it the phone uses UnifiedPush). Release signing stays in the gitignored `keystore.properties` — `docs/release.md` → Your site.
 
 ## Architecture (shared)
 
@@ -83,7 +83,8 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 | `DanaRecognitionService` | Custom speech recognition service |
 | `CallRecordingObserverService` | Foreground service for call recording detection/upload; runs only once the user turns call recordings on |
 | `DanaNotificationListener` | Notification access → Dana's Inbox, plus bank sign-in codes / bank and card notifications for the `money` addon (`data/money/`; phone flavor only) |
-| `DanaMessagingService` | FCM wake-up pings → `PhoneEvents.catchUp` (phone flavor only; see `docs/notifications.md`) |
+| `DanaUnifiedPushService` | UnifiedPush endpoints and wake-up pings from the distributor app (ntfy) → `PushPing` → `PhoneEvents.catchUp` (phone flavor; builds without Firebase, the released APKs among them; see `docs/notifications.md`) |
+| `DanaMessagingService` | FCM wake-up pings → `PushPing` → `PhoneEvents.catchUp` (phone flavor, only a build with your own `google-services.json`) |
 | `SuggestionsPopupActivity` | New suggestions pop-up (server push → `SuggestionsReceiver.show`) |
 | `CallDebriefActivity` / `ShortCallActivity` | Native call screens opened from notifications (Debrief; short-call upload prompt) |
 
@@ -113,7 +114,7 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 | `docs/projects.md` | Projects place: the new model (sections, decisions compared, files, budget), its data layer `data/projects/`, panes folded / unfolded |
 | `docs/money.md` | Money (More → Money): `MoneyController` core, dashboards, Transactions / Accounts / Save, the panes |
 | `docs/shopping.md` | Shopping (under More), offline store + queue, live stream / push, widget + quick add, the watch's shopping data and actions (the watch screen itself: `docs/wear.md`) |
-| `docs/notifications.md` | Notification Inbox, direct push (FCM), urgent alerts, suggestion pop-up, buttons, snooze |
+| `docs/notifications.md` | Notification Inbox, direct push (UnifiedPush / FCM, Settings → Push), urgent alerts, suggestion pop-up, buttons, snooze |
 | `docs/people.md` | Caller card, People / weekly review screens, briefing / meeting / review pushes, home-screen widgets |
 | `docs/wear.md` | Watch app: performance rules, hands-free turns, phone bridge, alarm, tiles / complications, the Shopping screen (and its debug fake phone) |
 | `docs/kiosk.md` | Wall-tablet kiosk, wake word, voice turn tuning |

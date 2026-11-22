@@ -136,8 +136,8 @@ def unit_activity() -> None:
 
 
 async def test_flow(client) -> None:
-    await client.post("/api/phone/register", headers=auth(ANN), json={"token": "tok-a"})
-    await client.post("/api/phone/register", headers=auth(BOB), json={"token": "tok-b"})
+    await client.post("/api/phone/register", headers=auth(ANN), json={"transport": "fcm", "token": "tok-a"})
+    await client.post("/api/phone/register", headers=auth(BOB), json={"transport": "fcm", "token": "tok-b"})
     PINGS.clear()
     r = await hook(client, ANN, "claude", claude("SessionStart", source="startup"))
     check("SessionStart alone shows nothing", r["status"] == 200 and r["change"] is None

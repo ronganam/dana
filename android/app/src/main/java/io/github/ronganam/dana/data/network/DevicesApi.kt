@@ -31,6 +31,15 @@ data class PhoneEventsPage(val events: LenientList<PhoneEvent> = emptyList(), va
 @Serializable
 private data class Registered(val latestSeq: Long = 0)
 
+/** What the server said to a push registration (`POST /api/phone/register`). */
+sealed interface PushRegistered {
+    /** Stored; [latestSeq] is the user's newest event number (a fresh install starts there). */
+    data class Ok(val latestSeq: Long) : PushRegistered
+
+    /** Refused (400 `fcm_not_configured`, `invalid_endpoint`, …): [detail] says why, in words for the user. */
+    data class Refused(val code: Int, val error: String, val detail: String) : PushRegistered
+}
+
 @Serializable
 private data class UnlockAnswer(val status: String = "")
 
@@ -39,11 +48,21 @@ class DevicesApi(private val http: ApiClient) {
 
     suspend fun me(): MeAnswer = http.decode(MeAnswer.serializer(), http.text(http.request("/api/me"), "Failed to load your account", "{}"))
 
-    /** Register this phone's FCM token; returns the server's latest event number. */
-    suspend fun registerPush(deviceId: String, token: String, name: String, appVersion: String): Long {
-        val body = buildJsonObject { put("device_id", deviceId); put("token", token); put("name", name); put("app_version", appVersion) }
-        return http.decode(Registered.serializer(),
-            http.text(http.request("/api/phone/register") { post(jsonBody(body)) }, "Couldn't register for push", "{}")).latestSeq
+    /**
+     * Register this device for push: [transport] `fcm` with its FCM token, or
+     * `unifiedpush` with the distributor's endpoint, as [address]. The server
+     * ties it to the device of this app's token. Throws [java.io.IOException]
+     * when the server can't be reached.
+     */
+    suspend fun registerPush(transport: String, address: String, appVersion: String): PushRegistered {
+        val body = buildJsonObject {
+            put("transport", transport)
+            put(if (transport == "unifiedpush") "endpoint" else "token", address)
+            put("app_version", appVersion)
+        }
+        val res = http.result(http.request("/api/phone/register") { post(jsonBody(body)) })
+        return if (res.ok) PushRegistered.Ok(http.decode(Registered.serializer(), res.body.ifEmpty { "{}" }).latestSeq)
+        else PushRegistered.Refused(res.code, res.error, res.json().text("detail").orEmpty())
     }
 
     /** Events newer than [after]. */

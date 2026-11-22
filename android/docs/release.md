@@ -5,7 +5,7 @@
 A pushed tag `v<version>` runs `.github/workflows/release.yml` (or run it by hand with an existing tag). It fails unless the tag equals `server/VERSION` and the `versionName` of `:app` and `:wear` (bump them together; `:watchface` keeps its own version). Then:
 
 - the server image `ghcr.io/ronganam/dana:<version>` and `:latest` (linux/amd64 + linux/arm64);
-- the release APKs, built with **no site** (`DANA_SITE` is an empty folder, and no `google-services.json`): no server address, LAN DNS, cleartext permission, TV defaults or Firebase push are built in; each app starts with no server and is paired later;
+- the release APKs, built with **no site** (`DANA_SITE` is an empty folder, and no `google-services.json`): no server address, LAN DNS, cleartext permission, TV defaults or Firebase config are built in; each app starts with no server and is paired later, and the phone pushes through UnifiedPush (the ntfy app; `docs/notifications.md`);
 - signed with the project's release key from the repository secrets `ANDROID_KEYSTORE_BASE64` (the keystore file, base64), `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, `ANDROID_KEY_PASSWORD` (written into a `keystore.properties` in the runner and removed after the build; a missing secret fails the build rather than signing with a debug key). Every APK must carry the same certificate (the watch app must match the phone's, below);
 - the GitHub Release with these assets and the commits since the previous tag as its notes:
 
@@ -81,7 +81,7 @@ What belongs to one deployment lives in its site folder (`../site/` at the repos
 |---|---|
 | `android.env` | `SERVER_URL`: the server a fresh app / kiosk / TV starts with (`BuildConfig.DEFAULT_SERVER_URL`), and where `bin/deploy-app.sh` publishes. `LAN_DNS_SERVERS`: comma-separated LAN resolvers for the TV (`docs/tv.md` → LanDns). `ALLOW_CLEARTEXT=true`: release builds may reach a plain-http server (above, HTTPS). `PHONE_AVD` / `WATCH_AVD`: the emulators `bin/dev-install.sh` boots. For `bin/deploy-*.sh`: `APP_PUBLISH_TOKEN` or `APP_PUBLISH_TOKEN_CMD`, `TV_SERIAL`, `KIOSK_SERIAL`, `WATCH_IP`. |
 | `tv-defaults.json` | The TV's first-run home screen (apps, Home Assistant entities, cameras, remote bindings) in `TvConfig`'s JSON shape (`BuildConfig.TV_DEFAULTS_JSON`). |
-| `google-services.json` | Your Firebase project's Android config (package `io.github.ronganam.dana`), for direct push (FCM; the server's side: `server/docs/notifications.md`). `app/src/phone/google-services.json` is read when the site has none. Without either, the phone builds and works, with no direct push. |
+| `google-services.json` | Your Firebase project's Android config (package `io.github.ronganam.dana`), for direct push through FCM (the server then needs `FCM_SERVICE_ACCOUNT_JSON` from the same project: `server/docs/notifications.md`). `app/src/phone/google-services.json` is read when the site has none. Without either, the phone pushes through UnifiedPush (a distributor app such as ntfy on the phone; nothing to configure). |
 
 Secrets stay out of the site, in gitignored files here: `keystore.properties` and the keystore (release signing, above); `local.properties` holds only `sdk.dir`.
 

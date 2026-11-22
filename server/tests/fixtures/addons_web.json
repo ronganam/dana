@@ -792,10 +792,16 @@
        "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
       },
       {
+       "kind": "app",
+       "optional": true,
+       "what": "the ntfy app on your phone (UnifiedPush)",
+       "why": "Direct push to the phone, through ntfy.sh or your own ntfy server; without it events wait for the app's next check"
+      },
+      {
        "kind": "env",
        "optional": true,
        "what": "FCM_SERVICE_ACCOUNT_JSON",
-       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+       "why": "Direct push through Firebase instead, only for an app you build with your own Firebase project"
       },
       {
        "kind": "env",
@@ -818,6 +824,7 @@
      "touches": {
       "acts_outside": true,
       "hosts": [
+       "your phone's ntfy server (ntfy.sh by default)",
        "fcm.googleapis.com",
        "oauth2.googleapis.com",
        "api.typesafe.ai"
@@ -2190,10 +2197,16 @@
        "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
       },
       {
+       "kind": "app",
+       "optional": true,
+       "what": "the ntfy app on your phone (UnifiedPush)",
+       "why": "Direct push to the phone, through ntfy.sh or your own ntfy server; without it events wait for the app's next check"
+      },
+      {
        "kind": "env",
        "optional": true,
        "what": "FCM_SERVICE_ACCOUNT_JSON",
-       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+       "why": "Direct push through Firebase instead, only for an app you build with your own Firebase project"
       },
       {
        "kind": "env",
@@ -2216,6 +2229,7 @@
      "touches": {
       "acts_outside": true,
       "hosts": [
+       "your phone's ntfy server (ntfy.sh by default)",
        "fcm.googleapis.com",
        "oauth2.googleapis.com",
        "api.typesafe.ai"
@@ -3546,10 +3560,16 @@
        "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
       },
       {
+       "kind": "app",
+       "optional": true,
+       "what": "the ntfy app on your phone (UnifiedPush)",
+       "why": "Direct push to the phone, through ntfy.sh or your own ntfy server; without it events wait for the app's next check"
+      },
+      {
        "kind": "env",
        "optional": true,
        "what": "FCM_SERVICE_ACCOUNT_JSON",
-       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+       "why": "Direct push through Firebase instead, only for an app you build with your own Firebase project"
       },
       {
        "kind": "env",
@@ -3572,6 +3592,7 @@
      "touches": {
       "acts_outside": true,
       "hosts": [
+       "your phone's ntfy server (ntfy.sh by default)",
        "fcm.googleapis.com",
        "oauth2.googleapis.com",
        "api.typesafe.ai"
@@ -4867,10 +4888,16 @@
        "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
       },
       {
+       "kind": "app",
+       "optional": true,
+       "what": "the ntfy app on your phone (UnifiedPush)",
+       "why": "Direct push to the phone, through ntfy.sh or your own ntfy server; without it events wait for the app's next check"
+      },
+      {
        "kind": "env",
        "optional": true,
        "what": "FCM_SERVICE_ACCOUNT_JSON",
-       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+       "why": "Direct push through Firebase instead, only for an app you build with your own Firebase project"
       },
       {
        "kind": "env",
@@ -4893,6 +4920,7 @@
      "touches": {
       "acts_outside": true,
       "hosts": [
+       "your phone's ntfy server (ntfy.sh by default)",
        "fcm.googleapis.com",
        "oauth2.googleapis.com",
        "api.typesafe.ai"
@@ -6202,10 +6230,16 @@
        "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
       },
       {
+       "kind": "app",
+       "optional": true,
+       "what": "the ntfy app on your phone (UnifiedPush)",
+       "why": "Direct push to the phone, through ntfy.sh or your own ntfy server; without it events wait for the app's next check"
+      },
+      {
        "kind": "env",
        "optional": true,
        "what": "FCM_SERVICE_ACCOUNT_JSON",
-       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+       "why": "Direct push through Firebase instead, only for an app you build with your own Firebase project"
       },
       {
        "kind": "env",
@@ -6228,6 +6262,7 @@
      "touches": {
       "acts_outside": true,
       "hosts": [
+       "your phone's ntfy server (ntfy.sh by default)",
        "fcm.googleapis.com",
        "oauth2.googleapis.com",
        "api.typesafe.ai"
@@ -7537,10 +7572,16 @@
        "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
       },
       {
+       "kind": "app",
+       "optional": true,
+       "what": "the ntfy app on your phone (UnifiedPush)",
+       "why": "Direct push to the phone, through ntfy.sh or your own ntfy server; without it events wait for the app's next check"
+      },
+      {
        "kind": "env",
        "optional": true,
        "what": "FCM_SERVICE_ACCOUNT_JSON",
-       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+       "why": "Direct push through Firebase instead, only for an app you build with your own Firebase project"
       },
       {
        "kind": "env",
@@ -7563,6 +7604,7 @@
      "touches": {
       "acts_outside": true,
       "hosts": [
+       "your phone's ntfy server (ntfy.sh by default)",
        "fcm.googleapis.com",
        "oauth2.googleapis.com",
        "api.typesafe.ai"

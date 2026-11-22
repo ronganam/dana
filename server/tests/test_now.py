@@ -395,7 +395,7 @@ async def main():
             return r.status, await r.json()
 
         phone_token = devices.create(OWNER, "phone", "Phone")[0]
-        await client.post("/api/phone/register", headers={"Authorization": f"Bearer {phone_token}"}, json={"token": "tok"})
+        await client.post("/api/phone/register", headers={"Authorization": f"Bearer {phone_token}"}, json={"transport": "fcm", "token": "tok"})
         await client.post("/api/notifications/batch", json={"posted": [], "removed": [], "active_keys": []})
 
         # --- GET /api/now -------------------------------------------------------------

@@ -247,12 +247,12 @@ def test_convert_9_0():
     expected["money_import_maps"] = []  # money m0003: the CSV column mappings of statement imports
     # core m0004 adds users.languages / users.currency, empty (the server's defaults apply)
     expected["users"] = sorted(tuple(r) + ("''", "''") for r in expected["users"])
-    # core m0005 + phone m0002: each phone_devices row is a core device (kind phone, no token, a new id)
-    # with its push registration keyed by it.
+    # core m0005 + phone m0002 / m0003: each phone_devices row is a core device (kind phone, no token, a new
+    # id) with its push registration keyed by it, an fcm one.
     expected["device_pairings"] = []
     moved = expected.pop("phone_devices")
     wanted = sorted(((u, n, "'phone'", "''", "''", "None", c, lf if lf != "None" else up),
-                     (u, tok, ver, up, lf, seq)) for u, _, tok, n, ver, c, up, lf, seq in moved)
+                     (u, "'fcm'", tok, ver, up, lf, seq)) for u, _, tok, n, ver, c, up, lf, seq in moved)
     by_id = {r[0]: r for r in after.get("devices", [])}
     got = sorted((by_id[p[0]][1:], p[1:]) for p in after.get("phone_push", []) if p[0] in by_id)
     check("9.0: each phone_devices row is a core device with its push registration", moved and got == wanted,

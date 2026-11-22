@@ -321,17 +321,17 @@ def events_of(user_id: str) -> List[Dict[str, Any]]:
 # --- 2. Devices and push --------------------------------------------------------------------------
 
 async def test_push(client: TestClient) -> None:
-    r = await client.post("/api/phone/register", headers=auth(ADMIN), json={"token": "tok-a", "app_version": "9.0"})
+    r = await client.post("/api/phone/register", headers=auth(ADMIN), json={"transport": "fcm", "token": "tok-a", "app_version": "9.0"})
     reg_a = await r.json()
-    r = await client.post("/api/phone/register", headers=auth(BOB), json={"token": "tok-b"})
+    r = await client.post("/api/phone/register", headers=auth(BOB), json={"transport": "fcm", "token": "tok-b"})
     reg_b = await r.json()
     check("register: each device registers for its token's user; the first admin's latest seq continues",
           reg_a.get("latest_seq") == 1 and reg_b.get("latest_seq") == 0, (reg_a, reg_b))
-    r = await client.post("/api/phone/register", headers=auth(CARL), json={"token": "tok-c"})
+    r = await client.post("/api/phone/register", headers=auth(CARL), json={"transport": "fcm", "token": "tok-c"})
     check("register: no phone addon → 403 not_connected", r.status == 403
           and (await r.json()).get("error") == "not_connected")
     r = await client.post("/api/phone/register", headers={"Authorization": f"Bearer {SCRIPT_TOKEN}"},
-                          json={"token": "tok-script"})
+                          json={"transport": "fcm", "token": "tok-script"})
     check("register: a token of no device → 400 device_required", r.status == 400
           and (await r.json()).get("error") == "device_required")
     with get_db_connection() as conn:
@@ -422,7 +422,7 @@ async def test_push(client: TestClient) -> None:
           not bob_checks["push"]["ok"] and admin_checks["push"]["ok"]
           and carl_checks["push"]["ok"] and carl_checks["push"]["detail"] == "not connected",
           (bob_checks["push"]["detail"], admin_checks["push"]["detail"], carl_checks["push"]["detail"]))
-    await client.post("/api/phone/register", headers=auth(BOB), json={"token": "tok-b"})
+    await client.post("/api/phone/register", headers=auth(BOB), json={"transport": "fcm", "token": "tok-b"})
 
 
 # --- 3. Notifications -----------------------------------------------------------------------------

@@ -105,6 +105,8 @@ DATABASE_PATH=/app/db/db.sqlite3
 PORT=8080
 TIMEZONE=Asia/Jerusalem
 API_TOKEN=$api_token
+# With API_TOKEN set this only lets UnifiedPush pings go to the plain-http ntfy stub.
+DANA_INSECURE_DEV=1
 CREDENTIALS_KEY=$key
 APP_PUBLISH_TOKEN=$publish
 APP_RELEASES_REPO=
