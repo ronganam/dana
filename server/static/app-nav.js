@@ -18,7 +18,7 @@
 
 // The shell's own screens (core/addons/hooks.py, CORE_SCREENS: no addon page may take one of these ids);
 // every other screen is an addon's page (app-panels.js).
-const CORE_SCREENS = ["now", "chat", "settings", "addons", "usage", "debug", "review"];
+const CORE_SCREENS = ["now", "chat", "settings", "addons", "devices", "usage", "debug", "review"];
 
 // Core pieces an addon page can host in an element of its own (api.piece(name, el), static/dana.js).
 const CORE_PIECES = {
@@ -37,6 +37,7 @@ function coreNavPlaces(me) {
     return [
         { id: "settings", label: "Settings", icon: "settings" },
         { id: "addons", label: "Addons", icon: "plug" },
+        { id: "devices", label: "Devices", icon: "smartphone" },
         { id: "usage", label: "Usage", icon: "receipt" },
         ...(can("manage_server") ? [{ id: "debug", label: "Debug", icon: "terminal" }] : []),
         { id: "dash", label: "Dash", icon: "layout-dashboard", href: "/dashboard" },
@@ -426,6 +427,7 @@ function switchTab(tabId, arg = null) {
     if (tabId === "review") window.DanaReview?.show(); else window.DanaReview?.hide();
     if (tabId === "usage") window.DanaUsage?.show(); else window.DanaUsage?.hide();
     if (tabId === "addons") window.DanaAddons?.show(); else window.DanaAddons?.hide();
+    if (tabId === "devices") window.DanaDevices?.show(); else window.DanaDevices?.hide();
     if (tabId === "now") showNow(); else hideNow();
     if (tabId === "debug") { loadDebugData(); startDebugPolling(); }
     else if (tabId === "chat") {
@@ -461,5 +463,6 @@ document.getElementById("rail-brand")?.addEventListener("click", () => switchTab
 document.getElementById("btn-open-debug-tab")?.addEventListener("click", () => switchTab("debug"));
 document.getElementById("btn-open-usage-tab")?.addEventListener("click", () => switchTab("usage"));
 document.getElementById("btn-open-addons-tab")?.addEventListener("click", () => switchTab("addons"));
+document.getElementById("btn-open-devices-tab")?.addEventListener("click", () => switchTab("devices"));
 
 renderNav();

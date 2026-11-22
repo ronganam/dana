@@ -6,9 +6,11 @@ with a high-priority Firebase Cloud Messaging data message that carries
 **only** the sequence number. The app then fetches ``GET
 /api/phone/events?after=<seq>`` with its API token (only that user's events),
 so no content goes through Google and a lost ping costs nothing: the next
-ping, the app starting or its hourly sync fetches everything it missed. A
-device belongs to the user whose token registered it; a user without the
-``phone`` addon gets nothing (no event is stored for anyone).
+ping, the app starting or its hourly sync fetches everything it missed. The
+devices are core's (core/devices.py): a paired device registers its FCM token
+(``phone_push``, keyed by the device, which belongs to the user whose token
+it has); a user without the ``phone`` addon gets nothing (no event is stored
+for anyone).
 
 Each event type has its own lifetime (``TTL``): an urgent alert from an hour
 ago must not pop up when the phone comes back online, a voice transcript
@@ -46,6 +48,7 @@ from typing import Any, Dict, List, Optional
 import httpx
 
 from core.db import get_db_connection
+from core.devices import Device
 from core.users import User
 from core.addons import store
 from addons.phone.config import ADDON, mark
@@ -120,61 +123,65 @@ def latest_seq(user: User) -> int:
     return int(row["s"] or 0)
 
 
-def register(user: User, device_id: str, token: str, name: str = "", app_version: str = "") -> Dict[str, Any]:
-    """``user``'s app's FCM token (sent on start and whenever Firebase rotates
-    it), on their own row for the device (``(user, device id)``; migration
-    ``m0017``). Another user's row is never taken over by a device id alone
-    (it is not secret): only the FCM token proves it is the same installed
-    app, so rows of other users holding the *same token* are removed (the
-    phone now belongs to ``user``; one row per token) and rows with another
-    token are left alone (docs/access.md, "Security rules"). Returns the
-    newest number of their events so a fresh install starts from now instead
-    of replaying old events."""
-    device_id, token = (device_id or "").strip()[:100], (token or "").strip()[:4096]
-    if not device_id or not token:
-        raise ValueError("device_id and token are required")
+def register(user: User, device: Device, token: str, app_version: str = "") -> Dict[str, Any]:
+    """The FCM token of ``device`` (``user``'s, the request's own device: the
+    app sends it on start and whenever Firebase rotates it). One row per FCM
+    token: a row of another device with the same token (the app reinstalled
+    and paired again, or paired as someone else) is removed, since only the
+    installed app holds it (docs/access.md, "Security rules"). Returns the
+    newest number of the user's events so a fresh install starts from now
+    instead of replaying old events.
+
+    Raises:
+        ValueError: no token, or ``device`` is not ``user``'s.
+    """
+    token = (token or "").strip()[:4096]
+    if not token:
+        raise ValueError("token is required")
+    if device.user_id != user.id:
+        raise ValueError("not this user's device")
     now = _utc()
     with get_db_connection() as conn:
-        # One row per token: a reinstall gets a new device id but may reuse it,
-        # and a phone that signs in as someone else presents its own token.
-        moved = conn.execute("DELETE FROM phone_devices WHERE token = ? AND NOT (user_id = ? AND device_id = ?)",
-                             (token, user.id, device_id)).rowcount
+        # scoped: one row per FCM token, whoever's: only the installed app holds the token
+        moved = conn.execute("DELETE FROM phone_push WHERE fcm_token = ? AND device_id != ?",
+                             (token, device.id)).rowcount
         conn.execute(
-            "INSERT INTO phone_devices (user_id, device_id, token, name, app_version, created_at, updated_at) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(user_id, device_id) DO UPDATE SET token = excluded.token, "
-            "name = excluded.name, app_version = excluded.app_version, updated_at = excluded.updated_at",
-            (user.id, device_id, token, (name or "")[:100] or None, (app_version or "")[:40] or None, now, now))
+            "INSERT INTO phone_push (device_id, user_id, fcm_token, app_version, updated_at) VALUES (?, ?, ?, ?, ?) "
+            "ON CONFLICT(device_id) DO UPDATE SET fcm_token = excluded.fcm_token, "
+            "app_version = excluded.app_version, updated_at = excluded.updated_at",
+            (device.id, user.id, token, (app_version or "")[:40] or None, now))
         conn.commit()
-    logger.info(f"Phone push: registered device {device_id[:8]} of user {user.id} ({name or '?'}, {app_version or '?'})"
-                + (f"; {moved} older row(s) with its token replaced" if moved else ""))
+    logger.info(f"Phone push: registered device {device.id} of user {user.id} ({device.kind}, {app_version or '?'})"
+                + (f"; {moved} older registration(s) with its token replaced" if moved else ""))
     return {"ok": True, "latest_seq": latest_seq(user)}
 
 
 def devices(user: User) -> List[Dict[str, Any]]:
-    """``user``'s registered phones (no tokens), most recently updated first."""
+    """``user``'s devices registered for push (no tokens), most recently updated first."""
     with get_db_connection() as conn:
-        rows = conn.execute("SELECT device_id, name, app_version, created_at, updated_at, last_fetch_at, last_seq "
-                            "FROM phone_devices WHERE user_id = ? ORDER BY updated_at DESC", (user.id,)).fetchall()
+        rows = conn.execute("SELECT p.device_id, d.name, d.kind, p.app_version, d.created_at, p.updated_at, "
+                            "p.last_fetch_at, p.last_seq FROM phone_push p JOIN devices d ON d.id = p.device_id "
+                            "WHERE p.user_id = ? ORDER BY p.updated_at DESC", (user.id,)).fetchall()
     return [dict(r) for r in rows]
 
 
 def _drop_token(token: str) -> None:
     with get_db_connection() as conn:
-        # scoped: a token FCM reported dead: the device row holding it goes, whoever's
-        conn.execute("DELETE FROM phone_devices WHERE token = ?", (token,))
+        # scoped: a token FCM reported dead: the push registration holding it goes, whoever's
+        conn.execute("DELETE FROM phone_push WHERE fcm_token = ?", (token,))
         conn.commit()
 
 
 # --- Events ------------------------------------------------------------------
 
-def events_after(user: User, after: int, device_id: str = "") -> Dict[str, Any]:
+def events_after(user: User, after: int, device: Optional[Device] = None) -> Dict[str, Any]:
     """``user``'s unexpired events newer than ``after`` (oldest first) + the
     newest number of theirs.
 
-    With ``device_id``: ``registered`` says whether the server still knows the
-    device as ``user``'s (its token was dropped, the DB was restored, it
-    registered for someone else, …), so the phone can register again instead
-    of silently getting no pings."""
+    With ``device`` (the request's own): ``registered`` says whether its push
+    registration is still there (its FCM token was dropped, the DB was
+    restored, …), so the app can register again instead of silently getting
+    no pings."""
     now = _utc()
     with get_db_connection() as conn:
         rows = conn.execute("SELECT seq, type, data, created_at FROM phone_events WHERE user_id = ? AND seq > ? "
@@ -183,10 +190,10 @@ def events_after(user: User, after: int, device_id: str = "") -> Dict[str, Any]:
         latest = conn.execute("SELECT MAX(seq) AS s FROM phone_events WHERE user_id = ?",
                               (user.id,)).fetchone()["s"] or 0
         registered = None
-        if device_id:
+        if device is not None and device.user_id == user.id:
             seen = max([after] + [r["seq"] for r in rows])
-            cur = conn.execute("UPDATE phone_devices SET last_fetch_at = ?, last_seq = MAX(COALESCE(last_seq, 0), ?) "
-                               "WHERE device_id = ? AND user_id = ?", (now, seen, device_id[:100], user.id))
+            cur = conn.execute("UPDATE phone_push SET last_fetch_at = ?, last_seq = MAX(COALESCE(last_seq, 0), ?) "
+                               "WHERE device_id = ? AND user_id = ?", (now, seen, device.id, user.id))
             registered = cur.rowcount > 0
             conn.commit()
     res = {"events": [{"seq": r["seq"], "type": r["type"], "data": json.loads(r["data"]),
@@ -206,12 +213,12 @@ def _store(user: User, type_: str, data: Dict[str, Any], replace: bool = False) 
         cur = conn.execute("INSERT INTO phone_events (user_id, type, data, created_at, expires_at) "
                            "VALUES (?, ?, ?, ?, ?)",
                            (user.id, type_, json.dumps(data, ensure_ascii=False), _utc(now), _utc(expires)))
-        # Keep the numbering (AUTOINCREMENT), drop old rows and long-silent devices.
+        # Keep the numbering (AUTOINCREMENT), drop old rows and the push registrations of long-silent devices.
         # scoped: server-wide retention of old push events (KEEP_EVENTS_DAYS)
         conn.execute("DELETE FROM phone_events WHERE created_at < ?",
                      (_utc(now - datetime.timedelta(days=KEEP_EVENTS_DAYS)),))
-        # scoped: server-wide cleanup of devices silent for STALE_DEVICE_DAYS
-        conn.execute("DELETE FROM phone_devices WHERE COALESCE(last_fetch_at, updated_at) < ?",
+        # scoped: server-wide cleanup of push registrations silent for STALE_DEVICE_DAYS
+        conn.execute("DELETE FROM phone_push WHERE COALESCE(last_fetch_at, updated_at) < ?",
                      (_utc(now - datetime.timedelta(days=STALE_DEVICE_DAYS)),))
         conn.commit()
         return int(cur.lastrowid)
@@ -260,8 +267,8 @@ async def send(user: User, type_: str, data: Dict[str, Any], replace: bool = Fal
         return False
     seq = _store(user, type_, {k: v for k, v in data.items() if v is not None}, replace=replace)
     with get_db_connection() as conn:
-        tokens = [r["token"] for r in conn.execute("SELECT token FROM phone_devices WHERE user_id = ?",
-                                                   (user.id,)).fetchall()]
+        tokens = [r["fcm_token"] for r in conn.execute("SELECT fcm_token FROM phone_push WHERE user_id = ?",
+                                                       (user.id,)).fetchall()]
     if not tokens:
         logger.warning(f"Phone push: {type_} #{seq} queued, but user {user.id} has no phone registered")
         mark("push", user.id, False, "no phone registered")

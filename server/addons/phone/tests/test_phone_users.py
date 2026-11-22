@@ -37,7 +37,7 @@ from unittest.mock import AsyncMock, patch
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("phone_users_test")
 ROOT = str(testenv.SERVER)
-os.environ["API_TOKEN"] = "phone-users-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "phone-users-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["ANTHROPIC_API_KEY"] = "test-key"  # a test value: LiteLLM only ever runs its offline mock here
 os.environ["TYPESAFE_API_KEY"] = "test-typesafe"
 os.environ["FCM_SERVICE_ACCOUNT_JSON"] = '{"project_id": "dana-test"}'
@@ -56,7 +56,7 @@ import litellm
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from core import db, users
+from core import db, devices, users
 
 db.migrate()
 users.bootstrap()
@@ -105,13 +105,21 @@ NOTIFICATION_TOOLS = {"search_notifications", "list_notifications", "summarize_n
 def test_migration() -> None:
     with get_db_connection() as conn:
         owners = {t: {r[0] for r in conn.execute(f"SELECT DISTINCT user_id FROM {t}")}
-                  for t in ("phone_devices", "phone_events", "notifications", "notification_rules",
+                  for t in ("devices", "phone_push", "phone_events", "notifications", "notification_rules",
                             "notification_summaries", "notification_rule_declines", "notification_action_requests")}
         fts = [r[0] for r in conn.execute("SELECT id FROM notifications_fts WHERE notifications_fts MATCH '\"Friday\"*'")]
     check("migration: devices, events, notifications, rules, summaries, declines, requests are the first admin's",
           all(v == {ADMIN.id} for v in owners.values()), owners)
     check("migration: the FTS index still finds the first admin's notification", fts == ["n1"], fts)
     check("migration: the first admin's latest seq is the fixture's", push.latest_seq(ADMIN) == 1)
+    moved = push.devices(ADMIN)
+    check("migration: the fixture's phone is a core device (kind phone, not paired) with its push registration",
+          [(d["name"], d["kind"], d["app_version"], d["last_seq"]) for d in moved] == [("Test phone", "phone", "8.1.0", 1)]
+          and not devices.get(moved[0]["device_id"]).paired, moved)
+    FIXTURE_DEVICE.append(moved[0]["device_id"] if moved else "")
+
+
+FIXTURE_DEVICE: List[str] = []
 
 
 test_migration()
@@ -122,7 +130,11 @@ for _kind in ("phone", "tasks", "people"):
     store.connect(BOB, _kind)
 store.connect(CARL, "tasks")
 task_groups.ensure_default_groups_for_everyone()
-TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ADMIN, BOB, CARL)}
+# Each user's paired phone: its own token (core/devices.py).
+PAIRED = {u.id: devices.create(u, "phone", f"{u.name}'s phone") for u in (ADMIN, BOB, CARL)}
+TOKENS = {uid: token for uid, (token, _) in PAIRED.items()}
+DEV = {uid: device.id for uid, (_, device) in PAIRED.items()}
+SCRIPT_TOKEN = users.issue_token(BOB.id, "script")[0]  # a token of no device
 
 
 def auth(user) -> Dict[str, str]:
@@ -309,22 +321,23 @@ def events_of(user_id: str) -> List[Dict[str, Any]]:
 # --- 2. Devices and push --------------------------------------------------------------------------
 
 async def test_push(client: TestClient) -> None:
-    r = await client.post("/api/phone/register", headers=auth(ADMIN), json={"device_id": "dev-a", "token": "tok-a",
-                                                                            "name": "Fold"})
+    r = await client.post("/api/phone/register", headers=auth(ADMIN), json={"token": "tok-a", "app_version": "9.0"})
     reg_a = await r.json()
-    r = await client.post("/api/phone/register", headers=auth(BOB), json={"device_id": "dev-b", "token": "tok-b",
-                                                                          "name": "Pixel"})
+    r = await client.post("/api/phone/register", headers=auth(BOB), json={"token": "tok-b"})
     reg_b = await r.json()
     check("register: each device registers for its token's user; the first admin's latest seq continues",
           reg_a.get("latest_seq") == 1 and reg_b.get("latest_seq") == 0, (reg_a, reg_b))
-    r = await client.post("/api/phone/register", headers=auth(CARL), json={"device_id": "dev-c", "token": "tok-c"})
+    r = await client.post("/api/phone/register", headers=auth(CARL), json={"token": "tok-c"})
     check("register: no phone addon → 403 not_connected", r.status == 403
           and (await r.json()).get("error") == "not_connected")
+    r = await client.post("/api/phone/register", headers={"Authorization": f"Bearer {SCRIPT_TOKEN}"},
+                          json={"token": "tok-script"})
+    check("register: a token of no device → 400 device_required", r.status == 400
+          and (await r.json()).get("error") == "device_required")
     with get_db_connection() as conn:
-        owners = dict(conn.execute("SELECT device_id, user_id FROM phone_devices").fetchall())
-    check("register: devices stored per user (the fixture's device stays the first admin's)",
-          owners.get("dev-a") == ADMIN.id and owners.get("dev-b") == BOB.id and owners.get("dev1") == ADMIN.id
-          and "dev-c" not in owners, owners)
+        owners = dict(conn.execute("SELECT device_id, user_id FROM phone_push").fetchall())
+    check("register: each registration is the request's own device (the fixture's stays the first admin's)",
+          owners == {DEV[ADMIN.id]: ADMIN.id, DEV[BOB.id]: BOB.id, FIXTURE_DEVICE[0]: ADMIN.id}, owners)
 
     n = len(SEEN["pings"])
     ok = await push.send(BOB, "reminder", {"task_id": "t-bob", "task_title": "Bob's thing"})
@@ -344,9 +357,9 @@ async def test_push(client: TestClient) -> None:
     check("send: a user without the addon → nothing stored, nothing pinged",
           not ok and events_of(CARL.id) == before == [] and pings_since(n) == [])
 
-    r = await client.get("/api/phone/events?after=0&device_id=dev-b", headers=auth(BOB))
+    r = await client.get("/api/phone/events?after=0", headers=auth(BOB))
     eb = await r.json()
-    r = await client.get("/api/phone/events?after=0&device_id=dev-a", headers=auth(ADMIN))
+    r = await client.get("/api/phone/events?after=0", headers=auth(ADMIN))
     ea = await r.json()
     check("events: each user fetches only their own events",
           [e["data"].get("task_id") for e in eb["events"]] == ["t-bob"]
@@ -354,17 +367,20 @@ async def test_push(client: TestClient) -> None:
           and "t-admin" in [e["data"].get("task_id") for e in ea["events"]], (eb, ea))
     check("events: latest is the user's own newest seq", eb["latest"] == seq_bob and ea["latest"] > seq_bob,
           (eb["latest"], ea["latest"]))
-    r = await client.get("/api/phone/events?after=0&device_id=dev-a", headers=auth(BOB))
+    r = await client.get(f"/api/phone/events?after=0&device_id={DEV[ADMIN.id]}",
+                         headers={"Authorization": f"Bearer {SCRIPT_TOKEN}"})
     other = await r.json()
     with get_db_connection() as conn:
-        dev_a = dict(conn.execute("SELECT user_id, last_seq FROM phone_devices WHERE device_id = 'dev-a'").fetchone())
-    check("events: another user's device id → registered false, their device untouched",
-          other.get("registered") is False and dev_a == {"user_id": ADMIN.id, "last_seq": ea["latest"]}, (other, dev_a))
+        dev_a = dict(conn.execute("SELECT user_id, last_seq FROM phone_push WHERE device_id = ?",
+                                  (DEV[ADMIN.id],)).fetchone())
+    check("events: registered says whether the request's device is registered; a device id in the query is ignored",
+          ea.get("registered") is True and eb.get("registered") is True and "registered" not in other
+          and dev_a == {"user_id": ADMIN.id, "last_seq": ea["latest"]}, (other, dev_a))
     r = await client.get("/api/phone/events?after=0", headers=auth(CARL))
     check("events: no phone addon → 403", r.status == 403)
     r = await client.get("/api/phone/devices", headers=auth(BOB))
     dv = await r.json()
-    check("devices: only the caller's phones, no tokens", [d["device_id"] for d in dv["devices"]] == ["dev-b"]
+    check("devices: only the caller's phones, no tokens", [d["device_id"] for d in dv["devices"]] == [DEV[BOB.id]]
           and dv["latest_seq"] == seq_bob and "token" not in json.dumps(dv["devices"]), dv)
 
     await push.send(BOB, "alert", {"notification_id": "x"})
@@ -391,8 +407,9 @@ async def test_push(client: TestClient) -> None:
         ok = await push.send(BOB, "reminder", {"task_id": "t-bob-2"})
     finally:
         SEEN["gone"] = None
-    check("dead token: only that user's device is removed", not ok and push.devices(BOB) == []
-          and {d["device_id"] for d in push.devices(ADMIN)} == {"dev1", "dev-a"}, (push.devices(BOB), push.devices(ADMIN)))
+    check("dead token: only that user's push registration is removed (the device stays)", not ok and push.devices(BOB) == []
+          and {d["device_id"] for d in push.devices(ADMIN)} == {FIXTURE_DEVICE[0], DEV[ADMIN.id]}
+          and devices.get(DEV[BOB.id]) is not None, (push.devices(BOB), push.devices(ADMIN)))
     with get_db_connection() as conn:
         marks = {r["key"]: r["ok"] for r in conn.execute("SELECT key, ok FROM system_marks WHERE key LIKE 'push:%'")}
     check("push mark per user (Bob's failure doesn't mark the first admin's)",
@@ -405,7 +422,7 @@ async def test_push(client: TestClient) -> None:
           not bob_checks["push"]["ok"] and admin_checks["push"]["ok"]
           and carl_checks["push"]["ok"] and carl_checks["push"]["detail"] == "not connected",
           (bob_checks["push"]["detail"], admin_checks["push"]["detail"], carl_checks["push"]["detail"]))
-    await client.post("/api/phone/register", headers=auth(BOB), json={"device_id": "dev-b", "token": "tok-b"})
+    await client.post("/api/phone/register", headers=auth(BOB), json={"token": "tok-b"})
 
 
 # --- 3. Notifications -----------------------------------------------------------------------------

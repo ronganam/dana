@@ -36,7 +36,7 @@ import testenv  # first: clean env, temp DB removed at exit, no .env (see testen
 testenv.isolate("money_providers_test")
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake logins
-os.environ["API_TOKEN"] = "money-providers-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "money-providers-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["TIMEZONE"] = "Asia/Jerusalem"
 os.environ["OWNER_NAME"] = "Alice"
 sys.path.insert(0, str(testenv.SERVER))

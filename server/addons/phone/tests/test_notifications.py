@@ -17,7 +17,7 @@ from cryptography.fernet import Fernet
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("notifications_test")
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 os.environ["TYPESAFE_API_KEY"] = "test-typesafe"
@@ -28,7 +28,7 @@ import litellm
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from core import db, users
+from core import db, devices, users
 from addons import bootstrap as addons_bootstrap
 from addons.tasks.groups import ensure_default_groups_for_everyone
 
@@ -199,7 +199,7 @@ task_titles.resolve_task_group = plain_group
 
 def build_app():
     app = web.Application()
-    setup_auth(app)  # no API_TOKEN: every request is the first admin
+    setup_auth(app)  # no API_TOKEN: a request without credentials is the first admin
     r = app.router
     r.add_get("/api/suggestions", phone_api.get_suggestions_api)
     r.add_post("/api/suggestions/bulk", phone_api.bulk_suggestions_api)
@@ -300,13 +300,17 @@ async def main():
     check("redact: plain numbers kept", ingest.redact("Meet at 1930 near gate 4") == "Meet at 1930 near gate 4")
 
     async with TestClient(TestServer(build_app())) as client:
-        # --- phone registers for direct push ---
-        r = await client.post("/api/phone/register", json={"device_id": "dev-1", "token": "tok-phone",
-                                                          "name": "Pixel 8", "app_version": "7.11.0"})
+        # --- the paired phone registers for direct push ---
+        phone_token, phone_device = devices.create(OWNER, "phone", "Pixel 8")
+        phone = {"Authorization": f"Bearer {phone_token}"}
+        r = await client.post("/api/phone/register", headers=phone, json={"token": "tok-phone", "app_version": "7.11.0"})
         reg = await r.json()
         check("push: register → latest_seq", r.status == 200 and reg["latest_seq"] == 0, reg)
-        r = await client.post("/api/phone/register", json={"device_id": "dev-1"})
+        r = await client.post("/api/phone/register", headers=phone, json={})
         check("push: register without a token → 400", r.status == 400)
+        r = await client.post("/api/phone/register", json={"token": "tok-phone"})
+        check("push: register from no device → 400 device_required", r.status == 400
+              and (await r.json()).get("error") == "device_required")
 
         # --- ingest ---
         batch = {"posted": [
@@ -796,7 +800,7 @@ async def main():
         check("delete app: task-linked notification survives", (await r.json())["deleted"] == 0)
 
         # --- direct push: catch-up, expiry, digest, dead tokens ---
-        r = await client.get("/api/phone/events?after=0&device_id=dev-1")
+        r = await client.get("/api/phone/events?after=0", headers=phone)
         evs = await r.json()
         types = [e["type"] for e in evs["events"]]
         check("push: catch-up returns queued events in order",
@@ -805,8 +809,10 @@ async def main():
         dev = phone_push.devices(OWNER)[0]
         check("push: fetch recorded on the device", dev["last_seq"] == evs["latest"] and dev["last_fetch_at"], dev)
         check("push: known device → registered", evs.get("registered") is True, evs.get("registered"))
-        r = await client.get("/api/phone/events?after=0&device_id=forgotten")
-        check("push: unknown device → registered false (phone re-registers)", (await r.json()).get("registered") is False)
+        spare = {"Authorization": f"Bearer {devices.create(OWNER, 'phone', 'Spare')[0]}"}
+        r = await client.get("/api/phone/events?after=0", headers=spare)
+        check("push: a device not registered → registered false (it registers again)",
+              (await r.json()).get("registered") is False)
         r = await client.get(f"/api/phone/events?after={evs['latest']}")
         check("push: nothing newer → empty", (await r.json())["events"] == [])
         with get_db_connection() as conn:
@@ -833,14 +839,17 @@ async def main():
         check("push: unregistered token → device removed, not delivered", not ok and phone_push.devices(OWNER) == [])
         check("push: no device → queued but not delivered", not await phone_push.notify(OWNER, "x", "y")
               and phone_push.latest_seq(OWNER) > evs["latest"])
-        phone_push.register(OWNER, "old-phone", "tok-old")
+        old_phone, new_phone = devices.create(OWNER, "phone", "Old")[1], devices.create(OWNER, "phone", "New")[1]
+        phone_push.register(OWNER, old_phone, "tok-old")
         with get_db_connection() as conn:
-            conn.execute("UPDATE phone_devices SET updated_at = '2000-01-01T00:00:00+00:00' WHERE device_id = 'old-phone'")
+            conn.execute("UPDATE phone_push SET updated_at = '2000-01-01T00:00:00+00:00' WHERE device_id = ?",
+                         (old_phone.id,))
             conn.commit()
-        phone_push.register(OWNER, "new-phone", "tok-new")
+        phone_push.register(OWNER, new_phone, "tok-new")
         await phone_push.notify(OWNER, "x", "y")
-        check("push: a device silent for 60 days is dropped", [d["device_id"] for d in phone_push.devices(OWNER)] == ["new-phone"],
-              phone_push.devices(OWNER))
+        check("push: a device silent for 60 days loses its push registration (the device stays)",
+              [d["device_id"] for d in phone_push.devices(OWNER)] == [new_phone.id]
+              and devices.get(old_phone.id) is not None, phone_push.devices(OWNER))
 
     passed = sum(1 for _, ok in results if ok)
     print(f"\n{passed}/{len(results)} passed")

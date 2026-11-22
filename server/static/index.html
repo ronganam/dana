@@ -25,11 +25,13 @@
     <link rel="stylesheet" href="/static/review.css">
     <link rel="stylesheet" href="/static/usage.css">
     <link rel="stylesheet" href="/static/addons.css">
+    <link rel="stylesheet" href="/static/devices.css">
     <!-- Third-Party Libraries -->
     <!-- Vendored, exact versions (THIRD_PARTY.md): no script comes from a CDN -->
     <script src="/static/vendor/marked.min.js"></script>
     <script src="/static/vendor/purify.min.js"></script>
     <script src="/static/vendor/lucide.min.js"></script>
+    <script src="/static/vendor/qrcode.js" defer></script>
     <script src="/static/dana.js" defer></script>
     <script src="/static/app-core.js" defer></script>
     <script src="/static/app-places.js" defer></script>
@@ -48,6 +50,7 @@
     <script src="/static/usage.js" defer></script>
     <script src="/static/addons.js" defer></script>
     <script src="/static/profile.js" defer></script>
+    <script src="/static/devices.js" defer></script>
 </head>
 <body>
     <div class="app-container">
@@ -233,16 +236,6 @@
                         <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Dana</h2>
                         
                         <div class="settings-input-group">
-                            <label class="settings-label" for="settings-server-url">Server URL</label>
-                            <input type="text" class="settings-input" id="settings-server-url" placeholder="https://dana.example.com">
-                        </div>
-
-                        <div class="settings-input-group">
-                            <label class="settings-label" for="settings-api-token">API Token (Optional)</label>
-                            <input type="password" class="settings-input" id="settings-api-token" placeholder="Bearer Token">
-                        </div>
-
-                        <div class="settings-input-group">
                             <span class="settings-label" id="settings-theme-label">Theme</span>
                             <div class="segmented-control" id="settings-theme" role="radiogroup" aria-labelledby="settings-theme-label">
                                 <button type="button" class="segmented-btn" role="radio" data-theme-choice="system">System</button>
@@ -250,8 +243,6 @@
                                 <button type="button" class="segmented-btn" role="radio" data-theme-choice="light">Paper</button>
                             </div>
                         </div>
-
-                        <button class="btn-primary" id="btn-save-settings">Save Settings</button>
 
                         <div style="border-top:1px solid var(--hairline);padding-top:16px;">
                             <span class="settings-label">Connected Interfaces & Hubs</span>
@@ -264,6 +255,10 @@
                                     <i data-lucide="layout-dashboard"></i>
                                     <span>Bedroom Dashboard</span>
                                 </a>
+                                <button class="settings-link-tile" id="btn-open-devices-tab">
+                                    <i data-lucide="smartphone"></i>
+                                    <span>Devices</span>
+                                </button>
                                 <button class="settings-link-tile" id="btn-open-addons-tab">
                                     <i data-lucide="plug"></i>
                                     <span>Addons</span>
@@ -301,6 +296,24 @@
                     </div>
                 </div>
                 <div class="ibx-modal hidden" id="itg-modal"></div>
+            </section>
+
+            <!-- ════ DEVICES (static/devices.js) — opened from Settings or /#devices ════ -->
+            <section class="screen-panel" id="panel-devices">
+                <header class="top-bar">
+                    <span class="top-bar-title">Devices</span>
+                    <div class="top-bar-actions">
+                        <button class="icon-btn" id="dev-refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
+                        <button class="btn-primary" id="dev-pair"><i data-lucide="plus"></i> Pair a device</button>
+                    </div>
+                </header>
+                <div class="dev-scroll">
+                    <div class="dev-inner">
+                        <p class="dev-intro">Every phone, watch, tablet, TV and browser signed in as you, each with its own key. Remove one and it is signed out at once.</p>
+                        <div id="dev-list"></div>
+                    </div>
+                </div>
+                <div class="ibx-modal hidden" id="dev-modal"></div>
             </section>
 
             <!-- ════ USAGE & COST (static/usage.js) ════ -->

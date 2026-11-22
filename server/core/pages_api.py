@@ -36,6 +36,11 @@ def _read_server_version() -> str:
 _SERVER_VERSION = _read_server_version()
 
 
+def server_version() -> str:
+    """This server's version (the ``VERSION`` file; "unknown" without one)."""
+    return _SERVER_VERSION
+
+
 async def health_api(request: web.Request) -> web.Response:
     """GET /api/health — cheap liveness probe used by clients to show a
     "server unreachable" indicator. Does no I/O beyond building the response."""

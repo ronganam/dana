@@ -27,7 +27,7 @@ from typing import Any, Dict, List, Tuple
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("agent_sessions_test")
-os.environ["API_TOKEN"] = "agent-sessions-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "agent-sessions-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["FCM_SERVICE_ACCOUNT_JSON"] = '{"project_id": "dana-test"}'
 os.environ["AGENT_SESSIONS_PUSH_INTERVAL"] = "0.4"
 from cryptography.fernet import Fernet  # noqa: E402
@@ -37,7 +37,7 @@ import httpx  # noqa: E402
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from core import db, users  # noqa: E402
+from core import db, devices, users  # noqa: E402
 
 db.migrate()
 users.bootstrap()
@@ -61,7 +61,7 @@ CARL = users.create("Carl")
 for _u in (ANN, BOB):
     store.connect(_u, "phone")
 store.connect(CARL, "tasks")
-TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ANN, BOB, CARL)}
+TOKENS = {u.id: devices.create(u, "phone")[0] for u in (ANN, BOB, CARL)}  # each one's paired phone
 PINGS: List[Dict[str, Any]] = []
 
 
@@ -136,8 +136,8 @@ def unit_activity() -> None:
 
 
 async def test_flow(client) -> None:
-    await client.post("/api/phone/register", headers=auth(ANN), json={"device_id": "dev-a", "token": "tok-a"})
-    await client.post("/api/phone/register", headers=auth(BOB), json={"device_id": "dev-b", "token": "tok-b"})
+    await client.post("/api/phone/register", headers=auth(ANN), json={"token": "tok-a"})
+    await client.post("/api/phone/register", headers=auth(BOB), json={"token": "tok-b"})
     PINGS.clear()
     r = await hook(client, ANN, "claude", claude("SessionStart", source="startup"))
     check("SessionStart alone shows nothing", r["status"] == 200 and r["change"] is None

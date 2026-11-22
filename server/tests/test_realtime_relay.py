@@ -22,7 +22,7 @@ from cryptography.fernet import Fernet
 # A throwaway database: the relay stores the call's transcript in the caller's session.
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("realtime_relay_test")
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 # A throwaway key: the startup import stores any addon credentials it finds in env encrypted.
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 
@@ -208,7 +208,7 @@ async def run_verification():
     os.environ["OPENAI_API_KEY"] = "mock-sk-test-token"
 
     relay_app = web.Application()
-    setup_auth(relay_app)  # no API_TOKEN: every request is the first admin
+    setup_auth(relay_app)  # no API_TOKEN: a request without credentials is the first admin
     relay_app.router.add_get("/api/assistant/realtime", assistant_realtime_ws_api)
     relay_runner = web.AppRunner(relay_app)
     await relay_runner.setup()

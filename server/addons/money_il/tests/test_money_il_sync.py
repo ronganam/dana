@@ -43,7 +43,7 @@ import testenv  # first: clean env, temp DB removed at exit, no .env (see testen
 DB_PATH = testenv.isolate("money_sync_test")
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake logins
-os.environ["API_TOKEN"] = "money-sync-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "money-sync-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["TIMEZONE"] = "Asia/Jerusalem"
 os.environ["OWNER_NAME"] = "Robin"
 os.environ["ALLOWED_TELEGRAM_USER_IDS"] = "111"

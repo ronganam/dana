@@ -7,33 +7,17 @@ then the first admin's default addons, once.
   the start.
 - **The first admin's addons**: every ``default_on`` addon they may have, once
   (``system_marks['addons:first_admin_defaults']``), so one they turn off later
-  stays off. Nothing is read from env: addons with credentials or settings are
+  stays off; with no admin yet (setup mode) the setup page gives them when it
+  creates the admin (core/setup.py). Nothing is read from env: addons with credentials or settings are
   connected on the Addons page or with ``bin/dana addons connect``.
 """
 
 import logging
 from typing import List
 
-from core import users, user_rows
 from core.addons import crypto, store
-from core.db import get_db_connection
 
 logger = logging.getLogger(__name__)
-
-DEFAULTS_MARK = "addons:first_admin_defaults"
-
-
-def _defaults_given() -> bool:
-    with get_db_connection() as conn:
-        return conn.execute("SELECT 1 FROM system_marks WHERE key = ?", (DEFAULTS_MARK,)).fetchone() is not None
-
-
-def _mark_defaults_given(detail: str) -> None:
-    now = user_rows.now_iso()
-    with get_db_connection() as conn:
-        conn.execute("INSERT OR IGNORE INTO system_marks (key, last_at, ok, last_ok_at, detail) VALUES (?, ?, 1, ?, ?)",
-                     (DEFAULTS_MARK, now, now, detail[:300]))
-        conn.commit()
 
 
 def ensure_credentials_key() -> None:
@@ -56,17 +40,11 @@ def ensure_credentials_key() -> None:
 
 def bootstrap() -> List[str]:
     """Check the credentials key and give the first admin their default addons
-    (once). Run at startup after ``users.bootstrap()``. Returns the addons turned on now.
+    (once: :func:`core.addons.store.connect_first_admin_defaults`). Run at
+    startup after ``users.bootstrap()``. Returns the addons turned on now.
 
     Raises:
         CredentialsKeyError: the key is missing, malformed or wrong (the message says what to do).
     """
     ensure_credentials_key()
-    admin = users.first_admin()
-    if admin is None or _defaults_given():
-        return []
-    turned_on = store.connect_defaults(admin)
-    _mark_defaults_given(", ".join(turned_on) or "none")
-    if turned_on:
-        logger.info(f"Default addons turned on for {admin.name}: {', '.join(turned_on)}")
-    return turned_on
+    return store.connect_first_admin_defaults()

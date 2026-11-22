@@ -1,7 +1,8 @@
 # Self-hosting Dana with Docker Compose (docs/operations.md, "Running it").
 #
-#   cp .env.example .env            # fill in the LLM key and API_TOKEN (both required)
+#   cp .env.example .env            # fill in the LLM key
 #   docker compose up -d            # http://localhost:8080 (this machine only, see ports below)
+#   docker compose logs app | grep setup   # open the setup link to create your admin account
 #   docker compose --profile money_il up -d   # also money_il's worker: the Israeli bank syncs (docs/money-il.md)
 #
 # An addon's worker (its worker/ folder: docs/operations.md, "Workers") runs as a service under a
@@ -21,7 +22,7 @@ services:
     ports:
       # Only this machine can reach Dana. To reach it from elsewhere, put it behind a reverse proxy
       # with TLS (Caddy, Traefik, nginx…) on the same host, or change this to "8080:8080" on a network
-      # you trust. API_TOKEN is required either way (docs/operations.md, "Running it").
+      # you trust (docs/operations.md, "Running it"); set PUBLIC_URL to the address phones use.
       - "127.0.0.1:8080:8080"
     volumes:
       - data:/app/db

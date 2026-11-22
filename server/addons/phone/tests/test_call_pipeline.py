@@ -18,7 +18,7 @@ from cryptography.fernet import Fernet
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("call_pipeline_test")
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.setdefault("GEMINI_API_KEY", "test-key")
 
@@ -152,7 +152,7 @@ cal.add_event = fake_add_event
 
 def build_app():
     app = web.Application()
-    setup_auth(app)  # no API_TOKEN: every request is the first admin
+    setup_auth(app)  # no API_TOKEN: a request without credentials is the first admin
     r = app.router
     r.add_post("/api/calls/upload", calls_api.upload_call_api)
     r.add_get("/api/calls", calls_api.get_calls_api)

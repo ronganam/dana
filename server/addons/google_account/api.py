@@ -12,11 +12,10 @@ needs the one-time ``state`` that ``connect`` gave to the same user.
 """
 
 import logging
-import os
 
 from aiohttp import web
 
-from core import users
+from core import public_url, users
 from core.auth import request_user
 from core.addons import crypto, store
 from addons.google_account import oauth
@@ -27,14 +26,10 @@ PAGE = "/?google={result}#addons"
 
 
 def redirect_uri(request: web.Request) -> str:
-    """Where Google sends the user back: ``PUBLIC_URL`` when set, else the
-    address the request came to. It must be one of the OAuth client's
-    authorised redirect URIs."""
-    base = (os.getenv("PUBLIC_URL") or "").strip().rstrip("/")
-    if not base:
-        scheme = request.headers.get("X-Forwarded-Proto", request.scheme).split(",")[0].strip() or request.scheme
-        base = f"{scheme}://{request.host}"
-    return base + oauth.CALLBACK_PATH
+    """Where Google sends the user back: the server's public address
+    (core/public_url.py) + the callback path. It must be one of the OAuth
+    client's authorised redirect URIs."""
+    return public_url.base_url(request) + oauth.CALLBACK_PATH
 
 
 def _back(result: str) -> web.HTTPFound:

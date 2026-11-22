@@ -187,7 +187,7 @@ The `suggestions` push (full-screen review on the phone) is sent for calls that 
 
 | key | ok when | source of the timestamp |
 |---|---|---|
-| `push` | FCM configured, a phone of the caller registered, the last ping attempt to it didn't fail (or the phone fetched since), it checked in within `CHECK_PUSH_FETCH_HOURS` (24) (ok "not connected" without the `phone` addon) | their `phone_devices.last_fetch_at`, `system_marks['push:<user>']` (every `push.send` to them) |
+| `push` | FCM configured, a phone of the caller registered, the last ping attempt to it didn't fail (or the phone fetched since), it checked in within `CHECK_PUSH_FETCH_HOURS` (24) (ok "not connected" without the `phone` addon) | their `phone_push.last_fetch_at`, `system_marks['push:<user>']` (every `push.send` to them) |
 | `notification_sync` | a batch from the caller's phone within `CHECK_NOTIFICATION_SYNC_HOURS` (12) (ok "not connected" without the addon) | `system_marks['notification_sync:<user>']` (every batch), else their newest notification |
 | `location` | the caller's person entity changed, or a zone transition fired, within `CHECK_LOCATION_DAYS` (3) | `system_marks['ha_event:<user>:person']` (the Home Assistant watcher) |
 | `car` | the caller's car connection changed within `CHECK_CAR_DAYS` (7) | `system_marks['ha_event:<user>:car']` |

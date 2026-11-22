@@ -29,7 +29,7 @@ from cryptography.fernet import Fernet
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("multi_user_core")
 ROOT = str(testenv.SERVER)
-os.environ["API_TOKEN"] = "mu-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "mu-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["ALLOWED_TELEGRAM_USER_IDS"] = "111"
 os.environ["TELEGRAM_CHAT_ID"] = "1111"
 os.environ.pop("SHORTCUTS", None)

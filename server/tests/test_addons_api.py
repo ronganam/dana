@@ -25,7 +25,7 @@ from unittest.mock import AsyncMock
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("addons_api_test")
-os.environ["API_TOKEN"] = "addons-api-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "addons-api-env-token"  # a test value: the first admin's token (a headless install)
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
 os.environ["HA_WATCH_RECONCILE_SECONDS"] = "3600"  # the periodic tick never comes during the test

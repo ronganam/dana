@@ -18,6 +18,7 @@ const SHELL = [
   "/static/review.css",
   "/static/usage.css",
   "/static/addons.css",
+  "/static/devices.css",
   "/static/dana.js",
   "/static/app-core.js",
   "/static/app-places.js",
@@ -36,11 +37,13 @@ const SHELL = [
   "/static/usage.js",
   "/static/addons.js",
   "/static/profile.js",
+  "/static/devices.js",
   "/static/favicon.png",
   "/static/icons/icon-192x192.png",
   "/static/vendor/lucide.min.js",
   "/static/vendor/marked.min.js",
   "/static/vendor/purify.min.js",
+  "/static/vendor/qrcode.js",
   "/manifest.json"
 ];
 

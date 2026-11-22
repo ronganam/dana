@@ -18,7 +18,7 @@ import os
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("user_locale_test")
-os.environ["API_TOKEN"] = "user-locale-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "user-locale-env-token"  # a test value: the first admin's token (a headless install)
 
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402

@@ -23,7 +23,7 @@ from cryptography.fernet import Fernet
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("about_test")
-os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development mode, every request is the first admin
+os.environ["DANA_INSECURE_DEV"] = "1"  # no API_TOKEN: local development, a request without credentials is the first admin
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 os.environ.setdefault("ANTHROPIC_API_KEY", "test-key")
 os.environ["ABOUT_MAX_CHARS"] = "700"
@@ -481,7 +481,7 @@ async def test_learner():
 async def test_http():
     reset_facts()
     app = web.Application()
-    setup_auth(app)  # no API_TOKEN: every request is the first admin
+    setup_auth(app)  # no API_TOKEN: a request without credentials is the first admin
     about_api.setup(app)
     actions_api.setup(app)  # POST /api/undo/{id}
     app.router.add_get("/api/memories", about_api.get_memories_api)

@@ -40,7 +40,7 @@ from typing import Any, Dict, List, Tuple
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("shopping_users_test")
 ROOT = str(testenv.SERVER)
-os.environ["API_TOKEN"] = "shopping-users-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "shopping-users-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["FCM_SERVICE_ACCOUNT_JSON"] = '{"project_id": "dana-test"}'
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
@@ -59,7 +59,7 @@ import httpx
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from core import db, users
+from core import db, devices, users
 
 db.migrate()
 users.bootstrap()
@@ -124,8 +124,8 @@ CARL = users.create("Carl", telegram_ids=[333])  # no shopping
 for who in (BOB, EVE):
     store.connect(who, "shopping")
 store.connect(BOB, "phone")
-push.register(ADMIN, "admin-phone", "tok-admin")
-push.register(BOB, "bob-phone", "tok-bob")
+push.register(ADMIN, devices.create(ADMIN, "phone")[1], "tok-admin")
+push.register(BOB, devices.create(BOB, "phone")[1], "tok-bob")
 TOKENS = {u.id: users.issue_token(u.id, f"test {u.name}")[0] for u in (ADMIN, BOB, EVE, CARL)}
 A_LIST, B_LIST, E_LIST = (lists.own_list_id(u) for u in (ADMIN, BOB, EVE))
 

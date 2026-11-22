@@ -246,6 +246,14 @@ def types_of(events: List[Dict[str, Any]]) -> List[str]:
     return [e.get("type", "") for e in events]
 
 
+async def pair(c: "Client", token: str, name: str, kind: str = "phone") -> str:
+    """A new device of ``token``'s user, paired the way an app pairs (code, then POST /api/pair): its own token."""
+    started = await c.post("/api/devices/pairings", {"kind": kind, "name": name}, token)
+    code = (started.body or {}).get("code", "")
+    paired = await c.post("/api/pair", {"code": code, "kind": kind, "name": name}, None)
+    return (paired.body or {}).get("token", "")
+
+
 def ids(items: Any, key: str = "id") -> set:
     return {i.get(key) for i in items or [] if isinstance(i, dict)}
 
@@ -985,8 +993,9 @@ async def watcher(c: Client, maya: Dict[str, str]) -> None:
     print("\n== 5. Home Assistant watcher")
     tok = maya["token"]
     for t, dev in ((ADMIN_TOKEN, "e2e-admin-phone"), (tok, "e2e-maya-phone")):
-        r = await c.post("/api/phone/register", {"device_id": dev, "token": f"fcm-{dev}", "name": dev}, t)
-        check(f"phone: register {dev}", r.status == 200, r)
+        device_token = await pair(c, t, dev)
+        r = await c.post("/api/phone/register", {"token": f"fcm-{dev}", "app_version": "e2e"}, device_token)
+        check(f"phone: {dev} paired and registered for push", bool(device_token) and r.status == 200, r)
     mk = [(ADMIN_TOKEN, "E2E arrive work", {"location": {"location": "work", "event": "arrive"}}),
           (ADMIN_TOKEN, "E2E car enter", {"car": "enter"}),
           (ADMIN_TOKEN, "E2E arrive office", {"location": {"location": "office", "event": "arrive"}}),
@@ -1288,12 +1297,15 @@ async def security(c: Client, maya: Dict[str, str]) -> None:
     devs = (await c.get("/api/phone/devices")).body or {}
     admin_devices = {d["device_id"]: d for d in devs.get("devices") or []}
     taken = next(iter(admin_devices), "")
-    r = await c.post("/api/phone/register", {"device_id": taken, "token": "maya-fcm-token"}, tok)
+    maya_phone = await pair(c, tok, "e2e-maya-second")
+    r = await c.post("/api/phone/register", {"device_id": taken, "token": "maya-fcm-token"}, maya_phone)
     after = {d["device_id"]: d for d in ((await c.get("/api/phone/devices")).body or {}).get("devices") or []}
     mine = ids(((await c.get("/api/phone/devices", tok)).body or {}).get("devices"), "device_id")
-    check("devices: registering the admin's device id gives her her own row; the admin's stays",
-          taken and r.status == 200 and taken in after and after[taken] == admin_devices[taken] and taken in mine,
-          (taken, r, sorted(after), sorted(mine)))
+    check("devices: a device id in the body is ignored: her phone registers itself; the admin's stays theirs",
+          taken and r.status == 200 and taken in after and after[taken] == admin_devices[taken] and taken not in mine
+          and len(mine) == 2, (taken, r, sorted(after), sorted(mine)))
+    r = await c.post("/api/phone/register", {"token": "script-fcm-token"}, ADMIN_TOKEN)
+    check("devices: a token of no device (API_TOKEN) cannot register for push", r.status == 400, r)
 
 
 # =================================================================================================

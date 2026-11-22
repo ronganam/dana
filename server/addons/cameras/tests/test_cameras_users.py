@@ -26,7 +26,7 @@ from typing import Any, Dict, List, Tuple
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("cameras_users_test")
-os.environ["API_TOKEN"] = "cam-users-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "cam-users-test-env-token"  # a test value: the first admin's token (a headless install)
 from cryptography.fernet import Fernet  # noqa: E402
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key (Erin's Home Assistant token)
 os.environ["FRIGATE_URL"] = "https://frigate.example.com/"  # the old env import's name: read by nothing now

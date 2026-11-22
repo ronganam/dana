@@ -36,7 +36,7 @@ from unittest.mock import AsyncMock, patch
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("whatsapp_users_test")
-os.environ["API_TOKEN"] = "wa-users-test-env-token"  # a test value: with it set, DB tokens are honoured
+os.environ["API_TOKEN"] = "wa-users-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["WAHA_WEBHOOK_SECRET"] = "wa-users-test-waha-secret"  # a test value: WAHA's HMAC key
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
