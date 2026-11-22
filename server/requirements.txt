@@ -9,7 +9,7 @@ litellm>=1.108.3
 # import chain needs the `mcp` package (upstream bug BerriAI/litellm#46045).
 # Remove once the upstream fix (BerriAI/litellm#46269) ships.
 mcp>=2.2.0,<3
-pydantic>=2.0.0
+pydantic>=2.14.4
 cryptography>=42.0.0
 python-dotenv>=1.0.0
 ddgs>=9.0.0
