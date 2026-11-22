@@ -97,7 +97,7 @@ Some parts need something without being an addon:
 - **The Android apps** (phone, watch, wall tablet, TV): the APKs on each GitHub release, or built from [`android/`](android/) ([Build the apps](#build-the-apps)). Each pairs with your server by a QR code or a short code from the web's Devices page; the watch is paired through the phone app.
 - **Direct push** to the phone: the free [ntfy](https://ntfy.sh) app on the phone (UnifiedPush; public ntfy.sh or your own ntfy server). The ping carries no content. If you build the app yourself with a Firebase project, FCM works instead (`FCM_SERVICE_ACCOUNT_JSON` on the server). Without either, the app still works and catches up when it syncs.
 - **Telegram**: `TELEGRAM_BOT_TOKEN` for chatting with Dana in Telegram and for the messages Dana sends there.
-- **Voice**: `OPENAI_API_KEY` for realtime voice calls; the transcription model's key (`GEMINI_API_KEY` by default) for voice messages and push-to-talk.
+- **Voice**: `OPENAI_API_KEY` for realtime voice calls; a transcription model for voice messages and call recordings: an OpenAI or Gemini key, or a local Whisper server (`docker compose --profile whisper up -d` and `WHISPER_URL=http://whisper:8000`); push-to-talk uses the phone's own speech recognition.
 
 ## Your own deployment
 

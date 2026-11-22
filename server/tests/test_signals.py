@@ -27,7 +27,10 @@ import testenv  # first: clean env, temp DB removed at exit, no .env (see testen
 testenv.isolate("signals_test")
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
-os.environ["TIMEZONE"] = "Asia/Jerusalem"
+# A zone where it is around noon now (Etc/GMT-N is UTC+N), so no check runs across a local midnight.
+_OFFSET = max(-12, min(14, 12 - datetime.datetime.now(datetime.timezone.utc).hour))
+ZONE = f"Etc/GMT{-_OFFSET:+d}" if _OFFSET else "Etc/GMT"
+os.environ["TIMEZONE"] = ZONE
 
 import httpx
 from aiohttp import web
@@ -256,7 +259,7 @@ async def test_post(client) -> None:
         loc = sources_of(g, "location")[0]
         check("overview: Gal's last location signal is the zone's name, nothing more",
               loc["detail"] == "arrive Home" and loc["last_at"] and loc["active"], loc)
-        check("overview: the time is local (the server's zone)", loc["last_at"].endswith(("+02:00", "+03:00")), loc)
+        check("overview: the time is local (the server's zone)", datetime.datetime.fromisoformat(loc["last_at"]).utcoffset() == datetime.timedelta(hours=_OFFSET), loc)
         r = await get_signals(client, ROBIN)
         check("isolation: Gal's events are not on Robin's overview",
               all(s["last_at"] is None for sig in r["signals"] for s in sig["sources"] if s["source"] == "phone"), r)
@@ -535,11 +538,8 @@ async def test_fixture(client) -> None:
 
 
 async def main() -> None:
-    local = clock.now()
-    if local.hour == 23 and local.minute >= 58:  # the wake window ends at 23:59: wait for the new day
-        await asyncio.sleep((60 - local.minute) * 60 - local.second + 5)
     ha = FakeHA("R", "tok-robin", {"weather.robin": ("cloudy", {"temperature": 14, "temperature_unit": "°C"})},
-                {}, "Asia/Jerusalem")
+                {}, ZONE)
     await ha.start()
     store.connect(ROBIN, "homeassistant", credentials={"host": ha.url, "token": "tok-robin"},
                   settings={"weather_entity": "weather.robin", "phone_interactive_sensor": "binary_sensor.robin_screen",

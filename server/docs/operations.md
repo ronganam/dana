@@ -39,7 +39,7 @@
 A failure stops the push. `DANA_NO_DEPLOY=1 git push …` pushes without deploying; `git push --no-verify` skips tests and deploy. Android changes are not tested by the hook.
 
 - **`bin/deploy [<commit>] [--wait]`** reads the site's `deploy.env` (`DANA_DEPLOY_CONFIG` names another file; the template is `site.example/deploy.env.example`): builds the `app` stage of that commit (default HEAD) from a clean checkout, with the site's addons as the `site_addons` build context (`site/addons/`, or the folders in `DANA_IMAGE_ADDONS`; the image's `/app/addons-site`; `docs/writing-an-addon.md`), as `$DANA_IMAGE:<release>` and `latest`, plus one image per addon worker (below), and pushes them. The release is `<VERSION>-<commit>`, plus `-a<hash>` of the site addons' files when there are any, so changing only a site addon and running `bin/deploy` again is a new release that rolls out. With `DANA_GITOPS_REPO` it writes the release into `DANA_GITOPS_VALUES` (every `tag:` line and every worker's `image:`) in that repository (from its own clone in `~/.cache/dana-deploy/gitops`) and pushes, for ArgoCD / Flux to roll the pod. It runs no tests. Use it to redeploy or roll back (`bin/deploy <older commit>`).
-- The release name is written into the image's `VERSION` file: `/api/health` reports it and the dashboard's `?v=` cache-buster uses it, so every deploy reaches cached clients. **No VERSION bump is needed to ship**; bump it to name a release.
+- The release name is written into the image's `VERSION` file: `/api/health` reports it and the web release digest (`pages_api.web_release()`, the dashboard's and the service worker's `?v=`) follows it, so every deploy reaches cached clients. **No VERSION bump is needed to ship**; bump it to name a release.
 - `bin/deploy --wait` waits until a pod in `DANA_K8S_NAMESPACE` matching `DANA_K8S_SELECTOR` runs the release and is ready.
 
 ### Workers
@@ -166,7 +166,9 @@ The web server listens on port 8080. Every path but the public ones (`docs/acces
 | `GET /api/assistant/models` | Chat model catalog + default id (the profiles the caller's access level may use) |
 | `GET /api/assistant/voice_stream` | WebSocket: PCM in, then the same run events as JSON frames, closed by `state` (or `no_speech`) |
 | `GET /api/me` | The caller: `{id, name, access, capabilities, addons, languages, currency}` |
-| `GET` / `PUT /api/profile` | The caller's languages and currency (`core/profile_api.py`) |
+| `GET` / `PUT /api/profile` | The caller's languages, currency and `wake_window` (`core/profile_api.py`) |
+| `GET` / `PUT /api/dashboard?device=`, `GET /api/dashboard/widget?id=`, `GET /api/dashboard/catalog`, `GET /dashboard` | A tablet's or TV's dashboard: layout and widget data (`core/dashboard_api.py`, `docs/dashboard.md`) |
+| `GET /api/usage`, `PUT /api/usage/budget` | Usage and cost; the monthly budget (admin) (`core/usage_api.py`) |
 | `GET /api/setup` · `POST /api/setup/admin` | Setup mode (public, only while there are no users): `{setup_required, version}` / create the first admin `{code, name}` → 201 `{user, device, token}` with the session cookie; 403 `invalid_code`, 409 `already_set_up`, 429 (`docs/devices.md`) |
 | `POST /api/pair` | A new device redeems a pairing code (public, rate-limited): `{code, kind, name?}` → `{token, device, user, server}`; 403 `invalid_code`, 409 `wrong_kind`, 429 |
 | `POST /api/devices/pairings` · `GET` / `DELETE /api/devices/pairings/{id}` | Start a pairing for the caller (or `user_id` with `manage_users`) → 201 `{id, code, expires_at, qr, …}` / its status (`pending \| paired \| expired`) / cancel it |
@@ -223,7 +225,8 @@ The web server listens on port 8080. Every path but the public ones (`docs/acces
 | `GET /api/frigate/event/{id}/clip.mp4` | Event clip, buffered (4-clip LRU) and served with Range support |
 | `GET /api/people?sort=&q=` / `GET /api/people/{id}` | People with stats / one person: brief, timeline, tasks (`docs/people.md`) |
 | `GET /api/people/lookup?phone=` | The incoming-call card for a number |
-| `POST /api/phone/unlock` | Phone unlocked (`{at}` epoch ms) — the wake signal; returns `confirming` / `done` / `outside_window` (`unavailable` for a user without Home Assistant) |
+| `POST /api/signals` | The caller's phone events (unlock, screen, car, zone, sleep) → `{accepted, rejected}` (phone addon; `docs/signals.md`) |
+| `GET /api/signals` | The caller's signals and their sources, the wake window (`core/signals_api.py`) |
 | `GET /api/briefing/today` | Today's wake briefing (`?generate=1` makes it) |
 | `GET /api/review/latest` | The latest weekly review with its proposals |
 | `GET /api/app/version` | The Android app versions offered (from releases and uploads; manifest in `<data dir>/app-updates/`; App updates above) |

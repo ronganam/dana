@@ -211,10 +211,10 @@
      "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
     },
     {
-     "kind": "env",
+     "kind": "account",
      "optional": true,
-     "what": "GEMINI_API_KEY",
-     "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+     "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+     "why": "Transcribes the voice notes you receive (Claude does not hear audio)"
     },
     {
      "kind": "env",
@@ -587,10 +587,10 @@
      "name": "knowledge",
      "needs": [
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcripts of the videos and audio files you save (Claude does not hear audio)"
       }
      ],
      "options": false,
@@ -786,10 +786,10 @@
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes call recordings (Claude does not hear audio)"
       },
       {
        "kind": "app",
@@ -1007,8 +1007,8 @@
       {
        "can_change": true,
        "default": null,
-       "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
-       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "description": "Phone battery level sensor (a dashboard's Batteries widget when it names none)",
+       "help": "From the Home Assistant phone app; shown on dashboards.",
        "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
        "placeholder": "sensor.pixel_battery_level",
@@ -1181,10 +1181,10 @@
        "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes the voice notes you receive (Claude does not hear audio)"
       },
       {
        "kind": "env",
@@ -2028,10 +2028,10 @@
      "name": "knowledge",
      "needs": [
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcripts of the videos and audio files you save (Claude does not hear audio)"
       }
      ],
      "options": false,
@@ -2191,10 +2191,10 @@
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes call recordings (Claude does not hear audio)"
       },
       {
        "kind": "app",
@@ -2389,8 +2389,8 @@
       {
        "can_change": true,
        "default": null,
-       "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
-       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "description": "Phone battery level sensor (a dashboard's Batteries widget when it names none)",
+       "help": "From the Home Assistant phone app; shown on dashboards.",
        "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
        "placeholder": "sensor.pixel_battery_level",
@@ -2563,10 +2563,10 @@
        "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes the voice notes you receive (Claude does not hear audio)"
       },
       {
        "kind": "env",
@@ -3391,10 +3391,10 @@
      "name": "knowledge",
      "needs": [
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcripts of the videos and audio files you save (Claude does not hear audio)"
       }
      ],
      "options": false,
@@ -3554,10 +3554,10 @@
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes call recordings (Claude does not hear audio)"
       },
       {
        "kind": "app",
@@ -3752,8 +3752,8 @@
       {
        "can_change": true,
        "default": null,
-       "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
-       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "description": "Phone battery level sensor (a dashboard's Batteries widget when it names none)",
+       "help": "From the Home Assistant phone app; shown on dashboards.",
        "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
        "placeholder": "sensor.pixel_battery_level",
@@ -3927,10 +3927,10 @@
        "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes the voice notes you receive (Claude does not hear audio)"
       },
       {
        "kind": "env",
@@ -4719,10 +4719,10 @@
      "name": "knowledge",
      "needs": [
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcripts of the videos and audio files you save (Claude does not hear audio)"
       }
      ],
      "options": false,
@@ -4882,10 +4882,10 @@
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes call recordings (Claude does not hear audio)"
       },
       {
        "kind": "app",
@@ -5080,8 +5080,8 @@
       {
        "can_change": true,
        "default": null,
-       "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
-       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "description": "Phone battery level sensor (a dashboard's Batteries widget when it names none)",
+       "help": "From the Home Assistant phone app; shown on dashboards.",
        "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
        "placeholder": "sensor.pixel_battery_level",
@@ -5254,10 +5254,10 @@
        "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes the voice notes you receive (Claude does not hear audio)"
       },
       {
        "kind": "env",
@@ -6061,10 +6061,10 @@
      "name": "knowledge",
      "needs": [
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcripts of the videos and audio files you save (Claude does not hear audio)"
       }
      ],
      "options": false,
@@ -6224,10 +6224,10 @@
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes call recordings (Claude does not hear audio)"
       },
       {
        "kind": "app",
@@ -6422,8 +6422,8 @@
       {
        "can_change": true,
        "default": null,
-       "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
-       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "description": "Phone battery level sensor (a dashboard's Batteries widget when it names none)",
+       "help": "From the Home Assistant phone app; shown on dashboards.",
        "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
        "placeholder": "sensor.pixel_battery_level",
@@ -6596,10 +6596,10 @@
        "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes the voice notes you receive (Claude does not hear audio)"
       },
       {
        "kind": "env",
@@ -7403,10 +7403,10 @@
      "name": "knowledge",
      "needs": [
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcripts of the videos and audio files you save (Claude does not hear audio)"
       }
      ],
      "options": false,
@@ -7566,10 +7566,10 @@
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes call recordings (Claude does not hear audio)"
       },
       {
        "kind": "app",
@@ -7764,8 +7764,8 @@
       {
        "can_change": true,
        "default": null,
-       "description": "Phone battery level sensor (the bedroom dashboard's phone tile)",
-       "help": "From the Home Assistant phone app; shown on the bedroom dashboard.",
+       "description": "Phone battery level sensor (a dashboard's Batteries widget when it names none)",
+       "help": "From the Home Assistant phone app; shown on dashboards.",
        "label": "Phone's battery sensor",
        "name": "phone_battery_sensor",
        "placeholder": "sensor.pixel_battery_level",
@@ -7938,10 +7938,10 @@
        "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
       },
       {
-       "kind": "env",
+       "kind": "account",
        "optional": true,
-       "what": "GEMINI_API_KEY",
-       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+       "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+       "why": "Transcribes the voice notes you receive (Claude does not hear audio)"
       },
       {
        "kind": "env",
@@ -8700,10 +8700,10 @@
      "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
     },
     {
-     "kind": "env",
+     "kind": "account",
      "optional": true,
-     "what": "GEMINI_API_KEY",
-     "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+     "what": "a transcription model: an OpenAI or Gemini key, or your own Whisper server",
+     "why": "Transcribes the voice notes you receive (Claude does not hear audio)"
     },
     {
      "kind": "env",

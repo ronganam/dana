@@ -6,7 +6,7 @@ device or its user removes the row (``ON DELETE CASCADE``)."""
 
 import sqlite3
 
-VERSION = 8
+VERSION = 9
 NAME = "dashboards"
 
 

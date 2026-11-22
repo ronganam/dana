@@ -140,7 +140,7 @@ An addon with a sidecar process declares `worker=Worker(port=8090, url_env="EXAM
 
 ### LLM jobs
 
-`llm_jobs={"purpose": "profile"}` registers purposes for `core.llm.complete(purpose=...)`; the model is `MODEL_<PURPOSE>` from env, else the profile's model (`fast` / `balanced` / `deep`), and usage is filed under the purpose.
+`llm_jobs={"purpose": "profile"}` registers purposes for `core.llm.complete(purpose=...)`; the model is `MODEL_<PURPOSE>` from env, else the profile's model (`fast` / `balanced` / `deep`), and usage is filed under the purpose. `LlmJob(profile, label, background=True)` marks a purpose as background work, paused when the monthly budget is spent (`server/docs/usage.md`).
 
 ## Where addons come from, and turning them on
 
