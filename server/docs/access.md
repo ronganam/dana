@@ -261,11 +261,16 @@ design), `/api/app/upload` (guarded by `APP_PUBLISH_TOKEN`, not a user),
 addon and answers for the caller: the Now screen, its check cards,
 `/api/checks`, `/api/search`, `/api/briefing/*`, `/api/review/*`,
 `/api/phone/unlock`; `/api/phone/*` and `/api/notifications/*`, the caller's
-phone and Inbox; `/api/client-config`, `/api/zones`, `/api/ha/*` and the HA
+phone and Inbox; `/api/zones` and `/api/wizard*`, the caller's own zones and
+first-run wizard (every user, no addon needed); `/api/client-config`,
+`/api/ha/*` (including `POST /api/ha/zones/import`) and the HA
 camera proxies, the caller's Home Assistant (the proxies also need
 `cameras`); `/api/calendar/*`, the caller's Google Calendar; `/api/frigate/*`,
 the caller's Frigate; `/api/me` and `/api/addons*`, the caller's own
-(another user's with `manage_users`).
+(another user's with `manage_users`). Server-wide: `/api/llm` (the model
+provider and its key) needs `manage_server`; `/api/household/members*` and
+`/api/demo*` need `manage_users` (`GET /api/household` shows a member only
+themselves).
 
 ## Security rules
 
@@ -276,6 +281,16 @@ model in [`SECURITY.md`](../../SECURITY.md). Tests: `bin/test test_security`
 (each rule has its own section), plus the HTTP-reachable ones in
 `tests/local_env/e2e.py` ("security").
 
+- **Push registrations.** A push registration (an FCM token or a UnifiedPush
+  endpoint) belongs to the device that sent it; there is one per address, so
+  the same address from another device moves it. Endpoints are https only
+  (http only with `DANA_INSECURE_DEV=1`), never redirected, and only their
+  host is logged.
+- **The demo view.** The `dana_demo_view` cookie makes requests act as a demo
+  user only when the signed-in user has `manage_users` and the named user is
+  a demo user; `/api/demo*` always acts as the signed-in user. Demo users are
+  members, never admins, and are left out of `users.list_users()` (so no
+  background work, push or sharing reaches them).
 - **Pairing and setup.** A pairing code is 8 characters, one-time, valid for
   five minutes and stored only as a hash; it makes a device of the user who
   started it (someone else's only with `manage_users`) and nobody else.
@@ -610,7 +625,7 @@ Rules:
 | `about` | About-you facts and learner | none | none | built in, no sharing; facts, "do not re-add", the size cap, the prompt section and the learner per user (docs/about.md) |
 | `people` | people, briefs | none | none | built in, no sharing; people, their numbers (unique per user), briefs and the call card per user; calls / notifications linked only from the user's own (both by their `user_id`, `activity.calls_sql` / `notifications_sql`) (docs/people.md) |
 | `phone` | the Android phone: push, notifications Inbox, calls and suggestions | none (each device pairs and gets its own token; its push registration is keyed by that device) | none | built in. Devices, push events (one `seq` numbering for the server, each event fetched only by its user), notifications (FTS, rules, summaries, declines, action requests, digest state), calls (uploads, recordings, transcripts, labels, FTS search, processing / reanalysis / backfill as the owner), call and notification suggestions (only their owner's: listed, accepted, dismissed, edited, undone, popped up), context chats on them, the self-check marks `push` / `notification_sync` / `triage`, the calls check and the loops per user; `/api/phone/*`, `/api/notifications/*`, `/api/calls/*` and `/api/suggestions/*` for the caller, 403 `not_connected` without the addon (docs/notifications.md, docs/calls.md) |
-| `homeassistant` | Home Assistant | `host` (an address), `token` | `person` (person entity: zone triggers), `car_sensor` (the phone's Bluetooth connection sensor) + `car_device` (the car's Bluetooth name in its `connected_paired_devices`): car triggers, `phone_interactive_sensor` (screen on: wake confirmation), `phone_battery_sensor` (bedroom dashboard tile), `phone_notify_service` (only reported by `/api/client-config`), `weather_entity` (`weather.forecast_home`: briefing, Now), `tv_entity` (the Android TV media player `control_android_tv` uses when not given one) + `tv_channel_command` (an ADB command with `{channel}` for its `watch_channel`, e.g. a TV provider app's deep link; unset: no channel changes); no other defaults | no limits on Dana's side: whatever the token can do. Everything per connection: REST / WebSocket clients, zones, states cache, home map, the entity watcher (docs/tasks-and-triggers.md). Tools, `/api/ha/*`, `/api/zones`, `/api/client-config`, the HA camera proxies (which also need `cameras`): the caller's connection, 403 `not_connected` without it |
+| `homeassistant` | Home Assistant | `host` (an address), `token` | `person` (person entity: zone triggers), `car_sensor` (the phone's Bluetooth connection sensor) + `car_device` (the car's Bluetooth name in its `connected_paired_devices`): car triggers, `phone_interactive_sensor` (screen on: wake confirmation), `phone_battery_sensor` (bedroom dashboard tile), `phone_notify_service` (only reported by `/api/client-config`), `weather_entity` (`weather.forecast_home`: briefing, Now), `tv_entity` (the Android TV media player `control_android_tv` uses when not given one) + `tv_channel_command` (an ADB command with `{channel}` for its `watch_channel`, e.g. a TV provider app's deep link; unset: no channel changes); no other defaults | no limits on Dana's side: whatever the token can do. Everything per connection: REST / WebSocket clients, zones, states cache, home map, the entity watcher (docs/tasks-and-triggers.md). Tools, `/api/ha/*` (zone import included), `/api/client-config`, the HA camera proxies (which also need `cameras`): the caller's connection, 403 `not_connected` without it |
 | `whatsapp` | WAHA | `url` (an address), `api_key` (optional), `session` (a name, not one another user's connection uses) | `voice_telegram_chat_id` (none): the user's voice-transcript chat (their own Telegram id unless an admin sets it) | account: the session's WhatsApp id, learned from WAHA (routes inbound events, see "Inbound"). Tools, name maps, "me", dedupe, saved contacts (`whatsapp_contacts`) and the images its tools save per connection / user (docs/whatsapp.md). No HTTP endpoint of its own besides the inbound webhook |
 | `calendar` | Google Calendar | `refresh_token` (from the Google sign-in, "Google account") | `calendar_id` (`primary`): where new events go, `selected_calendars` (none): ids of the calendars shown and searched (none chosen: `calendar_id`) | OAuth client id/secret are server-wide. Tools, `/api/calendar/*`, undo of events, accepting an event suggestion and the composers' calendar reads (Now, briefing, meeting cards, weekly review, the `calendar` self-check) use the acting user's connection; credentials (access token) and today's events cached per connection; 403 `not_connected` without it. No sharing on Dana's side: calendars Google shares with a user show through their own account (docs/now.md) |
 | `contacts` | Google Contacts | `refresh_token` (from the Google sign-in) | none | a copy of the user's contacts, synced in the background (`CONTACTS_SYNC_MINUTES`) and deleted on disconnect; search / read tools, `add_contact` / `update_contact` ask first; fills the user's people and names unknown callers (docs/contacts.md) |
@@ -865,8 +880,8 @@ shared items.
 Sessions and the `main` thread (the wire id stays `main`), runs, pending
 approvals, undo entries, learned phrases, usage rows, About-you facts and the
 learner, people, tasks, shopping lists, projects, calls, notifications and
-rules, phone devices and events, briefings, weekly reviews, Now, self-checks
-of that user's addons. Another user's ids answer 404.
+rules, phone devices and events, zones, the first-run wizard's progress,
+briefings, weekly reviews, Now, self-checks of that user's addons. Another user's ids answer 404.
 
 In detail: sessions and `main`, runs, pending approvals, undo entries,
 learned phrases, usage rows and the Now screen's approval cards (see "The
@@ -914,8 +929,10 @@ chat if they have one today; their phone through `addons/phone/push.py`
 Three ways, the same rules: `bin/dana` on the server (everything, any
 user, works on the database directly), the HTTP API (a user's own
 addons; an admin's for anyone) and the web UI's **Addons** page
-built on that API (Settings → Addons). Users, tokens, Telegram ids and
-sharing have no screen: the CLI (and the API for sharing) cover them.
+built on that API (Settings → Addons). Members, their levels and their
+invites (a phone pairing QR and a browser code) are on Settings → Household
+(`docs/household.md`); tokens, Telegram ids and sharing have no screen: the
+CLI (and the API for sharing) cover them.
 
 ### bin/dana
 

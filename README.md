@@ -24,16 +24,15 @@ It is one person's daily driver, published as is: opinionated, built around one 
 
 ## Run the server
 
-An LLM key is the only value you need: `ANTHROPIC_API_KEY` with the default models, or another provider's key plus `MODEL`. Three steps with Docker, no checkout:
+An LLM key is the only thing you need, and the setup page asks for it (Claude by default; OpenAI, Gemini or a local model through Ollama also work). Three steps with Docker, no checkout:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
-echo "ANTHROPIC_API_KEY=..." > .env     # your key, next to compose.yaml
 docker compose up -d
 docker compose logs dana                # open the setup link it prints
 ```
 
-The setup link (one-time, on this machine) creates you as the admin, in that browser; your phone and other devices are paired from there. The port is published on 127.0.0.1 only; to reach Dana from other devices, put a reverse proxy with HTTPS in front of it or use a VPN ([`server/docs/operations.md`](server/docs/operations.md)). Upgrade: `docker compose pull && docker compose up -d`.
+The setup link (one-time, on this machine) creates you as the admin, in that browser, then walks you through a short wizard: you, your home, the model and its key (tested on the spot), your phone (scan a QR code), add-ons, and an optional sample household to look around with. Household members are added and invited from Settings → Household. The port is published on 127.0.0.1 only; to reach Dana from other devices, put a reverse proxy with HTTPS in front of it or use a VPN ([`server/docs/operations.md`](server/docs/operations.md)). Upgrade: `docker compose pull && docker compose up -d`.
 
 Headless (no browser at hand to open the link): also put `API_TOKEN` in `.env` (generate one: `openssl rand -hex 32`) before the first start, and sign in with it.
 
@@ -95,8 +94,8 @@ Each feature is an addon you turn on per user. Before you turn one on, this says
 
 Some parts need something without being an addon:
 
-- **The Android apps** (phone, watch, wall tablet, TV): built from [`android/`](android/) with JDK 21 and the Android SDK ([Build the apps](#build-the-apps)), pointed at your server's address. The watch pairs with the phone app.
-- **Direct push** to the phone: your own Firebase project, its `google-services.json` in the app build and `FCM_SERVICE_ACCOUNT_JSON` on the server. Without it the app still works and catches up when it syncs.
+- **The Android apps** (phone, watch, wall tablet, TV): the APKs on each GitHub release, or built from [`android/`](android/) ([Build the apps](#build-the-apps)). Each pairs with your server by a QR code or a short code from the web's Devices page; the watch is paired through the phone app.
+- **Direct push** to the phone: the free [ntfy](https://ntfy.sh) app on the phone (UnifiedPush; public ntfy.sh or your own ntfy server). The ping carries no content. If you build the app yourself with a Firebase project, FCM works instead (`FCM_SERVICE_ACCOUNT_JSON` on the server). Without either, the app still works and catches up when it syncs.
 - **Telegram**: `TELEGRAM_BOT_TOKEN` for chatting with Dana in Telegram and for the messages Dana sends there.
 - **Voice**: `OPENAI_API_KEY` for realtime voice calls; the transcription model's key (`GEMINI_API_KEY` by default) for voice messages and push-to-talk.
 
@@ -118,7 +117,8 @@ JDK 21 and the Android SDK are needed. Point the app at your server in its Setti
 ## Extend it
 
 - A new addon is a package in `server/addons/<name>/`: declare it in `addon.py`, write its tools as typed Python functions with docstrings (the schema is generated), and it shows up for users who connect it. The design: [`docs/addons.md`](docs/addons.md); the reference: [`server/docs/access.md`](server/docs/access.md) → Addon.
-- Something only your setup needs can stay out of the repository as a **site addon** in your site's `addons/`: the same code as an official addon ([`server/docs/writing-an-addon.md`](server/docs/writing-an-addon.md); a working example: [`examples/addons/hello/`](examples/addons/hello/)).
+- Something only your setup needs can stay out of the repository as a **site addon** in your site's `addons/`: the same code as an official addon ([`server/docs/writing-an-addon.md`](server/docs/writing-an-addon.md); working examples: [`examples/addons/hello/`](examples/addons/hello/), the smallest, and [`examples/addons/showcase/`](examples/addons/showcase/), every capability once).
+- **The add-on kit**, made to be driven by a coding agent: `bin/dana addons new <name>` writes an add-on in its own repository with an `AGENTS.md` guide and the generated reference ([`server/docs/addon-reference.md`](server/docs/addon-reference.md)); `check` says what is wrong and how to fix it, `test` runs its tests, `dev` runs it with sample data, and `publish` releases it and opens a pull request to the community catalog, [dana-catalog](https://github.com/ronganam/dana-catalog).
 - Every area has a doc: start from [`server/AGENTS.md`](server/AGENTS.md) and [`android/AGENTS.md`](android/AGENTS.md). They are written for people and coding agents alike.
 
 ## Contributing
