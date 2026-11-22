@@ -1,44 +1,59 @@
-"""The dashboard widgets every user has (docs/dashboard.md): the clock with
-the weather (through the ``weather`` provider, when an addon of the user's
-gives one) and Now (what needs the user and the household). Drawn by
-``web/widgets.js``."""
+"""What every user gets from the essentials addon beyond its tools:
 
-import asyncio
-import inspect
-import logging
+- the ``weather`` provider (rank 10, source ``open_meteo``): Open-Meteo at
+  their Home zone (addons/essentials/weather.py), asked before Home
+  Assistant's weather entity; and the ``signal.weather`` source for it
+  (docs/signals.md);
+- the morning briefing's ``weather`` section, from whichever weather
+  provider answers first (``core.briefing.weather``);
+- the dashboard widgets every user has (docs/dashboard.md): the clock with
+  the weather, and Now (what needs the user and the household), drawn by
+  ``web/widgets.js``.
+"""
+
 from typing import Any, Dict, Optional
 
-from core import now as now_screen
-from core.addons import WidgetContext, registry
+from core import briefing, now as now_screen, zones
+from core.addons import BriefingContext, Section, WidgetContext
 from core.users import User
+from addons.essentials import weather
 from addons.essentials.addon import addon
 
-logger = logging.getLogger(__name__)
+OPEN_METEO = {"rank": 10, "source": "open_meteo", "label": "Open-Meteo"}
 
-# How many Now items each size lists.
+# How many Now items each widget size lists.
 NOW_ITEMS = {"small": 3, "medium": 5, "large": 8}
 
 
-async def _weather(user: User) -> Optional[Dict[str, Any]]:
-    hook = registry.provider("weather", user)
-    if hook is None:
-        return None
-    try:
-        if inspect.iscoroutinefunction(hook.func):
-            return await hook.func(user)
-        return await asyncio.to_thread(hook.func, user)
-    except Exception as e:
-        logger.debug(f"Clock widget weather failed: {e}")
-        return None
+@addon.provide("weather", **OPEN_METEO)
+async def open_meteo_weather(user: User) -> Optional[Dict[str, Any]]:
+    """Today's weather at ``user``'s Home zone (None without one or when Open-Meteo fails)."""
+    return await weather.for_user(user)
+
+
+@addon.provide("signal.weather", **OPEN_METEO)
+def open_meteo_source(user: User) -> str:
+    """What Open-Meteo needs before it can tell ``user``'s weather ("" when nothing)."""
+    return "" if zones.home(user) is not None else "Set your Home zone (Settings → Zones)"
+
+
+@addon.briefing("weather", default=None, rank=10)
+async def briefing_weather(user: User, ctx: BriefingContext) -> Section:
+    w = await briefing.weather(user)
+    points = []
+    if w and w.get("temperature") is not None:
+        hi = f", high {w['high']}°" if w.get("high") is not None else ""
+        points.append(f"{w['condition'].capitalize()}, {w['temperature']}°{hi}")
+    return Section(w, points=points)
 
 
 @addon.widget("clock", title="Clock and weather", script="widgets.js", icon="clock", refresh=900,
               sizes=("medium", "small", "large"),
-              description="The time and date in large type, with the weather when one of your add-ons gives it")
+              description="The time and date in large type, with the weather at your Home zone")
 async def clock_widget(user: User, ctx: WidgetContext) -> Dict[str, Any]:
     """The weather (``condition``, ``temperature``, ``unit``, ``high``, ``low``,
     ``rain_chance``) or None; the page draws the time from its own clock."""
-    return {"weather": await _weather(user)}
+    return {"weather": await briefing.weather(user)}
 
 
 @addon.widget("now", title="Now", script="widgets.js", icon="inbox", refresh=60,

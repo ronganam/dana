@@ -43,6 +43,8 @@ Event types (``data`` fields) — handled by the app's ``PhoneEvents``:
   addons/shopping/events.py)
 - ``agent_sessions``: sessions (list; the user's coding-agent sessions, the
   whole state each time, so it replaces earlier ones; agent_sessions.py)
+- ``zones_changed``: changed_at (the user's zones changed: the app reads
+  ``GET /api/zones`` again and registers its geofences; replaces earlier ones)
 
 Config (FCM, the server's sender identity, env): ``FCM_SERVICE_ACCOUNT_JSON``
 (service-account key, allowed only to send messages) and ``FCM_PROJECT_ID``
@@ -70,6 +72,7 @@ from addons.phone.config import ADDON, mark
 
 logger = logging.getLogger(__name__)
 
+KEEP_EVENTS_DAYS = 2
 TTL = {
     "alert": 15 * 60,
     "notification_action": 120,
@@ -83,9 +86,9 @@ TTL = {
     "weekly_review": 3 * 24 * 3600,
     "shopping": 10 * 60,
     "agent_sessions": 30 * 60,
+    "zones_changed": KEEP_EVENTS_DAYS * 24 * 3600,
 }
 DEFAULT_TTL = 3600
-KEEP_EVENTS_DAYS = 2
 # A device that hasn't fetched (or registered) for this long is gone (old phone).
 STALE_DEVICE_DAYS = 60
 MAX_FETCH = 50

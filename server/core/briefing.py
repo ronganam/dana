@@ -33,8 +33,9 @@ import re
 import time
 from typing import Any, Dict, FrozenSet, List, Optional
 
-from core import budget, clock, composers, llm, notify as notify_mod, user_locale, user_profile, users
+from core import budget, clock, composers, llm, notify as notify_mod, signals, user_locale, user_profile, users
 from core.addons import BriefingContext, Section, registry, store
+from core.addons.addon import get_addon
 from core.db import get_db_connection
 from core.notify import notify
 from core.users import User
@@ -63,12 +64,14 @@ _meeting_backoff: Dict[str, float] = {}
 
 def available(user: Optional[User]) -> bool:
     """Whether ``user`` gets a briefing: a delivery channel (phone), or a
-    Telegram chat with at least one briefing section addon."""
+    Telegram chat with at least one briefing section of an addon they turned
+    on (what every user has, the weather, is not reason enough)."""
     if user is None:
         return False
     if registry.channels(user):
         return True
-    return user.telegram_chat_id is not None and bool(registry.hooks("briefing", user))
+    return user.telegram_chat_id is not None and any(not get_addon(h.addon).everyone
+                                                     for h in registry.hooks("briefing", user))
 
 
 def require(user: User) -> None:
@@ -169,15 +172,14 @@ def sections(user: User, now: datetime.datetime) -> Dict[str, Section]:
 
 
 async def weather(user: User) -> Optional[Dict[str, Any]]:
-    """``user``'s weather via the active ``weather`` provider (None when unavailable)."""
-    hook = registry.provider("weather", user)
+    """``user``'s weather from the highest-ranked ``weather`` provider that
+    answers (Open-Meteo for their Home zone, then Home Assistant's weather
+    entity; recorded as the ``weather`` signal's source); None when none does."""
+    hook, value = await registry.answer("weather", user)
     if hook is None:
         return None
-    try:
-        return await hook.func(user) if inspect.iscoroutinefunction(hook.func) else await asyncio.to_thread(hook.func, user)
-    except Exception as e:
-        logger.debug(f"Briefing weather failed: {e}")
-        return None
+    signals.record(user, "weather", registry.source_of(hook), str(value.get("condition") or ""))
+    return value
 
 
 async def gather(user: User) -> Dict[str, Any]:

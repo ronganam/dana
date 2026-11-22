@@ -367,7 +367,7 @@ Called with the user right after `update` changed the stored credentials (anothe
 
 ## Hooks
 
-Declared with a decorator on the `addon` object, in any module the loader imports. Composer hooks (`now_cards`, `day_items`, `review`, `search`, `selfcheck`, `context*`) are plain functions; jobs, services, handlers, channels and the action hooks are `async`; `briefing`, `provide` and `widget` may be either. Keys (a card prefix, a section, a check, a provider, a widget) are unique across addons.
+Declared with a decorator on the `addon` object, in any module the loader imports. Composer hooks (`now_cards`, `day_items`, `review`, `search`, `selfcheck`, `context*`) are plain functions; jobs, services, handlers, channels and the action hooks are `async`; `briefing`, `provide` and `widget` may be either. Keys (a card prefix, a section, a check, a widget) are unique across addons; a provider key may be declared by several, ranked.
 
 ### `@addon.tool(name=None, *, is_write=False, confirm=False, acts_outside=False, needs=(), available=None, untrusted_result=False, describe=None, shortcut=False, shortcut_prep=False, shortcut_describe=None)`
 
@@ -753,10 +753,16 @@ item of `kind` for another addon's context prompt (e.g. a task's source call).
 
 Example: under `@addon.context`.
 
-### `@addon.provide(key)`
+### `@addon.provide(key, *, rank=50, source='', label='')`
 
 Register a named capability `key` (sync or async) that core composers
-look up through `provider` without importing the addon.
+look up through `providers` without importing the addon.
+
+Several addons may provide the same key: they come ranked, lower
+`rank` first (ties in the fixed addon order), and a caller takes the
+first that answers (`answer`). `source` /
+`label`: who answers, when the key is a signal's (core/signals.py:
+`"phone"` / `"Dana's phone app"`); default the addon's name and title.
 
 From [`examples/addons/showcase/now.py`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/now.py):
 

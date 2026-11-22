@@ -2,12 +2,14 @@
 
 A **zone** is one of a user's places: a name, a centre (latitude, longitude) and a radius in metres. Location
 reminders name a zone ("remind me when I arrive at the Gym"); "at home" is the user's Home zone. Zones are Dana's own,
-per user, and work with or without Home Assistant.
+per user, and work with or without Home Assistant: the phone app's geofences tell Dana when the user arrives or
+leaves (`docs/signals.md`).
 
 Code: `core/zones.py` (the zones), `core/zones_api.py` (HTTP), `core/places.py` (the place search, a country's
 currency); web: `static/zones.js` + `zones.css` (the Settings → Zones card and the place picker the wizard shares).
 Table: core migration `m0006_zones_wizard`. Tests: `bin/test test_zones`, `bin/test test_web_zones`; the import is in
-`test_homeassistant_users`, location reminders on zones in `test_tasks_users`.
+`test_homeassistant_users`, location reminders on zones in `test_tasks_users`, the phone's zone events and
+`zones_changed` in `test_signals`.
 
 ## A zone
 
@@ -47,10 +49,19 @@ The tasks addon checks a location trigger against the user's zones (`addons/task
 name in any case, "home" meaning their Home zone whatever it is called. An unknown name is refused with the list of
 their zones (HTTP 400 `{"error": "'Moon' is not one of your zones. Your zones: Home, Gym."}`, the tool's error in
 chat); with no zones at all the message says to add them in Settings → Zones. The agent lists them with the tasks
-tool `get_zones`. The trigger fires when `addons.tasks.triggers.fire(user, "location", action="arrive" | "leave",
-target=<zone name>)` runs for that user: today the Home Assistant watcher calls it from their person entity's state
-(the HA zone's name, `docs/tasks-and-triggers.md`), so for users with Home Assistant the zone names should match
-theirs (the import below copies them).
+tool `get_zones`. The trigger fires on the user's `location` signal (`docs/signals.md`): the phone app's geofences on these zones
+(`{"type": "zone", "action": "arrive" | "leave", "zone_id"}` to `POST /api/signals`: the zone's name is used, an id
+that is not one of the caller's zones is refused), or, while the phone is not the active source, their Home Assistant
+watcher from their person entity's state (the HA zone's name, `docs/tasks-and-triggers.md`), so for users with Home
+Assistant the zone names should match theirs (the import below copies them).
+
+## The phone's geofences
+
+Every change of a user's zones (create, update, delete, a new Home, an import that added any) emits
+`core.zones.changed` for them (`core/zones.py`); the phone addon sends their phone a `zones_changed` push event
+(`{changed_at}`, replacing an earlier one; `docs/notifications.md`), and the app reads `GET /api/zones` again and
+registers its geofences. A user with no phone registered for push gets no event: the app reads the zones when it
+starts. The server never learns where the phone is, only "arrived at Home at 18:02".
 
 ## Import from Home Assistant
 

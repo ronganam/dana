@@ -69,10 +69,11 @@ SYNC_HOOKS = ("now_cards", "day_items", "review", "search", "selfcheck", "contex
               "context_block", "demo")
 FLEX_HOOKS = ("briefing", "provide", "widget")
 # Hooks declared for a key (a card prefix, a section key, a check key, an item
-# type, a context kind, a provider key): one addon per key and kind across every addon (the
-# loader fails the later addon that repeats one).
+# type, a context kind): one addon per key and kind across every addon (the
+# loader fails the later addon that repeats one). A provider key (``provide``)
+# may be declared by several addons, ranked (core/addons/registry.py ``providers``).
 KEYED_HOOKS = ("now_action", "briefing", "review", "review_action", "selfcheck", "context", "context_card",
-               "context_block", "provide", "widget")
+               "context_block", "widget")
 _MISSING = object()
 
 
@@ -740,12 +741,21 @@ class Addon:
         return self._hook("widget", key, title=title, script=script, sizes=tuple(sizes), settings=tuple(settings),
                           description=description, icon=icon, refresh=refresh)
 
-    def provide(self, key: str) -> Callable[[F], F]:
+    def provide(self, key: str, *, rank: int = 50, source: str = "", label: str = "") -> Callable[[F], F]:
         """Register a named capability ``key`` (sync or async) that core composers
-        look up through :func:`core.addons.registry.provider` without importing the addon."""
+        look up through :func:`core.addons.registry.providers` without importing the addon.
+
+        Several addons may provide the same key: they come ranked, lower
+        ``rank`` first (ties in the fixed addon order), and a caller takes the
+        first that answers (:func:`core.addons.registry.answer`). ``source`` /
+        ``label``: who answers, when the key is a signal's (core/signals.py:
+        ``"phone"`` / ``"Dana's phone app"``); default the addon's name and title."""
         if not key:
             raise ValueError(f"{self.name}: @addon.provide needs a key")
-        return self._hook("provide", key)
+        if source and not re.match(r"^[a-z][a-z0-9_]*$", source):
+            raise ValueError(f"{self.name}: @addon.provide source {source!r} must be lower case letters, digits, _")
+        _short(self.name, "a provider label", label, MAX_LABEL)
+        return self._hook("provide", key, rank=int(rank), source=source or self.name, label=label or self.title)
 
 
 def _require_async(addon: str, what: str, func: Callable[..., Any]) -> None:

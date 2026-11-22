@@ -10,9 +10,9 @@ see the task; the reminder goes to them.
 Entry points:
 
 - :func:`fire` — "fire the triggers of type T (and target) for user U": called
-  by the addon's event handlers (hooks.py) for the Home Assistant watcher's
-  ``homeassistant.location.changed`` / ``homeassistant.car.changed`` and the
-  wake flow's ``core.user.woke``;
+  by the addon's event handlers (hooks.py) for core's location / car signals
+  (``core.signal.location`` / ``core.signal.car``) and the wake flow's
+  ``core.user.woke``;
 - :func:`check_time_triggers` — one user's due time triggers, run for every
   user with ``tasks`` by the addon's job (hooks.py).
 

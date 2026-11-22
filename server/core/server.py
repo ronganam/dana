@@ -33,7 +33,8 @@ from aiohttp.web_urldispatcher import AbstractResource, DynamicResource, PlainRe
 
 from core import (actions_api, addons_api, app_updates, assistant_api, briefing, briefing_api, dashboard_api,
                   debug_api, demo_api, devices_api, events, household_api, llm_api, now_api, pages_api, profile_api,
-                  sessions_api, setup_api, sharing_api, usage, usage_api, wake, weekly_review, wizard_api, zones_api)
+                  sessions_api, setup_api, sharing_api, signals_api, usage, usage_api, wake, weekly_review, wizard_api,
+                  zones_api)
 from core.addons import loader, scheduler, state
 from core.auth import Handler, setup_auth
 
@@ -46,6 +47,7 @@ ROUTE_MODULES = (
     pages_api, assistant_api, app_updates, debug_api, sessions_api, briefing_api, actions_api, now_api,
     usage_api, sharing_api, addons_api, profile_api, devices_api, setup_api, household_api, demo_api, zones_api, wizard_api, llm_api,
     dashboard_api,
+    signals_api,
 )
 
 

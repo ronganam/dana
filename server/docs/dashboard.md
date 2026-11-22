@@ -24,7 +24,7 @@ four-column grid (two on a narrow screen), filled in order, gaps back-filled.
 
 | Widget | Addon | Data | Settings |
 |---|---|---|---|
-| `clock` Clock and weather | essentials | `weather` from the `weather` provider (`registry.provider("weather", user)`), or null; the time is the page's own clock | |
+| `clock` Clock and weather | essentials | `weather` from the highest-ranked `weather` provider that answers (`core.briefing.weather`: Open-Meteo at the Home zone, then Home Assistant), or null; the time is the page's own clock | |
 | `now` Now | essentials | the top of the user's Now screen: `lede`, `total`, `items` (3 / 5 / 8 by size) | |
 | `shopping` Shopping list | shopping | the active list: `list`, `to_buy`, `items` (6 / 12 / 30); live: the script follows `/api/shopping/events` | |
 | `calendar` Calendar | calendar | `days`: today and tomorrow with their events (the user's Google Calendar) | |

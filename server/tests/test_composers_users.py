@@ -63,7 +63,7 @@ import core.server as server
 from core import sessions_api
 from addons.tasks import api as tasks_api
 from core import (actions_api, briefing, briefing_api, checks, clock, composers, context_chats, now as now_mod, now_api,
-                  notify as notify_mod, search, usage, user_rows, wake, weekly_review)
+                  notify as notify_mod, search, usage, user_rows, wake, wake_window, weekly_review)
 from core.auth import setup_auth
 from core.db import get_db_connection
 from core.session import get_session_state
@@ -71,7 +71,7 @@ from addons.calendar import events as calendar_events
 from core.addons import sharing, store
 from addons.homeassistant import client as ha_client
 from addons.people import store as people_store
-from addons.phone import push
+from addons.phone import api as phone_api, push
 from addons.shopping import lists as shopping_lists
 from addons.tasks import groups as task_groups, titles as task_titles
 
@@ -294,7 +294,8 @@ async def plain_group(user, group, title):
 task_titles.sanitize_task_title = plain_title
 task_titles.resolve_task_group = plain_group
 
-wake.WAKE_WINDOW = (0, 24)  # the test may run at any hour
+for _u in (ADMIN, BOB, CARL, EVE):
+    wake_window.set_window(_u, {"start": "00:00", "end": "23:59"})  # the test may run at any hour
 wake.WAKE_CONFIRM_SECONDS = 0
 
 
@@ -305,7 +306,7 @@ def build_app() -> web.Application:
     briefing_api.setup(app)
     actions_api.setup(app)
     r = app.router
-    r.add_post("/api/phone/unlock", briefing_api.phone_unlock_api)
+    r.add_post("/api/signals", phone_api.post_signals_api)
     r.add_post("/api/chat/context", sessions_api.start_context_chat_api)
     r.add_get("/api/tasks", tasks_api.get_tasks_api)
     return app
@@ -375,9 +376,20 @@ EVENTS["bob-refresh"] = [ev("b1", "Coffee with Dafna Levi", NOW + datetime.timed
 EVENTS["carl-refresh"] = [ev("c1", "Carl dentist", NOW + datetime.timedelta(minutes=5))]
 
 
-def unlock_body() -> Dict[str, int]:
-    """An unlock 150 s ago: the screen has been on since (the check measures from the signal)."""
-    return {"at": int((datetime.datetime.now(datetime.timezone.utc).timestamp() - 150) * 1000)}
+def unlock_body() -> Dict[str, Any]:
+    """The phone's unlock 150 s ago (today's midnight at the earliest: a wake counts on its own day): the
+    screen has been on since (the check measures from the signal)."""
+    now = clock.now()
+    at = max(now - datetime.timedelta(seconds=150), now.replace(hour=0, minute=0, second=0, microsecond=0))
+    return {"events": [{"type": "unlock", "at": int(at.timestamp() * 1000)}]}
+
+
+def wake_signal(user) -> Optional[str]:
+    """The detail of ``user``'s last wake signal from the phone (None: none)."""
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT detail FROM signal_sources WHERE user_id = ? AND signal = 'wake' AND source = 'phone'",
+                           (user.id,)).fetchone()
+    return row[0] if row else None
 
 
 def pings_of(user, type_: str) -> List[Dict[str, Any]]:
@@ -535,19 +547,18 @@ def test_briefing_content() -> None:
 async def test_wake(client: TestClient) -> None:
     SEEN["history"] = {"admin": [(200, "on")], "bob": [(200, "on")]}
     SEEN["pings"].clear()
-    r = await client.post("/api/phone/unlock", json=unlock_body(), headers=auth(BOB))
-    check("wake: Bob's unlock starts his check", (r.status, (await r.json())["status"]) == (200, "confirming"))
+    r = await client.post("/api/signals", json=unlock_body(), headers=auth(BOB))
+    check("wake: Bob's unlock accepted", (r.status, await r.json()) == (200, {"accepted": 1, "rejected": []}))
     await drain()
     today = clock.now().date().isoformat()
     check("wake: Bob's wake confirmed (his wake_log row), not the first admin's",
           wake.done_today(BOB, today) and not wake.done_today(ADMIN, today))
     with get_db_connection() as conn:
         marks = {r[0] for r in conn.execute("SELECT key FROM task_trigger_marks WHERE key LIKE 'last_trigger_v2_wake_%'")}
-        sig = conn.execute("SELECT detail FROM system_marks WHERE key = ?", (f"wake_signal:{BOB.id}",)).fetchone()
     check("wake: only Bob's wake-trigger task fired",
           f"last_trigger_v2_wake_{IDS['bob_wake']}" in marks and f"last_trigger_v2_wake_{IDS['admin_wake']}" not in marks,
           marks)
-    check("wake: Bob's raw signal recorded under his id", sig is not None and sig[0] == "unlock")
+    check("wake: Bob's signal recorded under his id", wake_signal(BOB) == "unlock" and wake_signal(ADMIN) is None)
     check("wake: the briefing pushed to Bob's phone only, built for him",
           len(pings_of(BOB, "briefing")) == 1 and not pings_of(ADMIN, "briefing")
           and pings_of(BOB, "briefing")[0]["payload"]["headline"] == "Day of bob",
@@ -558,25 +569,24 @@ async def test_wake(client: TestClient) -> None:
     b = briefing.get_today(BOB)
     check("wake: Bob's briefing of today is marked delivered (trigger wake)",
           b and b["trigger"] == "wake" and b["delivered_at"])
-    r = await client.post("/api/phone/unlock", json=unlock_body(), headers=auth(BOB))
-    check("wake: once a day per user — Bob's second unlock is done", (await r.json())["status"] == "done")
+    check("wake: once a day per user — Bob's second unlock is done", await wake.unlock(BOB) == "done")
     n_before = len(pings_of(BOB, "briefing"))
     await drain()
     check("wake: no second briefing push for Bob", len(pings_of(BOB, "briefing")) == n_before)
-    r = await client.post("/api/phone/unlock", json=unlock_body(), headers=auth(ADMIN))
-    check("wake: the first admin's unlock is independent of Bob's", (await r.json())["status"] == "confirming")
+    r = await client.post("/api/signals", json=unlock_body(), headers=auth(ADMIN))
+    check("wake: the first admin's unlock is independent of Bob's", (await r.json())["accepted"] == 1)
     await drain()
     check("wake: the first admin's wake confirmed and their briefing pushed to their phone",
           wake.done_today(ADMIN, today) and len(pings_of(ADMIN, "briefing")) == 1)
     for u in (CARL, EVE):
-        r = await client.post("/api/phone/unlock", json=unlock_body(), headers=auth(u))
-        check(f"wake: {NAMES[u.id]} without the phone and Home Assistant → unavailable",
-              (r.status, (await r.json())["status"]) == (200, "unavailable"))
+        r = await client.post("/api/signals", json=unlock_body(), headers=auth(u))
+        check(f"wake: {NAMES[u.id]} without the phone addon → 403 not_connected; an unlock → unavailable",
+              (r.status, (await r.json())["error"]) == (403, "not_connected") and await wake.unlock(u) == "unavailable")
     with get_db_connection() as conn:
         rows = {r[0] for r in conn.execute("SELECT user_id FROM wake_log WHERE date = ?", (today,))}
-        carl_sig = conn.execute("SELECT 1 FROM system_marks WHERE key = ?", (f"wake_signal:{CARL.id}",)).fetchone()
-    check("wake: nothing recorded for Carl / Eve", rows == {ADMIN.id, BOB.id} and carl_sig is None, rows)
-    check("wake: the flow needs both phone and Home Assistant",
+        others = conn.execute("SELECT COUNT(*) FROM signal_sources WHERE user_id IN (?, ?)", (CARL.id, EVE.id)).fetchone()[0]
+    check("wake: nothing recorded for Carl / Eve", rows == {ADMIN.id, BOB.id} and others == 0, (rows, others))
+    check("wake: the flow needs a channel and a wake source (the paired phone)",
           wake.available(ADMIN) and wake.available(BOB) and not wake.available(CARL) and not wake.available(EVE))
 
 
@@ -585,13 +595,16 @@ async def test_wake_poll() -> None:
     today = clock.now().date().isoformat()
     with get_db_connection() as conn:
         conn.execute("DELETE FROM wake_log WHERE date = ?", (today,))
+        # the phones quiet for days: Home Assistant's screen sensors are the wake source again
+        conn.execute("UPDATE signal_sources SET last_at = '2000-01-01T00:00:00+00:00'")
         conn.commit()
     SEEN["ha_fail"] = {"admin"}
     SEEN["history"] = {"bob": [(1700, "on"), (1500, "off"), (900, "on"), (700, "off"), (300, "on"), (100, "off")]}
     SEEN["ha"].clear()
     out = await wake.poll_once()
     check("wake poll: Bob's wake fired although the first admin's Home Assistant failed first",
-          out.get(BOB.id) is True and ADMIN.id not in out and wake.done_today(BOB, today), out)
+          out.get(BOB.id) is True and out.get(ADMIN.id) is False and wake.done_today(BOB, today)
+          and not wake.done_today(ADMIN, today), out)
     asked = {(u, who) for u, who, fn, _ in SEEN["ha"] if fn == "history"}
     check("wake poll: each user's own Home Assistant asked, only users with the flow",
           asked == {(ADMIN.id, "admin"), (BOB.id, "bob")}, asked)
@@ -705,8 +718,10 @@ async def test_checks(client: TestClient) -> None:
           all(set(x) == {"key", "label", "ok", "detail", "since", "ignored_until"} for x in a.values()))
     check("checks: Bob sees only the checks of his addons (no server check)",
           set(b) == {"push", "notification_sync", "location", "car", "ha_entities", "ha_watcher", "wake", "triage",
-                     "calls", "calendar", "briefing"}, list(b))
-    check("checks: Carl sees calendar and briefing only", set(c) == {"calendar", "briefing"}, list(c))
+                     "calls", "calendar", "briefing", "signals"}, list(b))
+    check("checks: Carl sees calendar, briefing and signals (reminders with no wake, car or place source)",
+          set(c) == {"calendar", "briefing", "signals"} and not c["signals"]["ok"] and b["signals"]["ok"],
+          (list(c), c.get("signals"), b.get("signals")))
     check("checks: Eve sees none", e == {}, e)
     check("checks: Bob's wake check reads his own wake", b["wake"]["detail"] == "confirmed today", b["wake"])
     r = await client.post("/api/checks/push/ignore", json={"days": 3}, headers=auth(BOB))

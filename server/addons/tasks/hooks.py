@@ -3,8 +3,10 @@ docs/now.md; the hooks: docs/writing-an-addon.md):
 
 - jobs: every ``TIME_CHECK_INTERVAL`` seconds (30) each user's due time
   triggers fire; at start every user gets the default lists they lack;
-- events: ``homeassistant.location.changed`` / ``homeassistant.car.changed``
-  fire location / car triggers, ``core.user.woke`` the wake ones;
+- events: core's ``core.signal.location`` / ``core.signal.car`` (from the
+  phone or Home Assistant, whichever is active: core/signals.py) fire
+  location / car triggers (a ``late`` one only records the transition),
+  ``core.user.woke`` the wake ones;
   ``knowledge.project.deleted`` deletes the owner's tasks that carried the
   project and clears it from everyone else's (``tasks.project_id`` has no
   foreign key: the projects table is the knowledge addon's);
@@ -68,14 +70,22 @@ async def ensure_default_groups(user: User) -> None:
     groups.ensure_default_groups(user)
 
 
-@addon.on("homeassistant.location.changed")
+@addon.on("core.signal.location")
 async def on_location(user: User, data: Dict[str, Any]) -> None:
-    await triggers.fire(user, "location", action=str(data.get("action") or ""), target=str(data.get("target") or ""))
+    action, target = str(data.get("action") or ""), str(data.get("target") or "")
+    if data.get("late"):
+        triggers.record_transition(user, "location", action.strip().lower(), target.strip().lower())
+        return
+    await triggers.fire(user, "location", action=action, target=target)
 
 
-@addon.on("homeassistant.car.changed")
+@addon.on("core.signal.car")
 async def on_car(user: User, data: Dict[str, Any]) -> None:
-    await triggers.fire(user, "car", action=str(data.get("action") or ""))
+    action = str(data.get("action") or "")
+    if data.get("late"):
+        triggers.record_transition(user, "car", action.strip().lower())
+        return
+    await triggers.fire(user, "car", action=action)
 
 
 @addon.on("core.user.woke")

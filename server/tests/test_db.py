@@ -262,10 +262,13 @@ def test_convert_9_0():
     if got == wanted and len(by_id) == len(moved):
         expected["devices"], expected["phone_push"] = after["devices"], after["phone_push"]
     # core m0006: no zones yet, and every user who exists has the first-run wizard finished;
-    # core m0007: no server settings yet; the dashboards migration: no dashboards yet.
+    # core m0007: no server settings yet; core m0008 / phone m0004: no signals yet;
+    # core m0009: no dashboards yet.
     expected["zones"] = []
     expected["server_settings"] = []
     expected["dashboards"] = []
+    for table in ("signal_sources", "wake_windows", "phone_screen_sessions", "phone_signal_keys"):
+        expected[table] = []
     wizard_rows = after.get("user_wizard", [])
     check("9.0: every existing user has the wizard finished (no steps)",
           sorted(r[0] for r in wizard_rows) == sorted(r[0] for r in after["users"])

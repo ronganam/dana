@@ -3,15 +3,19 @@
 (static/profile.js) and the wizard's You step (static/setup.js).
 
     GET /api/profile → {name, pronoun, languages: [..], currency, own: {languages: [..], currency},
-                        defaults: {languages: [..], currency}}
+                        defaults: {languages: [..], currency},
+                        wake_window: {start: "HH:MM", end: "HH:MM", learned: bool}}
         ``languages`` / ``currency``: what counts for the caller (their own, else
         the server's ``DEFAULT_LANGUAGES`` / ``CURRENCY``); ``own``: what they
-        chose (``[]`` / ``""``: none, the server's apply).
+        chose (``[]`` / ``""``: none, the server's apply); ``wake_window``: the
+        hours their wake is looked for (core/wake_window.py).
     PUT /api/profile {name?, pronoun?: "he" | "she" | "they",
-                      languages?: "he, en" | ["he", "en"] | [] , currency?: "ILS" | ""}
-        → the same payload. ``[]`` / ``""`` go back to the server's. An empty
-        name, an unknown pronoun or a malformed code → 400 ``{"error":
-        "invalid", "field": <name>, "detail": <why>}``.
+                      languages?: "he, en" | ["he", "en"] | [] , currency?: "ILS" | "",
+                      wake_window?: {start: "HH:MM", end: "HH:MM"} | null}
+        → the same payload. ``[]`` / ``""`` go back to the server's, a null
+        wake window to the learned one. An empty name, an unknown pronoun, a
+        malformed code or wake window → 400 ``{"error": "invalid", "field":
+        <name>, "detail": <why>}`` (nothing is changed).
 
 Each user changes only their own; an admin changes someone else's with
 ``bin/dana users update USER --languages / --currency``.
@@ -22,7 +26,7 @@ from typing import Any, Dict
 
 from aiohttp import web
 
-from core import user_locale, user_rows, users
+from core import user_locale, user_rows, users, wake_window
 from core.auth import request_user
 from core.users import User
 
@@ -44,6 +48,7 @@ def profile_payload(user: User) -> Dict[str, Any]:
         "currency": user_locale.currency(user),
         "own": {"languages": own_languages, "currency": user.currency},
         "defaults": {"languages": list(user_locale.server_languages()), "currency": user_locale.server_currency()},
+        "wake_window": wake_window.get(user).to_json(),
     }
 
 
@@ -91,8 +96,15 @@ async def put_profile_api(request: web.Request) -> web.Response:
             changes["currency"] = user_locale.check_currency(raw or "")
         except ValueError as e:
             return _invalid("currency", str(e))
+    if "wake_window" in body and body["wake_window"] is not None:
+        try:
+            wake_window.check(body["wake_window"])
+        except ValueError as e:
+            return _invalid("wake_window", str(e))
     if changes:
         user = users.update(user.id, **changes)
+    if "wake_window" in body:
+        wake_window.set_window(user, body["wake_window"])
     return web.json_response(profile_payload(user))
 
 

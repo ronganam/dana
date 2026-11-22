@@ -4,8 +4,13 @@ A zone is a name, a centre (latitude, longitude) and a radius in metres, owned
 by one user (table ``zones``, core migration ``m0006_zones_wizard``). The zone
 with ``is_home`` is the user's Home (at most one). Names are unique per user,
 in any case; location reminders (the tasks addon) name a zone, and the
-reminder fires when that user arrives at or leaves it (an event from their
-Home Assistant today, from the phone's geofences later).
+reminder fires when that user arrives at or leaves it (the ``location``
+signal: the phone's geofences or their Home Assistant, core/signals.py).
+
+Every change (create, update, delete, set Home, an import that added any) is
+emitted as ``core.zones.changed`` for the user (no data); the phone addon
+sends their phone the ``zones_changed`` event so it registers its geofences
+again.
 
 Everything here is per user: another user's zone answers like a missing one.
 """
@@ -17,6 +22,7 @@ import uuid
 from dataclasses import asdict, dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Optional, Tuple
 
+from core import events
 from core.db import get_db_connection
 from core.users import User
 
@@ -149,6 +155,10 @@ def _taken(conn: sqlite3.Connection, user: User, name: str, other_than: str = ""
                         (user.id, name, other_than)).fetchone() is not None
 
 
+def _changed(user: User) -> None:
+    events.emit("core.zones.changed", user)
+
+
 def create(user: User, name: Any, latitude: Any, longitude: Any, radius_m: Any = DEFAULT_RADIUS,
            is_home: bool = False) -> Zone:
     """Add a zone of ``user``; ``is_home`` makes it their Home (the old Home stays a plain zone).
@@ -156,6 +166,12 @@ def create(user: User, name: Any, latitude: Any, longitude: Any, radius_m: Any =
     Raises:
         Invalid: a bad field, or a name they already use (``field: name``).
     """
+    zone = _insert(user, name, latitude, longitude, radius_m, is_home)
+    _changed(user)
+    return zone
+
+
+def _insert(user: User, name: Any, latitude: Any, longitude: Any, radius_m: Any, is_home: bool) -> Zone:
     zone = Zone(id=uuid.uuid4().hex[:12], user_id=user.id, name=_name(name),
                 latitude=_number("latitude", latitude, -90, 90), longitude=_number("longitude", longitude, -180, 180),
                 radius_m=_radius(radius_m), is_home=bool(is_home), created_at=_now())
@@ -206,6 +222,8 @@ def update(user: User, zone_id: str, changes: Mapping[str, Any]) -> Zone:
         conn.commit()
     updated = get(user, zone.id)
     assert updated is not None
+    if fields:
+        _changed(user)
     return updated
 
 
@@ -214,6 +232,8 @@ def delete(user: User, zone_id: str) -> bool:
     with get_db_connection() as conn:
         cur = conn.execute("DELETE FROM zones WHERE id = ? AND user_id = ?", (zone_id, user.id))
         conn.commit()
+    if cur.rowcount:
+        _changed(user)
     return cur.rowcount > 0
 
 
@@ -244,9 +264,11 @@ def import_zones(user: User, items: Iterable[Mapping[str, Any]]) -> Tuple[List[Z
             skipped.append(name)
             continue
         try:
-            added.append(create(user, name, item.get("latitude"), item.get("longitude"),
-                                item.get("radius_m") or DEFAULT_RADIUS,
-                                is_home=bool(item.get("is_home")) and home(user) is None))
+            added.append(_insert(user, name, item.get("latitude"), item.get("longitude"),
+                                 item.get("radius_m") or DEFAULT_RADIUS,
+                                 is_home=bool(item.get("is_home")) and home(user) is None))
         except Invalid:
             skipped.append(name)
+    if added:
+        _changed(user)
     return added, skipped

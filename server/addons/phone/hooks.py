@@ -11,7 +11,12 @@
 - context chats for ``suggestion``, ``call`` and ``notification``, plus the
   ``call`` context block for tasks linked to a call;
 - global search over the user's calls and active notifications;
-- self-checks: ``push``, ``notification_sync``, ``triage``, ``calls``.
+- self-checks: ``push``, ``notification_sync``, ``triage``, ``calls``;
+- signals (docs/signals.md): the ``phone`` source (rank 10, before Home
+  Assistant) of ``wake``, ``screen``, ``car``, ``location`` and ``sleep``,
+  and the ``screen_sessions`` provider (addons/phone/signals.py);
+- ``core.zones.changed``: the ``zones_changed`` event to the user's phone,
+  when one is registered for push (it registers its geofences again).
 """
 
 import asyncio
@@ -26,7 +31,7 @@ from core.addons import BriefingContext, Check, ContextRequest, Hit, Section, he
 from core.db import get_db_connection
 from core.notify import Message
 from core.users import User
-from addons.phone import now_cards as _now_cards, push, suggestions as phone_suggestions  # noqa: F401
+from addons.phone import now_cards as _now_cards, push, signals as phone_signals, suggestions as phone_suggestions  # noqa: F401
 from addons.phone.addon import addon
 from addons.phone.calls import (actions as suggestion_actions, chat as phone_chat,
                                 processing as calls_processing, retention as calls_retention)
@@ -76,6 +81,34 @@ async def send_digest(user: User) -> int:
 @addon.job(every=datetime.timedelta(seconds=30))
 async def renudge(user: User) -> int:
     return await escalation.renudge_due(user)
+
+
+# --- Signals --------------------------------------------------------------------------------
+
+PHONE_SOURCE = {"rank": 10, "source": phone_signals.SOURCE, "label": phone_signals.LABEL}
+
+
+@addon.provide("screen_sessions", **PHONE_SOURCE)
+def screen_sessions(user: User, since_utc: datetime.datetime, until_utc: datetime.datetime) -> Optional[List[float]]:
+    """Seconds of each of ``user``'s phone screen sessions in [since, until] (None while the phone sends none)."""
+    return phone_signals.screen_seconds(user, since_utc, until_utc)
+
+
+def _phone_source(user: User) -> str:
+    return phone_signals.missing(user)
+
+
+for _signal in ("wake", "screen", "car", "location", "sleep"):
+    addon.provide(f"signal.{_signal}", **PHONE_SOURCE)(_phone_source)
+
+
+@addon.on("core.zones.changed")
+async def zones_changed(user: User, data: Dict[str, Any]) -> None:
+    """``user``'s zones changed: their phone re-registers its geofences (none
+    registered for push: nothing; a phone reads the zones when it starts)."""
+    if not push.devices(user):
+        return
+    await push.send(user, "zones_changed", {"changed_at": clock.now().isoformat(timespec="seconds")}, replace=True)
 
 
 @addon.channel("push")

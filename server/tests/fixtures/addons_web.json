@@ -382,7 +382,7 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search",
+     "description": "The time, asking you to pick, web search, the weather at Home",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
@@ -406,7 +406,8 @@
      "touches": {
       "acts_outside": false,
       "hosts": [
-       "DuckDuckGo and other public search engines"
+       "DuckDuckGo and other public search engines",
+       "api.open-meteo.com"
       ],
       "reads": [],
       "stores_credentials": false
@@ -439,10 +440,10 @@
      "name": "tasks",
      "needs": [
       {
-       "kind": "addon",
+       "kind": "app",
        "optional": true,
-       "what": "homeassistant",
-       "why": "Reminders when you arrive at a place, leave it or get in the car"
+       "what": "Dana's phone app, or Home Assistant",
+       "why": "Reminders when you arrive at a place, leave it, get in the car or wake up"
       },
       {
        "kind": "addon",
@@ -465,7 +466,6 @@
       "acts_outside": false,
       "hosts": [],
       "reads": [
-       "homeassistant",
        "people",
        "phone"
       ],
@@ -1847,7 +1847,7 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search",
+     "description": "The time, asking you to pick, web search, the weather at Home",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
@@ -1871,7 +1871,8 @@
      "touches": {
       "acts_outside": false,
       "hosts": [
-       "DuckDuckGo and other public search engines"
+       "DuckDuckGo and other public search engines",
+       "api.open-meteo.com"
       ],
       "reads": [],
       "stores_credentials": false
@@ -1904,10 +1905,10 @@
      "name": "tasks",
      "needs": [
       {
-       "kind": "addon",
+       "kind": "app",
        "optional": true,
-       "what": "homeassistant",
-       "why": "Reminders when you arrive at a place, leave it or get in the car"
+       "what": "Dana's phone app, or Home Assistant",
+       "why": "Reminders when you arrive at a place, leave it, get in the car or wake up"
       },
       {
        "kind": "addon",
@@ -1930,7 +1931,6 @@
       "acts_outside": false,
       "hosts": [],
       "reads": [
-       "homeassistant",
        "people",
        "phone"
       ],
@@ -3186,7 +3186,7 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search",
+     "description": "The time, asking you to pick, web search, the weather at Home",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
@@ -3210,7 +3210,8 @@
      "touches": {
       "acts_outside": false,
       "hosts": [
-       "DuckDuckGo and other public search engines"
+       "DuckDuckGo and other public search engines",
+       "api.open-meteo.com"
       ],
       "reads": [],
       "stores_credentials": false
@@ -3243,10 +3244,10 @@
      "name": "tasks",
      "needs": [
       {
-       "kind": "addon",
+       "kind": "app",
        "optional": true,
-       "what": "homeassistant",
-       "why": "Reminders when you arrive at a place, leave it or get in the car"
+       "what": "Dana's phone app, or Home Assistant",
+       "why": "Reminders when you arrive at a place, leave it, get in the car or wake up"
       },
       {
        "kind": "addon",
@@ -3269,7 +3270,6 @@
       "acts_outside": false,
       "hosts": [],
       "reads": [
-       "homeassistant",
        "people",
        "phone"
       ],
@@ -4538,7 +4538,7 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search",
+     "description": "The time, asking you to pick, web search, the weather at Home",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
@@ -4562,7 +4562,8 @@
      "touches": {
       "acts_outside": false,
       "hosts": [
-       "DuckDuckGo and other public search engines"
+       "DuckDuckGo and other public search engines",
+       "api.open-meteo.com"
       ],
       "reads": [],
       "stores_credentials": false
@@ -4595,10 +4596,10 @@
      "name": "tasks",
      "needs": [
       {
-       "kind": "addon",
+       "kind": "app",
        "optional": true,
-       "what": "homeassistant",
-       "why": "Reminders when you arrive at a place, leave it or get in the car"
+       "what": "Dana's phone app, or Home Assistant",
+       "why": "Reminders when you arrive at a place, leave it, get in the car or wake up"
       },
       {
        "kind": "addon",
@@ -4621,7 +4622,6 @@
       "acts_outside": false,
       "hosts": [],
       "reads": [
-       "homeassistant",
        "people",
        "phone"
       ],
@@ -5880,7 +5880,7 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search",
+     "description": "The time, asking you to pick, web search, the weather at Home",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
@@ -5904,7 +5904,8 @@
      "touches": {
       "acts_outside": false,
       "hosts": [
-       "DuckDuckGo and other public search engines"
+       "DuckDuckGo and other public search engines",
+       "api.open-meteo.com"
       ],
       "reads": [],
       "stores_credentials": false
@@ -5937,10 +5938,10 @@
      "name": "tasks",
      "needs": [
       {
-       "kind": "addon",
+       "kind": "app",
        "optional": true,
-       "what": "homeassistant",
-       "why": "Reminders when you arrive at a place, leave it or get in the car"
+       "what": "Dana's phone app, or Home Assistant",
+       "why": "Reminders when you arrive at a place, leave it, get in the car or wake up"
       },
       {
        "kind": "addon",
@@ -5963,7 +5964,6 @@
       "acts_outside": false,
       "hosts": [],
       "reads": [
-       "homeassistant",
        "people",
        "phone"
       ],
@@ -7222,7 +7222,7 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search",
+     "description": "The time, asking you to pick, web search, the weather at Home",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
@@ -7246,7 +7246,8 @@
      "touches": {
       "acts_outside": false,
       "hosts": [
-       "DuckDuckGo and other public search engines"
+       "DuckDuckGo and other public search engines",
+       "api.open-meteo.com"
       ],
       "reads": [],
       "stores_credentials": false
@@ -7279,10 +7280,10 @@
      "name": "tasks",
      "needs": [
       {
-       "kind": "addon",
+       "kind": "app",
        "optional": true,
-       "what": "homeassistant",
-       "why": "Reminders when you arrive at a place, leave it or get in the car"
+       "what": "Dana's phone app, or Home Assistant",
+       "why": "Reminders when you arrive at a place, leave it, get in the car or wake up"
       },
       {
        "kind": "addon",
@@ -7305,7 +7306,6 @@
       "acts_outside": false,
       "hosts": [],
       "reads": [
-       "homeassistant",
        "people",
        "phone"
       ],

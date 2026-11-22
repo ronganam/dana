@@ -5,6 +5,8 @@ and direct push to the phone (docs/calls.md, docs/notifications.md).
   ``POST /api/suggestions/{id}/accept``, ``POST /api/suggestions/{id}/dismiss``
 - ``POST /api/phone/register``, ``GET /api/phone/events``, ``GET /api/phone/devices``, ``POST /api/phone/test``
 - ``POST /api/agent-sessions/hook``, ``GET /api/agent-sessions``, ``DELETE /api/agent-sessions/{id}``
+- ``POST /api/signals``: the phone's signals (addons/phone/signals.py; ``GET
+  /api/signals``, the overview, is core's: core/signals_api.py)
 
 Every route answers for the request's user, who must have ``phone``
 (``access.phone_user``; else 403 ``not_connected`` from the middleware). The
@@ -23,7 +25,8 @@ from core.addons.store import NotConnected
 from addons.phone.access import phone_user
 from addons.phone.calls import api as calls_api
 from addons.phone.notifications import api as notifications_api
-from addons.phone import agent_sessions, config as phone_config, push as phone_push, suggestions as phone_suggestions
+from addons.phone import (agent_sessions, config as phone_config, push as phone_push, signals as phone_signals,
+                          suggestions as phone_suggestions)
 from addons.phone.calls import actions as suggestion_actions
 
 logger = logging.getLogger(__name__)
@@ -143,6 +146,24 @@ async def phone_events_api(request: web.Request) -> web.Response:
     return web.json_response(phone_push.events_after(user, after, request_device(request)))
 
 
+async def post_signals_api(request: web.Request) -> web.Response:
+    """POST /api/signals {events: [...]} — the caller's phone's signals (unlock,
+    screen, car, zone, sleep), at most 200, oldest first → ``{accepted,
+    rejected: [{index, error}]}``; a body that is not ``{"events": [...]}`` → 400."""
+    user = phone_user(request)
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid", "detail": "a JSON object is expected"}, status=400)
+    events = data.get("events") if isinstance(data, dict) else None
+    if not isinstance(events, list):
+        return web.json_response({"error": "invalid", "detail": 'expected {"events": [...]}'}, status=400)
+    if len(events) > phone_signals.MAX_EVENTS:
+        return web.json_response({"error": "invalid", "detail": f"at most {phone_signals.MAX_EVENTS} events"},
+                                 status=400)
+    return web.json_response(await phone_signals.receive(user, events))
+
+
 async def phone_devices_api(request: web.Request) -> web.Response:
     """GET /api/phone/devices — the caller's devices registered for push (transport, no tokens or endpoints) +
     whether FCM is configured."""
@@ -210,6 +231,7 @@ def setup(app: web.Application) -> None:
     app.router.add_post("/api/suggestions/bulk", bulk_suggestions_api)
     app.router.add_post("/api/phone/register", phone_register_api)
     app.router.add_get("/api/phone/events", phone_events_api)
+    app.router.add_post("/api/signals", post_signals_api)
     app.router.add_get("/api/phone/devices", phone_devices_api)
     app.router.add_post("/api/phone/test", phone_test_api)
     app.router.add_put("/api/suggestions/{id}", update_suggestion_api)

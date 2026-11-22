@@ -74,8 +74,8 @@ Each feature is an addon you turn on per user. Before you turn one on, this says
 <!-- addons-table:start -->
 | Feature | What it does | Required | Optional | Region |
 |---|---|---|---|---|
-| Essentials | The time, asking you to pick, web search | — | — | Any |
-| Tasks | Task lists, reminders and their triggers | — | the Home Assistant addon; the Phone addon | Any |
+| Essentials | The time, asking you to pick, web search, the weather at Home | — | — | Any |
+| Tasks | Task lists, reminders and their triggers | — | Dana's phone app, or Home Assistant; the Phone addon | Any |
 | Shopping | Your shopping list, sorted by aisle and shared live | — | the Phone addon | Any |
 | Projects | Projects, decisions and saved notes, links and files | — | a transcription model: an OpenAI or Gemini key, or your own Whisper server | Any |
 | About you | What Dana remembers about you | — | — | Any |

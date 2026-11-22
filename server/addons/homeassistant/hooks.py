@@ -2,12 +2,14 @@
 (../docs/addons.md, "The manifest").
 
 - the entity watchers (a service): one per user with a person entity or a
-  car sensor set, over their own connection; each transition is emitted as
-  the event ``homeassistant.location.changed`` or ``homeassistant.car.changed``;
+  car sensor set, over their own connection; each transition is delivered
+  as the ``location`` / ``car`` signal from the ``homeassistant`` source
+  (core/signals.py: ignored while Dana's phone app delivers it);
 - at start: every user's home map fetched in the background for their prompt;
 - self-checks: ``location``, ``car``, ``ha_entities``, ``ha_watcher``;
-- morning briefing: ``weather``;
-- providers: ``weather``, ``screen_sessions``.
+- providers (rank 50, after the phone and Open-Meteo): ``weather``,
+  ``screen_sessions``, and the sources ``signal.wake``, ``signal.screen``,
+  ``signal.car``, ``signal.location``, ``signal.weather``.
 """
 
 import datetime
@@ -16,8 +18,8 @@ import os
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
-from core import events
-from core.addons import BriefingContext, Check, Section, helpers, store
+from core import signals
+from core.addons import Check, helpers, store
 from core.users import User
 from addons.homeassistant import client as ha_client, config, home_map, status as ha_status, watcher as ha_watcher
 from addons.homeassistant.addon import addon
@@ -31,9 +33,14 @@ CAR_DAYS = float(os.getenv("CHECK_CAR_DAYS", "7"))
 HA_WATCHER_MINUTES = float(os.getenv("CHECK_HA_WATCHER_MINUTES", "10"))
 _STARTED = time.monotonic()
 
+RANK = 50
+
+
 async def emit_transition(user: User, trigger_type: str, *, action: str = "", target: str = "") -> None:
-    """A watcher saw ``user`` arrive / leave a zone or enter / leave the car."""
-    events.emit(f"homeassistant.{trigger_type}.changed", user, action=action, target=target)
+    """A watcher saw ``user`` arrive / leave a zone or enter / leave the car:
+    the ``location`` / ``car`` signal from Home Assistant."""
+    detail = f"{action} {target}".strip()
+    signals.deliver(user, trigger_type, "homeassistant", detail=detail, action=action, target=target)
 
 
 @addon.service
@@ -52,7 +59,7 @@ async def warm_home_map(user: User) -> None:
 
 # --- Providers & briefing -------------------------------------------------------------------
 
-@addon.provide("weather")
+@addon.provide("weather", rank=RANK)
 async def fetch_weather(user: User) -> Optional[Dict[str, Any]]:
     """``user``'s weather (their Home Assistant ``weather_entity``):
     condition and temperature, today's high / low / rain chance when the
@@ -78,17 +85,7 @@ async def fetch_weather(user: User) -> Optional[Dict[str, Any]]:
         return None
 
 
-@addon.briefing("weather", default=None, rank=10)
-async def briefing_weather(user: User, ctx: BriefingContext) -> Section:
-    w = await fetch_weather(user)
-    points = []
-    if w and w.get("temperature") is not None:
-        hi = f", high {w['high']}°" if w.get("high") is not None else ""
-        points.append(f"{w['condition'].capitalize()}, {w['temperature']}°{hi}")
-    return Section(w, points=points)
-
-
-@addon.provide("screen_sessions")
+@addon.provide("screen_sessions", rank=RANK)
 async def screen_sessions(user: User, since_utc: datetime.datetime,
                           until_utc: datetime.datetime) -> Optional[List[float]]:
     """Seconds of each screen-on stretch of ``user``'s phone screen sensor in
@@ -116,6 +113,40 @@ async def screen_sessions(user: User, since_utc: datetime.datetime,
         if b > a:
             out.append((b - a).total_seconds())
     return out
+
+
+# --- Signal sources -------------------------------------------------------------------------
+
+def _missing(user: User, *needed: str) -> str:
+    """"" when every setting in ``needed`` is set in ``user``'s connection, else what to set."""
+    conn = store.get(user, ADDON)
+    unset = [n for n in needed if conn is None or not config.setting(conn, n)]
+    return f"Set {' and '.join(unset)} in the Home Assistant addon" if unset else ""
+
+
+@addon.provide("signal.wake", rank=RANK)
+def wake_source(user: User) -> str:
+    return _missing(user, config.SCREEN_SENSOR)
+
+
+@addon.provide("signal.screen", rank=RANK)
+def screen_source(user: User) -> str:
+    return _missing(user, config.SCREEN_SENSOR)
+
+
+@addon.provide("signal.car", rank=RANK)
+def car_source(user: User) -> str:
+    return _missing(user, config.CAR_SENSOR, config.CAR_DEVICE)
+
+
+@addon.provide("signal.location", rank=RANK)
+def location_source(user: User) -> str:
+    return _missing(user, config.PERSON)
+
+
+@addon.provide("signal.weather", rank=RANK)
+def weather_source(user: User) -> str:
+    return _missing(user, config.WEATHER)
 
 
 # --- Self-checks ----------------------------------------------------------------------------

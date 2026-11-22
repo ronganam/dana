@@ -1,46 +1,116 @@
 {
-  "signals": [
+ "signals": [
+  {
+   "signal": "wake",
+   "sources": [
     {
-      "signal": "wake",
-      "sources": [
-        {"source": "phone", "label": "Dana's phone app", "active": true, "last_at": "2026-11-22T07:12:03+02:00", "detail": "unlock"},
-        {"source": "homeassistant", "label": "Home Assistant", "active": false, "last_at": null, "detail": ""}
-      ]
+     "source": "phone",
+     "label": "Dana's phone app",
+     "active": true,
+     "last_at": "2026-11-22T23:54:12+02:00",
+     "detail": "unlock"
     },
     {
-      "signal": "screen",
-      "sources": [
-        {"source": "phone", "label": "Dana's phone app", "active": true, "last_at": "2026-11-22T07:20:00+02:00", "detail": ""},
-        {"source": "homeassistant", "label": "Home Assistant", "active": false, "last_at": null, "detail": ""}
-      ]
-    },
-    {
-      "signal": "car",
-      "sources": [
-        {"source": "phone", "label": "Dana's phone app", "active": true, "last_at": "2026-11-21T18:40:00+02:00", "detail": "leave"},
-        {"source": "homeassistant", "label": "Home Assistant", "active": false, "last_at": null, "detail": ""}
-      ]
-    },
-    {
-      "signal": "location",
-      "sources": [
-        {"source": "phone", "label": "Dana's phone app", "active": true, "last_at": "2026-11-21T18:45:00+02:00", "detail": "Home"},
-        {"source": "homeassistant", "label": "Home Assistant", "active": false, "last_at": null, "detail": ""}
-      ]
-    },
-    {
-      "signal": "sleep",
-      "sources": [
-        {"source": "phone", "label": "Dana's phone app", "active": false, "last_at": null, "detail": ""}
-      ]
-    },
-    {
-      "signal": "weather",
-      "sources": [
-        {"source": "open_meteo", "label": "Open-Meteo", "active": true, "last_at": null, "detail": ""},
-        {"source": "homeassistant", "label": "Home Assistant", "active": false, "last_at": null, "detail": ""}
-      ]
+     "source": "homeassistant",
+     "label": "Home Assistant",
+     "active": false,
+     "last_at": "2026-11-22T23:54:42+02:00",
+     "detail": "screen"
     }
-  ],
-  "wake_window": {"start": "05:00", "end": "12:00", "learned": false}
+   ]
+  },
+  {
+   "signal": "screen",
+   "sources": [
+    {
+     "source": "phone",
+     "label": "Dana's phone app",
+     "active": true,
+     "last_at": "2026-11-22T23:54:24+02:00",
+     "detail": "180s on"
+    },
+    {
+     "source": "homeassistant",
+     "label": "Home Assistant",
+     "active": false,
+     "last_at": "2026-11-22T23:54:42+02:00",
+     "detail": "600s on"
+    }
+   ]
+  },
+  {
+   "signal": "car",
+   "sources": [
+    {
+     "source": "phone",
+     "label": "Dana's phone app",
+     "active": true,
+     "last_at": "2026-11-22T21:54:41+02:00",
+     "detail": "leave (android_auto)"
+    },
+    {
+     "source": "homeassistant",
+     "label": "Home Assistant",
+     "active": false,
+     "last_at": "2026-11-22T23:54:41+02:00",
+     "detail": "enter"
+    }
+   ]
+  },
+  {
+   "signal": "location",
+   "sources": [
+    {
+     "source": "phone",
+     "label": "Dana's phone app",
+     "active": true,
+     "last_at": "2026-11-22T23:54:34+02:00",
+     "detail": "arrive Home"
+    },
+    {
+     "source": "homeassistant",
+     "label": "Home Assistant",
+     "active": false,
+     "last_at": "2026-11-22T23:54:41+02:00",
+     "detail": "leave home"
+    }
+   ]
+  },
+  {
+   "signal": "sleep",
+   "sources": [
+    {
+     "source": "phone",
+     "label": "Dana's phone app",
+     "active": true,
+     "last_at": "2026-11-22T23:34:42+02:00",
+     "detail": "16:34–23:34"
+    }
+   ]
+  },
+  {
+   "signal": "weather",
+   "sources": [
+    {
+     "source": "open_meteo",
+     "label": "Open-Meteo",
+     "active": true,
+     "last_at": "2026-11-22T23:54:42+02:00",
+     "detail": "rainy"
+    },
+    {
+     "source": "homeassistant",
+     "label": "Home Assistant",
+     "active": false,
+     "last_at": "2026-11-22T23:54:42+02:00",
+     "detail": "cloudy"
+    }
+   ]
+  }
+ ],
+ "wake_window": {
+  "start": "06:00",
+  "end": "10:30",
+  "learned": false
+ }
 }
