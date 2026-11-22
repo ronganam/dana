@@ -96,6 +96,7 @@ def isolate(name: str) -> str:
         os.environ.pop(env, None)
     os.environ.update(OWNER_ENV)
     os.environ["DANA_ADDON_DIRS"] = ""  # never your site's addons (a test that wants one sets it)
+    os.environ["APP_RELEASES_REPO"] = ""  # no app updates read from GitHub (test_app_updates fakes it)
     path = scratch_path(f"{name}.sqlite3")
     os.environ["DATABASE_PATH"] = path
     return path

@@ -42,7 +42,7 @@ One value: an LLM key (`ANTHROPIC_API_KEY` with the default models). A server wi
 | `DANA_INSECURE_DEV` | `1` = local development without `API_TOKEN`: a request without credentials is the first admin (created at start from `OWNER_*`), the server listens on `127.0.0.1` only and logs a warning at start. Never in production |
 | `CREDENTIALS_KEY` | Fernet key that encrypts connection credentials in the `connections` table and the money addon's bank / card logins (`money_sources`, `docs/money.md`; `core/addons/crypto.py`). Optional: unset, the first start generates one into `<data dir>/credentials.key` (mode 0600, next to the database) and logs where it is; **back that file up with the database**. When set, the env value wins over the file (keep it in your secret store to keep the key outside the data directory). A missing, malformed or wrong key with stored credentials stops the start with a message saying what to do. Losing it loses the stored credentials (reconnect them). Generate one: `python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"` |
 | `WAHA_WEBHOOK_SECRET` | the shared secret WAHA signs each webhook with (HMAC-SHA512 of the body in `X-Webhook-Hmac`; set the same value as WAHA's `WHATSAPP_HOOK_HMAC_KEY`, `docs/whatsapp.md`). Unset: every unsigned `/webhook/waha` is refused (403), so incoming WhatsApp voice notes stop |
-| `APP_PUBLISH_TOKEN` | Bearer token guarding `POST /api/app/upload` (Android APK publishing). At least 24 characters and not the example's placeholder (`openssl rand -hex 32`); otherwise publishing is disabled and the start logs why |
+| `APP_PUBLISH_TOKEN` | Bearer token guarding `POST /api/app/upload` (Android APK publishing, for apps you build yourself). At least 24 characters and not the example's placeholder (`openssl rand -hex 32`); otherwise publishing is disabled and the start logs why |
 
 ## External services (set in .env)
 
@@ -64,6 +64,7 @@ One value: an LLM key (`ANTHROPIC_API_KEY` with the default models). A server wi
 | `PORT` | web server (default 8080) |
 | `DANA_SITE` | your deployment's site folder (`../docs/site.md`); default `site/` at the repository root |
 | `DANA_CATALOG_URL` | where the addon catalog is read from (default `https://raw.githubusercontent.com/ronganam/dana/master/server/catalog.json`; the copy shipped in the image when it cannot be read; `../docs/addons.md`, "The catalog") |
+| `APP_RELEASES_REPO` | the GitHub repository (`owner/name`) whose latest release's phone and watch apps the server offers as app updates (default `ronganam/dana`; read at start and every 6 hours through the public API, no token; `docs/operations.md` → App updates). Empty: only uploaded APKs are offered |
 | `DANA_CATALOG_FILE` | a local catalog file instead of the URL (offline servers, tests) |
 | `DANA_ADDON_DIRS` | folders of non-official addons, separated by `:` (`docs/writing-an-addon.md`), replacing the default sources; unset: the site's `addons/`, the image's `/app/addons-site` and `<data dir>/addons/` (each when it exists); empty: none (the tests) |
 | `TIMEZONE` | the server's timezone (one for every user), e.g. `Asia/Jerusalem` (falls back to the first admin's Home Assistant → `TZ` → UTC) |

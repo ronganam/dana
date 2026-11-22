@@ -1,0 +1,230 @@
+# A release: on a pushed tag v<version> (or by hand for an existing tag).
+#   1. the tag must equal server/VERSION and the versionName of :app and :wear;
+#   2. the server image ghcr.io/<owner>/dana:<version> and :latest (amd64 + arm64);
+#   3. the Android release APKs (phone, tablet = kiosk, TV, watch, watch face), signed with
+#      the project key from the repository secrets, built with no site (no server, no defaults);
+#   4. the GitHub Release: the APKs, SHA256SUMS, versions.json (read by servers that offer
+#      app updates: server/core/app_updates.py) and the commits since the previous tag.
+# android/docs/release.md, "Releases".
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "An existing tag to release, e.g. v10.0.0"
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - id: check
+        name: The tag matches server/VERSION and the Android versionName
+        run: |
+          version="${TAG#v}"
+          status=0
+          server=$(tr -d '[:space:]' < server/VERSION)
+          [ "$server" = "$version" ] || { echo "::error file=server/VERSION::$server, the tag says $version"; status=1; }
+          for f in android/app/build.gradle.kts android/wear/build.gradle.kts; do
+            name=$(sed -n 's/^ *versionName *= *"\(.*\)".*/\1/p' "$f" | head -1)
+            [ "$name" = "$version" ] || { echo "::error file=$f::versionName $name, the tag says $version"; status=1; }
+          done
+          [ "$status" = 0 ] && echo "version=$version" >> "$GITHUB_OUTPUT"
+          exit $status
+
+  image:
+    needs: version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - id: name
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dana" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: server
+          target: app
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.name.outputs.image }}:${{ needs.version.outputs.version }}
+            ${{ steps.name.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.version.outputs.version }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=MIT
+          cache-from: type=gha,scope=release
+          cache-to: type=gha,scope=release,mode=max
+
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: android
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: true
+      - name: Release signing from the repository secrets
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          # Without them Gradle would sign with a debug key: refuse instead.
+          for name in KEYSTORE_BASE64 KEYSTORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            [ -n "${!name}" ] || { echo "::error::the repository secret ANDROID_${name} is not set"; exit 1; }
+          done
+          keystore="$RUNNER_TEMP/dana-release.keystore"
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > "$keystore"
+          umask 077
+          {
+            printf 'storeFile=%s\n' "$keystore"
+            printf 'storePassword=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+          } > keystore.properties
+      # A release holds no deployment: DANA_SITE names an empty folder, so no server address,
+      # LAN DNS, cleartext permission, TV defaults or Firebase config is built in (docs/release.md,
+      # "Your site"); the apps start with no server and are paired later.
+      - name: Build the release APKs (no site)
+        run: |
+          mkdir -p "$RUNNER_TEMP/no-site"
+          if [ -e app/src/phone/google-services.json ]; then
+            echo "::error file=android/app/src/phone/google-services.json::a release build must not carry a Firebase config"; exit 1
+          fi
+          # Two workers: three :app variants compiled at once exhaust the Kotlin daemon's heap.
+          DANA_SITE="$RUNNER_TEMP/no-site" ./gradlew --no-configuration-cache --max-workers=2 \
+            :app:assemblePhoneRelease :app:assembleKioskRelease :app:assembleTvRelease \
+            :wear:assembleRelease :watchface:assembleRelease
+      - name: Name the APKs, SHA256SUMS and versions.json
+        run: |
+          out="$RUNNER_TEMP/release"
+          mkdir -p "$out"
+          cp app/build/outputs/apk/phone/release/app-phone-release.apk "$out/dana-phone-$VERSION.apk"
+          cp app/build/outputs/apk/kiosk/release/app-kiosk-release.apk "$out/dana-tablet-$VERSION.apk"
+          cp app/build/outputs/apk/tv/release/app-tv-release.apk "$out/dana-tv-$VERSION.apk"
+          cp wear/build/outputs/apk/release/wear-release.apk "$out/dana-wear-$VERSION.apk"
+          cp watchface/build/outputs/apk/release/watchface-release.apk "$out/dana-watchface-$VERSION.apk"
+          aapt2=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)aapt2
+          apksigner=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          cd "$out"
+          # Every APK carries the release key (one certificate for all: the watch app must match the phone's).
+          certs=$(for f in dana-*.apk; do "$apksigner" verify --print-certs "$f" | grep -o 'certificate SHA-256 digest: [0-9a-f]*'; done | sort -u | wc -l)
+          [ "$certs" = 1 ] || { echo "::error::the APKs are not all signed with one certificate"; exit 1; }
+          sha256sum dana-*.apk > SHA256SUMS
+          python3 - "$aapt2" <<'EOF'
+          import hashlib, json, os, re, subprocess, sys
+          version = os.environ["VERSION"]
+          out = {}
+          for artifact in ("phone", "wear", "watchface", "tablet", "tv"):
+              file = f"dana-{artifact}-{version}.apk"
+              badging = subprocess.run([sys.argv[1], "dump", "badging", file],
+                                       check=True, capture_output=True, text=True).stdout
+              m = re.search(r"versionCode='(\d+)' versionName='([^']*)'", badging)
+              data = open(file, "rb").read()
+              out[artifact] = {"versionName": m.group(2), "versionCode": int(m.group(1)), "file": file,
+                               "sha256": hashlib.sha256(data).hexdigest(), "size": len(data)}
+          json.dump(out, open("versions.json", "w"), indent=2)
+          EOF
+          cat SHA256SUMS versions.json
+      - name: Remove the signing files
+        if: always()
+        run: rm -f keystore.properties "$RUNNER_TEMP/dana-release.keystore"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: android-release
+          path: ${{ runner.temp }}/release/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: [version, image, android]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          name: android-release
+          path: release
+      - name: Release notes (commits since the previous tag)
+        run: |
+          previous=$(git describe --tags --abbrev=0 --match 'v*' "$TAG^" 2>/dev/null || true)
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dana:$VERSION"
+          {
+            echo "Server image: \`$image\` (also \`:latest\`). Quick start: \`compose.yaml\` at the repository root."
+            echo
+            echo "Android: \`dana-phone\` (phone), \`dana-wear\` (watch), \`dana-watchface\`, \`dana-tablet\` (wall tablet), \`dana-tv\` (TV). Check them against \`SHA256SUMS\`."
+            echo
+            if [ -n "$previous" ]; then
+              echo "## Changes since $previous"
+              echo
+              git log --no-merges --pretty='- %s' "$previous..$TAG"
+            else
+              echo "## Changes"
+              echo
+              git log --no-merges --pretty='- %s' -n 50 "$TAG"
+            fi
+          } > notes.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.TAG }}
+          name: Dana ${{ needs.version.outputs.version }}
+          body_path: notes.md
+          fail_on_unmatched_files: true
+          files: |
+            release/dana-phone-${{ needs.version.outputs.version }}.apk
+            release/dana-wear-${{ needs.version.outputs.version }}.apk
+            release/dana-watchface-${{ needs.version.outputs.version }}.apk
+            release/dana-tablet-${{ needs.version.outputs.version }}.apk
+            release/dana-tv-${{ needs.version.outputs.version }}.apk
+            release/SHA256SUMS
+            release/versions.json

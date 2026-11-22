@@ -5,7 +5,7 @@ Every route lives in the module that owns it, each registering its routes
 with ``setup(app)``: core's own (:data:`ROUTE_MODULES`, in this order), then
 every loaded addon's ``api.py`` in the addon order (core/addons/loader.py).
 Background work: core's own loops (usage, the briefing fallback, meeting
-cards, the weekly review, the wake watch) and the addons' jobs and services
+cards, the weekly review, the wake watch, app updates from GitHub Releases) and the addons' jobs and services
 (core/addons/scheduler.py). Nothing here imports an addon.
 
 Every route an addon's ``setup(app)`` adds is remembered as that addon's:
@@ -211,8 +211,10 @@ def _start_core_background(app: web.Application) -> None:
     """Core's own loops, each for every user it applies to: meeting cards
     (calendar + phone), the 10:00 briefing fallback (users who get a
     briefing), the weekly review, and the wake fallback (the phone's screen
-    history, in case no unlock signal arrives)."""
+    history, in case no unlock signal arrives); and the Android app updates
+    read from GitHub Releases (core/app_updates.py), server-wide."""
     app["meeting_cards_task"] = asyncio.create_task(briefing.meeting_cards_loop())
     app["briefing_fallback_task"] = asyncio.create_task(briefing.fallback_loop())
     app["weekly_review_task"] = asyncio.create_task(weekly_review.schedule_loop())
     app["wake_watch_task"] = asyncio.create_task(wake.wake_watch_loop())
+    app["app_releases_task"] = asyncio.create_task(app_updates.releases_loop())

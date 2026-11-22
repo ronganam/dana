@@ -119,7 +119,7 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 | `docs/kiosk.md` | Wall-tablet kiosk, wake word, voice turn tuning |
 | `docs/tv.md` | Dana TV: home override, key service, camera PiP, TCL/MTK quirks |
 | `docs/permissions.md` | Every permission and special access, per flavor; distribution (sideload / your server, not Play); call recordings opt-in |
-| `docs/release.md` | Setup (SDK, JDK), HTTPS / cleartext, signing, in-app updates, R8/AOT, local defaults (Firebase config, server URL, TV defaults) |
+| `docs/release.md` | Releases (the tag workflow, signing secrets, release assets, `versions.json`), setup (SDK, JDK), HTTPS / cleartext, signing, in-app updates, R8/AOT, local defaults (Firebase config, server URL, TV defaults) |
 | `DESIGN.md` | "Ink & Paper" design system |
 
 Keep docs current in the same commit as the code; add new areas as a doc + one line here rather than growing this file.
