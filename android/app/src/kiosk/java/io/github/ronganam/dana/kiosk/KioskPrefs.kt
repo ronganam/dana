@@ -1,11 +1,10 @@
 package io.github.ronganam.dana.kiosk
 
-import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import io.github.ronganam.dana.wake.WakePrefs
 import androidx.core.content.edit
 
-/** Kiosk-only settings; server, token and voice settings live in [WakePrefs]. */
+/** Kiosk-only settings; voice settings live in [WakePrefs], the server and token come from pairing (`DevicePairing`). */
 object KioskPrefs {
     // The old kiosk forced a DPR-1 viewport with ?zoom=220; at the tablet's native
     // DPR (2.25) the same on-screen size is ?zoom=98.
@@ -16,16 +15,7 @@ object KioskPrefs {
     fun dashboardPath(context: Context): String =
         WakePrefs.prefs(context).getString(KEY_PATH, null)?.takeIf { it.isNotBlank() } ?: DEFAULT_PATH
 
-    fun save(
-        context: Context,
-        serverUrl: String,
-        apiToken: String,
-        path: String,
-        threshold: Float,
-        speak: Boolean,
-        followUp: Boolean
-    ) {
-        ServerConfig.save(context, serverUrl, apiToken)
+    fun save(context: Context, path: String, threshold: Float, speak: Boolean, followUp: Boolean) {
         WakePrefs.prefs(context).edit { putString(KEY_PATH, path.trim()) }
         WakePrefs.saveVoice(context, threshold = threshold, speak = speak, followUp = followUp)
     }

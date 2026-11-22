@@ -23,6 +23,8 @@ import io.github.ronganam.dana.BuildConfig
 import io.github.ronganam.dana.CallRecordingObserverService
 import io.github.ronganam.dana.data.update.UpdateManager
 import io.github.ronganam.dana.data.voice.DeviceSpeech
+import io.github.ronganam.dana.ui.components.FoundServers
+import io.github.ronganam.dana.ui.components.rememberFoundServers
 import io.github.ronganam.dana.ui.components.GlassCard
 import io.github.ronganam.dana.ui.components.ScreenTopBar
 import io.github.ronganam.dana.ui.components.SectionLabel
@@ -116,6 +118,8 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
                     )
+                    val foundServers by rememberFoundServers()
+                    FoundServers(foundServers, ServerConfig.normalize(serverUrl), onPick = { serverUrl = it.url })
                     OutlinedTextField(
                         value = apiToken,
                         onValueChange = { apiToken = it },

@@ -8,8 +8,9 @@
 #   bin/deploy-tv.sh                       # release build → $ANDROID_SERIAL, else $TV_SERIAL (site/android.env)
 #   bin/deploy-tv.sh -s 192.168.1.20:5555
 #   bin/deploy-tv.sh --debug               # debug build (logs every remote key)
-#   DANA_API_TOKEN=… bin/deploy-tv.sh      # also hand it the server's API token
-#   bin/deploy-tv.sh --server https://dana.example.com
+#   bin/deploy-tv.sh --server https://dana.example.com   # fill the pairing screen's server address
+#
+# A new install opens on the pairing screen: pair it with a code from Dana's Devices page.
 #
 # adb auth: a TV that already trusts another adb key (e.g. Home Assistant's) needs it:
 #   adb kill-server; ADB_VENDOR_KEYS=<that key> adb start-server
@@ -26,7 +27,7 @@ while [[ $# -gt 0 ]]; do
     -s) SERIAL="$2"; shift 2 ;;
     --debug) VARIANT=Debug; shift ;;
     --server) SERVER="$2"; shift 2 ;;
-    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,16p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "Unknown option: $1" >&2; exit 1 ;;
   esac
 done
@@ -43,7 +44,7 @@ if ! out=$("${ADB[@]}" install -r -g "$APK" 2>&1); then
   echo "$out" >&2
   if grep -q INSTALL_FAILED_UPDATE_INCOMPATIBLE <<<"$out"; then
     echo "Installed build has another signature (debug vs release). Uninstall first:" >&2
-    echo "  adb -s $SERIAL uninstall $PKG   # wipes Dana TV's settings and token" >&2
+    echo "  adb -s $SERIAL uninstall $PKG   # wipes Dana TV's settings and its pairing" >&2
   fi
   exit 1
 fi
@@ -74,6 +75,5 @@ tvsh cmd package set-home-activity "$HOME_ACT" >/dev/null || true
 
 extras=()
 [[ -n "$SERVER" ]] && extras+=(--es server "$SERVER")
-[[ -n "${DANA_API_TOKEN:-}" ]] && extras+=(--es token "$DANA_API_TOKEN")
 tvsh am start -n "$HOME_ACT" "${extras[@]}" >/dev/null
 echo "Dana TV installed ($VARIANT) on $SERIAL and started."
