@@ -87,12 +87,18 @@ def scratch_path(name: str) -> str:
     return os.path.join(scratch_dir(), name)
 
 
+# Set by git while a hook runs: a test's own git commands would act on the real repository.
+GIT_LOCATION_ENV = ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                    "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_NAMESPACE",
+                    "GIT_QUARANTINE_PATH")
+
+
 def isolate(name: str) -> str:
     """Clean the environment for a test process and point ``DATABASE_PATH``
     at ``<scratch dir>/<name>.sqlite3``. Returns that path."""
     os.environ["LITELLM_MODE"] = "PRODUCTION"
     os.environ["DANA_ENV_FILE"] = ""  # a subprocess (bin/dana) never reads a real server/.env
-    for env in ADDON_ENV + IDENTITY_ENV:
+    for env in ADDON_ENV + IDENTITY_ENV + GIT_LOCATION_ENV:
         os.environ.pop(env, None)
     os.environ.update(OWNER_ENV)
     os.environ["DANA_ADDON_DIRS"] = ""  # never your site's addons (a test that wants one sets it)
