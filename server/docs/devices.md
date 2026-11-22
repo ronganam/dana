@@ -1,16 +1,17 @@
-# Devices, pairing and setup mode
+# Devices, pairing, setup mode and the wizard
 
 Every app instance that talks to Dana (a phone, a watch, a wall tablet, a TV, a browser, another client) is a
 **device** of one user with its own revocable token. A device is made by **pairing**: a signed-in user shows a
 short code (and a QR code), the new device sends it to the server and gets its token. A fresh server with no
-users starts in **setup mode** and waits for its first admin.
+users starts in **setup mode** and waits for its first admin; then every user goes through the **first-run wizard**.
 
 Code: `core/devices.py` (devices, pairing), `core/devices_api.py` (HTTP), `core/setup.py` +
 `core/setup_api.py` (setup mode), `core/ratelimit.py` (wrong-code limits), `core/public_url.py` (the address
 in QR codes and the setup link), `core/auth.py` (the request's device, `/login` with a code); web:
 `static/devices.js` + `devices.css` (the Devices page), `static/setup.html` + `setup.js` (the setup page),
-`static/login.html`. Tables: core migration `m0005_devices`. Tests: `bin/test test_devices`,
-`bin/test test_web_devices`.
+`static/login.html`; the wizard: `core/wizard.py` + `core/wizard_api.py`, its steps in `static/setup.js`. Tables:
+core migrations `m0005_devices`, `m0006_zones_wizard` (`user_wizard`). Tests: `bin/test test_devices`,
+`bin/test test_web_devices`, `bin/test test_wizard`, `bin/test test_web_setup`.
 
 ## Device
 
@@ -141,6 +142,34 @@ is no setup mode; `DANA_INSECURE_DEV=1` (local development) does the same.
 an ordinary signed-in page afterwards. `setup.js` takes the code out of the address bar, asks `GET /api/setup`
 and runs `STEPS` in order: each step is `{id, kicker, title, needed(state), render(el, state, done)}`; a step
 whose `needed(state)` is false is skipped, `render` draws it and calls `done(changes)` (merged into `state`),
-and after the last step the app opens (`/`). Today there is one step, `admin` (name → create). A later step
-(home, languages, the LLM key, pairing a phone, addons) is one more entry after `admin`; it runs as the
-signed-in admin and uses the ordinary API.
+and after the last step the wizard is finished and the app opens (`/`). The first step is `admin` (name →
+create, setup mode only); the wizard's steps follow.
+
+## The wizard
+
+After setup mode creates the first admin, and on every new user's first sign-in, the web app sends the user to
+`/setup` while their wizard is not finished (`static/app.js` asks `GET /api/wizard`). Users who existed before the
+wizard have it finished (migration `m0006_zones_wizard`). Each step has Skip; what a user finished or skipped is
+stored per user (`user_wizard.steps`), so a reload or a later sign-in picks up at the next step. Settings → Setup
+wizard (`/setup?again=1`) shows every step again.
+
+| Step | Who | What it does |
+|---|---|---|
+| `you` | everyone | name, pronoun, languages → `PUT /api/profile` |
+| `home` | everyone | a place search or "Use my location" (`static/zones.js`'s place picker, `docs/zones.md`) → `PUT /api/wizard/home`: their Home zone; the place's timezone becomes the server's when the user has `manage_server` (stored in `server_settings`, `core/clock.py`; `TIMEZONE` in env still wins), the country's currency becomes theirs when they chose none |
+| `model` | `manage_server` | the LLM provider and its key, tested on the spot (`static/llm.js`, `PUT /api/llm`; `docs/configuration.md` → Models) |
+| `phone` | everyone | a pairing code and QR for a phone (`POST /api/devices/pairings`, drawn with `DanaDevicesCore` from the Devices page); done when the phone pairs |
+| `addons` | everyone | the addons the server suggests (`GET /api/addons` → `welcome.suggested`) that are off and free to turn on now (no required account, hardware, key or credential), each turned on with `PUT /api/addons/{name}` |
+| `sample` | when the server has `POST /api/demo` | "Show me with sample data": calls it |
+
+A step that is not for the user (`model` without `manage_server`, `sample` without the demo route, found in the app's
+router at request time) is left out (`available: false`).
+
+| Method and path | Body → answer |
+|---|---|
+| `GET /api/wizard` | → `<state>` = `{steps: [{id, status: pending \| done \| skipped, available}], finished, finished_at, next, demo, timezone}` (`next`: the first available pending step, null when none) |
+| `POST /api/wizard/steps/{step}` | `{status: done \| skipped}` → `<state>`; 404 unknown step, 400 `unavailable` |
+| `POST /api/wizard/finish` | → `<state>` (steps not reached stay pending) |
+| `PUT /api/wizard/home` | `{latitude, longitude, radius_m?, timezone?, currency?}` → `{zone, timezone: {value, applied}, currency, state}`; marks `home` done |
+
+Every signed-in user, for themselves only.

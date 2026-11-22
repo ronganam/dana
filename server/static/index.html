@@ -27,6 +27,8 @@
     <link rel="stylesheet" href="/static/addons.css">
     <link rel="stylesheet" href="/static/devices.css">
     <link rel="stylesheet" href="/static/household.css">
+    <link rel="stylesheet" href="/static/zones.css">
+    <link rel="stylesheet" href="/static/llm.css">
     <!-- Third-Party Libraries -->
     <!-- Vendored, exact versions (THIRD_PARTY.md): no script comes from a CDN -->
     <script src="/static/vendor/marked.min.js"></script>
@@ -54,6 +56,8 @@
     <script src="/static/devices.js" defer></script>
     <script src="/static/household.js" defer></script>
     <script src="/static/demo.js" defer></script>
+    <script src="/static/zones.js" defer></script>
+    <script src="/static/llm.js" defer></script>
 </head>
 <body>
     <div class="app-container">
@@ -237,6 +241,23 @@
                         <button class="btn-primary" id="btn-save-profile">Save Profile</button>
                         <span class="profile-hint" id="profile-status" role="status" aria-live="polite"></span>
                     </div>
+                    <!-- static/zones.js: the signed-in user's places (Home and the others) for location reminders -->
+                    <div class="settings-card" id="zones-card">
+                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Zones</h2>
+                        <span class="profile-hint">Places for reminders when you arrive or leave: Home and the others you go to.</span>
+                        <div id="zones-list"></div>
+                        <div class="zn-btns">
+                            <button class="btn-primary" id="zones-add"><i data-lucide="plus"></i> Add a zone</button>
+                            <button class="btn-secondary hidden" id="zones-import"><i data-lucide="download"></i> Import from Home Assistant</button>
+                        </div>
+                        <span class="profile-hint" id="zones-status" role="status" aria-live="polite"></span>
+                        <div class="ibx-modal hidden" id="zones-modal"></div>
+                    </div>
+                    <!-- static/setup.js (the wizard) and static/llm.js (the model): server/docs/devices.md, configuration.md -->
+                    <div class="settings-card" id="llm-card">
+                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">The model</h2>
+                        <div id="llm-box"></div>
+                    </div>
                     <div class="settings-card">
                         <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Dana</h2>
                         
@@ -259,6 +280,10 @@
                                 <a href="/dashboard" class="settings-link-tile" target="_blank">
                                     <i data-lucide="layout-dashboard"></i>
                                     <span>Bedroom Dashboard</span>
+                                </a>
+                                <a href="/setup?again=1" class="settings-link-tile">
+                                    <i data-lucide="sparkles"></i>
+                                    <span>Setup wizard</span>
                                 </a>
                                 <button class="settings-link-tile" id="btn-open-devices-tab">
                                     <i data-lucide="smartphone"></i>

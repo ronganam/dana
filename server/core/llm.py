@@ -55,7 +55,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 import litellm
 
-from core import purposes, usage, user_locale, users
+from core import llm_provider, purposes, usage, user_locale, users
 
 logger = logging.getLogger(__name__)
 
@@ -127,12 +127,14 @@ def transcription_prompt(langs: Tuple[str, ...]) -> str:
 
 
 def model(job: str) -> str:
-    """The LiteLLM model id configured for ``job`` (read on every call)."""
+    """The LiteLLM model id configured for ``job`` (read on every call): its env
+    chain, else the provider chosen in the app (core/llm_provider.py), else the
+    built-in default."""
     for var in _CHAINS[job]:
         value = os.getenv(var, "").strip()
         if value:
             return value
-    return _DEFAULTS.get(job, HAIKU)
+    return llm_provider.job_model(job) or _DEFAULTS.get(job, HAIKU)
 
 
 def model_for(purpose: str, job: Optional[str] = None) -> str:
@@ -153,7 +155,7 @@ def model_for(purpose: str, job: Optional[str] = None) -> str:
         value = os.getenv(var, "").strip()
         if value:
             return value
-    return default
+    return llm_provider.profile_model(p.profile) or default
 
 
 def _call(purpose: str, job: Optional[str]) -> tuple:
@@ -227,9 +229,9 @@ def missing_key_message(name: str) -> str:
     who = provider(name) or name
     missing = _missing_keys(name)
     if missing:
-        return f"No API key for {who}: set {missing[0]} in server/.env"
+        return f"No API key for {who}: add one in Settings → The model (or set {missing[0]})"
     keys = PROVIDER_KEYS.get(provider(name)) or ("its API key",)
-    return f"The {who} API key was refused: check {keys[0]} in server/.env"
+    return f"The {who} API key was refused: enter it again in Settings → The model (or check {keys[0]})"
 
 
 def configured(job: str) -> bool:
@@ -280,6 +282,25 @@ async def complete(messages: List[Dict[str, Any]], *, job: Optional[str] = None,
                                          litellm_metadata=usage.meta(purpose, ref, source),
                                          **claude_kwargs(name, job or "", kwargs))
     return _text(response)
+
+
+async def check_model(name: str, *, api_key: str = "", api_base: str = "", timeout: float = 30.0) -> None:
+    """A tiny completion with ``name`` (and the given key / server address
+    instead of the configured ones), filed under the purpose ``setup_check``:
+    whether a key or a local model works before it is saved.
+
+    Raises:
+        Exception: the provider's error (refused key, unknown model, unreachable server…).
+    """
+    extra: Dict[str, Any] = {}
+    if api_key:
+        extra["api_key"] = api_key
+    if api_base:
+        extra["api_base"] = api_base
+    await litellm.acompletion(model=name, messages=[{"role": "user", "content": "Reply with the word OK."}],
+                              max_tokens=16, timeout=timeout, drop_params=True,
+                              litellm_metadata=usage.meta("setup_check", "", "setup"),
+                              **claude_kwargs(name, "chat", extra))
 
 
 async def complete_json(prompt: str, schema: Dict[str, Any], *, job: Optional[str] = None, temperature: float = 0.2,

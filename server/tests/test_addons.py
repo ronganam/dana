@@ -182,7 +182,7 @@ def test_per_user_lists():
     check("tools: the admin's list is the tools of their addons, in addon then definition order",
           # two users: core has share_item (the admin has tasks, an addon with shareable items) and shopping
           # has choose_shopping_list
-          admin_tools == expected and len(admin_tools) == 4 + 7 + 5 + 13 + 4 + 4 + 11, str(len(admin_tools)))
+          admin_tools == expected and len(admin_tools) == 4 + 7 + 5 + 14 + 4 + 4 + 11, str(len(admin_tools)))
     check("tools: no HA / WhatsApp / calendar tools without those addons",
           not {"call_ha_service", "send_whatsapp_message", "add_event"} & set(admin_tools))
     check("tools: the order is deterministic (same list every time, realtime too)",

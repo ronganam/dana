@@ -49,7 +49,7 @@ from addons import bootstrap as addons_bootstrap
 addons_bootstrap.bootstrap()
 
 from addons.tasks import api as tasks_api
-from core import clock, notify as core_notify, sharing_api
+from core import clock, notify as core_notify, sharing_api, zones
 from core.addons import sharing
 from core.auth import setup_auth
 from core.db import get_db_connection
@@ -250,20 +250,44 @@ def test_triggers_per_user() -> None:
     check("transitions are recorded per user", triggers.last_transition("car", BOB) is not None
           and triggers.last_transition("car", CARL) is None)
 
-    # Location triggers need the user's Home Assistant.
-    try:  # like a zone that does not exist, the error reaches the agent loop as the tool's error
+    # Location triggers name one of the user's own zones (core/zones.py), with or without Home Assistant.
+    try:  # like any bad argument, the error reaches the agent loop as the tool's error
         tool(BOB, "add_task", title="Milk", location="home", location_event="arrive")
         out = ""
-    except service.NoHomeAssistant as e:
+    except service.UnknownZone as e:
         out = str(e)
-    check("a location reminder without Home Assistant: a clear message, no task",
-          "Home Assistant isn't connected for you" in out and "Milk" not in tool(BOB, "list_tasks"), out)
+    check("a location reminder without any zone: a clear message, no task",
+          "Settings → Zones" in out and "time, car or wake-up" in out and "Milk" not in tool(BOB, "list_tasks"), out)
+    zones.create(BOB, "Home", 40.1, -74.0, is_home=True)
+    zones.create(BOB, "Bakery", 40.2, -74.1)
+    zones.create(CARL, "Carl Gym", 40.3, -74.2)
+    check("get_zones: the user's own zones, Home marked",
+          tool(BOB, "get_zones") == "Your zones:\n- Home (Home)\n- Bakery", tool(BOB, "get_zones"))
+    out = tool(BOB, "add_task", title="Bread", location="bakery", location_event="arrive")
+    stored = [t for t in service.list_tasks(BOB) if t["title"] == "Bread"]
+    check("a location reminder on Bob's zone (no Home Assistant): added, the zone stored",
+          stored and json.loads(stored[0]["triggers"])["location"] == {"location": "bakery", "event": "arrive"}, out)
     try:
-        service.check_location_trigger(BOB)
-        raised = False
-    except service.NoHomeAssistant as e:
-        raised = "time, car or wake-up" in str(e)
-    check("check_location_trigger: NoHomeAssistant with the alternatives", raised)
+        service.resolve_zone(BOB, "Carl Gym")
+        msg = ""
+    except service.UnknownZone as e:
+        msg = str(e)
+    check("another user's zone is unknown (Bob's zones listed, not Carl's)",
+          "Bakery" in msg and "Carl Gym" not in msg.split("Your zones")[1], msg)
+    check("'home' is the user's Home zone", service.resolve_zone(BOB, "HOME") == "Home")
+
+    async def fire_location(user: users.User, action: str, target: str) -> int:
+        n = await triggers.fire(user, "location", action=action, target=target)
+        await asyncio.sleep(0.05)
+        return n
+
+    sent.clear()
+    with patch.object(core_notify, "notify", fake_notify), \
+            patch.object(phone_push, "send", AsyncMock(return_value=True)):
+        n_carl = run(fire_location(CARL, "arrive", "Bakery"))
+        n_bob = run(fire_location(BOB, "arrive", "Bakery"))
+    check("location: arriving at Bob's Dana zone fires his reminder, to him only (no Home Assistant)",
+          n_carl == 0 and n_bob == 1 and [u for u, _ in sent] == [BOB.id], str(sent))
 
 
 # --- 5. Sharing --------------------------------------------------------------------------------
@@ -442,10 +466,16 @@ async def test_http(client: TestClient) -> None:
     resp = await client.delete(f"/api/tasks/{wt}", headers=auth(BOB_TOKEN))
     check("DELETE a task of a read-only shared list → 403", resp.status == 403)
     resp = await client.post("/api/tasks", headers=auth(BOB_TOKEN),
+                             json={"title": "Where", "triggers": {"location": {"location": "Moon", "event": "arrive"}}})
+    body = await resp.json()
+    check("POST a location reminder on a zone Bob does not have → 400 listing his zones",
+          resp.status == 400 and "not one of your zones" in body.get("error", "") and "Bakery" in body["error"], str(body))
+    resp = await client.post("/api/tasks", headers=auth(BOB_TOKEN),
                              json={"title": "Where", "triggers": {"location": {"location": "home", "event": "arrive"}}})
     body = await resp.json()
-    check("POST a location reminder without Home Assistant → 400 with the message",
-          resp.status == 400 and "Home Assistant isn't connected" in body.get("error", ""), str(body))
+    made = service.get_task(BOB, body.get("id", ""))
+    check("POST a location reminder at 'home' (no Home Assistant) → his Home zone",
+          resp.status == 200 and made and json.loads(made["triggers"])["location"]["location"] == "Home", str(body))
     resp = await client.get("/api/tasks", headers=auth(ADMIN_TOKEN))
     ts = await resp.json()
     check("GET /api/tasks for the owner: no shared_by / access / owner columns",

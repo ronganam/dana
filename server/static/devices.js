@@ -13,7 +13,7 @@
  * /login. Server side: core/devices_api.py, server/docs/devices.md.
  *
  * Two parts: DanaDevicesCore (pure: labels, icons, times, the code's display, the QR drawing; tested by
- * test_web_devices.mjs; static/household.js reuses it for invites)
+ * test_web_devices.mjs; static/household.js reuses it for invites and the wizard's phone step, static/setup.js)
  * and the controller below it (window.DanaDevices = {show, hide}; app-nav.js calls them on tab switches).
  */
 (() => {
@@ -80,9 +80,10 @@
     return body;
   }
 
-  /** The pairing QR code as SVG (the vendored qrcode-generator); "" without it. Household invites draw it too. */
+  /** The pairing QR code as an SVG tag (the vendored qrcode-generator; "" when it is not loaded). Household
+   *  invites and the wizard draw it too. */
   function qrSvg(text) {
-    const make = typeof window !== "undefined" ? window.qrcode : undefined;
+    const make = (typeof window !== "undefined" ? window : globalThis).qrcode;
     if (typeof make !== "function") return "";
     const qr = make(0, "M");
     qr.addData(text);

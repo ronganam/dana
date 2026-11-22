@@ -108,7 +108,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional location or zone name to trigger this task. IMPORTANT: This must match the lowercase friendly name of a Home Assistant zone (e.g. 'home', 'office'). If you are unsure what zones are available or need to map a name (like 'parents home' or 'work') to a zone, you MUST first call get_ha_zones to see the list of active zones and choose the correct one."
+          "description": "The optional location or zone name to trigger this task. It must be one of the user's zones (e.g. 'home', 'office'); to map a name (like 'parents home' or 'work') to a zone, call get_zones first and choose the matching one."
         },
         "location_event": {
           "anyOf": [
@@ -213,7 +213,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional location or zone name to trigger this task. Specifying this will update the location trigger. Pass empty string to remove. IMPORTANT: This must match the lowercase friendly name of a Home Assistant zone (e.g. 'home', 'office'). If you are unsure what zones are available or need to map a name (like 'parents home' or 'work') to a zone, you MUST first call get_ha_zones to see the list of active zones and choose the correct one."
+          "description": "The optional location or zone name to trigger this task. Specifying this will update the location trigger. Pass empty string to remove. It must be one of the user's zones (e.g. 'home', 'office'); to map a name (like 'parents home' or 'work') to a zone, call get_zones first and choose the matching one."
         },
         "location_event": {
           "anyOf": [
@@ -335,6 +335,16 @@
       "required": [
         "item"
       ]
+    }
+  },
+  {
+    "type": "function",
+    "name": "get_zones",
+    "description": "List the user's zones: the places a location reminder can name (Home and the others they added). Call this before add_task or update_task with a location, to map what the user said ('work', 'my parents') to one of these names. If none matches, show them the list and ask; new zones are added in Settings → Zones.",
+    "parameters": {
+      "type": "object",
+      "properties": {},
+      "required": []
     }
   },
   {
@@ -1667,7 +1677,7 @@
               "type": "null"
             }
           ],
-          "description": "Home Assistant zone name for a location trigger (call get_ha_zones first if unsure)."
+          "description": "One of the user's zones for a location trigger (call get_zones first if unsure)."
         },
         "location_event": {
           "anyOf": [
@@ -1936,16 +1946,6 @@
         "service",
         "entity_id"
       ]
-    }
-  },
-  {
-    "type": "function",
-    "name": "get_ha_zones",
-    "description": "Retrieve all active zones configured in Home Assistant. Home Assistant ONLY supports zone-based location triggers. The location value MUST match the friendly name of an existing HA zone exactly. Use this to resolve natural-language location names (e.g. 'work', 'parents home') to the exact zone friendly_name required by location-based task triggers. IMPORTANT: You MUST call this tool BEFORE calling add_task or update_task with a location parameter. If the user asks for a location that doesn't match any zone, show them the available zones and ask which one they mean.",
-    "parameters": {
-      "type": "object",
-      "properties": {},
-      "required": []
     }
   },
   {

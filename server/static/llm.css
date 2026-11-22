@@ -1,0 +1,6 @@
+/* The model card (static/llm.js) on the Settings screen and in the wizard. Tokens from styles.css. */
+.llm-providers { flex-wrap: wrap; }
+.llm-form { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.llm-form .btn-primary { align-self: flex-start; }
+.llm-error { color: var(--rose-text); background: var(--rose-tint); border-radius: var(--radius-md); padding: 8px 12px; font-size: 13.5px; }
+.llm-error:empty { display: none; }

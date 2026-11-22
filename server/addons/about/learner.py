@@ -42,7 +42,7 @@ LOOP_TICK_SECONDS = 60.0                  # how often the loop looks for users w
 # Agent tools whose use, alone, makes a conversation a home command or a quick
 # lookup with nothing to learn.
 TRIVIAL_TOOLS = {
-    "call_ha_service", "get_ha_exposed_entities", "get_ha_zones", "control_android_tv",
+    "call_ha_service", "get_ha_exposed_entities", "get_zones", "control_android_tv",
     "get_current_time", "get_shopping_list", "add_shopping_items", "update_shopping_items",
     "edit_shopping_item",
 }

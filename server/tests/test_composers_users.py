@@ -133,6 +133,9 @@ CARL = users.create("Carl Weiss", telegram_chat_id=7001)
 store.connect(CARL, "tasks")
 store.connect(CARL, "calendar", credentials={"refresh_token": "carl-refresh"})
 EVE = users.create("Eve")
+from core import zones  # noqa: E402
+for _u in (ADMIN, BOB):  # a Home zone each (Dana's own): Now's "At home" slot and choices
+    zones.create(_u, "Home", 32.08, 34.78, is_home=True)
 task_groups.ensure_default_groups_for_everyone()
 shopping_lists.ensure_lists_for_everyone()
 TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ADMIN, BOB, CARL, EVE)}
@@ -178,14 +181,9 @@ async def fake_history(conn, entity_id, since_utc, until_utc):
     return [{"state": st, "last_changed": (now - datetime.timedelta(seconds=ago)).isoformat()} for ago, st in spec]
 
 
-async def fake_zones(conn):
-    SEEN["ha"].append((conn.user.id, _ha_who(conn), "zones", ""))
-    return [{"entity_id": "zone.home", "name": "Home"}]
-
 ha_client.entity_state = fake_entity_state
 ha_client.forecast = fake_forecast
 ha_client.history = fake_history
-ha_client.get_ha_zones_list = fake_zones
 
 EVENTS: Dict[str, List[Dict[str, Any]]] = {"admin-refresh": [], "bob-refresh": [], "carl-refresh": []}
 
@@ -633,7 +631,7 @@ async def test_now(client: TestClient) -> None:
           and e["day"]["calendar"] is False, e)
     slot_keys = {NAMES[u.id]: [s["key"] for s in p["day"]["slots"] if not s["key"].isdigit()]
                  for u, p in ((ADMIN, a), (BOB, b), (CARL, c), (EVE, e))}
-    check("now: day slots — At home with Home Assistant, On waking with the wake flow; neither for Carl / Eve",
+    check("now: day slots — At home with a Home zone, On waking with the wake flow; neither for Carl / Eve",
           slot_keys == {"admin": ["home", "wake"], "bob": ["home", "wake"], "carl": [], "eve": []}, slot_keys)
     wake_items = {NAMES[u.id]: [i["task_id"] for s in p["day"]["slots"] if s["key"] == "wake" for i in s["items"]]
                   for u, p in ((ADMIN, a), (BOB, b))}
@@ -647,7 +645,7 @@ async def test_now(client: TestClient) -> None:
           "When I get home" in choice_text and "When I wake" in choice_text, choice_text[:300])
     from addons.phone import now_cards as phone_now
     labels = [o["label"] for o in phone_now.suggestion_choices(CARL, {}, clock.now())]
-    check("now: no home / wake choices without Home Assistant / the wake flow",
+    check("now: no home / wake choices without a Home zone / the wake flow",
           "When I get home" not in labels and "When I wake" not in labels, labels)
     # Lede: the briefing headline is per user.
     check("now: Bob's lede is his own briefing headline", b["lede"] == "Day of bob.", b["lede"])

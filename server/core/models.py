@@ -4,7 +4,10 @@ A profile is a LiteLLM model id plus the settings that shape how it answers
 (e.g. how hard it thinks). Clients only ever see and send the profile ``id``,
 so the underlying model can change server-side without a client release.
 
-Configuration (both optional):
+The built-in catalog is Claude's; when the admin chose another provider in
+the app (core/llm_provider.py) the catalog is that provider's models.
+
+Configuration (both optional, above the provider chosen in the app):
   * ``ASSISTANT_MODELS``        — JSON list overriding the built-in catalog, e.g.
         [{"id": "fast", "label": "Fast", "model": "anthropic/claude-haiku-5-5",
           "output_config": {"effort": "low"}},
@@ -28,6 +31,7 @@ import os
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from core import llm_provider
 from core.access import AccessLevel
 
 logger = logging.getLogger(__name__)
@@ -89,53 +93,70 @@ _BUILTIN_CATALOG: List[ModelProfile] = [
 ]
 
 
-def _load_catalog() -> List[ModelProfile]:
+def _profiles(items: Any) -> List[ModelProfile]:
+    """``ASSISTANT_MODELS``-style entries as profiles.
+
+    Raises:
+        Exception: a malformed entry, or none.
+    """
+    profiles = []
+    for item in items:
+        known = {"id", "label", "model", "description", "reasoning_effort"}
+        profiles.append(ModelProfile(
+            id=str(item["id"]),
+            label=str(item.get("label") or item["id"]),
+            model=str(item["model"]),
+            description=str(item.get("description") or ""),
+            reasoning_effort=item.get("reasoning_effort") or None,
+            extra={k: v for k, v in item.items() if k not in known},
+        ))
+    if not profiles:
+        raise ValueError("empty list")
+    return profiles
+
+
+def _env_catalog() -> Optional[List[ModelProfile]]:
     raw = os.getenv("ASSISTANT_MODELS", "").strip()
     if not raw:
-        return list(_BUILTIN_CATALOG)
+        return None
     try:
-        items = json.loads(raw)
-        profiles = []
-        for item in items:
-            known = {"id", "label", "model", "description", "reasoning_effort"}
-            profiles.append(ModelProfile(
-                id=str(item["id"]),
-                label=str(item.get("label") or item["id"]),
-                model=str(item["model"]),
-                description=str(item.get("description") or ""),
-                reasoning_effort=item.get("reasoning_effort") or None,
-                extra={k: v for k, v in item.items() if k not in known},
-            ))
-        if not profiles:
-            raise ValueError("empty list")
-        return profiles
+        return _profiles(json.loads(raw))
     except Exception as e:
         logger.error("Ignoring malformed ASSISTANT_MODELS (%s); using the built-in catalog", e)
-        return list(_BUILTIN_CATALOG)
+        return None
 
 
-_CATALOG: List[ModelProfile] = _load_catalog()
-_BY_ID: Dict[str, ModelProfile] = {p.id: p for p in _CATALOG}
+_ENV_CATALOG: Optional[List[ModelProfile]] = _env_catalog()
+
+
+def _catalog() -> List[ModelProfile]:
+    """The catalog now: ``ASSISTANT_MODELS``, else the chosen provider's, else the built-in (Claude) one."""
+    if _ENV_CATALOG is not None:
+        return list(_ENV_CATALOG)
+    chosen = llm_provider.catalog()
+    return _profiles(chosen) if chosen else list(_BUILTIN_CATALOG)
 
 
 def list_profiles() -> List[ModelProfile]:
-    return list(_CATALOG)
+    return _catalog()
 
 
 def default_profile() -> ModelProfile:
+    catalog = _catalog()
     wanted = os.getenv("ASSISTANT_DEFAULT_MODEL", "").strip()
-    if wanted and wanted in _BY_ID:
-        return _BY_ID[wanted]
+    for p in catalog:
+        if p.id == wanted:
+            return p
     if wanted:
-        logger.warning("ASSISTANT_DEFAULT_MODEL=%r is not in the catalog; using %r", wanted, _CATALOG[0].id)
-    return _CATALOG[0]
+        logger.warning("ASSISTANT_DEFAULT_MODEL=%r is not in the catalog; using %r", wanted, catalog[0].id)
+    return catalog[0]
 
 
 def profiles_for(level: AccessLevel) -> List[ModelProfile]:
     """The profiles ``level`` may use, in catalog order. A catalog with none
     of them (a custom ``ASSISTANT_MODELS``) leaves the level the default
     profile alone, so chat keeps working."""
-    allowed = [p for p in _CATALOG if level.may_use_profile(p.id)]
+    allowed = [p for p in _catalog() if level.may_use_profile(p.id)]
     if not allowed:
         logger.warning("Access level %r may use no profile of the catalog; giving it the default", level.name)
         return [default_profile()]
@@ -158,7 +179,8 @@ def resolve_profile(model_id: Optional[str], level: AccessLevel) -> ModelProfile
         if p.id == model_id:
             return p
     if model_id:
-        why = "Unknown" if model_id not in _BY_ID else f"Not allowed for access level {level.name!r}:"
+        known = any(p.id == model_id for p in _catalog())
+        why = f"Not allowed for access level {level.name!r}:" if known else "Unknown"
         logger.warning("%s model profile %r requested; using the default", why, model_id)
     return default_profile_for(level)
 

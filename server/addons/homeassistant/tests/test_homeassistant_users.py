@@ -6,7 +6,7 @@ history / config / camera, and the WebSocket auth, entity registry and
 ``subscribe_entities`` messages), each with its own token and entities. The
 first admin's addon is connected by the operator (the car entities set
 after it) and is then pointed at instance A; Bob has instance B; Carl has no
-Home Assistant. Checked: tools, proxies, zones, the home map, the clock's
+Home Assistant. Checked: tools, proxies, the zone import, the home map, the clock's
 zone, weather and wake reads hit only the user's own instance with their own
 token; the user without the addon gets 403 / no tools / no map / no wake; the
 entity watcher fires the right user's location / car triggers (targets as the
@@ -60,13 +60,13 @@ ensure_default_groups_for_everyone()
 from addons.cameras import api as cameras_api  # noqa: E402
 from addons.homeassistant import api as homeassistant_api  # noqa: E402
 from addons.whatsapp import api as whatsapp_api  # noqa: E402
-from core import briefing, checks, clock, notify as core_notify, now as now_mod, wake  # noqa: E402
+from core import briefing, checks, clock, notify as core_notify, now as now_mod, wake, zones as core_zones  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import registry, scheduler, store  # noqa: E402
 from addons.homeassistant import client as ha_client, home_map, status as ha_status  # noqa: E402
 from addons.homeassistant import watcher as ha_watcher  # noqa: E402
-from addons.tasks import service as tasks_service, tools as tasks_tools, triggers  # noqa: E402
+from addons.tasks import service as tasks_service, triggers  # noqa: E402
 from testfakes import FakeHA  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
@@ -90,18 +90,19 @@ async def until(cond, timeout: float = 5.0) -> bool:
 HA_A = FakeHA("A", "tok-a", {
     "person.robin": ("home", {"friendly_name": "Robin"}),
     "sensor.pixel_8_bluetooth_connection": ("1", {"connected_paired_devices": "[]"}),
-    "zone.home": ("0", {"friendly_name": "Home"}),
-    "zone.work": ("0", {"friendly_name": "Work"}),
-    "zone.gym": ("0", {"friendly_name": "Gym"}),
+    "zone.home": ("0", {"friendly_name": "Home", "latitude": 32.1, "longitude": 34.8, "radius": 120}),
+    "zone.work": ("0", {"friendly_name": "Work", "latitude": 32.0, "longitude": 34.7, "radius": 200}),
+    "zone.gym": ("0", {"friendly_name": "Gym", "latitude": 32.2, "longitude": 34.9}),
     "light.a_kitchen": ("on", {"friendly_name": "A Kitchen"}),
     "weather.forecast_home": ("sunny", {"temperature": 21, "temperature_unit": "°C"}),
 }, {"light.a_kitchen": "A Kitchen"}, "Asia/Jerusalem")
 HA_B = FakeHA("B", "tok-b", {
     "person.bob": ("home", {"friendly_name": "Bob"}),
     "sensor.b_bt": ("0", {"connected_paired_devices": []}),
-    "zone.home": ("0", {"friendly_name": "Home"}),
-    "zone.work": ("0", {"friendly_name": "Work"}),
-    "zone.bobplace": ("0", {"friendly_name": "BobPlace"}),
+    "zone.home": ("0", {"friendly_name": "Home", "latitude": 40.1, "longitude": -74.0, "radius": 100}),
+    "zone.work": ("0", {"friendly_name": "Work", "latitude": 40.2, "longitude": -74.1, "radius": 100}),
+    "zone.bobplace": ("0", {"friendly_name": "BobPlace", "latitude": 40.3, "longitude": -74.2, "radius": 50}),
+    "zone.unplaced": ("0", {"friendly_name": "Unplaced"}),
     "light.b_den": ("off", {"friendly_name": "B Den"}),
     "weather.b": ("rainy", {"temperature": 31, "temperature_unit": "°C"}),
     "media_player.den_tv_adb": ("on", {"friendly_name": "Den TV (ADB)"}),
@@ -175,14 +176,6 @@ def connect_users() -> None:
 
 async def test_reads() -> None:
     clear()
-    out_a = await tool(ADMIN, "get_ha_zones")
-    check("tool get_ha_zones: the admin's zones from A with A's token",
-          "Gym" in out_a and "BobPlace" not in out_a and HA_A.tokens_seen() == {"tok-a"} and not HA_B.requests, out_a)
-    clear()
-    out_b = await tool(BOB, "get_ha_zones")
-    check("tool get_ha_zones: Bob's zones from B with B's token",
-          "BobPlace" in out_b and "Gym" not in out_b and HA_B.tokens_seen() == {"tok-b"} and not HA_A.requests, out_b)
-    clear()
     await tool(BOB, "call_ha_service", domain="light", service="turn_on", entity_id="light.b_den")
     check("tool call_ha_service: only on Bob's instance",
           HA_B.service_calls == [("light.turn_on", {"entity_id": "light.b_den"})] and not HA_A.service_calls)
@@ -192,24 +185,13 @@ async def test_reads() -> None:
           "light.a_kitchen" in out and "light.b_den" not in out and HA_A.tokens_seen() == {"tok-a"}
           and not HA_B.requests, out)
     try:
-        await tool(CARL, "get_ha_zones")
+        await tool(CARL, "call_ha_service", domain="light", service="turn_on", entity_id="light.b_den")
         refused = False
     except registry.ToolNotAvailable:
         refused = True
     names = {s["function"]["name"] for s in registry.tool_schemas(CARL)}
     check("no addon: no Home Assistant tools, a call refused like an unknown tool",
-          refused and not names & {"get_ha_zones", "call_ha_service", "get_ha_exposed_entities", "control_android_tv"})
-
-    # Location triggers validate against the user's own zones.
-    check("task location: Bob's zone is valid for Bob",
-          await tasks_tools.validate_ha_zone(BOB, "bobplace") == "BobPlace")
-    try:
-        await tasks_tools.validate_ha_zone(ADMIN, "BobPlace")
-        msg = ""
-    except ValueError as e:
-        msg = str(e)
-    check("task location: Bob's zone is not valid for the admin (lists the admin's zones)",
-          "Gym" in msg and "BobPlace" in msg.split("Available")[0], msg)
+          refused and not names & {"call_ha_service", "get_ha_exposed_entities", "control_android_tv"})
 
     # Home map per connection, in the right prompt only.
     home_map._caches.clear()
@@ -261,7 +243,7 @@ def build_app() -> web.Application:
     app = web.Application()
     setup_auth(app)
     r = app.router
-    r.add_get("/api/zones", homeassistant_api.get_zones_api)
+    r.add_post("/api/ha/zones/import", homeassistant_api.import_zones_api)
     r.add_get("/api/client-config", homeassistant_api.client_config_api)
     r.add_get("/api/ha/state/{entity_id}", homeassistant_api.ha_entity_state_api)
     r.add_get("/api/ha/states", homeassistant_api.ha_states_api)
@@ -285,10 +267,21 @@ async def test_http() -> None:
         check("client-config: Bob's own entities", body["person"] == "person.bob"
               and body["battery_sensor"] == "sensor.b_battery" and body["notify_service"] is None, body)
 
-        r = await client.get("/api/zones", headers=BOB_AUTH)
+        clear()
+        core_zones.create(BOB, "Work", 1.0, 2.0)  # his own Work stays as it is
+        r = await client.post("/api/ha/zones/import", headers=BOB_AUTH)
         body = await r.json()
-        check("zones: Bob's from B", r.status == 200 and {z["name"] for z in body} == {"Home", "Work", "BobPlace"}
-              and not HA_A.requests, body)
+        mine = {z.name: z for z in core_zones.list_zones(BOB)}
+        check("zone import: Bob's zones copied from B (Home marked Home, his own Work kept, one without a place left out)",
+              r.status == 200 and sorted(z["name"] for z in body["added"]) == ["BobPlace", "Home"]
+              and body["skipped"] == ["Work"] and mine["Home"].is_home and mine["BobPlace"].radius_m == 50
+              and (mine["Work"].latitude, mine["Work"].longitude) == (1.0, 2.0) and "Unplaced" not in mine
+              and HA_B.tokens_seen() == {"tok-b"} and not HA_A.requests, body)
+        check("zone import: nothing of Bob's reached the admin", core_zones.list_zones(ADMIN) == [])
+        r = await client.post("/api/ha/zones/import", headers=BOB_AUTH)
+        check("zone import: a second time adds nothing", (await r.json())["added"] == [])
+        r = await client.post("/api/ha/zones/import", headers=CARL_AUTH)
+        check("zone import: without Home Assistant → 403 not_connected", r.status == 403)
         clear()
         r = await client.get("/api/ha/state/person.robin", headers=ADMIN_AUTH)
         check("ha/state: the admin's entity from A", (await r.json())["state"] == "home"
@@ -316,7 +309,7 @@ async def test_http() -> None:
               and HA_A.service_calls == [("light.turn_off", {"entity_id": "light.a_kitchen"})] and not HA_B.service_calls)
         r = await client.get("/api/camera/camera.x/proxy", headers=BOB_AUTH)
         check("camera proxy: through Bob's Home Assistant", await r.read() == b"jpeg-B")
-        for path in ("/api/zones", "/api/client-config", "/api/ha/state/light.b_den", "/api/ha/states?ids=x",
+        for path in ("/api/client-config", "/api/ha/state/light.b_den", "/api/ha/states?ids=x",
                      "/api/camera/camera.x/proxy"):
             r = await client.get(path, headers=CARL_AUTH)
             body = await r.json()

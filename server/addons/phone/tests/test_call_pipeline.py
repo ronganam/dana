@@ -118,11 +118,10 @@ async def fake_acompletion(**kwargs):
 litellm.acompletion = fake_acompletion
 
 
-async def fake_zones(conn):
-    return [{"name": "Home", "entity_id": "zone.home"}, {"name": "Acme", "entity_id": "zone.acme"}]
-
-import addons.homeassistant.client as ha  # noqa: E402
-ha.get_ha_zones_list = fake_zones
+# The owner's zones (core/zones.py): Home and Acme.
+from core import zones as core_zones  # noqa: E402
+core_zones.create(OWNER, "Home", 32.08, 34.78, is_home=True)
+core_zones.create(OWNER, "Acme", 32.07, 34.79)
 
 # Keep the task title as given (no LLM emoji call) and resolve groups by name.
 import addons.tasks.tools as todos

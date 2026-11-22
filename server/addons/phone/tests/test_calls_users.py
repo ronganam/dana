@@ -21,7 +21,7 @@ admin's prompts are compared byte for byte with ``tests/fixtures/calls/``,
 written by the code before calls were per user.
 
 The model is LiteLLM's offline ``mock_response`` (so the real usage callback
-records each call); Home Assistant zones, the calendar's ``add_event`` and the
+records each call); the calendar's ``add_event`` and the
 phone push are faked where they are called.
 
 Run: bin/test test_calls_users
@@ -74,7 +74,6 @@ from addons.about import learner
 from addons.calendar import tools as calendar_tools
 from core.addons import registry, scheduler, store
 from core.addons.registry import ToolNotAvailable
-from addons.homeassistant import client as ha_client
 from addons.knowledge import projects as knowledge_projects
 from addons.people import briefs as people_briefs, store as people_store
 from addons.phone import popups, push, suggestions as phone_suggestions
@@ -172,12 +171,11 @@ litellm.acompletion = fake_acompletion
 litellm.suppress_debug_info = True
 
 
-async def fake_zones(conn):
-    if conn.user.id == BOB.id:
-        return [{"name": "Home", "entity_id": "zone.home"}, {"name": "Bob Gym", "entity_id": "zone.bob_gym"}]
-    return [{"name": "Home", "entity_id": "zone.home"}, {"name": "Acme", "entity_id": "zone.acme"}]
-
-ha_client.get_ha_zones_list = fake_zones
+# Each user's own zones (core/zones.py).
+from core import zones as core_zones  # noqa: E402
+for _who, _place in ((ADMIN, "Acme"), (BOB, "Bob Gym")):
+    core_zones.create(_who, "Home", 32.08, 34.78, is_home=True)
+    core_zones.create(_who, _place, 32.07, 34.79)
 
 
 def fake_add_event(conn, title, start, end=None, description=None, location=None):

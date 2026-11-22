@@ -675,7 +675,7 @@ ADMIN_IDS_404 = [
 NOT_CONNECTED = [
     ("/api/tasks", "tasks"), ("/api/task-groups", "tasks"), ("/api/shopping/items", "shopping"), ("/api/projects", "knowledge"),
     ("/api/about", "about"), ("/api/people", "people"), ("/api/calls", "phone"), ("/api/notifications", "phone"),
-    ("/api/phone/devices", "phone"), ("/api/ha/states?ids=light.living_room", "homeassistant"), ("/api/zones", "homeassistant"),
+    ("/api/phone/devices", "phone"), ("/api/ha/states?ids=light.living_room", "homeassistant"),
     ("/api/calendar/events?start_date=2026-11-15&end_date=2026-11-16", "calendar"),
     ("/api/frigate/events/ptz", "cameras"),
 ]
@@ -777,6 +777,9 @@ async def second_user(c: Client, admin_id: str) -> Dict[str, str]:
           and "person.robin" not in opts, r)
     r = await c.get("/api/client-config", token)
     check("member: client-config from her settings", (r.body or {}).get("person") == "person.maya", r)
+    r = await c.post("/api/ha/zones/import", token=token)
+    check("member: her Home Assistant zones copied into her own", r.status == 200
+          and sorted(z["name"] for z in (r.body or {}).get("added", [])) == ["Gym", "Home"], r)
     r = await c.get("/api/zones", token)
     check("member: her zones (Gym, not Work)", {z["name"] for z in r.body or []} == {"Home", "Gym"}, r)
     r = await c.get("/api/ha/state/light.living_room", token)
@@ -996,6 +999,9 @@ async def watcher(c: Client, maya: Dict[str, str]) -> None:
         device_token = await pair(c, t, dev)
         r = await c.post("/api/phone/register", {"token": f"fcm-{dev}", "app_version": "e2e"}, device_token)
         check(f"phone: {dev} paired and registered for push", bool(device_token) and r.status == 200, r)
+    r = await c.post("/api/ha/zones/import", token=ADMIN_TOKEN)
+    check("zones: the admin's Home Assistant zones copied into his own (location reminders name them)",
+          r.status == 200 and {"Home", "Work", "Office"} <= {z["name"] for z in (r.body or {}).get("added", [])}, r)
     mk = [(ADMIN_TOKEN, "E2E arrive work", {"location": {"location": "work", "event": "arrive"}}),
           (ADMIN_TOKEN, "E2E car enter", {"car": "enter"}),
           (ADMIN_TOKEN, "E2E arrive office", {"location": {"location": "office", "event": "arrive"}}),

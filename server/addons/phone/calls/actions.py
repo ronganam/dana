@@ -20,7 +20,6 @@ from addons.calendar import config as calendar_config, tools as calendar_tools
 from core.addons import store
 from addons.phone import suggestions as phone_suggestions
 from addons.phone.calls.analysis import valid_date
-from addons.phone.calls.context import zone_names
 from addons.phone.calls.values import loads, text
 from addons.tasks import groups as task_groups, service as tasks_service, titles as task_titles
 
@@ -43,8 +42,8 @@ async def create_task_record(user: User, fields: Dict[str, Any], call_id: Option
 
     Raises:
         NotConnected: ``user`` does not have ``tasks``.
-        ValueError: no title, a zone that does not exist, or a location
-            trigger without Home Assistant (``tasks_service.NoHomeAssistant``).
+        ValueError: no title, or a location trigger naming none of the
+            user's zones (``tasks_service.UnknownZone``).
         LookupError / tasks_service.ReadOnly: the list is not one they can add to.
     """
     store.require(user, tasks_service.ADDON)
@@ -65,11 +64,7 @@ async def create_task_record(user: User, fields: Dict[str, Any], call_id: Option
         triggers = loads(triggers, {}) or {}
     loc = triggers.get("location")
     if isinstance(loc, dict) and loc.get("location"):
-        tasks_service.check_location_trigger(user)
-        zones = {z.lower(): z for z in await zone_names(user)}
-        if zones and loc["location"].lower() not in zones:
-            raise ValueError(f"'{loc['location']}' is not a Home Assistant zone. Zones: {', '.join(zones.values())}")
-        loc["location"] = loc["location"].lower()
+        loc["location"] = tasks_service.resolve_zone(user, str(loc["location"])).lower()
         loc["event"] = loc.get("event") if loc.get("event") in ("arrive", "leave") else "arrive"
     triggers = {k: v for k, v in triggers.items() if v not in (None, "", False, {})}
 

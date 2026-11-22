@@ -100,10 +100,17 @@
     return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
-  /** The zone names a location trigger offers (Home and Work while Home Assistant gives none). */
+  /** The zone names a location trigger offers: the user's zones (Settings → Zones); [] without any. */
   function zoneNames(zones) {
-    const list = zones && zones.length ? zones : [{ name: "Home" }, { name: "Work" }];
-    return list.map((z) => (z && typeof z === "object" && z.name != null ? String(z.name) : String(z)));
+    return (zones || []).map((z) => (z && typeof z === "object" && z.name != null ? String(z.name) : String(z)));
+  }
+
+  /** The <option>s of a zone picker: the zones (the stored one selected, any case), or one disabled hint without any. */
+  function zoneOptions(zones, selected, esc) {
+    const names = zoneNames(zones);
+    if (!names.length) return `<option value="" disabled selected>No zones yet: add them in Settings → Zones</option>`;
+    const want = String(selected || "").toLowerCase();
+    return names.map((z) => `<option value="${esc(z)}"${z.toLowerCase() === want ? " selected" : ""}>${esc(z)}</option>`).join("");
   }
 
   /** The `triggers` a save sends from the form's choices: {time?, location?: {location, event}, car?, wake?}. */
@@ -117,5 +124,5 @@
   }
 
   globalThis.DanaTasksCore = { triggersOf, groupOf, triggerCounts, groupCounts, filterTasks, dueBucket, sections,
-                               localDatetime, zoneNames, triggersFrom };
+                               localDatetime, zoneNames, zoneOptions, triggersFrom };
 })();

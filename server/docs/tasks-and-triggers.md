@@ -4,7 +4,7 @@
 
 Tasks support triggers stored as JSON in `tasks.triggers`:
 - `time`: ISO datetime — checked every 30s, per user (the `check_time_triggers` job in `addons/tasks/hooks.py`)
-- `location`: `{"location": "zone_name", "event": "arrive|leave"}` — fired by the user's Home Assistant watcher (below) from their person entity (the event `homeassistant.location.changed`, handled in `addons/tasks/hooks.py`)
+- `location`: `{"location": "zone_name", "event": "arrive|leave"}` — the name of one of the user's zones (Dana's own, `docs/zones.md`); fired by the user's Home Assistant watcher (below) from their person entity (the event `homeassistant.location.changed`, handled in `addons/tasks/hooks.py`)
 - `car`: `"enter"|"leave"` — fired by the same watcher from their car Bluetooth sensor (`homeassistant.car.changed`)
 - `wake`: `true` — fired once a day per user when they are up (their phone unlock confirmed by the screen history from their Home Assistant, or a fallback screen-history poll; only for users with `phone` and `homeassistant`; `docs/people.md` → Wake detection); the same moment sends their morning briefing
 
@@ -27,7 +27,7 @@ The `tasks` addon (`addons/tasks/`) owns lists, tasks, links and the trigger eng
 | Module | What |
 |---|---|
 | `groups.py` | task lists: default set, lookups, create / rename / delete, the `task_list` sharing item type |
-| `service.py` | tasks: what a user sees (`visible_sql`), lookups, create / save / complete / snooze / delete, payloads (`public_task`), the location-trigger check |
+| `service.py` | tasks: what a user sees (`visible_sql`), lookups, create / save / complete / snooze / delete, payloads (`public_task`), a location trigger's zone (`resolve_zone`) |
 | `links.py` | task links (`task_links`: task → `call` / `session` / `whatsapp` / `memory` / `project` / `notification` / `person` ref) |
 | `titles.py` | emoji and list picking for new tasks (model at `llm.complete`, purposes `task_emoji` / `task_group`) |
 | `triggers.py` | the trigger engine: `fire(user, type, action=, target=)`, the time checker, refire / flap / cooldown marks |
@@ -39,5 +39,5 @@ The `tasks` addon (`addons/tasks/`) owns lists, tasks, links and the trigger eng
 - **Lists** (`task_groups.user_id`): each user with `tasks` has their own lists; names are unique per user. The default lists (General, Home, Work, Shopping, Health, Personal) are created when `tasks` is connected for a user and again at every start (a deleted default list comes back on restart). The first admin's list ids are what they were (`general`, `home`, a new list `fitness`); other users' ids carry their user id (`<user id>-general`).
 - **Tasks** belong to their list's owner (`tasks.user_id`) and record who created them (`tasks.created_by`). Moving a task to another list gives it to that list's owner. A user sees their own tasks and the tasks of lists shared with them (docs/access.md, "Sharing"); another user's task answers "not found" (404).
 - **Triggers** fire for the task's creator, while they can still see the task (also on a list someone shared with them), and the reminder goes to them. `fire(user, "location" | "car" | "wake", …)` fires only that user's tasks; the time checker runs for every user with `tasks`, as that user, one user's failure not stopping the others. Refire / flap / cooldown marks are per user in `task_trigger_marks (user_id, key, at)` (same keys as the old `memories` rows: `last_trigger_v2_<type>_<task id>`, `last_event_v2_<type>_<zone or ->`).
-- **Location triggers** need the user's own `homeassistant` connection (its zones). Without it, adding or snoozing a task with a location trigger is refused: "Location reminders use Home Assistant zones, and Home Assistant isn't connected for you. Use a time, car or wake-up reminder instead." (HTTP 400; the tool's error in chat).
+- **Location triggers** name one of the user's own zones (`docs/zones.md`), with or without Home Assistant (`service.resolve_zone`: any case; "home" is their Home zone). Another name is refused with the list of their zones, and with no zones at all with "Location reminders need one of your zones, and you have none yet: add your places in Settings → Zones. Use a time, car or wake-up reminder instead." (HTTP 400; the tool's error in chat). The tool `get_zones` lists them for the agent.
 - HTTP endpoints (`/api/tasks*`, `/api/task-groups*`; `addons/tasks/api.py`) need `tasks` connected (403 `not_connected`); a write to a task or list shared read-only answers 403, renaming / deleting / sharing a list someone else owns 403, an unknown or invisible id 404.

@@ -5,7 +5,6 @@ Tools exposed to the agent:
 1. get_ha_exposed_entities  — returns all voice-exposed entities with names, aliases
                               and live state in one call.
 2. call_ha_service          — controls a device by calling any HA service.
-3. get_ha_zones             — lists configured zones (for location-based task triggers).
 
 The agent's system prompt also carries a cached "home map" of the exposed
 entities (ids, names, aliases, no state; see home_map.get_home_map), so most commands
@@ -251,41 +250,7 @@ async def call_ha_service(
 
 
 # ---------------------------------------------------------------------------
-# Tool 3 — get_ha_zones
-# ---------------------------------------------------------------------------
-
-@addon.tool()
-async def get_ha_zones(conn: Connection) -> str:
-    """Retrieve all active zones configured in Home Assistant.
-
-    Home Assistant ONLY supports zone-based location triggers. The location
-    value MUST match the friendly name of an existing HA zone exactly.
-
-    Use this to resolve natural-language location names (e.g. 'work', 'parents home')
-    to the exact zone friendly_name required by location-based task triggers.
-
-    IMPORTANT: You MUST call this tool BEFORE calling add_task or update_task
-    with a location parameter. If the user asks for a location that doesn't match
-    any zone, show them the available zones and ask which one they mean.
-    """
-    try:
-        zones = await ha_api.get_ha_zones_list(conn)
-    except Exception as e:
-        logger.error(f"Error fetching HA zones: {e}", exc_info=True)
-        err_msg = str(e).strip() or type(e).__name__
-        return f"Error: Failed to connect to Home Assistant: {err_msg}"
-
-    if not zones:
-        return "No zones are configured in Home Assistant."
-
-    lines = ["Available Home Assistant zones:"]
-    for z in zones:
-        lines.append(f"  {z['entity_id']} | {z['name']}")
-    return "\n".join(lines)
-
-
-# ---------------------------------------------------------------------------
-# Tool 4 — control_android_tv
+# Tool 3 — control_android_tv
 # ---------------------------------------------------------------------------
 
 async def _is_app_active(conn: Connection, app_id: str, entity_id: str) -> bool:

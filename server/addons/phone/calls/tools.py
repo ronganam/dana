@@ -380,7 +380,7 @@ async def accept_call_suggestion(
         priority: 'low', 'medium' or 'high' (tasks).
         group: Task group name (e.g. 'Home', 'Work', 'Health').
         time_trigger: Reminder time 'YYYY-MM-DD HH:MM' (tasks). Compute absolute times with get_current_time.
-        location: Home Assistant zone name for a location trigger (call get_ha_zones first if unsure).
+        location: One of the user's zones for a location trigger (call get_zones first if unsure).
         location_event: 'arrive' or 'leave' for the location trigger.
         car_trigger: 'enter' or 'leave' car trigger.
         wake_trigger: True to remind when the user wakes up.

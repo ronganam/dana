@@ -12,7 +12,7 @@ pop-up for notification suggestions but still for fresh calls; the
 Notifications overview (rule mapping, noise, sorting, summaries) and rule
 suggestions accept / decline; clearing by app / the noise with undo; checks
 (ok, quiet, ignored, the Now card); search across kinds (Hebrew + English).
-Calendar, Home Assistant zones, the model and FCM are mocked; no network.
+Calendar, the model and FCM are mocked; no network.
 
 Run: bin/test test_now
 """
@@ -166,11 +166,10 @@ calendar.add_event = fake_add_event
 calendar.delete_event = fake_delete_event
 
 
-async def fake_zones(conn):
-    return [{"name": "Home", "entity_id": "zone.home"}, {"name": "Work", "entity_id": "zone.work"}]
-
-import addons.homeassistant.client as ha  # noqa: E402
-ha.get_ha_zones_list = fake_zones
+# The owner's zones (core/zones.py): Home and Work.
+from core import zones as core_zones  # noqa: E402
+core_zones.create(OWNER, "Home", 32.08, 34.78, is_home=True)
+core_zones.create(OWNER, "Work", 32.07, 34.79)
 
 import addons.tasks.tools as todos
 import addons.tasks.titles as task_titles  # noqa: E402
@@ -746,7 +745,7 @@ async def main():
 
         code, res = await act(f"sug:{sid}", "accept", {"triggers": {"location": {"location": "home", "event": "arrive"}}})
         tid = (phone_suggestions.get_suggestion(OWNER, sid)["result_ref"] or "")[5:]
-        check("accept: 'home' choice → the HA home zone", code == 200 and res["message"] == "Reminder set · when you get home"
+        check("accept: 'home' choice → the Home zone", code == 200 and res["message"] == "Reminder set · when you get home"
               and json.loads(task_row(tid)["triggers"])["location"]["location"] == "home", res)
         await do_undo(res["undo_id"])
         code, res = await act(f"sug:{sid}", "schedule", {"slot": "wake"})

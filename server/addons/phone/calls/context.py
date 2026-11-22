@@ -1,5 +1,5 @@
 """What the call and notification prompts know about their user: their saved
-contacts, open tasks, task lists, active projects, Home Assistant zones and
+contacts, open tasks, task lists, active projects, zones and
 recent decisions on suggestions.
 
 Every piece comes from that user's own addons through the functions
@@ -8,17 +8,15 @@ of anyone else's is read.
 """
 from __future__ import annotations
 
-import asyncio
 import datetime
 import json
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
-from core import clock, user_profile
+from core import clock, user_profile, zones
 from core.db import get_db_connection
 from core.users import User
 from core.addons import store
-from addons.homeassistant import client as ha_client, config as ha_config
 from addons.knowledge import projects as knowledge_projects
 from addons.people import store as people_store
 from addons.phone.calls.values import text
@@ -66,28 +64,9 @@ def task_group_names(user: Optional[User]) -> List[str]:
 
 
 # user id → (loop time, zone names)
-_zone_cache: Dict[str, Tuple[float, List[str]]] = {}
-
-
-async def zone_names(user: Optional[User]) -> List[str]:
-    """The user's Home Assistant zone names (cached 10 min; empty without
-    Home Assistant or when it is unreachable)."""
-    conn = store.get(user, ha_config.ADDON) if user is not None else None
-    if conn is None:
-        return []
-    loop_now = asyncio.get_event_loop().time()
-    hit = _zone_cache.get(conn.user.id)
-    if hit and hit[1] and loop_now - hit[0] < 600:
-        return hit[1]
-    try:
-        zones = await asyncio.wait_for(ha_client.get_ha_zones_list(conn), timeout=8)
-        names = [z["name"] for z in zones or [] if z.get("name")]
-    except Exception as e:
-        logger.debug(f"zone lookup failed: {e}")
-        names = []
-    if names:
-        _zone_cache[conn.user.id] = (loop_now, names)
-    return names
+def zone_names(user: Optional[User]) -> List[str]:
+    """The names of ``user``'s zones (core/zones.py; empty without a user)."""
+    return [z.name for z in zones.list_zones(user)] if user is not None else []
 
 
 async def gather_context(user: Optional[User]) -> Dict[str, Any]:
@@ -97,7 +76,7 @@ async def gather_context(user: Optional[User]) -> Dict[str, Any]:
         "projects": active_projects(user),
         "open_tasks": open_tasks(user),
         "groups": task_group_names(user),
-        "zones": await zone_names(user),
+        "zones": zone_names(user),
         "feedback": suggestion_feedback(user),
     }
 

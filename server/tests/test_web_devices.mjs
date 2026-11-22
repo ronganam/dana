@@ -1,5 +1,5 @@
 /**
- * The web Devices page's pure part (static/devices.js, DanaDevicesCore): kinds and their icons, the line under a device (kind, room / role, last seen, this device, not paired), times ago, the code shown in two groups, the pairing countdown, the pairing request body (a role and room only for a tablet or a TV).
+ * The web Devices page's pure part (static/devices.js, DanaDevicesCore): kinds and their icons, the line under a device (kind, room / role, last seen, this device, not paired), times ago, the code shown in two groups, the pairing countdown, the pairing request body (a role and room only for a tablet or a TV), the QR code's SVG.
  *
  * Run: bin/test test_web_devices
  */
@@ -57,6 +57,10 @@ check("pairing body: a phone sends only its kind", eq(C.pairingBody("phone", "ki
 check("pairing body: a tablet sends its role and room",
       eq(C.pairingBody("tablet", "kitchen", " Kitchen "), { kind: "tablet", role: "kitchen", room: "Kitchen" }));
 check("pairing body: a personal TV sends no role", eq(C.pairingBody("tv", "", ""), { kind: "tv" }));
+check("QR: nothing without the QR library", C.qrSvg("dana://pair?code=X") === "");
+sb.qrcode = () => ({ addData(t) { this.t = t; }, make() {}, createSvgTag() { return `<svg>${this.t}</svg>`; } });
+check("QR: the library's SVG of the pairing string (the wizard's phone step shares it)",
+      C.qrSvg("dana://pair?code=X") === "<svg>dana://pair?code=X</svg>");
 
 console.log(`\n${pass}/${pass + failures.length} passed`);
 process.exit(failures.length ? 1 : 0);

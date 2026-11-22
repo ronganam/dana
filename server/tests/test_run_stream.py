@@ -418,7 +418,7 @@ async def test_missing_key(client):
     errors = [f for f in frames if f["type"] == "error"]
     check("missing key: no retry, one error naming the variable to set",
           "retry" not in t and len(fake.calls) == 1 and len(errors) == 1
-          and errors[0]["message"] == "No API key for anthropic: set ANTHROPIC_API_KEY in server/.env", str(errors or t))
+          and errors[0]["message"] == "No API key for anthropic: add one in Settings → The model (or set ANTHROPIC_API_KEY)", str(errors or t))
     fake.scripts.clear()
     await wait_idle("s_nokey")
     check("missing key: the message is the stored answer",
@@ -432,7 +432,7 @@ async def test_missing_key(client):
     check("missing key: with a key set, a refusal says to check it",
           llm._missing_keys("anthropic/claude-sonnet-5-5") == []
           and llm.missing_key_message("anthropic/claude-sonnet-5-5")
-          == "The anthropic API key was refused: check ANTHROPIC_API_KEY in server/.env")
+          == "The anthropic API key was refused: enter it again in Settings → The model (or check ANTHROPIC_API_KEY)")
     os.environ.pop("ANTHROPIC_API_KEY")
     os.environ.pop("GEMINI_API_KEY")
 
