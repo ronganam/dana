@@ -1,34 +1,33 @@
-"""The {{name}} addon: its tool and setting{{#web}}, its page and route{{/web}}{{#worker}}, its worker{{/worker}}, for the users who have it only.
+"""The {{name}} addon: its tools (setting, facts service, model), Now card and day item{{#web}}, page and route{{/web}}{{#worker}}, worker{{/worker}}, for the users who have it only.
 
-Run from server/: bin/test {{name}}. Robin (the first admin) and Gal turn it on, Maya does not.
+Run: bin/dana addons test <this addon's folder> (from Dana's server/), or
+DANA_HOME=<a Dana checkout> python tests/test_{{name}}.py. Robin (the first admin)
+and Gal turn it on, Maya does not. Every name and value is made up.
 """
 
 import asyncio
 import os
 import sys
-from pathlib import Path
 {{#worker}}import socket
 import subprocess
 {{/worker}}
-import testenv  # first: a clean env and a temporary database (server/tests/testenv.py)
-testenv.isolate("{{name}}_test")
-HERE = Path(__file__).resolve().parents[1]  # this addon's folder
-os.environ["DANA_ADDON_DIRS"] = str(HERE.parent)  # the folder holding it: loaded as a site addon
+import dana_harness  # first: finds Dana (DANA_HOME), a clean environment and a temporary database
+dana_harness.start("{{name}}_test")
 {{#web}}os.environ["API_TOKEN"] = "{{name}}-test-env-token"  # a test value: with it set, Bearer tokens decide the user
 {{/web}}
 {{#web}}from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-{{/web}}from core import db, users  # noqa: E402
+{{/web}}from core import clock, db, users  # noqa: E402
 
 db.migrate()
 users.bootstrap()
 
 {{#web}}from core.auth import setup_auth  # noqa: E402
-{{/web}}from core.addons import loader, registry, store  # noqa: E402
-{{#web}}from core.addons.addon import get_addon  # noqa: E402
-{{/web}}
+from core.addons.addon import get_addon  # noqa: E402
+{{/web}}from core.addons import NowContext, loader, registry  # noqa: E402
 from core.addons.registry import ToolNotAvailable  # noqa: E402
+import fakes  # noqa: E402
 
 failures = 0
 
@@ -39,13 +38,13 @@ def check(name: str, cond: object, detail: object = "") -> None:
     failures += 0 if cond else 1
 
 
-loader.load()  # every addon, this one included
-ROBIN = users.first_admin()
-assert ROBIN is not None
-GAL = users.create("Gal")
-MAYA = users.create("Maya")
-store.connect(ROBIN, "{{name}}")
-store.connect(GAL, "{{name}}", settings={"greeting": "Shalom"})
+ROBIN, GAL, MAYA = fakes.three_users("{{name}}", gal_settings={"greeting": "Shalom"})
+LLM = fakes.FakeLLM(lambda messages, purpose: "Owls hoot at night,\nthen sleep in the light.").install()
+
+
+def hook(kind: str, user: users.User):
+    """This addon's hook of ``kind`` for ``user`` (None: not offered to them)."""
+    return next((h for h in registry.hooks(kind, user) if h.addon == "{{name}}"), None)
 
 
 async def main() -> None:
@@ -61,8 +60,31 @@ async def main() -> None:
     check("prompt: its line only for its users",
           all(any("{{name}}_hello" in p for p in registry.prompt_parts(u, "guides")) for u in (ROBIN, GAL))
           and not any("{{name}}_hello" in p for p in registry.prompt_parts(MAYA, "guides")))
+
+    # The facts service: a fake on this machine, reached through {{NAME}}_API_URL.
+    async with fakes.FakeHTTP({"GET /facts": lambda request: (200, {"fact": f"{request.query['topic']} can fly."})}) as svc:
+        os.environ["{{NAME}}_API_URL"] = svc.url
+        fact = await registry.execute(ROBIN, "{{name}}_fact", {"topic": "Owls"})
+        check("tool: a fact from the facts service", fact == "Owls can fly." and svc.requests[-1]["query"] == {"topic": "Owls"},
+              fact)
+    del os.environ["{{NAME}}_API_URL"]
+
+    # The model: the fake answers, under the addon's purpose.
+    rhyme = await registry.execute(GAL, "{{name}}_rhyme", {"word": "light"})
+    check("tool: a rhyme from the model, under its purpose", rhyme.startswith("Owls hoot")
+          and LLM.calls[-1]["purpose"] == "{{name}}_rhyme", (rhyme, LLM.calls))
+
+    # The Now screen: a morning card and a day item, for its users only.
+    morning = NowContext(now=clock.now().replace(hour=9, minute=0), hidden={})
+    cards = hook("now_cards", ROBIN).func(ROBIN, morning)
+    check("now: a morning card", [c.title for c in cards] == ["Say hello to someone today"], cards)
+    check("now: no card in the afternoon", hook("now_cards", ROBIN).func(ROBIN, NowContext(
+        now=clock.now().replace(hour=15, minute=0), hidden={})) == [])
+    items = hook("day_items", GAL).func(GAL, morning)
+    check("now: the day item at noon", [(i.title, i.at.hour) for i in items] == [("Hello hour", 12)], items)
+    check("now: nothing for Maya", hook("now_cards", MAYA) is None and hook("day_items", MAYA) is None)
 {{#web}}
-    page = (HERE / "web" / "{{name}}.js").read_text(encoding="utf-8")
+    page = (dana_harness.ADDON / "web" / "{{name}}.js").read_text(encoding="utf-8")
     check("page: declared, its script registers with Dana.panel",
           [p.id for p in get_addon("{{name}}").web] == ["{{page}}"] and "Dana.panel(" in page)
     app = web.Application()
@@ -81,7 +103,8 @@ async def main() -> None:
     sock.bind(("127.0.0.1", 0))
     port = sock.getsockname()[1]
     sock.close()
-    worker = subprocess.Popen([sys.executable, str(HERE / "worker" / "server.py")], env={**os.environ, "PORT": str(port)})
+    worker = subprocess.Popen([sys.executable, str(dana_harness.ADDON / "worker" / "server.py")],
+                              env={**os.environ, "PORT": str(port)})
     os.environ["{{env}}"] = f"http://127.0.0.1:{port}"
     try:
         answer = ""

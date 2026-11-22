@@ -41,8 +41,6 @@ FROM base AS app
 # Copy application source code
 COPY main.py .
 COPY VERSION .
-# The addon catalog this release ships with: used when the online one cannot be read.
-COPY catalog.json .
 COPY core/ ./core/
 # An addon's worker/ (a sidecar) is its own image (bin/deploy), not part of this one.
 COPY --exclude=*/worker addons/ ./addons/

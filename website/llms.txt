@@ -1,0 +1,16 @@
+# Dana
+
+> Dana is a self-hosted, open-source personal assistant for a household (a Python aiohttp server with an agent loop over LiteLLM, Android clients, a web app). Everything a user can turn on is an add-on: a folder with an `addon.py` manifest and typed Python functions that Dana offers to the model as tools, plus hooks for the Now screen, the briefing, search, web pages and background jobs.
+
+## Making an add-on
+
+- [AGENTS.md of a new add-on](https://github.com/ronganam/dana/blob/master/server/cli/template/AGENTS.md.tmpl): what an add-on is, the loop (`bin/dana addons new`, `check`, `test`, `dev`, `publish`) and the rules (declare needs and touches, secrets only in credentials, made-up test data)
+- [REFERENCE.md](https://github.com/ronganam/dana/blob/master/server/docs/addon-reference.md): every manifest field, every hook with its signature and a tested example, what hooks return, and the manifest's JSON schema (generated from the code)
+- [The showcase add-on](https://github.com/ronganam/dana/tree/master/examples/addons/showcase): one add-on using every capability once, with its tests
+- [Writing an add-on](https://github.com/ronganam/dana/blob/master/server/docs/writing-an-addon.md): the guide (pages and their API, testing, workers)
+- [The add-on design](https://github.com/ronganam/dana/blob/master/docs/addons.md): where add-ons come from, needs and touches, the catalog, installing
+
+## Optional
+
+- [The catalog](https://github.com/ronganam/dana-catalog): the add-ons anyone can install, and how to add one
+- [Repository map](https://github.com/ronganam/dana/blob/master/AGENTS.md)

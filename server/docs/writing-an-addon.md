@@ -9,10 +9,13 @@ Commands run from `server/`. The addon goes in your site (`site/addons/`, or `$D
 **1. New.** `bin/dana addons new tides` writes `site/addons/tides/`:
 
 ```
-tides/
-  addon.py            addon = Addon("tides", ...): a setting and a line of the agent's instructions
-  tools.py            tides_hello: a tool
-  tests/test_tides.py its test
+tides/                its own git repository (one commit)
+  addon.py            addon = Addon("tides", ...): needs, touches, a setting, a line of the agent's instructions
+  tools.py            tides_hello, tides_fact (an HTTP call), tides_rhyme (a model call)
+  hooks.py            a Now card and a day item
+  tests/              test_tides.py, with dana_harness.py (finds Dana) and fakes.py (users, model, HTTP)
+  AGENTS.md           the author's guide: the loop, the rules, where each capability is documented
+  REFERENCE.md        the add-on reference (addon-reference.md), copied in
   README.md           what it does (the catalog shows it)
 ```
 
@@ -36,7 +39,7 @@ def tides_next(conn: Connection, place: str) -> str:
 
 The model sees the name, the docstring and the typed parameters; `conn` (the user's connection) is left out. Say when to use it in the manifest's `prompt_parts` (`PromptPart("guides", "For tide times, use tides_next.")`).
 
-**3. Test.** Change `tests/test_tides.py` to call your tool, then `bin/test tides`. The scaffold's test already has the users every addon test needs: Robin and Gal have the addon (each with their own setting), Maya does not, and it checks that she is refused.
+**3. Test.** Change `tests/test_tides.py` to call your tool, then `bin/dana addons check site/addons/tides` and `bin/dana addons test site/addons/tides` (or `bin/test tides`). The scaffold's test already has the users every addon test needs: Robin and Gal have the addon (each with their own setting), Maya does not, and it checks that she is refused.
 
 **4. Turn it on.** Restart Dana (addons load at start). Turn it on in Settings → Addons, or `bin/dana addons connect <user> tides`. Ask Dana about the tides.
 
@@ -61,7 +64,22 @@ web=(Page("tides", panel="tides.js", style="tides.css", nav=Nav("Tides", icon="w
 
 and the route it reads in `api.py` ("Routes"). `bin/dana addons new tides --web` writes all three. Restart, and the page has a button in the navigation of every user who has the addon: among the places by its `order`, in the main bar when the user pins it (`Nav(..., primary=True)` puts it there by default, for a page most users open daily; `web-design.md`, "Navigation").
 
-From here: [`examples/addons/hello/`](../../examples/addons/hello/) is the same shape grown by a table, a job, an event handler and a Now card; `addons/tasks/` uses most hooks. To share an addon, put it in a git repository and add an entry to `server/catalog.json` pinned to a full commit (`../../docs/addons.md`, "The catalog").
+From here: [`examples/addons/hello/`](../../examples/addons/hello/) is the same shape grown by a table, a job, an event handler and a Now card; `addons/tasks/` uses most hooks. [`examples/addons/showcase/`](../../examples/addons/showcase/) uses every capability once; the [reference](addon-reference.md) quotes it. To share an addon, `bin/dana addons publish` ("The add-on kit").
+
+## The add-on kit
+
+Commands for building an addon outside Dana's tree (`server/cli/kit/`; each takes the addon's folder):
+
+| Command | What it does |
+|---|---|
+| `bin/dana addons new NAME [--dir PATH]` | writes the addon from `server/cli/template/` into its own git repository |
+| `bin/dana addons check PATH [--json]` | the manifest against its JSON schema, imports (loaded in a clean process), migration names and order, a documented `Args:` line for every tool parameter, and what the code does against what it declares: hosts it calls (static scan of string literals in calls) against `touches.hosts`, environment values it reads against `needs` (`Need("env", …)`, a worker's `url_env`), imports of other addons against `needs` (`Need("addon", …)`). Each problem names the file and line and says the fix; exit 1 on an error |
+| `bin/dana addons test PATH [-v]` | runs the addon's `tests/test_*.py` and `test_*.mjs`, each in a clean process with `DANA_HOME` set to this checkout, Dana's `.env` values removed |
+| `bin/dana addons dev PATH [--once]` | checks it, starts the local test environment on your working tree with the addon mounted (`DANA_LOCAL_ADDONS`, `local-testing.md`), connects it for the first user and prints its log lines, tools, Now cards and day items; then watches the folder and, on a save, restarts the app and prints them again |
+| `bin/dana addons publish PATH [--catalog-repo OWNER/dana-catalog] [--dry-run]` | runs check and test, pushes the addon to `OWNER/dana-addon-NAME` with `gh` (created if missing), tags `v<version>` with a release, and opens a pull request to the catalog repository adding or replacing its entry pinned to that full commit; `--dry-run` prints every `git` / `gh` command and the entry instead |
+| `bin/dana addons reference [--check]` | writes [`addon-reference.md`](addon-reference.md) from the code (manifest fields, hooks with signatures and examples from the showcase, the manifest JSON schema); `test_addon_kit.py` fails when it is out of date |
+
+The scaffold's tests run without Dana's tree inside the addon: `tests/dana_harness.py` finds a Dana checkout from `DANA_HOME`, an importable Dana (when run by `bin/dana addons test` or `bin/test`), or a `dana` folder next to the addon, and says how to set `DANA_HOME` when none is found. `tests/fakes.py` has `three_users` (Robin and Gal with the addon, Maya without), `FakeLLM` (answers model calls, records each call's `purpose`) and `FakeHTTP` (a local server for the hosts the addon calls; point the addon's env override at its `url`).
 
 ## Reference
 
@@ -256,4 +274,4 @@ A page uses only its own elements and `api`. It builds on the shell's tokens and
 
 ### Testing
 
-`bin/test` runs `tests/test_*.py` and `test_*.mjs` of every official and site addon. A script starts with `import testenv; testenv.isolate("<name>")` (a clean environment and a temporary database; `DANA_ADDON_DIRS=""`), and a site addon's test sets `DANA_ADDON_DIRS` to the folder holding it before importing the app, as the scaffold's does. Cover two users with the addon and one without.
+`bin/test` runs `tests/test_*.py` and `test_*.mjs` of every official and site addon. A script starts with `import testenv; testenv.isolate("<name>")` (a clean environment and a temporary database; `DANA_ADDON_DIRS=""`), and a site addon's test sets `DANA_ADDON_DIRS` to the folder holding it before importing the app, as the scaffold's `dana_harness.start()` does. Cover two users with the addon and one without.

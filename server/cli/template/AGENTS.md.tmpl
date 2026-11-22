@@ -1,0 +1,40 @@
+# {{title}} — a Dana add-on
+
+Instructions for anyone changing this add-on, people and coding agents alike. **Dana** is a self-hosted personal assistant; an **add-on** (an *addon* in the code) is a folder that adds things to it: tools Dana can call in chat and voice, cards on the Now screen, briefing sections, pages in the web app, background jobs. This folder is one add-on, `{{name}}`, and its own git repository.
+
+Everything below runs from a Dana checkout's `server/` folder (`git clone https://github.com/ronganam/dana`, then `cd dana/server && python3 -m venv .venv && .venv/bin/pip install -r requirements.lock`). `DANA_HOME` names that checkout when a test runs on its own.
+
+## Layout
+
+```
+addon.py           the manifest: addon = Addon("{{name}}", ...): what it needs, what it touches, settings, prompt lines
+tools.py           @addon.tool() functions the model calls (the schema comes from type hints and the docstring)
+hooks.py           a Now card and a day item (jobs, events, briefing sections… go here too)
+tests/             test_{{name}}.py, dana_harness.py (finds Dana, a clean environment), fakes.py (users, model, HTTP)
+README.md          what it does, its settings, the events it emits (the catalog shows it)
+REFERENCE.md       every manifest field and hook with a working example, generated from Dana's code
+AGENTS.md          this file
+```
+
+## The loop
+
+1. **Edit** the code. Look the field or hook up in `REFERENCE.md` first; its examples are real, tested code.
+2. **Check**: `bin/dana addons check <this folder>` (`--json` for a machine). It loads the add-on, then compares what the code does with what the manifest declares, and prints each problem with its fix. Fix every error.
+3. **Test**: `bin/dana addons test <this folder>` runs `tests/test_*.py` against Dana's test harness (a temporary database, made-up users, no network). Add a check for every new behaviour, asserting on data.
+4. **Try it**: `bin/dana addons dev <this folder>` starts Dana's local test environment (Docker, stub services, a fake model) with this add-on loaded, connects it for the test admin, and prints its log lines, its tools and the Now cards it makes; it restarts the app when a file here changes. Open the web app at the address it prints.
+5. **Publish** (when it works): `bin/dana addons publish <this folder>` runs check and test, pushes this repository to GitHub, tags a release `v<version>` and opens a pull request adding it to the catalog. `--dry-run` prints every command first.
+
+## Rules
+
+- **Declare what it needs and what it touches**, in `addon.py`: every env value the code reads is a `Need("env", ...)`, every host it calls is in `Touches(hosts=...)`, acting for the user outside Dana (sending messages, changing things at a service) is `acts_outside=True`, another add-on's data it reads is in `reads=`. People see this before they turn it on or install it, and `check` fails when the code does more than it says. Write `touches=` with plain values (strings, tuples, True / False).
+- **Secrets only in credentials**: an API key, password or token is a `Field` in `credentials=` (stored encrypted, then `stores_credentials=True`), read from `conn.credentials`. Never in code, settings, env values, logs, test files or commits.
+- **Made-up test data**: no real names, phone numbers, addresses, accounts, keys or money in tests, fixtures or examples. The harness's users are Robin, Gal and Maya.
+- **Per user**: every tool and hook runs for one user; every query filters by that user (`core.addons.UserTable` does it for you), and another user's id answers like a missing one. Test two users with the add-on and one without (`fakes.three_users`).
+- **Tools**: the first parameter is `conn`; the docstring's first line says what the tool does and `Args:` describes every parameter (the model reads only that). A tool that changes something is `is_write=True` (and registers an undo where it can); one that sends something to another person or deletes for good is `confirm=True`.
+- **Dana's ways**: time from `core.clock.now()` (the user's zone), never `datetime.now()`; the model through `core.llm` with a `purpose=` declared in `llm_jobs`; tables only through `migrations/mNNNN_<what>.py` (numbered from 1, never edited once shipped); files the add-on keeps under the data folder (`core.paths`). Extra Python packages go in `requirements.txt`.
+- Keep `README.md` current: what it does, its settings, the events it emits.
+
+## Where everything is documented
+
+- `REFERENCE.md` (here; also `server/docs/addon-reference.md` in Dana): the manifest fields, `Need` / `Touches` / `Field` / `Page`…, the functions given to the manifest (`test=`, `options=`, `validate=`…), every hook (`tool`, `job`, `service`, `on`, `channel`, `now_cards`, `now_action`, `day_items`, `briefing`, `review`, `review_action`, `search`, `selfcheck`, `context`, `provide`), what hooks get and return (`Card`, `DayItem`, `Section`, `Hit`, `Check`…), settings and credentials, HTTP, tables, routes, web pages, workers, and the manifest's JSON schema.
+- Dana's `server/docs/writing-an-addon.md`: the guide (pages and their API, testing, workers); `docs/addons.md`: the design (where add-ons come from, the catalog, installing); `examples/addons/showcase/`: one add-on using every capability, with its tests.

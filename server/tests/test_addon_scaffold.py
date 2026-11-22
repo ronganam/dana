@@ -1,12 +1,13 @@
-"""bin/dana addons new: the smallest addon, with --web and --worker, written into a site that bin/test then runs and passes; refused names; the example addon keeps the scaffold's shape.
+"""bin/dana addons new: the addon and its kit, with --web and --worker, written into a site that bin/test then runs and passes; refused names; the example addon keeps the scaffold's shape.
 
 Run: bin/test test_addon_scaffold
 
 End to end, as an author does it: ``bin/dana addons new`` (a subprocess, the
 real command line) writes into ``$DANA_SITE/addons`` of a temp site, then
 ``bin/test <name>`` (a subprocess too) finds the new addons' tests there and
-they pass as written. ``examples/addons/hello`` has every file the scaffold
-writes with ``--web``, at the same path.
+they pass as written. ``examples/addons/hello`` has every code file the
+scaffold writes with ``--web``, at the same path (the kit's files, AGENTS.md,
+REFERENCE.md and the tests' harness, are checked by ``test_addon_kit.py``).
 """
 
 import os
@@ -39,12 +40,16 @@ def dana(*args: str) -> subprocess.CompletedProcess:
 
 def files(folder: Path) -> list:
     return sorted(str(p.relative_to(folder)) for p in folder.rglob("*")
-                  if p.is_file() and "__pycache__" not in p.parts)
+                  if p.is_file() and "__pycache__" not in p.parts and ".git" not in p.parts)
+
+
+KIT = [".gitignore", "AGENTS.md", "README.md", "REFERENCE.md", "addon.py", "hooks.py", "tests/dana_harness.py",
+       "tests/fakes.py"]
 
 
 r = dana("addons", "new", "weather")
-check("new: the smallest addon (manifest, tool, test, README) in the site's addons/",
-      r.returncode == 0 and files(ADDONS / "weather") == ["README.md", "addon.py", "tests/test_weather.py", "tools.py"],
+check("new: the addon and its kit (manifest, tools, hooks, test, harness, guides) in the site's addons/",
+      r.returncode == 0 and files(ADDONS / "weather") == sorted(KIT + ["tests/test_weather.py", "tools.py"]),
       r.stdout + r.stderr)
 weather = (ADDONS / "weather" / "addon.py").read_text()
 check("new: the name is filled in everywhere, no page or worker",
@@ -53,9 +58,9 @@ check("new: the name is filled in everywhere, no page or worker",
 
 r = dana("addons", "new", "tide_chart", "--web", "--worker", "--title", "Tide chart")
 made = files(ADDONS / "tide_chart")
-check("new --web --worker: a page and the route it reads, a worker and a tool calling it", r.returncode == 0 and made == [
-    "README.md", "addon.py", "api.py", "tests/test_tide_chart.py", "tools.py", "web/tide_chart.css", "web/tide_chart.js",
-    "worker/Dockerfile", "worker/server.py"], made)
+check("new --web --worker: a page and the route it reads, a worker and a tool calling it", r.returncode == 0 and made == sorted(
+    KIT + ["api.py", "tests/test_tide_chart.py", "tools.py", "web/tide_chart.css", "web/tide_chart.js",
+           "worker/Dockerfile", "worker/server.py"]), made)
 tide = (ADDONS / "tide_chart" / "addon.py").read_text()
 check("new --web --worker: the manifest declares the page (its id from the name) and the worker",
       'web=(Page("tide-chart", panel="tide_chart.js", style="tide_chart.css", nav=Nav("Tide chart"' in tide
@@ -78,9 +83,11 @@ for name, why in (("weather", "already exists"), ("tasks", "official"), ("Bad-Na
 
 # The example lives at the repository root, outside the image's server/ (the container's test stage).
 if EXAMPLE.parent.is_dir():
-    shape = [f.replace("tide_chart", "hello") for f in made if not f.startswith("worker/")]
+    shape = [f.replace("tide_chart", "hello") for f in made if not f.startswith("worker/")
+             and f not in (".gitignore", "AGENTS.md", "REFERENCE.md", "tests/dana_harness.py", "tests/fakes.py")]
     missing = [f for f in shape if not (EXAMPLE / f).is_file()]
-    check("examples/addons/hello has the scaffold's shape (every file new --web writes, at its path)", not missing, missing)
+    check("examples/addons/hello has the scaffold's shape (every code file new --web writes, at its path)", not missing,
+          missing)
 
 print(f"\n{'All checks passed' if not failures else f'{failures} check(s) failed'}")
 raise SystemExit(1 if failures else 0)

@@ -18,6 +18,7 @@ bin/local-env.sh ps      # the containers
 bin/local-env.sh down    # remove containers, networks, the data volume and the generated state
 bin/local-env.sh reset   # down + up: a fresh 9.0 start
 bin/local-env.sh restart # restart the app
+bin/local-env.sh exec …  # a command in the app container (exec python bin/dana users list)
 ```
 
 **Iterating on code**: with `DANA_LOCAL_SOURCE=1` the app runs your working tree
@@ -27,6 +28,9 @@ image only when it is missing, `restart` (about 8 s) picks up a Python change, a
 static file change is live on the next browser reload. Rebuild with
 `bin/local-env.sh build` after changing `requirements.lock` or the `Dockerfile`.
 Without it, the environment runs exactly what `bin/deploy` would build.
+`DANA_LOCAL_ADDONS=NAME=PATH[:NAME=PATH…]` also mounts addon folders read-only as
+site addons (`/app/addons-site/NAME`, `.state/compose.addons.yaml`); `bin/dana addons
+dev PATH` sets both and prints what the addon produced (`writing-an-addon.md`, "The add-on kit").
 
 ```bash
 DANA_LOCAL_SOURCE=1 bin/local-env.sh reset   # fresh start on your code (~35 s with the image built)

@@ -1,0 +1,4 @@
+/* The Plants page: the shell's tokens only (static/styles.css). */
+.plants-body { padding: 16px; display: grid; gap: 12px; }
+.plants-body ul { list-style: none; margin: 0; padding: 0; }
+.plants-body li { padding: 8px 0; border-bottom: 1px solid var(--line, rgba(127, 127, 127, 0.2)); }

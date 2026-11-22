@@ -1,0 +1,26 @@
+"""The ``{{name}}`` hooks: a card on the Now screen and an item in its day strip
+(every hook, with an example: REFERENCE.md, "Hooks").
+
+Composer hooks are plain functions; each runs only for a user who has the addon.
+"""
+
+from typing import List
+
+from core.addons import Card, DayItem, NowContext
+from core.users import User
+from addons.{{name}}.addon import addon
+
+
+@addon.now_cards(order=80)
+def hello_card(user: User, ctx: NowContext) -> List[Card]:
+    """In the morning: a card suggesting the user greets someone."""
+    if ctx.now.hour >= 12:
+        return []
+    return [Card(id="{{name}}:morning", kind="{{name}}", source="{{title}}", title="Say hello to someone today",
+                 why="A morning greeting", schedulable=False)]
+
+
+@addon.day_items
+def hello_hour(user: User, ctx: NowContext) -> List[DayItem]:
+    """A "Hello hour" at noon in the day strip."""
+    return [DayItem(title="Hello hour", kind="{{name}}", at=ctx.now.replace(hour=12, minute=0, second=0, microsecond=0))]

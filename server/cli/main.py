@@ -5,7 +5,8 @@ docs/writing-an-addon.md).
     bin/dana addons …     the server's addons and a user's connections (cli/addons.py)
 
 Commands that touch the database refuse one that is not migrated (start the
-server once first); ``addons new / install / remove`` work on folders only.
+server once first); ``addons new / install / remove`` and the addon kit (``addons check /
+test / dev / reference / publish``, cli/kit/) work on folders only.
 """
 
 import argparse
@@ -25,8 +26,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="area", required=True, metavar="area")
     users_cli.register(sub.add_parser("users", help="users, their tokens, Telegram ids and shares").add_subparsers(
         dest="command", required=True, metavar="command"))
-    addons_cli.register(sub.add_parser("addons", help="the server's addons: list, new, install, remove, "
-                                       "disable, enable; a user's: show, connect, update, disconnect").add_subparsers(
+    addons_cli.register(sub.add_parser("addons", help="the server's addons: list, new, check, test, dev, "
+                                       "publish, install, remove, disable, enable; a user's: show, connect, update, "
+                                       "disconnect").add_subparsers(
         dest="command", required=True, metavar="command"))
     return parser
 
@@ -45,8 +47,8 @@ def main(argv: Optional[Sequence[str]] = None, *, stdout: Optional[TextIO] = Non
                   f"({len(pending)} migration(s) pending); start the server once first.", file=err)
             return 1
     try:
-        args.func(args, out, stdin or sys.stdin)
+        status = args.func(args, out, stdin or sys.stdin)
     except CliError as e:
         print(f"error: {e}", file=err)
         return 1
-    return 0
+    return status if isinstance(status, int) else 0

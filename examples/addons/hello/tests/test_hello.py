@@ -15,7 +15,10 @@ from pathlib import Path
 import testenv  # first: clean env, temp DB removed at exit, no .env (server/tests/testenv.py)
 testenv.isolate("hello_example")
 HERE = Path(__file__).resolve().parents[1]  # this addon's folder
-os.environ["DANA_ADDON_DIRS"] = str(HERE.parent)  # examples/addons: hello is a site addon
+_HOLDER = Path(testenv.scratch_dir()) / "addons"  # holds only hello, not its neighbours in examples/addons
+_HOLDER.mkdir(exist_ok=True)
+(_HOLDER / "hello").symlink_to(HERE, target_is_directory=True)
+os.environ["DANA_ADDON_DIRS"] = str(_HOLDER)  # hello is a site addon
 os.environ["API_TOKEN"] = "hello-test-env-token"  # a test value: the first admin's token (a headless install)
 
 from aiohttp import web  # noqa: E402

@@ -63,7 +63,7 @@ One value: an LLM key (`ANTHROPIC_API_KEY` with the default models). A server wi
 | `DB_BUSY_TIMEOUT_MS` | how long a connection waits for a locked database (default 30000) |
 | `PORT` | web server (default 8080) |
 | `DANA_SITE` | your deployment's site folder (`../docs/site.md`); default `site/` at the repository root |
-| `DANA_CATALOG_URL` | where the addon catalog is read from (default `https://raw.githubusercontent.com/ronganam/dana/master/server/catalog.json`; the copy shipped in the image when it cannot be read; `../docs/addons.md`, "The catalog") |
+| `DANA_CATALOG_URL` | where the addon catalog is read from (default `https://raw.githubusercontent.com/ronganam/dana-catalog/main/catalog.json`; while it cannot be read, the copy read from it earlier with a notice; `../../docs/addons.md`, "The catalog") |
 | `APP_RELEASES_REPO` | the GitHub repository (`owner/name`) whose latest release's phone and watch apps the server offers as app updates (default `ronganam/dana`; read at start and every 6 hours through the public API, no token; `docs/operations.md` → App updates). Empty: only uploaded APKs are offered |
 | `DANA_CATALOG_FILE` | a local catalog file instead of the URL (offline servers, tests) |
 | `DANA_ADDON_DIRS` | folders of non-official addons, separated by `:` (`docs/writing-an-addon.md`), replacing the default sources; unset: the site's `addons/`, the image's `/app/addons-site` and `<data dir>/addons/` (each when it exists); empty: none (the tests) |

@@ -1,12 +1,17 @@
-"""The ``{{name}}`` tools. The schema the model sees comes from the type hints and
-the docstring; ``conn`` (the user's connection) is left out of it."""
-{{#worker}}
+"""The ``{{name}}`` tools. The schema the model sees comes from the type hints and the docstring:
+its first line says what the tool does, and every parameter is described under ``Args:``
+(bin/dana addons check fails otherwise). ``conn`` (the user's connection) is left out of it."""
+
 import os
 
-from aiohttp import ClientSession, ClientTimeout
-{{/worker}}
+from aiohttp import ClientError, ClientSession, ClientTimeout
+
+from core import llm
 from core.addons import Connection
 from addons.{{name}}.addon import addon
+
+# The facts service; {{NAME}}_API_URL (declared in needs=) points it elsewhere (the tests' fake).
+BASE_URL = "https://api.example.com"
 
 
 @addon.tool()
@@ -17,6 +22,34 @@ def {{name}}_hello(conn: Connection, who: str) -> str:
         who: Who to greet.
     """
     return f"{conn.settings.get('greeting') or 'Hello'}, {who}!"
+
+
+@addon.tool()
+async def {{name}}_fact(conn: Connection, topic: str) -> str:
+    """A short fact about a topic, from the facts service.
+
+    Args:
+        topic: What the fact is about ("owls").
+    """
+    base = os.getenv("{{NAME}}_API_URL", BASE_URL).rstrip("/")
+    try:
+        async with ClientSession(timeout=ClientTimeout(total=10)) as session, \
+                session.get(f"{base}/facts", params={"topic": topic}) as r:
+            r.raise_for_status()
+            return str((await r.json())["fact"])
+    except ClientError as e:
+        return f"Error: the facts service did not answer ({type(e).__name__})."
+
+
+@addon.tool()
+async def {{name}}_rhyme(conn: Connection, word: str) -> str:
+    """A short rhyme with a word, written by the model.
+
+    Args:
+        word: The word to rhyme with.
+    """
+    return await llm.complete([{"role": "user", "content": f"A two-line rhyme ending with '{word}'."}],
+                              purpose="{{name}}_rhyme")
 {{#worker}}
 
 

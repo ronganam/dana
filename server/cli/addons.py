@@ -4,8 +4,15 @@
     addons table                            the official addons as a Markdown table: what each does, what it
                                             needs (required / optional) and where it works (the README's)
     addons new NAME [--web] [--worker] [--title T] [--dir DIR]
-                                            write a working addon from the template (default: site/addons/NAME):
-                                            a tool and its test; --web adds a page, --worker a sidecar
+                                            write a working addon from the template (default: site/addons/NAME),
+                                            its own git repository: tools, a Now card, tests with the fakes they
+                                            need, AGENTS.md, REFERENCE.md; --web adds a page, --worker a sidecar
+    addons check PATH [--json]              what is wrong with an addon, each problem with its fix (cli/kit/check.py)
+    addons test PATH [-v]                   run an addon's tests against Dana's harness
+    addons dev PATH [--once]                run it in the local test environment, reloaded on save
+    addons reference [--check]              write docs/addon-reference.md from the code (--check: only compare)
+    addons publish PATH [--repo R] [--catalog-repo R] [--owner O] [--dry-run]
+                                            check, test, push to GitHub, release, open the catalog pull request
     addons install NAME|REPO@COMMIT[:PATH] [--dir DIR | --data] [--yes]
                                             fetch one commit of an addon (a catalog entry, or any git repository)
                                             into the site's addons/ (default), DIR, or the data dir's addons/;
@@ -33,6 +40,10 @@ from core import addon_dirs
 from core.addons import catalog, install, loader, state
 from core.addons.addon import Addon, all_addons, get_addon
 from core.addons.hooks import ADDON, CORE_SCREENS, ENV, REGION, Need, Touches
+from cli.kit import check as check_kit
+from cli.kit import dev as dev_kit
+from cli.kit import publish as publish_kit
+from cli.kit import reference, runner
 from cli.users import CliError, register_connections
 
 TEMPLATE = Path(__file__).resolve().parent / "template"
@@ -123,14 +134,18 @@ def cmd_table(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
 
 # Template files only some addons get: what decides it (the first part of the file's path).
 OPTIONAL_FILES = {"api.py.tmpl": "web", "web": "web", "worker": "worker"}
+# Template files written under another name.
+RENAMED = {"gitignore": ".gitignore"}
 BLOCK = re.compile(r"\{\{#(\w+)\}\}(.*?)\{\{/\1\}\}", re.S)
 
 
 def scaffold(name: str, root: Path, title: str = "", web: bool = False, worker: bool = False) -> Path:
-    """Write a new addon ``root/<name>`` from the template (cli/template/): a
-    manifest with a setting and a prompt line, a tool, its test and a README;
-    ``web``: a page and the route it reads; ``worker``: a sidecar and a tool
-    that calls it. Returns its folder.
+    """Write a new addon ``root/<name>`` from the template (cli/template/) as its own git
+    repository: a manifest with needs and touches, tools (a setting, an outside service, the
+    model), a Now card and a day item, tests with the users and fakes they need
+    (``tests/dana_harness.py``, ``tests/fakes.py``), AGENTS.md, README.md and REFERENCE.md
+    (cli/kit/reference.py); ``web``: a page and the route it reads; ``worker``: a sidecar and
+    a tool that calls it. Commits it when git knows who you are. Returns its folder.
 
     Raises:
         CliError: a bad name, or the folder exists.
@@ -143,7 +158,7 @@ def scaffold(name: str, root: Path, title: str = "", web: bool = False, worker: 
     if target.exists():
         raise CliError(f"{target} already exists.")
     flags = {"web": web, "worker": worker}
-    words = {"{{name}}": name, "{{title}}": title or name.replace("_", " ").capitalize(),
+    words = {"{{name}}": name, "{{NAME}}": name.upper(), "{{title}}": title or name.replace("_", " ").capitalize(),
              "{{page}}": name.replace("_", "-"), "{{env}}": f"{name.upper()}_WORKER_URL"}
     for src in sorted(TEMPLATE.rglob("*.tmpl")):
         rel = src.relative_to(TEMPLATE)
@@ -152,19 +167,66 @@ def scaffold(name: str, root: Path, title: str = "", web: bool = False, worker: 
         text = BLOCK.sub(lambda m: m.group(2) if flags[m.group(1)] else "", src.read_text(encoding="utf-8"))
         for key, value in words.items():
             text = text.replace(key, value)
-        dest = target / str(rel.with_suffix("")).replace("NAME", name)
+        out = str(rel.with_suffix("")).replace("NAME", name)
+        dest = target / RENAMED.get(out, out)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text, encoding="utf-8")
+    (target / "REFERENCE.md").write_text(reference.render(), encoding="utf-8")
+    try:
+        publish_kit.git(["init", "-q", "-b", "main"], target)
+        publish_kit.git(["add", "-A"], target)
+        publish_kit.git(["commit", "-q", "-m", f"Start the {name} addon (bin/dana addons new)"], target)
+    except publish_kit.PublishError:
+        pass  # no git, or git does not know who you are yet: the files are there to commit by hand
     return target
 
 
 def cmd_new(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     root = Path(args.dir).expanduser().resolve() if args.dir else _site_addons()
     target = scaffold(args.name, root, args.title or "", web=args.web, worker=args.worker)
-    files = sorted(str(p.relative_to(target)) for p in target.rglob("*") if p.is_file())
-    print(f"Wrote the {args.name} addon in {target}: {', '.join(files)}.\n"
-          f"Test it: bin/test {args.name} (from server/). Restart Dana to load it, then turn it on in "
-          f"Settings → Addons (or bin/dana addons connect <user> {args.name}).", file=out)
+    files = sorted(str(p.relative_to(target)) for p in target.rglob("*") if p.is_file() and ".git" not in p.parts)
+    try:
+        committed = bool(publish_kit.git(["rev-parse", "HEAD"], target))
+    except publish_kit.PublishError:
+        committed = False
+    print(f"Wrote the {args.name} addon in {target}: {', '.join(files)}"
+          f"{' (a git repository, first commit made)' if committed else ''}.\n"
+          f"Next (AGENTS.md has the loop): bin/dana addons check {target}, bin/dana addons test {target}, "
+          f"bin/dana addons dev {target}.", file=out)
+
+
+# --- check / test / dev / reference / publish ---------------------------------------------------
+
+def cmd_check(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
+    report = check_kit.check(Path(args.path))
+    out.write(json.dumps(report.to_json(), indent=1, ensure_ascii=False) + "\n" if args.json else report.text())
+    return 0 if report.ok else 1
+
+
+def cmd_test(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
+    return 1 if runner.run(Path(args.path), out, verbose=args.verbose) else 0
+
+
+def cmd_dev(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
+    return dev_kit.dev(Path(args.path), out, once=args.once)
+
+
+def cmd_reference(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> int:
+    target = Path(args.out).expanduser().resolve() if args.out else reference.OUTPUT
+    if args.check:
+        same = target.is_file() and target.read_text(encoding="utf-8") == reference.render()
+        print(f"{target} is {'up to date' if same else 'out of date: run bin/dana addons reference'}.", file=out)
+        return 0 if same else 1
+    print(f"Wrote {reference.write(target)}.", file=out)
+    return 0
+
+
+def cmd_publish(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
+    try:
+        publish_kit.publish(Path(args.path), out, catalog_repo=args.catalog_repo, repo=args.repo or "",
+                            owner=args.owner or "", dry_run=args.dry_run)
+    except publish_kit.PublishError as e:
+        raise CliError(str(e)) from e
 
 
 # --- install / remove ----------------------------------------------------------------------------
@@ -282,6 +344,33 @@ def register(sub: Any) -> None:
     p.add_argument("--worker", action="store_true", help="also a sidecar (worker/: a Dockerfile) and a tool calling it")
     p.add_argument("--dir", help="the addons folder to write into (default: the site's addons/)")
     p.set_defaults(func=cmd_new, needs_db=False)
+    p = sub.add_parser("check", help="what is wrong with an addon (manifest, imports, migrations, tool docstrings, "
+                       "declared vs used), each problem with its fix")
+    p.add_argument("path", help="the addon's folder")
+    p.add_argument("--json", action="store_true", help="the report as JSON")
+    p.set_defaults(func=cmd_check, needs_db=False)
+    p = sub.add_parser("test", help="run an addon's tests (tests/test_*.py, .mjs) against Dana's harness")
+    p.add_argument("path", help="the addon's folder")
+    p.add_argument("-v", "--verbose", action="store_true", help="print every test's output")
+    p.set_defaults(func=cmd_test, needs_db=False)
+    p = sub.add_parser("dev", help="run an addon in the local test environment: its log, tools and Now cards, "
+                       "reloaded on save")
+    p.add_argument("path", help="the addon's folder")
+    p.add_argument("--once", action="store_true", help="start, show and stop (no watching)")
+    p.set_defaults(func=cmd_dev, needs_db=False)
+    p = sub.add_parser("reference", help="write docs/addon-reference.md from the code")
+    p.add_argument("--out", help="write it here instead")
+    p.add_argument("--check", action="store_true", help="only say whether the file is up to date (exit 1 if not)")
+    p.set_defaults(func=cmd_reference, needs_db=False)
+    p = sub.add_parser("publish", help="check, test, push the addon to GitHub, release it and open the catalog "
+                       "pull request")
+    p.add_argument("path", help="the addon's folder (in its own git repository)")
+    p.add_argument("--repo", help="its GitHub repository OWNER/NAME (default: <you>/dana-addon-<name>)")
+    p.add_argument("--catalog-repo", default=publish_kit.CATALOG_REPO, help="the catalog repository OWNER/NAME "
+                   f"(default {publish_kit.CATALOG_REPO})")
+    p.add_argument("--owner", help="your GitHub login (default: asked from gh)")
+    p.add_argument("--dry-run", action="store_true", help="print every gh / git command instead of running it")
+    p.set_defaults(func=cmd_publish, needs_db=False)
     p = sub.add_parser("install", help="fetch one commit of an addon: a catalog NAME or REPO@COMMIT[:PATH]")
     p.add_argument("spec", metavar="NAME|REPO@COMMIT[:PATH]")
     p.add_argument("--yes", action="store_true", help="agree to what it may touch without asking")

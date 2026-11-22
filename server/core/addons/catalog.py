@@ -1,5 +1,5 @@
-"""The addon catalog: ``server/catalog.json``, read by the server and the CLI
-(../docs/addons.md, "The catalog").
+"""The addon catalog: ``catalog.json`` of the dana-catalog repository, read by
+the server and the CLI (../docs/addons.md, "The catalog").
 
 ``{"addons": [{name, title, description, icon, author, homepage, tags, min_dana,
 touches, source: {repo, path, ref}}]}`` (``icon``: optional, a Lucide icon name; ``touches``: optional, what
@@ -8,8 +8,9 @@ before installing and checked against the fetched manifest by core/addons/instal
 commit hash, so an entry always means exactly one version of the addon. Read from ``DANA_CATALOG_FILE``
 (a local file: tests, offline servers) or ``DANA_CATALOG_URL`` (default
 :data:`DEFAULT_URL`), with a short timeout, and kept for
-:data:`CACHE_SECONDS`. When the URL cannot be read, the copy shipped with this
-release (:data:`BUNDLED`) is used instead, with a ``notice`` saying so. An entry that is not valid (a missing field, a ref that
+:data:`CACHE_SECONDS`. When the URL cannot be read again, the copy this process
+read last from it is kept, with a ``notice`` saying so; with none, the read
+fails. An entry that is not valid (a missing field, a ref that
 is not a full commit, a name that is not an identifier, a repeated name) is
 skipped and its reason logged and returned with the entries.
 """
@@ -30,9 +31,7 @@ from core.addons.install import FULL_COMMIT, InstallError, Source, check_path, c
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_URL = "https://raw.githubusercontent.com/ronganam/dana/master/server/catalog.json"
-# The catalog this release was built with (in the image next to core/).
-BUNDLED = Path(__file__).resolve().parents[2] / "catalog.json"
+DEFAULT_URL = "https://raw.githubusercontent.com/ronganam/dana-catalog/main/catalog.json"
 TIMEOUT_SECONDS = 5.0
 CACHE_SECONDS = 600.0
 MAX_BYTES = 1_000_000
@@ -72,7 +71,7 @@ class Catalog:
     entries: List[Entry]
     problems: List[str] = field(default_factory=list)
     origin: str = ""
-    # Why the shipped copy is shown instead of the one at ``origin`` ("" when it was read).
+    # Why an earlier copy is shown instead of a fresh read of ``origin`` ("" when it was read now).
     notice: str = ""
 
     def get(self, name: str) -> Optional[Entry]:
@@ -80,6 +79,8 @@ class Catalog:
 
 
 _cache: Dict[str, Tuple[float, Catalog]] = {}
+# The last catalog read from each URL: shown (with a notice) while that URL cannot be read.
+_last_good: Dict[str, Catalog] = {}
 
 
 def origin() -> str:
@@ -175,10 +176,10 @@ def _parse_bytes(raw: bytes, where: str) -> Catalog:
 def load(*, fresh: bool = False) -> Catalog:
     """The catalog (blocking: from a thread in the server), cached for :data:`CACHE_SECONDS`.
 
-    A URL that cannot be read falls back to :data:`BUNDLED` (``notice`` says why).
+    A URL that cannot be read gives the copy last read from it in this process (``notice`` says why).
 
     Raises:
-        CatalogError: it cannot be read or is not a catalog (nor is the shipped copy, for a URL).
+        CatalogError: it cannot be read or is not a catalog (and, for a URL, none was read before).
     """
     where = origin()
     hit = _cache.get(where)
@@ -189,14 +190,17 @@ def load(*, fresh: bool = False) -> Catalog:
     except Exception as e:
         reason = str(e) if isinstance(e, CatalogError) else \
             f"The catalog at {where} cannot be read ({type(e).__name__}: {e})."
-        if not where.startswith(("http://", "https://")) or not BUNDLED.is_file():
+        earlier = _last_good.get(where)
+        if earlier is None:
             if isinstance(e, CatalogError):
                 raise
             raise CatalogError(reason) from e
-        logger.warning(f"{reason} Using the catalog shipped with this release.")
-        catalog = _parse_bytes(BUNDLED.read_bytes(), str(BUNDLED))
-        catalog.origin = where
-        catalog.notice = f"{reason} Showing the catalog this release shipped with."
+        logger.warning(f"{reason} Showing the copy read earlier.")
+        catalog = Catalog(entries=list(earlier.entries), problems=list(earlier.problems), origin=where,
+                          notice=f"{reason} Showing the copy read earlier.")
+    else:
+        if where.startswith(("http://", "https://")):
+            _last_good[where] = catalog
     _cache[where] = (time.monotonic(), catalog)
     return catalog
 

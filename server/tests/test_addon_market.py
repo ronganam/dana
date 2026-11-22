@@ -10,7 +10,7 @@ is installed from its first commit into ``<data dir>/addons`` before the
 server loads. ``watcher`` declares a host at the first commit and also acting
 outside Dana at the second (an update that adds a touch asks again);
 ``samey`` declares the same touches at both; ``vague`` writes its touches
-with a name, not plain values. The catalog is a local file (``DANA_CATALOG_FILE``). The first
+with a name, not plain values. The catalog is a local file (``DANA_CATALOG_FILE``), and a fake catalog site on this machine for ``DANA_CATALOG_URL``. The first
 admin and Bob have ``mk``; Carl has nothing. No network.
 """
 
@@ -389,20 +389,38 @@ async def test_disable(c: TestClient) -> None:
 # --- 4. The catalog ----------------------------------------------------------------------------------
 
 async def test_catalog(c: TestClient) -> None:
-    shipped = catalog.parse(json.loads(catalog.BUNDLED.read_text(encoding="utf-8")))
-    check("server/catalog.json (shipped in the image): every entry is valid, hello among them",
-          [e.name for e in shipped.entries] == ["hello", "israel_rail", "money_il"] and shipped.problems == [], shipped.problems)
+    # Read from a URL: a fake catalog site on this machine (an aiohttp server), then that site gone.
+    served = {"addons": [entry("greeter", COMMIT2), entry("samey", COMMIT2)]}
+    site_app = web.Application()
+    site_app.router.add_get("/catalog.json", lambda request: web.json_response(served))
     saved_file = os.environ.pop("DANA_CATALOG_FILE")
-    os.environ["DANA_CATALOG_URL"] = "http://127.0.0.1:9/catalog.json"
     try:
-        fallback = catalog.load(fresh=True)
+        os.environ["DANA_CATALOG_URL"] = "http://127.0.0.1:9/catalog.json"
+        try:
+            catalog.load(fresh=True)
+            unread = ""
+        except catalog.CatalogError as e:
+            unread = str(e)
+        check("catalog URL unreachable and never read: an error naming the URL (no copy shipped in the image)",
+              "127.0.0.1:9" in unread, unread)
+        async with TestServer(site_app) as site:
+            url = str(site.make_url("/catalog.json"))
+            os.environ["DANA_CATALOG_URL"] = url
+            online = await asyncio.to_thread(catalog.load, fresh=True)  # blocking: off the loop serving it
+            check("catalog from a URL (DANA_CATALOG_URL): its entries, no notice",
+                  [e.name for e in online.entries] == ["greeter", "samey"] and online.origin == url
+                  and online.notice == "", online)
+        stale = catalog.load(fresh=True)  # the site is gone now
+        check("catalog URL unreachable after a read: the copy read earlier, with a notice naming the URL",
+              [e.name for e in stale.entries] == ["greeter", "samey"] and url in stale.notice
+              and stale.origin == url, stale.notice)
     finally:
         os.environ["DANA_CATALOG_FILE"] = saved_file
-        del os.environ["DANA_CATALOG_URL"]
-    check("catalog URL unreachable: the shipped copy is used, with a notice naming the URL",
-          [e.name for e in fallback.entries] == ["hello", "israel_rail", "money_il"] and "127.0.0.1:9" in fallback.notice
-          and fallback.origin == "http://127.0.0.1:9/catalog.json", fallback.notice)
-    check("catalog from a file: no notice", catalog.load(fresh=True).notice == "")
+        os.environ.pop("DANA_CATALOG_URL", None)
+    check("catalog from a file (DANA_CATALOG_FILE wins over the URL): no notice",
+          catalog.load(fresh=True).notice == "" and catalog.origin() == str(CATALOG))
+    check("catalog: the default URL is the dana-catalog repository's catalog.json",
+          catalog.DEFAULT_URL.endswith("/dana-catalog/main/catalog.json"))
     src = {"repo": "https://example.invalid/r.git", "path": "", "ref": "c" * 40}
     iconed = catalog.parse({"addons": [{"name": "iconed", "icon": "cloud-sun", "source": src},
                                        {"name": "badicon", "icon": "Cloud Sun", "source": src}]})

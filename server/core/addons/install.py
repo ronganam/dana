@@ -148,7 +148,7 @@ def check_name(name: str, root: Path) -> None:
                                "two addons with one name would stop the server.")
 
 
-_GIT_LOCATION_VARS = frozenset({
+GIT_LOCATION_VARS = frozenset({
     "GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
     "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_COMMON_DIR", "GIT_PREFIX", "GIT_NAMESPACE",
     "GIT_QUARANTINE_PATH",
@@ -160,7 +160,7 @@ def _git(args: Iterable[str], cwd: Path) -> None:
         raise InstallError("git is not installed on this server.")
     # Variables that point git at another repository (set when Dana runs inside a git hook)
     # would make every command act on that repository instead of `cwd`.
-    env = {k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_VARS}
+    env = {k: v for k, v in os.environ.items() if k not in GIT_LOCATION_VARS}
     env.update(GIT_TERMINAL_PROMPT="0", GIT_ASKPASS="echo", GIT_CONFIG_NOSYSTEM="1")
     try:
         done = subprocess.run(["git", *args], cwd=cwd, env=env, capture_output=True, text=True,

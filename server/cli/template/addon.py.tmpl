@@ -1,6 +1,7 @@
-"""The ``{{name}}`` addon's manifest: everything it adds to Dana is declared on this object."""
+"""The ``{{name}}`` addon's manifest: everything it adds to Dana is declared on this object
+(every field: REFERENCE.md, "The manifest")."""
 
-from core.addons import Addon, Field, PromptPart, Touches{{#worker}}, Need{{/worker}}{{#web}}, Nav, Page{{/web}}{{#worker}}, Worker{{/worker}}
+from core.addons import Addon, Field, Need, PromptPart, Touches{{#web}}, Nav, Page{{/web}}{{#worker}}, Worker{{/worker}}
 
 addon = Addon(
     "{{name}}",
@@ -9,20 +10,27 @@ addon = Addon(
     version="0.1.0",
     icon="sparkles",                                   # a Lucide icon name for the Addons page
     # What it adds and what to say to Dana once it's on, in plain words (the Addons page shows them).
-    features=("Greets people in your words",),
-    examples=("Say hello to Noa",),
+    features=("Greets people in your words", "A fact about anything, from the facts service"),
+    examples=("Say hello to Noa", "Tell me a fact about owls"),
     # setup=("A step done outside Dana before connecting",), when there is one (an account, a server).
-    # What running it takes, shown before it is turned on: Need(kind, what, why, optional=False) with kind
-    # env / account / hardware / app / region / addon, e.g. Need("account", "a weather service account", "Forecasts").
-{{#worker}}    needs=(Need("env", "{{env}}", "Where Dana reaches the sidecar (default http://127.0.0.1:8091)", optional=True),),
-{{/worker}}    # What it may touch beyond Dana's own data: hosts it contacts, acting for the user outside Dana (messages,
-    # mail), stored credentials, other addons' data it reads. Shown before installing; growing it asks again.
-    touches=Touches({{#worker}}hosts=("its sidecar ({{env}})",){{/worker}}),
-    # Per-user choices (plain JSON); credentials=(Field(...),) would be stored encrypted.
+    # What running it takes, shown before it is turned on: Need(kind, what, why, optional=False), kind one of
+    # env / account / hardware / app / region / addon. Every env value the code reads is one (bin/dana addons check).
+    needs=(Need("env", "{{NAME}}_API_URL", "Another address for the facts service (tests point it at a fake)",
+                optional=True),{{#worker}}
+           Need("env", "{{env}}", "Where Dana reaches the sidecar (default http://127.0.0.1:8091)", optional=True),{{/worker}}),
+    # What it may touch beyond Dana's own data: every host the code calls, acting for the user outside Dana
+    # (messages, mail), stored credentials, other addons' data it reads. Shown before installing; growing it
+    # asks the admin again. bin/dana addons check compares it with the code.
+    touches=Touches(hosts=("api.example.com",{{#worker}} "its sidecar ({{env}})",{{/worker}})),
+    # Per-user choices (plain JSON). Secrets (keys, passwords, tokens) go in credentials=(Field(...),) only:
+    # stored encrypted, and touches= must then say stores_credentials=True.
     settings=(Field("greeting", "How {{name}} greets people", default="Hello", label="Greeting",
                     help="The word Dana starts a greeting with.", placeholder="Hello"),),
-    # A line of the agent's instructions, only for users who turned the addon on.
-    prompt_parts=(PromptPart("guides", "When the user asks to greet someone, use {{name}}_hello.", rank=90),),
+    # Lines of the agent's instructions, only for users who turned the addon on.
+    prompt_parts=(PromptPart("guides", "When the user asks to greet someone, use {{name}}_hello; for a fact, "
+                                       "{{name}}_fact; for a rhyme, {{name}}_rhyme.", rank=90),),
+    # Each purpose its code passes to core.llm, with its default model profile (fast / balanced / deep).
+    llm_jobs={"{{name}}_rhyme": "fast"},
 {{#web}}    # A page in the web app: web/{{name}}.js and web/{{name}}.css, a button in the navigation.
     web=(Page("{{page}}", panel="{{name}}.js", style="{{name}}.css", nav=Nav("{{title}}", icon="sparkles", order=80)),),
 {{/web}}{{#worker}}    # A sidecar built from worker/ (its Dockerfile) by bin/deploy; Dana reaches it at the URL in {{env}}.
