@@ -41,7 +41,7 @@ class PushPingTest {
             val api = ApiService(server.url("").toString().trimEnd('/'), "device-token")
             var fetched = 0
             val ping = PushPing(now = { 0L }, noteLastPing = {}, catchUp = {
-                fetched = api.devices.phoneEvents(7, "").events.size
+                fetched = api.devices.phoneEvents(7).events.size
             })
             assertTrue(runBlocking { ping.run() })
             val req = server.takeRequest(5, TimeUnit.SECONDS)!!

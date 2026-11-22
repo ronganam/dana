@@ -66,9 +66,9 @@ class DevicesApi(private val http: ApiClient) {
     }
 
     /** Events newer than [after]. */
-    suspend fun phoneEvents(after: Long, deviceId: String): PhoneEventsPage =
+    suspend fun phoneEvents(after: Long): PhoneEventsPage =
         http.decode(PhoneEventsPage.serializer(),
-            http.text(http.request("/api/phone/events?after=$after&device_id=${enc(deviceId)}"), "Couldn't fetch phone events", "{}"))
+            http.text(http.request("/api/phone/events?after=$after"), "Couldn't fetch phone events", "{}"))
 
     /** The phone was unlocked (the wake signal). Returns the server's status: confirming | done | outside_window. */
     suspend fun reportUnlock(atMillis: Long): String =

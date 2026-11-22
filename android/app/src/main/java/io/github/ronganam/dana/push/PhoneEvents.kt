@@ -21,7 +21,6 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
-import java.util.UUID
 import androidx.core.content.edit
 import io.github.ronganam.dana.R
 
@@ -41,7 +40,6 @@ import io.github.ronganam.dana.R
 object PhoneEvents {
     private const val TAG = "PhoneEvents"
     private const val KEY_SEQ = "push_last_seq"
-    private const val KEY_DEVICE = "push_device_id"
     private const val KEY_TRANSPORT = "push_transport"
     private const val KEY_ADDRESS = "push_address"
     private const val KEY_REGISTERED_AT = "push_registered_at"
@@ -52,13 +50,6 @@ object PhoneEvents {
     private val lock = Mutex()
     /** Events that change what Now / Notifications show (they refresh when one arrives). */
     private val REFRESHING = setOf("alert", "suggestions", "reminder", "reminder_clear", "briefing", "weekly_review", "context_card")
-
-    fun deviceId(context: Context): String {
-        val prefs = ServerConfig.prefs(context)
-        return prefs.getString(KEY_DEVICE, null) ?: UUID.randomUUID().toString().also {
-            prefs.edit { putString(KEY_DEVICE, it) }
-        }
-    }
 
     private fun configured(context: Context): Boolean = ServerConfig.load(context).isConfigured
 
@@ -130,7 +121,7 @@ object PhoneEvents {
             repeat(5) {  // at most 5 pages of 50
                 val after = prefs.getLong(KEY_SEQ, 0)
                 val res = try {
-                    api.devices.phoneEvents(after, deviceId(context))
+                    api.devices.phoneEvents(after)
                 } catch (e: Exception) {
                     Log.w(TAG, "Couldn't fetch events", e)
                     return

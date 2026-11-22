@@ -86,11 +86,13 @@ def dump_data(path: str) -> dict:
         conn.close()
 
 
-def without_device_ids(data: dict) -> dict:
-    """``data`` (:func:`dump_data`) with the ids of devices made by a migration left out (they are new each time)."""
+def without_migration_values(data: dict) -> dict:
+    """``data`` (:func:`dump_data`) without what a migration makes anew each run: the ids of the devices it
+    moves, and the time it marks existing users' wizard finished."""
     out = dict(data)
     for t in ("devices", "phone_push"):
         out[t] = sorted(r[1:] for r in data.get(t, []))
+    out["user_wizard"] = sorted(r[:-1] for r in data.get("user_wizard", []))
     return out
 
 
@@ -293,8 +295,8 @@ def test_convert_9_0():
     check("9.0 at 34: converts", db.migrate(p34) == LATER_LABELS
           and snapshots(p34)[:1] == ["at34-before-addons-from-0034.sqlite3"],
           str(snapshots(p34)))
-    check("9.0 at 34: same schema and rows (the moved devices' new ids aside)",
-          shape(p34) == shape(path) and without_device_ids(dump_data(p34)) == without_device_ids(after))
+    check("9.0 at 34: same schema and rows (the moved devices' ids and the wizard's finish time aside)",
+          shape(p34) == shape(path) and without_migration_values(dump_data(p34)) == without_migration_values(after))
 
 
 def test_core_connections_renamed():
