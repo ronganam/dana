@@ -5,7 +5,7 @@
 | Path | What | Guide |
 |---|---|---|
 | `server/` | aiohttp server: the ReAct agent over LiteLLM, addons (each owns its tools; `docs/addons.md`), REST/SSE/WebSocket APIs, the web UI (`static/` + addon `web/` panels), Telegram, background pipelines, the bank-worker sidecar (`addons/money_il/worker/`) | `server/AGENTS.md`, `server/docs/` |
-| `android/` | Gradle project: `:app` (flavors `phone`, `kiosk`, `tv`), `:wear` (watch), `:protocol` (phone↔watch Data Layer contract) | `android/AGENTS.md`, `android/docs/` |
+| `android/` | Gradle project: `:app` (flavors `phone`, `kiosk`, `tv`), `:wear` (watch), `:watchface` (the Dana watch face), `:protocol` (phone↔watch Data Layer contract) | `android/AGENTS.md`, `android/docs/` |
 | `extensions/raycast-assistant/` | Raycast extension (macOS) | its `README.md` |
 | `examples/addons/hello/` | The example addon, loaded as a site addon by `server/tests/test_addon_loading.py` | `server/docs/writing-an-addon.md` |
 | `site.example/` | The template of a deployment's **site** folder: `site/` (gitignored, often a link to a private repository) holds one deployment's config, site addons, app defaults and notes | `docs/site.md` |

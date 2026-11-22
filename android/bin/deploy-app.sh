@@ -82,10 +82,11 @@ echo "Phone: $PHONE_VERSION_NAME (code $PHONE_VERSION_CODE) | Wear: $WEAR_VERSIO
 # --- Build ---
 PHONE_APK="app/build/outputs/apk/phone/release/app-phone-release.apk"
 WEAR_APK="wear/build/outputs/apk/release/wear-release.apk"
+FACE_APK="watchface/build/outputs/apk/release/watchface-release.apk"
 
 if [[ $SKIP_BUILD -eq 0 ]]; then
   echo "==> Building release APKs"
-  ./gradlew :app:assemblePhoneRelease :wear:assembleRelease
+  ./gradlew :app:assemblePhoneRelease :wear:assembleRelease :watchface:assembleRelease
 fi
 [[ -f "$PHONE_APK" ]] || { echo "ERROR: $PHONE_APK not found — build failed?" >&2; exit 1; }
 [[ -f "$WEAR_APK" ]] || { echo "ERROR: $WEAR_APK not found — build failed?" >&2; exit 1; }
@@ -145,6 +146,9 @@ if [[ -n "$WATCH_IP" ]]; then
     -n io.github.ronganam.dana/androidx.profileinstaller.ProfileInstallReceiver >/dev/null || true
   adb -s "$WATCH_IP" shell cmd package compile -m speed-profile -f io.github.ronganam.dana >/dev/null || true
   echo "==> Watch app updated to $WEAR_VERSION_NAME"
+  if [[ -f "$FACE_APK" ]]; then
+    adb -s "$WATCH_IP" install -r "$FACE_APK" >/dev/null && echo "==> Watch face updated"
+  fi
 fi
 
 echo "==> Done."
