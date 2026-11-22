@@ -4,7 +4,10 @@
  * The shell is classic scripts sharing one global scope, no build step, one area each:
  *   dana.js          the SDK addon pages are written against (Dana.panel; tested by test_web_panels.mjs)
  *   app-core.js      shared state and helpers
- *   app-nav.js       the rail / bottom nav, switchTab, the core screens and the core pieces pages host
+ *   app-places.js    the navigation's places, pure: primary / rest / core, what fits, More's badge
+ *                    (tested by test_web_places.mjs)
+ *   app-nav.js       the rail / bottom bar / More sheet and Edit, switchTab, the core screens and the
+ *                    core pieces pages host
  *   app-panels.js    addons' pages: the navigation from GET /api/addons, loading, mount / unmount
  *                    (its pure part is tested by test_web_panels.mjs)
  *   app-stream.js    the assistant stream client (its run model is pure, tested by test_web_stream.mjs)

@@ -1,8 +1,8 @@
 /* The web app — addons' pages (static/app.js says how the app's scripts fit together).
  *
- * The shell knows no addon by name. At start it asks GET /api/me and GET /api/addons, puts a navigation
- * button for each page the user has (`panelEntries`: every `Page` in the `web=(…)` of the addons on for
- * them), and loads each page's script, which registers itself with Dana.panel (static/dana.js; may start
+ * The shell knows no addon by name. At start it asks GET /api/me and GET /api/addons, gives the navigation
+ * (app-nav.js) a place for each page the user has (`panelEntries`: every `Page` with a `Nav` in the
+ * `web=(…)` of the addons on for them), and loads each page's script, which registers itself with Dana.panel (static/dana.js; may start
  * background work such as a badge). Opening a page loads its style the first time, gives it its own
  * <section id="panel-<id>"> and calls its mount; leaving calls unmount. `/<id>` and `#<id>…` open a page
  * when the app loads. The Addons page announces changes with the `dana:addons-changed` event and the
@@ -14,7 +14,7 @@
 // ADDON PAGES
 // ══════════════════════════════════════════════════════════════════════
 
-/** The pages of a GET /api/addons payload, in navigation order: [{addon, id, label, icon, order, nav, panel, style}]. */
+/** The pages of a GET /api/addons payload, in navigation order: [{addon, id, label, icon, order, nav, primary, panel, style}]. */
 function panelEntries(payload) {
     const out = [];
     for (const a of (payload && payload.addons) || []) {
@@ -29,6 +29,7 @@ function panelEntries(payload) {
                 icon: (nav && nav.icon) || "puzzle",
                 order: nav && Number.isFinite(nav.order) ? nav.order : 100,
                 nav: Boolean(nav),
+                primary: Boolean(nav && nav.primary),
                 panel: page.panel,
                 style: page.style || null,
             });
@@ -54,28 +55,6 @@ const panelHost = {
 };
 
 const pageEntry = (id) => panelHost.entries.find(e => e.id === id) || null;
-
-function panelNavButton(entry, cls) {
-    const b = document.createElement("button");
-    b.className = cls;
-    b.dataset.tab = entry.id;
-    b.title = entry.label;
-    b.innerHTML = `<i data-lucide="${escapeHtml(entry.icon)}"></i><span>${escapeHtml(entry.label)}</span>`
-        + `<span class="nav-badge hidden" data-badge="${escapeHtml(entry.id)}"></span>`;
-    b.addEventListener("click", () => openPage(entry.id));
-    return b;
-}
-
-function renderPanelNav() {
-    const shown = panelHost.entries.filter(e => e.nav);
-    const rail = document.getElementById("rail-addons");
-    const bottom = document.getElementById("bottom-addons");
-    if (rail) rail.replaceChildren(...shown.map(e => panelNavButton(e, "rail-btn")));
-    if (bottom) bottom.replaceChildren(...shown.map(e => panelNavButton(e, "bottom-nav-btn")));
-    highlightNav(activeTab);
-    paintBadges();
-    refreshIcons();
-}
 
 function loadPanelStyle(url) {
     if (!url) return Promise.resolve();
@@ -164,6 +143,7 @@ function paintBadges() {
         b.dataset.tone = tone;
         b.classList.toggle("hidden", !text);
     });
+    paintMoreBadges(panelBadges);   // the More buttons add up the badges under them (app-nav.js)
 }
 
 let appToastTimer = null;
@@ -191,9 +171,9 @@ function refreshPanels() {
     panelHost.ready = (async () => {
         const [me, addons] = await Promise.all([fetchJson("/api/me"), fetchJson("/api/addons")]);
         if (me) panelHost.me = me;
+        if (addons) panelHost.entries = panelEntries(addons);
+        setNavPlaces(panelHost.entries, panelHost.me);   // the navigation's places (app-nav.js)
         if (!addons) return;
-        panelHost.entries = panelEntries(addons);
-        renderPanelNav();
         await Promise.all(panelHost.entries.map(loadPanel));
         // A page the user no longer has stays registered (scripts cannot be unloaded) but leaves the screen.
         if (panelHost.current && !pageEntry(panelHost.current)) switchTab("chat");

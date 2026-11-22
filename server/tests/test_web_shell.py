@@ -150,7 +150,7 @@ async def served() -> None:
         r = await client.get("/shopping")
         page = await r.text()
         check("GET /shopping (the shopping addon's route) serves the web app, which opens the page by its path",
-              r.status == 200 and 'id="rail-addons"' in page and "/static/app-panels.js" in page)
+              r.status == 200 and 'id="rail-places"' in page and "/static/app-panels.js" in page)
 
 
 asyncio.run(served())

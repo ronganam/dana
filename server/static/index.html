@@ -32,6 +32,7 @@
     <script src="/static/vendor/lucide.min.js"></script>
     <script src="/static/dana.js" defer></script>
     <script src="/static/app-core.js" defer></script>
+    <script src="/static/app-places.js" defer></script>
     <script src="/static/app-nav.js" defer></script>
     <script src="/static/app-panels.js" defer></script>
     <script src="/static/app-stream.js" defer></script>
@@ -48,50 +49,15 @@
 </head>
 <body>
     <div class="app-container">
-        <!-- ── Navigation Rail (Desktop / Tablet >= 768px) ── -->
+        <!-- ── Navigation (static/app-nav.js draws the places: the rail when wide, the bottom bar when narrow) ── -->
         <aside class="nav-rail" id="nav-rail">
-            <div class="nav-rail-brand" id="rail-brand" title="Dana">D</div>
-            <div class="nav-rail-items">
-                <button class="rail-btn active" data-tab="chat" title="Chat & Assistant">
-                    <i data-lucide="message-square"></i>
-                    <span>Chat</span>
-                </button>
-                <!-- The user's addon pages (static/app-panels.js) -->
-                <div class="nav-addons" id="rail-addons"></div>
-                <button class="rail-btn" data-tab="settings" title="Settings">
-                    <i data-lucide="settings"></i>
-                    <span>Settings</span>
-                </button>
-            </div>
+            <button type="button" class="nav-rail-brand" id="rail-brand" title="Dana" aria-label="Dana: open Chat">D</button>
+            <nav class="nav-rail-items" id="rail-places" aria-label="Places"></nav>
             <div class="rail-divider"></div>
-            <div class="nav-rail-secondary">
-                <button class="rail-btn" data-tab="debug" title="Debug & Logs">
-                    <i data-lucide="terminal"></i>
-                    <span>Debug</span>
-                </button>
-                <button class="rail-btn" data-tab="usage" title="Usage &amp; cost">
-                    <i data-lucide="receipt"></i>
-                    <span>Usage</span>
-                </button>
-                <a href="/dashboard" class="rail-btn" title="Dashboard">
-                    <i data-lucide="layout-dashboard"></i>
-                    <span>Dash</span>
-                </a>
-            </div>
+            <nav class="nav-rail-secondary" id="rail-core" aria-label="Settings and tools"></nav>
         </aside>
 
-        <!-- ── Mobile Bottom Navigation Bar (< 768px) ── -->
-        <nav class="bottom-nav" id="bottom-nav">
-            <button class="bottom-nav-btn active" data-tab="chat">
-                <i data-lucide="message-square"></i>
-                <span>Chat</span>
-            </button>
-            <div class="nav-addons" id="bottom-addons"></div>
-            <button class="bottom-nav-btn" data-tab="settings">
-                <i data-lucide="settings"></i>
-                <span>Settings</span>
-            </button>
-        </nav>
+        <nav class="bottom-nav" id="bottom-nav" aria-label="Places"></nav>
 
         <!-- ── Main Viewport ── -->
         <main class="main-viewport" id="main-viewport">
@@ -398,6 +364,21 @@
             </section>
 
         </main>
+    </div>
+
+    <!-- More: the places not in the bar / rail, and Edit (static/app-nav.js) -->
+    <div class="nav-sheet" id="nav-more" hidden>
+        <div class="nav-sheet-scrim" data-close></div>
+        <div class="nav-sheet-card" role="dialog" aria-modal="true" aria-labelledby="nav-more-title">
+            <div class="nav-sheet-handle" aria-hidden="true"></div>
+            <header class="nav-sheet-head">
+                <h2 class="nav-sheet-title" id="nav-more-title">More</h2>
+                <button type="button" class="chip" id="nav-more-edit" aria-pressed="false">Edit</button>
+                <button type="button" class="icon-btn" id="nav-more-close" aria-label="Close" title="Close"><i data-lucide="x" aria-hidden="true"></i></button>
+            </header>
+            <div class="nav-sheet-body" id="nav-more-body"></div>
+            <p class="nav-sr-only" id="nav-more-status" role="status" aria-live="polite"></p>
+        </div>
     </div>
 
     <div class="app-toast hidden" id="app-toast" role="status" aria-live="polite"></div>

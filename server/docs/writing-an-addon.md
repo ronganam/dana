@@ -59,7 +59,7 @@ web=(Page("tides", panel="tides.js", style="tides.css", nav=Nav("Tides", icon="w
 })();
 ```
 
-and the route it reads in `api.py` ("Routes"). `bin/dana addons new tides --web` writes all three. Restart, and the page has a button in the navigation of every user who has the addon.
+and the route it reads in `api.py` ("Routes"). `bin/dana addons new tides --web` writes all three. Restart, and the page has a button in the navigation of every user who has the addon: among the places by its `order`, in the main bar when the user pins it (`Nav(..., primary=True)` puts it there by default, for a page most users open daily; `web-design.md`, "Navigation").
 
 From here: [`examples/addons/hello/`](../../examples/addons/hello/) is the same shape grown by a table, a job, an event handler and a Now card; `addons/tasks/` uses most hooks. To share an addon, put it in a git repository and add an entry to `server/catalog.json` pinned to a full commit (`../../docs/addons.md`, "The catalog").
 

@@ -12,12 +12,15 @@
 
 .rail-btn, .bottom-nav-btn { position: relative; }
 .nav-badge {
-  position: absolute; top: 4px; right: 14px; min-width: 17px; height: 17px; padding: 0 5px;
+  position: absolute; top: 4px; inset-inline-end: 14px; min-width: 17px; height: 17px; padding: 0 5px;
   border-radius: var(--radius-full); background: var(--accent); color: var(--on-accent);
   font-size: 10px; font-weight: 600; line-height: 17px; text-align: center; pointer-events: none;
 }
-.bottom-nav-btn .nav-badge { top: 2px; right: calc(50% - 22px); }
+.bottom-nav-btn .nav-badge { top: 2px; inset-inline-end: calc(50% - 24px); }
 .nav-badge[data-tone="quiet"] { background: var(--body-strong); color: var(--on-primary); }
+/* More's badge when what is under it has no count: a dot */
+.nav-badge.dot { min-width: 0; width: 8px; height: 8px; padding: 0; top: 9px; inset-inline-end: 20px; }
+.bottom-nav-btn .nav-badge.dot { top: 8px; inset-inline-end: calc(50% - 16px); }
 .nav-badge.hidden { display: none; }
 
 /* Layout */
@@ -95,4 +98,3 @@
 }
 .app-toast button { background: none; color: var(--accent-on-ink); font-weight: 600; font-size: 13px; cursor: pointer; margin-left: 12px; }
 .app-toast.hidden { display: none; }
-.nav-addons { display: contents; }

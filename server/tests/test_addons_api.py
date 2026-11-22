@@ -231,12 +231,12 @@ async def test_me_and_list(client: TestClient) -> None:
           ess["everyone"] is True and ess["state"] == "on" and ess["connected"] is True
           and ess["can_change"] is False and ess["why_not"] == "Every user has it", ess)
     phone_pages = addons["phone"]["web"]
-    check("list: an addon's pages, each with its id, file URLs and navigation entry (phone: Inbox and Calls)",
+    check("list: an addon's pages, each with its id, file URLs and navigation entry (phone: Inbox, primary, and Calls)",
           phone_pages == [
               {"id": "inbox", "panel": "/addons/phone/web/inbox.js", "style": "/addons/phone/web/inbox.css",
-               "nav": {"label": "Inbox", "icon": "inbox", "order": 30}},
+               "nav": {"label": "Inbox", "icon": "inbox", "order": 30, "primary": True}},
               {"id": "calls", "panel": "/addons/phone/web/calls.js", "style": "/addons/phone/web/calls.css",
-               "nav": {"label": "Calls", "icon": "phone", "order": 90}}]
+               "nav": {"label": "Calls", "icon": "phone", "order": 90, "primary": False}}]
           and [p["id"] for p in addons["tasks"]["web"]] == ["tasks"], phone_pages)
     check("list: one connection's shape (credentials only as set / not set)",
           set(ha) == {"name", "title", "description", "version", "source", "state", "needs", "everyone", "web",

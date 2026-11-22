@@ -219,12 +219,16 @@ a {
   position: relative;
 }
 
-/* Left Navigation Rail (Desktop & Tablet >= 768px) */
+/* Navigation (static/app-nav.js; server/docs/web-design.md, "Navigation"): the rail when wide, the bottom
+   bar when narrow, More (a bottom sheet on a phone, a flyout beside the rail). The rail's row heights are
+   also in app-nav.js (RAIL_SIZE): a row 52 px + the 4 px gap, a core row 40 + 4, Edit 36 + 4, the divider
+   21, the line between the primary places and the rest 9. */
 .nav-rail {
+  position: relative;
   width: var(--rail-width);
   height: 100vh;
   background: var(--canvas-soft);
-  border-right: 1px solid var(--hairline);
+  border-inline-end: 1px solid var(--hairline);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -237,6 +241,7 @@ a {
 .nav-rail-brand {
   width: 40px;
   height: 40px;
+  flex-shrink: 0;
   border-radius: var(--radius-full);
   background: var(--accent-tint);
   display: flex;
@@ -259,12 +264,17 @@ a {
   width: 100%;
   gap: 4px;
   flex: 1;
+  min-height: 0;
+  overflow-y: auto;          /* only when not even the primary places fit */
+  scrollbar-width: none;
 }
+.nav-rail-items::-webkit-scrollbar { display: none; }
 
 .rail-btn {
   width: calc(100% - 12px);
   margin: 0 6px;
   height: 52px;
+  flex-shrink: 0;
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
@@ -280,13 +290,18 @@ a {
   height: 20px;
   stroke-width: 1.8;
   opacity: 0.65;
-  transition: opacity 0.15s ease, transform 0.15s ease;
+  transition: opacity var(--dur-fast) var(--ease-standard);
 }
-.rail-btn span {
+.rail-btn .nav-label {
+  max-width: 100%;
+  padding: 0 3px;
   font-size: 11px;
   font-weight: 400;
   letter-spacing: 0.02em;
   opacity: 0.75;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .rail-btn:hover {
   background: rgb(var(--ink-rgb) / 0.05);
@@ -299,7 +314,7 @@ a {
   background: var(--accent-tint);
   color: var(--ink);
 }
-/* The current place: an accent pill and a 3px accent line at the rail's edge */
+/* The current place: an accent pill and a 3px accent line at the rail's edge (on More when it is under More) */
 .rail-btn.active::before {
   content: "";
   position: absolute;
@@ -307,7 +322,8 @@ a {
   top: 12px;
   bottom: 12px;
   width: 3px;
-  border-radius: 0 3px 3px 0;
+  border-start-end-radius: 3px;
+  border-end-end-radius: 3px;
   background: var(--accent);
 }
 .rail-btn.active svg, .rail-btn.active i {
@@ -315,33 +331,53 @@ a {
   stroke-width: 2.2;
   color: var(--accent-text);
 }
-.rail-btn.active span {
+.rail-btn.active .nav-label {
   font-weight: 500;
   opacity: 1;
 }
+/* Between the primary places and the rest */
+.rail-sep {
+  flex-shrink: 0;
+  width: 28px;
+  height: 1px;
+  margin: 2px auto;
+  background: var(--hairline);
+}
+/* Edit places, when the rail has room for every place (else Edit is in More) */
+.rail-btn.rail-edit {
+  height: 36px;
+  color: var(--mute);
+}
+.rail-btn.rail-edit svg { width: 16px; height: 16px; }
 
 .rail-divider {
   width: 44px;
   height: 1px;
+  flex-shrink: 0;
   background: var(--hairline);
   margin: 10px 0;
 }
+.rail-divider[hidden], .nav-rail-secondary[hidden] { display: none; }
 
-/* Secondary items at the bottom of the rail */
+/* The core group at the foot of the rail: quieter and shorter rows */
 .nav-rail-secondary {
   display: flex;
   flex-direction: column;
   width: 100%;
   gap: 4px;
+  flex-shrink: 0;
 }
+.rail-btn.rail-core-btn { height: 40px; gap: 2px; color: var(--mute); }
+.rail-btn.rail-core-btn svg { width: 17px; height: 17px; opacity: 0.55; }
+.rail-btn.rail-core-btn .nav-label { font-size: 10px; }
+.rail-btn.rail-core-btn.active::before { top: 9px; bottom: 9px; }
 
-/* Mobile Bottom Navigation Bar (< 768px) */
+/* Bottom bar (narrow): at most four places and More */
 .bottom-nav {
   display: none;
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  inset-inline: 0;
   height: var(--bottomnav-height);
   background: var(--canvas-soft);
   border-top: 1px solid var(--hairline);
@@ -353,7 +389,8 @@ a {
 }
 
 .bottom-nav-btn {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -364,15 +401,20 @@ a {
   border-radius: var(--radius-md);
   padding: 4px 0;
   transition: var(--t-state);
+  isolation: isolate;
 }
 .bottom-nav-btn svg, .bottom-nav-btn i {
   width: 20px;
   height: 20px;
   opacity: 0.65;
 }
-.bottom-nav-btn span {
-  font-size: 10.5px;
+.bottom-nav-btn .nav-label {
+  max-width: calc(100% - 6px);
+  font-size: 11px;
   font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .bottom-nav-btn.active {
   color: var(--ink);
@@ -381,13 +423,12 @@ a {
   opacity: 1;
   color: var(--accent-text);
 }
-/* Phone: the current place's icon sits on an accent pill */
+/* Phone: the current place's icon sits on an accent pill (More's, when the place is under More) */
 .bottom-nav-btn.active::before {
   content: "";
   position: absolute;
   top: 7px;
-  left: 0;
-  right: 0;
+  inset-inline: 0;
   width: 52px;
   max-width: calc(100% - 4px);
   height: 28px;
@@ -396,9 +437,96 @@ a {
   background: var(--accent-tint);
   z-index: -1;
 }
-.bottom-nav-btn { isolation: isolate; }
-.bottom-nav-btn.active span {
+.bottom-nav-btn.active .nav-label {
   font-weight: 500;
+}
+
+/* More: a bottom sheet over a scrim on a phone; beside the rail, a flyout (.pop) */
+.nav-sheet { position: fixed; inset: 0; z-index: 120; }
+.nav-sheet[hidden] { display: none; }
+.nav-sheet-scrim {
+  position: absolute; inset: 0; background: var(--scrim);
+  animation: dn-fade var(--dur-base) var(--ease-decel);
+}
+.nav-sheet-card {
+  position: absolute; inset-inline: 0; bottom: 0;
+  max-height: min(82vh, 680px); overflow-y: auto; overscroll-behavior: contain;
+  background: var(--canvas-soft); border-top: 1px solid var(--hairline);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0; box-shadow: var(--shadow);
+  padding: 8px 16px calc(20px + env(safe-area-inset-bottom, 0px));
+  animation: dn-sheet var(--dur-slow) var(--ease-decel);
+}
+.nav-sheet.closing .nav-sheet-scrim { animation: dn-fade-out var(--dur-base) var(--ease-accel) forwards; }
+.nav-sheet.closing .nav-sheet-card { animation: dn-sheet-out var(--dur-base) var(--ease-accel) forwards; }
+.nav-sheet-handle {
+  width: 36px; height: 4px; margin: 0 auto -2px; border-radius: var(--radius-full); background: var(--hairline-strong);
+}
+.nav-sheet-head {
+  position: sticky; top: -8px; z-index: 1; display: flex; align-items: center; gap: 8px;
+  margin: 0 -4px; padding: 8px 4px 12px; background: inherit;
+}
+.nav-sheet-title { flex: 1; min-width: 0; font-size: 17px; font-weight: 600; color: var(--ink); }
+.nav-sheet-head .chip[aria-pressed="true"] { background: var(--accent-tint); color: var(--accent-text); border-color: transparent; }
+
+.nav-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
+.nav-tile {
+  position: relative; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 8px 2px 10px; border-radius: var(--radius-card); color: var(--body-strong); transition: var(--t-state);
+}
+.nav-tile svg {
+  width: 46px; height: 46px; padding: 12px; border-radius: 14px; flex-shrink: 0;
+  background: rgb(var(--ink-rgb) / 0.06); stroke-width: 1.8; color: var(--body-strong);
+}
+.nav-tile .nav-label {
+  max-width: 100%; font-size: 12px; line-height: 1.25; text-align: center;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.nav-tile:hover { background: rgb(var(--ink-rgb) / 0.04); color: var(--ink); }
+.nav-tile.active { color: var(--ink); }
+.nav-tile.active svg { background: var(--accent-tint); color: var(--accent-text); stroke-width: 2.2; }
+.nav-tile.active .nav-label { font-weight: 500; }
+.nav-tile .nav-badge { top: 4px; inset-inline-end: calc(50% - 31px); }
+.nav-group-label {
+  margin: 18px 4px 6px; font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .6px;
+  text-transform: uppercase; color: var(--mute);
+}
+.nav-sheet-body > .nav-group-label:first-child { margin-top: 2px; }
+/* The core group: quieter rows, two to a line */
+.nav-grid.quiet { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 2px 8px; }
+.nav-tile.quiet { flex-direction: row; gap: 10px; padding: 9px 10px; color: var(--body); }
+.nav-tile.quiet svg { width: 17px; height: 17px; padding: 0; border-radius: 0; background: none; opacity: 0.7; }
+.nav-tile.quiet.active { background: var(--accent-tint); }
+.nav-tile.quiet.active svg { background: none; opacity: 1; }
+.nav-tile.quiet .nav-label { font-size: 13px; text-align: start; }
+
+/* Edit: the primary places in order (up / down / remove), then the others (add) */
+.nav-edit-hint { font-size: 13px; line-height: 1.45; color: var(--mute); margin: 0 4px 4px; }
+.nav-edit-list { list-style: none; border-top: 1px solid var(--hairline); }
+.nav-edit-row {
+  display: flex; align-items: center; gap: 12px; min-height: 52px;
+  padding-inline-start: 10px; padding-inline-end: 2px; border-bottom: 1px solid var(--hairline);
+}
+.nav-edit-row > svg { width: 18px; height: 18px; flex-shrink: 0; color: var(--body); opacity: 0.8; }
+.nav-edit-label { flex: 1; min-width: 0; font-size: 14px; color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-edit-acts { display: flex; gap: 2px; flex-shrink: 0; }
+.nav-edit-acts .icon-btn { width: 44px; height: 44px; }
+.nav-edit-acts .icon-btn:disabled { opacity: 0.3; cursor: default; background: none; }
+.nav-edit-reset { margin-top: 16px; }
+.nav-edit-reset svg { width: 14px; height: 14px; }
+.nav-sr-only {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+@media (min-width: 768px) {
+  .nav-sheet.pop .nav-sheet-scrim { background: transparent; animation: none; }
+  .nav-sheet.pop .nav-sheet-card {
+    inset-inline-start: calc(var(--rail-width) + 8px); inset-inline-end: auto; bottom: var(--pop-bottom, 8px);
+    width: 380px; max-height: calc(100vh - 16px); padding: 12px 14px 16px;
+    background: var(--canvas-raised); border: 1px solid var(--hairline-strong); border-radius: var(--radius-sheet);
+    animation: dn-rise var(--dur-base) var(--ease-decel);
+  }
+  .nav-sheet.pop.closing .nav-sheet-card { animation: dn-fade-out var(--dur-fast) var(--ease-accel) forwards; }
+  .nav-sheet.pop .nav-sheet-handle { display: none; }
 }
 
 /* Main Viewport */
@@ -2270,6 +2398,8 @@ textarea.form-control {
 @keyframes dn-rise { from { opacity: 0; transform: translateY(var(--rise)); } }
 @keyframes dn-slide-in { from { opacity: 0; transform: translateX(calc(var(--slide) * var(--dn-dir, 1))); } }
 @keyframes dn-sheet { from { opacity: 0; transform: translateY(24px); } }
+@keyframes dn-sheet-out { to { opacity: 0; transform: translateY(24px); } }
+@keyframes dn-fade-out { to { opacity: 0; } }
 @keyframes dn-flash { from { opacity: 1; } to { opacity: 0; } }
 @keyframes dn-roll { from { opacity: 0; transform: translateY(40%); } }
 /* toasts centred with translateX(-50%) */
@@ -2302,7 +2432,7 @@ textarea.form-control {
 
 /* Press: a quick scale, everywhere something is tapped. */
 :is(.btn-primary, .btn-secondary, .btn-destructive-outline, .btn-ghost-danger, .chip, .icon-btn, .rail-btn, .bottom-nav-btn,
-  .segmented-btn, .task-card, .chat-sidebar-item, .settings-link-tile, .selection-option-row, .filter-nav-item, .ibx-link,
+  .nav-tile, .segmented-btn, .task-card, .chat-sidebar-item, .settings-link-tile, .selection-option-row, .filter-nav-item, .ibx-link,
   .chat-bubble-act-btn, .project-tab, .knowledge-entry-card):active:not(:disabled) {
   transform: scale(0.97);
 }

@@ -10,7 +10,7 @@ SCOPES = ("https://www.googleapis.com/auth/calendar",)
 # The OAuth client (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET) is server-wide env;
 # the refresh token comes from the Google sign-in (addons/google_account).
 addon = Addon(
-    ADDON, web=(Page("calendar", panel="calendar.js", nav=Nav("Calendar", icon="calendar", order=70)),), order=100,
+    ADDON, web=(Page("calendar", panel="calendar.js", nav=Nav("Calendar", icon="calendar", order=70, primary=True)),), order=100,
     title="Google Calendar", icon="calendar",
     credentials=(Field("refresh_token", "Google OAuth refresh token", label=oauth.TOKEN_LABEL, help=oauth.TOKEN_HELP),),
     settings=(Field(DEFAULT_CALENDAR, "Calendar new events go to", "primary", label="Calendar for new events",

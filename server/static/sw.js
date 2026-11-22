@@ -20,6 +20,7 @@ const SHELL = [
   "/static/addons.css",
   "/static/dana.js",
   "/static/app-core.js",
+  "/static/app-places.js",
   "/static/app-nav.js",
   "/static/app-panels.js",
   "/static/app-stream.js",

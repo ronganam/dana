@@ -30,6 +30,14 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const bare = (url) => String(url || "").split(/[?#]/)[0];
 
+  /** localStorage that never throws: get(key, fallback), set(key, value), remove(key). Pages get it as
+   *  api.store; the shell keeps its own per-browser choices with it too (the navigation's places). */
+  const store = {
+    get(k, d) { try { const v = root.localStorage.getItem(k); return v === null ? (d === undefined ? null : d) : v; } catch (_) { return d === undefined ? null : d; } },
+    set(k, v) { try { root.localStorage.setItem(k, String(v)); } catch (_) { /* ignore */ } },
+    remove(k) { try { root.localStorage.removeItem(k); } catch (_) { /* ignore */ } },
+  };
+
   /** The absolute URL of `url` (relative to the page). */
   function absolute(url) {
     try { return new URL(url, root.location ? root.location.href : "http://localhost/").href; } catch (_) { return String(url); }
@@ -170,11 +178,7 @@
       /** HTML-escapes text for a template. */
       esc,
       /** localStorage that never throws: get(key, fallback), set(key, value), remove(key). */
-      store: {
-        get(k, d) { try { const v = root.localStorage.getItem(k); return v === null ? (d === undefined ? null : d) : v; } catch (_) { return d === undefined ? null : d; } },
-        set(k, v) { try { root.localStorage.setItem(k, String(v)); } catch (_) { /* ignore */ } },
-        remove(k) { try { root.localStorage.removeItem(k); } catch (_) { /* ignore */ } },
-      },
+      store,
       /** Shared motion: arrive(el), flash(el), complete(el) → Promise, number(el, text), reduced(). */
       motion,
     };
@@ -222,5 +226,6 @@
     expect(url, addon, page) { owners.set(bare(absolute(url)), { addon, page }); },
     sibling,
     motion,
+    store,
   };
 })();

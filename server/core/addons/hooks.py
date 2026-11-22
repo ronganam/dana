@@ -31,10 +31,14 @@ from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
 
 @dataclass(frozen=True)
 class Nav:
-    """The addon's entry in the web app's navigation."""
+    """The addon's entry in the web app's navigation: ``order`` places it
+    among the others, ``primary`` asks for a place in the default navigation
+    bar (Chat and up to three such pages; each user may choose their own:
+    docs/web-design.md, "Navigation")."""
     label: str
     icon: str = ""
     order: int = 100
+    primary: bool = False
 
 
 # The web app's own screens: no addon page may take one of these ids (static/app-nav.js, CORE_SCREENS).

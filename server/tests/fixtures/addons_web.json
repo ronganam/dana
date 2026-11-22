@@ -260,7 +260,8 @@
      "nav": {
       "icon": "shopping-cart",
       "label": "Shopping",
-      "order": 10
+      "order": 10,
+      "primary": false
      },
      "panel": "/addons/shopping/web/shopping.js",
      "style": "/addons/shopping/web/shopping.css"
@@ -369,7 +370,8 @@
        "nav": {
         "icon": "check-square",
         "label": "Tasks",
-        "order": 5
+        "order": 5,
+        "primary": true
        },
        "panel": "/addons/tasks/web/tasks.js",
        "style": "/addons/tasks/web/tasks.css"
@@ -433,7 +435,8 @@
        "nav": {
         "icon": "shopping-cart",
         "label": "Shopping",
-        "order": 10
+        "order": 10,
+        "primary": false
        },
        "panel": "/addons/shopping/web/shopping.js",
        "style": "/addons/shopping/web/shopping.css"
@@ -479,7 +482,8 @@
        "nav": {
         "icon": "folder",
         "label": "Projects",
-        "order": 50
+        "order": 50,
+        "primary": false
        },
        "panel": "/addons/knowledge/web/projects.js",
        "style": "/addons/knowledge/web/projects.css"
@@ -524,7 +528,8 @@
        "nav": {
         "icon": "star",
         "label": "Memory",
-        "order": 60
+        "order": 60,
+        "primary": false
        },
        "panel": "/addons/about/web/memory.js",
        "style": "/addons/about/web/memory.css"
@@ -569,7 +574,8 @@
        "nav": {
         "icon": "users",
         "label": "People",
-        "order": 40
+        "order": 40,
+        "primary": false
        },
        "panel": "/addons/people/web/people.js",
        "style": "/addons/people/web/people.css"
@@ -616,7 +622,8 @@
        "nav": {
         "icon": "inbox",
         "label": "Inbox",
-        "order": 30
+        "order": 30,
+        "primary": true
        },
        "panel": "/addons/phone/web/inbox.js",
        "style": "/addons/phone/web/inbox.css"
@@ -626,7 +633,8 @@
        "nav": {
         "icon": "phone",
         "label": "Calls",
-        "order": 90
+        "order": 90,
+        "primary": false
        },
        "panel": "/addons/phone/web/calls.js",
        "style": "/addons/phone/web/calls.css"
@@ -2043,7 +2051,8 @@
        "nav": {
         "icon": "calendar",
         "label": "Calendar",
-        "order": 70
+        "order": 70,
+        "primary": true
        },
        "panel": "/addons/calendar/web/calendar.js",
        "style": null
@@ -2460,7 +2469,8 @@
        "nav": {
         "icon": "check-square",
         "label": "Tasks",
-        "order": 5
+        "order": 5,
+        "primary": true
        },
        "panel": "/addons/tasks/web/tasks.js",
        "style": "/addons/tasks/web/tasks.css"
@@ -2524,7 +2534,8 @@
        "nav": {
         "icon": "shopping-cart",
         "label": "Shopping",
-        "order": 10
+        "order": 10,
+        "primary": false
        },
        "panel": "/addons/shopping/web/shopping.js",
        "style": "/addons/shopping/web/shopping.css"
@@ -4041,7 +4052,8 @@
        "nav": {
         "icon": "calendar",
         "label": "Calendar",
-        "order": 70
+        "order": 70,
+        "primary": true
        },
        "panel": "/addons/calendar/web/calendar.js",
        "style": null
@@ -5037,7 +5049,8 @@
        "nav": {
         "icon": "calendar",
         "label": "Calendar",
-        "order": 70
+        "order": 70,
+        "primary": true
        },
        "panel": "/addons/calendar/web/calendar.js",
        "style": null

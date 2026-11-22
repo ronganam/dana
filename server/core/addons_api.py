@@ -48,7 +48,7 @@ now. An admin acting with ``?user=`` gets ``show: false``. ``source``: ``officia
 ``disabled-on-server`` (an admin disabled it, or an addon it needs, for
 everyone) or ``failed`` (a site / installed addon that did not load: only
 admins get its ``error``); ``web`` (empty unless it is on for the user) =
-its pages, ``[{id, panel, style, nav: {label, icon, order} | null}]`` with
+its pages, ``[{id, panel, style, nav: {label, icon, order, primary} | null}]`` with
 the URLs of their files;
 ``worker``: it has a sidecar. Admins also get ``installed`` (``{repo, path,
 commit}``) for an addon installed from git. ``<entry>`` = the catalog entry
@@ -176,7 +176,8 @@ def _web(addon: Addon) -> List[Dict[str, Any]]:
     """``addon``'s pages: each one's id, the URLs of its files and its navigation entry."""
     base = f"/addons/{addon.name}/web/"
     return [{"id": p.id, "panel": base + p.panel, "style": base + p.style if p.style else None,
-             "nav": {"label": p.nav.label, "icon": p.nav.icon, "order": p.nav.order} if p.nav is not None else None}
+             "nav": {"label": p.nav.label, "icon": p.nav.icon, "order": p.nav.order, "primary": p.nav.primary}
+             if p.nav is not None else None}
             for p in addon.web]
 
 
