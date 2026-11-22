@@ -1,5 +1,5 @@
 """Transcription with one LLM key: the order that picks the transcription model (MODEL_<PURPOSE>,
-TRANSCRIBE_MODEL, the chosen provider's audio model when its key is set, OPENAI_API_KEY, WHISPER_URL),
+TRANSCRIBE_MODEL, the chosen provider's audio model when its key is set, GEMINI_API_KEY, OPENAI_API_KEY, WHISPER_URL),
 a local Whisper server (an OpenAI-compatible fake: the model downloaded once on a 404, then the
 transcript), and the unavailable path: a typed error before anything is sent, the admins'
 `transcription` self-check, and each caller saying it needs a transcription model (the web voice
@@ -99,6 +99,10 @@ def test_order():
     env(MODEL="gemini/gemini-3.5-flash", GEMINI_API_KEY="test-key")
     check("order: no choice: the chat model's provider when it hears audio",
           llm.transcriber() == llm.Transcriber("gemini/gemini-3.1-flash-lite", "provider"))
+    env(GEMINI_API_KEY="test-key", OPENAI_API_KEY="test-key")
+    choose("claude")
+    check("order: Claude chosen, a Gemini key → Gemini's audio model, before an OpenAI key",
+          llm.transcriber() == llm.Transcriber("gemini/gemini-3.1-flash-lite", "GEMINI_API_KEY"))
     env(OPENAI_API_KEY="test-key", WHISPER_URL="http://whisper.test:8000")
     check("order: OPENAI_API_KEY before a Whisper server", llm.transcriber().model == "openai/gpt-4o-transcribe")
     env(WHISPER_URL="http://whisper.test:8000/")

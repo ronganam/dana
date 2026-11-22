@@ -550,8 +550,10 @@ def transcriber(purpose: str = "voice_transcript") -> Optional[Transcriber]:
     """Which model transcribes for ``purpose`` now (read on every call), the
     first that applies: ``MODEL_<PURPOSE>``; ``TRANSCRIBE_MODEL``; the chosen
     provider's own audio model when it hears audio and its key is set (with no
-    choice, the provider of the chat model); ``OPENAI_API_KEY`` →
-    ``openai/gpt-4o-transcribe``; ``WHISPER_URL`` → its ``WHISPER_MODEL``.
+    choice, the provider of the chat model); another key that hears audio:
+    ``GEMINI_API_KEY`` → Gemini's audio model (a chat model: it follows the
+    language instructions), then ``OPENAI_API_KEY`` → ``openai/gpt-4o-transcribe``;
+    ``WHISPER_URL`` → its ``WHISPER_MODEL``.
     None when nothing can transcribe.
 
     Raises:
@@ -565,6 +567,9 @@ def transcriber(purpose: str = "voice_transcript") -> Optional[Transcriber]:
     own = llm_provider.audio_model(provider(model("chat")))
     if own and not _missing_keys(own):
         return Transcriber(own, "provider")
+    gemini = llm_provider.PROVIDERS["gemini"].transcribe
+    if not _missing_keys(gemini):
+        return Transcriber(gemini, "GEMINI_API_KEY")
     if _env("OPENAI_API_KEY"):
         return Transcriber(OPENAI_TRANSCRIBE, "OPENAI_API_KEY")
     url = _env("WHISPER_URL")
