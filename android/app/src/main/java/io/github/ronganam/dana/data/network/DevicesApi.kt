@@ -40,10 +40,7 @@ sealed interface PushRegistered {
     data class Refused(val code: Int, val error: String, val detail: String) : PushRegistered
 }
 
-@Serializable
-private data class UnlockAnswer(val status: String = "")
-
-/** This user and this device: `/api/me`, direct push, the wake signal, coding-agent sessions. */
+/** This user and this device: `/api/me`, direct push, coding-agent sessions. */
 class DevicesApi(private val http: ApiClient) {
 
     suspend fun me(): MeAnswer = http.decode(MeAnswer.serializer(), http.text(http.request("/api/me"), "Failed to load your account", "{}"))
@@ -69,11 +66,6 @@ class DevicesApi(private val http: ApiClient) {
     suspend fun phoneEvents(after: Long): PhoneEventsPage =
         http.decode(PhoneEventsPage.serializer(),
             http.text(http.request("/api/phone/events?after=$after"), "Couldn't fetch phone events", "{}"))
-
-    /** The phone was unlocked (the wake signal). Returns the server's status: confirming | done | outside_window. */
-    suspend fun reportUnlock(atMillis: Long): String =
-        http.decode(UnlockAnswer.serializer(),
-            http.text(http.request("/api/phone/unlock") { post(jsonBody(buildJsonObject { put("at", atMillis) })) }, "Unlock report failed", "{}")).status
 
     /** Forget one of the user's coding-agent sessions (the live notification's Hide). */
     suspend fun hideAgentSession(id: String): Boolean = http.send(http.request("/api/agent-sessions/${enc(id)}") { delete() })

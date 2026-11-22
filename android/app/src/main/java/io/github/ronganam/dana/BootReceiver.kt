@@ -7,10 +7,10 @@ import android.util.Log
 import io.github.ronganam.dana.data.sync.CallUploadSettings
 
 /**
- * Restarts the call-recording observer after a reboot or an app update
- * (when the user turned call recordings on).
- * Before this it only started when the app was opened, so recordings made
- * after a restart were missed until then.
+ * After a reboot or an app update: registers the geofences again (Android
+ * dropped them; `PhoneSignals.onBoot`) and restarts the call-recording
+ * observer (when the user turned call recordings on), which otherwise only
+ * started when the app was opened.
  */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -19,6 +19,7 @@ class BootReceiver : BroadcastReceiver() {
             Intent.ACTION_MY_PACKAGE_REPLACED -> Unit
             else -> return
         }
+        io.github.ronganam.dana.data.signals.PhoneSignals.onBoot(context)
         if (!CallUploadSettings.canWatch(context)) {
             Log.i("BootReceiver", "Call recordings off or no storage access; not starting the call observer")
             return

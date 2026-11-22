@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- The phone app: everything the kiosk and the TV don't have (call recordings,
      the watch bridge, the system assistant, the notification Inbox, pop-ups,
-     direct push, widgets, in-app updates). docs/permissions.md lists why each
+     direct push, widgets, in-app updates, signals). docs/permissions.md lists why each
      permission is here. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
@@ -19,6 +19,15 @@
     <!-- WorkManager runs long call-recording uploads as a foreground job -->
     <!-- Caller card: notice incoming / outgoing calls (callcard/CallerCard.kt). -->
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
+    <!-- Signals (data/signals/): the screen's on/off history (Usage access, granted in system
+         settings), the car's Bluetooth connection, geofences for the user's zones. -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <application>
         <!-- The launcher entry and share target (the activity itself is in main). -->
@@ -93,6 +102,23 @@
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
             </intent-filter>
         </receiver>
+
+        <!-- Signals: the car's Bluetooth connection. ACL_CONNECTED / ACL_DISCONNECTED are
+             protected broadcasts from the Bluetooth stack (not the system uid, hence exported)
+             that Android still delivers to manifest receivers (data/signals/CarSignals.kt). -->
+        <receiver
+            android:name=".data.signals.CarBluetoothReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.bluetooth.device.action.ACL_CONNECTED" />
+                <action android:name="android.bluetooth.device.action.ACL_DISCONNECTED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Signals: geofence crossings from Google Play services (data/signals/Places.kt). -->
+        <receiver
+            android:name=".data.signals.PlacesReceiver"
+            android:exported="false" />
 
         <!-- "Hide" on a coding-agent session's live notification -->
         <receiver

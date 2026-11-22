@@ -9,11 +9,9 @@ Phone-side of the server features in `server/docs/people.md`.
 - `CallerCardOverlay` uses plain Views in a `TYPE_APPLICATION_OVERLAY` window. Colours are the Ink & Paper tokens (`ui/theme/Color.kt`), dark or light from `ThemeSettings` (System follows the night mode); body lines start on their own script's side; 560dp centred when the screen is ≥ 600dp wide. You can drag it; its Y position is saved in `caller_card_y`. Tapping it opens the person in the shell (`EXTRA_OPEN_PERSON_ID` → More → People → person; Back goes person → People → More); ✕ closes it. Android hides app overlays while Settings (and some system screens) are in front, so it doesn't show over them. The same card is sent to the watch (`WearCards.send(kind = "caller")`).
 - It needs `READ_PHONE_STATE` + `READ_CALL_LOG` (for the number) and "Display over other apps". Settings → *Caller card* has the on/off toggle (pref `caller_card_enabled`, default on), lists what's missing (`CallerCards.missing`) and offers grant buttons.
 
-## Wake signal (`data/wake/UnlockWatcher.kt`)
+## Wake signal
 
-- An `ACTION_USER_PRESENT` receiver is registered at runtime, both from the notification listener (which Android keeps bound) and from `DanaApp`. Between 05:00 and 12:00, an unlock enqueues `UnlockReportWorker`, which posts `POST /api/phone/unlock {at}` (unique work, network constraint, retried up to 3 times, and dropped if more than an hour late).
-- Unlocks are reported at most once every 2 min. Once the server answers `done`, nothing more is sent that day (pref `wake_done_date`). The server confirms from the screen history; see the server's `docs/people.md` → Wake detection.
-- Each unlock is logged (`adb logcat -s UnlockWatcher`).
+The phone's unlocks and screen time are signals: `docs/phone.md` → Signals (`data/wake/UnlockWatcher.kt`, `data/signals/`). The server confirms the wake from the screen history; see the server's `docs/people.md` → Wake detection.
 
 ## Pushes (`DanaCards.kt`, dispatched by `push/PhoneEvents`)
 

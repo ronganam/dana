@@ -4,7 +4,7 @@ What each build asks Android for, what uses it, and in which flavor. The manifes
 
 ## Distribution
 
-The apps are not on Google Play. They are installed by sideloading (`adb install`, `bin/deploy-*.sh`) or through your own Dana server's update channel: the phone downloads a published APK from `/api/app/version` and hands it to the system installer (`docs/release.md`). That is why the phone holds `REQUEST_INSTALL_PACKAGES`, and why it declares a few permissions Play restricts (`READ_CALL_LOG`, `USE_FULL_SCREEN_INTENT`, the `specialUse` foreground service) without a Play declaration form.
+The apps are not on Google Play. They are installed by sideloading (`adb install`, `bin/deploy-*.sh`) or through your own Dana server's update channel: the phone downloads a published APK from `/api/app/version` and hands it to the system installer (`docs/release.md`). That is why the phone holds `REQUEST_INSTALL_PACKAGES`, and why it declares a few permissions Play restricts (`READ_CALL_LOG`, `USE_FULL_SCREEN_INTENT`, `ACCESS_BACKGROUND_LOCATION`, `PACKAGE_USAGE_STATS`, the `specialUse` foreground service) without a Play declaration form.
 
 ## Permissions
 
@@ -21,7 +21,7 @@ P = phone, K = kiosk, T = TV, W = watch.
 | `FOREGROUND_SERVICE_SPECIAL_USE` | P | `CallRecordingObserverService` (`specialUse`, subtype in the manifest), only while call recordings are on. |
 | `FOREGROUND_SERVICE_DATA_SYNC` | P | WorkManager's `SystemForegroundService` (`dataSync`) for long uploads (call recordings). |
 | `FOREGROUND_SERVICE_MICROPHONE` | K T | `WakeWordService` ("Hey Dana", `src/wake`). |
-| `RECEIVE_BOOT_COMPLETED` | P K T | Phone: `BootReceiver` restarts the call-recording observer (when on). TV: `TvSystemReceiver` switches the button service back on (`KeyServiceGuard`) and, with the home override on, opens Dana TV over Google TV's launcher. The kiosk declares it through `main` but registers no receiver (it is the home screen, so Android relaunches it). |
+| `RECEIVE_BOOT_COMPLETED` | P K T | Phone: `BootReceiver` registers the geofences again (places on) and restarts the call-recording observer (when on). TV: `TvSystemReceiver` switches the button service back on (`KeyServiceGuard`) and, with the home override on, opens Dana TV over Google TV's launcher. The kiosk declares it through `main` but registers no receiver (it is the home screen, so Android relaunches it). |
 | `SYSTEM_ALERT_WINDOW` | P K T | "Display over other apps", granted by the user in system settings. Phone: urgent-alert and suggestion screens opened from the background (`NotificationAlertReceiver`, `SuggestionsReceiver`, `ReminderReceiver`), the caller card over the dialer (`CallerCard`). TV: the camera picture-in-picture over other apps (`CameraPip`). The kiosk declares it through `main` and does not use it. |
 | `VIBRATE` | P K W | Reminder and urgent alerts (`ReminderActivity`, `NotificationAlertActivity`), haptics; the watch's reminder alarm. |
 | `WAKE_LOCK` | P (*library*) K T W | WorkManager / Firebase (phone); `WakeWordService` keeps the CPU while listening (kiosk, TV); the watch's alarm. |
@@ -30,6 +30,9 @@ P = phone, K = kiosk, T = TV, W = watch.
 | `READ_MEDIA_AUDIO` (Android 13+) / `READ_EXTERNAL_STORAGE` (≤ 12, `maxSdkVersion=32`) | P | Reading call recordings from `Recordings/Call` (`CallRecordingObserverService`, "Upload past recordings"). Asked only when the user turns call recordings on. |
 | `READ_CALL_LOG` | P | Who a recorded call was with, its number and direction (`RecordingInspector`). Asked with call recordings, or from Settings → Call recordings. |
 | `READ_PHONE_STATE` | P | The caller card: notice the phone ringing (`CallerCardReceiver`). Asked at first launch. |
+| `BLUETOOTH_CONNECT` (Android 12+) / `BLUETOOTH` (≤ 11, `maxSdkVersion=30`) | P | Signals → car: list the paired devices for "This is my car" and receive the car's `ACL_CONNECTED` / `ACL_DISCONNECTED` (`CarSignals`, `CarBluetoothReceiver`). Asked on Android 12+ only when the user picks the car ("Nearby devices"). |
+| `ACCESS_FINE_LOCATION` + `ACCESS_COARSE_LOCATION` | P | Signals → places: Google Play services geofences for the user's zones need precise location (`Places`). Asked when the user turns "Place reminders" on. The app never reads a location itself; the server only hears arrive / leave with a zone id. |
+| `ACCESS_BACKGROUND_LOCATION` (Android 10+) | P | Places: geofences fire only with location "all the time". Asked as the second step, after a short explanation (Android 11+ grants it on its own settings page). |
 | `REQUEST_INSTALL_PACKAGES` | P | In-app updates from your server (`UpdateManager` → the system installer; FileProvider serves the APK). The user allows "Install unknown apps" for Dana once. |
 | `WRITE_SECURE_SETTINGS` | T | Granted over adb only (`bin/deploy-tv.sh`: `pm grant`): `KeyServiceGuard` switches the accessibility button service back on after an update. Without the grant the TV works; the service must then be re-enabled by hand after updates. |
 | `com.google.android.c2dm.permission.RECEIVE` | P (*library*: Firebase) | Direct push (FCM, `DanaMessagingService`); only does something when the build has a `google-services.json`. |
@@ -45,6 +48,7 @@ TV features: `leanback`, `touchscreen` and `microphone` are declared not require
 | Default digital assistant | P | `DanaVoiceInteractionService` / `DanaRecognitionService`: long-press Home or the side key opens Dana's sheet. | Settings → Apps → Default apps → Digital assistant app. |
 | Display over other apps | P T | See `SYSTEM_ALERT_WINDOW`. | Settings → Apps → Special app access. |
 | Install unknown apps | P | See `REQUEST_INSTALL_PACKAGES`. | Prompted on the first in-app update. |
+| Usage access (`PACKAGE_USAGE_STATS`) | P | Signals → "Wake from screen time": the screen's on / off history (`ScreenTime`, Android 9+; never which apps were used), sent as "screen" stretches the wake flow confirms with (`docs/phone.md` → Signals). | Settings → Apps → Special app access → Usage access; the switch on Dana's Signals page opens it. |
 | Full screen intents | P W | See `USE_FULL_SCREEN_INTENT` (Android 14+). | Settings → Apps → Special app access. |
 | Accessibility service | T | `DanaKeyService`: remote buttons open Dana and camera picture-in-picture (`docs/tv.md`). | Settings → Accessibility, or `bin/deploy-tv.sh` (with `WRITE_SECURE_SETTINGS`). |
 | Home app | K T | `KioskActivity` / `TvHomeActivity` are `HOME` activities, so Android relaunches them after boot, crashes and Home presses. | Chosen once when Home is pressed, or set over adb. |

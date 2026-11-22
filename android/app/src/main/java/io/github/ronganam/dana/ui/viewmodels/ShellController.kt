@@ -17,13 +17,13 @@ enum class Place(val label: String) {
 /**
  * What More can open. SHOPPING (the `shopping` addon) and MONEY (`money`)
  * take over the whole place with their own list and stage, with a way back to
- * More. SETTINGS opens from About you, MEMORY only from the old Settings link
- * (previous layout), REVIEW from its notification; none of them are rows of
- * the list.
+ * More. SETTINGS opens from About you, SIGNALS from Settings, MEMORY only
+ * from the old Settings link (previous layout), REVIEW from its notification;
+ * none of them are rows of the list.
  */
 enum class MoreItem(val label: String) {
     SHOPPING("Shopping"), MONEY("Money"), CALLS("Calls"), PEOPLE("People"), ABOUT("About you"),
-    SETTINGS("Settings"), MEMORY("Memory"), REVIEW("Weekly review");
+    SETTINGS("Settings"), SIGNALS("Signals"), MEMORY("Memory"), REVIEW("Weekly review");
 
     /** Items with their own list + stage, shown in place of More's list. */
     val takesOver: Boolean get() = this == SHOPPING || this == MONEY
@@ -259,6 +259,7 @@ class ShellController(
             Place.PROJECTS -> Unit
             Place.MORE -> _more.value = when (_more.value) {
                 MoreItem.SETTINGS -> MoreItem.ABOUT
+                MoreItem.SIGNALS -> MoreItem.SETTINGS
                 MoreItem.MEMORY -> MoreItem.ABOUT
                 else -> null
             }
@@ -268,7 +269,7 @@ class ShellController(
     /**
      * Routes used by deep links, notifications and older code
      * (`MainViewModel.navigateTo`): "chat", "tasks", "inbox", "shopping",
-     * "money", "calls", "people", "projects", "memory", "settings", "review".
+     * "money", "calls", "people", "projects", "memory", "settings", "signals", "review".
      */
     fun openRoute(route: String) {
         when (route) {
@@ -286,6 +287,7 @@ class ShellController(
                     "memory" -> MoreItem.MEMORY
                     "about" -> MoreItem.ABOUT
                     "settings" -> MoreItem.SETTINGS
+                    "signals" -> MoreItem.SIGNALS
                     "review" -> MoreItem.REVIEW
                     else -> return
                 }
