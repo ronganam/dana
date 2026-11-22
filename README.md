@@ -24,29 +24,40 @@ It is one person's daily driver, published as is: opinionated, built around one 
 
 ## Run the server
 
-The minimal first run needs two values in `server/.env`: an LLM key (`ANTHROPIC_API_KEY` with the default models, or another provider's key plus `MODEL`) and `API_TOKEN` (generate one: `openssl rand -hex 32`). Without `API_TOKEN` the server refuses to start.
+An LLM key is the only value you need: `ANTHROPIC_API_KEY` with the default models, or another provider's key plus `MODEL`. Three steps with Docker, no checkout:
 
-With Docker:
+```bash
+curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
+echo "ANTHROPIC_API_KEY=..." > .env     # your key, next to compose.yaml
+docker compose up -d
+docker compose logs app                 # open the setup link it prints
+```
+
+The setup link (one-time, on this machine) creates you as the admin, in that browser; your phone and other devices are paired from there. The port is published on 127.0.0.1 only; to reach Dana from other devices, put a reverse proxy with HTTPS in front of it or use a VPN ([`server/docs/operations.md`](server/docs/operations.md)). Upgrade: `docker compose pull && docker compose up -d`.
+
+Headless (no browser at hand to open the link): also put `API_TOKEN` in `.env` (generate one: `openssl rand -hex 32`) before the first start, and sign in with it.
+
+### Build from source
+
+With Docker, building the image from your checkout:
 
 ```bash
 cd server
-cp .env.example .env        # set ANTHROPIC_API_KEY and API_TOKEN
-docker compose up -d        # http://127.0.0.1:8080, sign in with API_TOKEN
+cp .env.example .env        # set ANTHROPIC_API_KEY
+docker compose up -d        # then open the setup link from docker compose logs
 ```
 
-The port is published on 127.0.0.1 only; to reach Dana from other devices, put a reverse proxy with HTTPS in front of it ([`server/docs/operations.md`](server/docs/operations.md)).
-
-From source (Python 3.12 or newer; the image and the tests run 3.14):
+Without Docker (Python 3.12 or newer; the image and the tests run 3.14):
 
 ```bash
 cd server
 python3 -m venv .venv                        # or python3.14 / python3.12 when python3 is older
 .venv/bin/pip install -r requirements.lock   # every dependency pinned
-cp .env.example .env                         # set ANTHROPIC_API_KEY and API_TOKEN
-.venv/bin/python main.py                     # http://localhost:8080, sign in with API_TOKEN
+cp .env.example .env                         # set ANTHROPIC_API_KEY
+.venv/bin/python main.py                     # open the setup link it logs
 ```
 
-At the first start the server creates you as its admin, turns on the addons that need no account (tasks, shopping, projects, people, phone…) and, unless `CREDENTIALS_KEY` is set, generates the key that encrypts addon credentials into `credentials.key` next to the database: back it up with the database. Then connect the rest on the web UI (Settings → Addons) or with `bin/dana addons connect`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
+At setup the server creates you as its admin, turns on the addons that need no account (tasks, shopping, projects, people, phone…) and, unless `CREDENTIALS_KEY` is set, generates the key that encrypts addon credentials into `credentials.key` next to the database: back it up with the database. Then connect the rest on the web UI (Settings → Addons) or with `bin/dana addons connect`. Configuration: [`server/docs/configuration.md`](server/docs/configuration.md). Deploying (Docker, Kubernetes, the push-to-deploy hook): [`server/docs/operations.md`](server/docs/operations.md).
 
 ## What each feature needs
 

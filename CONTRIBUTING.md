@@ -15,7 +15,7 @@ cp -r site.example site                      # your deployment's folder (docs/si
 cd server
 python3 -m venv .venv                        # Python 3.12 or newer; the image and the tests run 3.14
 .venv/bin/pip install -r requirements.lock
-cp .env.example .env                         # ANTHROPIC_API_KEY and API_TOKEN (tests need neither)
+cp .env.example .env                         # an LLM key (ANTHROPIC_API_KEY), then the setup link main.py logs (tests need neither)
 ```
 
 Android: JDK 21 and the Android SDK; open `android/` in Android Studio or use `./gradlew`.

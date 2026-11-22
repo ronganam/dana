@@ -11,3 +11,6 @@ AGENTS.local.md
 
 # Python bytecode (the example addon is imported by the tests)
 __pycache__/
+
+# Kotlin compiler caches (Gradle builds)
+android/.kotlin/

@@ -11,7 +11,7 @@
   ```
 
   The setup link creates the first admin and their token in the browser; settings go in an optional `.env` next to `compose.yaml` (`docs/configuration.md`). Headless (no browser at hand): put `API_TOKEN` in that `.env` before the first start. Upgrade: `docker compose pull && docker compose up -d`. The data lives in the `data` volume; the port is `127.0.0.1:8080` (reverse proxy or VPN to reach it from elsewhere, below).
-- **Locally**: `python main.py` (README). The web UI and API on `:8080`, Telegram if `TELEGRAM_BOT_TOKEN` is set. It needs `API_TOKEN` (or `DANA_INSECURE_DEV=1`: no authentication, `127.0.0.1` only) and an LLM key.
+- **Locally**: `python main.py` (README). The web UI and API on `:8080`, Telegram if `TELEGRAM_BOT_TOKEN` is set. It needs only an LLM key: a fresh database starts in setup mode and logs the setup link (`docs/devices.md`); `API_TOKEN` instead creates the first admin from env (headless), and `DANA_INSECURE_DEV=1` turns authentication off (`127.0.0.1` only).
 - **Docker Compose from source** (contributors): `docker compose up -d` in `server/` builds the image and keeps the data in the `data` volume (`compose.yaml`; an addon's worker runs under its profile, e.g. `docker compose --profile money_il up -d`: "Workers" below). The port is published on `127.0.0.1:8080` only: to reach Dana from other machines, put a reverse proxy with HTTPS in front of it (Caddy, Traefik, nginx) or change the mapping knowingly. The healthcheck polls `/api/health`.
 - **Data to back up**: the database directory (`DATABASE_PATH`'s folder: the database, `recordings/`, `media/`, `uploads/`…) including `credentials.key` when `CREDENTIALS_KEY` is not set (the generated key: without it the stored addon credentials are lost).
 - **Kubernetes** (one replica: SQLite): the image (`Dockerfile`, `app` stage) runs as UID 1001 and keeps everything it writes in the directory holding the database (`DATABASE_PATH`, default `/app/db/db.sqlite3`; `core/paths.py`), so mount one volume there. Secrets come in as env vars (`docs/configuration.md`). Probes: TCP on 8080. An addon's worker runs as a sidecar in the same pod ("Workers" below; e.g. `money_il`'s on `127.0.0.1:8090`, mounting only `<data dir>/money`). Backups: copy `<data dir>/snapshots/db.sqlite3` after `python3 -m core.db_snapshot` (a consistent copy; a raw copy of a live SQLite file can catch it mid-write), e.g. from a Velero pre-backup hook.
@@ -156,7 +156,7 @@ kubectl cp -n "$NS" "$POD":/app/db/recordings/<filename> ./recording.m4a
 
 ## API endpoints
 
-The web server listens on port 8080. Every path but the public ones (`docs/access.md`) needs `Authorization: Bearer <token>` (`API_TOKEN` or a user's token), from inside a cluster too; the inbound webhook `/webhook/waha` takes no token but only events WAHA signed with `WAHA_WEBHOOK_SECRET` (`docs/whatsapp.md`). Without `API_TOKEN` the server refuses to start (`DANA_INSECURE_DEV=1` for local development: no authentication, `127.0.0.1` only).
+The web server listens on port 8080. Every path but the public ones (`docs/access.md`) needs `Authorization: Bearer <token>` (a device's or user's token, or `API_TOKEN` when set), from inside a cluster too; the inbound webhook `/webhook/waha` takes no token but only events WAHA signed with `WAHA_WEBHOOK_SECRET` (`docs/whatsapp.md`). A server with no users and no `API_TOKEN` is in setup mode: only the setup page and API, the health check and static files answer until the first admin is created (everything else 503 `setup_required`; `docs/devices.md`). `DANA_INSECURE_DEV=1` for local development: no authentication, `127.0.0.1` only.
 
 | Endpoint | What it returns |
 |---|---|
@@ -167,12 +167,17 @@ The web server listens on port 8080. Every path but the public ones (`docs/acces
 | `GET /api/assistant/voice_stream` | WebSocket: PCM in, then the same run events as JSON frames, closed by `state` (or `no_speech`) |
 | `GET /api/me` | The caller: `{id, name, access, capabilities, addons, languages, currency}` |
 | `GET` / `PUT /api/profile` | The caller's languages and currency (`core/profile_api.py`) |
+| `GET /api/setup` · `POST /api/setup/admin` | Setup mode (public, only while there are no users): `{setup_required, version}` / create the first admin `{code, name}` → 201 `{user, device, token}` with the session cookie; 403 `invalid_code`, 409 `already_set_up`, 429 (`docs/devices.md`) |
+| `POST /api/pair` | A new device redeems a pairing code (public, rate-limited): `{code, kind, name?}` → `{token, device, user, server}`; 403 `invalid_code`, 409 `wrong_kind`, 429 |
+| `POST /api/devices/pairings` · `GET` / `DELETE /api/devices/pairings/{id}` | Start a pairing for the caller (or `user_id` with `manage_users`) → 201 `{id, code, expires_at, qr, …}` / its status (`pending \| paired \| expired`) / cancel it |
+| `GET /api/devices` · `PATCH` / `DELETE /api/devices/{id}` | The caller's devices (`?user=` with `manage_users`) / rename, room, role / remove (its token stops working at once) |
 | `GET /api/users` | `manage_users` only: `{users: [{id, name, access}]}` — the Addons page's user picker |
 | `GET /api/addons` · `GET /api/addons/{name}` | The caller's addons (`?user=<id>` with `manage_users`): fields with their type, whether each credential is set (never a secret's value; an address's value is shown), settings, account, and whether the caller may change each addon / field (`can_change`, `why_not`, `rule`) (`docs/access.md` → Managing users) |
 | `PUT /api/addons/{name}` | Connect (201) or update (200): `{credentials?, settings?}`, merged; 400 `invalid` with the field; 403 `forbidden` for an addon the level may not have |
 | `DELETE /api/addons/{kind}` | Disconnect |
 | `POST /api/addons/{kind}/test` | Does the service answer with these credentials: `{kind, checked, ok, reason}` (Home Assistant, WhatsApp, Calendar, cameras) |
 | `GET /api/addons/{kind}/options` | Candidates for the settings, read from the service (Home Assistant: people, car sensors and devices, phone sensors, weather) |
+| `GET /api/addons/catalog` · `POST /api/addons/install` · `POST /api/addons/{name}/remove` | `manage_server` only: the catalog / install a catalog entry (`{name}`) or a repository (`{repo, ref, path?}`), with `accept` (the touches the admin agreed to) → 201 `{name, commit, touches, restart_needed}`; 409 `confirm_touches {touches, added}` when it may touch more than the replaced version plus `accept` (nothing written; send it again with `accept` once agreed) / remove it (`../docs/addons.md`) |
 | `GET` / `PUT /api/sharing/{item_type}/{id}` | Who an item the caller owns is shared with / share it (`{user_id, level: read\|edit\|none}`); owner only (`docs/access.md` → Sharing) |
 | `GET /api/usage` · `GET /api/usage/events` | Usage and cost: totals, per day, breakdowns, individual calls (`docs/usage.md`) |
 | `GET /api/debug/sessions` | The caller's sessions with history length & pending status |
@@ -193,7 +198,7 @@ The web server listens on port 8080. Every path but the public ones (`docs/acces
 | `POST /api/money/sources/{id}/sync` · `GET /api/money/syncs?source=` | Sync now (202 · 429 `too_soon` · 409 `needs_attention`) / recent syncs with their outcome and counts |
 | `GET /api/money/code-requests[/{id}]` · `POST /api/money/code-requests/{id}` | Sign-in codes a sync waits for (the phone reads the sender and pattern) / hand one over (`{code}`) |
 | `GET /api/money/overview\|pace?month=` · `/categories` · `/months` · `/recurring` | The Money page's numbers (`docs/money.md` → Page API and insights) |
-| `GET /api/money/meals?months=` | The meal card (Pluxee): the budget now, its cycles with their card line, meals and places (`docs/money.md` → Meal cards) |
+| `GET /api/money/meals?months=` | The meal card: the budget now, its cycles with their card line, meals and places (`docs/money.md` → Meal cards) |
 | `GET /api/money/savings[/{key}]` · `PATCH /api/money/savings/{key}` · `POST /api/money/savings/{key}/check` | Ways to save and spending to watch with the caller's choices (status, answers, targets, subscription lines → `undo_id`) / a price check on request (202 · 400 `needs_answer` · 409 · 429 · 503) (`docs/money.md` → Savings) |
 | `GET /api/money/portfolio?days=&trades=` | The caller's investment accounts: value, holdings, value per day, activity, allocation (`docs/money.md` → Investment accounts) |
 | `GET /api/money/transactions` · `GET` / `PATCH /api/money/transactions/{id}` | Transactions (search, filters, cursor) / one in full / change its category (`for_merchant`) or note → `undo_id` |

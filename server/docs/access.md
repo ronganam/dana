@@ -23,12 +23,16 @@ first user's values), tables from migrations `m0002_users` and
 | `pronoun` | `he` / `she` / `they` (default `they`): how prompts refer to them, verbs agreeing ("she does", "they do"). |
 | `other_names` | Other spellings of their first name (another script), shown in brackets where a prompt reads a transcript: "Robin (רובין)". |
 | `prompt_name` | What Dana's own instructions call them (the agent prompt, the shared phone screen); '' = their first name. The first admin's is `the owner`. |
-| `languages` | Comma list of language codes (`he,en`), the first their default reply language: the agent's language rule and the transcription prompt are worded for them (`core/user_locale.py`, core migration `m0004_user_locale`). '' = the server's `DEFAULT_LANGUAGES` (default `en`). |
-| `currency` | ISO 4217 code (`ILS`): what money values mean where an addon does not know better (knowledge's budgets and prices; `{currency}` in a prompt part). '' = the server's `CURRENCY` (default `USD`). Changed by the user on the web Settings → Profile card (`PUT /api/profile`) or with `bin/dana users update --languages / --currency`. |
-| identities | Telegram user ids (`user_telegram`) and API tokens (`user_tokens`, one per device, with a label, created / last-used) that resolve to this user. |
+| `languages` | Comma list of language codes (`he,en`), the first their default reply language: the agent's language rule and the transcription prompt are worded for them, and the first one is what their notification summaries, morning briefing, weekly review and people briefs are written in and what the apps listen in first (`core/user_locale.py`, core migration `m0004_user_locale`). '' = the server's `DEFAULT_LANGUAGES` (default `en`). |
+| `currency` | ISO 4217 code (`ILS`): what money values mean: all of money (transactions, dashboards, savings, tools: `user_locale.format_money` / `money_text`, money's `home_currency`), knowledge's budgets and prices, `{currency}` in a prompt part. '' = the server's `CURRENCY` (default `USD`). Changed by the user on the web Settings → Profile card (`PUT /api/profile`) or with `bin/dana users update --languages / --currency`. |
+| identities | Telegram user ids (`user_telegram`) and tokens (`user_tokens`, with a label, created / last-used) that resolve to this user: one per device, made by pairing (`devices`, docs/devices.md), plus any issued with `bin/dana users tokens issue`. |
 
-- **First user.** `users.bootstrap()` runs at startup (`main.py`, after
-  `db.migrate()`): when no user exists it creates one named `OWNER_NAME`
+- **First user.** With no users and no `API_TOKEN` the server starts in
+  **setup mode** (`core/setup.py`, docs/devices.md): it logs a one-time setup
+  link and the first admin is created in the browser that opens it (that
+  browser becomes their first device). With `API_TOKEN` set (a headless
+  install) or `DANA_INSECURE_DEV=1`, `users.bootstrap()` runs at startup (`main.py`, after
+  `db.migrate()`) instead: when no user exists it creates one named `OWNER_NAME`
   (default `Owner`), access `admin`, Telegram ids from
   `ALLOWED_TELEGRAM_USER_IDS` (non-numeric entries skipped), proactive chat
   `TELEGRAM_CHAT_ID`, and a profile from `OWNER_CONTEXT`, `OWNER_PRONOUN`
@@ -40,7 +44,9 @@ first user's values), tables from migrations `m0002_users` and
   `ALLOWED_TELEGRAM_USER_IDS` lists ids no user has): change a user with
   `bin/dana users update`. "The first admin" is the oldest user with access
   `admin`.
-- **Tokens.** `API_TOKEN` (env) is always a valid token of the first admin and
+- **Tokens.** A device's token is made when it pairs (`devices.redeem`,
+  `POST /api/pair`; docs/devices.md) and removing the device revokes it.
+  `API_TOKEN` (env), when set, is always a valid token of the first admin and
   is never stored. Other tokens are made by `users.issue_token(user_id, label)`
   (returns the raw token once; `bin/dana users tokens issue`) and revoked by
   `users.revoke_token(token_id)`. Stored hashed: `token_hash` = SHA-256 of the
@@ -49,13 +55,15 @@ first user's values), tables from migrations `m0002_users` and
   token.
 - **Web login** uses the cookie `dana_session` = HMAC-SHA256 of the token
   with the constant `dana-web-session` (`users.session_cookie_value`).
-  `/login` accepts any valid token; revoking a token also ends the web logins
-  made with it.
+  `/login` accepts any valid token, or a pairing code of kind `browser` (the
+  browser becomes a device of the code's user and gets its own token's
+  cookie); revoking a token also ends the web logins made with it.
 - **Requests** (`core/auth.py`): a Bearer token or the session cookie resolves
   to a user and the middleware sets `request["user"]` (a `core.users.User`).
   Public paths (`/login`, `/api/health`, `/api/app/version`,
-  `/api/app/upload`, `/api/app/download/*`, `/static/*`, `/sw.js`,
-  `/manifest.json`) need nothing and get no user.
+  `/api/app/upload`, `/api/app/download/*`, `/api/pair`, `/api/setup`,
+  `/api/setup/admin`, `/static/*`, `/sw.js`, `/manifest.json`) need nothing
+  and get no user; pairing and setup prove themselves with a code.
 - **Inbound webhook.** A request without credentials reaches only the
   inbound webhook path (`/webhook/waha`; `auth.INBOUND_PATHS`), with no
   `request["user"]`; its handler accepts it only when WAHA signed the raw body
@@ -64,9 +72,12 @@ first user's values), tables from migrations `m0002_users` and
   in-cluster Service name is as easy to send as any other. Home Assistant
   posts nothing any more (`/webhook` is gone: "Home Assistant triggers").
   Every other path needs credentials.
-- **No `API_TOKEN`.** The server refuses to start (`auth.startup_problem()`,
-  `main.py`). For local development only, `DANA_INSECURE_DEV=1` starts it
-  anyway: every request is the first admin, the server listens on
+- **No `API_TOKEN`.** While there are no users the server is in setup mode:
+  only `/setup`, `/api/setup`, `/api/setup/admin`, `/api/health`,
+  `/static/*`, `/sw.js` and `/manifest.json` answer, everything else 503
+  `setup_required`. Once the first admin exists, requests need a DB token
+  (a device's) or its cookie. For local development only, `DANA_INSECURE_DEV=1`
+  skips both: every request is the first admin, the server listens on
   `127.0.0.1` only (`auth.bind_host()`) and the start logs a warning. Without
   either (a test app that skips `main.py`), every request is refused (401).
 - **Telegram** (`core/telegram_bot.py::AuthMiddleware`): the sender's Telegram
@@ -118,7 +129,8 @@ work). One mechanism, bound in four places:
   `briefing.meeting_cards_loop`, `weekly_review.schedule_loop`) go over every
   user who has the addons the work needs with `core/composers.for_each` (each
   as that user, one failing not stopping the next); the phone's loops (notification retention,
-  digest, re-nudge, call audio retention: `addons.phone.config.for_each_user`)
+  digest, re-nudge, triage retry (every 5 minutes: the notifications the judge
+  did not answer), call audio retention: `addons.phone.config.for_each_user`)
   each user with `phone`, call processing / reanalysis
   (`addons.phone.calls.processing.process_call`) the call's owner; the
   task time checker
@@ -258,10 +270,22 @@ the caller's Frigate; `/api/me` and `/api/addons*`, the caller's own
 ## Security rules
 
 Rules that keep one user from reaching another user's data or the server's
-network through something they control. Tests: `bin/test test_security`
+network through something they control. What the server stores, what reaches
+the model provider and what an installed addon is trusted with: the threat
+model in [`SECURITY.md`](../../SECURITY.md). Tests: `bin/test test_security`
 (each rule has its own section), plus the HTTP-reachable ones in
 `tests/local_env/e2e.py` ("security").
 
+- **Pairing and setup.** A pairing code is 8 characters, one-time, valid for
+  five minutes and stored only as a hash; it makes a device of the user who
+  started it (someone else's only with `manage_users`) and nobody else.
+  Wrong codes are limited per client and in all (`ratelimit.PAIRING_FAILURES`,
+  429 `rate_limited` past either); a code of another kind is refused and
+  stays usable; codes and tokens are never logged. The setup code exists only
+  while there are no users, is checked in constant time and rate-limited the
+  same way, and is spent by the first admin (`already_set_up` after). Each
+  device has its own token and push registration, so removing a device ends
+  its sign-in and its pushes at once (docs/devices.md).
 - **Debug export** (`GET /api/debug/sessions/{id}`, the Telegram debug file;
   `core/debug_env.py`). The `environment` section is filled only for a user
   with `manage_server`; everyone else gets `{}` (same payload shape). For an
@@ -585,7 +609,7 @@ Rules:
 | `knowledge` | projects and entries | none | none | built in; projects per user with `project` sharing, entries follow their project (docs/knowledge.md) |
 | `about` | About-you facts and learner | none | none | built in, no sharing; facts, "do not re-add", the size cap, the prompt section and the learner per user (docs/about.md) |
 | `people` | people, briefs | none | none | built in, no sharing; people, their numbers (unique per user), briefs and the call card per user; calls / notifications linked only from the user's own (both by their `user_id`, `activity.calls_sql` / `notifications_sql`) (docs/people.md) |
-| `phone` | the Android phone: push, notifications Inbox, calls and suggestions | none (devices register with the user's API token) | none | built in. Devices, push events (one `seq` numbering for the server, each event fetched only by its user), notifications (FTS, rules, summaries, declines, action requests, digest state), calls (uploads, recordings, transcripts, labels, FTS search, processing / reanalysis / backfill as the owner), call and notification suggestions (only their owner's: listed, accepted, dismissed, edited, undone, popped up), context chats on them, the self-check marks `push` / `notification_sync` / `triage`, the calls check and the loops per user; `/api/phone/*`, `/api/notifications/*`, `/api/calls/*` and `/api/suggestions/*` for the caller, 403 `not_connected` without the addon (docs/notifications.md, docs/calls.md) |
+| `phone` | the Android phone: push, notifications Inbox, calls and suggestions | none (each device pairs and gets its own token; its push registration is keyed by that device) | none | built in. Devices, push events (one `seq` numbering for the server, each event fetched only by its user), notifications (FTS, rules, summaries, declines, action requests, digest state), calls (uploads, recordings, transcripts, labels, FTS search, processing / reanalysis / backfill as the owner), call and notification suggestions (only their owner's: listed, accepted, dismissed, edited, undone, popped up), context chats on them, the self-check marks `push` / `notification_sync` / `triage`, the calls check and the loops per user; `/api/phone/*`, `/api/notifications/*`, `/api/calls/*` and `/api/suggestions/*` for the caller, 403 `not_connected` without the addon (docs/notifications.md, docs/calls.md) |
 | `homeassistant` | Home Assistant | `host` (an address), `token` | `person` (person entity: zone triggers), `car_sensor` (the phone's Bluetooth connection sensor) + `car_device` (the car's Bluetooth name in its `connected_paired_devices`): car triggers, `phone_interactive_sensor` (screen on: wake confirmation), `phone_battery_sensor` (bedroom dashboard tile), `phone_notify_service` (only reported by `/api/client-config`), `weather_entity` (`weather.forecast_home`: briefing, Now), `tv_entity` (the Android TV media player `control_android_tv` uses when not given one) + `tv_channel_command` (an ADB command with `{channel}` for its `watch_channel`, e.g. a TV provider app's deep link; unset: no channel changes); no other defaults | no limits on Dana's side: whatever the token can do. Everything per connection: REST / WebSocket clients, zones, states cache, home map, the entity watcher (docs/tasks-and-triggers.md). Tools, `/api/ha/*`, `/api/zones`, `/api/client-config`, the HA camera proxies (which also need `cameras`): the caller's connection, 403 `not_connected` without it |
 | `whatsapp` | WAHA | `url` (an address), `api_key` (optional), `session` (a name, not one another user's connection uses) | `voice_telegram_chat_id` (none): the user's voice-transcript chat (their own Telegram id unless an admin sets it) | account: the session's WhatsApp id, learned from WAHA (routes inbound events, see "Inbound"). Tools, name maps, "me", dedupe, saved contacts (`whatsapp_contacts`) and the images its tools save per connection / user (docs/whatsapp.md). No HTTP endpoint of its own besides the inbound webhook |
 | `calendar` | Google Calendar | `refresh_token` (from the Google sign-in, "Google account") | `calendar_id` (`primary`): where new events go, `selected_calendars` (none): ids of the calendars shown and searched (none chosen: `calendar_id`) | OAuth client id/secret are server-wide. Tools, `/api/calendar/*`, undo of events, accepting an event suggestion and the composers' calendar reads (Now, briefing, meeting cards, weekly review, the `calendar` self-check) use the acting user's connection; credentials (access token) and today's events cached per connection; 403 `not_connected` without it. No sharing on Dana's side: calendars Google shares with a user show through their own account (docs/now.md) |
@@ -593,7 +617,7 @@ Rules:
 | `gmail` | Gmail | `refresh_token` (from the Google sign-in) | none | account: the mailbox address. Chat tools only (`Addon(realtime=False)`: not offered or run in realtime voice, which has no Approve step); sending asks first, other changes have Undo; reading tools are `untrusted_result`; nothing is stored (docs/gmail.md) |
 | `telegram_account` | the user's own Telegram account (Telethon) | `session` (from the QR sign-in, `/telegram/connect`) | none | account: the Telegram name and @username. The app (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) is server-wide. Read-only tools, `untrusted_result`, chat only (`realtime=False`); nothing is marked read; one client per connection (docs/telegram-account.md) |
 | `cameras` | Frigate | none | `url` (an address; none) | changed only by a user with `manage_users` (for anyone); no tools, only the camera endpoints (`/api/frigate/*`, `/api/camera/{entity}/proxy`), each for the caller's own Frigate, 403 `not_connected` without the addon; the two that go through Home Assistant also need `homeassistant`; caches per connection (docs/dashboard.md) |
-| `money` | bank / card sites through the bank-worker sidecar | none of its own: each bank / card login is a row of `money_sources`, its credentials a Fernet token under the same `CREDENTIALS_KEY`, decrypted only in `addons/money/sync.py` to start a worker job, never returned by an API or tool, never logged | `MONEY_SYNC_TIMES` is server-wide | built in for nobody: connected per user; sources, accounts, transactions, rules, syncs and code requests per user (another user's source / request id answers 404); disconnecting deletes all of them and the user's browser profiles. SMS sign-in codes are never stored or logged: the phone posts them to `/api/money/code-requests/{id}`, and a Telegram message of only 4–8 digits is taken as the code (before the agent, history or logs) only while that user has a pending request (docs/money.md) |
+| `money` | transactions, dashboards, savings and tools in the user's currency; statement files imported (CSV, OFX, QIF) or bank / card logins brought by a provider addon (e.g. `money_il` from the catalog, with its worker) | none of its own: each bank / card login is a row of `money_sources`, its credentials a Fernet token under the same `CREDENTIALS_KEY`, decrypted only in `addons/money/sync.py` to start the provider's sync, never returned by an API or tool, never logged | `MONEY_SYNC_TIMES` is server-wide | built in for nobody: connected per user; sources, accounts, transactions, rules, syncs and code requests per user (another user's source / request id answers 404); disconnecting deletes all of them and the user's browser profiles. SMS sign-in codes are never stored or logged: the phone posts them to `/api/money/code-requests/{id}`, and a Telegram message of only 4–8 digits is taken as the code (before the agent, history or logs) only while that user has a pending request (docs/money.md) |
 | `ops` | kubectl, Python | none | none | `admin` only; never turned on by itself; `run_python` asks first and is not a sandbox ("Security rules") |
 
 Server-wide configuration stays in env: model keys and model names, the
@@ -1047,10 +1071,12 @@ connect).
 
 ### How to
 
-- **Add a user.** `bin/dana users add "Maya Levi" --pronoun she --context
-  "Maya is a nurse in Haifa. Noa is her sister."`, then
-  `bin/dana users tokens issue maya --label phone` (give her the printed token
-  for the app / web login) and, for Telegram, `bin/dana users telegram add maya
+- **Add a user and pair their devices.** `bin/dana users add "Maya Levi" --pronoun she --context
+  "Maya is a nurse in Haifa. Noa is her sister."`, then pair her first device:
+  an admin starts a pairing for her (`POST /api/devices/pairings {"kind":
+  "phone", "user_id": "<her id>"}`, which answers the QR string and the code)
+  and her phone scans it in the app (a browser types the code on `/login`);
+  she pairs her other devices herself from her Devices page (docs/devices.md) and, for Telegram, `bin/dana users telegram add maya
   <her Telegram user id>` plus `update maya --telegram-chat <chat id>` for
   proactive messages. She starts with only `essentials`.
 - **Connect an addon from the page.** Settings → Addons (an admin first
