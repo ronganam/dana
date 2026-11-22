@@ -18,6 +18,8 @@ import java.time.LocalDate
 
 /** The dashboards' words, against the web's expectations (the server's test_web_money.mjs) on the same payloads. */
 class MoneyDashTextTest {
+    init { MoneyFormat.use("ILS") }  // the fixtures' user pays in shekels
+
     private val today = LocalDate.parse("2026-11-18")
     private val ov = MoneyOverview.parse(MoneyDashFixture.web("overview"))
     private val past = MoneyOverview.parse(MoneyDashFixture.web("overview_past"))

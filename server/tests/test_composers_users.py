@@ -413,7 +413,7 @@ async def usage_rows(purpose: str) -> List[str]:
 
 def old_briefing_prompt(d: Dict[str, Any]) -> str:
     """core/briefing.py's prompt before composers were per user (git 1a98af3)."""
-    OWNER_NAME, OWNER_CONTEXT, LANGUAGE = testenv.OWNER_NAME, testenv.OWNER_CONTEXT, briefing.LANGUAGE
+    OWNER_NAME, OWNER_CONTEXT = testenv.OWNER_NAME, testenv.OWNER_CONTEXT
     return f"""Write {OWNER_NAME}'s morning briefing. He just woke up and will glance at it on his phone, watch and bedroom tablet.
 
 About Robin:
@@ -428,7 +428,7 @@ Today's data (JSON):
 Return:
 - `headline`: 3–8 words capturing the shape of the day ("Busy morning, free after 2", "Quiet Friday, two things due").
 - `points`: 3–6 short fragments (4–12 words), most useful first: the first event and anything time-critical, what's due or overdue, what needs him in the Inbox, weather only if it matters (rain, heat, cold), birthdays, one person to reach out to. Skip empty categories; never pad.
-Fragments, not sentences; no trailing periods; no emoji; no advice beyond the facts. Use 24h times. Write in {LANGUAGE}; keep names, event titles and task titles as written (Hebrew stays Hebrew)."""
+Fragments, not sentences; no trailing periods; no emoji; no advice beyond the facts. Use 24h times. Write in English; keep names, event titles and task titles as written, in their own language."""
 
 
 def old_review_prompt(c: Dict[str, Any], nw: Optional[Dict[str, Any]], today: datetime.date) -> str:
@@ -436,7 +436,7 @@ def old_review_prompt(c: Dict[str, Any], nw: Optional[Dict[str, Any]], today: da
     OWNER_NAME, OWNER_CONTEXT = testenv.OWNER_NAME, testenv.OWNER_CONTEXT
     listing = [{"ref": i["ref"], "type": i["type"], "title": i["title"], "why": i["why"], "facts": i["facts"],
                 "group": i.get("group"), "allowed": list(weekly_review.actions_for(i["type"]))} for i in c["items"]]
-    return f"""You're helping {OWNER_NAME} with his weekly review (Saturday evening, before the Israeli work week starts Sunday).
+    return f"""You're helping {OWNER_NAME} with his weekly review (Saturday evening, before the week ahead).
 
 About Robin:
 {OWNER_CONTEXT}
@@ -488,6 +488,12 @@ def test_prompts() -> None:
               bob_b.startswith("Write Bob Stone's morning briefing. They just woke up and will glance at it on their phone")
               and "what needs them in the Inbox" in bob_b, bob_b[:200])
         bob_r = weekly_review.review_prompt(weekly_review.candidates(BOB), None, TODAY, BOB)
+        bob_de = users.update(BOB.id, languages="de,en")
+        check("prompts: a German-first user's briefing and review are written in German",
+              "Use 24h times. Write in German;" in briefing.briefing_prompt(run(briefing.gather(bob_de)), bob_de)
+              and "Write in German; keep titles" in weekly_review.review_prompt(weekly_review.candidates(bob_de), None,
+                                                                                TODAY, bob_de))
+        users.update(BOB.id, languages="")
         check("prompts: Bob's review prompt is written for Bob",
               bob_r.startswith("You're helping Bob Stone with their weekly review"), bob_r[:120])
         leaks = [p for p in (bob_b, bob_r) if "Robin" in p or "About " in p or testenv.OWNER_CONTEXT in p]

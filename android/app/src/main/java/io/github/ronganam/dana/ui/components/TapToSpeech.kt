@@ -2,7 +2,7 @@ package io.github.ronganam.dana.ui.components
 
 import android.content.Context
 import android.speech.tts.TextToSpeech
-import java.util.Locale
+import io.github.ronganam.dana.data.voice.useVoiceFor
 
 /**
  * Speaks a reply when it is tapped. The engine is bound on the first tap, not
@@ -35,7 +35,7 @@ class TapToSpeech(private val context: Context) {
 
     private fun say(text: String) {
         val engine = tts ?: return
-        engine.language = if (text.any { it in '֐'..'׿' }) Locale.forLanguageTag("he-IL") else Locale.US
+        engine.useVoiceFor(text, context)
         engine.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)
     }
 

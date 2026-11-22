@@ -334,8 +334,17 @@ async def main():
     check("brief: not rewritten when nothing changed", await people_briefs.refresh_briefs(OWNER) == 0 and not p["brief_stale"])
     mom_prompt = [pr for k, pr in seen["model"] if k == "brief" and "אמא" in pr.split("\n")[0]]
     gal_prompt = [pr for k, pr in seen["model"] if k == "brief" and "Wedding call" in pr]
-    check("brief: language follows the content", mom_prompt and "Write in Hebrew" in mom_prompt[0]
-          and gal_prompt and "Write in English" in gal_prompt[0])
+    check("brief: in the user's first language (Hebrew for Robin), whatever the calls' language",
+          mom_prompt and "Write in Hebrew, whatever language" in mom_prompt[0]
+          and gal_prompt and "Write in Hebrew, whatever language" in gal_prompt[0])
+    german = users.update(OWNER.id, languages="de,en")
+    with db.get_db_connection() as conn:
+        sig_he = people_briefs.signature(conn, OWNER, people_store.row(conn, OWNER, gal))
+        g_prompt = people_briefs.brief_prompt(conn, german, people_store.row(conn, german, gal))
+        sig_de = people_briefs.signature(conn, german, people_store.row(conn, german, gal))
+    users.update(OWNER.id, languages=testenv.OWNER_LANGUAGES)
+    check("brief: a German-first user's brief is in German; a language change rewrites it",
+          "Write in German, whatever language" in g_prompt and sig_he and sig_de and sig_he != sig_de)
     add_call("gal-new", "גל כהן 🚀❤️🔥", "0501112222", 0, title="Back in touch")
     linking.link_pending(OWNER)
     check("brief: new call makes it stale", detail.get_person(OWNER, gal, schedule_brief=False)["brief_stale"])

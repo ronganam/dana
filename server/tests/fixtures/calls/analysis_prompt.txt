@@ -6,10 +6,10 @@ Saved contacts / people:
 - mom: 972500000077@c.us
 - gal_contact: 0501112222
 
-The call: with "אמא" (0501234567), an incoming call (the contact called Robin), on Sunday 2026-11-08 11:41 (Israel time), duration 1:35.
+The call: with "אמא" (0501234567), an incoming call (the contact called Robin), on Sunday 2026-11-08 11:41 (UTC time), duration 1:35.
 
 Return JSON matching the schema. Rules:
-- Language: write title, summary, roles, key facts and action items in the transcript's main language (Hebrew transcript → Hebrew). Keep names as spoken.
+- Language: write title, summary, roles, key facts and action items in the transcript's main language (a Spanish call → Spanish). Keep names as spoken.
 - Speakers: one side is Robin, the other is normally "אמא". Do NOT invent names for the speakers; if a name isn't clearly said, use "Robin" / the contact name / "the other side". A business contact name means a representative of that business.
 - title: 3-7 words, specific (what was decided/asked), no quotes.
 - summary: 2-6 short markdown bullet lines starting with "- ". Concrete: decisions, agreements, numbers, dates, addresses. No headings, no fluff.

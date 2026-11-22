@@ -30,6 +30,8 @@ import java.time.LocalDate
  * today 18 Nov 2026), the same assertions as its `test_web_money.mjs`.
  */
 class MoneyLedgerTest {
+    init { MoneyFormat.use("ILS") }  // the fixtures' user pays in shekels
+
     private val f = jsonObjectOf(MoneyLedgerTest::class.java.classLoader!!.getResource("money_web.json")!!.readText())
     private fun body(k: String) = f.obj(k)!!.obj("body")!!
     private val today = LocalDate.parse("2026-11-18")

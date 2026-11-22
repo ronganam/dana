@@ -287,7 +287,7 @@ fun UploadFormSheet(
             value = formState.instructions,
             onValueChange = onInstructionsChange,
             label = { Text("Custom Instructions (optional)") },
-            placeholder = { Text("e.g. focus on action items, summarize in Hebrew...") },
+            placeholder = { Text("e.g. focus on action items, keep it short...") },
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 16.dp),

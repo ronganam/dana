@@ -24,6 +24,8 @@ import java.time.ZonedDateTime
 
 /** Investments and the meal card: the payloads parsed, tiles, the value chart, allocation, activity, cycles. */
 class MoneyDashHoldingsTest {
+    init { MoneyFormat.use("ILS") }  // the fixtures' user pays in shekels
+
     private val today = LocalDate.parse("2026-11-18")
     private val now = ZonedDateTime.of(2026, 11, 18, 14, 0, 0, 0, ZoneId.of("Asia/Jerusalem"))
     private val pf = MoneyPortfolio.parse(MoneyDashFixture.portfolio("portfolio"))

@@ -28,7 +28,7 @@ KNOWLEDGE_GUIDE = (
     "(auto transcript+summary+media), 'record' for structured data, otherwise 'note'.\n"
     "5. 'What did I save about X': `search_knowledge` (scope with project_id), then "
     "`get_knowledge_item(entry_id)` for the full body, fields, files and transcripts.\n"
-    "AUTHORING RULES (match the user's language — Hebrew supported):\n"
+    "AUTHORING RULES (match the user's language):\n"
     "  - `title`: SHORT label, max ~8 words (an option: the vendor's name), no markdown.\n"
     "  - `body`: full details as clean Markdown — '##' headings, **bold** key figures, '- ' bullets. "
     "Keep every fact, number, date and name verbatim.\n"

@@ -101,8 +101,8 @@ _tasks: Set["asyncio.Task[None]"] = set()
 def _prompt(names: List[str]) -> str:
     aisles = "\n".join(f"- {k}: {n}" for k, n in CATEGORIES)
     listed = "\n".join(f"- {n}" for n in names)
-    return ("You sort grocery shopping-list items into supermarket aisles. The names may be in Hebrew or "
-            "English, with typos or brand names.\n\nAisles:\n" + aisles +
+    return ("You sort grocery shopping-list items into supermarket aisles. The names may be in any language "
+            "(several at once), with typos or brand names.\n\nAisles:\n" + aisles +
             "\n\nFor each item below give the one aisle it is usually found in; use 'other' only when none "
             "fits. Answer with every item exactly as written.\n\nItems:\n" + listed)
 

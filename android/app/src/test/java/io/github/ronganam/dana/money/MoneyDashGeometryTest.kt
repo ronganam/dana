@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.money
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.data.money.CashflowMonth
 import io.github.ronganam.dana.data.money.MoneyBalance
 import io.github.ronganam.dana.data.money.MoneyCashflow
@@ -22,6 +23,8 @@ import kotlin.math.abs
 
 /** The charts' geometry (pace, 12 months, cash flow, balance, ticks, sparklines), against the web's numbers on the same payloads. */
 class MoneyDashGeometryTest {
+    init { MoneyFormat.use("ILS") }  // the fixtures' user pays in shekels
+
     private val ov = MoneyOverview.parse(MoneyDashFixture.web("overview"))
     private val pace = MoneyPace.parse(MoneyDashFixture.web("pace"))
     private val months = MoneyMonths.parse(MoneyDashFixture.web("months"))

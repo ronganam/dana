@@ -515,8 +515,9 @@ async def main() -> None:
 
 test_flags_and_access()
 test_prompt()
-test_context()
-asyncio.run(main())
+with users.acting_as(ROBIN):  # as in production: money text is in the acting user's currency
+    test_context()
+    asyncio.run(main())
 
 passed = sum(1 for _, ok in results if ok)
 print(f"\n{passed}/{len(results)} passed")

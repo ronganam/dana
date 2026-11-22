@@ -10,7 +10,9 @@ speaker); the knowledge prompt's ``{currency}``; ``DEFAULT_COUNTRY_CODE``
 unset (numbers stay as given) and set (a leading 0 replaced), in people and
 WhatsApp; ``GET`` / ``PUT /api/profile`` (each user their own, 400 on a bad
 code, back to the server's with ``[]`` / ``""``) and ``GET /api/me``'s
-``addons`` / ``languages`` / ``currency``.
+``addons`` / ``languages`` / ``currency`` for two users with different
+locales; :func:`format_money` and the money addon's amounts and foreign
+charges in each acting user's currency.
 """
 
 import asyncio
@@ -64,6 +66,14 @@ check("currency: upper case, '' for nothing", user_locale.check_currency(" ils "
 check("currency: anything but three letters is refused", raises(user_locale.check_currency, "shekel")
       and raises(user_locale.check_currency, "₪"))
 
+check("money: symbol, grouping, cents, sign; '—' for none",
+      user_locale.format_money(123450, "EUR") == "€1,234.50" and user_locale.format_money(-5000, "usd") == "-$50.00"
+      and user_locale.format_money(None, "EUR") == "—" and user_locale.format_money(8000, "ILS") == "₪80.00")
+check("money: a currency without a symbol is written as its code",
+      user_locale.format_money(8000, "CHF") == "CHF 80.00" and user_locale.currency_symbol("CHF") == "CHF ")
+check("money: whole units round half up", user_locale.format_money(123450, "EUR", cents=False) == "€1,235"
+      and user_locale.format_money(-149, "GBP", cents=False) == "-£1")
+
 # --- the server's defaults -----------------------------------------------------------------
 check("server: en / USD when unset", user_locale.server_languages() == ("en",) and user_locale.server_currency() == "USD")
 os.environ.update({"DEFAULT_LANGUAGES": "fr,en", "CURRENCY": "eur"})
@@ -114,6 +124,26 @@ check("knowledge part: money in the user's currency (ILS for the admin, USD for 
       "plain numbers in ILS" in agent.instructions(users.get(ADMIN.id))
       and "plain numbers in USD" in agent.instructions(users.get(es.id)))
 
+# --- money amounts in the acting user's currency ------------------------------------------
+from addons.money import store as money_store  # noqa: E402
+eur = users.update(es.id, currency="EUR")
+with users.acting_as(eur):
+    eur_text = money_store.money_text(-123450)
+    eur_foreign = (money_store.is_foreign({"orig_currency": "EUR", "orig_amount": 100}),
+                   money_store.is_foreign({"orig_currency": "ILS", "orig_amount": 100}))
+with users.acting_as(users.get(ADMIN.id)):
+    ils_text = money_store.money_text(-123450, cents=False)
+    ils_foreign = (money_store.is_foreign({"orig_currency": "ILS", "orig_amount": 100}),
+                   money_store.is_foreign({"orig_currency": "EUR", "orig_amount": 100}))
+check("money addon: amounts in the acting user's currency", eur_text == "-€1,234.50" and ils_text == "-₪1,235",
+      (eur_text, ils_text))
+check("money addon: a charge is foreign when it is not in the user's own currency",
+      eur_foreign == (False, True) and ils_foreign == (False, True), (eur_foreign, ils_foreign))
+store.connect(eur, "money")
+check("money part: amounts are in the user's currency", "Amounts are in EUR." in agent.instructions(users.get(eur.id))
+      and "₪" not in agent.instructions(users.get(eur.id)))
+users.update(es.id, currency="")
+
 # --- the phone country code ----------------------------------------------------------------
 check("country code: unset, a local number stays as given", user_locale.country_code() == ""
       and norm_phone("050-123-4567") == "0501234567" and shown_phone("0501234567") == "0501234567"
@@ -152,6 +182,10 @@ async def api() -> None:
         me = await r.json()
         check("me: addons, languages and currency (kinds repeats addons for the old app)", r.status == 200 and me["languages"] == ["de", "en"]
               and me["currency"] == "CHF" and "essentials" in me["addons"] and me["kinds"] == me["addons"], me)
+        r = await c.get("/api/me", headers=admin_auth)
+        admin_me = await r.json()
+        check("me: each user their own locale (the admin's Hebrew / shekels beside Bob's German / francs)",
+              admin_me["languages"] == ["he", "en"] and admin_me["currency"] == "ILS" and admin_me["id"] == ADMIN.id, admin_me)
         r = await c.put("/api/profile", headers=bob_auth, json={"currency": "francs"})
         body = await r.json()
         check("profile: a bad currency is 400 with the field, nothing changed",

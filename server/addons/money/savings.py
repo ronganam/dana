@@ -175,7 +175,7 @@ class Context:
 
 # --- Small helpers ----------------------------------------------------------------------------
 
-sh = store.shekels
+sh = store.money_text
 
 
 def _r(x: float) -> int:
@@ -187,19 +187,18 @@ def _d(value: str) -> datetime.date:
     return datetime.date.fromisoformat(value[:10])
 
 
-def _ils(agorot: Optional[int]) -> str:
-    """``₪1,235``: whole shekels, for titles."""
-    return f"₪{_r((agorot or 0) / 100):,}"
+def _whole(amount: Optional[int]) -> str:
+    """``€1,235``: whole units of the user's currency, for titles."""
+    return sh(amount or 0, cents=False)
 
 
-def _ils_he(agorot: int) -> str:
-    """``₪109`` or ``₪109.90``, for the Hebrew scripts."""
-    whole, cents = divmod(abs(int(agorot)), 100)
-    return f"₪{whole:,}" if not cents else f"₪{whole:,}.{cents:02d}"
+def _exact(amount: int) -> str:
+    """``€109`` or ``€109.90`` (cents only when there are any), for the scripts to say."""
+    return sh(abs(int(amount)), cents=bool(abs(int(amount)) % 100))
 
 
 def _range(low: int, high: int) -> str:
-    return _ils(high) if _r(low / 100) == _r(high / 100) else f"{_ils(low)}–{_ils(high)}"
+    return _whole(high) if _r(low / 100) == _r(high / 100) else f"{_whole(low)}–{_whole(high)}"
 
 
 def _pct(value: float) -> str:
@@ -236,7 +235,7 @@ def _has_word(text: str, word: str) -> bool:
 
 
 def _foreign(r: Dict[str, Any]) -> bool:
-    return (r.get("orig_currency") or "ILS") != "ILS" and r.get("orig_amount") is not None
+    return store.is_foreign(r)
 
 
 def _spent(rows: Iterable[Dict[str, Any]]) -> int:
@@ -255,7 +254,7 @@ def _per_text_he(cadence: str) -> str:
 
 
 def _round50(agorot: float) -> int:
-    """Rounded to the nearest ₪50 (half up)."""
+    """Rounded to the nearest 50 units (half up)."""
     return int(math.floor(agorot / 5_000 + 0.5)) * 5_000
 
 
@@ -404,10 +403,10 @@ def in_scope(ctx: Context, r: Dict[str, Any], scope: Dict[str, Any]) -> bool:
 
 def _bill_script(merchant: str, before: int, after: int, cadence: str, offer: Optional[Dict[str, Any]]) -> str:
     per = _per_text_he(cadence)
-    text = (f"שלום, אני מתקשר/ת בקשר לחשבון שלי ב{merchant}. ראיתי שהחיוב עלה מ-{_ils_he(before)} ל-{_ils_he(after)} "
+    text = (f"שלום, אני מתקשר/ת בקשר לחשבון שלי ב{merchant}. ראיתי שהחיוב עלה מ-{_exact(before)} ל-{_exact(after)} "
             f"{per}. אני לקוח/ה כבר תקופה ארוכה ומבקש/ת לחזור למחיר הקודם.")
     if offer:
-        text += (f" מצאתי הצעה של {offer['provider']} — {offer['plan']} ב-{_ils_he(offer['avg_12'])} לחודש בממוצע "
+        text += (f" מצאתי הצעה של {offer['provider']} — {offer['plan']} ב-{_exact(offer['avg_12'])} לחודש בממוצע "
                  f"בשנה הראשונה.")
     return text + " אם אין לכם הצעה טובה יותר, אשקול לעבור."
 
@@ -478,7 +477,7 @@ def _bills(ctx: Context) -> List[Dict[str, Any]]:
         if saving is None:
             saving = _saving(increase, increase, "increase")
         out.append(_item(
-            key, "bill", SAVE, f"{c['merchant']} went up {_ils((ch['to'] - ch['from']) * per)} a month",
+            key, "bill", SAVE, f"{c['merchant']} went up {_whole((ch['to'] - ch['from']) * per)} a month",
             f"From {sh(ch['from'])} to {sh(ch['to'])} {every} since {_day(ch['since'])}: "
             f"{sh(_r(increase))} a year more. Ask for the old price back or switch.",
             saving=saving, at_stake=_r(ch["to"] * 12 * per), effort=_effort(20, "call"),
@@ -566,7 +565,7 @@ def _cash(ctx: Context) -> List[Dict[str, Any]]:
         first = (_step(f"You already hold {funds[0]['name']}: buy more of it with the cash") if funds else
                  _step(f"Buy a money market fund (קרן כספית) with the cash in {a['label']}"))
         out.append(_item(
-            f"cash:{a['id']}", "cash", SAVE, f"{_ils(cash)} cash earning nothing in {a['label']}",
+            f"cash:{a['id']}", "cash", SAVE, f"{_whole(cash)} cash earning nothing in {a['label']}",
             f"A money market fund pays about {_pct(y)} a year now (the Bank of Israel rate minus fees): "
             f"about {sh(_r(value))} a year on it.",
             saving=_saving(value, value, "measured"), at_stake=_r(value), effort=_effort(10, "app"),
@@ -675,7 +674,7 @@ def _fx(ctx: Context) -> List[Dict[str, Any]]:
                 else:
                     summary += " The price check found no card that would cost less."
         out.append(_item(
-            f"fx:{account_id}", "fx", SAVE, f"{_ils(markup)} a year in foreign-currency fees", summary,
+            f"fx:{account_id}", "fx", SAVE, f"{_whole(markup)} a year in foreign-currency fees", summary,
             saving=saving, at_stake=_r(markup), effort=_effort(20, "online"),
             evidence=_evidence([f"{len(lines)} purchases in foreign currency in 12 months, {sh(charged)} charged",
                                 f"{_pct(round(total_pct, 2))} over the Bank of Israel rate in total, median "
@@ -713,7 +712,7 @@ def _fees(ctx: Context) -> List[Dict[str, Any]]:
         return []
     names = sorted({_merchant(r) for r in rows if r["amount"] < 0})
     return [_item(
-        "fees", "fees", SAVE, f"{_ils(total)} in bank and card fees",
+        "fees", "fees", SAVE, f"{_whole(total)} in bank and card fees",
         f"{sh(total)} in the last 12 months. Ask to waive them, or move to the bank's basic track (מסלול בסיסי).",
         saving=_saving(total, total, "measured"), at_stake=total, effort=_effort(15, "call"),
         evidence=_evidence([f"{sum(1 for r in rows if r['amount'] < 0)} fees in 12 months: {', '.join(names[:4])}"],
@@ -722,7 +721,7 @@ def _fees(ctx: Context) -> List[Dict[str, Any]]:
         steps=[_step("Call the bank and ask to waive the account fees"),
                _step("Ask for the basic track (מסלול בסיסי) if your activity fits it"),
                _step("For a card fee, ask the card company to waive it or switch to a card without one")],
-        script=(f"שלום, ראיתי שבשנה האחרונה שילמתי {_ils_he(total)} בעמלות. אבקש לבטל את העמלות האלה, או להעביר אותי "
+        script=(f"שלום, ראיתי שבשנה האחרונה שילמתי {_exact(total)} בעמלות. אבקש לבטל את העמלות האלה, או להעביר אותי "
                 f"למסלול הבסיסי אם הוא זול יותר עבורי."),
         baseline={"fees": total, "monthly": total / 12}, label="Fees")]
 
@@ -832,7 +831,7 @@ def _insurance_review(ctx: Context) -> List[Dict[str, Any]]:
     if total < INSURANCE_MIN:
         return []
     return [_item(
-        "insurance_review", "insurance_review", SAVE, f"Review your insurance: {_ils(total)} a year",
+        "insurance_review", "insurance_review", SAVE, f"Review your insurance: {_whole(total)} a year",
         f"{len(policies)} policies. הר הביטוח lists every policy in your name, so the same cover paid twice stands out.",
         at_stake=total, effort=_effort(30, "review"),
         evidence=_evidence([f"{name}: {sh(yearly)} a year ({how})" for name, yearly, how in policies], [],
@@ -895,7 +894,7 @@ def _subscriptions(ctx: Context) -> List[Dict[str, Any]]:
     cancel = sum(s["yearly"] or 0 for s in subitems if s["choice"] == "cancel" and s["active"])
     every = {"monthly": "a month", "bimonthly": "every 2 months", "weekly": "a week", "yearly": "a year"}
     return [_item(
-        "subscriptions", "subscriptions", SAVE, f"Subscriptions: {_ils(total)} a year",
+        "subscriptions", "subscriptions", SAVE, f"Subscriptions: {_whole(total)} a year",
         f"{len(lines)} subscriptions. Mark the ones to cancel" + (f": {sh(cancel)} a year marked so far." if cancel else "."),
         saving=_saving(cancel, cancel, "measured") if cancel else None, at_stake=total, effort=_effort(10, "review"),
         evidence=_evidence([f"{l['merchant']}: {sh(l['amount'])} {every.get(l['cadence'] or '', 'now and then')}"
@@ -948,7 +947,7 @@ def _creep(ctx: Context) -> List[Dict[str, Any]]:
     if len(months) < 6:
         return []
     # The last half of the whole months against the half before (6 and 6 from a year of data); at least
-    # ₪200 a month more.
+    # 200 a month more.
     span = min(6, len(months) // 2)
     more = CREEP_MORE_A_MONTH * span
     keys = [m.strftime("%Y-%m") for m in months]
@@ -972,7 +971,7 @@ def _creep(ctx: Context) -> List[Dict[str, Any]]:
         at_stake = _r((new_avg - old_avg) * 12)
         top = max(by_cat, key=lambda k: by_cat[k]) if by_cat else cats[0]
         out.append(_item(
-            f"creep:{bucket}", "creep", WATCH, f"{label} is up: {_ils(new_avg)} a month",
+            f"creep:{bucket}", "creep", WATCH, f"{label} is up: {_whole(new_avg)} a month",
             f"{sh(_r(new_avg))} a month in the last {span} months, {sh(_r(old_avg))} in the {span} before: "
             f"{sh(at_stake)} a year more at this pace.",
             at_stake=at_stake,
@@ -980,7 +979,7 @@ def _creep(ctx: Context) -> List[Dict[str, Any]]:
                                _monthly_series(rows, shown), {"view": "transactions", "category": top}),
             math_lines=[f"{sh(s_new)} ÷ {span} = {sh(_r(new_avg))} a month", f"{sh(s_old)} ÷ {span} = {sh(_r(old_avg))} a month",
                         f"({sh(_r(new_avg))} − {sh(_r(old_avg))}) × 12 = {sh(at_stake)} a year"],
-            steps=[_step(f"Set a monthly target: halfway back is {_ils(_round50((old_avg + new_avg) / 2))}")],
+            steps=[_step(f"Set a monthly target: halfway back is {_whole(_round50((old_avg + new_avg) / 2))}")],
             scope={"categories": list(cats)}, suggested_target=_round50((old_avg + new_avg) / 2),
             baseline={"pace": _r(new_avg), "old_pace": _r(old_avg)}, label=label))
     return out
@@ -1119,7 +1118,7 @@ def _penalties(ctx: Context) -> List[Dict[str, Any]]:
     if total < 100:
         return []
     return [_item(
-        "penalties", "penalties", WATCH, f"{_ils(total)} in fines and late fees",
+        "penalties", "penalties", WATCH, f"{_whole(total)} in fines and late fees",
         f"{len(rows)} charges in the last 12 months: fines, late-payment interest or ATM fees.",
         at_stake=total,
         evidence=_evidence([f"{_day(r['purchase_date'])}: {_merchant(r)} {sh(-r['amount'])}" for r in rows[-6:]],
@@ -1139,7 +1138,7 @@ def _late_night(ctx: Context) -> List[Dict[str, Any]]:
         return []
     yearly = _r(total * 365 / LATE_DAYS)
     return [_item(
-        "late_night", "late_night", WATCH, f"Late-night shopping: {_ils(total)} in {LATE_DAYS} days",
+        "late_night", "late_night", WATCH, f"Late-night shopping: {_whole(total)} in {LATE_DAYS} days",
         f"{len(rows)} purchases between 23:00 and 05:00: about {sh(yearly)} a year at this pace.",
         at_stake=yearly,
         evidence=_evidence([f"{len(rows)} purchases, {sh(total)}"],
@@ -1792,7 +1791,7 @@ def _undo_label(item: Dict[str, Any], before: Dict[str, Any], after: Dict[str, A
     if after["status"] != before["status"]:
         return f"{name}: {_STATUS_WORDS.get(after['status'], after['status'])}"
     if after["target"] != before["target"]:
-        return f"{name}: target {_ils(after['target'])} a month" if after["target"] is not None else f"{name}: target removed"
+        return f"{name}: target {_whole(after['target'])} a month" if after["target"] is not None else f"{name}: target removed"
     return f"{name}: answers changed"
 
 
@@ -1868,23 +1867,23 @@ def short_name(user: User, key: str) -> str:
 
 
 def target_lines(user: User, items: Sequence[Dict[str, Any]]) -> List[str]:
-    """``Eating out ₪300 of ₪700 this month`` for each watched target."""
+    """``Eating out 300 of 700 this month`` for each watched target."""
     out = []
     for i in items:
         t = i.get("target")
         if t:
-            out.append(f"{short_name(user, i['key'])} {_ils(t['this_month'])} of {_ils(t['monthly'])} this month")
+            out.append(f"{short_name(user, i['key'])} {_whole(t['this_month'])} of {_whole(t['monthly'])} this month")
     return out
 
 
 def week_line(user: User, today: Optional[datetime.date] = None) -> Optional[str]:
-    """The weekly review's savings line ("Savings: saved ₪120 so far; 3 ideas open worth ₪800–₪1,400 a
-    year; Eating out ₪300 of ₪700 this month"), None with nothing to say."""
+    """The weekly review's savings line ("Savings: saved 120 so far; 3 ideas open worth 800–1,400 a
+    year; Eating out 300 of 700 this month"), None with nothing to say."""
     data = overview(user, today)
     t = data["totals"]
     parts = []
     if t["saved"] > 0:
-        parts.append(f"saved {_ils(t['saved'])} so far")
+        parts.append(f"saved {_whole(t['saved'])} so far")
     if t["count"]:
         parts.append(f"{t['count']} idea{'s' if t['count'] != 1 else ''} open worth {_range(t['low'], t['high'])} a year")
     parts += target_lines(user, data["items"])
@@ -1892,7 +1891,7 @@ def week_line(user: User, today: Optional[datetime.date] = None) -> Optional[str
 
 
 def insight_cards(user: User, book: dashboard.Book) -> List[Dict[str, Any]]:
-    """The Overview's card for the month in progress: ``N ways to save ₪a–₪b a year`` (none without an
+    """The Overview's card for the month in progress: ``N ways to save a–b a year`` (none without an
     open way to save that has a saving)."""
     data = overview(user, book.today, book)
     t = data["totals"]

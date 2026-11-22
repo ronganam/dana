@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.projects
 
+import io.github.ronganam.dana.data.money.MoneyFormat
 import io.github.ronganam.dana.ui.screens.projects.MdBlock
 import io.github.ronganam.dana.ui.screens.projects.parseMarkdownBlocks
 import org.junit.Assert.assertEquals
@@ -7,6 +8,8 @@ import org.junit.Test
 
 /** The small Markdown of section summaries and entry details: headings, lists, tables, code. */
 class ProjectMarkdownTest {
+    init { MoneyFormat.use("ILS") }  // the fixtures' user pays in shekels
+
 
     @Test
     fun parsesASummaryWithATable() {

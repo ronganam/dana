@@ -688,7 +688,7 @@
       const head = `<div class="mny-card-head"><span>Holdings</span><span class="mny-head-hint">${count} ${count === 1 ? "security" : "securities"}</span></div>`;
       const row = (h) => {
         const meta = [h.quantity != null ? `${C.quantityText(h.quantity)} × ${C.unitPrice(h.price, h.currency)}` : "",
-                      h.currency && !["ILS", "NIS"].includes(String(h.currency).toUpperCase()) ? h.currency : "",
+                      h.currency && C.currencyCode(h.currency) !== C.currency() ? h.currency : "",
                       total && h.value ? `${C.pctText((h.value / total) * 100, { sign: "none", digits: 1 })} of the portfolio` : "",
                       h.security ? `#${h.security}` : ""].filter(Boolean).join(" · ");
         const tone = h.profit == null || h.profit === 0 ? "" : h.profit < 0 ? "neg" : "in";
@@ -936,7 +936,7 @@
       if (editing) {
         const pre = S.saveDraft[it.key] ?? String(Math.round(((it.target && it.target.monthly) || it.suggested_target || 0) / 100) || "");
         html += `<form class="mny-sv-tform" data-save-target-form="${k}">
-          <label><span>Spend at most</span><span class="mny-sv-tin">₪<input name="amount" data-keep="sv-target" data-save-draft="${k}" inputmode="numeric" autocomplete="off"
+          <label><span>Spend at most</span><span class="mny-sv-tin">${esc(C.currencySymbol())}<input name="amount" data-keep="sv-target" data-save-draft="${k}" inputmode="numeric" autocomplete="off"
             value="${esc(pre)}" aria-label="Monthly target in shekels"></span><span>a month</span></label>
           <button class="btn-primary" type="submit" ${S.saveBusy[it.key] ? "disabled" : ""}>${it.target ? "Save target" : "Set target"}</button>
           <button class="btn-secondary" type="button" data-save-target-cancel="${k}">Cancel</button>

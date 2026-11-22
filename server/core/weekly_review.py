@@ -25,7 +25,7 @@ import re
 import uuid
 from typing import Any, Dict, List, Optional
 
-from core import briefing, clock, composers, llm, notify as notify_mod, user_profile, users
+from core import briefing, clock, composers, llm, notify as notify_mod, user_locale, user_profile, users
 from core.addons import BriefingContext, registry, store
 from core.addons.helpers import next_weekday, valid_future_date
 from core.db import get_db_connection
@@ -191,7 +191,7 @@ def review_prompt(c: Dict[str, Any], nw: Optional[Dict[str, Any]], today: dateti
                 "group": i.get("group"), "allowed": list(actions_for(i["type"]))} for i in c["items"]]
     mlines = money_lines(c.get("money"))
     money = f"Money this week: {'; '.join(mlines)}\n" if mlines else ""
-    return f"""You're helping {who.name} with {his} weekly review (Saturday evening, before the Israeli work week starts Sunday).
+    return f"""You're helping {who.name} with {his} weekly review (Saturday evening, before the week ahead).
 
 {who.about()}Today: {clock.describe_now()}
 This week: {c['stats']['done']} tasks done ({', '.join(c['stats']['done_titles']) or 'none'}), {c['stats']['created']} created, {c['stats']['open']} open.
@@ -208,7 +208,7 @@ For every item return one entry in `items` with its `ref`, an `action` from its 
 - complete only when the title or facts suggest it's already done or no longer relevant; delete for clearly dead items; keep when unsure.
 - Dismiss suggestions that are old and vague; accept ones still clearly useful.
 Also return `headline` (3–8 words on the week) and `summary`: 1–3 short fragments about the week and the one coming (no advice-speak, no emoji).
-Write in English; keep titles and names as written."""
+Write in {user_locale.language_name(user_locale.languages(user)[0], native=False)}; keep titles and names as written."""
 
 
 _SCHEMA = {"type": "object", "properties": {

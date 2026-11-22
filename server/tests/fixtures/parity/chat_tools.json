@@ -738,7 +738,7 @@
     "type": "function",
     "function": {
       "name": "save_knowledge_item",
-      "description": "Save a knowledge entry (note, record, or link) into a project and return its ID. The returned ID is used later with update_knowledge_item / delete_knowledge_item / save_whatsapp_file. In an 'options' section (a decision such as photographers or venues) the entry is one option: give `fields` exactly the section's column names (see `list_project_entries`), in the column's type. Follow these AUTHORING RULES: - title is a SHORT label (max ~8 words) in the user's language, with NO markdown and NO punctuation. Example: \"Photographer — Yanai Budget\". Never paste a whole paragraph into the title. - body holds the full details written as clean Markdown: '##' or '###' headings, **bold** for key figures and names, '-' bullet lists, and a blank line between paragraphs. Preserve the user's facts, numbers, dates and Hebrew/English wording exactly. Example body: ## Contact - Phone: **050-1234567** - Email: yanai@example.com ## Budget - Price: 4,500 - Deposit paid: **yes** (12/06/2026) - kind: 'note' for free text (ideas, general notes), 'record' for structured data (contacts, vendors, prices, contracts) — pair with fields, 'link' when saving a URL (auto-processed for transcript, summary and media). - fields: capture the few facts you might want to query later as [{\"name\": \"<label>\", \"type\": \"<type>\", \"value\": <value>}] where type is one of text, number, money (a plain number in the user's currency), phone, checkbox, date, url, select, rating (1-5). Example: [{\"name\": \"Phone\", \"type\": \"text\", \"value\": \"050-1234567\"}, {\"name\": \"Price\", \"type\": \"number\", \"value\": 4500}, {\"name\": \"Paid\", \"type\": \"checkbox\", \"value\": true}] - tags: 2-4 short labels (words or short phrases) in the user's language to enable cross-project search, e.g. [\"צלם\", \"תקציב\"] or [\"vendor\"], [\"budget\"]. - status: 'open' (default) | 'in_progress' | 'done' | 'archived'. - priority: 'low' | 'medium' | 'high'. - due_at: ISO date 'YYYY-MM-DD' only when a deadline or timing matters. - url: full URL to attach and auto-process; typically combined with kind 'link'.",
+      "description": "Save a knowledge entry (note, record, or link) into a project and return its ID. The returned ID is used later with update_knowledge_item / delete_knowledge_item / save_whatsapp_file. In an 'options' section (a decision such as photographers or venues) the entry is one option: give `fields` exactly the section's column names (see `list_project_entries`), in the column's type. Follow these AUTHORING RULES: - title is a SHORT label (max ~8 words) in the user's language, with NO markdown and NO punctuation. Example: \"Photographer — Yanai Budget\". Never paste a whole paragraph into the title. - body holds the full details written as clean Markdown: '##' or '###' headings, **bold** for key figures and names, '-' bullet lists, and a blank line between paragraphs. Preserve the user's facts, numbers, dates and wording (in whatever language) exactly. Example body: ## Contact - Phone: **555-0100** - Email: yanai@example.com ## Budget - Price: 4,500 - Deposit paid: **yes** (12/06/2026) - kind: 'note' for free text (ideas, general notes), 'record' for structured data (contacts, vendors, prices, contracts) — pair with fields, 'link' when saving a URL (auto-processed for transcript, summary and media). - fields: capture the few facts you might want to query later as [{\"name\": \"<label>\", \"type\": \"<type>\", \"value\": <value>}] where type is one of text, number, money (a plain number in the user's currency), phone, checkbox, date, url, select, rating (1-5). Example: [{\"name\": \"Phone\", \"type\": \"text\", \"value\": \"050-1234567\"}, {\"name\": \"Price\", \"type\": \"number\", \"value\": 4500}, {\"name\": \"Paid\", \"type\": \"checkbox\", \"value\": true}] - tags: 2-4 short labels (words or short phrases) in the user's language to enable cross-project search, e.g. [\"צלם\", \"תקציב\"] or [\"vendor\"], [\"budget\"]. - status: 'open' (default) | 'in_progress' | 'done' | 'archived'. - priority: 'low' | 'medium' | 'high'. - due_at: ISO date 'YYYY-MM-DD' only when a deadline or timing matters. - url: full URL to attach and auto-process; typically combined with kind 'link'.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -834,7 +834,7 @@
     "type": "function",
     "function": {
       "name": "search_knowledge",
-      "description": "Search the knowledge base (titles, bodies, AI summaries, transcripts, tags, fields) with FTS. Use to answer the user's questions like 'what did I save/find about X?'. Prefer 1-2 concrete Hebrew/English keywords over full sentences. Pass project_id to scope the search to a project.",
+      "description": "Search the knowledge base (titles, bodies, AI summaries, transcripts, tags, fields) with FTS. Use to answer the user's questions like 'what did I save/find about X?'. Prefer 1-2 concrete keywords (in the language the content is in) over full sentences. Pass project_id to scope the search to a project.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -1422,7 +1422,7 @@
                 "type": "null"
               }
             ],
-            "description": "Optional name, relation or phone number to filter by (Hebrew or English)."
+            "description": "Optional name, relation or phone number to filter by (in any language or script)."
           },
           "sort": {
             "type": "string",
@@ -1447,7 +1447,7 @@
         "properties": {
           "person": {
             "type": "string",
-            "description": "The person's name (Hebrew or English, partial is fine), phone number or id."
+            "description": "The person's name (in any language or script, partial is fine), phone number or id."
           }
         },
         "required": [
@@ -1521,7 +1521,7 @@
                 "type": "null"
               }
             ],
-            "description": "Another name they go by (e.g. the Hebrew or English spelling, a nickname)."
+            "description": "Another name they go by (e.g. their name in another script, a nickname)."
           },
           "add_phone": {
             "anyOf": [
@@ -2205,7 +2205,7 @@
     "type": "function",
     "function": {
       "name": "send_whatsapp_message",
-      "description": "Send a WhatsApp text message to a chat by contact/group name or chat ID. To pass along something someone else sent (a file, photo, voice note or their message), use forward_whatsapp_message instead of describing it in text. IMPORTANT: The 'text' parameter must contain the user's exact original phrasing. Do not rephrase, formalize, translate, or add greetings/closings — send exactly what the user wrote unless they explicitly ask you to rewrite it. The chat_id can be: - An existing contact/group name from your WhatsApp (e.g. 'John', 'ענבל', 'Family') — auto-resolved. - A properly formatted chat ID (e.g. '972500000301@c.us') — use this for new/newly-validated numbers. WhatsApp chat IDs ALWAYS include a suffix: '@c.us' for individuals, '@g.us' for groups. Bare phone numbers like '0500000302' are NOT valid chat IDs. If you only have a bare phone number (not in your contacts/chats yet): 1. First call check_whatsapp_number(phone) to validate it and get the chat ID. 2. Then pass the returned chat ID (e.g. '972500000302@c.us') here. The tool supports bilingual matching (Hebrew <-> English translations/transliterations, e.g. 'ענבל' matches 'Inbal Cohen'), nicknames, and partial searches. When a name matches multiple contacts, the tool automatically prefers the most recently active one. If the name query is still ambiguous after recency filtering, it returns all candidates so you can ask the user to clarify.",
+      "description": "Send a WhatsApp text message to a chat by contact/group name or chat ID. To pass along something someone else sent (a file, photo, voice note or their message), use forward_whatsapp_message instead of describing it in text. IMPORTANT: The 'text' parameter must contain the user's exact original phrasing. Do not rephrase, formalize, translate, or add greetings/closings — send exactly what the user wrote unless they explicitly ask you to rewrite it. The chat_id can be: - An existing contact/group name from your WhatsApp (e.g. 'John', 'ענבל', 'Family') — auto-resolved. - A properly formatted chat ID (e.g. '15550100301@c.us') — use this for new/newly-validated numbers. WhatsApp chat IDs ALWAYS include a suffix: '@c.us' for individuals, '@g.us' for groups. Bare phone numbers like '0500000302' are NOT valid chat IDs. If you only have a bare phone number (not in your contacts/chats yet): 1. First call check_whatsapp_number(phone) to validate it and get the chat ID. 2. Then pass the returned chat ID (e.g. '15550100302@c.us') here. The tool supports bilingual matching (Hebrew <-> English translations/transliterations, e.g. 'ענבל' matches 'Inbal Cohen'), nicknames, and partial searches. When a name matches multiple contacts, the tool automatically prefers the most recently active one. If the name query is still ambiguous after recency filtering, it returns all candidates so you can ask the user to clarify.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -2246,7 +2246,7 @@
         "properties": {
           "phone": {
             "type": "string",
-            "description": "The phone number to check (e.g. '+972500000301' or '972500000301')."
+            "description": "The phone number to check (e.g. '+15550100301' or '15550100301')."
           }
         },
         "required": [
@@ -2259,7 +2259,7 @@
     "type": "function",
     "function": {
       "name": "send_whatsapp_file",
-      "description": "Send a file (image, document, audio, video) at a public URL to a WhatsApp chat. Only for a file at a public http(s) URL. A file someone sent on WhatsApp has no public URL: pass it along with forward_whatsapp_message (the `id: ...` read_chat_messages shows). The chat_id can be: - An existing contact/group name from your WhatsApp — auto-resolved. - A properly formatted chat ID (e.g. '972500000301@c.us') — use for new/newly-validated numbers. WhatsApp chat IDs ALWAYS include a suffix: '@c.us' for individuals, '@g.us' for groups. Bare phone numbers are NOT valid chat IDs.",
+      "description": "Send a file (image, document, audio, video) at a public URL to a WhatsApp chat. Only for a file at a public http(s) URL. A file someone sent on WhatsApp has no public URL: pass it along with forward_whatsapp_message (the `id: ...` read_chat_messages shows). The chat_id can be: - An existing contact/group name from your WhatsApp — auto-resolved. - A properly formatted chat ID (e.g. '15550100301@c.us') — use for new/newly-validated numbers. WhatsApp chat IDs ALWAYS include a suffix: '@c.us' for individuals, '@g.us' for groups. Bare phone numbers are NOT valid chat IDs.",
       "parameters": {
         "type": "object",
         "properties": {
@@ -2320,7 +2320,7 @@
           },
           "message_id": {
             "type": "string",
-            "description": "The full id of the message to forward, exactly as shown (e.g. 'false_972501234567@c.us_3EB0C0FFEE')."
+            "description": "The full id of the message to forward, exactly as shown (e.g. 'false_15550101234@c.us_3EB0C0FFEE')."
           },
           "what": {
             "anyOf": [
@@ -2351,11 +2351,11 @@
         "properties": {
           "chat_id": {
             "type": "string",
-            "description": "The WhatsApp chat ID (e.g. '972500000301@c.us') or contact/group name (e.g. 'John', 'ORA')."
+            "description": "The WhatsApp chat ID (e.g. '15550100301@c.us') or contact/group name (e.g. 'John', 'ORA')."
           },
           "message_id": {
             "type": "string",
-            "description": "The id of your own message to edit, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_972500000301@c.us_3EB01234567890')."
+            "description": "The id of your own message to edit, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_15550100301@c.us_3EB01234567890')."
           },
           "new_text": {
             "type": "string",
@@ -2380,11 +2380,11 @@
         "properties": {
           "chat_id": {
             "type": "string",
-            "description": "The WhatsApp chat ID (e.g. '972500000301@c.us') or contact/group name (e.g. 'John', 'ORA')."
+            "description": "The WhatsApp chat ID (e.g. '15550100301@c.us') or contact/group name (e.g. 'John', 'ORA')."
           },
           "message_id": {
             "type": "string",
-            "description": "The id of your own message to delete, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_972500000301@c.us_3EB01234567890')."
+            "description": "The id of your own message to delete, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_15550100301@c.us_3EB01234567890')."
           }
         },
         "required": [

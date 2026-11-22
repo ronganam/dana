@@ -19,12 +19,12 @@ import re
 import sqlite3
 from typing import Dict, List, Optional
 
-from core import clock, llm, user_profile, users
+from core import clock, llm, user_locale, user_profile, users
 from core.db import get_db_connection
 from core.users import User
 from core.addons import store as connections
 from addons.people import activity, linking, person_tasks, store
-from addons.people.values import BRIEF_BATCH, BRIEF_INTERVAL, BRIEF_STYLE, HEBREW, ADDON, LATIN, loads, now_iso
+from addons.people.values import BRIEF_BATCH, BRIEF_INTERVAL, BRIEF_STYLE, ADDON, loads, now_iso
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +45,15 @@ def signature(conn: sqlite3.Connection, user: User, r: sqlite3.Row) -> Optional[
     if not calls and (msg["n"] or 0) < 3:
         return None  # not enough to say anything
     tasks = sorted(t["id"] for t in person_tasks.tasks_for(conn, user, pid))
-    h = hashlib.sha1(BRIEF_STYLE.encode())
+    h = hashlib.sha1(f"{BRIEF_STYLE}:{_language(user)}".encode())  # a new language rewrites the brief
     h.update(("|".join(f"{c['id']}:{c['status']}" for c in calls)).encode())
     h.update(f"|{msg['n']}:{msg['t']}|{','.join(tasks)}|{r['relation']}|{r['notes']}".encode())
     return h.hexdigest()[:16]
 
 
-def _language(texts: List[str]) -> str:
-    text = " ".join(texts)
-    heb, lat = len(HEBREW.findall(text)), len(LATIN.findall(text))
-    return "Hebrew" if heb and heb >= 0.4 * (heb + lat) else "English"
+def _language(user: Optional[User]) -> str:
+    """The language ``user``'s briefs are written in: their first one, by name ("German")."""
+    return user_locale.language_name(user_locale.languages(user)[0], native=False)
 
 
 def brief_prompt(conn: sqlite3.Connection, user: User, r: sqlite3.Row) -> str:
@@ -70,7 +69,7 @@ def brief_prompt(conn: sqlite3.Connection, user: User, r: sqlite3.Row) -> str:
     msg_lines = [f"- {str(m['posted_at'])[:16].replace('T', ' ')}"
                  f"{' in ' + repr(m['conversation']) if m['is_group'] else ''}: {re.sub(chr(10), ' ', m['text'] or '')[:220]}"
                  for m in msgs] or ["- (no messages)"]
-    lang = _language([c["summary"] for c in calls] + [m["text"] or "" for m in msgs])
+    lang = _language(user)
     names = ", ".join(loads(r["aliases"], []))
     about = f"About {me}:\n{who.context}\n\n" if who.context else ""
     return f"""Write a short brief about {r['name']} for {who.name}, to glance at when they call or before meeting them.
@@ -92,7 +91,7 @@ Suggestions waiting for {me}: {', '.join(s['title'] for s in sugg) or '(none)'}
 Return:
 - `points`: 1–3 short fragments (4–10 words) on what's going on with them lately, most recent and important first.
 - `open`: 0–3 open loops between them and {me} — who owes what ("{me} to send the quote", "waiting for her answer about Friday"). Only things not yet done.
-Only what is written above; never invent. No emoji, no trailing periods. Write in {lang}; keep names as written."""
+Only what is written above; never invent. No emoji, no trailing periods. Write in {lang}, whatever language the calls and messages are in; keep names as written."""
 
 
 async def refresh_brief(user: User, person_id: str, *, force: bool = False) -> bool:

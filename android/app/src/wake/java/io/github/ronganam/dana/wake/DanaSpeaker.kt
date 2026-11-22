@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
+import io.github.ronganam.dana.data.voice.useVoiceFor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -13,10 +14,14 @@ import java.util.Locale
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Speaks Dana's replies, choosing a Hebrew or English voice per reply by its
- * script. Markdown is flattened first so "**bold**" isn't read out as symbols.
+ * Speaks Dana's replies, choosing a voice per reply by its script and the
+ * user's languages (`useVoiceFor`); a locale the engine has no voice
+ * for is read with its default voice, except Hebrew, which is shown but not
+ * spoken without a Hebrew voice (the kiosk settings say how to install one).
+ * Markdown is flattened first so "**bold**" isn't read out as symbols.
  */
 class DanaSpeaker(context: Context) {
+    private val appContext = context.applicationContext
     private val pending = AtomicInteger(0)
     private val _speaking = MutableStateFlow(false)
     val speaking: StateFlow<Boolean> = _speaking.asStateFlow()
@@ -67,8 +72,8 @@ class DanaSpeaker(context: Context) {
             Log.w(TAG, "No Hebrew TTS voice installed; showing the reply without speaking it")
             return
         }
-        val locale = if (hebrew) HEBREW.first { tts.isLanguageAvailable(it) >= TextToSpeech.LANG_AVAILABLE } else Locale.US
-        tts.language = locale
+        if (hebrew) tts.language = HEBREW.first { tts.isLanguageAvailable(it) >= TextToSpeech.LANG_AVAILABLE }
+        else tts.useVoiceFor(text, appContext)
         // Long replies: the engine limit is ~4000 chars; split on sentences.
         for (chunk in chunks(text, 3500)) {
             pending.incrementAndGet()

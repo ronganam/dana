@@ -59,7 +59,7 @@ The tab appears only with a meal card.
 
 ### Tests
 
-`app/src/test/.../money/MoneyDashTextTest.kt`, `MoneyDashGeometryTest.kt` and `MoneyDashHoldingsTest.kt` run against `money_web.json`, `money_portfolio_web.json` and `money_meals_web.json`, read straight from `server/tests/fixtures/` (synthetic data, today 18 Nov 2026). Their expectations are those of the server's `test_web_money.mjs`. Every amount is written by `data/money/MoneyFormat` in the user's currency (`/api/me` `currency`) and the phone's locale; the unit tests pin en-US.
+`app/src/test/.../money/MoneyDashTextTest.kt`, `MoneyDashGeometryTest.kt` and `MoneyDashHoldingsTest.kt` run against `money_web.json`, `money_portfolio_web.json` and `money_meals_web.json`, read straight from `server/tests/fixtures/` (synthetic data, today 18 Nov 2026). Their expectations are those of the server's `test_web_money.mjs`. Every amount is written by `data/money/MoneyFormat` in the user's currency (`/api/me` `currency`; USD until it is known) and the phone's locale; the unit tests pin en-US and the fixtures' ILS.
 
 ## Transactions, Accounts, Save
 

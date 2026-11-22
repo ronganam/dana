@@ -111,7 +111,7 @@ async def get_fitting_emoji_ai(title: str) -> str:
     """Ask the chat model for a single fitting emoji for the task description (any language)."""
     prompt = (
         f"Analyze the following task description and return exactly ONE single emoji character "
-        f"that fits the task best. If the description is in Hebrew, understand its meaning first. "
+        f"that fits the task best. The description may be in any language: understand its meaning first. "
         f"Do not include any text, reasoning, whitespace, punctuation or explanation. Only a single emoji.\n\n"
         f"Task: \"{title}\"\n"
         f"Emoji:"
@@ -154,7 +154,7 @@ async def get_fitting_group_ai(title: str, available_groups: list) -> str:
     prompt = (
         f"Analyze the following task description and choose the BEST matching group "
         f"from this list: {groups_list}. "
-        f"If the description is in Hebrew, understand its meaning first. "
+        f"The description may be in any language: understand its meaning first. "
         f"Return ONLY the group name, nothing else. No punctuation, no explanation.\n\n"
         f"Task: \"{title}\"\n"
         f"Group:"

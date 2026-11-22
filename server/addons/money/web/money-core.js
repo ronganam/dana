@@ -1,8 +1,9 @@
 /* Money — the pure part of the Money panel (money.js is the controller, money-dash.js draws
  * the dashboard views).
  *
- * DanaMoneyCore: no DOM, no network. Amounts arrive from the server in agorot (signed: money out is
- * negative, docs/money.md "Page API and insights") and are formatted only here; dates are the server's
+ * DanaMoneyCore: no DOM, no network. Amounts arrive from the server in hundredths of the user's currency
+ * (signed: money out is negative, docs/money.md "Page API and insights") and are formatted only here, in
+ * that currency and the browser's locale (setCurrency, from GET /api/me); dates are the server's
  * local ISO dates. It formats money (bidi-safe next to Hebrew merchant names), dates and times, works out
  * months, the charts' geometry (everyday pace, 12-month bars, cash flow in / out, bank balance and
  * forecast, row sparklines), groups transactions by day, maps the page's view and filters to the API's
@@ -23,7 +24,6 @@
   // Bidi isolates: FSI…PDI around text of either direction (a Hebrew merchant in an English sentence),
   // LRI…PDI around an amount so "−₪25.00" keeps its order inside right-to-left text.
   const FSI = "⁨", LRI = "⁦", PDI = "⁩";
-  const CURRENCY = { ILS: "₪", USD: "$", EUR: "€", GBP: "£" };
   const INCOME_FLOWS = ["income", "transfer_in"];
   // The 12-month chart's series, bottom to top: eight groups keep a colour of their own (money.css
   // .mny-g-<key>), the rest fold into "other"; uncategorized stays apart. Colour follows the group.
@@ -64,18 +64,47 @@
 
   // ---------- money ----------
 
-  /** Agorot → "₪1,234.50". sign: "minus" (default; "−" on money out), "plus" (also "+" on money in),
-   *  "none" (the absolute amount). cents: true (default), false (whole shekels, rounded), "auto" (drop ".00"). */
+  // The user's currency (ISO 4217) and the locale amounts are written in: setCurrency.
+  let CUR = "USD", LOCALE = "en-US";
+
+  /** Use the user's `currency` (GET /api/me) and the browser's `locale` (navigator.language) from now on. */
+  function setCurrency(currency, locale) {
+    CUR = /^[A-Za-z]{3}$/.test(String(currency || "")) ? String(currency).toUpperCase() : "USD";
+    if (locale) { try { new Intl.NumberFormat(locale); LOCALE = locale; } catch (_) { LOCALE = "en-US"; } }
+  }
+  /** The user's currency code ("EUR"). */
+  const currency = () => CUR;
+  /** A currency code as ISO 4217, upper case; "NIS" (some sites' name for the shekel) → "ILS"; "" → the user's. */
+  function currencyCode(code) {
+    const c = String(code || "").trim().toUpperCase();
+    return c === "NIS" ? "ILS" : c || CUR;
+  }
+
+  /** `units` (a positive decimal) in `code` and the locale: "₪1,234.50", "1.234,50 €", "CHF 80.00";
+   *  `digits` fraction digits (null: the currency's own). A code Intl does not know: "80.00 XYZ". */
+  function formatUnits(units, code, digits) {
+    const opts = { style: "currency", currency: code, currencyDisplay: "narrowSymbol" };
+    if (digits != null) { opts.minimumFractionDigits = digits; opts.maximumFractionDigits = digits; }
+    try { return new Intl.NumberFormat(LOCALE, opts).format(units); } catch (_) {
+      return `${digits == null ? units : units.toFixed(digits)} ${code}`;
+    }
+  }
+  /** The currency's narrow symbol in the locale ("€", "₪", "CHF"). */
+  function currencySymbol(code = CUR) {
+    try {
+      const part = new Intl.NumberFormat(LOCALE, { style: "currency", currency: code, currencyDisplay: "narrowSymbol" })
+        .formatToParts(0).find((p) => p.type === "currency");
+      return part ? part.value : code;
+    } catch (_) { return code; }
+  }
+
+  /** Hundredths → "₪1,234.50" in the user's currency. sign: "minus" (default; "−" on money out), "plus" (also "+"
+   *  on money in), "none" (the absolute amount). cents: true (default), false (whole units, rounded), "auto" (drop ".00"). */
   function money(agorot, o = {}) {
     const v = Math.round(Number(agorot) || 0);
     const abs = Math.abs(v);
-    let body;
-    if (o.cents === false) body = group3(Math.round(abs / 100));
-    else {
-      const whole = Math.floor(abs / 100), cents = abs % 100;
-      body = group3(whole) + (o.cents === "auto" && cents === 0 ? "" : "." + pad2(cents));
-    }
-    const s = "₪" + body;
+    const s = o.cents === false ? formatUnits(Math.round(abs / 100), CUR, 0)
+      : formatUnits(abs / 100, CUR, o.cents === "auto" && abs % 100 === 0 ? 0 : 2);
     const sign = o.sign || "minus";
     if (sign === "none" || v === 0 || (o.cents === false && Math.round(abs / 100) === 0)) return s;
     if (v < 0) return MINUS + s;
@@ -86,23 +115,22 @@
   /** The same as HTML: a left-to-right isolate with tabular figures (money.css .mny-amt). */
   const moneyHtml = (agorot, o = {}, cls = "") => `<bdi dir="ltr" class="mny-amt${cls ? " " + cls : ""}">${esc(money(agorot, o))}</bdi>`;
 
-  /** Short axis / chart values: ₪850, ₪4.8k, ₪12k, ₪1.2M. */
+  /** Short axis / chart values: ₪850, ₪4.8k, ₪12k, ₪1.2M (the symbol first, whatever the locale). */
   function compact(agorot) {
     const sh = Math.abs(Number(agorot) || 0) / 100;
     const neg = (Number(agorot) || 0) < 0 ? MINUS : "";
+    const sym = currencySymbol();
     const trim = (x) => x.toFixed(1).replace(/\.0$/, "");
-    if (sh >= 1e6) return `${neg}₪${trim(sh / 1e6)}M`;
-    if (sh >= 1e4) return `${neg}₪${Math.round(sh / 1e3)}k`;
-    if (sh >= 1e3) return `${neg}₪${trim(sh / 1e3)}k`;
-    return `${neg}₪${Math.round(sh)}`;
+    if (sh >= 1e6) return `${neg}${sym}${trim(sh / 1e6)}M`;
+    if (sh >= 1e4) return `${neg}${sym}${Math.round(sh / 1e3)}k`;
+    if (sh >= 1e3) return `${neg}${sym}${trim(sh / 1e3)}k`;
+    return `${neg}${sym}${Math.round(sh)}`;
   }
 
-  /** A foreign amount in its currency's minor units → "$5.00", "€35.00", "5.00 CHF" (absolute). */
+  /** A foreign amount in its currency's hundredths → "$5.00", "€35.00", "CHF 5.00" (absolute). */
   function foreignText(amount, currency) {
     const abs = Math.abs(Math.round(Number(amount) || 0));
-    const body = group3(Math.floor(abs / 100)) + "." + pad2(abs % 100);
-    const sym = CURRENCY[String(currency || "").toUpperCase()];
-    return sym ? sym + body : `${body} ${currency || ""}`.trim();
+    return formatUnits(abs / 100, currencyCode(currency), 2);
   }
 
   // ---------- dates ----------
@@ -404,7 +432,7 @@
     if (first >= 0) present.add("net");
     const ticks = [];
     if (up) { ticks.push({ v: up, y: r1(zero - up * unit), text: compact(up) }); if (up * unit > 40) ticks.push({ v: up / 2, y: r1(zero - (up / 2) * unit), text: compact(up / 2) }); }
-    ticks.push({ v: 0, y: zero, text: "₪0", zero: true });
+    ticks.push({ v: 0, y: zero, text: compact(0), zero: true });
     if (down) { if (down * unit > 40) ticks.push({ v: -down / 2, y: r1(zero + (down / 2) * unit), text: compact(-down / 2) }); ticks.push({ v: -down, y: r1(zero + down * unit), text: compact(-down) }); }
     const every = months.length > 8 ? 2 : 1;
     const xLabels = bars.map((b, i) => ({ month: b.month, x: b.cx, text: MON[Number(b.month.slice(5)) - 1], show: (months.length - 1 - i) % every === 0 }));
@@ -508,15 +536,13 @@
     const frac = String(Math.round((abs - whole) * 10000) / 10000).replace(/^0/, "");
     return (q < 0 ? MINUS : "") + group3(whole) + (frac === "0" ? "" : frac);
   }
-  /** A unit price in its own currency (a decimal number, not minor units): "₪250.00", "$150.00", "12.50 CHF". */
+  /** A unit price in its own currency (a decimal number, not minor units; none: the user's): "₪250.00",
+   *  "$150.00", "CHF 12.50"; four decimals below 1, trailing zeros after two dropped. */
   function unitPrice(price, currency) {
     if (price == null || !isFinite(price)) return "";
     const abs = Math.abs(price);
-    const [w, f] = abs.toFixed(abs >= 1 ? 2 : 4).split(".");
-    const body = group3(Number(w)) + "." + f.replace(/(\d\d\d*?)0+$/, "$1");
-    const code = String(currency || "ILS").toUpperCase();
-    const sym = CURRENCY[code === "NIS" ? "ILS" : code];
-    return sym ? sym + body : `${body} ${currency}`;
+    const f = abs.toFixed(abs >= 1 ? 2 : 4).split(".")[1].replace(/(\d\d\d*?)0+$/, "$1");
+    return formatUnits(abs, currencyCode(currency), f.length);
   }
   /** The four tiles of GET /api/money/portfolio (its total; the site's own profit % with one account):
    *  value, today's change, profit over cost, cash. */
@@ -812,10 +838,10 @@
                     snoozed: it.snooze_until ? `Snoozed until ${shortDate(it.snooze_until)}` : "Snoozed" };
     return `${words[b.status] || "Saved"} · ${name}`;
   }
-  /** Whole shekels typed for a monthly target ("650", "₪1,200") → agorot; null when it isn't a whole
-   *  number of shekels from 1 to 1,000,000. */
+  /** Whole units typed for a monthly target ("650", "₪1,200", "1,200 €") → hundredths; null when
+   *  it isn't a whole number from 1 to 1,000,000. */
   function targetAgorot(text) {
-    const s = String(text ?? "").replace(/[₪,\s]/g, "");
+    const s = String(text ?? "").replace(/[,\s]/g, "").replace(/^\p{Sc}|\p{Sc}$/u, "");
     if (!/^\d{1,7}$/.test(s)) return null;
     const n = Number(s);
     return n >= 1 && n <= 1000000 ? n * 100 : null;
@@ -1363,7 +1389,7 @@
 
   const core = {
     MONTHS, MON, SERIES, EMPTY_FILTERS, MINUS, FSI, LRI, PDI, TABS, TAB_LABELS, FLOW_LABELS, FLOW_SERIES, ACCOUNT_KINDS,
-    esc, isolate, money, moneyText, moneyHtml, compact, foreignText,
+    esc, isolate, setCurrency, currency, currencyCode, currencySymbol, money, moneyText, moneyHtml, compact, foreignText,
     isDay, parseDay, dayIso, todayIso, addDays, shortDate, longDate, dayLabel, timeOf, ago, until, countdown, when, waitText, accountName,
     isMonth, monthOf, shiftMonth, monthLabel, monthBounds,
     niceMax, niceTicks, paceGeometry, paceIndexAt, paceAt, seriesOf, monthsGeometry, barPath, trendsAsMonths, sparkBars,

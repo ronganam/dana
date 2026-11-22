@@ -921,7 +921,7 @@ async def main():
             items_gh = notification_summary.active_by_app(conn, OWNER)["com.github.android"]
             conn.execute("INSERT INTO notification_summaries (user_id, scope, signature, summary, count, updated_at) "
                          "VALUES (?, 'com.github.android', ?, 'CI passed on three PRs\nNothing failed', 3, '2026-01-01')",
-                         (OWNER.id, notification_summary._signature(items_gh)))
+                         (OWNER.id, notification_summary._signature(items_gh, notification_summary.language(OWNER))))
             conn.commit()
         r = await client.get("/api/notifications/overview")
         ov = await r.json()

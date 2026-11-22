@@ -20,7 +20,7 @@ import kotlin.math.floor
 object MoneyFormat {
     const val MINUS = "−"
 
-    @Volatile var currency: Currency = Currency.getInstance("ILS")
+    @Volatile var currency: Currency = Currency.getInstance("USD")  // until `Me` knows the user's
     @Volatile var locale: Locale = Locale.getDefault()
 
     enum class Sign { MINUS, PLUS, NONE }

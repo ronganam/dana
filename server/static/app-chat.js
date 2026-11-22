@@ -532,7 +532,9 @@ function fillBubble(bubble, msg) {
             window.speechSynthesis.cancel();
             const cleanText = msg.content.replace(/[*#`_\-]/g, "");
             const utter = new SpeechSynthesisUtterance(cleanText);
-            if (isRtlText(cleanText)) utter.lang = "he-IL";
+            // Hebrew / Arabic letters get a voice of their language; other text the browser's own.
+            if (/[\u0590-\u05FF]/.test(cleanText)) utter.lang = "he-IL";
+            else if (/[\u0600-\u06FF]/.test(cleanText)) utter.lang = "ar";
             window.speechSynthesis.speak(utter);
         }
     });

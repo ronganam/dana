@@ -321,9 +321,9 @@ async def save_knowledge_item(conn: Connection, project_id: str, kind: str = "no
       Example: "Photographer — Yanai Budget". Never paste a whole paragraph into the title.
     - body holds the full details written as clean Markdown: '##' or '###' headings, **bold** for key
       figures and names, '-' bullet lists, and a blank line between paragraphs. Preserve the user's
-      facts, numbers, dates and Hebrew/English wording exactly. Example body:
+      facts, numbers, dates and wording (in whatever language) exactly. Example body:
         ## Contact
-        - Phone: **050-1234567**
+        - Phone: **555-0100**
         - Email: yanai@example.com
         ## Budget
         - Price: 4,500
@@ -387,7 +387,7 @@ async def search_knowledge(conn: Connection, query: str, project_id: Optional[st
     """Search the knowledge base (titles, bodies, AI summaries, transcripts, tags, fields) with FTS.
 
     Use to answer the user's questions like 'what did I save/find about X?'. Prefer 1-2 concrete
-    Hebrew/English keywords over full sentences. Pass project_id to scope the search to a project.
+    keywords (in the language the content is in) over full sentences. Pass project_id to scope the search to a project.
 
     Args:
         query: The search term(s), e.g. "צלם" or "insurance policy".

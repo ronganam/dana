@@ -585,7 +585,7 @@ def trends(book: Book, month: Optional[str] = None, n: int = 12) -> Dict[str, An
     — ``typical`` is the median of :data:`TYPICAL_MONTHS` whole months before (a month without
     any counts as 0), ``on_track`` (a month in progress, from day :data:`ON_TRACK_MIN_DAYS`):
     what was spent so far, plus the typical everyday spending of the days left (scaling up
-    what was spent would make one ₪1,500 payment a ₪2,500 month), plus the recurring charges
+    what was spent would make one 1,500 payment a 2,500 month), plus the recurring charges
     still due this month. Movers compare everyday spending only (a bimonthly bill doubles its
     category every other month, a renewal is expected; a fixed cost that changes is a price
     change) and leave out drops while the month runs (the month is not over)."""
@@ -779,7 +779,7 @@ def insights_for(book: Book, month: Optional[str] = None, fc: Optional[Dict[str,
     cf = cashflow(book, 12, t["month"])
     this = cf["months"][-1]
     out: List[Dict[str, Any]] = []
-    sh = store.shekels
+    sh = store.money_text
     e = t["everyday"]
     if e["typical"]:
         margin = max(MOVER_MIN_AGOROT, e["typical"] // 10)
