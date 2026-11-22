@@ -31,7 +31,9 @@ import androidx.core.content.ContextCompat
  *   rather than never.
  *
  * A state already sent is not sent again (a flapping connection, or the
- * periodic check after the receiver saw it).
+ * periodic check after the receiver saw it). A third way, driving detection
+ * for a car without Bluetooth, is [Driving]; the chosen Bluetooth car wins
+ * over it ([DrivingRule]).
  */
 object CarSignals {
     private const val TAG = "CarSignals"
@@ -69,6 +71,8 @@ object CarSignals {
     fun report(context: Context, inCar: Boolean, via: CarVia, at: Long = System.currentTimeMillis()) {
         val app = context.applicationContext
         if (!SignalSettings.car(app)) return
+        // The car's own connection now speaks: a ride driving detection started ends with it.
+        if (via == CarVia.BLUETOOTH) SignalSettings.clearCarState(app, CarVia.ACTIVITY)
         if (SignalSettings.carState(app, via) == inCar) return
         SignalSettings.setCarState(app, via, inCar)
         Log.i(TAG, "Car ${if (inCar) "enter" else "leave"} via ${via.wire}")

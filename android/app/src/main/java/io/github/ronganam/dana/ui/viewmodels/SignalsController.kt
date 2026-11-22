@@ -42,7 +42,7 @@ class SignalsController(private val ctx: ControllerContext, private val appConte
 
     /** Re-read the switches and permissions (back from a system settings page). */
     fun refreshPhone() {
-        _phone.value = PhoneSignals.status(appContext)
+        ctx.scope.launch { _phone.value = PhoneSignals.status(appContext) }
     }
 
     /** Set the wake window by hand ("HH:MM"). */
@@ -64,6 +64,10 @@ class SignalsController(private val ctx: ControllerContext, private val appConte
     fun setScreenTime(on: Boolean) { PhoneSignals.setScreenTime(appContext, on); refreshPhone() }
 
     fun setCar(on: Boolean) { PhoneSignals.setCar(appContext, on); refreshPhone() }
+
+    fun setDriving(on: Boolean) { PhoneSignals.setDriving(appContext, on); refreshPhone() }
+
+    fun setSleep(on: Boolean) { PhoneSignals.setSleep(appContext, on); refreshPhone() }
 
     fun pairedDevices(): List<BluetoothChoice> = PhoneSignals.pairedDevices(appContext)
 

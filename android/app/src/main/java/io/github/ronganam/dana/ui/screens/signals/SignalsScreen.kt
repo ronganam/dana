@@ -50,6 +50,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import io.github.ronganam.dana.data.signals.BluetoothChoice
+import io.github.ronganam.dana.data.signals.HealthConnectState
 import io.github.ronganam.dana.data.signals.LocationAccess
 import io.github.ronganam.dana.data.signals.PhoneSignalStatus
 import io.github.ronganam.dana.data.signals.PhoneSignals
@@ -78,7 +79,7 @@ fun SignalsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
     val failed by controller.failed.collectAsState()
     val phone by controller.phone.collectAsState()
     LaunchedEffect(Unit) { controller.refresh() }
-    // Back from a system settings page (usage access, location, Bluetooth): read the access again.
+    // Back from a system settings page (usage access, location, Bluetooth, Health Connect): read the access again.
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle) {
         val obs = LifecycleEventObserver { _, e -> if (e == Lifecycle.Event.ON_RESUME) controller.refreshPhone() }
@@ -122,7 +123,7 @@ fun SignalsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                 val p = phone
                 val controls = when (signal.signal) {
                     "wake" -> p != null || o?.wakeWindow != null
-                    "car", "location" -> p != null
+                    "car", "location", "sleep" -> p != null
                     else -> false
                 }
                 // Before the overview loads, only the signals with something to change here.
@@ -159,6 +160,7 @@ private fun SignalControls(signal: String, p: PhoneSignalStatus?, window: WakeWi
         }
         "car" -> if (p != null) CarControl(p, controller)
         "location" -> if (p != null) PlacesControl(p, controller)
+        "sleep" -> if (p != null) SleepControl(p, controller)
     }
 }
 
@@ -286,7 +288,7 @@ private fun TimeChip(time: String, onClick: () -> Unit) {
     )
 }
 
-/** The car: on/off, which paired Bluetooth device is the car, Android Auto. */
+/** The car: on/off, which paired Bluetooth device is the car, Android Auto, driving detection. */
 @Composable
 private fun CarControl(p: PhoneSignalStatus, controller: SignalsController) {
     SwitchRow(
@@ -295,7 +297,31 @@ private fun CarControl(p: PhoneSignalStatus, controller: SignalsController) {
             "The device's address stays on this phone.",
         checked = p.car
     ) { controller.setCar(it) }
-    if (p.car) CarDeviceRow(p, controller)
+    if (p.car) {
+        CarDeviceRow(p, controller)
+        DrivingRow(p, controller)
+    }
+}
+
+/** "Detect driving": Activity Recognition for a car without Bluetooth (Physical activity asked on Android 10+). */
+@Composable
+private fun DrivingRow(p: PhoneSignalStatus, controller: SignalsController) {
+    // Asked only with the switch on: register again now that it may be allowed.
+    val activity = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { controller.setDriving(true) }
+    fun ask() { if (Build.VERSION.SDK_INT >= 29) activity.launch(Manifest.permission.ACTIVITY_RECOGNITION) }
+    SwitchRow(
+        "Detect driving",
+        "For a car without Bluetooth: riding in a vehicle counts as getting in, stopping as getting out. " +
+            "The phone notices it itself, without location. Once your chosen Bluetooth car has connected, its connection decides instead.",
+        checked = p.driving
+    ) { on ->
+        controller.setDriving(on)
+        if (on && !p.activityAllowed) ask()
+    }
+    if (p.driving && !p.activityAllowed) {
+        Missing("Needs physical activity access.")
+        ActionButton("Allow physical activity") { ask() }
+    }
 }
 
 /** "This is my car": the paired device that counts, chosen from a list (Nearby devices asked first on Android 12+). */
@@ -399,4 +425,47 @@ private fun PlacesControl(p: PhoneSignalStatus, controller: SignalsController) {
         },
         dismissButton = { TextButton(onClick = { explainBackground = false }) { Text("Not now") } }
     )
+}
+
+/** "Wake from sleep data": Health Connect's sleep sessions, with what Health Connect still needs. */
+@Composable
+private fun SleepControl(p: PhoneSignalStatus, controller: SignalsController) {
+    val context = LocalContext.current
+    val permissions = rememberLauncherForActivityResult(PhoneSignals.sleepPermissionContract()) { controller.refreshPhone() }
+    fun ask() = permissions.launch(PhoneSignals.sleepPermissions(context))
+    SwitchRow(
+        "Wake from sleep data",
+        "A night's sleep ending in your wake window is when you woke. It comes from Health Connect, where your watch's or " +
+            "phone's health app writes your sleep. Only when you slept is sent.",
+        checked = p.sleep && p.healthConnect != HealthConnectState.UNSUPPORTED,
+        enabled = p.healthConnect != HealthConnectState.UNSUPPORTED
+    ) { on ->
+        controller.setSleep(on)
+        if (on) when (p.healthConnect) {
+            HealthConnectState.NEEDS_UPDATE -> PhoneSignals.openHealthConnectInstall(context)
+            HealthConnectState.AVAILABLE -> if (!p.sleepAllowed) ask()
+            HealthConnectState.UNSUPPORTED -> Unit
+        }
+    }
+    when (p.healthConnect) {
+        HealthConnectState.UNSUPPORTED ->
+            Missing("Health Connect isn't available on this phone (it needs Android 9 or newer).")
+        HealthConnectState.NEEDS_UPDATE -> if (p.sleep) {
+            Missing(if (Build.VERSION.SDK_INT >= 34) "Health Connect needs an update." else "Needs the Health Connect app, installed and up to date.")
+            ActionButton(if (Build.VERSION.SDK_INT >= 34) "Update Health Connect" else "Get Health Connect") { PhoneSignals.openHealthConnectInstall(context) }
+        }
+        HealthConnectState.AVAILABLE -> if (p.sleep) when {
+            !p.sleepAllowed -> {
+                Missing("Needs Health Connect's permission to read sleep.")
+                ActionButton("Allow in Health Connect") { ask() }
+                TextButton(onClick = { PhoneSignals.openHealthConnect(context) }) { Text("Open Health Connect") }
+            }
+            p.sleepBackgroundSupported && !p.sleepBackground -> {
+                Missing("Read only while Dana is open. Allow reading in the background so your wake counts before you open it.")
+                ActionButton("Allow in the background") { ask() }
+            }
+            !p.sleepBackgroundSupported -> MonoLabel("Read while Dana is open (this Health Connect can't share in the background)")
+            else -> MonoLabel("Reading sleep from Health Connect")
+        }
+    }
 }
