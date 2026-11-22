@@ -12,6 +12,7 @@ import android.content.IntentFilter
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.util.Log
+import android.webkit.CookieManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
@@ -105,8 +106,9 @@ class HomeModel(val context: Context, private val scope: CoroutineScope) {
 private enum class Screen { PAIR, HOME, ALL_APPS, SETTINGS }
 
 /**
- * Dana TV's home screen (HOME + leanback launcher): favourite apps, Home
- * Assistant controls, cameras, and the entry to settings. Starts the "Hey
+ * Dana TV's home screen (HOME + leanback launcher): favourite apps, the
+ * TV's device dashboard ([TvDashboardActivity]), Home Assistant controls,
+ * cameras, and the entry to settings. Starts the "Hey
  * Dana" wake-word service; the assistant itself opens in [AssistantActivity].
  *
  * Until the TV is paired it shows [TvPairingScreen] (a code from the Devices
@@ -152,6 +154,7 @@ class TvHomeActivity : ComponentActivity() {
                         onAllApps = { screen = Screen.ALL_APPS },
                         onSettings = { screen = Screen.SETTINGS },
                         onAskDana = ::askDana,
+                        onDashboard = ::openDashboard,
                     )
                     Screen.ALL_APPS -> AllAppsScreen(model, onBack = ::goHome)
                     Screen.SETTINGS -> TvSettingsScreen(model, onBack = ::goHome, onAskDana = ::askDana, onUnpair = ::unpair)
@@ -211,6 +214,7 @@ class TvHomeActivity : ComponentActivity() {
     private fun unpair() {
         lifecycleScope.launch {
             DevicePairing.unpair(this@TvHomeActivity)
+            CookieManager.getInstance().removeAllCookies(null)
             showPairing()
         }
     }
@@ -226,8 +230,15 @@ class TvHomeActivity : ComponentActivity() {
         startActivity(Intent(this, AssistantActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
 
+    private fun openDashboard() {
+        if (screen == Screen.PAIR) return
+        startActivity(Intent(this, TvDashboardActivity::class.java))
+    }
+
     override fun onResume() {
         super.onResume()
+        // The dashboard found the TV removed on the server: it forgot its pairing.
+        if (screen != Screen.PAIR && !ServerConfig.load(this).isConfigured) showPairing()
         model.resumed = true
         model.startPolling()
         KeyServiceGuard.ensureEnabled(this)

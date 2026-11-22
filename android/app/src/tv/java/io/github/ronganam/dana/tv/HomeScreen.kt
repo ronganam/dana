@@ -51,6 +51,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import io.github.ronganam.dana.ui.theme.Success
+import io.github.ronganam.dana.data.pairing.DevicePairing
+import io.github.ronganam.dana.data.pairing.PairedDevice
 import io.github.ronganam.dana.wake.WakeBus
 import kotlinx.coroutines.delay
 import org.json.JSONObject
@@ -70,6 +72,7 @@ fun HomeScreen(
     onAllApps: () -> Unit,
     onSettings: () -> Unit,
     onAskDana: () -> Unit,
+    onDashboard: () -> Unit,
 ) {
     val settings by TvConfig.settings.collectAsState()
     val apps = model.apps
@@ -106,6 +109,12 @@ fun HomeScreen(
                     }
                 }
             }
+        }
+        Spacer(Modifier.height(10.dp))
+
+        TvSection("Dashboard", Modifier.padding(horizontal = SAFE_X))
+        LazyRow(contentPadding = ROW_PAD) {
+            item(key = "_dashboard") { DashboardTile(onDashboard) }
         }
         Spacer(Modifier.height(10.dp))
 
@@ -166,6 +175,28 @@ private fun Header(onAskDana: () -> Unit, onSettings: () -> Unit) {
             }
         }
     }
+}
+
+/** The Dashboard row's tile: this TV's own dashboard (chosen on the web, Devices → the TV). */
+@Composable
+private fun DashboardTile(onClick: () -> Unit) {
+    val context = LocalContext.current
+    val device = remember { DevicePairing.device(context) }
+    FocusTile(Modifier.size(TILE_W * 2 + 14.dp, TILE_H), onClick = onClick) { focused ->
+        Column(Modifier.fillMaxSize().padding(horizontal = 14.dp, vertical = 10.dp)) {
+            Text("Open dashboard", style = TvType.name, color = MaterialTheme.colorScheme.onSurface)
+            Spacer(Modifier.weight(1f))
+            TvMono(dashboardCaption(device), color = if (focused) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline)
+        }
+    }
+}
+
+/** "Living room · edit on Devices": the TV's room or role, or the default preset's name. */
+private fun dashboardCaption(device: PairedDevice?): String {
+    val place = device?.room?.takeIf { it.isNotBlank() }
+        ?: device?.role?.takeIf { it.isNotBlank() }?.let { PairedDevice.roleLabel(it) }
+        ?: "Living room"
+    return "$place · edit on Devices"
 }
 
 @Composable
