@@ -97,7 +97,7 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 - Packages: `io.github.ronganam.dana.{data,ui}.{models,network,screens,components,theme,viewmodels}`, plus `push/`, `wake/`, `tv/`, `kiosk/`.
 - Hebrew/RTL: text direction is decided per message/line by script, never assumed. Mixed " · " kicker lines go through `isolatedParts()` (each part isolated, LTR dots) so a Hebrew name can't reorder them.
 - Server URL and device token: only through `data/network/ServerConfig` (`load` / `save`; the URL is normalized — scheme, no trailing slash), written by a pairing: `data/pairing/` (`PairingClient` = `POST /api/pair`, read itself back, remove itself, start a pairing for the watch; `DevicePairing` keeps the device next to the config, `store` / `unpair`; `PairingFlow` is the code-entry state every pairing screen uses), with the code's shape, the wire and the refusals (`PairingCode`, `PairAnswer`, `PairError`) in `:protocol` (`Pairing.kt`), shared with the watch. Nothing is built in: an unpaired phone, tablet or TV shows its pairing screen (`docs/phone.md` → Pairing, `docs/kiosk.md`, `docs/tv.md`). The ViewModel holds one (`MainViewModel.serverConfig`, changed by `useServerConfig`; `paired` says whether it is set); background code uses `ServerConfig.load(context).api()`. No composable builds its own API client; the user's zones (`/api/zones`) come from `data/network/Zones`.
-- **Signals** (`data/signals/`): the models, `api.signals` and the persisted queue (`SignalQueue`, flushed by `SignalSendWorker`) in `main`; the phone-only sources (unlocks + screen time, car by Bluetooth / Android Auto, geofences on the user's zones) in `src/phone`, with a no-op twin in `src/nopush`; the Settings → Signals page (`docs/phone.md` → Signals).
+- **Signals** (`data/signals/`): the models, `api.signals` and the persisted queue (`SignalQueue`, flushed by `SignalSendWorker`) in `main`; the phone-only sources (unlocks + screen time, car by Bluetooth / Android Auto / driving detection, geofences on the user's zones, sleep from Health Connect) in `src/phone`, with a no-op twin in `src/nopush`; the Settings → Signals page (`docs/phone.md` → Signals).
 
 ## Gotchas
 
@@ -111,7 +111,7 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 
 | Doc | Read before touching |
 |---|---|
-| `docs/phone.md` | Pairing (first run, the `dana://pair` link, Settings → Unpair / Pair again), main screen (shell, thread, Reminders editor, day strip), chat stream / voice, offline queues, reminders + alarm screen, call recordings + Debrief, foldable sizes, Signals (unlocks, screen time, car, geofences, the Signals page) |
+| `docs/phone.md` | Pairing (first run, the `dana://pair` link, Settings → Unpair / Pair again), main screen (shell, thread, Reminders editor, day strip), chat stream / voice, offline queues, reminders + alarm screen, call recordings + Debrief, foldable sizes, Signals (unlocks, screen time, car, driving, geofences, sleep, the Signals page) |
 | `docs/projects.md` | Projects place: the new model (sections, decisions compared, files, budget), its data layer `data/projects/`, panes folded / unfolded |
 | `docs/money.md` | Money (More → Money): `MoneyController` core, dashboards, Transactions / Accounts / Save, the panes |
 | `docs/shopping.md` | Shopping (under More), offline store + queue, live stream / push, widget + quick add, the watch's shopping data and actions (the watch screen itself: `docs/wear.md`) |
