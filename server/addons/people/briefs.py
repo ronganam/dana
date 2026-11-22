@@ -19,7 +19,7 @@ import re
 import sqlite3
 from typing import Dict, List, Optional
 
-from core import clock, llm, user_locale, user_profile, users
+from core import budget, clock, llm, user_locale, user_profile, users
 from core.db import get_db_connection
 from core.users import User
 from core.addons import store as connections
@@ -145,7 +145,7 @@ def _lock(user: User) -> asyncio.Lock:
 async def refresh_briefs(user: User, person_ids: Optional[List[str]] = None) -> int:
     """Rewrite ``user``'s stale briefs (or those of ``person_ids``), as ``user``;
     a failed rewrite keeps the old brief. Returns how many were written."""
-    if not store.has_people(user) or not llm.configured("briefs"):
+    if not store.has_people(user) or not llm.configured("briefs") or budget.holds("people_brief"):
         return 0
     async with _lock(user):
         with users.acting_as(user):

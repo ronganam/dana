@@ -17,7 +17,7 @@ CONTACTS_GUIDE = (
 
 # Connecting it builds the user's prompt block; the block is the addon's
 # section of their system prompt (core/agent.py asks for it every turn).
-addon = Addon(facts.ADDON, web=(Page("memory", panel="memory.js", style="memory.css", nav=Nav("Memory", icon="star", order=60)),), order=50, default_on=True, llm_jobs={"about_learner": LlmJob("fast", "About you learner")}, title="About you", icon="star",
+addon = Addon(facts.ADDON, web=(Page("memory", panel="memory.js", style="memory.css", nav=Nav("Memory", icon="star", order=60)),), order=50, default_on=True, llm_jobs={"about_learner": LlmJob("fast", "About you learner", background=True)}, title="About you", icon="star",
     touches=Touches(reads=("phone",)),
     description="What Dana remembers about you",
                     features=("Remembers short facts about you and uses them in every answer",

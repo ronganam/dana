@@ -15,7 +15,10 @@ Flow for an upload (``POST /api/calls/upload``, addons/phone/calls/upload.py):
 
 ``CALL_PROCESSING_CONCURRENCY`` calls are processed at once for the whole
 server. Calls left in ``processing`` by a restart resume at startup, per user
-with ``phone`` (:func:`resume_unfinished`).
+with ``phone`` (:func:`resume_unfinished`). A server without a transcription
+model fails the call with :data:`NO_TRANSCRIPTION_MODEL`; while the monthly
+budget pauses background work, with :data:`BUDGET_PAUSED` (both can be analysed
+again later).
 """
 from __future__ import annotations
 
@@ -26,7 +29,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from core import clock, users
+from core import budget, clock, llm, users
 from core.db import get_db_connection
 from core.users import User
 from addons.people import briefs as people_briefs
@@ -38,6 +41,10 @@ from addons.phone.calls.transcription import audio_duration_seconds, err_text, t
 from addons.phone.calls.values import FAILED_TRANSCRIPT_PREFIX, PROCESSING_CONCURRENCY, transcript_usable
 
 logger = logging.getLogger(__name__)
+
+# The error of a call that could not be processed for want of a model or of budget (clients show it).
+NO_TRANSCRIPTION_MODEL = "Needs a transcription model: " + llm.UNAVAILABLE_HINT.split(": ", 1)[1]
+BUDGET_PAUSED = "Waiting: background work is paused by this month's budget; analyze it again later"
 
 _processing = asyncio.Semaphore(PROCESSING_CONCURRENCY)
 _scheduled: set = set()
@@ -92,6 +99,12 @@ async def process_call(call_id: str, *, custom_instructions: Optional[str] = Non
                 return
             with users.acting_as(owner):
                 await _process(owner, call_id, custom_instructions)
+        except budget.Paused:
+            logger.info(f"Call {call_id} waits: background work is paused by the monthly budget")
+            try:
+                calls_store.set_status(call_id, "failed", BUDGET_PAUSED)
+            except Exception:
+                pass
         except Exception as e:
             logger.error(f"Processing call {call_id} failed: {e}", exc_info=True)
             try:
@@ -124,6 +137,14 @@ async def _process(owner: User, call_id: str, custom_instructions: Optional[str]
         try:
             transcript = await transcribe_call_audio(path, mime, int(call.get("duration_seconds") or 0),
                                                      ref=f"call:{call_id}")
+        except llm.TranscriptionUnavailable:
+            logger.warning(f"Call {call_id} not transcribed: the server has no transcription model")
+            calls_store.set_status(call_id, "failed", NO_TRANSCRIPTION_MODEL,
+                                   title=row["title"] if row["title"] and row["title"] != "Processing…"
+                                   else f"Call with {call['contact']}")
+            return
+        except budget.Paused:
+            raise
         except Exception as e:
             logger.error(f"Transcription failed for call {call_id}: {err_text(e)}")
             transcript = f"{FAILED_TRANSCRIPT_PREFIX}: {err_text(e)}]"

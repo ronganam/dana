@@ -75,3 +75,22 @@ button.usg-ref:hover { color: var(--ink); border-color: var(--hairline-strong); 
   .usg-ranges { padding: 10px 16px 0; }
   .usg-total { font-size: 34px; }
 }
+
+/* The monthly budget card. */
+.usg-budget-nums { display: flex; flex-wrap: wrap; gap: 8px; }
+.usg-budget-state { text-transform: none; letter-spacing: 0; font-family: var(--font-inter); font-weight: 600; font-size: 12px; color: var(--body); }
+.usg-budget-state.warn { color: var(--prio-medium); }
+.usg-budget-state.paused { color: var(--prio-high); }
+.usg-budget-meter { position: relative; height: 8px; margin-top: 12px; border-radius: 4px; background: var(--canvas-soft); overflow: hidden; }
+.usg-budget-meter span { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; }
+.usg-budget-meter .fore { background: var(--usg-bar); opacity: .25; }
+.usg-budget-meter .used { background: var(--usg-bar); }
+.usg-budget-meter.warn .used { background: var(--prio-medium); }
+.usg-budget-meter.paused .used { background: var(--prio-high); }
+.usg-budget-meter i { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--hairline); }
+.usg-budget-note { margin-top: 10px; font-size: 12.5px; line-height: 1.4; color: var(--body); }
+.usg-budget-note.warn { color: var(--prio-medium); }
+.usg-budget-note.paused { color: var(--prio-high); }
+.usg-budget-actions, .usg-budget-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 12px; font-size: 13px; color: var(--body); }
+.usg-budget-form input { width: 120px; margin-left: 6px; padding: 5px 8px; border: 1px solid var(--hairline); border-radius: var(--radius-md);
+  background: var(--canvas); color: var(--ink); font: inherit; font-variant-numeric: tabular-nums; }

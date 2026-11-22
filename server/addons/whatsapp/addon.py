@@ -29,7 +29,7 @@ addon = Addon(
     needs=(Need("hardware", "a WAHA server (a WhatsApp Web bridge) Dana's server can reach", "Dana reads and sends WhatsApp through it"),
            Need("account", "a WhatsApp account, linked to WAHA", "Your chats; WAHA signs in as a linked device"),
            Need("env", "WAHA_WEBHOOK_SECRET", "Voice notes you receive turned into text (WAHA signs its webhooks with it)", optional=True),
-           Need("env", "GEMINI_API_KEY", "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)", optional=True),
+           Need("account", "a transcription model: an OpenAI or Gemini key, or your own Whisper server", "Transcribes the voice notes you receive (Claude does not hear audio)", optional=True),
            Need("env", "TELEGRAM_BOT_TOKEN", "Sends the voice-note transcripts to your Telegram", optional=True)),
     touches=Touches(hosts=("your WAHA server",), acts_outside=True, stores_credentials=True, reads=("knowledge", "people")),
     description="Read and send WhatsApp messages, voice notes as text",

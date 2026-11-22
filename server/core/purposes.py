@@ -8,6 +8,12 @@ the loader, :func:`register`). A purpose has a default model profile
 overrides the model for that purpose alone (core/llm.py). An unknown purpose
 is refused (:class:`UnknownPurpose`), so a typo never files usage under a
 name nobody reads.
+
+A purpose is either **background** (work Dana does on its own: notification
+triage, briefs and briefings, the About learner, money categories,
+summaries…) or **user-started** (chat, voice, anything a person asked for).
+The monthly budget (core/budget.py) pauses only background purposes;
+an addon marks one with ``LlmJob("fast", "Label", background=True)``.
 """
 
 from dataclasses import dataclass
@@ -26,26 +32,29 @@ class Purpose:
     profile: str
     label: str
     addon: str = "core"
+    background: bool = False
 
 
-# Core's own purposes: name → (default profile, label).
+# Core's own purposes: name → (default profile, label, background).
 CORE: Dict[str, tuple] = {
-    "chat": ("balanced", "Chat with Dana"),
-    "voice_reply": ("balanced", "Voice chat replies"),
-    "realtime_voice": ("balanced", "Live voice conversation"),
-    "voice_transcript": ("fast", "Voice note transcripts"),
-    "voice_summary": ("fast", "Voice note summaries"),
-    "wake_briefing": ("fast", "Wake briefing"),
-    "weekly_review": ("fast", "Weekly review"),
-    "setup_check": ("fast", "Testing a new LLM key"),
-    "other": ("fast", "Other (untagged)"),
+    "chat": ("balanced", "Chat with Dana", False),
+    "voice_reply": ("balanced", "Voice chat replies", False),
+    "realtime_voice": ("balanced", "Live voice conversation", False),
+    "voice_transcript": ("fast", "Voice note transcripts", False),
+    "voice_summary": ("fast", "Voice note summaries", False),
+    "wake_briefing": ("fast", "Wake briefing", True),
+    "weekly_review": ("fast", "Weekly review", True),
+    "setup_check": ("fast", "Testing a new LLM key", False),
+    "other": ("fast", "Other (untagged)", False),
 }
 
-_purposes: Dict[str, Purpose] = {name: Purpose(name, profile, label) for name, (profile, label) in CORE.items()}
+_purposes: Dict[str, Purpose] = {name: Purpose(name, profile, label, background=background)
+                                 for name, (profile, label, background) in CORE.items()}
 
 
-def register(name: str, profile: str, label: str = "", *, addon: str) -> Purpose:
-    """Declare ``addon``'s purpose ``name`` with its default ``profile``.
+def register(name: str, profile: str, label: str = "", *, addon: str, background: bool = False) -> Purpose:
+    """Declare ``addon``'s purpose ``name`` with its default ``profile``
+    (``background``: the monthly budget may pause it).
 
     Raises:
         ValueError: an unknown profile, or ``name`` already belongs to core or another addon.
@@ -55,7 +64,7 @@ def register(name: str, profile: str, label: str = "", *, addon: str) -> Purpose
     existing = _purposes.get(name)
     if existing is not None and existing.addon != addon:
         raise ValueError(f"{addon}: LLM purpose {name!r} already belongs to {existing.addon}")
-    p = _purposes[name] = Purpose(name, profile, label or name.replace("_", " ").capitalize(), addon)
+    p = _purposes[name] = Purpose(name, profile, label or name.replace("_", " ").capitalize(), addon, background)
     return p
 
 
@@ -85,3 +94,9 @@ def label(name: str) -> Optional[str]:
 
 def known(name: str) -> bool:
     return name in _purposes
+
+
+def is_background(name: str) -> bool:
+    """Whether ``name`` is background work (False for a user-started or unknown purpose)."""
+    p = _purposes.get(name)
+    return bool(p and p.background)

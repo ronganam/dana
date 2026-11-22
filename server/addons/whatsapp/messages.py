@@ -65,6 +65,8 @@ async def _media(conn: Connection, msg: Dict[str, Any]) -> str:
                 transcript = await llm.transcribe(audio, mimetype, source="whatsapp")
                 if transcript:
                     return f'[Voice message transcript]: "{transcript}"'
+        except llm.TranscriptionUnavailable:
+            return f"[Voice message ({mimetype}); not transcribed: the server needs a transcription model]"
         except Exception as e:
             logger.error(f"Failed transcribing a WhatsApp voice message: {e}")
         return f"[Voice message ({mimetype})]"

@@ -9,7 +9,7 @@ import shutil
 import tempfile
 from typing import List, Optional, Tuple
 
-from core import llm
+from core import budget, llm
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +76,8 @@ async def _split_audio(path: str, out_dir: str, chunk_seconds: int) -> List[str]
 async def transcribe_call_audio(path: str, mime: str, duration: int = 0, ref: str = "") -> str:
     """Transcribe a call recording of any length. Raises when nothing could be transcribed.
 
+    Raises ``llm.TranscriptionUnavailable`` / ``budget.Paused`` as they are.
+
     Short recordings are sent as they are. Long ones are cut into
     ``TRANSCRIBE_CHUNK_SECONDS`` chunks, transcribed concurrently and joined;
     a chunk that keeps failing becomes a ``[mm:ss–mm:ss could not be
@@ -101,6 +103,8 @@ async def transcribe_call_audio(path: str, mime: str, duration: int = 0, ref: st
             async with sem:
                 try:
                     return (await _transcribe_once(data, "audio/ogg", note, ref)).strip(), None
+                except (llm.TranscriptionUnavailable, budget.Paused):
+                    raise  # no part can be transcribed now: the call says why
                 except Exception as e:
                     start = i * TRANSCRIBE_CHUNK_SECONDS
                     end = start + TRANSCRIBE_CHUNK_SECONDS if i < n - 1 else max(duration, start)

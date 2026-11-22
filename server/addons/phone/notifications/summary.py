@@ -28,7 +28,7 @@ import time
 import sqlite3
 from typing import Any, Dict, List, Optional
 
-from core import clock, llm, user_locale, user_profile, users
+from core import budget, clock, llm, user_locale, user_profile, users
 from core.db import get_db_connection
 from core.user_profile import Profile
 from core.users import User
@@ -166,7 +166,7 @@ def _schedule(user: User, force: bool = False) -> bool:
         return True
     if not force and time.monotonic() - _last_runs.get(user.id, 0.0) < MIN_SECONDS:
         return False
-    if not llm.configured("notifications"):
+    if not llm.configured("notifications") or budget.holds("notification_summary"):
         return False
     try:
         loop = asyncio.get_running_loop()

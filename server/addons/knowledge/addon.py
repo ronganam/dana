@@ -39,8 +39,8 @@ KNOWLEDGE_GUIDE = (
     "-----------------------------------\n\n"
 )
 
-addon = Addon("knowledge", web=(Page("projects", panel="projects.js", style="projects.css", nav=Nav("Projects", icon="folder", order=50)),), order=40, default_on=True, llm_jobs={"media_summary": LlmJob("fast", "Link / media summaries"), "knowledge_file": LlmJob("fast", "Project file transcripts")}, title="Projects", icon="folder",
-    needs=(Need("env", "GEMINI_API_KEY", "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)", optional=True),),
+addon = Addon("knowledge", web=(Page("projects", panel="projects.js", style="projects.css", nav=Nav("Projects", icon="folder", order=50)),), order=40, default_on=True, llm_jobs={"media_summary": LlmJob("fast", "Link / media summaries", background=True), "knowledge_file": LlmJob("fast", "Project file transcripts")}, title="Projects", icon="folder",
+    needs=(Need("account", "a transcription model: an OpenAI or Gemini key, or your own Whisper server", "Transcripts of the videos and audio files you save (Claude does not hear audio)", optional=True),),
     touches=Touches(hosts=("the sites of the links you save (YouTube, TikTok, Instagram…)",), reads=("tasks",)),
     description="Projects, decisions and saved notes, links and files",
     features=("Projects with dates, budgets, decisions and notes", "Save links, files and transcripts to them",

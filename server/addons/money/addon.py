@@ -55,7 +55,7 @@ def accounts_section(user: User) -> str:
 
 
 addon = Addon(
-    ADDON, web=(Page("money", panel="money.js", style="money.css", nav=Nav("Money", icon="wallet", order=20)),), order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories")},
+    ADDON, web=(Page("money", panel="money.js", style="money.css", nav=Nav("Money", icon="wallet", order=20)),), order=140, llm_jobs={"money_classify": LlmJob("fast", "Money categories", background=True)},
     title="Money", icon="wallet",
     needs=(Need("addon", "phone", "Sign-in codes from your SMS, and charges from card notifications before the bank shows them", optional=True),),
     touches=Touches(stores_credentials=True, reads=("phone",)),

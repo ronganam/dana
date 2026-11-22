@@ -40,6 +40,7 @@ DB_PATH = testenv.isolate("calls_users_test")
 ROOT = str(testenv.SERVER)
 os.environ["API_TOKEN"] = "calls-users-test-env-token"  # a test value: the first admin's token (a headless install)
 os.environ["GEMINI_API_KEY"] = "test-key"  # a test value: LiteLLM only ever runs its offline mock here
+os.environ["TRANSCRIBE_MODEL"] = "gemini/gemini-3.1-flash-lite"  # a model that hears audio
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()
 sys.path.insert(0, ROOT)

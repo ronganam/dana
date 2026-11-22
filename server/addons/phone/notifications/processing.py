@@ -25,7 +25,7 @@ import json
 import logging
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
-from core import clock, events, llm, user_profile, users
+from core import budget, clock, events, llm, user_profile, users
 from core.db import get_db_connection
 from core.users import User
 from addons.phone import popups, suggestions
@@ -158,8 +158,10 @@ async def _process(user: User, ids: Sequence[str]) -> Dict[str, Dict[str, Any]]:
     for n in [n for n in todo if n["_rule"] == "mute"]:
         decided[n["id"]] = _store(user, n, triage.decide_rule_only("mute"), "skipped", "")
     ask = [n for n in todo if n["_rule"] != "mute"]
+    judge = judges.judge()
+    if ask and judge.name == "llm" and budget.holds(judges.PURPOSE):
+        ask = []  # the monthly budget holds the model: they stay pending, judged once it lets go
     if ask:
-        judge = judges.judge()
         who = user_profile.for_user(user)
         for i in range(0, len(ask), judge.batch_size):
             part = ask[i:i + judge.batch_size]
@@ -341,7 +343,10 @@ async def _model_items(user: User, n: Dict[str, Any], ctx: Dict[str, Any]) -> Li
 
 
 async def extract_suggestions(user: User, n: Dict[str, Any]) -> int:
-    """Turn ``user``'s notification into pending suggestions (as ``user``). Returns how many."""
+    """Turn ``user``'s notification into pending suggestions (as ``user``). Returns how many
+    (0 while the monthly budget holds background work: it stays pending for a later try)."""
+    if budget.holds("notification_extract"):
+        return 0
     try:
         with users.acting_as(user):
             ctx = await gather_context(user)

@@ -4,7 +4,7 @@
 (calendar + weather via addon providers, never awaited for long) and each
 active addon's ``@addon.now_cards`` / ``@addon.day_items`` hooks, so it is fast
 and makes no model call. ``act()`` carries out ``POST /api/now/act`` — core's
-own cards (``approval``, ``check``, ``review``) here, and every addon's card
+own cards (``approval``, ``check``, ``review``, ``budget``) here, and every addon's card
 through its ``@addon.now_action(<prefix>)`` — registering an undo
 (``core/undo.py``) for every reversible action.
 
@@ -21,7 +21,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-from core import approval_text, briefing, cards, checks, clock, now_hidden, undo, users, wake, weekly_review, zones
+from core import approval_text, briefing, budget, cards, checks, clock, now_hidden, undo, users, wake, weekly_review, zones
 from core.addons import DayItem, NowContext, registry
 from core.addons.helpers import ago, fmt_date, parse_time, when_phrase
 from core.db import get_db_connection
@@ -263,6 +263,32 @@ def _check_items(user: User, now: datetime.datetime, hidden: Dict[str, Any]) -> 
     return out[:3]
 
 
+def _budget_items(user: User, now: datetime.datetime, hidden: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """The monthly budget's card, for whoever may manage the server, from 80 %
+    of the limit until it is spent (then the ``budget`` check takes over);
+    dismissed, it stays away for the rest of the month (``budget:<YYYY-MM>``)."""
+    if not user.level.allows("manage_server"):
+        return []
+    st = budget.state(now.date())
+    item_id = f"budget:{st['month']}"
+    if st["state"] != budget.WARN or item_id in hidden:
+        return []
+    share = round(st["spent"] / st["limit"] * 100)
+    return [{
+        "id": item_id, "kind": "budget", "source": "Usage",
+        "title": f"{share}% of this month's model budget used",
+        "why": (f"${st['spent']:,.2f} of ${st['limit']:,.2f}, on course for ${st['forecast']:,.2f}. At 100% "
+                "background work (triage, briefs, learning, summaries) pauses until the month ends; chat and "
+                "voice keep working."),
+        "primary": cards.action("open", "Details", client=True),
+        "secondary": [cards.action("dismiss", "Dismiss for this month")],
+        "ref": {"type": "usage", "id": st["month"]},
+        "blocks": [{"type": "facts", "label": "This month",
+                    "items": [f"Spent ${st['spent']:,.2f}", f"Budget ${st['limit']:,.2f}",
+                              f"Forecast ${st['forecast']:,.2f}"]}],
+    }]
+
+
 _REVIEW_PHRASE = {"complete": "mark done", "delete": "delete", "keep": "keep", "accept": "add it",
                   "dismiss": "dismiss"}
 
@@ -400,6 +426,7 @@ async def build(user: User) -> Dict[str, Any]:
         def compose() -> Dict[str, Any]:
             items = [i for i in _approval_items(now, user.id) if i["id"] not in hidden]
             items += _hook_cards(user, ctx)
+            items += _budget_items(user, now, hidden)
             items += _check_items(user, now, hidden)
             items += _review_items(user, hidden)
             quiet_hook = registry.provider("now_quiet", user)
@@ -457,7 +484,8 @@ async def act(user: User, item_id: str, action: str, args: Optional[Dict[str, An
     if not ref:
         raise cards.ActError("id must look like '<kind>:<id>'")
     with users.acting_as(user):
-        handler = {"check": _act_check, "review": _act_review, "approval": _act_approval}.get(kind)
+        handler = {"check": _act_check, "review": _act_review, "approval": _act_approval,
+                   "budget": _act_budget}.get(kind)
         if handler:
             return await handler(user, ref, action, args, clock.now())
         hook = registry.hook_for("now_action", kind, user)  # NotConnected → 403 not_connected
@@ -489,6 +517,20 @@ async def _act_check(user, key, action, args, now):
         msg = f"Hidden until {when_phrase(until, now)}"
         return cards.result(msg, cards.hide_with_undo(user, f"check:{key}", until, msg))
     raise cards.ActError(f"'{action}' isn't an action for a check")
+
+
+async def _act_budget(user, month, action, args, now):
+    if not user.level.allows("manage_server"):
+        raise cards.ActError("unknown kind 'budget'")
+    if action != "dismiss":
+        raise cards.ActError(f"'{action}' isn't an action for the budget card")
+    first = now.date().replace(day=1)
+    if month != first.strftime("%Y-%m"):
+        raise cards.ActError("That month is over", 409)
+    nxt = (first + datetime.timedelta(days=32)).replace(day=1)
+    until = datetime.datetime.combine(nxt, datetime.time(0, 0), clock.get_timezone())
+    msg = "Budget card dismissed for this month"
+    return cards.result(msg, cards.hide_with_undo(user, f"budget:{month}", until, msg, reason="dismiss"))
 
 
 async def _act_review(user, rid, action, args, now):

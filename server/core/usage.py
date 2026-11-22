@@ -34,7 +34,8 @@ rather than as free; the screen says how many there are.
 
 Reads: :func:`summary` (totals, per day, breakdowns by kind / purpose / source /
 model, previous period) and :func:`events` (recent or most expensive calls),
-both for one user or everyone (``user_id=None``).
+both for one user or everyone (``user_id=None``); :func:`spent_since`, the
+server-wide spend the monthly budget reads (core/budget.py).
 Routes: ``core/usage_api.py``. Docs: ``docs/usage.md``.
 """
 from __future__ import annotations
@@ -514,6 +515,18 @@ def summary(rng: str = "30d", filters: Optional[Dict[str, Any]] = None,
         "breakdown": breakdown,
         "raw_days": RAW_DAYS,
     }
+
+
+def spent_since(first: datetime.date) -> float:
+    """USD spent by everyone (system calls included) from ``first`` (a local
+    day) on: stored rows of both tables plus what is still queued."""
+    with get_db_connection() as conn:
+        # scoped: server-wide total for the monthly budget (core/budget.py)
+        row = conn.execute("SELECT (SELECT COALESCE(SUM(cost), 0) FROM usage_events WHERE day >= ?) + "
+                           "(SELECT COALESCE(SUM(cost), 0) FROM usage_daily WHERE day >= ?)",
+                           (first.isoformat(), first.isoformat())).fetchone()
+    queued = sum(r["cost"] or 0 for r in list(_buffer) if r["day"] >= first.isoformat())
+    return float(row[0] or 0) + queued
 
 
 def events(limit: int = 50, before: Optional[int] = None, sort: str = "recent", rng: str = "7d",

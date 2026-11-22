@@ -8,7 +8,7 @@ Local: `.env` (gitignored, from `.env.example`). Production: the same names as e
 
 ## Models
 
-Every model is a LiteLLM id (`provider/model`: `anthropic/claude-haiku-5-5`, `gemini/gemini-3.1-flash-lite`, `openai/gpt-5-mini`…). All calls go through `core/llm.py` (the web/app chat through the profile catalog in `core/models.py`). Which model a job uses, first match wins: its env variable (the table below), else the provider an admin chose in the app (next section), else Claude: `anthropic/claude-sonnet-5-5` for `MODEL` and `SEARCH_MODEL`, `anthropic/claude-haiku-5-5` for the background jobs, `anthropic/claude-opus-5-5` for `deep`; `TRANSCRIBE_MODEL` → `gemini/gemini-3.1-flash-lite` (Claude takes no audio).
+Every model is a LiteLLM id (`provider/model`: `anthropic/claude-haiku-5-5`, `gemini/gemini-3.1-flash-lite`, `openai/gpt-5-mini`…). All calls go through `core/llm.py` (the web/app chat through the profile catalog in `core/models.py`). Which model a job uses, first match wins: its env variable (the table below), else the provider an admin chose in the app (next section), else Claude: `anthropic/claude-sonnet-5-5` for `MODEL` and `SEARCH_MODEL`, `anthropic/claude-haiku-5-5` for the background jobs, `anthropic/claude-opus-5-5` for `deep`. Transcription has its own order (below, "Transcription"): Claude takes no audio.
 
 ### The provider and key chosen in the app
 
@@ -16,10 +16,10 @@ A stranger's server needs one LLM key and no file editing: an admin picks the pr
 
 | Provider | Key (env name) | fast (background) | balanced (chat, search) | deep | Transcription |
 |---|---|---|---|---|---|
-| `claude` (default) | `ANTHROPIC_API_KEY` | `anthropic/claude-haiku-5-5` | `anthropic/claude-sonnet-5-5` | `anthropic/claude-opus-5-5` | the default (Gemini) |
+| `claude` (default) | `ANTHROPIC_API_KEY` | `anthropic/claude-haiku-5-5` | `anthropic/claude-sonnet-5-5` | `anthropic/claude-opus-5-5` | none of its own (Transcription, below) |
 | `openai` | `OPENAI_API_KEY` | `openai/gpt-5.4-mini` | `openai/gpt-5.5` | `openai/gpt-5.5-pro` | `openai/gpt-4o-transcribe` |
 | `gemini` | `GEMINI_API_KEY` | `gemini/gemini-3.1-flash-lite` | `gemini/gemini-3.5-flash` | `gemini/gemini-3.1-pro-preview` | `gemini/gemini-3.1-flash-lite` |
-| `ollama` (experimental for tool use) | none: the server's address (`OLLAMA_API_BASE`) and a model name | `ollama_chat/<model>` | the same | the same | the default (Gemini) |
+| `ollama` (experimental for tool use) | none: the server's address (`OLLAMA_API_BASE`) and a model name | `ollama_chat/<model>` | the same | the same | none of its own (Transcription, below) |
 
 The choice sets every job's default (`llm.model`, `llm.model_for`: chat → balanced, search → balanced, the background jobs → fast, a purpose → its profile), the chat profiles (`core/models.py`: Claude's own catalog for `claude`, the provider's three models otherwise) and the agent's model for Telegram and triggers, at once, without a restart. At start and after each change `llm_provider.apply()` puts the stored key in the process environment under the provider's own name (where LiteLLM reads it) and Ollama's address under `OLLAMA_API_BASE`. **Env stays the override**: a model variable set in env wins over the choice, and a key variable the operator set in env is never overwritten (the answer then says `from_env`). A stored key the credentials key cannot read is logged and left out (enter it again).
 
@@ -34,10 +34,24 @@ The choice sets every job's default (`llm.model`, `llm.model_for`: chat → bala
 | `MONEY_MODEL` | money transaction categories and clean merchant names (→ `BACKGROUND_MODEL`; without its key, rows the rules cannot settle stay uncategorized, `docs/money.md`) |
 | `TELEGRAM_SUMMARY_MODEL` | summaries of the user's unread Telegram chats (→ `BACKGROUND_MODEL`, `docs/telegram-account.md`) |
 | `SEARCH_MODEL` | web-grounded answers through LiteLLM's `web_search_options`: the money price checks (→ `MODEL`; needs a model with web search: Claude's web search tool, Gemini's Google Search grounding…; without one the price checks are unavailable, `docs/money.md` → Price checks) |
-| `TRANSCRIBE_MODEL` | all audio → text (voice notes, call recordings, voice chat, media). Must hear audio: a chat model with audio input (Gemini) or a speech-to-text model (`openai/gpt-4o-transcribe`, `deepgram/nova-3`…). Claude has no audio input |
+| `TRANSCRIBE_MODEL` | all audio → text (voice notes, call recordings, voice chat, media), above the rest of the transcription order (below). Must hear audio: a chat model with audio input (Gemini) or a speech-to-text model (`openai/gpt-4o-transcribe`, `deepgram/nova-3`…). Claude has no audio input |
+| `WHISPER_URL` | a local speech-to-text server with an OpenAI-compatible `/v1/audio/transcriptions` (e.g. `http://whisper:8000`, the root `compose.yaml`'s `whisper` profile; `/v1` is added when missing); used when nothing above it in the transcription order applies |
+| `WHISPER_MODEL` | the model that server transcribes with (default `Systran/faster-whisper-small`; a bigger one is better and slower on a CPU). A server that answers 404 for it is asked to download it once (`POST /v1/models/<model>`, speaches) |
 | `ASSISTANT_MODELS` / `ASSISTANT_DEFAULT_MODEL` | chat profiles for the web/app/Raycast picker (below) |
 | `DEEP_MODEL` | the `deep` profile's model for LLM purposes that default to it (→ `anthropic/claude-opus-5-5`); `fast` purposes use `BACKGROUND_MODEL`, `balanced` ones `MODEL` |
 | `MODEL_<PURPOSE>` | the model of one LLM purpose alone (`MODEL_TASK_EMOJI`, `MODEL_PEOPLE_BRIEF`…), above every variable here. Purposes: core's in `core/purposes.py`, each addon's in its manifest (`llm_jobs=`); an unknown purpose is an error, not a fallback |
+
+### Transcription
+
+Voice notes (WhatsApp, Telegram), call recordings, the tablet / TV / web voice turn and saved media are turned into text by `llm.transcribe`, with the first of these that applies, resolved on every call (`llm.transcriber`):
+
+1. `MODEL_<PURPOSE>` (e.g. `MODEL_CALL_TRANSCRIPT`), then `TRANSCRIBE_MODEL`;
+2. the provider chosen in the app, when it hears audio and its key is set: Gemini `gemini/gemini-3.1-flash-lite`, OpenAI `openai/gpt-4o-transcribe` (Claude and Ollama do not; with no choice, the provider of `MODEL`);
+3. `OPENAI_API_KEY` set → `openai/gpt-4o-transcribe`;
+4. `WHISPER_URL` set → `openai/<WHISPER_MODEL>` on that server (through LiteLLM's transcription with `api_base`; a local model has no price, so its calls show as unpriced on the Usage page). The root `compose.yaml` ships one as an optional profile: `docker compose --profile whisper up -d` starts `ghcr.io/speaches-ai/speaches:0.8.3-cpu` (faster-whisper on the CPU, its models in the `whisper-models` volume) and `WHISPER_URL=http://whisper:8000` points Dana at it;
+5. none: transcription is unavailable. `llm.transcribe` raises `llm.TranscriptionUnavailable` (`code` `no_transcription_model`) before sending anything, and each feature says so: the voice upload answers 503 `{"error", "code": "no_transcription_model"}`, the voice stream sends `{"type": "error", "code": "no_transcription_model"}`, Telegram replies with the reason, a call recording is marked failed with "Needs a transcription model" (analyse it again once one is set), a WhatsApp voice note is kept without text, and the `transcription` self-check (admins) turns red once a transcription was refused. The Phone, WhatsApp and Projects addons list it among their optional needs. Startup logs the transcription model or warns that there is none.
+
+Push-to-talk on the phone uses the phone's own speech recognition and needs none of this.
 
 Chat profiles (`core/models.py`): `fast` Claude Haiku 5.5 at low effort (thinking hidden), `balanced` Claude Sonnet 5.5 and `deep` Claude Opus 5.5, both at high effort with their thinking summary streamed (LiteLLM turns `reasoning_effort` into adaptive thinking, a summarized display and `output_config.effort`; Sonnet at medium often answers without thinking, so nothing would show). Telegram / trigger runs on a Claude `MODEL` think at medium.
 
@@ -63,7 +77,7 @@ Nothing: a server with no users and no `API_TOKEN` starts in **setup mode** and 
 |---|---|
 | `TELEGRAM_BOT_TOKEN` | aiogram bot; optional (unset: no Telegram channel, the web UI and apps still work) |
 | `TELEGRAM_API_BASE` | optional Bot API server for the bot (aiogram `TelegramAPIServer.from_base`, e.g. a self-hosted `telegram-bot-api`); unset = api.telegram.org. The local test environment points it at its fake Bot API (`docs/local-testing.md`) |
-| `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY` / … | key of each LLM provider in use (LiteLLM's standard names; by default Anthropic for every model and Gemini for transcription); optional when an admin entered the key in the app (Models), and wins over that one when set; `OPENAI_API_KEY` also powers realtime voice (`core/realtime.py`). Startup logs each job's model and warns when its key is missing |
+| `ANTHROPIC_API_KEY` / `GEMINI_API_KEY` / `OPENAI_API_KEY` / … | key of each LLM provider in use (LiteLLM's standard names; by default Anthropic for every model; transcription: Models → Transcription); optional when an admin entered the key in the app (Models), and wins over that one when set; `OPENAI_API_KEY` also powers realtime voice (`core/realtime.py`). Startup logs each job's model and warns when its key is missing |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | the server's Google OAuth client, used by every Google addon (each user's refresh token is the credential of their Google addons, set by the Google sign-in: `docs/access.md` → Google account) |
 | *(Google Cloud project of that client)* | needs the Calendar, People and Gmail APIs enabled and the `calendar`, `contacts`, `gmail.modify` and `gmail.settings.basic` scopes on its consent screen (`gmail.modify` is a restricted scope: the app is published unverified for its own few users, who pass Google's warning once); a user already signed in signs in again to grant a new addon's access |
 | `TELEGRAM_API_ID` / `TELEGRAM_API_HASH` | the server's Telegram app (my.telegram.org → API development tools), used by every user's `telegram_account` sign-in and reading (each user's session is the credential of their connection, `docs/telegram-account.md`); unset = the Connect Telegram page says the server has no app |

@@ -17,7 +17,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Dict, Optional, Set, Tuple
 
-from core import llm, outbound, paths, users
+from core import budget, llm, outbound, paths, users
 from core.db import get_db_connection
 from core.users import User
 from addons.knowledge.values import clean_str, loads_json
@@ -156,6 +156,8 @@ async def download_and_process_media(url: str, restricted: bool) -> dict:
                                 tags = [str(tags)]
                         except Exception as se:
                             logger.warning(f"Failed to generate AI summary/tags for {url}: {se}")
+            except (llm.TranscriptionUnavailable, budget.Paused) as e:
+                logger.info(f"Media {media_path} kept without a transcript: {e}")
             except Exception as e:
                 logger.error(f"Failed to transcribe media {media_path}: {e}")
                 

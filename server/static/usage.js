@@ -2,7 +2,9 @@
  *
  *   GET /api/usage?range=&kind=&purpose=&source=&model=     totals, per day, breakdowns, previous period
  *   GET /api/usage/events?range=&sort=&limit=&before=&…     individual calls (kept USAGE_RAW_DAYS)
- * Clicking a breakdown row filters the whole screen by it. Exposes window.DanaUsage = {show, hide};
+ *   PUT /api/usage/budget {limit}                           the monthly budget (whoever may manage the server)
+ * Clicking a breakdown row filters the whole screen by it; the budget card shows this month's spend, its
+ * forecast and the budget (`budget` of /api/usage). Exposes window.DanaUsage = {show, hide};
  * app-nav.js calls show/hide on tab switches. Server side: core/usage.py, docs/usage.md.
  */
 (() => {
@@ -28,7 +30,8 @@
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 
   const S = { range: store("usg.range") || "30d", tab: store("usg.tab") || "purpose", sort: "recent", filters: {},
-              data: null, events: [], next: null, visible: false, loading: false, error: "" };
+              data: null, events: [], next: null, visible: false, loading: false, error: "",
+              budgetEditing: false, budgetSaving: false, budgetError: "" };
   let timer = null;
   let seq = 0;
 
@@ -60,8 +63,8 @@
   }
   const ms = (v) => (v >= 1000 ? (v / 1000).toFixed(1) + " s" : v + " ms");
 
-  async function api(path) {
-    const r = await fetch(path);
+  async function api(path, init) {
+    const r = await fetch(path, init);
     let data = null;
     try { data = await r.json(); } catch (_) { /* empty */ }
     if (!r.ok) throw new Error((data && data.error) || `HTTP ${r.status}`);
@@ -104,6 +107,7 @@
   function render() {
     renderRanges();
     renderHero();
+    renderBudget();
     renderChart();
     renderBreakdown();
     renderEvents();
@@ -148,6 +152,65 @@
       </div>
       ${filters ? `<div class="usg-filters">${filters}</div>` : ""}
       ${unpriced}`;
+  }
+
+  const BUDGET_STATES = { ok: "On track", warn: "Nearly used", paused: "Background work paused" };
+
+  // This month against the budget: spend, forecast, the limit and its control (admins); a member sees only a
+  // paused or nearly-used budget, without amounts.
+  function renderBudget(force = false) {
+    const el = $("usg-budget");
+    if (!force && S.budgetEditing && el.querySelector("[data-budget-form]")) return;  // keep what is being typed
+    const b = S.data && S.data.budget;
+    if (!b || (!b.can_edit && b.state === "ok")) { el.classList.add("hidden"); el.innerHTML = ""; return; }
+    el.classList.remove("hidden");
+    const resets = b.resets ? new Date(b.resets + "T12:00:00").toLocaleDateString(undefined, { day: "numeric", month: "long" }) : "";
+    if (!b.can_edit) {
+      el.innerHTML = `<div class="usg-card-head"><span>This month</span></div>
+        <div class="usg-budget-note ${b.state}">${b.state === "paused"
+          ? "This month's model budget is spent: background work (triage, briefs, learning, summaries) waits until the month ends. Chat and voice keep working."
+          : "This month's model budget is nearly used."}</div>`;
+      return;
+    }
+    const pct = b.limit ? Math.min(100, (b.spent / b.limit) * 100) : 0;
+    const fpct = b.limit ? Math.min(100, (b.forecast / b.limit) * 100) : 0;
+    const meter = b.limit ? `<div class="usg-budget-meter ${b.state}" role="img" aria-label="${Math.round(pct)}% of the budget used">
+        <span class="fore" style="width:${fpct}%"></span><span class="used" style="width:${pct}%"></span><i style="left:80%"></i></div>` : "";
+    const stateLine = b.limit ? `<span class="usg-budget-state ${b.state}">${BUDGET_STATES[b.state] || b.state}</span>` : "";
+    const note = b.state === "paused"
+      ? `<div class="usg-budget-note paused">Background work (triage, briefs, learning, summaries) is paused until ${esc(resets)} or until you raise the budget. Chat, voice and anything you start keep working.</div>`
+      : b.state === "warn" ? `<div class="usg-budget-note warn">Past 80%: at 100% background work pauses until ${esc(resets)}.</div>` : "";
+    const control = S.budgetEditing
+      ? `<form class="usg-budget-form" data-budget-form>
+          <label>Monthly budget (USD) <input type="number" min="0" step="1" inputmode="decimal" name="limit" value="${S.budgetDraft !== undefined ? (S.budgetDraft ?? "") : (b.limit ?? "")}" placeholder="No budget" autofocus></label>
+          <button class="chip active" type="submit"${S.budgetSaving ? " disabled" : ""}>Save</button>
+          <button class="chip" type="button" data-budget-cancel>Cancel</button>
+          ${S.budgetError ? `<span class="usg-bad">${esc(S.budgetError)}</span>` : ""}</form>`
+      : `<div class="usg-budget-actions"><button class="chip" data-budget-edit>${b.limit ? "Change budget" : "Set a budget"}</button>
+          ${b.limit ? `<button class="chip" data-budget-remove>Remove</button>` : ""}</div>`;
+    el.innerHTML = `
+      <div class="usg-card-head"><span>This month</span>${stateLine}</div>
+      <div class="usg-budget-nums">
+        <div class="usg-stat"><span class="v">${money(b.spent, true)}</span><span class="l">spent</span></div>
+        <div class="usg-stat"><span class="v">${money(b.forecast, true)}</span><span class="l">forecast</span></div>
+        <div class="usg-stat"><span class="v">${b.limit ? money(b.limit, true) : "—"}</span><span class="l">budget</span></div>
+      </div>
+      ${meter}${note}${control}`;
+  }
+
+  async function saveBudget(limit) {
+    S.budgetSaving = true; S.budgetError = ""; S.budgetDraft = limit; renderBudget(true);
+    try {
+      const b = await api("/api/usage/budget", { method: "PUT", credentials: "same-origin",
+        headers: { "Content-Type": "application/json" }, body: JSON.stringify({ limit }) });
+      if (S.data) S.data.budget = b;
+      S.budgetEditing = false;
+      S.budgetDraft = undefined;
+    } catch (e) {
+      S.budgetError = e.message;
+    }
+    S.budgetSaving = false;
+    renderBudget(true);
   }
 
   // Per-day bars; long ranges are summed per week so bars stay readable.
@@ -306,6 +369,16 @@
       else if ((n = t.closest("[data-sort]"))) { S.sort = n.dataset.sort; load(); }
       else if (t.closest("[data-more]")) load({ more: true });
       else if ((n = t.closest("[data-ref]"))) openRef(n.dataset.ref);
+      else if (t.closest("[data-budget-edit]")) { S.budgetEditing = true; S.budgetError = ""; renderBudget(true); }
+      else if (t.closest("[data-budget-cancel]")) { S.budgetEditing = false; S.budgetDraft = undefined; renderBudget(true); }
+      else if (t.closest("[data-budget-remove]")) saveBudget(null);
+    });
+    root.addEventListener("submit", (ev) => {
+      const form = ev.target.closest("[data-budget-form]");
+      if (!form) return;
+      ev.preventDefault();
+      const raw = form.elements.limit.value.trim();
+      saveBudget(raw === "" ? null : Number(raw));
     });
     $("usg-refresh")?.addEventListener("click", () => load());
     let resizeTimer = null;

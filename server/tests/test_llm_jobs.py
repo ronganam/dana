@@ -20,12 +20,12 @@ def check(name, condition, detail=""):
     print(f"[{'PASS' if condition else 'FAIL'}] {name}" + (f" — {detail}" if detail and not condition else ""))
 
 
-# Defaults: the agent and search on Sonnet, background jobs on Haiku, audio on Gemini.
+# Defaults: the agent and search on Sonnet, background jobs on Haiku (transcription: test_transcription.py).
 defaults = {job: llm.model(job) for job in llm._CHAINS}
 check("defaults: chat and search on Sonnet", defaults["chat"] == defaults["search"] == llm.SONNET, str(defaults))
 check("defaults: background jobs on Haiku",
       all(defaults[j] == llm.HAIKU for j in ("calls", "notifications", "briefs", "shopping", "money", "telegram")), str(defaults))
-check("defaults: transcription stays on a model that hears audio", not llm.is_claude(defaults["transcribe"]), defaults["transcribe"])
+check("defaults: no job is transcription (it has its own order)", "transcribe" not in defaults, str(defaults))
 
 # Env chains still win.
 os.environ["BACKGROUND_MODEL"] = "anthropic/claude-sonnet-5-5"

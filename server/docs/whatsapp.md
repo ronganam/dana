@@ -142,7 +142,12 @@ dropped; it never reaches the model).
   gets it) and to Telegram (`core.notify.whatsapp_voice(user, chat_id, …)`,
   the chat of their `voice_telegram_chat_id` setting; none set: logged, not
   sent). Groups, outgoing and non-voice messages are ignored; redelivered
-  message ids are deduped in memory per connection.
+  message ids are deduped in memory per connection. Transcription needs a
+  model that hears audio (docs/configuration.md, "Transcription": an OpenAI or
+  Gemini key, or a local Whisper server); without one the voice note is
+  logged and skipped, the admins' `transcription` self-check says why, and a
+  voice note read through the tools reads "not transcribed: the server needs
+  a transcription model".
 - The Telegram copy carries a `✨ Summarize` inline button (`wa_sum:<hash>` →
   `TelegramBot.handle_whatsapp_summary_callback`), which summarizes the
   transcript on demand with the model (`core/voice.summarize_text`) and edits

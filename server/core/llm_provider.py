@@ -39,7 +39,7 @@ class Provider:
     key_env: str
     # Model per profile (core/purposes.py): fast = background jobs, balanced = chat, deep.
     models: Dict[str, str]
-    # Audio → text with the same key; "" keeps the default transcription model (Gemini).
+    # Its own audio → text model, with the same key ("": it hears no audio; core/llm.py transcriber).
     transcribe: str = ""
     # Where to get a key (shown next to the field).
     key_url: str = ""
@@ -137,10 +137,17 @@ JOB_PROFILES = {"chat": "balanced", "search": "balanced"}
 
 def job_model(job: str) -> Optional[str]:
     """The chosen provider's model for a core/llm.py job (None: keep the built-in default)."""
-    if job == "transcribe":
-        p = chosen()
-        return (p.transcribe or None) if p is not None else None
     return profile_model(JOB_PROFILES.get(job, "fast"))
+
+
+def audio_model(chat_provider: str = "") -> Optional[str]:
+    """The audio → text model of the chosen provider; with no choice, of the
+    provider whose LiteLLM name is ``chat_provider`` (the chat model's). None
+    when that provider hears no audio (Claude, a local model)."""
+    p = chosen()
+    if p is None:
+        p = PROVIDERS.get(chat_provider)
+    return (p.transcribe or None) if p is not None else None
 
 
 def catalog() -> Optional[List[Dict[str, Any]]]:

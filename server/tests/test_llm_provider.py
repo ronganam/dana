@@ -147,7 +147,8 @@ async def main() -> None:
         check("in the provider's env name for LiteLLM", os.environ.get("OPENAI_API_KEY") == OPENAI_KEY)
         check("every job follows: chat / search balanced, background fast, transcription OpenAI's",
               llm.model("chat") == "openai/gpt-5.5" and llm.model("search") == "openai/gpt-5.5"
-              and llm.model("calls") == "openai/gpt-5.4-mini" and llm.model("transcribe") == "openai/gpt-4o-transcribe")
+              and llm.model("calls") == "openai/gpt-5.4-mini"
+              and llm.transcriber() == llm.Transcriber("openai/gpt-4o-transcribe", "provider"))
         check("purposes follow their profile", llm.model_for("weekly_review") == "openai/gpt-5.4-mini"
               and llm.model_for("chat") == "openai/gpt-5.5")
         profiles = models.list_profiles()
@@ -179,7 +180,7 @@ async def main() -> None:
         status, body = await call(c, "PUT", ADMIN, {"provider": "claude", "key": CLAUDE_KEY})
         check("switching to Claude: its key in env, OpenAI's (ours) taken out, Claude's models",
               status == 200 and os.environ.get("ANTHROPIC_API_KEY") == CLAUDE_KEY and "OPENAI_API_KEY" not in os.environ
-              and llm.model("chat") == "anthropic/claude-sonnet-5-5" and llm.model("transcribe") == "gemini/gemini-3.1-flash-lite"
+              and llm.model("chat") == "anthropic/claude-sonnet-5-5" and llm.transcriber() is None
               and [p.model for p in models.list_profiles()][0] == "anthropic/claude-haiku-5-5"
               and body["key"]["last4"] == "QRST", body)
         status, body = await call(c, "PUT", ADMIN, {"provider": "openai"})
