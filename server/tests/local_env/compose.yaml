@@ -4,7 +4,8 @@
 # The app and the stubs are only on `internal` (no route out of the machine);
 # `gateway` is the one container also on `edge`, publishing the app and the
 # stubs' control API on 127.0.0.1.
-name: dana-local
+# bin/local-env.sh sets the name and the state folder per environment (DANA_LOCAL_NAME).
+name: ${DANA_LOCAL_NAME:-dana-local}
 
 x-image: &image
   image: ${DANA_LOCAL_IMAGE:-dana-local/app:latest}
@@ -13,7 +14,7 @@ x-image: &image
 services:
   app:
     <<: *image
-    env_file: .state/app.env
+    env_file: ${DANA_LOCAL_STATE:-.state}/app.env
     volumes:
       - data:/app/db
     networks:

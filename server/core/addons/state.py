@@ -10,27 +10,25 @@ services are stopped (core/addons/scheduler.py), its routes answer 404
 (core/addons_api.py). An addon that ``depends`` on a disabled addon is
 disabled with it. ``everyone`` addons (``essentials``) cannot be disabled.
 
-The set is read from the database and kept for :data:`CACHE_TTL_SECONDS`, so
-a change made by another process (``bin/dana addons disable``) reaches the
-server within that time; a change made here applies at once.
+The set is kept in memory and read again whenever the database changed since
+the last lookup (:class:`core.db.ChangeWatch`), so a change made here or by
+another process (``bin/dana addons disable``) applies to the next lookup.
 """
 
 import datetime
 import logging
 import sqlite3
-import time
 from typing import FrozenSet, Optional, Tuple
 
-from core.db import get_db_connection
+from core.db import ChangeWatch, get_db_connection
 from core.users import User
 from core.addons.addon import all_addons, get_addon, version
 
 logger = logging.getLogger(__name__)
 
-CACHE_TTL_SECONDS = 5.0
-
-# (loaded at, addon registry version, explicitly disabled, disabled with what they need)
-_cache: Optional[Tuple[float, int, FrozenSet[str], FrozenSet[str]]] = None
+# (addon registry version, explicitly disabled, disabled with what they need)
+_cache: Optional[Tuple[int, FrozenSet[str], FrozenSet[str]]] = None
+_watch = ChangeWatch()
 
 
 class CannotDisable(ValueError):
@@ -72,10 +70,10 @@ def _with_dependents(explicit: FrozenSet[str]) -> FrozenSet[str]:
 def _current() -> Tuple[FrozenSet[str], FrozenSet[str]]:
     global _cache
     c = _cache
-    if c is None or time.monotonic() - c[0] > CACHE_TTL_SECONDS or c[1] != version():
+    if _watch.changed() or c is None or c[0] != version():
         explicit = _read()
-        c = _cache = (time.monotonic(), version(), explicit, _with_dependents(explicit))
-    return c[2], c[3]
+        c = _cache = (version(), explicit, _with_dependents(explicit))
+    return c[1], c[2]
 
 
 def invalidate() -> None:

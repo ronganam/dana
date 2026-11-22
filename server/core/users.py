@@ -20,9 +20,9 @@ core/devices.py), and never stored. ``API_TOKEN`` (env), when set, is always a
 valid token of the first admin user and is not stored.
 
 Lookups run on every request and every Telegram update, so they read an
-in-memory copy of the tables. Changes made through this module refresh it at
-once; changes made by another process are picked up within
-:data:`CACHE_TTL_SECONDS`.
+in-memory copy of the tables, read again whenever the database changed since
+the last lookup (:class:`core.db.ChangeWatch`): a change made through this
+module or by another process (``bin/dana``) applies to the next lookup.
 
 **The current user.** Work done for a user runs with that user bound to a
 context variable: the web auth middleware binds the request's user, the
@@ -48,11 +48,10 @@ from dataclasses import dataclass
 from typing import Dict, FrozenSet, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from core import access, user_rows
-from core.db import get_db_connection
+from core.db import ChangeWatch, get_db_connection
 
 logger = logging.getLogger(__name__)
 
-CACHE_TTL_SECONDS = 10.0
 # last_used_at is written at most this often per token.
 TOUCH_INTERVAL_SECONDS = 3600.0
 DEFAULT_FIRST_USER_NAME = user_rows.DEFAULT_FIRST_USER_NAME
@@ -112,7 +111,6 @@ class Identity:
 
 @dataclass
 class _Snapshot:
-    loaded_at: float
     users: Dict[str, User]
     first_admin_id: Optional[str]
     token_by_hash: Dict[str, Tuple[str, str]]  # token_hash -> (token id, user id)
@@ -122,6 +120,7 @@ class _Snapshot:
 
 
 _snapshot: Optional[_Snapshot] = None
+_watch = ChangeWatch()
 _touched: Dict[str, float] = {}
 
 
@@ -175,7 +174,6 @@ def _load() -> _Snapshot:
                 first_admin_id = r["id"]
         tokens = conn.execute("SELECT id, user_id, token_hash, session_hash FROM user_tokens").fetchall()
     return _Snapshot(
-        loaded_at=time.monotonic(),
         users=users,
         first_admin_id=first_admin_id,
         token_by_hash={t["token_hash"]: (t["id"], t["user_id"]) for t in tokens},
@@ -210,7 +208,7 @@ def write_demo_ids(conn: sqlite3.Connection, ids: Sequence[str]) -> None:
 def _current() -> _Snapshot:
     global _snapshot
     snap = _snapshot
-    if snap is None or time.monotonic() - snap.loaded_at > CACHE_TTL_SECONDS:
+    if _watch.changed() or snap is None:
         snap = _snapshot = _load()
     return snap
 

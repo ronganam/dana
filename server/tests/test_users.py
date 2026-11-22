@@ -225,17 +225,12 @@ def test_cache():
     elapsed = time.process_time() - started
     check("lookups are cheap (60k in well under a second of CPU, no DB per call)", elapsed < 1.0, f"{elapsed:.2f}s")
 
-    # A change made by another process (bin/dana users) shows up within the TTL.
+    # A change made by another process (bin/dana users) shows up on the next lookup.
     with get_db_connection() as conn:
         conn.execute("UPDATE users SET name = 'Dana Renamed' WHERE id = ?", (STATE["member"].id,))
         conn.commit()
-    saved = users.CACHE_TTL_SECONDS
-    users.CACHE_TTL_SECONDS = 0.0
-    try:
-        check("another process's change is picked up after the TTL",
-              users.get(STATE["member"].id).name == "Dana Renamed")
-    finally:
-        users.CACHE_TTL_SECONDS = saved
+    check("another process's change is picked up by the next lookup",
+          users.get(STATE["member"].id).name == "Dana Renamed")
 
 
 # --- Web auth middleware ------------------------------------------------------------

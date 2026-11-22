@@ -5,9 +5,11 @@ One row per (user, addon). Credentials are stored only encrypted
 with ``everyone=True`` (``essentials``) have no row: every user has them.
 
 Lookups happen on every tool list and tool call, so they read an in-memory
-copy of the table: changes made here refresh it at once, changes made by
-another process are picked up within :data:`CACHE_TTL_SECONDS`. Decrypted
-credentials are cached with it.
+copy of the table, read again whenever the database changed since the last
+lookup (:class:`core.db.ChangeWatch`): a change made here or by another
+process (``bin/dana addons connect``) applies to the next lookup. Decrypted
+credentials are cached with it, and kept across a reload for rows that did
+not change.
 """
 
 import contextlib
@@ -16,21 +18,18 @@ import logging
 import os
 import re
 import sqlite3
-import time
 from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import Any, Callable, Dict, Iterator, List, Mapping, Optional, Set, Tuple
 
 from core import user_rows, users
-from core.db import get_db_connection
+from core.db import ChangeWatch, get_db_connection
 from core.users import User
 from core.addons import addresses, crypto, state
 from core.addons.addon import (ADDRESS, NAME, TELEGRAM_CHAT, Addon, InvalidValue,
                                          check_values, get_addon, all_addons)
 
 logger = logging.getLogger(__name__)
-
-CACHE_TTL_SECONDS = 10.0
 
 # Who may set any address or any Telegram chat, and give anyone an addon with
 # ``change_requires`` (docs/access.md, "Security rules").
@@ -101,29 +100,33 @@ class _Row:
 
 @dataclass
 class _Snapshot:
-    loaded_at: float
     rows: Dict[str, Dict[str, _Row]]  # user id -> addon -> row
     plain: Dict[Tuple[str, str], Tuple[Mapping[str, str], Mapping[str, Any]]] = field(default_factory=dict)
 
 
 _snapshot: Optional[_Snapshot] = None
+_watch = ChangeWatch()
 
 
-def _load() -> _Snapshot:
+def _load(previous: Optional[_Snapshot]) -> _Snapshot:
     rows: Dict[str, Dict[str, _Row]] = {}
     with get_db_connection() as db:
         for r in db.execute("SELECT * FROM connections ORDER BY user_id, addon"):
             rows.setdefault(r["user_id"], {})[r["addon"]] = _Row(
                 credentials=r["credentials"], settings=r["settings"], account=r["account"],
                 created_at=r["created_at"], updated_at=r["updated_at"], account_conflict=r["account_conflict"])
-    return _Snapshot(loaded_at=time.monotonic(), rows=rows)
+    snap = _Snapshot(rows=rows)
+    if previous is not None:  # decrypted values of the rows that did not change
+        snap.plain.update({key: plain for key, plain in previous.plain.items()
+                           if previous.rows.get(key[0], {}).get(key[1]) == rows.get(key[0], {}).get(key[1])})
+    return snap
 
 
 def _current() -> _Snapshot:
     global _snapshot
     snap = _snapshot
-    if snap is None or time.monotonic() - snap.loaded_at > CACHE_TTL_SECONDS:
-        snap = _snapshot = _load()
+    if _watch.changed() or snap is None:
+        snap = _snapshot = _load(snap)
     return snap
 
 

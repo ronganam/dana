@@ -153,7 +153,7 @@ An addon with a sidecar process declares `worker=Worker(port=8090, url_env="EXAM
 
 Three levels of "on":
 1. **Loaded**: found in a folder above.
-2. **Enabled on this server**: an admin can disable a loaded addon for everyone (Addons page, `POST /api/addons/<name>/disable`, `bin/dana addons disable <name>`; the `addon_state` table, `core/addons/state.py`). A disabled addon offers nothing: no tools, prompt parts, hooks, jobs, services (a running one is cancelled within seconds) or notify channels; its routes and `web/` files answer 404 `addon_disabled`; nobody can connect or change it (its connections and data are kept). Addons that depend on it are disabled with it. The running server sees a change, from the page or the CLI, within 5 seconds; no restart. `everyone` addons cannot be disabled.
+2. **Enabled on this server**: an admin can disable a loaded addon for everyone (Addons page, `POST /api/addons/<name>/disable`, `bin/dana addons disable <name>`; the `addon_state` table, `core/addons/state.py`). A disabled addon offers nothing: no tools, prompt parts, hooks, jobs, services (a running one is cancelled within seconds) or notify channels; its routes and `web/` files answer 404 `addon_disabled`; nobody can connect or change it (its connections and data are kept). Addons that depend on it are disabled with it. The running server sees a change, from the page or the CLI, on its next lookup (`core.db.ChangeWatch`); no restart. `everyone` addons cannot be disabled.
 3. **On for a user**: the user turned it on (with credentials, if it has any), or it is `default_on` / `everyone`.
 
 ## The catalog (marketplace)

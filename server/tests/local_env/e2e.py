@@ -28,6 +28,7 @@ with the reason the page shows).
 """
 
 import asyncio
+import datetime
 import json
 import os
 import pathlib
@@ -42,7 +43,7 @@ import aiohttp
 
 HERE = pathlib.Path(__file__).resolve().parent
 ROOT = HERE.parent.parent
-STATE = HERE / ".state"
+STATE = HERE / os.getenv("DANA_LOCAL_STATE", ".state")  # bin/local-env.sh names it per environment
 COMPOSE = ["docker", "compose", "-f", str(HERE / "compose.yaml")]
 BASE = f"http://127.0.0.1:{os.getenv('DANA_LOCAL_PORT', '18080')}"
 CTRL = f"http://127.0.0.1:{os.getenv('DANA_LOCAL_CONTROL_PORT', '18090')}"
@@ -59,7 +60,7 @@ SECRETS_IN_ENV = ("API_TOKEN", "CREDENTIALS_KEY", "TELEGRAM_BOT_TOKEN", "GOOGLE_
                   "WAHA_WEBHOOK_SECRET")
 # The admin's stub credentials bin/local-env.sh connects (connect_addons).
 STUB_SECRETS = ("local-ha-token-a", "local-waha-key", "local-google-refresh-token")
-DEFAULT_ADDONS = "tasks, shopping, knowledge, about, people, phone"
+DEFAULT_ADDONS = ["tasks", "shopping", "knowledge", "about", "people", "phone"]
 ALL_KINDS = ["essentials", "tasks", "shopping", "knowledge", "about", "people", "phone", "homeassistant", "whatsapp",
              "calendar", "cameras", "ops"]
 
@@ -292,6 +293,26 @@ FIXTURE_IDS = {
     "notifications": {"n1"},  # n2 is a muted app's notification: listed under the app, not active
     "facts": {"f1", "f2"},
 }
+FIXTURE_SQL = (ROOT / "tests" / "fixtures" / "db_9_0.sql").read_text()
+# The 9.0 fixture's own connections of the admin (old table ``integrations``): kept, not turned on again.
+FIXTURE_CONNECTED = set(re.findall(r"INSERT INTO integrations \(.*?\) VALUES \('[0-9a-f]+', '(\w+)'", FIXTURE_SQL))
+# A bought item leaves the list 12 hours after it was ticked (addons/shopping/values.py CLEAR_AFTER); the
+# fixture's s2 was ticked when the fixture was made, so the first read after the upgrade clears it once
+# that is more than 12 hours ago (always, now), raising the list's version.
+S2_TICKED = datetime.datetime.fromisoformat(re.search(r"VALUES \('s2',.*?'other', 1, '([^']+)'", FIXTURE_SQL).group(1))
+S2_CLEARED = datetime.datetime.now(datetime.timezone.utc) - S2_TICKED > datetime.timedelta(hours=12)
+FIXTURE_SHOPPING = ["s1"] if S2_CLEARED else ["s1", "s2"]
+
+
+def later_migrations() -> List[str]:
+    """Every migration after a baseline in this tree (core's and each official addon's), as the log names them:
+    what the converted 9.0 database gets."""
+    out = []
+    for folder in [ROOT / "core" / "db" / "migrations", *sorted((ROOT / "addons").glob("*/migrations"))]:
+        addon = "core" if folder.parent.name == "db" else folder.parent.name
+        out += [f"{addon}:{f.stem[1:]}" for f in sorted(folder.glob("m[0-9][0-9][0-9][0-9]_*.py"))
+                if not f.stem.startswith("m0001_")]
+    return out
 
 
 async def upgrade(c: Client) -> Dict[str, Any]:
@@ -300,12 +321,13 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     snap = "db-before-addons-from-0033.sqlite3"
     check("upgrade: first start logged the snapshot", f"Database snapshot before migrating: /app/db/snapshots/{snap}" in logs)
     applied = re.findall(r"Applied database migration (\S+)", logs)
-    check("upgrade: the 9.0 database converted to per-addon migrations, then only the later ones (core's, money's money_il)",
+    check("upgrade: the 9.0 database converted to per-addon migrations, then exactly the later ones (no baseline)",
           "Database converted to per-addon migrations (from version 33)" in logs
-          and applied and all(a.startswith("core:") or a == "money:0002_money_il" for a in applied),
-          [l for l in logs.splitlines() if "migrat" in l][:6])
-    check("upgrade: the first admin's default addons turned on (nothing read from env)",
-          f"Default addons turned on for Robin: {DEFAULT_ADDONS}" in logs and "Addons imported" not in logs)
+          and sorted(applied) == sorted(later_migrations()), (sorted(applied), sorted(later_migrations())))
+    turned_on = ", ".join(a for a in DEFAULT_ADDONS if a not in FIXTURE_CONNECTED)
+    check("upgrade: the first admin's default addons turned on, those 9.0 had kept (nothing read from env)",
+          FIXTURE_CONNECTED == {"core", "tasks"} and f"Default addons turned on for Robin: {turned_on}" in logs
+          and "Addons imported" not in logs, (FIXTURE_CONNECTED, [l for l in logs.splitlines() if "Default addons" in l]))
     check("upgrade: no CREDENTIALS_KEY error, no traceback at start",
           "CREDENTIALS_KEY" not in logs.split("Webhook & Web UI server listening")[0] and "Traceback" not in logs,
           [l for l in logs.splitlines() if "Traceback" in l or "CREDENTIALS_KEY" in l][:3])
@@ -337,7 +359,9 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     r = await c.get("/api/task-groups")
     check("upgrade: task lists keep their ids", FIXTURE_IDS["task_groups"] <= ids(r.body), r)
     r = await c.get("/api/shopping/items")
-    check("upgrade: shopping items s1 s2 (order kept)", [i["id"] for i in r.body or []][:2] == ["s1", "s2"], r)
+    check(f"upgrade: shopping items {' '.join(FIXTURE_SHOPPING)} (order kept; s2, bought over 12 hours ago, cleared)"
+          if S2_CLEARED else "upgrade: shopping items s1 s2 (order kept)",
+          [i["id"] for i in r.body or []] == FIXTURE_SHOPPING, r)
     r = await c.get("/api/projects")
     check("upgrade: project p1", FIXTURE_IDS["projects"] <= ids(r.body), r)
     r = await c.get("/api/projects/p1/items")
@@ -380,11 +404,16 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     r = await c.get("/api/review/wr1")
     check("upgrade: weekly review wr1", r.status == 200 and (r.body or {}).get("review", r.body or {}).get("id") == "wr1", r)
     r = await c.get("/api/phone/devices")
-    check("upgrade: phone device dev1", "dev1" in ids((r.body or {}).get("devices"), "device_id"), r)
+    devices = (r.body or {}).get("devices") or []
+    # 9.0's phone_devices row became a core device with a new id (phone migration 0002_push_on_devices).
+    check("upgrade: phone device dev1 is a device now: its name, FCM push, app version and last fetch kept",
+          [(d["name"], d["kind"], d["transport"], d["app_version"], d["last_fetch_at"]) for d in devices]
+          == [("Test phone", "phone", "fcm", "8.1.0", "2026-11-01T08:00:00+00:00")]
+          and devices[0]["device_id"] != "dev1", r)
     r = await c.get("/api/shopping")
-    check("upgrade: the shopping screen: s1 s2 with their names, under other, version 0",
-          r.status == 200 and [(i["id"], i["category"]) for i in (r.body or {}).get("items", [])][:2] == [("s1", "other"), ("s2", "other")]
-          and (r.body or {}).get("list", {}).get("version") == 0, r)
+    check(f"upgrade: the shopping screen: {' '.join(FIXTURE_SHOPPING)} under other, version {int(S2_CLEARED)}",
+          r.status == 200 and [(i["id"], i["category"]) for i in (r.body or {}).get("items", [])]
+          == [(i, "other") for i in FIXTURE_SHOPPING] and (r.body or {}).get("list", {}).get("version") == int(S2_CLEARED), r)
     code, out = dexec("python", "-c", "import sqlite3; c=sqlite3.connect('/app/db/db.sqlite3');"
                       "print(sorted(r[0] for r in c.execute(\"SELECT name FROM sqlite_master WHERE name LIKE 'catalog%' "
                       "OR name = 'shopping_operations'\")))")
@@ -404,10 +433,14 @@ async def upgrade(c: Client) -> Dict[str, Any]:
         "person": "person.robin", "car_sensor": "sensor.pixel_8_bluetooth_connection", "car_device": "CarKit-1234",
         "phone_interactive_sensor": "binary_sensor.robin_phone_interactive",
         "phone_battery_sensor": "sensor.robin_phone_battery", "phone_notify_service": "mobile_app_robin_phone",
-        "weather_entity": "weather.forecast_home"}, settings.get("homeassistant"))
+        "weather_entity": "weather.forecast_home", "tv_entity": None, "tv_channel_command": None},
+        settings.get("homeassistant"))
+    # bin/local-env.sh connected WhatsApp with the CLI (another process, no event loop): the server's
+    # learn_account job asks WAHA within a minute (addons/whatsapp/accounts.py).
+    account = await until(lambda: _account(c, ADMIN_TOKEN), timeout=75, every=1)
     check("upgrade: whatsapp voice chat setting and the account learned from WAHA",
-          settings.get("whatsapp", {}).get("voice_telegram_chat_id") == ADMIN_TG
-          and by_kind.get("whatsapp", {}).get("account") == ADMIN_ACCOUNT, by_kind.get("whatsapp"))
+          settings.get("whatsapp", {}).get("voice_telegram_chat_id") == ADMIN_TG and account == ADMIN_ACCOUNT,
+          (settings.get("whatsapp"), account))
     check("upgrade: calendar_id setting", settings.get("calendar", {}).get("calendar_id") == "primary", settings.get("calendar"))
     check("upgrade: cameras url; shopping has only the active-list setting", settings.get("cameras", {}).get("url") == "http://stubs:5000"
           and settings.get("shopping") == {"active_list": None}, (settings.get("cameras"), settings.get("shopping")))
@@ -432,7 +465,8 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     check("upgrade: self-check ha_watcher connected, no ha_entities missing",
           keys.get("ha_watcher", {}).get("ok") is True and keys.get("ha_entities", {}).get("ok", True) is True,
           {k: keys.get(k) for k in ("ha_watcher", "ha_entities")})
-    return {"admin_id": admin_id, "addons": integ.text}
+    # What the restart must leave unchanged: read now, after the WhatsApp account was learned.
+    return {"admin_id": admin_id, "addons": (await c.get("/api/addons")).text}
 
 
 async def restart_and_key_checks(c: Client, before: Dict[str, Any]) -> None:
@@ -556,12 +590,16 @@ WEB_LOAD = [
 
 # The web app's own scripts, in static/index.html's order (static/app.js says how they fit together).
 APP_SCRIPTS = [f"/static/{name}.js" for name in (
-    "dana", "app-core", "app-nav", "app-panels", "app-stream", "app-thread", "app-chat", "app-voice", "app-tasks",
-    "app-calls", "app-settings", "app-debug", "app")]
+    "dana", "app-core", "app-places", "app-nav", "app-panels", "app-stream", "app-thread", "app-chat", "app-voice",
+    "app-settings", "app-debug", "app-now-core", "app-now", "app")]
+# The pages that left the shell for their addon's web/ folder (Tasks, Calls), as /api/addons names them.
+ADDON_PAGES = ["/addons/tasks/web/tasks.js", "/addons/tasks/web/tasks-core.js", "/addons/tasks/web/tasks.css",
+               "/addons/phone/web/calls.js", "/addons/phone/web/calls-core.js", "/addons/phone/web/calls.css",
+               "/addons/phone/web/inbox.js"]
 
 PAGES = ["/", "/dashboard", "/calendar", *APP_SCRIPTS, "/static/styles.css", "/static/kit.css", "/manifest.json",
          "/sw.js", "/static/addons.js", "/static/addons.css", "/shopping", "/addons/shopping/web/shopping.js",
-         "/addons/shopping/web/shopping-core.js", "/addons/shopping/web/shopping.css"]
+         "/addons/shopping/web/shopping-core.js", "/addons/shopping/web/shopping.css", *ADDON_PAGES]
 
 
 async def existing_clients(c: Client) -> None:
@@ -577,6 +615,9 @@ async def existing_clients(c: Client) -> None:
     check("web: the page loads the app's scripts in order, before the core screens' scripts",
           0 < max(at) < index.text.find('"/static/review.js"') and at == sorted(at), at)
     check("web: the service worker pre-caches every app script", all(f'"{s}"' in sw.text for s in APP_SCRIPTS), sw.status)
+    listed = {p["panel"] for a in ((await c.get("/api/addons")).body or {}).get("addons", []) for p in a.get("web") or []}
+    check("web: /api/addons lists the Tasks, Inbox and Calls pages by those files",
+          {p for p in ADDON_PAGES if p.endswith(".js") and "-core" not in p} <= listed, sorted(listed))
 
     # Login page → cookie → the same user; a bad token goes back to the login page.
     r = await c.get("/", token=None)
@@ -705,8 +746,15 @@ async def second_user(c: Client, admin_id: str) -> Dict[str, str]:
         "member": {"name": MEMBER_NAME, "id": maya_id, "token": token}}, indent=2))
 
     me = await until(lambda: _me(c, token), timeout=15)
-    check("member: /api/me with the DB token: member, only core", me and me.get("access") == "member"
-          and me.get("kinds") == ["essentials"], me)
+    check("member: /api/me with the DB token: member, core and the default addons bin/dana users add gave her",
+          me and me.get("access") == "member" and me.get("kinds") == ["essentials", *DEFAULT_ADDONS], me)
+    # She turns her defaults off (as on the Addons page), so every per-user check below starts from core only.
+    for kind in DEFAULT_ADDONS:
+        r = await c.delete(f"/api/addons/{kind}", token)
+        check(f"member: DELETE /api/addons/{kind} turns her default off", r.status == 200
+              and (r.body or {}).get("connected") is False and (r.body or {}).get("disconnected") is True, r)
+    me = await _me(c, token)
+    check("member: /api/me now only core", (me or {}).get("kinds") == ["essentials"], me)
 
     for path, kind in NOT_CONNECTED:
         r = await c.get(path, token)
@@ -944,7 +992,7 @@ async def sharing(c: Client, maya: Dict[str, str]) -> None:
     names = [i["name"] for i in body.get("items", [])]
     check("share: use + move_items: the shared list is hers now, her items moved onto it",
           r.status == 200 and body["list"]["id"] == lid and body["list"]["access"] == "edit"
-          and {"Pita", "חלב"} <= set(names) and {"s1", "s2"} <= ids(body.get("items")), r)
+          and {"Pita", "חלב"} <= set(names) and set(FIXTURE_SHOPPING) <= ids(body.get("items")), r)
     check("share: one undo for the whole step", (body.get("undo") or {}).get("label")
           == f"Switched to {ADMIN_NAME}'s shopping list and moved 2 items", body.get("undo"))
     check("share: the admin's stream saw the change", first[0] == "changed" and first[1]["list_id"] == lid
@@ -1287,10 +1335,11 @@ async def security(c: Client, maya: Dict[str, str]) -> None:
           and (r.body or {}).get("environment_variables") == {}, r)
     r = await c.get("/api/debug/sessions/e2e-admin-tools")
     shown = (r.body or {}).get("environment_variables") or {}
+    # Addon credentials live encrypted in the database, not in env; the env's secrets are masked by name.
     check("debug: the admin's export has the environment, credentials masked",
-          r.status == 200 and shown.get("TIMEZONE") == "Asia/Jerusalem"
-          and all(shown.get(k) == "******" for k in ("HOMEASSISTANT_HOST", "HOMEASSISTANT_TOKEN", "WAHA_URL",
-                                                     "WAHA_API_KEY", "API_TOKEN", "CREDENTIALS_KEY")), sorted(shown)[:8])
+          r.status == 200 and shown.get("TIMEZONE") == "Asia/Jerusalem" and shown.get("OPENAI_API_BASE") == ENV["OPENAI_API_BASE"]
+          and all(shown.get(k) == "******" for k in (*SECRETS_IN_ENV, "OPENAI_API_KEY")),
+          {k: shown.get(k) for k in ("TIMEZONE", "OPENAI_API_BASE", *SECRETS_IN_ENV, "OPENAI_API_KEY")})
     check("debug: no secret value in either export", not no_secret_in(r.text), no_secret_in(r.text))
 
     r = await c.put("/api/addons/cameras", {"settings": {"url": "http://stubs:5000"}}, tok)
@@ -1526,7 +1575,7 @@ async def addons_page(c: Client, maya: Dict[str, str]) -> None:
           r.status == 200 and t.body == {"name": "homeassistant", "checked": True, "ok": True, "reason": ""}
           and any(x["path"] == "/api/config" and x["token_ok"] for x in log_b), (r, t))
     r = await c.put("/api/addons/homeassistant", {"credentials": {"host": original,
-                                                                        "token": ENV["HOMEASSISTANT_TOKEN"]}})
+                                                                        "token": STUB_SECRETS[0]}})
     t = await c.post("/api/addons/homeassistant/test")
     check("flow: back to the first stub, test passes again",
           r.status == 200 and integ_field(r.body, "host").get("value") == original and t.body.get("ok") is True, (r, t))
@@ -1562,14 +1611,15 @@ async def shopping_page(c: Client, maya: Dict[str, str]) -> None:
     tok, mid = maya["token"], maya["id"]
     page = await c.get("/shopping")
     check("shopping: /shopping serves the app shell, which builds its navigation from /api/addons",
-          page.status == 200 and 'id="rail-addons"' in page.text and "/static/app-panels.js" in page.text
+          page.status == 200 and 'id="rail-places"' in page.text and "/static/app-panels.js" in page.text
           and "shopping.js" not in page.text, page)
     r = await c.get("/shopping", token=None)
     check("shopping: signed out → the login page, coming back to /shopping",
           r.status in (302, 303) and r.headers.get("Location", "").endswith("next=/shopping"), (r.status, r.headers.get("Location")))
     listed = next((a for a in ((await c.get("/api/addons", token=tok)).body or {}).get("addons", []) if a["name"] == "shopping"), {})
     check("shopping: /api/addons gives its page to a user who has it",
-          (listed.get("web") or {}).get("panel") == "/addons/shopping/web/shopping.js", listed.get("web"))
+          [(p["id"], p["panel"], p["nav"]["label"]) for p in listed.get("web") or []]
+          == [("shopping", "/addons/shopping/web/shopping.js", "Shopping")], listed.get("web"))
     files = ("shopping.js", "shopping-core.js", "shopping.css")
     assets = {f: await c.get(f"/addons/shopping/web/{f}", token=tok) for f in files}
     check("shopping: its page files are served signed in",
@@ -1617,7 +1667,7 @@ async def shopping_page(c: Client, maya: Dict[str, str]) -> None:
 
 async def main() -> int:
     if (STATE / "users.json").exists():
-        print("This environment already ran the end-to-end script once (tests/local_env/.state/users.json exists).\n"
+        print(f"This environment already ran the end-to-end script once ({STATE / 'users.json'} exists).\n"
               "Run `bin/local-env.sh reset` for a fresh environment, then `bin/local-env.sh test`.")
         return 2
     async with aiohttp.ClientSession() as session:

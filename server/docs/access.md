@@ -104,10 +104,11 @@ first user's values), tables from migrations `m0002_users` and
   the server timezone (`core/clock.py`, their Home Assistant), bootstrap and
   migrations, startup logging, and `bin/dana users list` (marks them). Nothing
   else.
-- **Lookups are cheap**: an in-memory copy of the three tables, rebuilt after
-  every change made through `core/users.py` and at most every
-  `CACHE_TTL_SECONDS` (10 s), so a change made by another process
-  (`bin/dana`) takes effect within 10 s.
+- **Lookups are cheap**: an in-memory copy of the three tables, rebuilt
+  whenever the database changed since the last lookup (`core.db.ChangeWatch`
+  reads SQLite's file change counter), so a change made through
+  `core/users.py` or by another process (`bin/dana`) applies to the next
+  lookup.
 
 ## The current user
 
@@ -564,7 +565,7 @@ needs no restart: the connection cache, the tool list and the prompt change
 at once, the watcher starts / restarts / stops, the WhatsApp account is
 learned, default task lists and the shopping list are made
 (`test_addons_api.py`). A change made by `bin/dana` (another
-process) reaches the server through the 10 s cache refresh and the watcher's
+process) reaches the server on its next lookup (`core.db.ChangeWatch`) and the watcher's
 periodic reconcile (`HA_WATCH_RECONCILE_SECONDS`); the CLI runs `on_connect`
 itself. Importing the `addons` package registers
 every addon (explicit imports; `ADDON_ORDER` in `addons/__init__.py` fixes
@@ -588,8 +589,9 @@ API (`core/addons/`):
 
 `Connection` = `user`, `addon`, `credentials` (decrypted), `settings` (defaults
 filled in), `account`. Lookups read an in-memory copy of the table
-(decrypted values included), refreshed on every change made through `store`
-and at most every `CACHE_TTL_SECONDS` (10 s) for changes made elsewhere.
+(decrypted values included), read again whenever the database changed since
+the last lookup (`core.db.ChangeWatch`), so a change made through `store` or
+by another process (`bin/dana addons connect`) applies to the next lookup.
 
 Rules:
 
@@ -940,7 +942,7 @@ Plain argparse (`cli/`), `--help` on every command; run where the server's env i
 (`DATABASE_PATH`, `CREDENTIALS_KEY`), in production in the pod:
 `kubectl exec -n <namespace> deploy/<deployment> -- bin/dana users list`.
 It refuses to run on a database with pending migrations (start the server
-once). The running server sees a change within its 10 s cache refresh. Tests:
+once). The running server sees a change on its next lookup. Tests:
 `bin/test test_dana_cli`. The commands that run the server's addons (`new`,
 `install`, `remove`, `disable`, `enable`) are in `../docs/addons.md`.
 

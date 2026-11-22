@@ -14,8 +14,8 @@ sends the code to ``POST /api/pair`` and gets its token back
 (:func:`redeem`). Server code starts one with :func:`start_pairing`.
 
 Lookups by token run on every request, so they read an in-memory copy of the
-table (refreshed after every change made here, and at most every
-:data:`CACHE_TTL_SECONDS` for changes made by another process).
+table, read again whenever the database changed since the last lookup
+(:class:`core.db.ChangeWatch`: a change made here or by another process).
 """
 
 import datetime
@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
 
 from core import users
-from core.db import get_db_connection
+from core.db import ChangeWatch, get_db_connection
 from core.users import User
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,6 @@ MAX_OPEN_PAIRINGS = 10
 NAME_MAX = 60
 ROOM_MAX = 40
 
-CACHE_TTL_SECONDS = 10.0
 # last_seen_at is written at most this often per device.
 TOUCH_INTERVAL_SECONDS = 300.0
 
@@ -187,7 +186,7 @@ def _device(row: sqlite3.Row) -> Device:
 # --- Cache -----------------------------------------------------------------------------
 
 _by_token: Optional[Dict[str, Device]] = None
-_loaded_at = 0.0
+_watch = ChangeWatch()
 _touched: Dict[str, float] = {}
 
 
@@ -199,14 +198,14 @@ def invalidate() -> None:
 
 def by_token_id(token_id: Optional[str]) -> Optional[Device]:
     """The device whose own token is ``token_id`` (None: a token of no device)."""
-    global _by_token, _loaded_at
+    global _by_token
     if not token_id:
         return None
-    if _by_token is None or time.monotonic() - _loaded_at > CACHE_TTL_SECONDS:
+    if _watch.changed() or _by_token is None:
         with get_db_connection() as conn:
             # scoped: every paired device, for token lookups (the token decides the user)
             rows = conn.execute("SELECT * FROM devices WHERE token_id IS NOT NULL").fetchall()
-        _by_token, _loaded_at = {r["token_id"]: _device(r) for r in rows}, time.monotonic()
+        _by_token = {r["token_id"]: _device(r) for r in rows}
     return _by_token.get(token_id)
 
 

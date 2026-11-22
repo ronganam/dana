@@ -14,7 +14,10 @@
 #
 # Environment (all optional):
 #   DANA_LOCAL_PORT          web UI / API on 127.0.0.1 (default 18080)
-#   DANA_LOCAL_CONTROL_PORT  the stubs' control API on 127.0.0.1 (default 18090)
+#   DANA_LOCAL_NAME          the environment's name: its compose project, image dana-local/<name>:latest and
+#                            state folder tests/local_env/.state-<name> (default dana-local on port 18080, with
+#                            image dana-local/app:latest and .state; else dana-local-<port>)
+#   DANA_LOCAL_CONTROL_PORT  the stubs' control API on 127.0.0.1 (default 18090 on port 18080, else port+100)
 #   DANA_LOCAL_DB            seed from this SQLite file (a copy of a real database) instead of the
 #                            9.0 fixture; see docs/local-testing.md before using it
 #   DANA_LOCAL_ENV_EXTRA     file of KEY=value lines appended to the generated env (they win)
@@ -30,10 +33,27 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_DIR="$ROOT/tests/local_env"
-STATE="$ENV_DIR/.state"
-IMAGE="${DANA_LOCAL_IMAGE:-dana-local/app:latest}"
+# Several environments run side by side when each has its own port (or name): the
+# name gives the compose project (containers, network, volume), the image tag and
+# the state folder; the port gives the control port. Port 18080 keeps the plain names.
 PORT="${DANA_LOCAL_PORT:-18080}"
-export DANA_LOCAL_IMAGE="$IMAGE" DANA_LOCAL_PORT="$PORT" DANA_LOCAL_CONTROL_PORT="${DANA_LOCAL_CONTROL_PORT:-18090}"
+if [[ "$PORT" == "18080" ]]; then
+    NAME="${DANA_LOCAL_NAME:-dana-local}"
+    CONTROL_PORT="${DANA_LOCAL_CONTROL_PORT:-18090}"
+else
+    NAME="${DANA_LOCAL_NAME:-dana-local-$PORT}"
+    CONTROL_PORT="${DANA_LOCAL_CONTROL_PORT:-$((PORT + 100))}"
+fi
+if [[ "$NAME" == "dana-local" ]]; then
+    STATE_DIR=.state
+    IMAGE="${DANA_LOCAL_IMAGE:-dana-local/app:latest}"
+else
+    STATE_DIR=".state-$NAME"
+    IMAGE="${DANA_LOCAL_IMAGE:-dana-local/$NAME:latest}"
+fi
+STATE="$ENV_DIR/$STATE_DIR"
+export DANA_LOCAL_NAME="$NAME" DANA_LOCAL_IMAGE="$IMAGE" DANA_LOCAL_PORT="$PORT" \
+    DANA_LOCAL_CONTROL_PORT="$CONTROL_PORT" DANA_LOCAL_STATE="$STATE_DIR"
 
 compose() {
     local files=(-f "$ENV_DIR/compose.yaml")
@@ -224,7 +244,7 @@ up() {
     local token
     token="$(grep '^API_TOKEN=' "$STATE/app.env" | cut -d= -f2-)"
     echo
-    echo "Dana (local) is up: http://127.0.0.1:$PORT  (log in with the admin token: $token)"
+    echo "Dana (local) is up: http://127.0.0.1:$PORT  ($NAME; log in with the admin token: $token)"
     echo "Second test user: run 'bin/local-env.sh test' once; its token is then in $STATE/users.json"
 }
 
@@ -238,5 +258,5 @@ case "${1:-}" in
     reset) compose down -v --remove-orphans; rm -rf "$STATE"; up ;;
     restart) compose restart app; wait_healthy ;;
     exec) shift; compose exec -T app "$@" ;;
-    *) sed -n '2,30p' "$0"; exit 2 ;;
+    *) sed -n '2,31p' "$0"; exit 2 ;;
 esac
