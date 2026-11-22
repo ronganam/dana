@@ -1,5 +1,9 @@
 package io.github.ronganam.dana.tv
 
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.ui.graphics.compositeOver
+import io.github.ronganam.dana.ui.theme.Hue
+import io.github.ronganam.dana.ui.theme.hues
 import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -181,17 +185,37 @@ fun AppTile(app: TvApp, focusRequester: FocusRequester?, modifier: Modifier = Mo
     }
 }
 
+/**
+ * A Home Assistant control's hue (Ember's colour coding, same on every screen):
+ * lights amber, climate and sensors sky, switches and fans teal, covers sage,
+ * locks and alarms rose, media plum.
+ */
+private fun entityHue(id: String, entity: HaEntity?): Hue = when (entity?.domain ?: id.substringBefore('.')) {
+    "light" -> Hue.AMBER
+    "switch", "fan", "input_boolean", "script", "scene", "automation" -> Hue.TEAL
+    "cover", "valve", "vacuum" -> Hue.SAGE
+    "lock", "alarm_control_panel", "siren" -> Hue.ROSE
+    "media_player", "remote" -> Hue.PLUM
+    else -> Hue.SKY
+}
+
 @Composable
 private fun EntityTile(id: String, entity: HaEntity?, onClick: () -> Unit) {
     val active = entity?.active == true
-    FocusTile(Modifier.size(TILE_W, TILE_H), onClick = onClick) { focused ->
+    val h = hues
+    val hue = h.of(entityHue(id, entity))
+    val rest = MaterialTheme.colorScheme.surfaceContainer
+    // On: the hue's tint as an opaque fill (no alpha layer); always a 3dp start bar in the hue. Static: only focus moves.
+    val fill = remember(active, hue, rest) { if (active) h.tint(hue).compositeOver(rest) else rest }
+    FocusTile(Modifier.size(TILE_W, TILE_H), background = fill, onClick = onClick) { focused ->
+        Box(Modifier.align(Alignment.CenterStart).width(3.dp).fillMaxHeight().background(if (active) hue else hue.copy(alpha = 0.5f)))
         Column(Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 9.dp)) {
             Text(entity?.name ?: id, style = TvType.name, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 color = if (focused) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
             Row(verticalAlignment = Alignment.Bottom) {
                 Text(entity?.displayState() ?: "…", style = TvType.value, maxLines = 1,
-                    color = if (active) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface)
+                    color = if (active) h.text(hue) else MaterialTheme.colorScheme.onSurface)
                 entity?.detail()?.let {
                     Spacer(Modifier.width(8.dp))
                     Text(it, Modifier.padding(bottom = 5.dp).weight(1f, fill = false), style = TvType.small,

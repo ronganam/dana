@@ -1,5 +1,8 @@
 package io.github.ronganam.dana.kiosk
 
+import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.SectionLabel
+import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Intent
 import android.provider.Settings
@@ -74,6 +77,7 @@ fun KioskSettingsDialog(
                 Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                MonoLabel("Settings", color = MaterialTheme.colorScheme.primary)
                 Text("Dana kiosk", style = MaterialTheme.typography.headlineSmall)
                 Text("v${BuildConfig.VERSION_NAME} · $status", style = MaterialTheme.typography.bodySmall)
 
@@ -84,16 +88,25 @@ fun KioskSettingsDialog(
                 OutlinedTextField(path, { path = it }, label = { Text("Dashboard path") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth())
 
-                Text("Wake word sensitivity — fires at score ≥ %.2f".format(threshold), style = MaterialTheme.typography.titleSmall)
+                SectionLabel("Wake word sensitivity — fires at score ≥ %.2f".format(threshold), hue = hues.amber)
                 Slider(value = threshold, onValueChange = { threshold = it }, valueRange = 0.2f..0.9f)
                 Text("Live score (2 s peak): %.2f".format(score), style = MaterialTheme.typography.bodyMedium)
-                LinearProgressIndicator(progress = { score.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                // Amber below the threshold, sage once the score would fire (colour only: the bar just follows the value).
+                val h = hues
+                val fires = score >= threshold
+                LinearProgressIndicator(
+                    progress = { score.coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(),
+                    color = if (fires) h.sage else h.amber, trackColor = h.tint(if (fires) h.sage else h.amber)
+                )
                 val gain = io.github.ronganam.dana.wake.GainStream.gainFor(level.noiseFloor)
                 Text("Mic level %.0f · room noise %.0f (voice gain %.1f×, speech > %.0f raw)".format(
                     level.rms, level.noiseFloor, gain,
                     io.github.ronganam.dana.wake.GainStream.thresholdFor(level.noiseFloor) / gain),
                     style = MaterialTheme.typography.bodyMedium)
-                LinearProgressIndicator(progress = { (level.rms / 3000.0).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth())
+                LinearProgressIndicator(
+                    progress = { (level.rms / 3000.0).toFloat().coerceIn(0f, 1f) }, modifier = Modifier.fillMaxWidth(),
+                    color = h.teal, trackColor = h.tint(h.teal)
+                )
 
                 ToggleRow("Speak replies", speak) { speak = it }
                 if (!speaker.hebrewAvailable) {

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.tv
 
+import io.github.ronganam.dana.ui.theme.Motion
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
@@ -78,8 +79,10 @@ fun TvSection(text: String, modifier: Modifier = Modifier, trailing: String? = n
 }
 
 /**
- * A D-pad focusable tile: hairline at rest; when focused it grows slightly and
- * takes a vermilion outline (no glow, no shadow). OK / Enter clicks.
+ * A D-pad focusable tile: hairline at rest; when focused it scales 1.0 → 1.05
+ * in 150ms and takes a vermilion outline (no glow, no shadow) — on the TV focus
+ * IS the motion. The scale is read in the layer, so a focus move redraws two
+ * tiles and recomposes only for the outline. OK / Enter clicks.
  */
 @Composable
 fun FocusTile(
@@ -92,7 +95,7 @@ fun FocusTile(
     content: @Composable BoxScope.(focused: Boolean) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.05f else 1f, tween(110), label = "tileScale")
+    val scale by animateFloatAsState(if (focused) Motion.FOCUS_SCALE else 1f, tween(Motion.FOCUS, easing = Motion.Standard), label = "tileScale")
     val accent = MaterialTheme.colorScheme.primary
     val hairline = MaterialTheme.colorScheme.outlineVariant
     Box(

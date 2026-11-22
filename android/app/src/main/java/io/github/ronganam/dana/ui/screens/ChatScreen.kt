@@ -6,7 +6,6 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import io.github.ronganam.dana.ui.theme.Success
 import io.github.ronganam.dana.ui.theme.Warning
 import io.github.ronganam.dana.ui.theme.Info
-import io.github.ronganam.dana.ui.theme.CategoryPalette
 
 import android.Manifest
 import android.content.pm.PackageManager
@@ -188,7 +187,8 @@ fun TypingIndicator(
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        val color = MaterialTheme.colorScheme.onSurfaceVariant
+        // Ember while Dana is typing; the alphas are read in the layers, so frames don't recompose.
+        val color = MaterialTheme.colorScheme.primary
         Box(
             modifier = Modifier
                 .size(8.dp)

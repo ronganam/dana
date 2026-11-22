@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.ui.shell
 
+import io.github.ronganam.dana.ui.components.TailArrivals
+import io.github.ronganam.dana.ui.components.riseIn
 import io.github.ronganam.dana.data.network.pretty
 import kotlinx.serialization.json.JsonPrimitive
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -99,6 +101,9 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
     val rows = remember(messages, gapMinutes, shownMemory, memoryNow) {
         ThreadModel.rows(messages, gapMinutes, memoryNow, ZoneId.systemDefault(), shownMemory)
     }
+    // Messages that just arrived at the end rise in (not the ones there on opening, not older pages).
+    val arrivals = remember { TailArrivals() }
+    val fresh = remember(rows) { arrivals.fresh(rows.map { it.key }) }
 
     // Follow the conversation: jump to a new last message (not when older ones are
     // added on top), keep up with a streaming reply unless the user scrolled up to read.
@@ -201,9 +206,9 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                                 entry = msg.toolCall,
                                 onToggleCollapse = { id -> viewModel.chatController.toggleToolCallCollapse(id) },
                                 onApprove = { approved -> viewModel.chatController.approveAction(approved) },
-                                modifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = null, fadeOutSpec = null).then(faded)
+                                modifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = null, fadeOutSpec = null).riseIn(row.key in fresh).then(faded)
                             )
-                        } else Column(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).then(faded)) {
+                        } else Column(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).riseIn(row.key in fresh).then(faded)) {
                             ChatBubble(
                                 msg = msg,
                                 tts = tts,

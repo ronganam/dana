@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.shell
 
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -15,13 +16,17 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import io.github.ronganam.dana.ui.components.RollingText
+import io.github.ronganam.dana.ui.theme.Motion
+import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.ui.viewmodels.Place
 
 /**
  * The places as a slim row of mono labels (the current one gets a vermilion
- * rule on top). Notifications carries the Inbox's needs-you count. Bottom of
- * the screen when folded, bottom of the list pane when unfolded; a pane too
- * narrow for one row wraps it onto two.
+ * rule on top that grows from its middle, and a faint accent wash under the
+ * label). Notifications carries the Inbox's needs-you count (rolls when it
+ * changes). Bottom of the screen when folded, bottom of the list pane when
+ * unfolded; a pane too narrow for one row wraps it onto two.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -48,13 +53,21 @@ fun ShellNav(
                 count <= 0 -> ""
                 else -> ", $count need you"
             }
+            // Read only in the draw lambda below: switching place redraws two labels, nothing recomposes per frame.
+            val on = animateFloatAsState(if (selected) 1f else 0f, Motion.base(), label = "nav")
+            val wash = hues.tint(accent).copy(alpha = hues.tint(accent).alpha * 0.6f)
             Row(
                 Modifier
                     .heightIn(min = 48.dp)
                     .clickable(role = Role.Tab) { onPlace(place) }
                     .semantics { this.selected = selected; contentDescription = label }
                     .drawBehind {
-                        if (selected) drawLine(accent, Offset(0f, 1.dp.toPx()), Offset(size.width, 1.dp.toPx()), 2.dp.toPx())
+                        val v = on.value
+                        if (v > 0f) {
+                            val half = size.width / 2f * v
+                            drawRect(wash.copy(alpha = wash.alpha * v), size = size)
+                            drawLine(accent, Offset(size.width / 2f - half, 1.dp.toPx()), Offset(size.width / 2f + half, 1.dp.toPx()), 2.dp.toPx())
+                        }
                     }
                     .padding(horizontal = 4.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -66,12 +79,10 @@ fun ShellNav(
                     maxLines = 1,
                     softWrap = false
                 )
-                if (count > 0) Text(
+                if (count > 0) RollingText(
                     " " + if (count > 99) "99+" else count.toString(),
                     style = MaterialTheme.typography.labelMedium,
-                    color = accent,
-                    maxLines = 1,
-                    softWrap = false
+                    color = accent
                 )
             }
         }

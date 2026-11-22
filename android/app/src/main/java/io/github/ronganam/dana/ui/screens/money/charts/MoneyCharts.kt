@@ -42,12 +42,8 @@ import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.money.MoneyDashGeometry
 import io.github.ronganam.dana.data.money.MoneyDashGeometry.Box
 import io.github.ronganam.dana.data.money.MoneyDashGeometry.Pt
-import io.github.ronganam.dana.ui.theme.CategoryPalette
-import io.github.ronganam.dana.ui.theme.Danger
-import io.github.ronganam.dana.ui.theme.Info
+import io.github.ronganam.dana.ui.theme.Hue
 import io.github.ronganam.dana.ui.theme.Neutral
-import io.github.ronganam.dana.ui.theme.Success
-import io.github.ronganam.dana.ui.theme.Warning
 import kotlin.math.max
 import kotlin.math.min
 
@@ -55,12 +51,21 @@ import kotlin.math.min
 // web's, in pixels), a touch crosshair instead of hover (drag sideways to
 // scrub, tap to pin or open), sparse axis labels in mono, theme colours.
 
-/** The charts' colours: series hues follow the entity (a group, a kind of spending), never its rank. */
+/**
+ * The charts' colours, from Ember's hues (their dark values: mid-tones that
+ * read as fills on Ink and Paper alike): series hues follow the entity (a
+ * group, a kind of spending), never its rank; money in is sage, money out rose.
+ * Text in these colours goes through [goodColor] / [badColor] (theme-aware).
+ */
 object MoneyPalette {
-    private val teal = Color(0xFF22A6B5)
-    private val violet = CategoryPalette[4]
-    private val pink = CategoryPalette[5]
-    private val coral = lerp(Danger, Warning, 0.35f)
+    private val Info = Hue.SKY.dark
+    private val Success = Hue.SAGE.dark
+    private val Warning = Hue.AMBER.dark
+    private val Danger = Hue.ROSE.dark
+    private val teal = Hue.TEAL.dark
+    private val violet = Hue.PLUM.dark
+    private val pink = lerp(Hue.ROSE.dark, Hue.PLUM.dark, 0.35f)
+    private val coral = lerp(Hue.ROSE.dark, Hue.AMBER.dark, 0.45f)
     private val sage = lerp(Success, Info, 0.45f)
 
     /** A spending group's hue (MoneyDashGeometry.SERIES). */

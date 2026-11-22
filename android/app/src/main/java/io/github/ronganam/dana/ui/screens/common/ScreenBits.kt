@@ -16,25 +16,31 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
+import io.github.ronganam.dana.ui.components.HueMark
 import io.github.ronganam.dana.ui.components.MonoLabel
 import io.github.ronganam.dana.ui.theme.DanaSerif
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-/** Quiet, editorial empty state: one serif sentence and a muted line, no icon-in-circle. */
+/**
+ * Quiet, editorial empty state: a small hue mark ([hue], the accent by
+ * default), one serif sentence and a muted line, no icon-in-circle.
+ */
 @Composable
 fun QuietEmptyState(
     title: String,
     message: String,
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
+    hue: Color = MaterialTheme.colorScheme.primary,
     onAction: (() -> Unit)? = null
 ) {
     Column(
         modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 40.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        HueMark(hue, Modifier.padding(bottom = 4.dp))
         Text(
             text = title,
             style = MaterialTheme.typography.headlineMedium.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic),

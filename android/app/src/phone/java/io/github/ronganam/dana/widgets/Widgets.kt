@@ -1,11 +1,27 @@
 package io.github.ronganam.dana.widgets
 
+import io.github.ronganam.dana.ui.theme.AccentDark
+import io.github.ronganam.dana.ui.theme.AccentLight
+import io.github.ronganam.dana.ui.theme.DanaHues
+import io.github.ronganam.dana.ui.theme.DarkInk
+import io.github.ronganam.dana.ui.theme.DarkInkSoft
+import io.github.ronganam.dana.ui.theme.DarkMute
+import io.github.ronganam.dana.ui.theme.DarkSurface
+import io.github.ronganam.dana.ui.theme.DarkSurfaceHigh
+import io.github.ronganam.dana.ui.theme.Hue
+import io.github.ronganam.dana.ui.theme.LightInk
+import io.github.ronganam.dana.ui.theme.LightInkSoft
+import io.github.ronganam.dana.ui.theme.LightMute
+import io.github.ronganam.dana.ui.theme.LightSurface
+import io.github.ronganam.dana.ui.theme.LightSurfaceHigh
+import io.github.ronganam.dana.ui.theme.OnAccentDark
+import io.github.ronganam.dana.ui.theme.OnAccentLight
+import io.github.ronganam.dana.ui.theme.hueForName
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
 import android.util.Log
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
@@ -47,17 +63,23 @@ import io.github.ronganam.dana.MainActivity
 import io.github.ronganam.dana.data.sync.TaskActionQueue
 import androidx.core.net.toUri
 
-// ---- Ink & Paper colours (day / night) ----
+// ---- Ink & Paper colours (day / night), from the app's tokens and Ember's hues ----
 internal object W {
-    val surface = ColorProvider(Color(0xFFFAF6EE), Color(0xFF1B1713))
-    val surfaceHigh = ColorProvider(Color(0xFFEAE2D3), Color(0xFF26201B))
-    val ink = ColorProvider(Color(0xFF1A1511), Color(0xFFF2EBDD))
-    val inkSoft = ColorProvider(Color(0xFF4A4036), Color(0xFFCBBFAD))
-    val mute = ColorProvider(Color(0xFF6B6050), Color(0xFF9A8E7E))
-    val accent = ColorProvider(Color(0xFFD1401A), Color(0xFFFF6A3D))
-    val onAccent = ColorProvider(Color(0xFFFFFFFF), Color(0xFF1F0A02))
-    val danger = ColorProvider(Color(0xFFE5483D), Color(0xFFE5483D))
-    val warning = ColorProvider(Color(0xFFE0A02A), Color(0xFFE0A02A))
+    val surface = ColorProvider(LightSurface, DarkSurface)
+    val surfaceHigh = ColorProvider(LightSurfaceHigh, DarkSurfaceHigh)
+    val ink = ColorProvider(LightInk, DarkInk)
+    val inkSoft = ColorProvider(LightInkSoft, DarkInkSoft)
+    val mute = ColorProvider(LightMute, DarkMute)
+    val accent = ColorProvider(AccentLight, AccentDark)
+    val onAccent = ColorProvider(OnAccentLight, OnAccentDark)
+    val danger = hueText(Hue.ROSE)
+    val warning = hueText(Hue.AMBER)
+    val events = hueText(Hue.SKY)
+
+    /** A hue as text: the day value darkened to keep 4.5:1 (as `DanaHues.text`), the night value as it is. */
+    fun hueText(hue: Hue) = ColorProvider(DanaHues(dark = false).text(hue), hue.dark)
+    /** A hue's tint (12% day, 14% night) for a tile behind letters. */
+    fun hueTint(hue: Hue) = ColorProvider(hue.light.copy(alpha = 0.12f), hue.dark.copy(alpha = 0.14f))
 }
 
 internal fun style(color: GlanceColor = W.ink, size: Int = 13, bold: Boolean = false) =
@@ -147,7 +169,7 @@ class TodayWidget : GlanceAppWidget() {
                     }
                     items(s.events) { (time, title) ->
                         Row(GlanceModifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Text(time, style = style(W.accent, 12, bold = true), modifier = GlanceModifier.width(52.dp))
+                            Text(time, style = style(W.events, 12, bold = true), modifier = GlanceModifier.width(52.dp))
                             Text(title, style = style(W.ink, 13), maxLines = 1)
                         }
                     }
@@ -235,8 +257,10 @@ class PeopleWidget : GlanceAppWidget() {
                 LazyColumn(GlanceModifier.fillMaxSize()) {
                     items(s.people) { p ->
                         Row(GlanceModifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Box(GlanceModifier.size(32.dp).cornerRadius(16.dp).background(W.surfaceHigh), contentAlignment = Alignment.Center) {
-                                Text(p.initials.ifBlank { p.name.take(1) }, style = style(W.ink, 12, bold = true))
+                            // Initials on the person's hue (the same one as in the app).
+                            val hue = hueForName(p.id)
+                            Box(GlanceModifier.size(32.dp).cornerRadius(16.dp).background(W.hueTint(hue)), contentAlignment = Alignment.Center) {
+                                Text(p.initials.ifBlank { p.name.take(1) }, style = style(W.hueText(hue), 12, bold = true))
                             }
                             Spacer(GlanceModifier.width(10.dp))
                             Column(GlanceModifier.defaultWeight().clickable(actionStartActivity(openApp(context) { putExtra(EXTRA_OPEN_PERSON_ID, p.id) }))) {

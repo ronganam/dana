@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.ui.shell
 
+import io.github.ronganam.dana.ui.components.emberGradient
+import io.github.ronganam.dana.ui.components.pulseRing
 import android.Manifest
 import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -222,8 +224,10 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             Box(
                 Modifier
                     .size(44.dp)
+                    // Listening: a gentle ring leaves the button until it stops.
+                    .pulseRing(isRecording || isCallActive, MaterialTheme.colorScheme.primary)
                     .clip(CircleShape)
-                    .background(MaterialTheme.colorScheme.primary)
+                    .background(emberGradient())
                     // Dimmed while the server is unreachable (sending refuses and re-checks).
                     .alpha(if (serverStatus.isOffline && !isRecording) 0.5f else 1f)
                     .clickable {

@@ -1,7 +1,25 @@
 package io.github.ronganam.dana.ui.screens.reminders
 
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.text.style.ResolvedTextDirection
+import androidx.compose.ui.text.style.TextOverflow
+import io.github.ronganam.dana.ui.components.RollingText
+import io.github.ronganam.dana.ui.components.arrive
+import io.github.ronganam.dana.ui.components.startBar
+import io.github.ronganam.dana.ui.theme.Motion
+import io.github.ronganam.dana.ui.theme.hues
+import kotlin.math.roundToInt
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -68,26 +86,49 @@ fun ReminderListPane(viewModel: MainViewModel) {
     val now by rememberNow()
     val showSelection = LocalShellLayout.current != ShellLayout.STACKED
 
-    val open = remember(tasks) { tasks.filter(::isOpen) }
+    // A reminder being completed stays (as it was) until its animation ends; one coming back (Undo) animates in.
+    val completing = remember { mutableStateMapOf<String, Task>() }
+    val flow = remember { CompletionFlow() }
+    val open = tasks.mapNotNull { t -> completing[t.id] ?: t.takeIf(::isOpen) }
+    open.forEach { if (it.id in flow.gone && it.id !in completing) { flow.gone -= it.id; flow.returning += it.id } }
     val sections = remember(open, groups, byList, now.toLocalDate(), now.hour) {
         if (byList) sectionsByList(open, groups) else sectionsByWhen(open, now)
     }
     val done = remember(tasks) { doneRecently(tasks) }
     val forToday = remember(open, now) { open.count { bucketOf(it, now).let { b -> b == Bucket.OVERDUE || b == Bucket.TODAY } } }
     val groupNames = remember(groups) { groups.associate { it.id to it.name } }
+    val groupColors = remember(groups) { groups.associate { it.id to it.color } }
+    val h = hues
 
     fun listName(t: Task) = t.groupId?.let { groupNames[it] } ?: t.groupName ?: "General"
+    // The list's stored colour (the theme's value when it is one of the hues); reminders' amber without one.
+    fun listColor(t: Task) = h.fromHex(t.groupId?.let { groupColors[it] } ?: t.groupColor) ?: h.amber
 
-    val row: @Composable (Task) -> Unit = { t ->
+    val row: @Composable (Task, Int) -> Unit = { t, index ->
+        val id = t.id
         ReminderRow(
             task = t,
-            sub = if (byList) taskWhenText(t, now) else "${taskWhenText(t, now)} · ${listName(t)}",
+            whenText = taskWhenText(t, now),
+            listName = if (byList) null else listName(t),
+            hue = listColor(t),
             selected = showSelection && pick?.id == t.id,
+            phase = when (id) {
+                in completing -> RowPhase.COMPLETING
+                in flow.returning -> RowPhase.RETURNING
+                else -> RowPhase.REST
+            },
+            onPhaseDone = {
+                if (completing.remove(id) != null) flow.gone += id
+                flow.returning -= id
+            },
             onClick = { shell.selectReminder(t.id) },
-            onToggle = { tc.setDone(t.id, isOpen(t)) },
+            onToggle = {
+                if (isOpen(t)) completing[id] = t else flow.gone += id
+                tc.setDone(id, isOpen(t))
+            },
             modifier = if (isOpen(t)) Modifier.dragToDay(t.title) { slot ->
                 tc.setTriggers(t.id, remindWhenFor(slot, java.time.LocalDateTime.now(), zones).toTriggers(), "Moved to ${slotPhrase(slot)}")
-            } else Modifier
+            }.arrive("reminders", index) else Modifier
         )
     }
 
@@ -116,9 +157,14 @@ fun ReminderListPane(viewModel: MainViewModel) {
                 Text("Add one above, or tell Dana.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
+        var shown = 0
         sections.forEach { section ->
-            item(key = "h_${section.key}") { SectionHead(section.title, section.tasks.size) }
-            items(section.tasks, key = { "t_${section.key}_${it.id}" }) { row(it) }
+            val first = shown
+            shown += section.tasks.size
+            // By list: the section head carries the list's colour as a dot.
+            val dot = if (byList) section.tasks.firstOrNull()?.let(::listColor) else null
+            item(key = "h_${section.key}") { SectionHead(section.title, section.tasks.size, dot) }
+            itemsIndexed(section.tasks, key = { _, t -> "t_${section.key}_${t.id}" }) { i, t -> row(t, first + i) }
         }
         if (done.isNotEmpty()) {
             item(key = "done_fold") {
@@ -131,7 +177,7 @@ fun ReminderListPane(viewModel: MainViewModel) {
                 }
                 Rule(Modifier.padding(horizontal = GUTTER))
             }
-            if (doneOpen) items(done, key = { "d_${it.id}" }) { row(it) }
+            if (doneOpen) items(done, key = { "d_${it.id}" }) { row(it, Motion.STAGGER_ROWS) }
         }
     }
 }
@@ -195,36 +241,84 @@ private fun QuickAdd(onAdd: (String) -> Unit) {
 }
 
 @Composable
-private fun SectionHead(title: String, count: Int) {
+private fun SectionHead(title: String, count: Int, dot: Color? = null) {
     Column(Modifier.padding(horizontal = GUTTER).padding(top = 20.dp)) {
-        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (dot != null) Box(Modifier.padding(end = 8.dp).size(7.dp).clip(CircleShape).background(dot))
             MonoLabel(title, modifier = Modifier.weight(1f))
-            MonoLabel(count.toString())
+            RollingText(count.toString(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Rule()
     }
 }
 
-/** One reminder: circle, title (● when important), mono "when · list" line. Selected (unfolded) = canvas + accent bar. */
+/** Where a row is in its completion: at rest, being completed (then it leaves), or coming back (Undo). */
+enum class RowPhase { REST, COMPLETING, RETURNING }
+
+/** Which reminders were completed here (their return animates) and which are animating back in. */
+private class CompletionFlow {
+    val gone = HashSet<String>()
+    val returning = HashSet<String>()
+}
+
+private fun part(p: Float, from: Float, to: Float) = ((p - from) / (to - from)).coerceIn(0f, 1f)
+
+/**
+ * One reminder: circle, title (● when important), mono "when" line with its
+ * list as a chip tinted in the list's [hue], and a 3dp start bar in that hue.
+ * Selected (unfolded) = canvas + accent bar. Done = the circle filled with the
+ * hue and checked.
+ *
+ * Completing (~420ms, [Motion.COMPLETE]): the circle fills with the hue and its
+ * check draws, the title's strike-through grows line by line, then the row
+ * fades and collapses; RETURNING plays it backwards. One Animatable read only
+ * in draw / layer / layout, so no frame recomposes the list.
+ */
 @Composable
 fun ReminderRow(
     task: Task,
-    sub: String,
+    whenText: String,
+    listName: String?,
+    hue: Color,
     selected: Boolean,
     onClick: () -> Unit,
     onToggle: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    phase: RowPhase = RowPhase.REST,
+    onPhaseDone: () -> Unit = {}
 ) {
     val done = !isOpen(task)
     val accent = MaterialTheme.colorScheme.primary
     val canvas = MaterialTheme.colorScheme.background
+    val h = hues
+    val ink = MaterialTheme.colorScheme.onSurface
+    val outline = MaterialTheme.colorScheme.outline
+    val onHue = if (h.dark) MaterialTheme.colorScheme.background else Color.White
+    // 0 = open and at rest, 1 = completed and gone.
+    val progress = remember(task.id) { Animatable(if (phase == RowPhase.RETURNING) 1f else 0f) }
+    val latestDone by rememberUpdatedState(onPhaseDone)
+    LaunchedEffect(phase) {
+        when (phase) {
+            RowPhase.COMPLETING -> { progress.animateTo(1f, tween(Motion.COMPLETE, easing = LinearEasing)); latestDone() }
+            RowPhase.RETURNING -> { progress.animateTo(0f, tween(Motion.COMPLETE, easing = LinearEasing)); latestDone() }
+            RowPhase.REST -> progress.snapTo(0f)
+        }
+    }
+    var titleLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
     Column(
         modifier
+            .clipToBounds()
+            .layout { measurable, constraints ->
+                // Collapse in the last 40%: the one layout animation Ember allows.
+                val p = measurable.measure(constraints)
+                val f = part(progress.value, 0.6f, 1f)
+                val height = (p.height * (1f - f)).roundToInt()
+                layout(p.width, height) { if (f == 0f) p.place(0, 0) else p.placeWithLayer(0, 0) { alpha = 1f - f } }
+            }
             .fillMaxWidth()
             .then(
-                if (selected) Modifier.background(canvas).drawBehind {
-                    drawLine(accent, Offset(1.5.dp.toPx(), 0f), Offset(1.5.dp.toPx(), size.height), 3.dp.toPx())
-                } else Modifier
+                if (selected) Modifier.background(canvas).startBar(accent)
+                else Modifier.startBar(hue.copy(alpha = if (done) 0.45f else 1f))
             )
             .clickable(onClick = onClick)
     ) {
@@ -237,13 +331,24 @@ fun ReminderRow(
                     .semantics { contentDescription = if (done) "Mark not done" else "Mark done" },
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    Modifier
-                        .size(20.dp)
-                        .clip(CircleShape)
-                        .then(if (done) Modifier.background(accent) else Modifier)
-                        .border(1.5.dp, if (done) accent else MaterialTheme.colorScheme.outline, CircleShape)
-                )
+                Canvas(Modifier.size(20.dp)) {
+                    val fill = if (done) 1f else part(progress.value, 0f, 0.3f)
+                    val tick = if (done) 1f else part(progress.value, 0.1f, 0.4f)
+                    val r = size.minDimension / 2f
+                    val stroke = 1.5.dp.toPx()
+                    if (fill > 0f) drawCircle(hue.copy(alpha = fill), r)
+                    drawCircle(lerp(outline, hue, fill), r - stroke / 2, style = Stroke(stroke))
+                    if (tick > 0f) {
+                        // The check draws itself: down-stroke, then the long up-stroke.
+                        val a = Offset(size.width * 0.28f, size.height * 0.52f)
+                        val b = Offset(size.width * 0.44f, size.height * 0.68f)
+                        val c = Offset(size.width * 0.73f, size.height * 0.36f)
+                        val w = 1.8.dp.toPx()
+                        val first = (tick / 0.4f).coerceAtMost(1f)
+                        drawLine(onHue, a, a + (b - a) * first, w, StrokeCap.Round)
+                        if (tick > 0.4f) drawLine(onHue, b, b + (c - b) * ((tick - 0.4f) / 0.6f), w, StrokeCap.Round)
+                    }
+                }
             }
             Spacer(Modifier.width(6.dp))
             Column(Modifier.weight(1f).padding(top = 5.dp)) {
@@ -260,10 +365,45 @@ fun ReminderRow(
                         textDirection = TextDirection.Content,
                         textDecoration = if (done) TextDecoration.LineThrough else null
                     ),
-                    color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth()
+                    color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else ink,
+                    onTextLayout = { titleLayout = it },
+                    modifier = Modifier.fillMaxWidth().drawWithContent {
+                        drawContent()
+                        val strike = part(progress.value, 0.25f, 0.6f)
+                        val layout = titleLayout
+                        if (strike > 0f && layout != null && !done) {
+                            // Grows along the lines in reading order (from the right on a Hebrew line).
+                            val total = (0 until layout.lineCount).sumOf { (layout.getLineRight(it) - layout.getLineLeft(it)).toDouble() }.toFloat()
+                            var left = strike * total
+                            for (line in 0 until layout.lineCount) {
+                                if (left <= 0f) break
+                                val l = layout.getLineLeft(line)
+                                val r = layout.getLineRight(line)
+                                val len = minOf(left, r - l)
+                                val y = (layout.getLineTop(line) + layout.getLineBottom(line)) / 2f
+                                val rtl = layout.getParagraphDirection(layout.getLineStart(line)) == ResolvedTextDirection.Rtl
+                                if (rtl) drawLine(ink, Offset(r, y), Offset(r - len, y), 1.5.dp.toPx())
+                                else drawLine(ink, Offset(l, y), Offset(l + len, y), 1.5.dp.toPx())
+                                left -= len
+                            }
+                        }
+                    }
                 )
-                MonoLabel(sub, modifier = Modifier.padding(top = 3.dp))
+                Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+                    MonoLabel(whenText, modifier = Modifier.weight(1f, fill = false))
+                    if (listName != null) Text(
+                        listName.uppercase(),
+                        style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
+                        color = h.text(hue),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(start = 8.dp)
+                            .clip(RoundedCornerShape(5.dp))
+                            .background(h.tint(hue))
+                            .padding(horizontal = 6.dp, vertical = 1.dp)
+                    )
+                }
             }
         }
         Rule(Modifier.padding(horizontal = GUTTER).background(Color.Transparent))

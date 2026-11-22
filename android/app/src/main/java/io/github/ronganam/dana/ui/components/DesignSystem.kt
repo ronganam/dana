@@ -16,12 +16,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.sp
+import io.github.ronganam.dana.ui.theme.AccentWarmDark
+import io.github.ronganam.dana.ui.theme.AccentWarmLight
 import io.github.ronganam.dana.ui.theme.Space
+import io.github.ronganam.dana.ui.theme.hues
 
 /** Set by the app shell; non-null when a Settings shortcut should appear in top bars. */
 val LocalOpenSettings = compositionLocalOf<(() -> Unit)?> { null }
@@ -80,61 +86,78 @@ fun ScreenTopBar(
     }
 }
 
-/** Friendly empty/zero-data state with an optional primary action. */
+/**
+ * The one small hue mark an empty state may carry above its italic serif
+ * line (an 18 × 3dp bar), never an icon in a circle.
+ */
 @Composable
-fun EmptyState(
-    icon: ImageVector,
-    title: String,
-    message: String,
-    modifier: Modifier = Modifier,
-    actionLabel: String? = null,
-    onAction: (() -> Unit)? = null
-) {
-    Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 32.dp, vertical = 48.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Box(
-            modifier = Modifier.size(64.dp).clip(CircleShape).background(MaterialTheme.colorScheme.surfaceContainerHigh),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(28.dp))
-        }
-        Spacer(Modifier.height(4.dp))
-        Text(title, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurface, textAlign = TextAlign.Center)
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-        if (actionLabel != null && onAction != null) {
-            Spacer(Modifier.height(8.dp))
-            FilledTonalButton(onClick = onAction) { Text(actionLabel) }
-        }
+fun HueMark(color: Color, modifier: Modifier = Modifier) {
+    Box(modifier.size(18.dp, 3.dp).clip(RoundedCornerShape(2.dp)).background(color))
+}
+
+/**
+ * Small section label above a group of cards (Settings), with a dot in the
+ * group's [hue] (the kind it is about; the accent by default).
+ */
+@Composable
+fun SectionLabel(text: String, modifier: Modifier = Modifier, hue: Color = MaterialTheme.colorScheme.primary) {
+    Row(modifier.padding(horizontal = Space.xs, vertical = Space.sm), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.size(6.dp).clip(CircleShape).background(hue))
+        Spacer(Modifier.width(8.dp))
+        Text(text = text, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
-/** Small uppercase-free section label used above groups of rows/cards. */
-@Composable
-fun SectionLabel(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        style = MaterialTheme.typography.labelLarge,
-        color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = modifier.padding(horizontal = Space.xs, vertical = Space.sm)
-    )
-}
-
-/** Compact status/tag pill tinted by [color] (semantic hue or category colour). */
+/**
+ * Compact status/tag pill in [color] (a hue or a category colour): the hue's
+ * tint, a dot at the full hue and the text in the hue (darkened on Paper to
+ * keep 4.5:1).
+ */
 @Composable
 fun StatusPill(text: String, color: Color, modifier: Modifier = Modifier) {
+    val h = hues
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(50))
-            .background(color.copy(alpha = 0.16f))
+            .background(h.tint(color))
             .padding(horizontal = 10.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Box(Modifier.size(6.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(6.dp))
-        Text(text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface, fontWeight = FontWeight.Medium)
+        Text(text, style = MaterialTheme.typography.labelMedium, color = h.text(color), fontWeight = FontWeight.Medium)
+    }
+}
+
+/**
+ * Initials on a hue picked from the name (the same name, the same hue on
+ * every device): the hue's tint, the letters in the hue. People, callers.
+ */
+@Composable
+fun HueInitials(name: String, modifier: Modifier = Modifier, size: Dp = 36.dp, letters: String = initialsOf(name)) {
+    val h = hues
+    val color = h.forName(name)
+    Box(
+        modifier.size(size).clip(CircleShape).background(h.tint(color)),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            letters,
+            style = MaterialTheme.typography.labelLarge.copy(fontSize = (size.value * 0.36f).sp),
+            color = h.text(color),
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1
+        )
+    }
+}
+
+/** "Sam Example" → "SE", "דנה" → "ד", "" → "·". */
+fun initialsOf(name: String): String {
+    val words = name.trim().split(Regex("\\s+")).filter { it.isNotEmpty() && it.first().isLetterOrDigit() }
+    return when {
+        words.isEmpty() -> "·"
+        words.size == 1 -> words[0].take(1).uppercase()
+        else -> (words.first().take(1) + words.last().take(1)).uppercase()
     }
 }
 
@@ -172,11 +195,16 @@ fun InkChoice(
 ) {
     val accent = MaterialTheme.colorScheme.primary
     val shape = RoundedCornerShape(10.dp)
+    val fill = when {
+        solid -> Modifier.background(emberGradient())
+        selected -> Modifier.background(hues.tint(accent))
+        else -> Modifier
+    }
     Box(
         modifier = modifier
             .heightIn(min = 36.dp)
             .clip(shape)
-            .then(if (solid) Modifier.background(accent) else Modifier)
+            .then(fill)
             .border(1.dp, if (selected || solid) accent else MaterialTheme.colorScheme.outlineVariant, shape)
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 7.dp),
@@ -197,6 +225,19 @@ fun InkChoice(
             overflow = TextOverflow.Ellipsis
         )
     }
+}
+
+/**
+ * A primary button's fill: the accent warming slightly towards its end
+ * (start → end, so it follows the reading direction). Dimmed when disabled.
+ */
+@Composable
+fun emberGradient(enabled: Boolean = true): Brush {
+    val accent = MaterialTheme.colorScheme.primary
+    val warm = if (hues.dark) AccentWarmDark else AccentWarmLight
+    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
+    val colors = listOf(accent, warm).map { if (enabled) it else it.copy(alpha = 0.5f) }
+    return Brush.horizontalGradient(if (rtl) colors.reversed() else colors)
 }
 
 /** How loud an [InkButton] is. */
@@ -227,7 +268,7 @@ fun InkButton(
         modifier = modifier
             .heightIn(min = 34.dp)
             .clip(shape)
-            .then(if (emphasis == InkEmphasis.SOLID) Modifier.background(accent) else Modifier)
+            .then(if (emphasis == InkEmphasis.SOLID) Modifier.background(emberGradient(enabled)) else Modifier)
             .border(1.dp, border, shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = if (emphasis == InkEmphasis.BARE) 4.dp else 12.dp, vertical = 7.dp),

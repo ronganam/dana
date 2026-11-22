@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.money
 
+import io.github.ronganam.dana.ui.components.skeleton
 import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -255,15 +256,14 @@ internal fun BadgeRow(badges: List<io.github.ronganam.dana.data.money.BadgeText>
 
 @Composable
 private fun Skeleton() {
-    val tint = MaterialTheme.colorScheme.surfaceContainerHigh
     Column(Modifier.padding(horizontal = 18.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         repeat(6) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Box(Modifier.fillMaxWidth(0.6f).height(14.dp).clip(RoundedCornerShape(4.dp)).background(tint))
-                    Box(Modifier.fillMaxWidth(0.35f).height(10.dp).clip(RoundedCornerShape(4.dp)).background(tint))
+                    Box(Modifier.fillMaxWidth(0.6f).height(14.dp).clip(RoundedCornerShape(4.dp)).skeleton())
+                    Box(Modifier.fillMaxWidth(0.35f).height(10.dp).clip(RoundedCornerShape(4.dp)).skeleton())
                 }
-                Box(Modifier.width(64.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).background(tint))
+                Box(Modifier.width(64.dp).height(14.dp).clip(RoundedCornerShape(4.dp)).skeleton())
             }
         }
     }

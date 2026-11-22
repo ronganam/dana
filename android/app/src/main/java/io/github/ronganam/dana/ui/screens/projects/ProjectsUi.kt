@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.projects
 
+import io.github.ronganam.dana.ui.theme.hues
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -94,17 +95,13 @@ internal fun BackLink(label: String, onClick: () -> Unit) {
 /** A project's emoji on a tile tinted with its colour. */
 @Composable
 internal fun ProjectTile(icon: String, color: String, size: Dp = 32.dp) {
-    val tint = parseColor(color) ?: MaterialTheme.colorScheme.primary
+    // The project's colour in this theme's value when it is one of the hues; its tint behind the icon.
+    val tint = hues.fromHex(color) ?: MaterialTheme.colorScheme.primary
     Box(
-        Modifier.size(size).clip(RoundedCornerShape(8.dp)).background(tint.copy(alpha = 0.18f)),
+        Modifier.size(size).clip(RoundedCornerShape(8.dp)).background(hues.tint(tint)),
         contentAlignment = Alignment.Center
     ) { Text(icon.ifBlank { "📁" }, fontSize = (size.value * 0.52f).sp) }
 }
-
-internal fun parseColor(hex: String): Color? = runCatching {
-    val h = hex.trim().removePrefix("#")
-    if (h.length != 6) null else Color(0xFF000000 or h.toLong(16))
-}.getOrNull()
 
 /** How far a project's decisions are: a ring that fills with the decided share. */
 @Composable

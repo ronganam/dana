@@ -1,10 +1,9 @@
 package io.github.ronganam.dana.ui.screens.money
 
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
+import io.github.ronganam.dana.ui.components.flashOnChange
+import io.github.ronganam.dana.ui.theme.hues
+import androidx.compose.ui.draw.clip
+import io.github.ronganam.dana.ui.components.skeleton
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,7 +15,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
@@ -295,6 +293,8 @@ fun Tiles(tiles: List<TileData>, fourAcross: Boolean) {
 private fun Tile(t: TileData, modifier: Modifier) {
     Column(
         modifier
+            // A value that just changed (a sync landed) glows briefly, then settles.
+            .flashOnChange(t.value, hues.tint(MaterialTheme.colorScheme.primary))
             .then(if (t.onClick != null) Modifier.clickable(role = Role.Button, onClick = t.onClick) else Modifier)
             .padding(horizontal = 12.dp, vertical = 12.dp)
     ) {
@@ -340,22 +340,15 @@ private fun AmountPer(modifier: Modifier = Modifier, content: @Composable () -> 
 
 // ------------------------------------------------------------------ skeletons
 
-@Composable
-private fun pulse(): Float {
-    val t = rememberInfiniteTransition(label = "skel")
-    return t.animateFloat(0.45f, 0.9f, infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "skel").value
-}
-
-/** A grey block standing in for what loads. */
+/** A block standing in for what loads: one shimmer sweep across it, then still (no endless pulse). */
 @Composable
 fun Skel(height: Dp, modifier: Modifier = Modifier, width: Float = 1f) {
-    val a = pulse()
     Box(
         modifier
             .fillMaxWidth(width)
             .height(height)
-            .alpha(a)
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(6.dp))
+            .clip(RoundedCornerShape(6.dp))
+            .skeleton()
     )
 }
 
@@ -383,12 +376,10 @@ fun SkelTiles(fourAcross: Boolean) {
 // ------------------------------------------------------------------ colours
 
 @Composable
-fun goodColor(): Color = if (MaterialTheme.colorScheme.background.luminanceIsDark()) MoneyPalette.good.copy(alpha = 1f) else androidx.compose.ui.graphics.lerp(MoneyPalette.good, Color.Black, 0.25f)
+fun goodColor(): Color = io.github.ronganam.dana.ui.theme.hues.text(io.github.ronganam.dana.ui.theme.Hue.SAGE)
 
 @Composable
-fun badColor(): Color = MoneyPalette.bad
-
-private fun Color.luminanceIsDark() = (0.299f * red + 0.587f * green + 0.114f * blue) < 0.5f
+fun badColor(): Color = io.github.ronganam.dana.ui.theme.hues.text(io.github.ronganam.dana.ui.theme.Hue.ROSE)
 
 /** A small open / closed chevron drawn in the muted ink. */
 @Composable

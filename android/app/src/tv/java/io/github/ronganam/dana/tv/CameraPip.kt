@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.tv
 
+import android.view.animation.PathInterpolator
+import io.github.ronganam.dana.ui.theme.Motion
 import android.content.Context
 import android.graphics.PixelFormat
 import android.graphics.drawable.GradientDrawable
@@ -119,8 +121,9 @@ object CameraPip {
         windowManager = wm
         _showing.value = cameraId
         retries = 0
+        // The picture-in-picture fades in (Ember's one TV motion besides focus): base duration, decelerating.
         root.alpha = 0f
-        root.animate().alpha(1f).setDuration(150).start()
+        root.animate().alpha(1f).setDuration(Motion.BASE.toLong()).setInterpolator(PathInterpolator(0.05f, 0.7f, 0.1f, 1f)).start()
         val surface: SurfaceView = root.findViewWithTag("surface")
         // The TV's router may hide LAN names (LanDns); resolve off the main thread, then play the address.
         Thread {

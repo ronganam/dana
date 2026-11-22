@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.components.assistant
 
+import io.github.ronganam.dana.ui.theme.motionOff
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -40,8 +41,10 @@ enum class VoiceDialMode { IDLE, LISTENING, THINKING }
 
 /**
  * The assistant's one voice control: a vermilion button wrapped in a ring of ticks.
- * Ticks breathe like a level meter while listening, a bright sweep circles while thinking,
- * and they rest as a quiet dial when idle. Replaces the old glow sphere.
+ * Ticks breathe like a level meter while listening, with a gentle pulse ring
+ * leaving the button (stops the moment listening stops), a bright sweep circles
+ * while thinking, and they rest as a quiet dial when idle. Replaces the old glow
+ * sphere. Everything animated is read in the Canvas: frames redraw, never recompose.
  */
 @Composable
 fun VoiceDial(
@@ -51,7 +54,8 @@ fun VoiceDial(
     size: Dp = 76.dp,
     ticks: Int = 40
 ) {
-    val active = mode != VoiceDialMode.IDLE
+    // Nothing loops when the system turned animations off.
+    val active = mode != VoiceDialMode.IDLE && !motionOff()
     // Animated values are read only inside the Canvas below, so each frame just
     // redraws the ticks instead of recomposing the dial (that matters on the
     // tablet and the TV, where the dial runs for the whole conversation).
@@ -97,6 +101,17 @@ fun VoiceDial(
             val maxLen = outer * 0.24f
             val minLen = outer * 0.08f
             val stroke = 2.2.dp.toPx()
+            if (mode == VoiceDialMode.LISTENING && phase != null) {
+                // Pulse ring: from the button's edge out to the ticks, fading as it goes (twice per cycle).
+                val core = outer * 0.56f
+                val ring = (t * 2f) % 1f
+                drawCircle(
+                    color = accent.copy(alpha = 0.45f * (1f - ring) * energy),
+                    radius = core + (outer - minLen - core) * ring,
+                    center = c,
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.dp.toPx() * (1f - ring * 0.5f))
+                )
+            }
             for (i in 0 until ticks) {
                 val frac = i.toFloat() / ticks
                 val ang = (frac * 2f * PI).toFloat() - (PI / 2).toFloat()

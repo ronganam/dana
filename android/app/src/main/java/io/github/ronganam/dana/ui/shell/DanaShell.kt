@@ -17,6 +17,9 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.ui.components.MonoLabel
 import io.github.ronganam.dana.ui.components.ServerStatusBanner
+import io.github.ronganam.dana.ui.components.emberGlow
+import io.github.ronganam.dana.ui.components.enterOnChange
+import io.github.ronganam.dana.ui.theme.richMotion
 import io.github.ronganam.dana.ui.shell.destinations.rememberMoreDestination
 import io.github.ronganam.dana.ui.shell.destinations.rememberNotificationsDestination
 import io.github.ronganam.dana.ui.shell.destinations.rememberNowDestination
@@ -104,6 +107,7 @@ fun DanaShell(viewModel: MainViewModel) {
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
+            .emberGlow(MaterialTheme.colorScheme.primary, enabled = richMotion)
     ) {
         val layout = shellLayoutFor(maxWidth.value)
         CompositionLocalProvider(
@@ -171,7 +175,9 @@ fun DanaShell(viewModel: MainViewModel) {
                     onRetry = { viewModel.recheckServer() },
                     onOpenSettings = { viewModel.navigateTo("settings") }
                 )
-                Box(Modifier.weight(1f).fillMaxWidth()) {
+                // Switching place: the new one fades in and slides 12dp from the side of travel.
+                val travel = remember { PlaceTravel(place) }.update(place, places)
+                Box(Modifier.weight(1f).fillMaxWidth().enterOnChange(place, travel)) {
                     when (layout) {
                         ShellLayout.STACKED -> StackedFrame(dest, slots, threadOpen, { shell.closeThread() }, showNav = !imeVisible)
                         ShellLayout.SPLIT -> SplitFrame(dest, slots, threadOpen, { shell.closeThread() })
@@ -186,6 +192,18 @@ fun DanaShell(viewModel: MainViewModel) {
             }
             DayDragGhost(dropState)
         }
+    }
+}
+
+/** Which way the last place switch went in the nav's order (+1 towards the end, -1 back). */
+private class PlaceTravel(private var last: Place) {
+    private var direction = 1
+    fun update(place: Place, order: List<Place>): Int {
+        if (place != last) {
+            direction = if (order.indexOf(place) >= order.indexOf(last)) 1 else -1
+            last = place
+        }
+        return direction
     }
 }
 

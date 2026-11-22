@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.projects
 
+import io.github.ronganam.dana.ui.components.arrive
 import io.github.ronganam.dana.data.money.MoneyFormat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -83,9 +84,9 @@ internal fun ProjectList(c: ProjectsController, tree: Boolean) {
                 InkButton("New project", emphasis = InkEmphasis.SOLID) { c.newProject() }
             }
         }
-        shown.forEach { p ->
+        shown.forEachIndexed { i, p ->
             val open = tree && p.id == openId
-            ProjectRow(p, today, selected = open && sectionId == null) { c.openProject(p.id); c.openSection(null) }
+            ProjectRow(p, today, selected = open && sectionId == null, Modifier.arrive("projects", i)) { c.openProject(p.id); c.openSection(null) }
             if (open) {
                 val its = items?.takeIf { it.project.id == p.id }
                 its?.sections?.forEach { s ->
@@ -115,12 +116,12 @@ private fun Modifier.marked(selected: Boolean): Modifier {
 }
 
 @Composable
-private fun ProjectRow(p: Project, today: LocalDate, selected: Boolean, onClick: () -> Unit) {
+private fun ProjectRow(p: Project, today: LocalDate, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val lang = if (ProjectsCore.isRtl(p.title)) Lang.HE else Lang.EN
     val budget = ProjectsCore.budgetInfo(p)
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     Column(
-        Modifier.fillMaxWidth().marked(selected)
+        modifier.fillMaxWidth().marked(selected)
             .clickable(role = Role.Tab, onClick = onClick).semantics { this.selected = selected }
     ) {
         // A Hebrew project's row reads right to left as a whole (tile, lines, ring), like its page.

@@ -1,5 +1,12 @@
 package io.github.ronganam.dana.ui.screens.now
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.ui.graphics.Color
+import io.github.ronganam.dana.ui.components.HueMark
+import io.github.ronganam.dana.ui.components.RollingText
+import io.github.ronganam.dana.ui.components.arrive
+import io.github.ronganam.dana.ui.theme.Hue
+import io.github.ronganam.dana.ui.theme.hues
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -84,14 +91,22 @@ fun NowListPane(state: NowListState, handlers: NowHandlers, actions: NowListActi
             item(key = "head") { Header(state) }
             item(key = "needs") {
                 Row(Modifier.fillMaxWidth().padding(horizontal = NOW_GUTTER).padding(top = 22.dp, bottom = 8.dp)) {
-                    MonoLabel(if (state.items.isNotEmpty()) "Needs you · ${state.items.size}" else "Needs you", modifier = Modifier.weight(1f))
+                    Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
+                        MonoLabel(if (state.items.isNotEmpty()) "Needs you · " else "Needs you")
+                        if (state.items.isNotEmpty()) RollingText(
+                            state.items.size.toString(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                     if (state.items.isNotEmpty()) MonoLabel(if (wide) "drag → day" else "swipe → do · ← dismiss")
                 }
                 Rule(Modifier.padding(horizontal = NOW_GUTTER))
             }
             when {
-                state.items.isNotEmpty() -> items(state.items, key = { "i_" + it.id }) { item ->
+                state.items.isNotEmpty() -> itemsIndexed(state.items, key = { _, it -> "i_" + it.id }) { index, item ->
                     NowRow(
+                        modifier = Modifier.arrive("now", index),
                         item = item,
                         draft = state.drafts[item.id],
                         expanded = !wide && state.openId == item.id && state.openIsUser,
@@ -101,7 +116,7 @@ fun NowListPane(state: NowListState, handlers: NowHandlers, actions: NowListActi
                     )
                 }
                 state.payload == null && state.failed -> item(key = "unreachable") {
-                    Empty("Can't reach Dana.", "Your queue shows here once the server answers.", "Try again", actions.refresh)
+                    Empty("Can't reach Dana.", "Your queue shows here once the server answers.", "Try again", hues.rose, actions.refresh)
                 }
                 state.payload == null -> item(key = "loading") {
                     Text(
@@ -111,7 +126,7 @@ fun NowListPane(state: NowListState, handlers: NowHandlers, actions: NowListActi
                         modifier = Modifier.padding(horizontal = NOW_GUTTER, vertical = 16.dp)
                     )
                 }
-                else -> item(key = "empty") { Empty("Nothing needs you.", "New things land here quietly. Only urgent ones interrupt.") }
+                else -> item(key = "empty") { Empty("Nothing needs you.", "New things land here quietly. Only urgent ones interrupt.", mark = hues.sage) }
             }
             if (state.quiet.isNotEmpty()) {
                 item(key = "quiet_fold") {
@@ -186,8 +201,9 @@ private fun Header(state: NowListState) {
 }
 
 @Composable
-private fun Empty(title: String, line: String, action: String? = null, onAction: (() -> Unit)? = null) {
+private fun Empty(title: String, line: String, action: String? = null, mark: Color? = null, onAction: (() -> Unit)? = null) {
     Column(Modifier.padding(horizontal = NOW_GUTTER).padding(top = 26.dp, bottom = 10.dp)) {
+        if (mark != null) HueMark(mark, Modifier.padding(bottom = 10.dp))
         Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic, fontSize = 26.sp))
         Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
         if (action != null && onAction != null) InkButton(action, emphasis = InkEmphasis.PRIMARY, modifier = Modifier.padding(top = 12.dp), onClick = onAction)
@@ -230,7 +246,8 @@ private fun QuietRow(q: QuietEntry, actions: NowListActions) {
 internal fun LaterRow(at: String, item: DayItem, gutter: androidx.compose.ui.unit.Dp = NOW_GUTTER) {
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = gutter, vertical = 10.dp), verticalAlignment = Alignment.Top) {
-            Box(Modifier.width(80.dp).padding(top = 2.dp)) { MonoLabel(at) }
+            // Events in sky, reminders in amber (Ember's kinds).
+            Box(Modifier.width(80.dp).padding(top = 2.dp)) { MonoLabel(at, color = hues.text(if (item.isEvent) Hue.SKY else Hue.AMBER)) }
             Text(
                 item.title,
                 style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),

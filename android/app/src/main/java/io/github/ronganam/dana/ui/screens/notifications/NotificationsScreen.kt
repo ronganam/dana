@@ -1,5 +1,10 @@
 package io.github.ronganam.dana.ui.screens.notifications
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import io.github.ronganam.dana.ui.components.RollingText
+import io.github.ronganam.dana.ui.components.arrive
+import io.github.ronganam.dana.ui.components.flashOnChange
+import io.github.ronganam.dana.ui.theme.hues
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -142,15 +147,16 @@ fun NotificationsListPane(
                     item(key = "apps_head") {
                         Row(Modifier.fillMaxWidth().padding(horizontal = GUTTER).padding(top = 22.dp, bottom = 8.dp)) {
                             MonoLabel("By app", modifier = Modifier.weight(1f))
-                            MonoLabel(overview.apps.size.toString())
+                            RollingText(overview.apps.size.toString(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Rule(Modifier.padding(horizontal = GUTTER))
                     }
                     if (overview.apps.isEmpty()) item(key = "clear") {
                         Calm("All clear.", "Nothing is waiting on your phone.", Modifier.padding(horizontal = GUTTER))
                     }
-                    items(overview.apps, key = { "a_" + it.packageName }) { a ->
-                        AppRow(a, selected = wide && selected == a.packageName, onOpen = { actions.openApp(a) }, onClear = { actions.clearApp(a) })
+                    itemsIndexed(overview.apps, key = { _, a -> "a_" + a.packageName }) { i, a ->
+                        AppRow(a, selected = wide && selected == a.packageName, onOpen = { actions.openApp(a) }, onClear = { actions.clearApp(a) },
+                            modifier = Modifier.arrive("notifications", i))
                     }
                     if (overview.quietApps.isNotEmpty()) {
                         item(key = "quiet_fold") {
@@ -190,9 +196,13 @@ private fun AccessBox(onAllow: () -> Unit) {
 private fun NoiseBox(o: NotificationsOverview, wide: Boolean, onClear: () -> Unit) {
     val noise = o.counts.noise
     val noisiest = (o.apps + o.quietApps).filter { it.noise > 0 }.sortedByDescending { it.noise }.take(3).map { it.app }
+    // Teal (notifications) while there is noise to clear, sage once it is calm.
+    val h = hues
     Column(
         Modifier.padding(top = 14.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp))
             .background(if (wide) MaterialTheme.colorScheme.background else MaterialTheme.colorScheme.surfaceContainerLow)
+            .background(h.tint(if (noise > 0) h.teal else h.sage))
+            .flashOnChange(noise, h.teal.copy(alpha = 0.25f))
             .padding(13.dp)
     ) {
         Text(
@@ -209,9 +219,9 @@ private fun NoiseBox(o: NotificationsOverview, wide: Boolean, onClear: () -> Uni
 private fun NoticedBox(s: RuleSuggestion, onAnswer: (RuleSuggestion, Boolean) -> Unit) {
     Column(
         Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp))
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp)).padding(13.dp)
+            .border(1.dp, hues.teal.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(13.dp)
     ) {
-        MonoLabel("Dana noticed")
+        MonoLabel("Dana noticed", color = hues.text(hues.teal))
         Text("${s.reason} Keep it quiet?", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InkButton("Keep it quiet", emphasis = InkEmphasis.PRIMARY) { onAnswer(s, true) }
@@ -236,20 +246,23 @@ fun AppTile(pkg: String, name: String, size: Dp = 30.dp) {
         if (value == null) value = withContext(Dispatchers.IO) { AppIcons.load(ctx, pkg) }?.asImageBitmap()
     }
     val bmp = icon
+    // Without an icon: the letters on a hue picked from the app's name.
+    val h = hues
+    val hue = h.forName(name.ifBlank { pkg })
     Box(
-        Modifier.size(size).clip(RoundedCornerShape(8.dp)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        Modifier.size(size).clip(RoundedCornerShape(8.dp)).background(h.tint(hue)),
         contentAlignment = Alignment.Center
     ) {
         if (bmp != null) Image(bmp, contentDescription = null, modifier = Modifier.fillMaxSize())
-        else Text(name.take(2), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else Text(name.take(2), style = MaterialTheme.typography.labelMedium, color = h.text(hue))
     }
 }
 
 @Composable
-private fun AppRow(a: OverviewApp, selected: Boolean, onOpen: () -> Unit, onClear: () -> Unit) {
+private fun AppRow(a: OverviewApp, selected: Boolean, onOpen: () -> Unit, onClear: () -> Unit, modifier: Modifier = Modifier) {
     val accent = MaterialTheme.colorScheme.primary
     Column(
-        Modifier
+        modifier
             .fillMaxWidth()
             .then(
                 if (selected) Modifier.background(MaterialTheme.colorScheme.background).drawBehind {
@@ -268,7 +281,7 @@ private fun AppRow(a: OverviewApp, selected: Boolean, onOpen: () -> Unit, onClea
                         pushStyle(SpanStyle(fontFamily = MaterialTheme.typography.labelMedium.fontFamily, fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurfaceVariant))
                         append("  ${a.count}")
                         if (a.needsYou > 0) { pushStyle(SpanStyle(color = accent)); append(" · ${a.needsYou} NEEDS YOU"); pop() }
-                        if (a.rule == "alert") append(" · INTERRUPTS")
+                        if (a.rule == "alert") { pushStyle(SpanStyle(color = hues.text(hues.rose))); append(" · INTERRUPTS"); pop() }
                         pop()
                     },
                     style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.5.sp),

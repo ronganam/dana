@@ -1,5 +1,10 @@
 package io.github.ronganam.dana.ui.shell
 
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import io.github.ronganam.dana.ui.components.startBar
+import io.github.ronganam.dana.ui.theme.hues
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -101,7 +106,7 @@ fun DayStrip(viewModel: MainViewModel, onNow: () -> Unit, modifier: Modifier = M
             Column(
                 Modifier.width(84.dp).fillMaxHeight().clickable(onClick = onNow).edgeRule(end = true).padding(horizontal = 10.dp, vertical = 10.dp)
             ) {
-                MonoLabel("Now")
+                MonoLabel("Now", color = MaterialTheme.colorScheme.primary)
                 Text(
                     now.format(HM),
                     style = MaterialTheme.typography.headlineMedium.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic, fontSize = 26.sp),
@@ -126,7 +131,7 @@ private fun SlotCell(slot: DaySlot, label: String, items: List<DayItem>, hovered
             .fillMaxHeight()
             .dayDropTarget(slot)
             .then(
-                if (hovered) Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh).border(1.dp, accent)
+                if (hovered) Modifier.background(hues.tint(accent)).border(1.dp, accent)
                 else Modifier
             )
             .then(if (last) Modifier else Modifier.edgeRule(end = true))
@@ -142,6 +147,8 @@ private fun SlotCell(slot: DaySlot, label: String, items: List<DayItem>, hovered
 @Composable
 private fun SlotItem(item: DayItem) {
     val style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.5.sp, lineHeight = 14.sp, textDirection = TextDirection.Content)
+    // Events on a sky chip with a sky start bar, reminders with an amber dot (Ember's kinds).
+    val h = hues
     if (item.isEvent) {
         Text(
             item.title,
@@ -150,17 +157,22 @@ private fun SlotItem(item: DayItem) {
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.padding(top = 6.dp).fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(6.dp))
-                .padding(horizontal = 6.dp, vertical = 3.dp)
+                .clip(RoundedCornerShape(6.dp))
+                .background(h.tint(h.sky))
+                .startBar(h.sky, 2.dp)
+                .padding(start = 8.dp, end = 6.dp, top = 3.dp, bottom = 3.dp)
         )
     } else {
-        Text(
-            item.title,
-            style = style,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 6.dp).fillMaxWidth()
-        )
+        Row(Modifier.padding(top = 6.dp).fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Box(Modifier.padding(top = 5.dp, end = 5.dp).size(5.dp).clip(CircleShape).background(h.amber))
+            Text(
+                item.title,
+                style = style,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f)
+            )
+        }
     }
 }

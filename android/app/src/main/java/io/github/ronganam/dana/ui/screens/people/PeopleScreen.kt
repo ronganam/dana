@@ -1,5 +1,8 @@
 package io.github.ronganam.dana.ui.screens.people
 
+import androidx.compose.foundation.lazy.itemsIndexed
+import io.github.ronganam.dana.ui.components.arrive
+import io.github.ronganam.dana.ui.theme.hues
 import android.content.Intent
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -186,9 +189,9 @@ private fun PeopleList(
                 }
                 sections.forEach { s ->
                     item(key = "h-" + s.key) { SectionHeader(s.title, s.people.size, s.accent) }
-                    items(s.people, key = { s.key + it.id }) { p ->
+                    itemsIndexed(s.people, key = { _, it -> s.key + it.id }) { i, p ->
                         PersonRow(
-                            p, selected = p.id == selectedId, showTags = s.accent || sort == "drifting",
+                            p, modifier = Modifier.arrive("people", i), selected = p.id == selectedId, showTags = s.accent || sort == "drifting",
                             onClick = { onOpen(p) }, onPin = { onPin(p) }, onCall = onCall, onHide = { onHide(p) },
                         )
                     }
@@ -281,10 +284,11 @@ private fun PinnedFace(p: Person, selected: Boolean, onClick: () -> Unit) {
 private fun PersonRow(
     p: Person, selected: Boolean, showTags: Boolean,
     onClick: () -> Unit, onPin: () -> Unit, onCall: (String) -> Unit, onHide: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var menu by remember { mutableStateOf(false) }
     val selBg = MaterialTheme.colorScheme.surfaceContainerHighest
-    Box {
+    Box(modifier) {
         Row(
             Modifier.fillMaxWidth()
                 .padding(horizontal = Space.sm)
@@ -343,7 +347,7 @@ private fun PersonRow(
 @Composable
 fun Tag(text: String, color: Color) {
     Text(
-        text.uppercase(), style = MaterialTheme.typography.labelSmall, color = color, maxLines = 1,
-        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(color.copy(alpha = 0.14f)).padding(horizontal = 6.dp, vertical = 2.dp)
+        text.uppercase(), style = MaterialTheme.typography.labelSmall, color = hues.text(color), maxLines = 1,
+        modifier = Modifier.clip(RoundedCornerShape(6.dp)).background(hues.tint(color)).padding(horizontal = 6.dp, vertical = 2.dp)
     )
 }

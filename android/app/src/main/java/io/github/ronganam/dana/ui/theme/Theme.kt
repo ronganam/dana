@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.theme
 
+import io.github.ronganam.dana.BuildConfig
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.app.Activity
 import android.content.Context
@@ -7,7 +8,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -40,7 +43,7 @@ private val DarkScheme = darkColorScheme(
     primaryContainer = AccentContainerDark, onPrimaryContainer = OnAccentContainerDark,
     secondary = DarkInkSoft, onSecondary = DarkCanvas,
     secondaryContainer = DarkSurfaceHighest, onSecondaryContainer = DarkInk,
-    tertiary = Info, onTertiary = DarkCanvas,
+    tertiary = Hue.SKY.dark, onTertiary = DarkCanvas,
     tertiaryContainer = DarkSurfaceHigh, onTertiaryContainer = DarkInkSoft,
     background = DarkCanvas, onBackground = DarkInk,
     surface = DarkCanvas, onSurface = DarkInk,
@@ -53,7 +56,7 @@ private val DarkScheme = darkColorScheme(
     surfaceContainerHighest = DarkSurfaceHighest,
     inverseSurface = DarkInk, inverseOnSurface = DarkCanvas, inversePrimary = AccentLight,
     outline = DarkOutline, outlineVariant = DarkOutlineSoft,
-    error = Danger, onError = androidx.compose.ui.graphics.Color.White,
+    error = Hue.ROSE.dark, onError = DarkCanvas,
     errorContainer = androidx.compose.ui.graphics.Color(0xFF5A1F1B),
     onErrorContainer = androidx.compose.ui.graphics.Color(0xFFFFD9D5),
     scrim = androidx.compose.ui.graphics.Color.Black
@@ -64,7 +67,7 @@ private val LightScheme = lightColorScheme(
     primaryContainer = AccentContainerLight, onPrimaryContainer = OnAccentContainerLight,
     secondary = LightInkSoft, onSecondary = LightSurface,
     secondaryContainer = LightSurfaceHighest, onSecondaryContainer = LightInk,
-    tertiary = Info, onTertiary = LightSurface,
+    tertiary = Hue.SKY.light, onTertiary = LightSurface,
     tertiaryContainer = LightSurfaceHigh, onTertiaryContainer = LightInkSoft,
     background = LightCanvas, onBackground = LightInk,
     surface = LightCanvas, onSurface = LightInk,
@@ -77,11 +80,14 @@ private val LightScheme = lightColorScheme(
     surfaceContainerHighest = LightSurfaceHighest,
     inverseSurface = LightInk, inverseOnSurface = LightCanvas, inversePrimary = AccentDark,
     outline = LightOutline, outlineVariant = LightOutlineSoft,
-    error = androidx.compose.ui.graphics.Color(0xFFC2352B), onError = androidx.compose.ui.graphics.Color.White,
+    error = Hue.ROSE.light, onError = androidx.compose.ui.graphics.Color.White,
     errorContainer = androidx.compose.ui.graphics.Color(0xFFFFDAD6),
     onErrorContainer = androidx.compose.ui.graphics.Color(0xFF410002)
 )
 
+
+private val DarkHues = DanaHues(dark = true)
+private val LightHues = DanaHues(dark = false)
 
 /** Hairline strokes for cards: soft in both themes. */
 val androidx.compose.material3.ColorScheme.hairline get() = outlineVariant
@@ -112,5 +118,13 @@ fun DanaTheme(
             }
         }
     }
-    MaterialTheme(colorScheme = colorScheme, shapes = DanaShapes, typography = DanaTypography, content = content)
+    MaterialTheme(colorScheme = colorScheme, shapes = DanaShapes, typography = DanaTypography) {
+        // Inside MaterialTheme: it would otherwise put its ripple back as the indication.
+        CompositionLocalProvider(
+            LocalHues provides if (darkTheme) DarkHues else LightHues,
+            LocalRichMotion provides !(BuildConfig.TV || BuildConfig.KIOSK),
+            LocalIndication provides PressIndication,
+            content = content
+        )
+    }
 }

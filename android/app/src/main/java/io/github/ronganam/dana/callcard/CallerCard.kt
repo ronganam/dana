@@ -15,11 +15,10 @@ import io.github.ronganam.dana.ui.theme.LightInkSoft
 import io.github.ronganam.dana.ui.theme.LightMute
 import io.github.ronganam.dana.ui.theme.LightOutlineSoft
 import io.github.ronganam.dana.ui.theme.LightSurface
-import io.github.ronganam.dana.ui.theme.OnAccentDark
-import io.github.ronganam.dana.ui.theme.OnAccentLight
 import io.github.ronganam.dana.ui.theme.ThemeMode
 import io.github.ronganam.dana.ui.theme.ThemeSettings
-import io.github.ronganam.dana.ui.theme.Warning
+import io.github.ronganam.dana.ui.theme.DanaHues
+import io.github.ronganam.dana.ui.theme.Hue
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -208,15 +207,18 @@ object CallerCardOverlay {
     private var params: WindowManager.LayoutParams? = null
 
     /** Ink & Paper tokens as View colours, picked per show() from the app's theme setting. */
-    private class Palette(dark: Boolean) {
+    private class Palette(val dark: Boolean) {
         val ink = (if (dark) DarkInk else LightInk).toArgb()
         val inkSoft = (if (dark) DarkInkSoft else LightInkSoft).toArgb()
         val mute = (if (dark) DarkMute else LightMute).toArgb()
         val surface = (if (dark) DarkSurface else LightSurface).copy(alpha = 0.96f).toArgb()
         val outline = (if (dark) DarkOutlineSoft else LightOutlineSoft).toArgb()
         val accent = (if (dark) AccentDark else AccentLight).toArgb()
-        val onAccent = (if (dark) OnAccentDark else OnAccentLight).toArgb()
-        val open = Warning.toArgb()
+        val open = Hue.AMBER.of(dark).toArgb()
+        private val hues = DanaHues(dark)
+        /** The person's hue (as in People): its tint behind the initials, the letters in it. */
+        fun personTint(key: String) = hues.tint(hues.forName(key)).toArgb()
+        fun personText(key: String) = hues.text(hues.forName(key)).toArgb()
     }
 
     private fun isDark(context: Context): Boolean {
@@ -310,13 +312,14 @@ object CallerCardOverlay {
         }
 
         val header = LinearLayout(context).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        val hueKey = card.personId.ifBlank { card.name }
         val avatar = TextView(context).apply {
             text = card.initials
             gravity = Gravity.CENTER
-            setTextColor(c.onAccent)
+            setTextColor(c.personText(hueKey))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(c.accent) }
+            background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(c.personTint(hueKey)) }
         }
         header.addView(avatar, LinearLayout.LayoutParams(dp(context, 40f), dp(context, 40f)))
         val titles = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(context, 12f), 0, dp(context, 8f), 0) }

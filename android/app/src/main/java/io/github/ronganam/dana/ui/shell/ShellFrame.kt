@@ -3,7 +3,8 @@ package io.github.ronganam.dana.ui.shell
 import androidx.activity.compose.BackHandler
 import android.content.res.Configuration
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
@@ -28,6 +29,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.ui.adaptive.asidePaneWidth
 import io.github.ronganam.dana.ui.adaptive.sidePaneWidth
+import io.github.ronganam.dana.ui.components.enterOnChange
+import io.github.ronganam.dana.ui.theme.Motion
 import io.github.ronganam.dana.ui.viewmodels.Place
 
 /**
@@ -131,9 +134,12 @@ internal fun StackedFrame(dest: Destination, slots: ShellSlots, threadOpen: Bool
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f).fillMaxWidth()) {
             val stage = dest.stage
-            // The list keeps its scroll position while a pick is open.
-            if (stage != null && dest.picked) holder.SaveableStateProvider("${dest.place}-$STAGE_KEY") { stage() }
-            else holder.SaveableStateProvider("${dest.place}-$LIST_KEY") { dest.list() }
+            // The list keeps its scroll position while a pick is open. Drilling in slides from the end, Back from the start.
+            val drilled = stage != null && dest.picked
+            Box(Modifier.fillMaxSize().enterOnChange(drilled, if (drilled) 1 else -1)) {
+                if (drilled) holder.SaveableStateProvider("${dest.place}-$STAGE_KEY") { stage() }
+                else holder.SaveableStateProvider("${dest.place}-$LIST_KEY") { dest.list() }
+            }
             SnackbarHost(slots.snackbar, Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = slots.snackbarLift))
             ThreadSheet(threadOpen, onCloseThread) { slots.thread(onCloseThread) }
         }
@@ -170,10 +176,11 @@ internal fun SplitFrame(dest: Destination, slots: ShellSlots, threadOpen: Boolea
 private fun BoxScope.ThreadSheet(open: Boolean, onClose: () -> Unit, content: @Composable () -> Unit) {
     // Composed after the stage, so it beats a drilled-in screen's own Back handler.
     BackHandler(enabled = open, onBack = onClose)
+    // Slides up and fades in (decelerating), leaves faster (accelerating).
     AnimatedVisibility(
         visible = open,
-        enter = slideInVertically(tween(260)) { it },
-        exit = slideOutVertically(tween(220)) { it },
+        enter = slideInVertically(Motion.arrive(Motion.SLOW)) { it / 3 } + fadeIn(Motion.arrive(Motion.BASE)),
+        exit = slideOutVertically(Motion.leave(Motion.BASE)) { it / 3 } + fadeOut(Motion.leave(Motion.BASE)),
         modifier = Modifier.matchParentSize()
     ) {
         Box(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) { content() }

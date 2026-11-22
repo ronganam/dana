@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.now
 
+import io.github.ronganam.dana.ui.theme.hues
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
@@ -78,7 +79,8 @@ fun NowRow(
     expanded: Boolean,
     selected: Boolean,
     wide: Boolean,
-    handlers: NowHandlers
+    handlers: NowHandlers,
+    modifier: Modifier = Modifier
 ) {
     val actions = remember(item) { NowModel.rowActions(item) }
     val accent = MaterialTheme.colorScheme.primary
@@ -90,7 +92,8 @@ fun NowRow(
     val scope = rememberCoroutineScope()
     val primaryLabel = NowModel.primaryLabel(item, draft)
 
-    Column(Modifier.fillMaxWidth()) {
+    val kindHue = hues.of(remember(item) { NowModel.visual(item) }.hue())
+    Column(modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().clipToBounds()) {
             // What a swipe will do, revealed under the row as it moves (cover only).
             if (!wide && offset.value != 0f) {
@@ -121,7 +124,8 @@ fun NowRow(
                                 drawLine(accent, Offset(1.5.dp.toPx(), 0f), Offset(1.5.dp.toPx(), size.height), 3.dp.toPx())
                             }
                             wide -> Modifier
-                            else -> Modifier.background(canvas)
+                            // Canvas only while swiping (to cover what the swipe reveals), so the canvas glow shows through at rest.
+                            else -> Modifier.drawBehind { if (offset.value != 0f) drawRect(canvas) }
                         }
                     )
                     .then(
@@ -163,7 +167,7 @@ fun NowRow(
                         if (item.source.isNotBlank()) Text(
                             io.github.ronganam.dana.ui.screens.common.isolatedParts(item.source.uppercase()),
                             style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Ltr),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = hues.text(kindHue),
                             maxLines = 1,
                             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )

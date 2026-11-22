@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens
 
+import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.data.network.ServerConfig
 import android.content.Context
 import android.content.Intent
@@ -104,7 +105,7 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
 
             // --- Server ---
             Spacer(Modifier.height(8.dp))
-            SectionLabel("Server")
+            SectionLabel("Server", hue = hues.sky)
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
@@ -178,29 +179,29 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
 
             // --- Call recordings ---
             Spacer(Modifier.height(8.dp))
-            SectionLabel("Call recordings")
+            SectionLabel("Call recordings", hue = hues.sage)
             CallRecordingSettings()
 
             // --- Caller card (phone only) ---
             if (!BuildConfig.KIOSK && !BuildConfig.TV) {
                 Spacer(Modifier.height(8.dp))
-                SectionLabel("Caller card")
+                SectionLabel("Caller card", hue = hues.sage)
                 CallerCardSettings()
             }
 
             // --- Pop-ups (suggestions, urgent alerts) ---
             Spacer(Modifier.height(8.dp))
-            SectionLabel("Pop-ups")
+            SectionLabel("Pop-ups", hue = hues.teal)
             PopUpSettings()
 
             // --- Notifications (Inbox) ---
             Spacer(Modifier.height(8.dp))
-            SectionLabel("Notifications")
+            SectionLabel("Notifications", hue = hues.teal)
             NotificationInboxSettings(viewModel)
 
             // --- App update ---
             Spacer(Modifier.height(8.dp))
-            SectionLabel("About & updates")
+            SectionLabel("About & updates", hue = hues.sky)
             GlassCard(modifier = Modifier.fillMaxWidth()) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text(

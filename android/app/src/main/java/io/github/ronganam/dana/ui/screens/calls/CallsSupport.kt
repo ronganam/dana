@@ -1,13 +1,11 @@
 package io.github.ronganam.dana.ui.screens.calls
 
-import io.github.ronganam.dana.ui.components.EmptyState
 import androidx.compose.material.icons.filled.Phone
 import io.github.ronganam.dana.ui.components.ScreenTopBar
 import io.github.ronganam.dana.ui.theme.Danger
 import io.github.ronganam.dana.ui.theme.Success
 import io.github.ronganam.dana.ui.theme.Warning
 import io.github.ronganam.dana.ui.theme.Info
-import io.github.ronganam.dana.ui.theme.CategoryPalette
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer

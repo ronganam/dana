@@ -25,7 +25,8 @@ import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.Person
 import io.github.ronganam.dana.data.models.PersonEvent
 import io.github.ronganam.dana.ui.screens.calls.isHebrew
-import io.github.ronganam.dana.ui.theme.CategoryPalette
+import androidx.compose.runtime.ReadOnlyComposable
+import io.github.ronganam.dana.ui.theme.hues
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneId
@@ -35,8 +36,10 @@ import java.util.Locale
 
 // ---------------------------------------------------------------- avatar
 
-/** A stable soft hue per person so faces are easy to spot in a long list. */
-fun personHue(id: String): Color = CategoryPalette[Math.floorMod(id.hashCode(), CategoryPalette.size)]
+/** A stable hue per person (from their id) so faces are easy to spot in a long list. */
+@Composable
+@ReadOnlyComposable
+fun personHue(id: String): Color = hues.forName(id)
 
 @Composable
 fun PersonAvatar(person: Person, size: Dp = 44.dp, ring: Boolean = false) =
@@ -46,13 +49,13 @@ fun PersonAvatar(person: Person, size: Dp = 44.dp, ring: Boolean = false) =
 fun PersonAvatar(id: String, initials: String, size: Dp = 44.dp, ring: Boolean = false) {
     val hue = personHue(id)
     Box(
-        Modifier.size(size).clip(CircleShape).background(hue.copy(alpha = 0.18f))
+        Modifier.size(size).clip(CircleShape).background(hues.tint(hue))
             .then(if (ring) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, CircleShape) else Modifier),
         contentAlignment = Alignment.Center
     ) {
         Text(
             initials.ifBlank { "?" },
-            color = hue,
+            color = hues.text(hue),
             fontWeight = FontWeight.SemiBold,
             fontSize = (size.value * 0.36f).sp,
             maxLines = 1,

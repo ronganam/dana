@@ -1,5 +1,10 @@
 package io.github.ronganam.dana.ui.components
 
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import io.github.ronganam.dana.ui.theme.richMotion
+import androidx.compose.ui.draw.drawBehind
+import io.github.ronganam.dana.ui.theme.Motion
 import androidx.compose.foundation.gestures.scrollBy
 import android.Manifest
 import android.content.pm.PackageManager
@@ -160,6 +165,10 @@ fun FloatingAssistantOverlay(
             messages.map { io.github.ronganam.dana.data.chat.ThreadModel.Row.Message(it) }, messages, memory, memoryNow
         )
     }
+    // Turns that arrive while the sheet is open rise in (not the ones there when it opened).
+    val arrivals = remember { TailArrivals() }
+    val fresh = remember(rows) { arrivals.fresh(rows.map { it.key }) }
+    val rich = richMotion
     // The sheet's fresh view hides older messages Dana may still have in mind: say so.
     val remembersHidden = remember(messages, memory, memoryNow) {
         io.github.ronganam.dana.data.chat.ThreadModel.remembersEarlier(messages, memory, memoryNow)
@@ -317,10 +326,13 @@ fun FloatingAssistantOverlay(
         // Scrim (no AnimatedVisibility so the clickable can't intercept touches during exit)
         if (overlayState == AssistantOverlayState.EXPANDED) {
             val scrimAlpha = (0.5f - (sheetDragY / (screenHeightPx.coerceAtLeast(1f))) * 0.6f).coerceIn(0.15f, 0.5f)
+            // The scrim fades in with the sheet (read in the draw: no recomposition per frame).
+            val scrimIn = remember { Animatable(if (rich) 0f else 1f) }
+            LaunchedEffect(Unit) { scrimIn.animateTo(1f, Motion.base()) }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = scrimAlpha))
+                    .drawBehind { drawRect(Color.Black.copy(alpha = scrimAlpha * scrimIn.value)) }
                     .clickable(
                         indication = null,
                         interactionSource = remember { MutableInteractionSource() }
@@ -333,9 +345,13 @@ fun FloatingAssistantOverlay(
         AnimatedContent(
             targetState = overlayState,
             transitionSpec = {
-                if (targetState == AssistantOverlayState.EXPANDED) {
-                    (fadeIn(tween(200)) + slideInVertically(tween(320, easing = FastOutSlowInEasing)) { it / 3 })
-                        .togetherWith(fadeOut(tween(120)))
+                // The TV and the wall tablet just switch: no fade or slide over a large surface.
+                if (!rich) {
+                    EnterTransition.None togetherWith ExitTransition.None
+                } else if (targetState == AssistantOverlayState.EXPANDED) {
+                    // Sheet: slides up and fades in (decelerating); what it replaces leaves fast.
+                    (fadeIn(Motion.arrive(Motion.BASE)) + slideInVertically(Motion.arrive(Motion.SLOW)) { it / 3 })
+                        .togetherWith(fadeOut(Motion.leave()))
                 } else {
                     fadeIn(tween(220, easing = FastOutSlowInEasing)) + scaleIn(
                         initialScale = 0.85f,
@@ -485,6 +501,7 @@ fun FloatingAssistantOverlay(
                                                             .fillMaxWidth()
                                                             .padding(horizontal = 20.dp)
                                                             .animateItem(fadeInSpec = null, fadeOutSpec = null)
+                                                            .riseIn(row.key in fresh)
                                                             .then(faded)
                                                     )
                                                 } else {
@@ -495,7 +512,7 @@ fun FloatingAssistantOverlay(
                                                         tapToSpeech = tapToSpeech,
                                                         serverUrl = viewModel.serverConfig.url,
                                                         apiToken = viewModel.serverConfig.token,
-                                                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).then(faded)
+                                                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).riseIn(row.key in fresh).then(faded)
                                                     )
                                                 }
                                             }

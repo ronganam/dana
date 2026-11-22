@@ -1,11 +1,12 @@
 package io.github.ronganam.dana.ui.screens.memory
 
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.ReadOnlyComposable
+import io.github.ronganam.dana.ui.theme.Hue
+import io.github.ronganam.dana.ui.theme.hues
+
 import androidx.compose.ui.graphics.Color
 import io.github.ronganam.dana.data.models.Memory
-import io.github.ronganam.dana.ui.theme.CategoryPalette
-import io.github.ronganam.dana.ui.theme.Danger
-import io.github.ronganam.dana.ui.theme.Info
-import io.github.ronganam.dana.ui.theme.Success
 
 internal fun memoryTitle(key: String): String = key.replace("_", " ").replaceFirstChar { it.uppercase() }
 
@@ -29,12 +30,17 @@ internal fun memoryValueDisplay(value: String): String {
 
 internal fun categoryLabel(category: String): String = category.replaceFirstChar { it.uppercase() }
 
-internal fun memoryCategoryColor(category: String): Color = when (category.lowercase()) {
-    "personal" -> Danger
-    "work" -> Info
-    "general" -> Success
-    else -> CategoryPalette[4]
-}
+/** A memory category's hue: personal rose, work sky, general sage, anything else plum (memory's hue). */
+@Composable
+@ReadOnlyComposable
+internal fun memoryCategoryColor(category: String): Color = hues.of(
+    when (category.lowercase()) {
+        "personal" -> Hue.ROSE
+        "work" -> Hue.SKY
+        "general" -> Hue.SAGE
+        else -> Hue.PLUM
+    }
+)
 
 internal data class LetterSection(val letter: String, val items: List<Memory>)
 

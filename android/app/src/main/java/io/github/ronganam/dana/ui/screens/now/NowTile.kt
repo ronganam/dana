@@ -33,6 +33,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.notifications.AppIcons
+import io.github.ronganam.dana.ui.theme.Hue
+import io.github.ronganam.dana.ui.theme.hues
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -53,6 +55,27 @@ private fun NowGlyph.vector(): ImageVector = when (this) {
     NowGlyph.MONEY -> Icons.Outlined.CreditCard
 }
 
+/**
+ * The hue of a kind (Ember's colour coding): approvals ember, alerts rose,
+ * calls and money sage, events sky, reminders and Dana's checks amber, the
+ * weekly review plum (people), notifications and suggestions teal; anything
+ * from an app's notification teal.
+ */
+fun NowGlyph.hue(): Hue = when (this) {
+    NowGlyph.APPROVAL -> Hue.EMBER
+    NowGlyph.ALERT -> Hue.ROSE
+    NowGlyph.CALL, NowGlyph.MONEY -> Hue.SAGE
+    NowGlyph.EVENT -> Hue.SKY
+    NowGlyph.REMINDER, NowGlyph.CHECK -> Hue.AMBER
+    NowGlyph.REVIEW -> Hue.PLUM
+    NowGlyph.NOTIFICATION, NowGlyph.SUGGESTION -> Hue.TEAL
+}
+
+fun NowVisual.hue(): Hue = when (this) {
+    is NowVisual.Glyph -> glyph.hue()
+    is NowVisual.App -> Hue.TEAL
+}
+
 /** What the tile settled on once the app lookup (if any) is done. */
 private sealed class Shown {
     class Icon(val bitmap: ImageBitmap) : Shown()
@@ -62,10 +85,10 @@ private sealed class Shown {
 
 /**
  * Where a Now item came from, at a glance: the app's real launcher icon for
- * anything from a notification, else a quiet outline glyph for the kind. The
+ * anything from a notification, else an outline glyph for the kind, on its
+ * kind's hue (the hue's tint behind, the glyph or letters in the hue). The
  * same tile as the Notifications place; decorative (the mono source line next
- * to it says the same in words). Approvals and alerts, the things Dana is
- * waiting on, take the accent; everything else stays muted.
+ * to it says the same in words).
  */
 @Composable
 fun NowTile(visual: NowVisual, size: Dp = NOW_TILE, modifier: Modifier = Modifier) {
@@ -91,17 +114,18 @@ fun NowTile(visual: NowVisual, size: Dp = NOW_TILE, modifier: Modifier = Modifie
             }
         }
     }
-    val accent = visual is NowVisual.Glyph && (visual.glyph == NowGlyph.APPROVAL || visual.glyph == NowGlyph.ALERT)
+    val h = hues
+    val hue = h.of(visual.hue())
     Box(
-        modifier.size(size).clip(RoundedCornerShape(size * 0.27f)).background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        modifier.size(size).clip(RoundedCornerShape(size * 0.27f)).background(h.tint(hue)),
         contentAlignment = Alignment.Center
     ) {
         when (val s = shown) {
             is Shown.Icon -> Image(s.bitmap, contentDescription = null, modifier = Modifier.size(size))
-            is Shown.Letters -> Text(s.text, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            is Shown.Letters -> Text(s.text, style = MaterialTheme.typography.labelMedium, color = h.text(hue))
             is Shown.Glyph -> Icon(
                 s.glyph.vector(), contentDescription = null,
-                tint = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = h.of(s.glyph.hue()),
                 modifier = Modifier.size(size * 0.6f)
             )
             null -> Unit

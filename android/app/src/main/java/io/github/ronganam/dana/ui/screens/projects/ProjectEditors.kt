@@ -34,7 +34,8 @@ import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
 import io.github.ronganam.dana.ui.components.MonoLabel
 import io.github.ronganam.dana.ui.components.Rule
-import io.github.ronganam.dana.ui.theme.CategoryPalette
+import io.github.ronganam.dana.ui.theme.CategoryHues
+import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.ui.viewmodels.ProjectsController
 import io.github.ronganam.dana.ui.viewmodels.ProjectsEditor
 import java.time.LocalDate
@@ -121,8 +122,10 @@ private fun ColumnScope.ProjectForm(c: ProjectsController, d: ProjectsEditor.Pro
         }
         Labeled("Colour") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                CategoryPalette.forEach { color ->
-                    val hex = String.format("#%06x", color.toArgb() and 0xFFFFFF)
+                CategoryHues.forEach { hue ->
+                    // Stored as the hue's dark value (the same on every client); shown in the theme's value.
+                    val hex = String.format("#%06x", hue.dark.toArgb() and 0xFFFFFF)
+                    val color = hues.of(hue)
                     val on = d.color.equals(hex, ignoreCase = true)
                     Box(
                         Modifier.size(30.dp).clip(CircleShape).background(color)
