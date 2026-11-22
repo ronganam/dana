@@ -9,7 +9,7 @@ dana/                     ← upstream, unchanged: git pull to update
   site/  → ~/my-dana-site ← yours (gitignored here; a folder, or a link to your own private repository)
     deploy.env            where your images go and how they roll out
     addons/<name>/        your own addons (site addons)
-    android.env           your server URL and devices, for the apps
+    android.env           your server URL (for publishing apps) and devices
     tv-defaults.json      your TV's first-run home screen
     google-services.json  your Firebase project (optional)
     AGENTS.md             notes about this deployment, for you and coding agents
@@ -28,7 +28,7 @@ dana/                     ← upstream, unchanged: git pull to update
 | Add a capability others could use | an addon in `server/addons/`, sent as a pull request | a site addon you keep forever |
 | Fix or change how Dana itself works | a pull request upstream | a private patch |
 | Deploy somewhere | `site/deploy.env` + `server/bin/deploy`, or `server/compose.yaml` | edits to the scripts |
-| Point the apps at your server | `site/android.env` (`SERVER_URL`) | the Kotlin code |
+| Point the apps at your server | pair each app from the web Devices page (`server/docs/devices.md`) | the Kotlin code or `android.env` |
 
 When a change seems to need an edit to Dana's code just for your setup, the missing piece is usually a setting or an extension point. Ask for it in an issue, or add it in a pull request, instead of patching your copy.
 

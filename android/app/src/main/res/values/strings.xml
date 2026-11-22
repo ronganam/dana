@@ -38,7 +38,6 @@
     <string name="toast_session_id_copied">Session ID copied!</string>
     <string name="toast_copied_to_clipboard">Copied to clipboard</string>
     <string name="toast_copied">Copied</string>
-    <string name="toast_settings_saved">Settings Saved</string>
     <string name="toast_couldnt_open_settings">Could not open settings</string>
     <string name="toast_couldnt_launch_installer">Could not launch installer</string>
     <string name="toast_download_failed">Download failed — try again</string>

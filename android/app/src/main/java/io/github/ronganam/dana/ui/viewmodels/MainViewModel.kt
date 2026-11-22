@@ -41,13 +41,31 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val appContext: Context = application.applicationContext
     private val prefs: SharedPreferences = ServerConfig.prefs(appContext)
 
-    /** The server and token every controller talks to (Settings changes it: [updateServerConfig]). */
+    /** The server and device token every controller talks to (pairing changes it: [useServerConfig]). */
     var serverConfig: ServerConfig = ServerConfig.load(appContext)
         private set
     private var apiService = serverConfig.api()
 
+    private val _paired = MutableStateFlow(serverConfig.isConfigured)
+    /** Whether this app is paired with a server (else the phone shows the pairing screen). */
+    val paired: StateFlow<Boolean> = _paired.asStateFlow()
+
     private val userMessages = UserMessages()
     private val ctx = ControllerContext(viewModelScope, userMessages, Texts.of(appContext)) { apiService }
+
+    /** The pairing screen and Settings' Unpair / Pair again. */
+    val pairingController = PairingController(
+        viewModelScope,
+        deviceName = deviceModelName(),
+        current = { serverConfig },
+        onPaired = { config ->
+            // The shell starts (MainActivity: initialize) once the pairing screen closes.
+            useServerConfig(ServerConfig.savePaired(appContext, config))
+            io.github.ronganam.dana.push.PushSetup.ensureRegistered(appContext, force = true)
+        },
+        onUnpaired = { useServerConfig(ServerConfig.clear(appContext)) },
+        notify = { userMessages.post(it) },
+    )
 
     /** One-shot error/info messages for a Snackbar. */
     val messages: SharedFlow<String> = userMessages.messages
@@ -243,9 +261,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Save a new server / token (normalized) and point every controller at it. */
-    fun updateServerConfig(newServerUrl: String, newApiToken: String) {
-        serverConfig = ServerConfig.save(appContext, newServerUrl, newApiToken)
+    /** Point every controller at [config] (already saved: [ServerConfig]). */
+    fun useServerConfig(config: ServerConfig) {
+        serverConfig = config
+        _paired.value = config.isConfigured
         apiService = serverConfig.api()
         ServerStatusMonitor.configure(appContext, serverConfig.url)
         shoppingController.accountChanged()
@@ -310,7 +329,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val eventsJson = ctx.load("WearSync") { io.github.ronganam.dana.data.wear.WatchJson.events(eventsForWatch(apiService.tasks.calendarEvents())) } ?: "[]"
             val tasksJson = ctx.load("WearSync") { io.github.ronganam.dana.data.wear.WatchJson.tasks(apiService.tasks.tasksDueSoon()) } ?: "[]"
-            WearSyncManager.syncConfigToWear(appContext, serverConfig.url, serverConfig.token, sessionId, eventsJson, tasksJson)
+            WearSyncManager.syncConfigToWear(appContext, serverConfig.url, sessionId, eventsJson, tasksJson)
         }
     }
 
@@ -455,5 +474,16 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             "yyyy-MM-dd'T'HH:mm:ssXXX",
             "yyyy-MM-dd'T'HH:mm:ss.SSSXXX"
         )
+    }
+
+    /** How this phone is named on the Devices page ("Google Pixel 8"). */
+    private fun deviceModelName(): String {
+        val maker = android.os.Build.MANUFACTURER.orEmpty().replaceFirstChar { it.titlecase() }
+        val model = android.os.Build.MODEL.orEmpty()
+        return when {
+            model.isBlank() -> "Phone"
+            maker.isBlank() || model.startsWith(maker, ignoreCase = true) -> model
+            else -> "$maker $model"
+        }.take(60)
     }
 }

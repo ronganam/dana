@@ -17,7 +17,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.BuildConfig
 import io.github.ronganam.dana.CallRecordingObserverService
@@ -50,8 +49,6 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     val prefs = ServerConfig.prefs(context)
 
-    var serverUrl by remember { mutableStateOf(viewModel.serverConfig.url.ifEmpty { "https://" }) }
-    var apiToken by remember { mutableStateOf(viewModel.serverConfig.token) }
     var liveTranscription by remember { mutableStateOf(prefs.getBoolean(DeviceSpeech.PREF_KEY, true)) }
 
     val appUpdateInfo by viewModel.appUpdateInfo.collectAsState()
@@ -104,36 +101,10 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
 
-            // --- Server ---
+            // --- Server: the pairing (server docs/devices.md) ---
             Spacer(Modifier.height(8.dp))
             SectionLabel("Server", hue = hues.sky)
-            GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = serverUrl,
-                        onValueChange = { serverUrl = it },
-                        label = { Text("Server URL") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    OutlinedTextField(
-                        value = apiToken,
-                        onValueChange = { apiToken = it },
-                        label = { Text("API Token") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Button(
-                        onClick = {
-                            viewModel.updateServerConfig(serverUrl, apiToken)
-                            serverUrl = viewModel.serverConfig.url
-                            Toast.makeText(context, R.string.toast_settings_saved, Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                    ) { Text("Save") }
-                }
-            }
+            PairedServerCard(viewModel)
 
             // --- Assistant ---
             Spacer(Modifier.height(8.dp))
@@ -632,4 +603,50 @@ private fun CallerCardSettings() {
             }
         }
     }
+}
+
+/** The server this phone is paired with and its device on the Devices page; Unpair, Pair again. */
+@Composable
+private fun PairedServerCard(viewModel: MainViewModel) {
+    val config = viewModel.serverConfig
+    var confirmUnpair by remember { mutableStateOf(false) }
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(config.url, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    pairedAsText(config),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { viewModel.pairingController.pairAgain() },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) { Text("Pair again") }
+                OutlinedButton(
+                    onClick = { confirmUnpair = true },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) { Text("Unpair", color = MaterialTheme.colorScheme.error) }
+            }
+        }
+    }
+    if (confirmUnpair) {
+        AlertDialog(
+            onDismissRequest = { confirmUnpair = false },
+            title = { Text("Unpair this phone?") },
+            text = { Text("It is removed from Dana's Devices page and stops reaching ${config.url}. Pair it again with a new code.") },
+            confirmButton = {
+                TextButton(onClick = { confirmUnpair = false; viewModel.pairingController.unpair() }) { Text("Unpair") }
+            },
+            dismissButton = { TextButton(onClick = { confirmUnpair = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+/** "Paired as Pixel 8 (Robin's)": the device's name on the Devices page and whose it is. */
+internal fun pairedAsText(config: ServerConfig): String {
+    val device = config.deviceName.ifBlank { "this phone" }
+    return if (config.userName.isBlank()) "Paired as $device" else "Paired as $device, ${config.userName}'s device"
 }

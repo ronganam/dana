@@ -272,7 +272,7 @@ class KioskActivity : ComponentActivity() {
 
     private fun applySettings() {
         settingsVisible = false
-        ServerConfig.load(this).let { vm.updateServerConfig(it.url, it.token) }
+        vm.useServerConfig(ServerConfig.load(this))
         webView?.let { loadDashboard(it, forceLogin = true) }
     }
 

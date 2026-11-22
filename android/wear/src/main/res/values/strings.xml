@@ -86,6 +86,20 @@
     <string name="watch_app_version">Watch app v%1$s</string>
     <string name="phone_app_version">Phone app v%1$s</string>
 
+    <!-- Pairing (data/WatchPairing.kt, ui/screens/PairScreen.kt) -->
+    <string name="pairing_title">Dana account</string>
+    <string name="pairing_paired_as">Paired as %1$s</string>
+    <string name="pairing_working">Pairing…</string>
+    <string name="pairing_not_paired">Not paired yet</string>
+    <string name="pairing_no_phone">No phone connected. Type a code from Dana\'s Devices page (Pair a device → Watch).</string>
+    <string name="pairing_phone_silent">The phone didn\'t answer. Open Dana on the phone, or type a code.</string>
+    <string name="pairing_unreachable">Couldn\'t reach that server from the watch.</string>
+    <string name="pairing_bad_code">A code has 8 letters and digits.</string>
+    <string name="pairing_server">Server address</string>
+    <string name="pairing_code">Code</string>
+    <string name="pairing_pair">Pair</string>
+    <string name="pairing_ask_phone">Ask the phone</string>
+
     <!-- Tasks -->
     <string name="tasks_status_loading">Loading...</string>
     <string name="tasks_status_send_error">Send error</string>

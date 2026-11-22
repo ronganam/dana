@@ -12,6 +12,7 @@ import io.github.ronganam.dana.protocol.TaskStatusRequest
 import io.github.ronganam.dana.protocol.WearApprovalPrompt
 import io.github.ronganam.dana.protocol.WearExtension
 import io.github.ronganam.dana.protocol.WearOption
+import io.github.ronganam.dana.protocol.WearPairRequest
 import io.github.ronganam.dana.protocol.WearPaths
 import io.github.ronganam.dana.protocol.WearReply
 import io.github.ronganam.dana.protocol.WearRunAction
@@ -402,6 +403,12 @@ class WearMessageListenerService : WearableListenerService() {
                         val request = ShopRequest.decode(String(data)) ?: throw IllegalArgumentException("Unreadable shopping action")
                         val outcome = io.github.ronganam.dana.data.shopping.ShoppingWatch.handle(applicationContext, request)
                         sendReply(nodeId, WearPaths.response(WearPaths.SHOPPING_ACTION), outcome.encode().toByteArray())
+                    }
+                    WearPaths.PAIR_WATCH -> {
+                        // A code of kind "watch" that the watch redeems itself (its own device and token).
+                        val request = WearPairRequest.decode(String(data)) ?: WearPairRequest()
+                        val offer = WatchPairingOffer.offer(ServerConfig.load(applicationContext), request)
+                        sendReply(nodeId, WearPaths.response(WearPaths.PAIR_WATCH), offer.encode().toByteArray())
                     }
                     WearPaths.REMINDER_HANDLED_ON_WATCH -> {
                         ReminderHandled.decode(String(data))?.let { WearReminderBridge.dismissOnPhone(applicationContext, it.taskId) }

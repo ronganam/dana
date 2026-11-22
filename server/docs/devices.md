@@ -70,6 +70,13 @@ counted and stays usable. Neither codes nor tokens are logged; a failure logs th
 makes a device and its token directly (the setup page's browser, tests). `devices.redeem(code, kind=, name=)`
 is what `/api/pair` runs.
 
+**The phone and the watch** (android `docs/phone.md` → Pairing, `docs/wear.md` → Pairing): the phone app
+pairs with the QR code's `dana://pair` link (a camera app opens it in Dana) or the typed address and code,
+as kind `phone`; Settings → Unpair sends `DELETE /api/devices/{id}` with its own token. The watch gets a code
+from the phone, which starts a pairing of kind `watch` with its own token, and redeems it itself, so it is a
+device of the same user. A paired phone's push registration (`POST /api/phone/register`) is tied to its device
+by its token.
+
 **In a browser**: `/login` accepts a pairing code of kind `browser` as well as a token: the browser becomes
 a device of the code's user (named from its User-Agent, "Firefox on Linux") and gets the session cookie of
 its device token. A code of another kind is refused (`error=kind`) and stays usable; wrong codes count

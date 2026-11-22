@@ -16,6 +16,7 @@ class ApiService(serverUrl: String, apiToken: String) {
     val people = PeopleApi(http)
     val about = AboutApi(http)
     val devices = DevicesApi(http)
+    val pairing = PairingApi(http)
     val money = io.github.ronganam.dana.data.money.MoneyDeviceApi(http)
     val shopping = io.github.ronganam.dana.data.shopping.ShoppingApi(http)
 }

@@ -1,5 +1,14 @@
 # Wear OS watch (`:wear`)
 
+## Pairing
+
+The watch is its own device of the user (listed and revocable on the web Devices page, server `docs/devices.md`) with its own token; nothing travels from the phone but a one-time code. Today the watch uses the token for nothing else (its requests go through the phone), so revoking it on the Devices page only removes it from the list.
+
+- **Through the phone** (`data/WatchPairing.kt`): when the watch app starts, and when the phone's config (`/dana_config`, which carries the phone's server but no token) names a server the watch isn't paired with, the watch sends `/pair_watch` `WearPairRequest{name: <model>}`. The phone (`WatchPairingOffer`) starts a pairing of kind `watch` with its own token (`POST /api/devices/pairings`) and answers on `/response/pair_watch` with `WearPairOffer{server, code}` or `{error}` (the phone isn't paired, the server refused). The watch redeems the code itself: `POST /api/pair {code, kind: "watch", name}` (`WatchPairClient`, plain `HttpURLConnection`), and keeps the server, token, device id and name in `DanaWearPrefs`.
+- **Without the phone**: no phone node → the pairing screen (`ui/screens/PairScreen.kt`, route `pair`) opens by itself once per process, with the code entry (server address + code from the Devices page → Pair a device → Watch) and "Ask the phone". No answer from the phone in 20 s, or a refusal, shows the same screen's message; Settings → "Dana account" opens it any time and shows "Paired as …".
+- `WatchPairingFlow` holds the steps without Android (phone link, offer, redeem, save) and is unit-tested with fakes; `WatchPairClient` is tested against a local HTTP server (`wear/src/test/.../data/WatchPairingTest.kt`); the messages in `protocol/src/test/.../PairingTest.kt`.
+- **What needs real devices**: emulators can't do the phone ↔ watch round trip (the Data Layer needs the Play Store Wear OS app), so `/pair_watch` end to end, the automatic re-pair when the phone's server changes, and the watch reaching the server over the phone's connection are checked on hardware only. A release watch app reaches only HTTPS servers.
+
 ## Watch assistant performance (`:wear`)
 
 Built and measured on a OnePlus Watch 2 (OPWE242, Wear OS 4, 32-bit arm); an emulator is often attached too, so always pass `-s`. Its button opens Dana with a plain launcher intent (Google Assistant stays the system assistant), so a press goes MAIN → `MainActivity` → `WearViewModel.onAppOpened` → hands-free listening. `WearVoiceInteractionService` covers the case where Dana is made the default assistant.

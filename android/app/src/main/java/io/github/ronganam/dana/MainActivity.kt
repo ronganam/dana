@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -88,11 +90,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             DanaTheme {
                 val mainViewModel: MainViewModel = viewModel()
-                LaunchedEffect(Unit) {
-                    mainViewModel.initialize(applicationContext)
+                val paired by mainViewModel.paired.collectAsState()
+                val pairing by mainViewModel.pairingController.state.collectAsState()
+                if (!paired || pairing.requested) {
+                    // Unpaired (a fresh install, after Unpair), "Pair again" or a dana://pair link.
+                    io.github.ronganam.dana.ui.screens.PairingScreen(mainViewModel)
+                } else {
+                    // Runs again when the shell comes back after pairing anew.
+                    LaunchedEffect(Unit) {
+                        mainViewModel.initialize(applicationContext)
+                    }
+                    // The main screen: Now / Reminders / Notifications / More + ask bar + thread.
+                    io.github.ronganam.dana.ui.shell.DanaShell(mainViewModel)
                 }
-                // The main screen: Now / Reminders / Notifications / More + ask bar + thread.
-                io.github.ronganam.dana.ui.shell.DanaShell(mainViewModel)
             }
         }
 
@@ -104,10 +114,16 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    /** From the Debrief / notifications: open a chat with something attached, or a call. */
+    /** From the Debrief / notifications: open a chat with something attached, or a call; a `dana://pair` link pairs. */
     private fun handleDeepLink(intent: Intent?) {
         intent ?: return
         val vm = ViewModelProvider(this)[MainViewModel::class.java]
+        if (intent.action == Intent.ACTION_VIEW && intent.data?.scheme == "dana") {
+            vm.pairingController.openLink(intent.dataString)
+            // Handle once (not again after a configuration change).
+            intent.data = null
+            return
+        }
         val kind = intent.getStringExtra(CallDebriefActivity.EXTRA_CONTEXT_KIND)
         val id = intent.getStringExtra(CallDebriefActivity.EXTRA_CONTEXT_ID)
         val callId = intent.getStringExtra(CallDebriefActivity.EXTRA_OPEN_CALL_ID)

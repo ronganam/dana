@@ -8,7 +8,7 @@ package io.github.ronganam.dana.protocol
 object WearPaths {
     // --- Data items ---
 
-    /** Phone → watch: server, token, thread and cached tile data ([WearConfig]). */
+    /** Phone → watch: server, thread and cached tile data ([WearConfig]). */
     const val CONFIG = "/dana_config"
     /** Watch → phone: the watch app's version ([WearVersion]). */
     const val VERSION = "/dana/version"
@@ -36,6 +36,8 @@ object WearPaths {
     const val SUGGESTION_ACTION = "/suggestion_action"
     /** Tick / untick / add on the shopping list (JSON: action, id | text, list_id, ref). */
     const val SHOPPING_ACTION = "/shopping_action"
+    /** A pairing code of kind `watch` for the watch to redeem itself ([WearPairRequest]; answered with [WearPairOffer]). */
+    const val PAIR_WATCH = "/pair_watch"
 
     // --- Watch → phone push-to-talk audio, in arrival order ---
 

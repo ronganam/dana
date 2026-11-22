@@ -2,6 +2,8 @@ package io.github.ronganam.dana.wear.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.core.content.edit
+import io.github.ronganam.dana.protocol.PairAnswer
 import io.github.ronganam.dana.protocol.WearEvent
 import io.github.ronganam.dana.protocol.WearTaskItem
 import java.text.SimpleDateFormat
@@ -13,13 +15,32 @@ import java.util.UUID
 class WearPrefs(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("DanaWearPrefs", Context.MODE_PRIVATE)
 
-    var serverUrl: String
-        get() = prefs.getString("server_url", "https://") ?: "https://"
-        set(value) = prefs.edit().putString("server_url", value).apply()
+    /** The server the watch is paired with ("" when it isn't; docs/wear.md → Pairing). */
+    val serverUrl: String get() = prefs.getString("server_url", "") ?: ""
 
-    var apiToken: String
-        get() = prefs.getString("api_token", "") ?: ""
-        set(value) = prefs.edit().putString("api_token", value).apply()
+    /** The watch's own device token from its pairing. */
+    val apiToken: String get() = prefs.getString("api_token", "") ?: ""
+
+    /** The watch's device on the Devices page. */
+    val deviceName: String get() = prefs.getString("device_name", "") ?: ""
+
+    /** The server the phone is paired with, as its config last said ("" when it isn't). */
+    var phoneServerUrl: String
+        get() = prefs.getString("phone_server_url", "") ?: ""
+        set(value) = prefs.edit { putString("phone_server_url", value) }
+
+    /** Whether the watch has its own device and token. */
+    fun isPaired(): Boolean = serverUrl.isNotEmpty() && apiToken.isNotEmpty()
+
+    /** Store the watch's pairing with [server]. */
+    fun savePairing(server: String, answer: PairAnswer) {
+        prefs.edit {
+            putString("server_url", server)
+            putString("api_token", answer.token)
+            putString("device_id", answer.device.id)
+            putString("device_name", answer.device.name)
+        }
+    }
 
     var sessionId: String
         get() {
@@ -180,10 +201,5 @@ class WearPrefs(context: Context) {
             val parts = dueDate.split("-")
             if (parts.size == 3) "${parts[1]}/${parts[2]}" else dueDate
         } else "--"
-    }
-
-    fun isConfigured(): Boolean {
-        val url = serverUrl
-        return url.isNotEmpty() && url != "https://" && url != "http://"
     }
 }

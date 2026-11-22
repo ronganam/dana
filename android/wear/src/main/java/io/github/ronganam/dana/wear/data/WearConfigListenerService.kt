@@ -25,13 +25,13 @@ class WearConfigListenerService : WearableListenerService() {
                 try {
                     val config = WearConfig.from(DataMapItem.fromDataItem(event.dataItem).dataMap)
                     val serverUrl = config.serverUrl
-                    val apiToken = config.apiToken
                     val sessionId = config.sessionId
 
                     val wearPrefs = WearPrefs(applicationContext)
-                    if (serverUrl.isNotEmpty()) wearPrefs.serverUrl = serverUrl
-                    if (apiToken.isNotEmpty()) wearPrefs.apiToken = apiToken
+                    wearPrefs.phoneServerUrl = serverUrl
                     if (sessionId.isNotEmpty()) wearPrefs.sessionId = sessionId
+                    // The watch pairs itself with the phone's server (and again when it changes).
+                    if (serverUrl.isNotEmpty()) WatchPairing.ensure(applicationContext)
 
                     val phoneVersionCode = config.phoneVersionCode
                     if (phoneVersionCode > 0) wearPrefs.phoneVersionCode = phoneVersionCode
