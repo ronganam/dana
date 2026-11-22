@@ -124,4 +124,5 @@ extensions/*/package-lock.json
 
 # Local test environment (bin/local-env.sh): generated env file and tokens
 tests/local_env/.state/
+tests/local_env/.state-*/
 

@@ -42,13 +42,34 @@ Needs Docker with `docker compose`, and the repo's `.venv` for `test` (it uses
 aiohttp from there). `test` expects a fresh environment: it creates the second
 user, so run `reset` before running it again.
 
+**Several at once** (two checkouts, or parallel work in one): give each its own
+port. `DANA_LOCAL_PORT` picks the environment: every command (`up`, `test`,
+`logs`, `exec`, `down`…) run with the same port talks to the same one.
+
+| | port 18080 (the default) | any other port, e.g. 18087 |
+|---|---|---|
+| name (compose project: containers, network, data volume) | `dana-local` | `dana-local-18087` |
+| image | `dana-local/app:latest` | `dana-local/dana-local-18087:latest` |
+| control API | 18090 | the port + 100: 18187 |
+| generated state | `tests/local_env/.state/` | `tests/local_env/.state-dana-local-18087/` |
+
+`DANA_LOCAL_NAME` names it explicitly instead (image `dana-local/<name>:latest`,
+state `.state-<name>/`), and `DANA_LOCAL_CONTROL_PORT` / `DANA_LOCAL_IMAGE`
+override the derived values. The app container is `<name>-app-1`.
+
+```bash
+DANA_LOCAL_PORT=18087 DANA_LOCAL_SOURCE=1 bin/local-env.sh up   # next to another environment on 18080
+DANA_LOCAL_PORT=18087 bin/local-env.sh test
+DANA_LOCAL_PORT=18087 bin/local-env.sh down
+```
+
 ## What runs
 
 | Container | What |
 |---|---|
-| `app` | the image `dana-local/app:latest` (the repo's `Dockerfile`, built from the files git tracks or would add, like `bin/deploy`'s clean checkout), `python main.py`, data volume at `/app/db`, env from `tests/local_env/.state/app.env` |
+| `app` | the image `dana-local/app:latest` (another environment's own, above; the repo's `Dockerfile`, built from the files git tracks or would add, like `bin/deploy`'s clean checkout), `python main.py`, data volume at `/app/db`, env from `tests/local_env/.state/app.env` |
 | `stubs` | `tests/local_env/stubs.py` (same image, the directory mounted read-only): every outside service, each on its own port, plus a control API |
-| `gateway` | `tests/local_env/gateway.py`: forwards `127.0.0.1:18080` to the app and `127.0.0.1:18090` to the stubs' control API |
+| `gateway` | `tests/local_env/gateway.py`: forwards `127.0.0.1:18080` to the app and `127.0.0.1:18090` to the stubs' control API (the environment's own ports) |
 
 The app and the stubs are only on an internal Docker network with no route out
 of the machine (`compose.yaml`, `internal: true`); the gateway is the one
@@ -110,21 +131,25 @@ connect it) and `TIMEZONE`. The models are `openai/dana-local-*` on the stub.
   {"name": "call_ha_service", "args": {"domain": "light", "service": "turn_on",
   "entity_id": "light.living_room"}}}}, {"match": "lights", "reply": {"text":
   "On."}}]'`, then say "lights" in the chat.
-- Ports: `DANA_LOCAL_PORT` / `DANA_LOCAL_CONTROL_PORT` change 18080 / 18090.
+- Ports: `DANA_LOCAL_PORT` / `DANA_LOCAL_CONTROL_PORT` change 18080 / 18090 (a
+  port other than 18080 is another environment: "Several at once" above).
 
 ## The end-to-end rehearsal
 
 `tests/local_env/e2e.py` drives the running container over HTTP only, plus
 `docker exec … bin/dana` and `docker` (restart, start-up refusals). It
-covers: the upgrade (log lines, snapshot, every fixture row with its id through
-the API, `/api/me`, the default addons and the connections `up` made, their
+covers: the upgrade (log lines, exactly the migrations after the baselines in
+this tree, snapshot, every fixture row with its id through the API — the
+fixture's bought item cleared once it is over 12 hours old, its phone a core
+device now — `/api/me`, the default addons and the connections `up` made, their
 tests against the stubs, the CLI, a restart that gives nothing twice, missing /
 malformed / wrong `CREDENTIALS_KEY` on the migrated database, the key file
 generated for a fresh 9.0 one); the
-endpoints `static/*.js` load and the fields they read, the pages, the login
+endpoints `static/*.js` load and the fields they read, the pages (the shell's scripts in
+order, the addon pages `/api/addons` names), the login
 cookie, a streamed chat turn compared with `tests/fixtures/golden.sse`'s event
-types, reattach, approval, undo; a second user made with the CLI (403
-`not_connected`, admin-only endpoints, `ops` refused, her tool list and system
+types, reattach, approval, undo; a second user made with the CLI (the
+default addons it gives, turned off through the API, then 403 `not_connected`, admin-only endpoints, `ops` refused, her tool list and system
 message as the model received them, hidden tools refused and not executed,
 her own Home Assistant and WhatsApp connected through the API, empty data, the
 admin's ids 404 on every resource); sharing (task list read / edit / none,

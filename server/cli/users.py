@@ -3,8 +3,8 @@ Dana's users, their tokens, Telegram ids, connections and shares
 (docs/access.md, "Managing users").
 
 Works on the database directly, with the server's own env (``DATABASE_PATH``,
-``CREDENTIALS_KEY``); the running server notices changes within its cache
-refresh (10 s). In the pod::
+``CREDENTIALS_KEY``); the running server sees a change on its next lookup
+(``core.db.ChangeWatch``). In the pod::
 
     kubectl exec -n <namespace> deploy/<deployment> -- bin/dana users list
 

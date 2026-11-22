@@ -337,18 +337,25 @@ def test_settings_and_cache():
     check("credentials: update merges into the stored ones",
           conn.credentials["api_key"] == secret2 and conn.credentials["url"] == "http://waha.test")
 
-    # A change made outside this process is seen once the cache is older than its TTL.
+    # A change made outside this process (bin/dana) is seen by the next lookup; the decrypted
+    # credentials of the rows it did not touch are kept.
+    kept = store.require(MEMBER_USER, "whatsapp").credentials
+    check("cache: an unchanged lookup reuses the decrypted copy", store.require(MEMBER_USER, "whatsapp").credentials is kept)
     with sqlite3.connect(str(DATABASE_PATH)) as raw:
         raw.execute("UPDATE connections SET settings = '{\"url\": \"https://elsewhere\"}' "
                     "WHERE user_id = ? AND addon = 'cameras'", (ADMIN.id,))
-    check("cache: an outside change is not seen within the TTL",
-          store.require(ADMIN, "cameras").settings["url"] is None)
-    saved = store.CACHE_TTL_SECONDS
-    store.CACHE_TTL_SECONDS = 0
-    try:
-        check("cache: ... and is seen after it", store.require(ADMIN, "cameras").settings["url"] == "https://elsewhere")
-    finally:
-        store.CACHE_TTL_SECONDS = saved
+    check("cache: an outside change is seen at once", store.require(ADMIN, "cameras").settings["url"] == "https://elsewhere")
+    check("cache: ... and the other rows' decrypted credentials were kept",
+          store.require(MEMBER_USER, "whatsapp").credentials is kept)
+    with sqlite3.connect(str(DATABASE_PATH)) as raw:
+        raw.execute("INSERT INTO connections (user_id, addon, credentials, settings, account, created_at, updated_at) "
+                    "VALUES (?, 'about', NULL, '{}', NULL, '2026-11-22T00:00:00+00:00', '2026-11-22T00:00:00+00:00')",
+                    (MEMBER_USER.id,))
+    check("cache: an addon connected by another process is listed by the next lookup",
+          "about" in store.connected_addons(MEMBER_USER))
+    with sqlite3.connect(str(DATABASE_PATH)) as raw:
+        raw.execute("DELETE FROM connections WHERE user_id = ? AND addon = 'about'", (MEMBER_USER.id,))
+    check("cache: ... and gone after another process disconnected it", "about" not in store.connected_addons(MEMBER_USER))
     check("cache: disconnect removes the tools at once",
           store.disconnect(MEMBER_USER, "whatsapp") and not store.is_connected(MEMBER_USER, "whatsapp")
           and not store.disconnect(MEMBER_USER, "whatsapp"))

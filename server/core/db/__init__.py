@@ -27,8 +27,9 @@ import datetime
 import logging
 import os
 import sqlite3
+import threading
 from pathlib import Path
-from typing import Collection, Dict, Iterable, List, Optional, Set, Tuple, Union
+from typing import Any, Collection, Dict, Iterable, List, Optional, Set, Tuple, Union
 
 from core import addon_dirs, db_snapshot
 from core.db import convert
@@ -68,6 +69,67 @@ def get_db_connection(path: Optional[PathLike] = None) -> sqlite3.Connection:
     conn.execute(f"PRAGMA busy_timeout = {DB_BUSY_TIMEOUT_MS}")
     conn.execute("PRAGMA foreign_keys = ON")
     return conn
+
+
+class ChangeWatch:
+    """Tells whether anything was committed to the database since the last
+    look, by this process or another one (``bin/dana`` in the same
+    container): the in-memory copies of small tables read on every request
+    (users and tokens, devices, connections, disabled addons) check it before
+    each lookup and read their table again only then.
+
+    A look reads the file change counter of the database header (bytes
+    24-27, raised by every commit in SQLite's rollback-journal mode, the one
+    Dana uses); in WAL mode, which does not raise it on commit, it asks
+    ``PRAGMA data_version`` of a read-only connection of its own instead. The
+    file being replaced (a restore, another path) counts as a change. A look
+    costs a ``stat`` and a 28-byte read."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._fd: Optional[int] = None
+        self._conn: Optional[sqlite3.Connection] = None
+        self._file: Optional[Tuple[str, int, int]] = None
+        self._mark: Optional[Tuple[Any, ...]] = None
+
+    def changed(self) -> bool:
+        """True on the first look and whenever the database changed since the previous one."""
+        path = str(DATABASE_PATH)
+        with self._lock:
+            try:
+                st = os.stat(path)
+                file = (path, st.st_dev, st.st_ino)
+                if self._fd is None or self._file != file:
+                    self._close_locked()
+                    self._fd, self._file = os.open(path, os.O_RDONLY), file
+                header = os.pread(self._fd, 28, 0)
+            except OSError:
+                self._close_locked()
+                return True  # no database (yet): nothing to watch
+            if len(header) < 28:
+                mark: Tuple[Any, ...] = ("empty", st.st_size, st.st_mtime_ns)
+            elif header[18] == 2:  # WAL: commits go to the -wal file, the header counter stays
+                if self._conn is None:
+                    self._conn = sqlite3.connect(f"file:{path}?mode=ro", uri=True, check_same_thread=False,
+                                                 timeout=DB_BUSY_TIMEOUT_MS / 1000.0)
+                mark = ("wal", self._conn.execute("PRAGMA data_version").fetchone()[0])
+            else:
+                mark = ("counter", header[24:28])
+            changed = mark != self._mark
+            self._mark = mark
+            return changed
+
+    def close(self) -> None:
+        """Forget the database; the next look counts as a change."""
+        with self._lock:
+            self._close_locked()
+
+    def _close_locked(self) -> None:
+        if self._fd is not None:
+            os.close(self._fd)
+        if self._conn is not None:
+            self._conn.close()
+        self._fd, self._conn, self._file, self._mark = None, None, None, None
 
 
 def _user_tables(conn: sqlite3.Connection) -> Set[str]:
