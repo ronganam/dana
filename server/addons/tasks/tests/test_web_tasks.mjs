@@ -73,8 +73,13 @@ check("due buckets: this week, a bad date", C.dueBucket({ due_date: day(4) }, NO
 const local = new Date(2026, 0, 5, 7, 4).toISOString();
 check("datetime-local: local time with leading zeros; empty for none or a bad one",
   C.localDatetime(local) === "2026-01-05T07:04" && C.localDatetime("") === "" && C.localDatetime("nope") === "");
-check("zones: Home Assistant's names, plain strings too; Home and Work without any",
-  eq(C.zoneNames([{ name: "Gym" }, "Office"]), ["Gym", "Office"]) && eq(C.zoneNames([]), ["Home", "Work"]) && eq(C.zoneNames(null), ["Home", "Work"]));
+check("zones: the user's names, plain strings too; none without any",
+  eq(C.zoneNames([{ name: "Gym" }, "Office"]), ["Gym", "Office"]) && eq(C.zoneNames([]), []) && eq(C.zoneNames(null), []));
+const plain = (s) => String(s);
+check("zone picker: the stored zone selected in any case; a disabled hint without zones",
+  C.zoneOptions([{ name: "Home" }, { name: "Gym" }], "gym", plain)
+    === `<option value="Home">Home</option><option value="Gym" selected>Gym</option>`
+  && C.zoneOptions([], "", plain).includes("disabled") && C.zoneOptions([], "", plain).includes("Settings → Zones"));
 check("triggers sent: only the ones chosen, a location with its event",
   eq(C.triggersFrom({ time: "2026-11-20T08:00", zone: "Home", event: "leave", car: "enter", wake: true }),
     { time: "2026-11-20T08:00", location: { location: "Home", event: "leave" }, car: "enter", wake: true })

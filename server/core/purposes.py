@@ -37,6 +37,7 @@ CORE: Dict[str, tuple] = {
     "voice_summary": ("fast", "Voice note summaries"),
     "wake_briefing": ("fast", "Wake briefing"),
     "weekly_review": ("fast", "Weekly review"),
+    "setup_check": ("fast", "Testing a new LLM key"),
     "other": ("fast", "Other (untagged)"),
 }
 

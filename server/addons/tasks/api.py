@@ -8,7 +8,7 @@ links (docs/tasks-and-triggers.md).
 Every route answers for the request's user, who must have ``tasks`` connected
 (else 403 ``not_connected`` from the middleware): their own tasks and lists
 plus the lists shared with them. A location trigger is checked against the
-user's Home Assistant zones.
+user's own zones (core/zones.py): an unknown one is 400.
 """
 
 import datetime
@@ -22,7 +22,6 @@ from core import clock
 from core.auth import request_user
 from core.users import User
 from core.addons import sharing, store
-from addons.homeassistant import client as ha_client, config as ha_config
 from addons.people import store as people_store, values as people_values
 from addons.phone import config as phone_config
 from addons.phone.calls import store as calls_store
@@ -34,24 +33,6 @@ from addons.tasks import (
 )
 
 logger = logging.getLogger(__name__)
-
-
-async def _validate_zone(user: User, zone_name: str) -> Optional[str]:
-    """Validate zone_name against HA zones. Returns the name if valid,
-    None if HA is unreachable (allow fallback), or raises on mismatch
-    (``tasks_service.NoHomeAssistant`` when ``user`` has no Home Assistant)."""
-    tasks_service.check_location_trigger(user)
-    zones = await ha_client.get_ha_zones_list(store.require(user, ha_config.ADDON))
-    if not zones:
-        return None
-    zl = zone_name.strip().lower()
-    for z in zones:
-        if z["name"].strip().lower() == zl:
-            return z["name"]
-    raise ValueError(
-        f"'{zone_name}' is not a valid Home Assistant zone. "
-        f"Available zones: {', '.join(z['name'] for z in zones)}"
-    )
 
 
 def _tasks_user(request: web.Request) -> User:
@@ -67,7 +48,7 @@ def _task_error(e: Exception) -> Optional[web.Response]:
     cannot give a location trigger (None: not one of those)."""
     if isinstance(e, (tasks_service.ReadOnly, sharing.NotOwner)):
         return web.json_response({"error": str(e)}, status=403)
-    if isinstance(e, tasks_service.NoHomeAssistant):
+    if isinstance(e, tasks_service.UnknownZone):
         return web.json_response({"error": str(e)}, status=400)
     if isinstance(e, LookupError):
         return web.json_response({"error": str(e) or "Task not found"}, status=404)
@@ -105,14 +86,10 @@ async def create_task_api(request: web.Request) -> web.Response:
         if not group_id:
             group_id = await task_titles.resolve_task_group(user, None, title)
 
-        # Validate location trigger against HA zones
+        # A location trigger names one of the user's zones
         loc_trigger = triggers.get("location") if isinstance(triggers, dict) else None
-        if loc_trigger and isinstance(loc_trigger, dict):
-            loc_name = loc_trigger.get("location", "")
-            if loc_name:
-                valid = await _validate_zone(user, loc_name)
-                if valid:
-                    loc_trigger["location"] = valid
+        if loc_trigger and isinstance(loc_trigger, dict) and loc_trigger.get("location"):
+            loc_trigger["location"] = tasks_service.resolve_zone(user, str(loc_trigger["location"]))
 
         task_id = tasks_service.create_task(user, title=title, description=description, priority=priority,
                                             due_date=due_date, triggers=json.dumps(triggers), group_id=group_id)
@@ -184,15 +161,11 @@ async def update_task_api(request: web.Request) -> web.Response:
         elif triggers is None:
             triggers = {}
 
-        # Validate location trigger against HA zones
+        # A location trigger names one of the user's zones
         if isinstance(triggers, dict):
             loc_trigger = triggers.get("location")
-            if loc_trigger and isinstance(loc_trigger, dict):
-                loc_name = loc_trigger.get("location", "")
-                if loc_name:
-                    valid = await _validate_zone(user, loc_name)
-                    if valid:
-                        loc_trigger["location"] = valid
+            if loc_trigger and isinstance(loc_trigger, dict) and loc_trigger.get("location"):
+                loc_trigger["location"] = tasks_service.resolve_zone(user, str(loc_trigger["location"]))
 
         tasks_service.save_task(user, task_id, {
             "title": title, "description": description, "priority": priority, "due_date": due_date,
@@ -230,8 +203,7 @@ async def snooze_task_api(request: web.Request) -> web.Response:
             raw_loc = (data.get("location") or "").strip()
             if not raw_loc:
                 return web.json_response({"error": "location is required for location snooze"}, status=400)
-            valid_loc = await _validate_zone(user, raw_loc)
-            loc = (valid_loc or raw_loc).strip().lower()
+            loc = tasks_service.resolve_zone(user, raw_loc).lower()
             event = data.get("event", "arrive").strip().lower()
             triggers["location"] = {"location": loc, "event": event}
         elif snooze_type == "car":

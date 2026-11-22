@@ -7,10 +7,9 @@
 - at start: every user's home map fetched in the background for their prompt;
 - self-checks: ``location``, ``car``, ``ha_entities``, ``ha_watcher``;
 - morning briefing: ``weather``;
-- providers: ``weather``, ``home_zone``, ``resolve_home_zone``, ``screen_sessions``.
+- providers: ``weather``, ``screen_sessions``.
 """
 
-import asyncio
 import datetime
 import logging
 import os
@@ -31,10 +30,6 @@ LOCATION_DAYS = float(os.getenv("CHECK_LOCATION_DAYS", "3"))
 CAR_DAYS = float(os.getenv("CHECK_CAR_DAYS", "7"))
 HA_WATCHER_MINUTES = float(os.getenv("CHECK_HA_WATCHER_MINUTES", "10"))
 _STARTED = time.monotonic()
-
-# Per user: cached friendly name of zone.home (lower case).
-_home_zones: Dict[str, Dict[str, Any]] = {}
-
 
 async def emit_transition(user: User, trigger_type: str, *, action: str = "", target: str = "") -> None:
     """A watcher saw ``user`` arrive / leave a zone or enter / leave the car."""
@@ -91,31 +86,6 @@ async def briefing_weather(user: User, ctx: BriefingContext) -> Section:
         hi = f", high {w['high']}°" if w.get("high") is not None else ""
         points.append(f"{w['condition'].capitalize()}, {w['temperature']}°{hi}")
     return Section(w, points=points)
-
-
-@addon.provide("home_zone")
-def cached_home_zone(user: Optional[User]) -> str:
-    return _home_zones.setdefault(user.id if user else "", {"name": "home", "at": 0.0})["name"]
-
-
-@addon.provide("resolve_home_zone")
-async def resolve_home_zone(user: User) -> str:
-    cache = _home_zones.setdefault(user.id, {"name": "home", "at": 0.0})
-    if time.monotonic() - cache["at"] < 600:
-        return cache["name"]
-    conn = store.get(user, ADDON)
-    if conn is None:
-        return cache["name"]
-    try:
-        zones = await asyncio.wait_for(ha_client.get_ha_zones_list(conn), timeout=5)
-        for z in zones or []:
-            if z.get("entity_id") == "zone.home" and z.get("name"):
-                cache["name"] = z["name"].lower()
-                break
-        cache["at"] = time.monotonic()
-    except Exception as e:
-        logger.debug(f"Home zone lookup failed: {e}")
-    return cache["name"]
 
 
 @addon.provide("screen_sessions")

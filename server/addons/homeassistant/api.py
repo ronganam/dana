@@ -1,7 +1,8 @@
 """HTTP routes of the homeassistant addon: proxies to the caller's own Home
 Assistant for the web UI, the tablet and the TV (docs/dashboard.md).
 
-- ``GET /api/zones`` — their zones (fallbacks when HA fails)
+- ``POST /api/ha/zones/import`` — copy their Home Assistant zones into their Dana zones
+  (core/zones.py) → ``{added: [zone], skipped: [name]}``; 502 ``unreachable`` when HA fails
 - ``GET /api/client-config`` — their phone / person entity names
 - ``GET /api/ha/state/{entity_id}``, ``GET /api/ha/states?ids=|domains=`` (compact tiles)
 - ``POST /api/ha/service {domain, service, entity_id, service_data?}``
@@ -14,6 +15,7 @@ import logging
 
 from aiohttp import web
 
+from core import zones
 from core.auth import request_user
 from core.addons import store
 from addons.homeassistant import client as ha_client, config as ha_config
@@ -27,29 +29,19 @@ def _ha_conn(request: web.Request) -> store.Connection:
     return store.require(request_user(request), ha_config.ADDON)
 
 
-_FALLBACK_ZONES = [{"name": "Home", "entity_id": "zone.home"}, {"name": "Work", "entity_id": "zone.work"}]
-
-
-async def get_zones_api(request: web.Request) -> web.Response:
-    """GET /api/zones - the user's zones from their HA, or fallbacks when it fails."""
+async def import_zones_api(request: web.Request) -> web.Response:
+    """POST /api/ha/zones/import — the caller's Home Assistant zones copied
+    into their own (a name they already have is skipped)."""
+    user = request_user(request)
     conn = _ha_conn(request)
     try:
-        r = await ha_client.get(conn, "/api/states", timeout=5.0)
-        if r.status_code != 200:
-            logger.warning(f"Failed to fetch zones from HA ({r.status_code}), returning fallbacks.")
-            return web.json_response(_FALLBACK_ZONES)
-        res = []
-        for z in r.json():
-            entity_id = z.get("entity_id", "")
-            if not entity_id.startswith("zone."):
-                continue
-            friendly_name = z.get("attributes", {}).get("friendly_name")
-            name = friendly_name or entity_id.replace("zone.", "").replace("_", " ").title()
-            res.append({"name": name, "entity_id": entity_id})
-        return web.json_response(res or _FALLBACK_ZONES)
+        found = await ha_client.zones(conn)
     except Exception as e:
-        logger.error(f"Error fetching zones from Home Assistant: {e}")
-        return web.json_response(_FALLBACK_ZONES)
+        logger.warning(f"Zone import: Home Assistant failed for {user.name}: {type(e).__name__}")
+        return web.json_response({"error": "unreachable", "detail": "Home Assistant could not be reached."},
+                                 status=502)
+    added, skipped = zones.import_zones(user, found)
+    return web.json_response({"added": [z.to_dict() for z in added], "skipped": skipped})
 
 
 async def client_config_api(request: web.Request) -> web.Response:
@@ -174,7 +166,7 @@ async def ha_call_service_api(request: web.Request) -> web.Response:
 
 def setup(app: web.Application) -> None:
     """Register the Home Assistant routes."""
-    app.router.add_get("/api/zones", get_zones_api)
+    app.router.add_post("/api/ha/zones/import", import_zones_api)
     app.router.add_get("/api/ha/state/{entity_id}", ha_entity_state_api)
     app.router.add_get("/api/ha/states", ha_states_api)
     app.router.add_get("/api/client-config", client_config_api)

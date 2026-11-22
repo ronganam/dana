@@ -176,11 +176,9 @@ async def no_sleep(*_a, **_k):
 judges.asyncio.sleep = no_sleep  # retries without waiting
 
 
-async def fake_zones(conn):
-    return [{"name": "Home", "entity_id": "zone.home"}]
-
-import addons.homeassistant.client as ha  # noqa: E402
-ha.get_ha_zones_list = fake_zones
+# The owner's Home zone (core/zones.py).
+from core import zones as core_zones  # noqa: E402
+core_zones.create(OWNER, "Home", 32.08, 34.78, is_home=True)
 
 import addons.tasks.tools as todos
 import addons.tasks.titles as task_titles  # noqa: E402

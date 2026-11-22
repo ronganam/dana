@@ -21,7 +21,7 @@ import os
 import time
 from typing import Any, Dict, List, Optional
 
-from core import approval_text, briefing, cards, checks, clock, now_hidden, undo, users, wake, weekly_review
+from core import approval_text, briefing, cards, checks, clock, now_hidden, undo, users, wake, weekly_review, zones
 from core.addons import DayItem, NowContext, registry
 from core.addons.helpers import ago, fmt_date, parse_time, when_phrase
 from core.db import get_db_connection
@@ -49,36 +49,18 @@ _weather: Dict[str, Dict[str, Any]] = {}
 # ---------------------------------------------------------------------------
 
 def home_zone() -> str:
-    """The current user's cached home zone name ("home" when unavailable)."""
-    user = users.current()
-    hook = registry.provider("home_zone", user)
-    if hook is None:
-        return "home"
-    try:
-        return str(hook.func(user) or "home")
-    except Exception:
-        return "home"
+    """The current user's Home zone name in lower case ("home" without one; core/zones.py)."""
+    return zones.home_name(users.current())
 
 
 def has_home(user: Optional[User]) -> bool:
-    """Whether "at home" means something for ``user`` (an addon providing ``home_zone``)."""
-    return user is not None and registry.provider("home_zone", user) is not None
+    """Whether "at home" means something for ``user`` (they have a Home zone)."""
+    return zones.home(user) is not None
 
 
 def has_wake(user: Optional[User]) -> bool:
     """Whether "on waking" means something for ``user`` (the wake flow runs for them)."""
     return wake.available(user)
-
-
-async def _resolve_home_zone(user: User) -> str:
-    hook = registry.provider("resolve_home_zone", user)
-    if hook is None:
-        return "home"
-    try:
-        return str(await hook.func(user) or "home")
-    except Exception as e:
-        logger.debug(f"Home zone lookup failed: {e}")
-        return "home"
 
 
 def is_home(loc: Any) -> bool:
@@ -442,16 +424,16 @@ async def build(user: User) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 async def fix_home(user: User, triggers: Dict[str, Any]) -> Dict[str, Any]:
-    """A "home" location from a client (the choices offer it) → the real HA zone name."""
+    """A "home" location from a client (the choices offer it) → the name of the user's Home zone."""
     loc = triggers.get("location")
     if isinstance(loc, dict) and str(loc.get("location") or "").lower() in ("home", home_zone()):
-        triggers["location"] = {"location": await _resolve_home_zone(user), "event": loc.get("event") or "arrive"}
+        triggers["location"] = {"location": zones.home_name(user), "event": loc.get("event") or "arrive"}
     return triggers
 
 
 async def slot_trigger(user: User, slot: str, now: datetime.datetime) -> Dict[str, Any]:
     if slot == "home":
-        return {"location": {"location": await _resolve_home_zone(user), "event": "arrive"}}
+        return {"location": {"location": zones.home_name(user), "event": "arrive"}}
     if slot == "wake":
         return {"wake": True}
     return {"time": cards.slot_time(slot, now).strftime("%Y-%m-%d %H:%M")}

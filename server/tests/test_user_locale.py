@@ -169,7 +169,7 @@ async def api() -> None:
         r = await c.get("/api/profile", headers=admin_auth)
         body = await r.json()
         check("profile: the admin's own and the server's defaults", r.status == 200 and body == {
-            "name": ADMIN.name, "languages": ["he", "en"], "currency": "ILS",
+            "name": ADMIN.name, "pronoun": ADMIN.pronoun, "languages": ["he", "en"], "currency": "ILS",
             "own": {"languages": ["he", "en"], "currency": "ILS"},
             "defaults": {"languages": ["en"], "currency": "USD"}}, body)
         r = await c.put("/api/profile", headers=bob_auth, json={"languages": "de, EN", "currency": "chf"})

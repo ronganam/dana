@@ -12,8 +12,9 @@
  * dialog follows the pairing and says when the device has paired. A browser gets no QR: it types the code on
  * /login. Server side: core/devices_api.py, server/docs/devices.md.
  *
- * Two parts: DanaDevicesCore (pure: labels, icons, times, the code's display; tested by test_web_devices.mjs)
- * and the controller below it (window.DanaDevices = {show, hide}; app-nav.js calls them on tab switches).
+ * Two parts: DanaDevicesCore (pure: labels, icons, times, the code's display, the QR code; tested by
+ * test_web_devices.mjs; the wizard's phone step uses it too, static/setup.js) and the controller below it
+ * (window.DanaDevices = {show, hide}; app-nav.js calls them on tab switches).
  */
 (() => {
   "use strict";
@@ -79,7 +80,17 @@
     return body;
   }
 
-  const core = { KINDS, ROLES, ROLE_KINDS, kindOf, roleLabel, ago, metaLine, showCode, countdown, pairingBody };
+  /** The pairing QR code as an SVG tag (the vendored qrcode-generator; "" when it is not loaded). */
+  function qrSvg(text) {
+    const make = (typeof window !== "undefined" ? window : globalThis).qrcode;
+    if (typeof make !== "function") return "";
+    const qr = make(0, "M");
+    qr.addData(text);
+    qr.make();
+    return qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true, alt: "QR code for pairing" });
+  }
+
+  const core = { KINDS, ROLES, ROLE_KINDS, kindOf, roleLabel, ago, metaLine, showCode, countdown, pairingBody, qrSvg };
   (typeof window !== "undefined" ? window : globalThis).DanaDevicesCore = core;
   if (typeof document === "undefined" || !document.getElementById("panel-devices")) return;
 
@@ -244,14 +255,6 @@
         body.querySelector(".dev-error").textContent = err.message;
       }
     });
-  }
-
-  function qrSvg(text) {
-    if (typeof window.qrcode !== "function") return "";
-    const qr = window.qrcode(0, "M");
-    qr.addData(text);
-    qr.make();
-    return qr.createSvgTag({ cellSize: 5, margin: 2, scalable: true, alt: "QR code for pairing" });
   }
 
   function startPairing(p) {

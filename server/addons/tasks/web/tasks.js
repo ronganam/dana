@@ -5,7 +5,7 @@
  *
  *   GET  /api/tasks · POST /api/tasks · PUT|DELETE /api/tasks/{id}
  *   GET  /api/task-groups · POST /api/task-groups · DELETE /api/task-groups/{id}
- *   GET  /api/zones (Home Assistant's zones for location triggers; Home / Work without it)
+ *   GET  /api/zones (the user's zones for location triggers: Settings → Zones)
  *
  * The pure part is tasks-core.js (DanaTasksCore; tests/test_web_tasks.mjs).
  */
@@ -275,7 +275,7 @@
           <div class="trigger-option">
             <label class="trigger-label"><input type="checkbox" id="td-trig-loc" data-reveal="td-trig-loc-fields" ${loc ? "checked" : ""}> 📍 Location Trigger</label>
             <div class="trigger-val trigger-fields ${loc ? "" : "hidden"}" id="td-trig-loc-fields" style="display:flex;gap:6px;">
-              <select class="form-control" id="td-trig-loc-zone" style="flex:2;">${C.zoneNames(S.zones).map((z) => option(z, z, loc && loc.location === z)).join("")}</select>
+              <select class="form-control" id="td-trig-loc-zone" style="flex:2;">${C.zoneOptions(S.zones, loc && loc.location, esc)}</select>
               <select class="form-control" id="td-trig-loc-event" style="flex:1;">${option("arrive", "Arrive", !loc || loc.event !== "leave")}${option("leave", "Leave", loc && loc.event === "leave")}</select>
             </div>
           </div>
@@ -334,7 +334,7 @@
     ["task-trig-time-val", "task-trig-loc-group", "task-trig-car-val"].forEach((id) => $(id).classList.add("hidden"));
     $("task-group-select").innerHTML = `<option value="">Auto-detect Group</option>`
       + S.groups.map((g) => `<option value="${esc(g.id)}">${esc(`${g.emoji || "📁"} ${g.name}`)}</option>`).join("");
-    $("task-trig-loc-zone").innerHTML = C.zoneNames(S.zones).map((z) => `<option value="${esc(z)}">${esc(z)}</option>`).join("");
+    $("task-trig-loc-zone").innerHTML = C.zoneOptions(S.zones, "", esc);
     S.priority = "medium";
     root.querySelectorAll("#task-prio-control .segmented-btn").forEach((b) => b.classList.toggle("active", b.dataset.prio === S.priority));
     $("task-modal").classList.add("open");

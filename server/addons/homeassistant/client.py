@@ -188,24 +188,29 @@ async def forecast(conn: Connection, entity_id: str) -> Optional[Dict[str, Any]]
 
 
 # ---------------------------------------------------------------------------
-# Zones (location-based task triggers)
+# Zones (copied into Dana's own zones: POST /api/ha/zones/import)
 # ---------------------------------------------------------------------------
 
-async def get_ha_zones_list(conn: Connection) -> List[Dict[str, str]]:
-    """The user's zones as ``{name, entity_id}`` (friendly name required);
-    empty when Home Assistant is unreachable or has none."""
-    try:
-        states = await fetch_states(conn, timeout=10.0)
-    except Exception as e:
-        logger.error(f"Error fetching HA zones list: {e}", exc_info=True)
-        return []
-    zones: List[Dict[str, str]] = []
-    for s in states:
-        if s.get("entity_id", "").startswith("zone."):
-            friendly_name = s.get("attributes", {}).get("friendly_name", "")
-            if friendly_name:
-                zones.append({"name": friendly_name, "entity_id": s.get("entity_id", "")})
-    return zones
+async def zones(conn: Connection) -> List[Dict[str, Any]]:
+    """The user's Home Assistant zones as ``{name, latitude, longitude,
+    radius_m, is_home}`` (those with a name and a position; ``zone.home`` is
+    Home).
+
+    Raises:
+        Exception: Home Assistant could not be reached or answered an error.
+    """
+    out: List[Dict[str, Any]] = []
+    for s in await fetch_states(conn, timeout=10.0):
+        entity_id = str(s.get("entity_id", ""))
+        if not entity_id.startswith("zone."):
+            continue
+        attrs = s.get("attributes") or {}
+        name = str(attrs.get("friendly_name") or "").strip()
+        if not name or attrs.get("latitude") is None or attrs.get("longitude") is None:
+            continue
+        out.append({"name": name, "latitude": attrs.get("latitude"), "longitude": attrs.get("longitude"),
+                    "radius_m": attrs.get("radius") or 100, "is_home": entity_id == "zone.home"})
+    return out
 
 
 # ---------------------------------------------------------------------------

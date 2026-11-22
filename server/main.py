@@ -14,7 +14,7 @@ import sys  # noqa: E402
 import addons  # noqa: E402,F401
 from core.telegram_bot import TelegramBot  # noqa: E402
 from core.server import start_webhook_listener  # noqa: E402
-from core import auth, clock, db, lifecycle, llm, public_url, session_runner, setup, users  # noqa: E402
+from core import auth, clock, db, lifecycle, llm, llm_provider, public_url, session_runner, setup, users  # noqa: E402
 from core.paths import DATA_DIR, ensure_data_dirs  # noqa: E402
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 from core.addons import loader, registry, store  # noqa: E402
@@ -80,6 +80,9 @@ async def main():
     if not telegram_token:
         logger.warning("TELEGRAM_BOT_TOKEN is not set: running without the Telegram bot (web and apps only).")
 
+    # The LLM provider an admin chose in the app (its key, kept encrypted) under the
+    # provider's env name, unless env sets one (core/llm_provider.py).
+    llm_provider.apply()
     llm.log_configuration()
 
     # 3. The conversation core: the agent every channel's runs use

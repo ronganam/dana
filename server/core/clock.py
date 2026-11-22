@@ -5,9 +5,10 @@ date the agent believes it is, WhatsApp/call timestamps — is the user's wall
 clock. Always take "now" from :func:`now` instead of ``datetime.now()``.
 
 One timezone for the whole server (a server setting). Resolution (first
-match wins, resolved once and cached): ``TIMEZONE`` env var → the first
-admin's Home Assistant (``/api/config``, when they have it connected) →
-``TZ`` env var → UTC.
+match wins, resolved once and cached): ``TIMEZONE`` env var → the one an
+admin chose in the app (the wizard's Home step: ``server_settings['timezone']``,
+:func:`set_server_timezone`) → the first admin's Home Assistant
+(``/api/config``, when they have it connected) → ``TZ`` env var → UTC.
 
 The week (money's "this week", the weekly review's week) starts on one day
 for the whole server too (:func:`week_start_day`): ``WEEK_START`` ("mon",
@@ -21,7 +22,7 @@ import os
 import zoneinfo
 from typing import Callable, Optional
 
-from core import users
+from core import server_settings, users
 from core.users import User
 
 logger = logging.getLogger(__name__)
@@ -32,6 +33,7 @@ WEEK_START_ENV = "WEEK_START"
 REVIEW_AT_ENV = "WEEKLY_REVIEW_AT"
 DEFAULT_REVIEW_AT = "sat 20:00"
 
+TIMEZONE_SETTING = "timezone"
 _timezone: Optional[zoneinfo.ZoneInfo] = None
 # How to ask a user's Home Assistant for its zone: registered by the
 # homeassistant addon (addons/homeassistant/client.py) when it is imported.
@@ -72,11 +74,39 @@ def get_timezone() -> zoneinfo.ZoneInfo:
     if _timezone is None:
         _timezone = (
             _zone(os.getenv("TIMEZONE"), "TIMEZONE env")
+            or _zone(server_settings.get(TIMEZONE_SETTING), "the server's settings")
             or _zone(_home_assistant_timezone(), "Home Assistant")
             or _zone(os.getenv("TZ"), "TZ env")
             or zoneinfo.ZoneInfo("UTC")
         )
     return _timezone
+
+
+def valid_timezone(name: str) -> bool:
+    """Whether ``name`` is a timezone this server knows (``Europe/Paris``)."""
+    try:
+        zoneinfo.ZoneInfo(name)
+    except (zoneinfo.ZoneInfoNotFoundError, ValueError):
+        return False
+    return bool(name)
+
+
+def set_server_timezone(name: str, *, by: Optional[str] = None) -> bool:
+    """Store the server's timezone (an admin's choice); it applies at once
+    unless ``TIMEZONE`` is set in env. Returns whether it applies now.
+
+    Raises:
+        ValueError: not a timezone.
+    """
+    global _timezone
+    if not valid_timezone(name):
+        raise ValueError(f"{name!r} is not a timezone (like Europe/Paris).")
+    server_settings.put(TIMEZONE_SETTING, name, by=by)
+    if os.getenv("TIMEZONE", "").strip():
+        return False
+    _timezone = None
+    get_timezone()
+    return True
 
 
 def now() -> datetime.datetime:

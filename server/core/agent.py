@@ -212,11 +212,21 @@ class AgentOrchestrator:
                 for everyone); by default each run gets :func:`instructions`
                 for its user.
         """
-        self.model = model or llm.model("chat")
+        self._model = model
         self.last_error: Optional[str] = None
         # Custom instructions replace Dana's own for every user (tests, tools);
         # None: :func:`instructions` for the run's user.
         self.custom_instructions = system_instruction
+
+    @property
+    def model(self) -> str:
+        """The model of runs that name no catalog profile: the one given, else
+        the chat model now (``core.llm``: env, then the provider chosen in the app)."""
+        return self._model or llm.model("chat")
+
+    @model.setter
+    def model(self, value: Optional[str]) -> None:
+        self._model = value
 
     def instructions_for(self, user: Optional[User]) -> str:
         """The fixed instructions a run for ``user`` starts with: the custom

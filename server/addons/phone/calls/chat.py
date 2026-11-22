@@ -160,7 +160,7 @@ def suggestion_prompt(user: Optional[User], ref: str) -> Optional[str]:
         f"{who.agree('approves', 'approve')} your proposed version), call "
         "accept_call_suggestion with this suggestion_id and only the fields that change (title, due_date, "
         "priority, group, time_trigger, location, location_event, car_trigger, wake_trigger, description, "
-        f"start_time, end_time). Use get_ha_zones before setting a location. If {who.pronoun} "
+        f"start_time, end_time). Use get_zones before setting a location. If {who.pronoun} "
         f"{who.agree('wants', 'want')} it gone, call "
         "dismiss_call_suggestion. Don't ask for details you already have; keep replies short.\n\n"
         f"### Source\n{source_block}"

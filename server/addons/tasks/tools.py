@@ -11,9 +11,8 @@ from core.addons import Connection, sharing, store
 from addons.tasks.addon import addon
 from addons.tasks import approvals, groups, service
 from addons.tasks import titles as task_titles
-from core import undoable
+from core import undoable, zones
 from core.users import User
-from addons.homeassistant import client as ha_api
 from core import clock
 from core.db import get_db_connection
 
@@ -30,34 +29,6 @@ def _parse_location_event(event: Optional[str]) -> str:
     if any(x in val for x in ("arrive", "enter", "in", "arr", "entr")):
         return "arrive"
     return "arrive"
-
-async def validate_ha_zone(user: User, location: str) -> str:
-    """Check that *location* matches an existing HA zone friendly name.
-
-    Returns the properly-cased zone name on success.
-    Raises ValueError with available zones on mismatch, and
-    ``service.NoHomeAssistant`` (a ValueError) when the user has no Home Assistant.
-    Falls back to returning the input lowered if HA is unreachable (no zones).
-    """
-    service.check_location_trigger(user)
-    zones = await ha_api.get_ha_zones_list(store.require(user, "homeassistant"))
-    if not zones:
-        logger.warning("HA unreachable or no zones configured — skipping zone validation.")
-        return location.strip().lower()
-
-    loc_lower = location.strip().lower()
-    for z in zones:
-        if z["name"].strip().lower() == loc_lower:
-            return z["name"]
-
-    zone_list = "\n".join(f"  • {z['name']} ({z['entity_id']})" for z in zones)
-    raise ValueError(
-        f"'{location}' is not a valid Home Assistant zone. "
-        f"Home Assistant only supports zone-based location triggers, so the "
-        f"location must match an existing zone exactly.\n\n"
-        f"Available zones:\n{zone_list}\n\n"
-        f"Call get_ha_zones to see this list and pick the correct zone name."
-    )
 
 def _parse_car_action(trigger: Optional[str]) -> Optional[str]:
     if not trigger:
@@ -180,7 +151,7 @@ async def add_task(
         due_date: The optional due date of the task in YYYY-MM-DD. Use get_current_time to compute this; do NOT pass relative expressions like 'in 1 hour'.
         priority: The priority of the task ('low', 'medium', 'high').
         group: The optional group name for this task (e.g. 'Work', 'Home', 'Shopping'). If not provided, the best fitting group will be auto-detected.
-        location: The optional location or zone name to trigger this task. IMPORTANT: This must match the lowercase friendly name of a Home Assistant zone (e.g. 'home', 'office'). If you are unsure what zones are available or need to map a name (like 'parents home' or 'work') to a zone, you MUST first call get_ha_zones to see the list of active zones and choose the correct one.
+        location: The optional location or zone name to trigger this task. It must be one of the user's zones (e.g. 'home', 'office'); to map a name (like 'parents home' or 'work') to a zone, call get_zones first and choose the matching one.
         location_event: The location event action, either 'arrive' or 'leave'.
         time_trigger: The optional date/time trigger (e.g. 'YYYY-MM-DD HH:MM'). Use get_current_time to compute the correct absolute datetime; do NOT pass relative expressions like 'in 1 hour from now'.
         car_trigger: The optional car status trigger ('enter' or 'leave').
@@ -194,7 +165,7 @@ async def add_task(
 
     triggers: Dict[str, Any] = {}
     if location:
-        validated_location = await validate_ha_zone(user, location)
+        validated_location = service.resolve_zone(user, location)
         triggers["location"] = {
             "location": validated_location.strip().lower(),
             "event": _parse_location_event(location_event)
@@ -292,7 +263,7 @@ async def update_task(
     Args:
         item: The UID (unique ID, e.g. '7246aef6-672e-11f1-bbb0-bc2411aeaff6') of the task. Always use the UID (found in the 'ID: ...' part of the list_tasks output) to ensure we target the correct task, especially if there are multiple tasks with similar names.
         summary: The optional new summary/title for the task.
-        location: The optional location or zone name to trigger this task. Specifying this will update the location trigger. Pass empty string to remove. IMPORTANT: This must match the lowercase friendly name of a Home Assistant zone (e.g. 'home', 'office'). If you are unsure what zones are available or need to map a name (like 'parents home' or 'work') to a zone, you MUST first call get_ha_zones to see the list of active zones and choose the correct one.
+        location: The optional location or zone name to trigger this task. Specifying this will update the location trigger. Pass empty string to remove. It must be one of the user's zones (e.g. 'home', 'office'); to map a name (like 'parents home' or 'work') to a zone, call get_zones first and choose the matching one.
         location_event: The location event action, either 'arrive' or 'leave'.
         time_trigger: The optional new date/time trigger (e.g. 'YYYY-MM-DD HH:MM'). Pass empty string to remove. Use get_current_time to compute the correct absolute datetime; do NOT pass relative expressions like 'in 1 hour from now'.
         car_trigger: The optional new car status trigger ('enter' or 'leave'). Pass empty string to remove.
@@ -351,7 +322,7 @@ async def update_task(
             if location == "":
                 triggers.pop("location", None)
             else:
-                validated_location = await validate_ha_zone(user, location)
+                validated_location = service.resolve_zone(user, location)
                 curr_loc = triggers.get("location") or {}
                 evt = _parse_location_event(location_event) if location_event else curr_loc.get("event") or "arrive"
                 triggers["location"] = {
@@ -423,6 +394,20 @@ async def delete_task(conn: Connection, item: str) -> str:
     except Exception as e:
         logger.error(f"Error deleting task from SQLite: {e}", exc_info=True)
         return f"Error: Failed to delete task: {e}"
+
+@addon.tool()
+async def get_zones(conn: Connection) -> str:
+    """List the user's zones: the places a location reminder can name (Home and the others they added).
+
+    Call this before add_task or update_task with a location, to map what the user said
+    ('work', 'my parents') to one of these names. If none matches, show them the list and ask;
+    new zones are added in Settings → Zones.
+    """
+    found = zones.list_zones(conn.user)
+    if not found:
+        return "You have no zones yet. Add your places in Settings → Zones to use location reminders."
+    return "Your zones:\n" + "\n".join(f"- {z.name}{' (Home)' if z.is_home else ''}" for z in found)
+
 
 @addon.tool()
 async def list_tasks(conn: Connection, completed: bool = False) -> str:

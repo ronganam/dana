@@ -22,7 +22,7 @@ import sqlite3
 import uuid
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from core import events, undoable, users
+from core import events, undoable, users, zones
 from core.db import get_db_connection
 from core.undoable import UndoConflict
 from core.users import User
@@ -48,12 +48,8 @@ class ReadOnly(PermissionError):
         super().__init__(f"This {what} is shared with you read-only, so it can't be changed.")
 
 
-class NoHomeAssistant(ValueError):
-    """A location trigger needs the user's Home Assistant (its zones)."""
-
-    def __init__(self) -> None:
-        super().__init__("Location reminders use Home Assistant zones, and Home Assistant isn't connected for you. "
-                         "Use a time, car or wake-up reminder instead.")
+class UnknownZone(ValueError):
+    """A location trigger names a zone the user does not have (core/zones.py)."""
 
 
 # --- Scope -----------------------------------------------------------------------------
@@ -414,11 +410,18 @@ def snooze_task(user: User, task_id: str, triggers: str) -> Dict[str, Any]:
 
 # --- Location triggers ------------------------------------------------------------------
 
-def check_location_trigger(user: User) -> None:
-    """A location trigger needs ``user``'s Home Assistant (its zones).
+def resolve_zone(user: User, name: str) -> str:
+    """The name of ``user``'s zone called ``name`` (any case), as they wrote it;
+    "home" is their Home zone whatever it is called.
 
     Raises:
-        NoHomeAssistant: they do not have it connected.
+        UnknownZone: they have no zones, or none by that name (the message lists theirs).
     """
-    if not store.is_connected(user, "homeassistant"):
-        raise NoHomeAssistant()
+    found = zones.find(user, name) or (zones.home(user) if name.strip().lower() == "home" else None)
+    if found is not None:
+        return found.name
+    names = [z.name for z in zones.list_zones(user)]
+    if not names:
+        raise UnknownZone("Location reminders need one of your zones, and you have none yet: add your places "
+                          "in Settings → Zones. Use a time, car or wake-up reminder instead.")
+    raise UnknownZone(f"'{name.strip()}' is not one of your zones. Your zones: {', '.join(names)}.")
