@@ -1,6 +1,9 @@
 package io.github.ronganam.dana.kiosk
 
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.pairing.DevicePairing
+import io.github.ronganam.dana.data.pairing.PairingClient
+import io.github.ronganam.dana.data.pairing.PairingFlow
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Intent
@@ -73,6 +76,9 @@ import java.net.URLEncoder
  * After a spoken reply it listens once more for a follow-up, then closes
  * itself when idle.
  *
+ * Until it is paired it shows [KioskPairingScreen] instead (a code from the
+ * Devices page; the device gets its room and role from the pairing).
+ *
  * Hidden settings: tap the top-left corner 5 times.
  */
 class KioskActivity : ComponentActivity() {
@@ -83,6 +89,8 @@ class KioskActivity : ComponentActivity() {
     private lateinit var session: AssistantSession
     private val assistantVisible get() = session.visible
     private var settingsVisible by mutableStateOf(false)
+    private var paired by mutableStateOf(false)
+    private var pairingFlow by mutableStateOf<PairingFlow?>(null)
     private var webGeneration by mutableIntStateOf(0)
     private var webView: WebView? = null
 
@@ -124,11 +132,17 @@ class KioskActivity : ComponentActivity() {
         setContent {
             DanaTheme {
                 Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Color.Black)) {
-                    key(webGeneration) {
-                        AndroidView(
-                            modifier = Modifier.fillMaxSize(),
-                            factory = { ctx -> buildWebView(ctx).also { webView = it; loadWhenSized(it) } }
-                        )
+                    val flow = pairingFlow
+                    if (paired) {
+                        key(webGeneration) {
+                            AndroidView(
+                                modifier = Modifier.fillMaxSize(),
+                                factory = { ctx -> buildWebView(ctx).also { webView = it; loadWhenSized(it) } },
+                                onRelease = { view -> if (webView === view) { webView = null; view.destroy() } }
+                            )
+                        }
+                    } else if (flow != null) {
+                        KioskPairingScreen(flow, onSettings = { settingsVisible = true })
                     }
                     if (assistantVisible) {
                         FloatingAssistantOverlay(
@@ -143,7 +157,8 @@ class KioskActivity : ComponentActivity() {
                             speaker = speaker,
                             onDismiss = { settingsVisible = false },
                             onSaved = { applySettings() },
-                            onTestWake = { settingsVisible = false; openAssistant(null) }
+                            onTestWake = { settingsVisible = false; openAssistant(null) },
+                            onUnpair = { unpair() }
                         )
                     }
                 }
@@ -154,7 +169,7 @@ class KioskActivity : ComponentActivity() {
             WakeBus.wake.collect { frame -> openAssistant(frame) }
         }
 
-        if (ServerConfig.load(this).token.isEmpty()) settingsVisible = true
+        if (ServerConfig.load(this).isConfigured) paired = true else showPairing()
         ensureMic()
         handleIntent(intent)
     }
@@ -206,7 +221,7 @@ class KioskActivity : ComponentActivity() {
     override fun onDestroy() {
         session.release()
         speaker.shutdown()
-        webView?.destroy()
+        webView?.let { webView = null; it.destroy() }
         super.onDestroy()
     }
 
@@ -234,7 +249,7 @@ class KioskActivity : ComponentActivity() {
     }
 
     private fun openAssistant(wakeFrame: Long?) {
-        if (settingsVisible) return
+        if (settingsVisible || !paired) return
         val wasOpen = session.visible
         session.open(wakeFrame)
         if (!wasOpen) applyBrightness()
@@ -272,8 +287,37 @@ class KioskActivity : ComponentActivity() {
 
     private fun applySettings() {
         settingsVisible = false
-        vm.useServerConfig(ServerConfig.load(this))
-        webView?.let { loadDashboard(it, forceLogin = true) }
+        webView?.let { loadDashboard(it) }
+    }
+
+    // --- Pairing ---
+
+    private fun showPairing() {
+        closeAssistant()
+        paired = false
+        pairingFlow = PairingFlow(
+            lifecycleScope,
+            initialServer = ServerConfig.load(this).url,
+            pair = { server, code -> PairingClient().pair(server, code, kind = "tablet", name = DevicePairing.deviceName()) },
+            onPaired = { server, outcome ->
+                val config = DevicePairing.store(this, server, outcome)
+                vm.useServerConfig(config)
+                pairingFlow = null
+                paired = true
+                Log.i(TAG, "Paired as ${outcome.device.summary}")
+            }
+        )
+    }
+
+    /** Settings → Unpair, or the server no longer takes the token: forget it and show the pairing screen. */
+    private fun unpair() {
+        settingsVisible = false
+        lifecycleScope.launch {
+            DevicePairing.unpair(this@KioskActivity)
+            CookieManager.getInstance().removeAllCookies(null)
+            vm.useServerConfig(ServerConfig.load(this@KioskActivity))
+            showPairing()
+        }
     }
 
     // --- Dashboard WebView ---
@@ -320,10 +364,10 @@ class KioskActivity : ComponentActivity() {
             }
 
             override fun onPageFinished(view: WebView, url: String) {
-                // Landed on the login form: the saved token is wrong or missing.
-                if (url.contains("/login")) {
-                    Log.w(TAG, "Dashboard asked for login; opening settings")
-                    settingsVisible = true
+                // Landed on the login form: the device was removed (or its token revoked) on the server.
+                if (url.contains("/login") && paired) {
+                    Log.w(TAG, "Dashboard asked for login; this tablet is no longer paired")
+                    unpair()
                 }
             }
 
@@ -368,11 +412,11 @@ class KioskActivity : ComponentActivity() {
         }, 15_000)
     }
 
-    private fun loadDashboard(view: WebView, forceLogin: Boolean = false) {
+    private fun loadDashboard(view: WebView) {
         val (server, token) = ServerConfig.load(this)
         val path = KioskPrefs.dashboardPath(this)
         val hasSession = CookieManager.getInstance().getCookie(server)?.contains("$SESSION_COOKIE=") == true
-        if (token.isNotEmpty() && (forceLogin || !hasSession)) {
+        if (token.isNotEmpty() && !hasSession) {
             // Exchange the API token for the dashboard's long-lived session cookie.
             val body = "token=" + URLEncoder.encode(token, "UTF-8") + "&next=" + URLEncoder.encode(path, "UTF-8")
             view.postUrl("$server/login", body.toByteArray())

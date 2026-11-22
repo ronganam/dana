@@ -4,6 +4,10 @@ import io.github.ronganam.dana.ui.components.MonoLabel
 import io.github.ronganam.dana.ui.components.SectionLabel
 import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.pairing.DevicePairing
+import io.github.ronganam.dana.data.pairing.PairedDevice
+import androidx.compose.material3.AlertDialog
+import androidx.compose.runtime.LaunchedEffect
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
@@ -15,7 +19,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -37,8 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -53,11 +54,14 @@ fun KioskSettingsDialog(
     speaker: DanaSpeaker,
     onDismiss: () -> Unit,
     onSaved: () -> Unit,
-    onTestWake: () -> Unit
+    onTestWake: () -> Unit,
+    onUnpair: () -> Unit,
 ) {
     val context = LocalContext.current
-    var server by remember { mutableStateOf(ServerConfig.load(context).url) }
-    var token by remember { mutableStateOf(ServerConfig.load(context).token) }
+    val server = remember { ServerConfig.load(context) }
+    var device by remember { mutableStateOf(DevicePairing.device(context)) }
+    var confirmUnpair by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { DevicePairing.refresh(context)?.let { device = it } }
     var path by remember { mutableStateOf(KioskPrefs.dashboardPath(context)) }
     var threshold by remember { mutableFloatStateOf(WakePrefs.threshold(context)) }
     var speak by remember { mutableStateOf(WakePrefs.speakReplies(context)) }
@@ -81,10 +85,7 @@ fun KioskSettingsDialog(
                 Text("Dana kiosk", style = MaterialTheme.typography.headlineSmall)
                 Text("v${BuildConfig.VERSION_NAME} · $status", style = MaterialTheme.typography.bodySmall)
 
-                OutlinedTextField(server, { server = it }, label = { Text("Server URL") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
-                OutlinedTextField(token, { token = it }, label = { Text("API token") }, singleLine = true,
-                    modifier = Modifier.fillMaxWidth(), visualTransformation = PasswordVisualTransformation())
+                PairedAs(device, server)
                 OutlinedTextField(path, { path = it }, label = { Text("Dashboard path") }, singleLine = true,
                     modifier = Modifier.fillMaxWidth())
 
@@ -125,14 +126,43 @@ fun KioskSettingsDialog(
                         context.startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     }) { Text("Android settings") }
                 }
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    if (server.isConfigured) TextButton(onClick = { confirmUnpair = true }) {
+                        Text("Unpair", color = MaterialTheme.colorScheme.error)
+                    }
+                    Spacer(Modifier.weight(1f))
                     TextButton(onClick = onDismiss) { Text("Cancel") }
                     Button(onClick = {
-                        KioskPrefs.save(context, server, token, path, threshold, speak, followUp)
+                        KioskPrefs.save(context, path, threshold, speak, followUp)
                         onSaved()
                     }) { Text("Save & reload") }
                 }
             }
+        }
+    }
+    if (confirmUnpair) {
+        AlertDialog(
+            onDismissRequest = { confirmUnpair = false },
+            title = { Text("Unpair this tablet?") },
+            text = { Text("It is removed from Dana's devices and its token stops working. Pair it again with a new code.") },
+            confirmButton = { TextButton(onClick = { confirmUnpair = false; onUnpair() }) { Text("Unpair") } },
+            dismissButton = { TextButton(onClick = { confirmUnpair = false }) { Text("Cancel") } },
+        )
+    }
+}
+
+@Composable
+private fun PairedAs(device: PairedDevice?, server: ServerConfig) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        SectionLabel("This tablet", hue = hues.sky)
+        if (server.isConfigured) {
+            Text(device?.summary?.ifBlank { null } ?: "Paired", style = MaterialTheme.typography.titleMedium)
+            val whose = device?.userName?.takeIf { it.isNotBlank() }?.let { "$it's device · " }.orEmpty()
+            Text(whose + server.url, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text("Rename it or change its room and role on Dana's Devices page.", style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Text("Not paired", style = MaterialTheme.typography.titleMedium)
         }
     }
 }

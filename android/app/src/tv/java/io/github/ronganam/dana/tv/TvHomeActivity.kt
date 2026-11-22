@@ -1,6 +1,9 @@
 package io.github.ronganam.dana.tv
 
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.pairing.DevicePairing
+import io.github.ronganam.dana.data.pairing.PairingClient
+import io.github.ronganam.dana.data.pairing.PairingFlow
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -99,19 +102,23 @@ class HomeModel(val context: Context, private val scope: CoroutineScope) {
     }
 }
 
-private enum class Screen { HOME, ALL_APPS, SETTINGS }
+private enum class Screen { PAIR, HOME, ALL_APPS, SETTINGS }
 
 /**
  * Dana TV's home screen (HOME + leanback launcher): favourite apps, Home
  * Assistant controls, cameras, and the entry to settings. Starts the "Hey
  * Dana" wake-word service; the assistant itself opens in [AssistantActivity].
  *
- * adb setup: `am start -n io.github.ronganam.dana.tv/.tv.TvHomeActivity --es server URL --es token TOKEN`
- * (`--ez settings true` opens settings).
+ * Until the TV is paired it shows [TvPairingScreen] (a code from the Devices
+ * page; the device gets its room and role from the pairing).
+ *
+ * adb: `am start -n io.github.ronganam.dana.tv/.tv.TvHomeActivity --es server URL` fills the pairing
+ * screen's address (`--ez settings true` opens settings).
  */
 class TvHomeActivity : ComponentActivity() {
     private lateinit var model: HomeModel
     private var screen by mutableStateOf(Screen.HOME)
+    private var pairingFlow by mutableStateOf<PairingFlow?>(null)
     private val firstApp = FocusRequester()
 
     private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
@@ -127,17 +134,19 @@ class TvHomeActivity : ComponentActivity() {
         TvConfig.load(this)
         model = HomeModel(applicationContext, lifecycleScope)
         applyIntent(intent)
+        if (!ServerConfig.load(this).isConfigured) showPairing()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 // The launcher has nowhere to go back to.
-                if (screen != Screen.HOME) goHome()
+                if (screen != Screen.HOME && screen != Screen.PAIR) goHome()
             }
         })
 
         setContent {
             DanaTheme(darkTheme = true) {
                 when (screen) {
+                    Screen.PAIR -> pairingFlow?.let { TvPairingScreen(it) }
                     Screen.HOME -> HomeScreen(
                         model, firstApp,
                         onAllApps = { screen = Screen.ALL_APPS },
@@ -145,7 +154,7 @@ class TvHomeActivity : ComponentActivity() {
                         onAskDana = ::askDana,
                     )
                     Screen.ALL_APPS -> AllAppsScreen(model, onBack = ::goHome)
-                    Screen.SETTINGS -> TvSettingsScreen(model, onBack = ::goHome, onAskDana = ::askDana)
+                    Screen.SETTINGS -> TvSettingsScreen(model, onBack = ::goHome, onAskDana = ::askDana, onUnpair = ::unpair)
                 }
             }
         }
@@ -164,20 +173,46 @@ class TvHomeActivity : ComponentActivity() {
         super.onNewIntent(intent)
         applyIntent(intent)
         // Home pressed while already home: back to the top.
-        if (intent.hasCategory(Intent.CATEGORY_HOME) && !intent.getBooleanExtra("settings", false)) goHome()
+        if (intent.hasCategory(Intent.CATEGORY_HOME) && !intent.getBooleanExtra("settings", false) && screen != Screen.PAIR) goHome()
     }
 
     private fun applyIntent(intent: Intent?) {
         intent ?: return
-        val server = intent.getStringExtra("server")
-        val token = intent.getStringExtra("token")
-        if (server != null || token != null) {
-            ServerConfig.load(this).let { ServerConfig.save(this, server ?: it.url, token ?: it.token) }
-            Log.i(TAG, "Server config set from intent")
+        // `--es server URL`: the address the pairing screen starts from (a paired TV keeps its server).
+        intent.getStringExtra("server")?.let { server ->
+            if (!ServerConfig.load(this).isConfigured) {
+                ServerConfig.save(this, server, "")
+                pairingFlow?.setServer(server)
+                Log.i(TAG, "Pairing address set from intent")
+            }
         }
-        if (intent.getBooleanExtra("settings", false)) screen = Screen.SETTINGS
+        if (intent.getBooleanExtra("settings", false) && screen != Screen.PAIR) screen = Screen.SETTINGS
         // adb: `--ez assistant true` opens Dana, as the Ask Dana button does.
         if (intent.getBooleanExtra("assistant", false)) askDana()
+    }
+
+    private fun showPairing() {
+        pairingFlow = PairingFlow(
+            lifecycleScope,
+            initialServer = ServerConfig.load(this).url,
+            pair = { server, code -> PairingClient().pair(server, code, kind = "tv", name = DevicePairing.deviceName()) },
+            onPaired = { server, outcome ->
+                DevicePairing.store(this, server, outcome)
+                Log.i(TAG, "Paired as ${outcome.device.summary}")
+                pairingFlow = null
+                goHome()
+                model.startPolling()
+            }
+        )
+        screen = Screen.PAIR
+    }
+
+    /** Settings → Unpair: remove this TV on the server, forget its token, back to the pairing screen. */
+    private fun unpair() {
+        lifecycleScope.launch {
+            DevicePairing.unpair(this@TvHomeActivity)
+            showPairing()
+        }
     }
 
     private fun goHome() {
@@ -186,6 +221,7 @@ class TvHomeActivity : ComponentActivity() {
     }
 
     private fun askDana() {
+        if (screen == Screen.PAIR) return
         io.github.ronganam.dana.wake.OpenTimer.start("button")
         startActivity(Intent(this, AssistantActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }

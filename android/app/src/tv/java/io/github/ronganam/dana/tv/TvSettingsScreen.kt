@@ -1,6 +1,7 @@
 package io.github.ronganam.dana.tv
 
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.pairing.DevicePairing
 import android.content.Intent
 import android.provider.Settings
 import androidx.compose.foundation.background
@@ -45,7 +46,6 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -68,7 +68,7 @@ private val PICKER_DOMAINS = listOf(
 )
 
 @Composable
-fun TvSettingsScreen(model: HomeModel, onBack: () -> Unit, onAskDana: () -> Unit) {
+fun TvSettingsScreen(model: HomeModel, onBack: () -> Unit, onAskDana: () -> Unit, onUnpair: () -> Unit) {
     var section by remember { mutableStateOf(Section.CONNECTION) }
     val settings by TvConfig.settings.collectAsState()
     val firstNav = remember { FocusRequester() }
@@ -105,7 +105,7 @@ fun TvSettingsScreen(model: HomeModel, onBack: () -> Unit, onAskDana: () -> Unit
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             when (section) {
-                Section.CONNECTION -> item { ConnectionSection(model) }
+                Section.CONNECTION -> item { ConnectionSection(model, onUnpair) }
                 Section.APPS -> appsSection(model, settings)
                 Section.HOME -> homeSection(model, settings)
                 Section.CAMERAS -> camerasSection(settings)
@@ -147,21 +147,22 @@ private fun <T> List<T>.moved(index: Int, by: Int): List<T> {
 // --- Connection ---
 
 @Composable
-private fun ConnectionSection(model: HomeModel) {
+private fun ConnectionSection(model: HomeModel, onUnpair: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var server by remember { mutableStateOf(ServerConfig.load(context).url) }
-    var token by remember { mutableStateOf(ServerConfig.load(context).token) }
+    val server = remember { ServerConfig.load(context) }
+    var device by remember { mutableStateOf(DevicePairing.device(context)) }
     var result by remember { mutableStateOf<String?>(null) }
+    var confirmUnpair by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { DevicePairing.refresh(context)?.let { device = it } }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Heading("Connection", "The assistant server. Home Assistant is reached through it, so no HA token lives on the TV.")
-        OutlinedTextField(server, { server = it }, Modifier.fillMaxWidth(), label = { Text("Server URL") }, singleLine = true,
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
-        OutlinedTextField(token, { token = it }, Modifier.fillMaxWidth(), label = { Text("API token") }, singleLine = true,
-            visualTransformation = PasswordVisualTransformation())
+        Heading("Connection", "Paired with the assistant server. Home Assistant is reached through it, so no HA token lives on the TV.")
+        SettingRow(device?.summary?.ifBlank { null } ?: "Paired",
+            listOfNotNull(device?.userName?.takeIf { it.isNotBlank() }, server.url).joinToString(" · ")) {}
+        Text("Rename it or change its room and role on Dana's Devices page.", style = TvType.small,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
         ChipRow {
-            TvChip("Save & test") {
-                ServerConfig.save(context, server, token)
+            TvChip("Test") {
                 result = "Testing…"
                 scope.launch {
                     result = runCatching { HaClient.states(context, listOf("sun.sun")) }
@@ -169,6 +170,16 @@ private fun ConnectionSection(model: HomeModel) {
                     model.startPolling()
                 }
             }
+            if (confirmUnpair) {
+                TvChip("Yes, unpair", selected = true) { confirmUnpair = false; onUnpair() }
+                TvChip("Cancel") { confirmUnpair = false }
+            } else {
+                TvChip("Unpair") { confirmUnpair = true }
+            }
+        }
+        if (confirmUnpair) {
+            Text("The TV is removed from Dana's devices and its token stops working; pair it again with a new code.",
+                style = TvType.body, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         result?.let { Text(it, style = TvType.body, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }

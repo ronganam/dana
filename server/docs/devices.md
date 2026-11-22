@@ -77,10 +77,40 @@ from the phone, which starts a pairing of kind `watch` with its own token, and r
 device of the same user. A paired phone's push registration (`POST /api/phone/register`) is tied to its device
 by its token.
 
+**On a tablet or a TV**: the kiosk and TV apps open on a pairing screen until they are paired: the code (the
+TV has an on-screen keypad for the D-pad) and the server address, which fills itself from discovery (below).
+They send `POST /api/pair {code, kind: "tablet" | "tv", name: <manufacturer and model>}` and take the room
+and role from the pairing; their settings show the device (read back from `GET /api/devices`, the `current`
+one) and **Unpair** (`DELETE /api/devices/{id}` with the device's own token). A tablet whose dashboard lands
+on `/login` (its device was removed) forgets the pairing and asks again (`android/docs/kiosk.md`, `tv.md`).
+
 **In a browser**: `/login` accepts a pairing code of kind `browser` as well as a token: the browser becomes
 a device of the code's user (named from its User-Agent, "Firefox on Linux") and gets the session cookie of
 its device token. A code of another kind is refused (`error=kind`) and stays usable; wrong codes count
 towards the same limit.
+
+## Finding the server on the home network
+
+The apps (phone Settings, the kiosk and TV pairing screens) browse mDNS / DNS-SD for **`_dana._tcp`** with
+Android's `NsdManager` (`android/app/src/main/.../data/discovery/`) and offer what they find as the server
+address: one server fills the field, several are listed to pick from. A service stands for
+`http://<host>:<port><path>` (`https` when the port is 443); its TXT record carries `path` (default `/`) and
+`version` (shown next to the name). Release builds reach a plain-`http` address only when the build allows
+cleartext (`android/docs/release.md` → HTTPS).
+
+The server does not advertise itself (no mDNS library in its dependencies). Advertise it from the host or a
+sidecar on the host network, e.g. Avahi with a service file:
+
+```xml
+<service-group>
+  <name>Dana</name>
+  <service><type>_dana._tcp</type><port>8080</port>
+    <txt-record>path=/</txt-record><txt-record>version=10.0.0</txt-record></service>
+</service-group>
+```
+
+The address in QR codes and the setup link stays `core/public_url.py`'s (above); discovery only helps a device
+that types its code.
 
 ## API
 
