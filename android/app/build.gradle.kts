@@ -43,10 +43,10 @@ val firebaseConfig: Map<String, String> = File(siteDir, "google-services.json")
     )
 }
 
-// Your deployment's defaults, from its site folder: android.env (SERVER_URL: the app's
-// default server; LAN_DNS_SERVERS: the TV's LAN DNS fallback; KEY=value lines, the
-// same file bin/deploy-*.sh source) and tv-defaults.json (the TV's first-run home
-// screen, in TvConfig's JSON shape). Without a site the apps have no defaults.
+// Your deployment's defaults, from its site folder: android.env (LAN_DNS_SERVERS: the
+// TV's LAN DNS fallback; ALLOW_CLEARTEXT; KEY=value lines, the same file bin/deploy-*.sh
+// source) and tv-defaults.json (the TV's first-run home screen, in TvConfig's JSON
+// shape). Without a site the apps have no defaults. No server is built in: apps pair.
 val siteEnv = Properties().apply {
     val f = File(siteDir, "android.env")
     if (f.exists()) f.inputStream().use { load(it) }
@@ -67,8 +67,6 @@ android {
         versionCode = 59
         versionName = "8.7.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        // The server address a fresh install of the kiosk / TV starts with ("": set it in the app).
-        buildConfigField("String", "DEFAULT_SERVER_URL", quoted(siteValue("SERVER_URL")))
         // LAN resolvers the TV asks when the system DNS has no answer (comma-separated).
         buildConfigField("String", "LAN_DNS_SERVERS", quoted(siteValue("LAN_DNS_SERVERS")))
         // Release builds talk HTTPS only; ALLOW_CLEARTEXT=true in your site's android.env lets

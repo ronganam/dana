@@ -11,7 +11,7 @@ Android clients of **Dana** (the assistant). The server is `../server` (its `AGE
 | `:app` **tv** flavor ("Dana TV") | `io.github.ronganam.dana.tv` | `main` + `tv` + `wake` + `nopush` | Google TV / Android TV | `bin/deploy-tv.sh` |
 | `:wear` | `io.github.ronganam.dana` (same id + **same signing key** as phone) | `wear/` | Wear OS 3+ watches | `bin/deploy-app.sh --watch-ip <ip:port \| serial>` |
 | `:watchface` | `io.github.ronganam.dana.watchface` (same signing key) | `watchface/` | Wear OS 4+ (Watch Face Format, resources only) | `bin/deploy-app.sh --watch-ip …` installs it too; its slots default to `:wear`'s complications (events / tasks 1–4) |
-| `:protocol` | Android library `io.github.ronganam.dana.protocol` | `protocol/` | | the phone ↔ watch Data Layer paths (`WearPaths`) and payloads (`WearPayloads.kt`), used by `:app` and `:wear` |
+| `:protocol` | Android library `io.github.ronganam.dana.protocol` | `protocol/` | | the phone ↔ watch Data Layer paths (`WearPaths`) and payloads (`WearPayloads.kt`), and what both apps need to pair (`Pairing.kt`), used by `:app` and `:wear` |
 
 - Flavor rules (by addition): `main` holds what every flavor has — code, and in `src/main/AndroidManifest.xml` only the permissions and components all three use. Phone-only manifest entries (call recordings, watch bridge, system assistant, notification Inbox, pop-ups, push, widgets, in-app updates, the launcher entry) are in `src/phone/AndroidManifest.xml`; the kiosk and TV manifests only add their own. Never add a component to `main` and strip it with `tools:node="remove"`. Phone-only code with its own dependencies or no shared callers goes in `src/phone` (push: FCM and UnifiedPush, widgets, the voice-interaction services), with a no-op twin in `src/nopush` for kiosk/TV when shared code calls it; wake word + hands-free session in `src/wake` (kiosk + TV). `BuildConfig.KIOSK` / `BuildConfig.TV` for small runtime differences. Every permission and why: `docs/permissions.md`.
 - `docs/kiosk.md`, `docs/tv.md` and `docs/wear.md` name the device each flavor was tuned on and its quirks; check a change on your own hardware (or an emulator of the same form factor) for each flavor it touches.
@@ -57,7 +57,7 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 - Release builds run R8 (phone flavor: pass-through via `proguard-phone.pro`); kiosk/TV deploy scripts also force AOT compilation.
 - The Gradle daemon runs on JDK 21 (`gradle/gradle-daemon-jvm.properties`, downloaded through its `toolchainUrl.*` entries when the machine has none; regenerate them with `./gradlew updateDaemonJvm --jvm-version=21`); `gradle.properties` turns on the build cache, configuration cache and parallel builds; keep build logic configuration-cache safe (no `project` access at execution time).
 - Release builds reach the server over **HTTPS only**; debug builds also allow plain http (`src/debug`). A LAN server without TLS: `ALLOW_CLEARTEXT=true` in your site's `android.env` (`docs/release.md` → HTTPS).
-- A deployment's setup lives in its site, which the build reads when present: `../site/android.env` (`SERVER_URL`, `LAN_DNS_SERVERS`, `ALLOW_CLEARTEXT`), `tv-defaults.json`, `google-services.json` (direct push through FCM; without it the phone uses UnifiedPush). Release signing stays in the gitignored `keystore.properties` — `docs/release.md` → Your site.
+- A deployment's setup lives in its site, which the build reads when present: `../site/android.env` (`LAN_DNS_SERVERS`, `ALLOW_CLEARTEXT`; `SERVER_URL` only for publishing), `tv-defaults.json`, `google-services.json` (direct push through FCM; without it the phone uses UnifiedPush). No build has a server or token built in: the phone and the watch pair with a code (`docs/phone.md` → Pairing). Release signing stays in the gitignored `keystore.properties` — `docs/release.md` → Your site.
 
 ## Architecture (shared)
 
@@ -96,7 +96,7 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 - User-visible text: the watch's strings, and the phone's notification channels, toasts and manifest labels, live in `res/values/strings.xml` (counts in `<plurals>`); new text there goes in resources too. The phone's Compose screens and the pure models their tests pin (`data/money/`, `ProjectsCore`, the watch's `ShopModel`) still hold English literals.
 - Packages: `io.github.ronganam.dana.{data,ui}.{models,network,screens,components,theme,viewmodels}`, plus `push/`, `wake/`, `tv/`, `kiosk/`.
 - Hebrew/RTL: text direction is decided per message/line by script, never assumed. Mixed " · " kicker lines go through `isolatedParts()` (each part isolated, LTR dots) so a Hebrew name can't reorder them.
-- Server URL and API token: only through `data/network/ServerConfig` (`load` / `save`; the URL is normalized — scheme, no trailing slash — and falls back to the build's `DEFAULT_SERVER_URL`). The ViewModel holds one (`MainViewModel.serverConfig`, changed by `updateServerConfig`); background code uses `ServerConfig.load(context).api()`. No composable builds its own API client; Home Assistant zones come from `data/network/Zones`.
+- Server URL and device token: only through `data/network/ServerConfig` (`load` / `save`; the URL is normalized — scheme, no trailing slash), written by a pairing: `data/pairing/` (`PairingClient` = `POST /api/pair`, read itself back, remove itself, start a pairing for the watch; `DevicePairing` keeps the device next to the config, `store` / `unpair`; `PairingFlow` is the code-entry state every pairing screen uses), with the code's shape, the wire and the refusals (`PairingCode`, `PairAnswer`, `PairError`) in `:protocol` (`Pairing.kt`), shared with the watch. Nothing is built in: an unpaired phone, tablet or TV shows its pairing screen (`docs/phone.md` → Pairing, `docs/kiosk.md`, `docs/tv.md`). The ViewModel holds one (`MainViewModel.serverConfig`, changed by `useServerConfig`; `paired` says whether it is set); background code uses `ServerConfig.load(context).api()`. No composable builds its own API client; Home Assistant zones come from `data/network/Zones`.
 
 ## Gotchas
 
@@ -110,13 +110,13 @@ CI (`../.github/workflows/ci.yml`, the `android` job, on changes under `android/
 
 | Doc | Read before touching |
 |---|---|
-| `docs/phone.md` | Main screen (shell, thread, Reminders editor, day strip), chat stream / voice, offline queues, reminders + alarm screen, call recordings + Debrief, foldable sizes |
+| `docs/phone.md` | Pairing (first run, the `dana://pair` link, Settings → Unpair / Pair again), main screen (shell, thread, Reminders editor, day strip), chat stream / voice, offline queues, reminders + alarm screen, call recordings + Debrief, foldable sizes |
 | `docs/projects.md` | Projects place: the new model (sections, decisions compared, files, budget), its data layer `data/projects/`, panes folded / unfolded |
 | `docs/money.md` | Money (More → Money): `MoneyController` core, dashboards, Transactions / Accounts / Save, the panes |
 | `docs/shopping.md` | Shopping (under More), offline store + queue, live stream / push, widget + quick add, the watch's shopping data and actions (the watch screen itself: `docs/wear.md`) |
 | `docs/notifications.md` | Notification Inbox, direct push (UnifiedPush / FCM, Settings → Push), urgent alerts, suggestion pop-up, buttons, snooze |
 | `docs/people.md` | Caller card, People / weekly review screens, briefing / meeting / review pushes, home-screen widgets |
-| `docs/wear.md` | Watch app: performance rules, hands-free turns, phone bridge, alarm, tiles / complications, the Shopping screen (and its debug fake phone) |
+| `docs/wear.md` | Watch app: pairing (its own device, through the phone or a typed code), performance rules, hands-free turns, phone bridge, alarm, tiles / complications, the Shopping screen (and its debug fake phone) |
 | `docs/kiosk.md` | Wall-tablet kiosk, wake word, voice turn tuning |
 | `docs/tv.md` | Dana TV: home override, key service, camera PiP, TCL/MTK quirks |
 | `docs/permissions.md` | Every permission and special access, per flavor; distribution (sideload / your server, not Play); call recordings opt-in |

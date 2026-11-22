@@ -1,6 +1,8 @@
 package io.github.ronganam.dana.data.pairing
 
+import io.github.ronganam.dana.data.network.ApiException
 import io.github.ronganam.dana.data.network.ApiJson
+import io.github.ronganam.dana.data.network.HttpResult
 import io.github.ronganam.dana.data.network.HttpClients
 import io.github.ronganam.dana.data.network.LenientList
 import io.github.ronganam.dana.data.network.ServerConfig
@@ -15,6 +17,10 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import io.github.ronganam.dana.protocol.PairAnswer
+import io.github.ronganam.dana.protocol.PairError
+import io.github.ronganam.dana.protocol.PairRequest
+import io.github.ronganam.dana.protocol.PairingCode
 import java.io.IOException
 
 /** This app's device on the server, as `/api/pair` and `/api/devices` describe it. */
@@ -38,45 +44,11 @@ data class PairedDevice(
     }
 }
 
-/** Why a pairing failed; [message] is plain words for the screen. */
-sealed interface PairError {
-    val message: String
-
-    data object InvalidCode : PairError {
-        override val message = "That code isn't valid. Check it, or make a new one on Dana's Devices page."
-    }
-    data class WrongKind(val expected: String) : PairError {
-        override val message get() = "That code is for a ${expected.ifBlank { "different" }} device. Make a code for this kind of device."
-    }
-    data class RateLimited(val retryAfterSeconds: Long?) : PairError {
-        override val message get() = retryAfterSeconds?.let { s ->
-            "Too many wrong codes. Try again in ${if (s >= 90) "${(s + 59) / 60} minutes" else "$s seconds"}."
-        } ?: "Too many wrong codes. Try again in a few minutes."
-    }
-    data class Invalid(val detail: String) : PairError {
-        override val message get() = detail.ifBlank { "The server refused the request." }
-    }
-    data class Unreachable(val detail: String) : PairError {
-        override val message get() = "Can't reach the server${if (detail.isNotBlank()) " ($detail)" else ""}. Check the address."
-    }
-    data class Http(val code: Int) : PairError {
-        override val message get() = "The server answered HTTP $code. Is this a Dana server?"
-    }
-}
-
 /** What `POST /api/pair` gave: a token and the device it belongs to, or why not. */
 sealed interface PairOutcome {
     data class Paired(val token: String, val device: PairedDevice, val serverVersion: String) : PairOutcome
     data class Failed(val error: PairError) : PairOutcome
 }
-
-@Serializable
-private data class PairAnswer(
-    val token: String = "",
-    val device: DeviceWire = DeviceWire(),
-    val user: UserWire = UserWire(),
-    val server: ServerWire = ServerWire(),
-)
 
 @Serializable
 private data class DeviceWire(
@@ -85,21 +57,17 @@ private data class DeviceWire(
 )
 
 @Serializable
-private data class UserWire(val name: String = "")
-
-@Serializable
-private data class ServerWire(val version: String = "")
-
-@Serializable
-private data class ErrorWire(val error: String = "", val expected: String = "", val detail: String = "")
+private data class StartedWire(val code: String = "")
 
 @Serializable
 private data class DevicesWire(val devices: LenientList<DeviceWire> = emptyList())
 
 /**
  * Pairing with a Dana server (server `docs/devices.md`): redeem a code shown on
- * the Devices page for this device's own token, read this device back, and
- * remove it. [pair] needs no token; the others use the paired one.
+ * the Devices page for this device's own token, read this device back,
+ * remove it, and start a pairing for another device (the watch). [pair] needs
+ * no token; the others use the paired one. The code's shape, the wire and the
+ * refusals ([PairError]) are `:protocol`'s, shared with the watch.
  */
 class PairingClient(private val client: OkHttpClient = HttpClients.base) {
 
@@ -107,9 +75,8 @@ class PairingClient(private val client: OkHttpClient = HttpClients.base) {
     suspend fun pair(serverUrl: String, code: String, kind: String, name: String): PairOutcome {
         val base = ServerConfig.normalize(serverUrl)
         if (base.isEmpty()) return PairOutcome.Failed(PairError.Unreachable("no address"))
-        val body = buildJsonObject {
-            put("code", PairingCode.normalize(code)); put("kind", kind); put("name", name.take(60))
-        }.toString().toRequestBody(JSON)
+        val body = ApiJson.encodeToString(PairRequest.serializer(), PairRequest(PairingCode.normalize(code), kind, name.take(60)))
+            .toRequestBody(JSON)
         val request = try {
             Request.Builder().url("$base/api/pair").post(body).build()
         } catch (e: IllegalArgumentException) {
@@ -120,12 +87,13 @@ class PairingClient(private val client: OkHttpClient = HttpClients.base) {
                 client.newCall(request).await().use { response ->
                     val text = response.body.string()
                     if (response.isSuccessful) {
-                        val answer = ApiJson.decodeFromString(PairAnswer.serializer(), text.ifBlank { "{}" })
-                        if (answer.token.isBlank()) PairOutcome.Failed(PairError.Http(response.code))
-                        else PairOutcome.Paired(answer.token, answer.device.toModel(answer.user.name), answer.server.version)
+                        val answer = PairAnswer.decode(text)
+                        if (answer == null) PairOutcome.Failed(PairError.Http(response.code))
+                        else PairOutcome.Paired(answer.token, answer.device.let {
+                            PairedDevice(it.id, it.name, it.kind, it.room, it.role, answer.user.name)
+                        }, answer.server.version)
                     } else {
-                        val error = runCatching { ApiJson.decodeFromString(ErrorWire.serializer(), text) }.getOrNull() ?: ErrorWire()
-                        PairOutcome.Failed(errorFor(response.code, error, response.header("Retry-After")))
+                        PairOutcome.Failed(PairError.from(response.code, text, response.header("Retry-After")))
                     }
                 }
             }
@@ -150,32 +118,27 @@ class PairingClient(private val client: OkHttpClient = HttpClients.base) {
         client.newCall(request).await().use { it.isSuccessful }
     }
 
-    private fun DeviceWire.toModel(userName: String) = PairedDevice(id, name, kind, room, role, userName)
-
-    private fun errorFor(code: Int, error: ErrorWire, retryAfter: String?): PairError = when {
-        code == 429 -> PairError.RateLimited(retryAfter?.trim()?.toLongOrNull())
-        error.error == "invalid_code" -> PairError.InvalidCode
-        error.error == "wrong_kind" -> PairError.WrongKind(error.expected)
-        error.error == "invalid" -> PairError.Invalid(error.detail)
-        else -> PairError.Http(code)
+    /**
+     * `POST /api/devices/pairings {kind, name}` with [config]'s token: a code for
+     * another device of the same user (the phone makes the watch's). Returns the code.
+     *
+     * @throws ApiException the server refused (its `error` as the message)
+     * @throws IOException the server couldn't be reached
+     */
+    suspend fun startPairing(config: ServerConfig, kind: String, name: String = ""): String = withContext(Dispatchers.IO) {
+        val body = buildJsonObject { put("kind", kind); if (name.isNotBlank()) put("name", name.take(60)) }
+            .toString().toRequestBody(JSON)
+        val request = Request.Builder().url("${config.url}/api/devices/pairings").bearerAuth(config.token).post(body).build()
+        client.newCall(request).await().use { response ->
+            val result = HttpResult(response.code, response.body.string())
+            if (!result.ok) throw ApiException(response.code, result.error.ifBlank { "HTTP ${response.code}" })
+            ApiJson.decodeFromString(StartedWire.serializer(), result.body.ifBlank { "{}" }).code
+        }
     }
+
+    private fun DeviceWire.toModel(userName: String) = PairedDevice(id, name, kind, room, role, userName)
 
     private companion object {
         val JSON = "application/json".toMediaType()
     }
-}
-
-/** The 8-character pairing codes the server draws (`devices.py`: no 0/O, 1/I). */
-object PairingCode {
-    const val LENGTH = 8
-    const val ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
-
-    /** What was typed, upper case, without spaces or dashes ("k7qm-4xpz" → "K7QM4XPZ"). */
-    fun normalize(raw: String): String = raw.uppercase().filter { !it.isWhitespace() && it != '-' }
-
-    /** Eight characters of the alphabet. */
-    fun isComplete(code: String): Boolean = code.length == LENGTH && code.all { it in ALPHABET }
-
-    /** "K7QM4XPZ" → "K7QM 4XPZ" for showing. */
-    fun grouped(code: String): String = if (code.length > 4) code.take(4) + " " + code.drop(4) else code
 }

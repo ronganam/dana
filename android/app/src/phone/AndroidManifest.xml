@@ -48,6 +48,13 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="image/*" />
             </intent-filter>
+            <!-- Pairing: the QR code of the web Devices page holds dana://pair?server=…&code=… -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="dana" android:host="pair" />
+            </intent-filter>
         </activity>
 
         <!-- Urgent phone notifications → full-screen alert (direct push) -->

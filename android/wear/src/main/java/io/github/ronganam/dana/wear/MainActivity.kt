@@ -9,15 +9,22 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.lifecycle.ViewModelProvider
 import io.github.ronganam.dana.wear.perf.WearPerf
 import androidx.wear.compose.navigation.SwipeDismissableNavHost
 import androidx.wear.compose.navigation.composable
 import androidx.wear.compose.navigation.rememberSwipeDismissableNavController
+import io.github.ronganam.dana.wear.data.NeedsCodeReason
+import io.github.ronganam.dana.wear.data.WatchPairState
+import io.github.ronganam.dana.wear.data.WatchPairing
 import io.github.ronganam.dana.wear.data.WearConfigReceiver
 import io.github.ronganam.dana.wear.ui.WearViewModel
 import io.github.ronganam.dana.wear.ui.screens.AssistantScreen
+import io.github.ronganam.dana.wear.ui.screens.PairScreen
 import io.github.ronganam.dana.wear.ui.screens.SettingsScreen
 import io.github.ronganam.dana.wear.ui.screens.SideMenuScreen
 import kotlinx.coroutines.launch
@@ -82,6 +89,8 @@ class MainActivity : ComponentActivity() {
         wearViewModel = vm
         vm.initialize(this)
         if (!handleIntent(intent)) vm.onAppOpened(hasMicPermission())
+        // Its own device on the server: through the phone, else the code entry opens (WearApp).
+        WatchPairing.ensure(this)
 
         setContent {
             io.github.ronganam.dana.wear.ui.theme.DanaWearTheme {
@@ -156,11 +165,23 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/** Whether the code entry already opened by itself in this process. */
+private var codeEntryShown = false
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun WearApp(viewModel: WearViewModel) {
     val navController = rememberSwipeDismissableNavController()
     val coroutineScope = rememberCoroutineScope()
+    // No phone to pair through: show the code entry (once per process).
+    val pairState by WatchPairing.state.collectAsState()
+    LaunchedEffect(pairState) {
+        val s = pairState
+        if (s is WatchPairState.NeedsCode && s.reason == NeedsCodeReason.NO_PHONE && !codeEntryShown) {
+            codeEntryShown = true
+            navController.navigate("pair")
+        }
+    }
 
     SwipeDismissableNavHost(
         navController = navController,
@@ -185,7 +206,10 @@ fun WearApp(viewModel: WearViewModel) {
             }
         }
         composable("settings") {
-            SettingsScreen(viewModel = viewModel)
+            SettingsScreen(viewModel = viewModel, onOpenPairing = { navController.navigate("pair") })
+        }
+        composable("pair") {
+            PairScreen()
         }
     }
 }

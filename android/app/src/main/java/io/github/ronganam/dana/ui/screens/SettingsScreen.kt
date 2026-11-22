@@ -2,6 +2,8 @@ package io.github.ronganam.dana.ui.screens
 
 import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.pairing.DevicePairing
+import io.github.ronganam.dana.data.pairing.PairedDevice
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -17,14 +19,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.BuildConfig
 import io.github.ronganam.dana.CallRecordingObserverService
 import io.github.ronganam.dana.data.update.UpdateManager
 import io.github.ronganam.dana.data.voice.DeviceSpeech
-import io.github.ronganam.dana.ui.components.FoundServers
-import io.github.ronganam.dana.ui.components.rememberFoundServers
 import io.github.ronganam.dana.ui.components.GlassCard
 import io.github.ronganam.dana.ui.components.ScreenTopBar
 import io.github.ronganam.dana.ui.components.SectionLabel
@@ -52,8 +51,6 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
     val context = LocalContext.current
     val prefs = ServerConfig.prefs(context)
 
-    var serverUrl by remember { mutableStateOf(viewModel.serverConfig.url.ifEmpty { "https://" }) }
-    var apiToken by remember { mutableStateOf(viewModel.serverConfig.token) }
     var liveTranscription by remember { mutableStateOf(prefs.getBoolean(DeviceSpeech.PREF_KEY, true)) }
 
     val appUpdateInfo by viewModel.appUpdateInfo.collectAsState()
@@ -106,38 +103,10 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
                 }
             }
 
-            // --- Server ---
+            // --- Server: the pairing (server docs/devices.md) ---
             Spacer(Modifier.height(8.dp))
             SectionLabel("Server", hue = hues.sky)
-            GlassCard(modifier = Modifier.fillMaxWidth()) {
-                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    OutlinedTextField(
-                        value = serverUrl,
-                        onValueChange = { serverUrl = it },
-                        label = { Text("Server URL") },
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    val foundServers by rememberFoundServers()
-                    FoundServers(foundServers, ServerConfig.normalize(serverUrl), onPick = { serverUrl = it.url })
-                    OutlinedTextField(
-                        value = apiToken,
-                        onValueChange = { apiToken = it },
-                        label = { Text("API Token") },
-                        singleLine = true,
-                        visualTransformation = PasswordVisualTransformation(),
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    Button(
-                        onClick = {
-                            viewModel.updateServerConfig(serverUrl, apiToken)
-                            serverUrl = viewModel.serverConfig.url
-                            Toast.makeText(context, R.string.toast_settings_saved, Toast.LENGTH_SHORT).show()
-                        },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                    ) { Text("Save") }
-                }
-            }
+            PairedServerCard(viewModel)
 
             // --- Assistant ---
             Spacer(Modifier.height(8.dp))
@@ -730,4 +699,53 @@ private fun CallerCardSettings() {
             }
         }
     }
+}
+
+/** The server this phone is paired with and its device on the Devices page; Unpair, Pair again. */
+@Composable
+private fun PairedServerCard(viewModel: MainViewModel) {
+    val config = viewModel.serverConfig
+    val context = LocalContext.current
+    val device = remember(config) { DevicePairing.device(context) }
+    var confirmUnpair by remember { mutableStateOf(false) }
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(config.url, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    pairedAsText(device),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    onClick = { viewModel.pairingController.pairAgain() },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) { Text("Pair again") }
+                OutlinedButton(
+                    onClick = { confirmUnpair = true },
+                    modifier = Modifier.weight(1f).heightIn(min = 48.dp)
+                ) { Text("Unpair", color = MaterialTheme.colorScheme.error) }
+            }
+        }
+    }
+    if (confirmUnpair) {
+        AlertDialog(
+            onDismissRequest = { confirmUnpair = false },
+            title = { Text("Unpair this phone?") },
+            text = { Text("It is removed from Dana's Devices page and stops reaching ${config.url}. Pair it again with a new code.") },
+            confirmButton = {
+                TextButton(onClick = { confirmUnpair = false; viewModel.pairingController.unpair() }) { Text("Unpair") }
+            },
+            dismissButton = { TextButton(onClick = { confirmUnpair = false }) { Text("Cancel") } }
+        )
+    }
+}
+
+/** "Paired as Pixel 8, Robin's device": the device's name on the Devices page and whose it is. */
+internal fun pairedAsText(device: PairedDevice?): String {
+    val name = device?.name?.ifBlank { null } ?: "this phone"
+    val user = device?.userName.orEmpty()
+    return if (user.isBlank()) "Paired as $name" else "Paired as $name, $user's device"
 }

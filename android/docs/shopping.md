@@ -41,7 +41,7 @@ The shopping list on the phone: Shopping under More in the shell (it takes over 
 - An older answer never replaces a newer one (`accepts` by `list.version`; another list id is always taken), and a read that comes back while a write is on its way is ignored.
 - "N changes waiting to sync" under the header while anything is queued; the snackbar of a queued change says "… · will sync".
 - **Undo of a queued change** (`ShoppingStore.cancel(opId)`): still waiting → taken out of the queue, never sent (the screen goes back at once); already sent → its server `undo.id` is used (`POST /api/undo/{id}`); neither (too old, never answered) → "Too late to undo that".
-- **Account change**: `fetchMe` compares the cached `me_id` with the server's; a different user (or a new server / token in Settings: `MainViewModel.updateServerConfig`) runs `store.forget()` (cache and queue deleted, nothing of the previous user is sent) and reloads.
+- **Account change**: `fetchMe` compares the cached `me_id` with the server's; a different user (or a new pairing: `MainViewModel.useServerConfig`) runs `store.forget()` (cache and queue deleted, nothing of the previous user is sent) and reloads.
 
 ## Live updates
 

@@ -2,17 +2,18 @@ package io.github.ronganam.dana.data.network
 
 import android.content.Context
 import android.content.SharedPreferences
-import io.github.ronganam.dana.BuildConfig
 import androidx.core.content.edit
 
 /**
- * The Dana server this app talks to and its API token — the one place that
- * reads or writes them. [url] is normalized ([normalize]): a scheme, no
- * trailing slash, "" when not set. Both live in the app's preferences file
- * ([prefs]), which also holds small flags (never transcripts).
+ * The Dana server this app talks to and its own device token — the one place
+ * that reads or writes them. [url] is normalized ([normalize]): a scheme, no
+ * trailing slash, "" when not set. Apps get both by pairing
+ * (`data/pairing/DevicePairing`, which keeps the device next to them); no
+ * server is built in. Both live in the app's preferences file ([prefs]),
+ * which also holds small flags (never transcripts).
  *
- * Every flavor uses it: the phone's Settings, the kiosk and TV settings, and
- * background code (workers, receivers, services) through [load] → [api].
+ * Every flavor uses it: the pairing screens, settings, and background code
+ * (workers, receivers, services) through [load] → [api].
  */
 data class ServerConfig(val url: String, val token: String) {
 
@@ -31,14 +32,13 @@ data class ServerConfig(val url: String, val token: String) {
         fun prefs(context: Context): SharedPreferences =
             context.getSharedPreferences(PREFS_FILE, Context.MODE_PRIVATE)
 
-        /** The saved server, else the build's default (`SERVER_URL` in your site's android.env). */
+        /** The saved server and token ("" when this app isn't paired). */
         fun load(context: Context): ServerConfig {
             val p = prefs(context)
-            val url = normalize(p.getString(KEY_URL, "").orEmpty()).ifEmpty { normalize(BuildConfig.DEFAULT_SERVER_URL) }
-            return ServerConfig(url, p.getString(KEY_TOKEN, "").orEmpty().trim())
+            return ServerConfig(normalize(p.getString(KEY_URL, "").orEmpty()), p.getString(KEY_TOKEN, "").orEmpty().trim())
         }
 
-        /** Save a server and token as typed in a settings screen; returns what was stored. */
+        /** Save a server and token (a pairing's: [io.github.ronganam.dana.data.pairing.DevicePairing.store]); returns what was stored. */
         fun save(context: Context, url: String, token: String): ServerConfig {
             val config = ServerConfig(normalize(url), token.trim())
             prefs(context).edit { putString(KEY_URL, config.url); putString(KEY_TOKEN, config.token) }

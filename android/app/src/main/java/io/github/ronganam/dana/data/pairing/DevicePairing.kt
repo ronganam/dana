@@ -57,15 +57,19 @@ object DevicePairing {
      * Unpair: remove this device on the server with its own token (best effort:
      * an unreachable server still forgets it here), then drop the token and the
      * device. The server address stays, so pairing again starts from it.
+     * Returns false when the server couldn't be told (the device stays listed
+     * on its Devices page).
      */
-    suspend fun unpair(context: Context, client: PairingClient = PairingClient()) {
+    suspend fun unpair(context: Context, client: PairingClient = PairingClient()): Boolean {
         val config = ServerConfig.load(context)
         val id = device(context)?.id
-        if (config.isConfigured && !id.isNullOrBlank()) {
+        val removed = if (config.isConfigured && !id.isNullOrBlank()) {
             runCatching { client.remove(config, id) }
                 .onFailure { Log.w(TAG, "Couldn't remove this device on the server: ${it.message}") }
-        }
+                .getOrDefault(false)
+        } else true
         ServerConfig.save(context, config.url, "")
         ServerConfig.prefs(context).edit { remove(KEY_DEVICE) }
+        return removed
     }
 }

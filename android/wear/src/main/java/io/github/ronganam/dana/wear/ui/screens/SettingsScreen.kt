@@ -23,13 +23,16 @@ import androidx.wear.compose.foundation.lazy.ScalingLazyColumn
 import androidx.wear.compose.foundation.lazy.rememberScalingLazyListState
 import androidx.wear.compose.material.*
 import io.github.ronganam.dana.wear.ui.WearViewModel
+import io.github.ronganam.dana.wear.data.WatchPairState
+import io.github.ronganam.dana.wear.data.WatchPairing
 import io.github.ronganam.dana.wear.R
 import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalWearFoundationApi::class)
 @Composable
 fun SettingsScreen(
-    viewModel: WearViewModel
+    viewModel: WearViewModel,
+    onOpenPairing: () -> Unit,
 ) {
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { FocusRequester() }
@@ -87,6 +90,28 @@ fun SettingsScreen(
                         )
                     }
                 }
+            }
+
+            item {
+                val pairState by WatchPairing.state.collectAsState()
+                LaunchedEffect(Unit) { WatchPairing.load(context) }
+                Chip(
+                    onClick = onOpenPairing,
+                    label = { Text(stringResource(R.string.pairing_title), maxLines = 1) },
+                    secondaryLabel = {
+                        Text(
+                            when (val s = pairState) {
+                                is WatchPairState.Paired -> stringResource(R.string.pairing_paired_as, s.deviceName.ifBlank { "Watch" })
+                                WatchPairState.Working -> stringResource(R.string.pairing_working)
+                                is WatchPairState.NeedsCode -> stringResource(R.string.pairing_not_paired)
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    },
+                    colors = ChipDefaults.secondaryChipColors(),
+                    modifier = Modifier.fillMaxWidth()
+                )
             }
 
             item {

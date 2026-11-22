@@ -301,7 +301,7 @@ class KioskActivity : ComponentActivity() {
             pair = { server, code -> PairingClient().pair(server, code, kind = "tablet", name = DevicePairing.deviceName()) },
             onPaired = { server, outcome ->
                 val config = DevicePairing.store(this, server, outcome)
-                vm.updateServerConfig(config.url, config.token)
+                vm.useServerConfig(config)
                 pairingFlow = null
                 paired = true
                 Log.i(TAG, "Paired as ${outcome.device.summary}")
@@ -315,7 +315,7 @@ class KioskActivity : ComponentActivity() {
         lifecycleScope.launch {
             DevicePairing.unpair(this@KioskActivity)
             CookieManager.getInstance().removeAllCookies(null)
-            ServerConfig.load(this@KioskActivity).let { vm.updateServerConfig(it.url, it.token) }
+            vm.useServerConfig(ServerConfig.load(this@KioskActivity))
             showPairing()
         }
     }

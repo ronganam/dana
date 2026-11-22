@@ -1,7 +1,7 @@
 package io.github.ronganam.dana.pairing
 
+import io.github.ronganam.dana.protocol.PairError
 import io.github.ronganam.dana.data.discovery.DiscoveredServer
-import io.github.ronganam.dana.data.pairing.PairError
 import io.github.ronganam.dana.data.pairing.PairOutcome
 import io.github.ronganam.dana.data.pairing.PairedDevice
 import io.github.ronganam.dana.data.pairing.PairingFlow

@@ -71,7 +71,7 @@ bin/deploy-app.sh --watch-ip <watch-ip>:5555    # wear APK; uses adb wireless de
 
 Release builds talk to the server over HTTPS only (Android's default: cleartext traffic is refused). Debug builds also allow plain http (`app/src/debug/res/xml/network_security_config.xml`), for emulators and local servers (`http://10.0.2.2:8080`).
 
-A self-hosted server on a LAN without TLS: set `ALLOW_CLEARTEXT=true` in your site's `android.env`; your release build of `:app` then sets `android:usesCleartextTraffic="true"` (the `usesCleartextTraffic` manifest placeholder in `app/build.gradle.kts`). The token travels in the clear on that network — prefer TLS (a reverse proxy with a certificate, or a VPN such as Tailscale with HTTPS). The watch reaches the server through the phone, so it needs nothing.
+A self-hosted server on a LAN without TLS: set `ALLOW_CLEARTEXT=true` in your site's `android.env`; your release build of `:app` then sets `android:usesCleartextTraffic="true"` (the `usesCleartextTraffic` manifest placeholder in `app/build.gradle.kts`). The token travels in the clear on that network — prefer TLS (a reverse proxy with a certificate, or a VPN such as Tailscale with HTTPS). The watch's own requests (only its pairing, `docs/wear.md` → Pairing) reach the server directly and are HTTPS-only in a release build; everything else goes through the phone.
 
 ## Your site
 
@@ -79,7 +79,7 @@ What belongs to one deployment lives in its site folder (`../site/` at the repos
 
 | Site file | What |
 |---|---|
-| `android.env` | `SERVER_URL`: the server a fresh app / kiosk / TV starts with (`BuildConfig.DEFAULT_SERVER_URL`), and where `bin/deploy-app.sh` publishes. `LAN_DNS_SERVERS`: comma-separated LAN resolvers for the TV (`docs/tv.md` → LanDns). `ALLOW_CLEARTEXT=true`: release builds may reach a plain-http server (above, HTTPS). `PHONE_AVD` / `WATCH_AVD`: the emulators `bin/dev-install.sh` boots. For `bin/deploy-*.sh`: `APP_PUBLISH_TOKEN` or `APP_PUBLISH_TOKEN_CMD`, `TV_SERIAL`, `KIOSK_SERIAL`, `WATCH_IP`. |
+| `android.env` | `SERVER_URL`: where `bin/deploy-app.sh` publishes (no build has a server built in: the phone and the watch pair, `docs/phone.md` → Pairing). `LAN_DNS_SERVERS`: comma-separated LAN resolvers for the TV (`docs/tv.md` → LanDns). `ALLOW_CLEARTEXT=true`: release builds may reach a plain-http server (above, HTTPS). `PHONE_AVD` / `WATCH_AVD`: the emulators `bin/dev-install.sh` boots. For `bin/deploy-*.sh`: `APP_PUBLISH_TOKEN` or `APP_PUBLISH_TOKEN_CMD`, `TV_SERIAL`, `KIOSK_SERIAL`, `WATCH_IP`. |
 | `tv-defaults.json` | The TV's first-run home screen (apps, Home Assistant entities, cameras, remote bindings) in `TvConfig`'s JSON shape (`BuildConfig.TV_DEFAULTS_JSON`). |
 | `google-services.json` | Your Firebase project's Android config (package `io.github.ronganam.dana`), for direct push through FCM (the server then needs `FCM_SERVICE_ACCOUNT_JSON` from the same project: `server/docs/notifications.md`). `app/src/phone/google-services.json` is read when the site has none. Without either, the phone pushes through UnifiedPush (a distributor app such as ntfy on the phone; nothing to configure). |
 

@@ -1,6 +1,8 @@
 package io.github.ronganam.dana.ui.viewmodels
 
 import io.github.ronganam.dana.data.network.ServerConfig
+import io.github.ronganam.dana.data.pairing.DevicePairing
+import io.github.ronganam.dana.data.pairing.PairingClient
 import android.app.Application
 import android.content.Context
 import android.content.SharedPreferences
@@ -41,13 +43,36 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     private val appContext: Context = application.applicationContext
     private val prefs: SharedPreferences = ServerConfig.prefs(appContext)
 
-    /** The server and token every controller talks to (Settings changes it: [updateServerConfig]). */
+    /** The server and device token every controller talks to (pairing changes it: [useServerConfig]). */
     var serverConfig: ServerConfig = ServerConfig.load(appContext)
         private set
     private var apiService = serverConfig.api()
 
+    private val _paired = MutableStateFlow(serverConfig.isConfigured)
+    /** Whether this app is paired with a server (else the phone shows the pairing screen). */
+    val paired: StateFlow<Boolean> = _paired.asStateFlow()
+
     private val userMessages = UserMessages()
+    private val pairingClient = PairingClient()
     private val ctx = ControllerContext(viewModelScope, userMessages, Texts.of(appContext)) { apiService }
+
+    /** The pairing screen and Settings' Unpair / Pair again (kind `phone`). */
+    val pairingController = PairingController(
+        viewModelScope,
+        current = { serverConfig },
+        device = { DevicePairing.device(appContext) },
+        pair = { server, code -> pairingClient.pair(server, code, kind = "phone", name = DevicePairing.deviceName()) },
+        store = { server, paired ->
+            // The shell starts (MainActivity: initialize) once the pairing screen closes.
+            DevicePairing.store(appContext, server, paired).also {
+                io.github.ronganam.dana.push.PushSetup.ensureRegistered(appContext, force = true)
+            }
+        },
+        remove = { config, id -> pairingClient.remove(config, id) },
+        forget = { DevicePairing.unpair(appContext, pairingClient) },
+        reload = { useServerConfig(ServerConfig.load(appContext)) },
+        notify = { userMessages.post(it) },
+    )
 
     /** One-shot error/info messages for a Snackbar. */
     val messages: SharedFlow<String> = userMessages.messages
@@ -243,9 +268,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    /** Save a new server / token (normalized) and point every controller at it. */
-    fun updateServerConfig(newServerUrl: String, newApiToken: String) {
-        serverConfig = ServerConfig.save(appContext, newServerUrl, newApiToken)
+    /** Point every controller at [config] (already saved: [ServerConfig]). */
+    fun useServerConfig(config: ServerConfig) {
+        serverConfig = config
+        _paired.value = config.isConfigured
         apiService = serverConfig.api()
         ServerStatusMonitor.configure(appContext, serverConfig.url)
         shoppingController.accountChanged()
@@ -310,7 +336,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             val eventsJson = ctx.load("WearSync") { io.github.ronganam.dana.data.wear.WatchJson.events(eventsForWatch(apiService.tasks.calendarEvents())) } ?: "[]"
             val tasksJson = ctx.load("WearSync") { io.github.ronganam.dana.data.wear.WatchJson.tasks(apiService.tasks.tasksDueSoon()) } ?: "[]"
-            WearSyncManager.syncConfigToWear(appContext, serverConfig.url, serverConfig.token, sessionId, eventsJson, tasksJson)
+            WearSyncManager.syncConfigToWear(appContext, serverConfig.url, sessionId, eventsJson, tasksJson)
         }
     }
 

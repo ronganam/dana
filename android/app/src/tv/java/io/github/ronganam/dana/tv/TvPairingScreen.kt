@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.tv
 
+import io.github.ronganam.dana.protocol.PairingCode
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -45,7 +46,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.discovery.DiscoveredServer
-import io.github.ronganam.dana.data.pairing.PairingCode
 import io.github.ronganam.dana.data.pairing.PairingFlow
 import io.github.ronganam.dana.ui.components.foundServerLabel
 import io.github.ronganam.dana.ui.components.rememberFoundServers

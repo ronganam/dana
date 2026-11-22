@@ -24,10 +24,13 @@ val WearJson: Json = Json {
 /** Decode [text] with [WearJson]; null when it isn't [T] (a frame from another version). */
 fun <T> KSerializer<T>.decodeOrNull(text: String): T? = runCatching { WearJson.decodeFromString(this, text) }.getOrNull()
 
-/** The phone's settings for the watch, as the [WearPaths.CONFIG] data item. */
+/**
+ * The phone's settings for the watch, as the [WearPaths.CONFIG] data item.
+ * [serverUrl] is the server the phone is paired with ("" when it isn't); the
+ * watch pairs itself with it ([WearPaths.PAIR_WATCH]), so no token travels here.
+ */
 data class WearConfig(
     val serverUrl: String,
-    val apiToken: String,
     val sessionId: String,
     val calendarEventsJson: String = "[]",
     val dueTasksJson: String = "[]",
@@ -36,7 +39,6 @@ data class WearConfig(
     /** [timestamp] changes the item each time, so the watch is told even when nothing else did. */
     fun writeTo(map: DataMap, timestamp: Long) {
         map.putString(SERVER_URL, serverUrl)
-        map.putString(API_TOKEN, apiToken)
         map.putString(CHAT_SESSION_ID, sessionId)
         map.putString(CALENDAR_EVENTS, calendarEventsJson)
         map.putString(DUE_TASKS, dueTasksJson)
@@ -46,7 +48,6 @@ data class WearConfig(
 
     companion object {
         private const val SERVER_URL = "server_url"
-        private const val API_TOKEN = "api_token"
         private const val CHAT_SESSION_ID = "chat_session_id"
         private const val CALENDAR_EVENTS = "calendar_events"
         private const val DUE_TASKS = "due_tasks"
@@ -55,7 +56,6 @@ data class WearConfig(
 
         fun from(map: DataMap) = WearConfig(
             serverUrl = map.getString(SERVER_URL) ?: "",
-            apiToken = map.getString(API_TOKEN) ?: "",
             sessionId = map.getString(CHAT_SESSION_ID) ?: "",
             calendarEventsJson = map.getString(CALENDAR_EVENTS) ?: "[]",
             dueTasksJson = map.getString(DUE_TASKS) ?: "[]",

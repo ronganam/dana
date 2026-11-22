@@ -16,7 +16,6 @@ object WearSyncManager {
     fun syncConfigToWear(
         context: Context,
         serverUrl: String,
-        apiToken: String,
         sessionId: String,
         calendarEventsJson: String = "[]",
         dueTasksJson: String = "[]"
@@ -27,7 +26,7 @@ object WearSyncManager {
             } catch (e: Exception) { 0 }
 
             val putDataMapReq = PutDataMapRequest.create(WearPaths.CONFIG).apply {
-                WearConfig(serverUrl, apiToken, sessionId, calendarEventsJson, dueTasksJson, phoneVersionCode)
+                WearConfig(serverUrl, sessionId, calendarEventsJson, dueTasksJson, phoneVersionCode)
                     .writeTo(dataMap, System.currentTimeMillis())
             }
             val request = putDataMapReq.asPutDataRequest().setUrgent()

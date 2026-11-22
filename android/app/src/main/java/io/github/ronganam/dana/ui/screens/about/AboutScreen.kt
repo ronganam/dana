@@ -124,7 +124,7 @@ fun AboutScreen(viewModel: MainViewModel, onBack: (() -> Unit)?, onOpenSettings:
             ) {
                 Column(Modifier.weight(1f)) {
                     Text("Settings", style = MaterialTheme.typography.titleMedium)
-                    MonoLabel("server, token, permissions, updates", modifier = Modifier.padding(top = 2.dp))
+                    MonoLabel("server, permissions, updates", modifier = Modifier.padding(top = 2.dp))
                 }
                 MonoLabel("→", color = MaterialTheme.colorScheme.primary)
             }
