@@ -8,7 +8,7 @@ litellm>=1.108.3
 # litellm>=1.105 eagerly imports its MCP gateway on every tools= call and that
 # import chain needs the `mcp` package (upstream bug BerriAI/litellm#46045).
 # Remove once the upstream fix (BerriAI/litellm#46269) ships.
-mcp>=2.2.0,<3
+mcp>=2.3.0,<3
 pydantic>=2.0.0
 cryptography>=42.0.0
 python-dotenv>=1.0.0
