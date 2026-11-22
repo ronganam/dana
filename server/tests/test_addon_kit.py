@@ -71,7 +71,8 @@ check("new: the addon with its kit (AGENTS.md, REFERENCE.md, harness, fakes, a N
 COMMIT = publish.git(["rev-parse", "HEAD"], TIDES)
 log = publish.git(["log", "--format=%s"], TIDES)
 check("new: its own git repository, first commit made", log == "Start the tides addon (bin/dana addons new)", log)
-check("new: REFERENCE.md is the generated reference", (TIDES / "REFERENCE.md").read_text() == reference.render())
+check("new: REFERENCE.md is the generated reference (docs/addon-reference.md)",
+      (TIDES / "REFERENCE.md").read_text() == reference.OUTPUT.read_text(encoding="utf-8"))
 agents = (TIDES / "AGENTS.md").read_text()
 check("new: AGENTS.md has the loop and the rules", all(w in agents for w in (
     "bin/dana addons check", "bin/dana addons test", "bin/dana addons dev", "bin/dana addons publish",
@@ -124,7 +125,8 @@ shutil.copytree(TIDES, BROKEN, ignore=shutil.ignore_patterns(".git"))
 jobs = {
     "check": lambda: dana("addons", "check", str(TIDES), "--json"),
     "test": lambda: dana("addons", "test", str(TIDES)),
-    "alone": lambda: alone(CLONE / "tests" / "test_tides.py", SERVER.parent),
+    # a checkout: DANA_HOME is its root (what the guide says); an image has only the server folder itself
+    "alone": lambda: alone(CLONE / "tests" / "test_tides.py", SERVER.parent if (SERVER.parent / "server").is_dir() else SERVER),
     "nowhere": lambda: alone(CLONE / "tests" / "test_tides.py", SCRATCH),
     "bad": lambda: check_kit.check(BAD),
     "vague": lambda: check_kit.check(VAGUE),
@@ -207,16 +209,20 @@ check("imports: an addon that fails to import says why",
       found(R["broken"].to_json(), "error", "It does not load", "not_a_module_anywhere"), R["broken"].to_json())
 
 # --- 3. The reference --------------------------------------------------------------------------------
-check("reference: docs/addon-reference.md is what the code generates (bin/dana addons reference)",
-      reference.OUTPUT.read_text(encoding="utf-8") == reference.render())
-ref = reference.render()
-check("reference: every hook, the manifest fields, the schema; examples quoted from the showcase", all(
-    f"`@addon.{h}" in ref for h, _, _ in reference.HOOKS) and "| `touches` |" in ref and '"$defs"' in ref
-    and "examples/addons/showcase/tools.py" in ref and "def showcase_add_plant" in ref)
-stale = SCRATCH / "stale.md"
-stale.write_text("old\n")
-(r1, o1, _), (r2, o2, e2) = dana("addons", "reference", "--check", "--out", str(stale)), dana("addons", "reference", "--check")
-check("reference --check: 1 for a stale file, 0 for the real one", r1 == 1 and "out of date" in o1 and r2 == 0, o1 + o2 + e2)
+if SHOWCASE.is_dir():  # rendering quotes the showcase, which lives beside server/ (not in the image)
+    check("reference: docs/addon-reference.md is what the code generates (bin/dana addons reference)",
+          reference.OUTPUT.read_text(encoding="utf-8") == reference.render())
+    ref = reference.render()
+    check("reference: every hook, the manifest fields, the schema; examples quoted from the showcase", all(
+        f"`@addon.{h}" in ref for h, _, _ in reference.HOOKS) and "| `touches` |" in ref and '"$defs"' in ref
+        and "examples/addons/showcase/tools.py" in ref and "def showcase_add_plant" in ref)
+    stale = SCRATCH / "stale.md"
+    stale.write_text("old\n")
+    (r1, o1, _), (r2, o2, e2) = dana("addons", "reference", "--check", "--out", str(stale)), dana("addons", "reference", "--check")
+    check("reference --check: 1 for a stale file, 0 for the real one", r1 == 1 and "out of date" in o1 and r2 == 0, o1 + o2 + e2)
+else:
+    print("[SKIP] reference: no examples/ beside server/ to render it from")
+
 
 # --- 4. The showcase example -------------------------------------------------------------------------
 if SHOWCASE.is_dir():

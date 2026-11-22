@@ -150,20 +150,23 @@ wa = official_addon("whatsapp")
 check("official: WhatsApp needs a WAHA server", wa.needs[0].kind == "hardware" and "WAHA" in wa.needs[0].what)
 
 # --- The README's table ------------------------------------------------------------------------------
-text = README.read_text(encoding="utf-8")
-found = re.search(re.escape(START) + r"\n(.*?)" + re.escape(END), text, re.S)
-table = official_table()
-check("readme: the addons table is between its markers under \"What each feature needs\"",
-      found is not None and text.index("## What each feature needs") < text.index(START))
-check("readme: the table is what `bin/dana addons table` prints (after changing an addon's needs, run "
-      "`cd server && bin/dana addons table` and paste it between the addons-table markers in README.md)",
-      found is not None and found.group(1) == table,
-      "\n".join(line for line in __import__("difflib").unified_diff(
-          (found.group(1) if found else "").splitlines(), table.splitlines(), "README.md", "bin/dana addons table",
-          lineterm="")))
-check("table: one row per official addon, the header first",
-      table.splitlines()[0] == "| Feature | What it does | Required | Optional | Region |"
-      and len(table.splitlines()) == 2 + len(official))
+if README.is_file():  # the repository's README; an image ships only server/
+    text = README.read_text(encoding="utf-8")
+    found = re.search(re.escape(START) + r"\n(.*?)" + re.escape(END), text, re.S)
+    table = official_table()
+    check("readme: the addons table is between its markers under \"What each feature needs\"",
+          found is not None and text.index("## What each feature needs") < text.index(START))
+    check("readme: the table is what `bin/dana addons table` prints (after changing an addon's needs, run "
+          "`cd server && bin/dana addons table` and paste it between the addons-table markers in README.md)",
+          found is not None and found.group(1) == table,
+          "\n".join(line for line in __import__("difflib").unified_diff(
+              (found.group(1) if found else "").splitlines(), table.splitlines(), "README.md", "bin/dana addons table",
+              lineterm="")))
+    check("table: one row per official addon, the header first",
+          table.splitlines()[0] == "| Feature | What it does | Required | Optional | Region |"
+          and len(table.splitlines()) == 2 + len(official))
+else:
+    print("[SKIP] readme: no README.md beside server/")
 
 passed = sum(1 for _, ok in results if ok)
 print(f"\n{passed}/{len(results)} passed")

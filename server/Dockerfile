@@ -56,6 +56,8 @@ RUN set -e; for req in addons/*/requirements.txt addons-site/*/requirements.txt;
 # docker compose exec dana dana users list, kubectl exec … dana addons install NAME (into the data volume)
 COPY bin/dana ./bin/dana
 COPY cli/ ./cli/
+# The generated addon reference: bin/dana addons new copies it into each new addon as REFERENCE.md
+COPY docs/addon-reference.md ./docs/addon-reference.md
 ENV PATH="/app/bin:${PATH}"
 # The release name bin/deploy builds ("<VERSION>-<commit>"): /api/health reports it and the
 # dashboard's ?v= cache-buster uses it, so every deploy reaches cached clients.

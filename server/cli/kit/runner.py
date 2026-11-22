@@ -1,7 +1,7 @@
 """``bin/dana addons test <path>``: an addon's tests against Dana's test harness.
 
 Each ``tests/test_*.py`` runs in its own process from ``server/``, with ``server/`` and
-``server/tests/`` on the import path and ``DANA_HOME`` set to this checkout (what the
+``server/tests/`` on the import path and ``DANA_HOME`` set to this server folder (what the
 addon's ``tests/dana_harness.py`` looks for); ``tests/test_*.mjs`` run with Node. The
 values of Dana's own ``.env`` are left out of their environment, so a test never reaches
 a real service with a real key.
@@ -27,7 +27,7 @@ def clean_env() -> Dict[str, str]:
     secret = set(dotenv_values(loaded)) if loaded is not None and loaded.is_file() else set()
     env = {k: v for k, v in os.environ.items() if k not in secret}
     paths = [str(SERVER), str(SERVER / "tests")] + [p for p in env.get("PYTHONPATH", "").split(os.pathsep) if p]
-    env.update(PYTHONPATH=os.pathsep.join(paths), DANA_HOME=str(SERVER.parent), DANA_ENV_FILE="")
+    env.update(PYTHONPATH=os.pathsep.join(paths), DANA_HOME=str(SERVER), DANA_ENV_FILE="")
     return env
 
 

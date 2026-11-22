@@ -112,9 +112,12 @@ async def drain() -> None:
     """Wait until every handler started so far (and any they emit, or handed
     over from another thread) has finished (tests)."""
     while _pending or _handed:
-        if _pending:
-            await asyncio.gather(*list(_pending), return_exceptions=True)
+        running = [t for t in _pending if not t.done()]
+        if running:
+            await asyncio.gather(*running, return_exceptions=True)
         else:
+            # only finished tasks whose done callbacks have not run yet, or starts handed over from
+            # another thread: give the loop a turn (awaiting finished futures alone never yields)
             await asyncio.sleep(0.01)
 
 

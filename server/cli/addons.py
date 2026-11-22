@@ -183,7 +183,9 @@ def scaffold(name: str, root: Path, title: str = "", web: bool = False, worker: 
         dest = target / RENAMED.get(out, out)
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text, encoding="utf-8")
-    (target / "REFERENCE.md").write_text(reference.render(), encoding="utf-8")
+    # the generated reference (kept current by test_addon_kit), not rendered here: rendering needs the showcase
+    # example, which an image without the repository around server/ does not have
+    (target / "REFERENCE.md").write_text(reference.OUTPUT.read_text(encoding="utf-8"), encoding="utf-8")
     try:
         publish_kit.git(["init", "-q", "-b", "main"], target)
         publish_kit.git(["add", "-A"], target)
