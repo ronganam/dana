@@ -1,12 +1,16 @@
 """``bin/dana addons …``: the server's addons (../docs/addons.md).
 
     addons list                             every addon: source, version, state, fields; the failed ones
+    addons table                            the official addons as a Markdown table: what each does, what it
+                                            needs (required / optional) and where it works (the README's)
     addons new NAME [--web] [--worker] [--title T] [--dir DIR]
                                             write a working addon from the template (default: site/addons/NAME):
                                             a tool and its test; --web adds a page, --worker a sidecar
-    addons install NAME|REPO@COMMIT[:PATH] [--dir DIR | --data]
+    addons install NAME|REPO@COMMIT[:PATH] [--dir DIR | --data] [--yes]
                                             fetch one commit of an addon (a catalog entry, or any git repository)
-                                            into the site's addons/ (default), DIR, or the data dir's addons/
+                                            into the site's addons/ (default), DIR, or the data dir's addons/;
+                                            asks first when it may touch more than the version it replaces
+                                            (--yes: agree without asking)
     addons remove NAME [--dir DIR | --data] delete an addon folder there (its tables stay)
     addons disable NAME / enable NAME       for everyone on this server (the running server sees it within 5 s)
 
@@ -27,8 +31,8 @@ from typing import Any, TextIO
 
 from core import addon_dirs
 from core.addons import catalog, install, loader, state
-from core.addons.addon import all_addons, get_addon
-from core.addons.hooks import CORE_SCREENS
+from core.addons.addon import Addon, all_addons, get_addon
+from core.addons.hooks import ADDON, CORE_SCREENS, ENV, REGION, Need, Touches
 from cli.users import CliError, register_connections
 
 TEMPLATE = Path(__file__).resolve().parent / "template"
@@ -60,7 +64,7 @@ def cmd_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
                  "disabled on this server" if k.name in off else "",
                  "every user has it" if k.everyone else "",
                  f"needs the '{k.requires}' capability: admins only" if k.requires else "",
-                 f"needs {', '.join(k.needs)}" if k.needs else "",
+                 f"needs {', '.join(k.depends)}" if k.depends else "",
                  "has a worker" if k.worker is not None else ""]
         print(f"{k.name}: {k.description} ({', '.join(f for f in flags if f)})", file=out)
         for f in k.credentials:
@@ -70,6 +74,49 @@ def cmd_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
             print(f"  setting {f.name}{default}: {f.description}", file=out)
     for failed in loader.failed().values():
         print(f"{failed.name}: FAILED to load ({failed.source}, {failed.path}): {failed.error}", file=out)
+
+
+# --- table ---------------------------------------------------------------------------------------
+
+TABLE_HEAD = ("| Feature | What it does | Required | Optional | Region |\n"
+              "|---|---|---|---|---|")
+
+
+def _cell(text: str) -> str:
+    return text.replace("|", "\\|").replace("\n", " ").strip()
+
+
+def need_words(need: Need) -> str:
+    """A need as a table shows it: an env value in code, an addon by its title, the rest as written."""
+    if need.kind == ENV:
+        return f"`{need.what}`"
+    if need.kind == ADDON:
+        try:
+            return f"the {get_addon(need.what).title} addon"
+        except KeyError:
+            return f"the {need.what} addon"
+    return need.what
+
+
+def addons_table(addons: list[Addon]) -> str:
+    """``addons`` as a Markdown table: Feature · What it does · Required · Optional · Region."""
+    rows = [TABLE_HEAD]
+    for a in addons:
+        required = "; ".join(need_words(n) for n in a.needs if not n.optional and n.kind != REGION)
+        optional = "; ".join(need_words(n) for n in a.needs if n.optional and n.kind != REGION)
+        region = ", ".join(n.what for n in a.needs if n.kind == REGION)
+        rows.append(f"| {_cell(a.title)} | {_cell(a.description)} | {_cell(required) or '—'} | "
+                    f"{_cell(optional) or '—'} | {_cell(region) or 'Any'} |")
+    return "\n".join(rows) + "\n"
+
+
+def official_table() -> str:
+    """The table of the official addons (the README's "What each feature needs")."""
+    return addons_table([a for a in all_addons() if loader.folder(a.name).source.official])
+
+
+def cmd_table(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
+    out.write(official_table())
 
 
 # --- new -----------------------------------------------------------------------------------------
@@ -144,13 +191,35 @@ def parse_spec(spec: str) -> tuple[install.Source, str | None]:
     return entry.source, entry.name
 
 
+def touches_lines(touches: Touches) -> list[str]:
+    """What ``touches`` declares, a line each in plain words (none: one line saying so)."""
+    lines = [f"connects to {', '.join(touches.hosts)}"] if touches.hosts else []
+    if touches.acts_outside:
+        lines.append("acts for you outside Dana (sends messages or mail, changes things at a service)")
+    if touches.stores_credentials:
+        lines.append("keeps passwords, tokens or sign-ins (encrypted)")
+    if touches.reads:
+        lines.append(f"reads the data of {', '.join(touches.reads)}")
+    return lines or ["touches nothing beyond Dana's own data"]
+
+
 def cmd_install(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     source, name = parse_spec(args.spec)
     root = _root(args)
     print(f"Installing from {source.repo} at {source.ref}{' (' + source.path + ')' if source.path else ''} "
           f"into {root}. An addon runs with the server's full access: install only code you trust.", file=out)
     try:
-        done = install.install(source, root, name=name, by="cli")
+        try:
+            done = install.install(source, root, name=name, by="cli")
+        except install.ConfirmTouches as e:
+            print(f"{e.name} may touch:", *(f"  - {line}" for line in touches_lines(e.touches)), sep="\n", file=out)
+            print("New since the version you have (or you agreed to):",
+                  *(f"  - {line}" for line in touches_lines(e.added)), sep="\n", file=out)
+            if not args.yes:
+                print("Install it? [y/N] ", end="", file=out, flush=True)
+                if stdin.readline().strip().lower() not in ("y", "yes"):
+                    raise CliError("Not installed.") from None
+            done = install.install(source, root, name=name, by="cli", accept=e.touches)
     except install.InstallError as e:
         raise CliError(str(e)) from e
     after = ("Restart the server to load it." if root == addon_dirs.installed_dir().resolve()
@@ -204,6 +273,8 @@ def register(sub: Any) -> None:
     """Add the ``addons`` commands to ``sub`` (the ``bin/dana addons`` sub-parsers)."""
     p = sub.add_parser("list", help="every addon with its source, state and fields; the ones that failed")
     p.set_defaults(func=cmd_list, needs_db=True)
+    p = sub.add_parser("table", help="the official addons as a Markdown table: what each needs and where it works")
+    p.set_defaults(func=cmd_table, needs_db=False)
     p = sub.add_parser("new", help="write a working addon (a setting, a tool, its test, a README) to start from")
     p.add_argument("name")
     p.add_argument("--title", help="its name for people (default: from the name)")
@@ -213,6 +284,7 @@ def register(sub: Any) -> None:
     p.set_defaults(func=cmd_new, needs_db=False)
     p = sub.add_parser("install", help="fetch one commit of an addon: a catalog NAME or REPO@COMMIT[:PATH]")
     p.add_argument("spec", metavar="NAME|REPO@COMMIT[:PATH]")
+    p.add_argument("--yes", action="store_true", help="agree to what it may touch without asking")
     _where(p)
     p.set_defaults(func=cmd_install, needs_db=False)
     p = sub.add_parser("remove", help="delete an addon folder (its tables stay)")

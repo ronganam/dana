@@ -80,7 +80,7 @@ ROOT = Path(testenv.scratch_path("addon_dirs"))
         return text
     '''))
 (ROOT / "hkx" / "addon.py").write_text(
-    "from core.addons import Addon\naddon = Addon('hkx', description='Needs hk', needs=('hk',))\n")
+    "from core.addons import Addon, Need\naddon = Addon('hkx', description='Needs hk', needs=(Need('addon', 'hk', 'Its hooks'),))\n")
 (ROOT / "hkx" / "hooks.py").write_text(textwrap.dedent('''\
     import asyncio
     import threading

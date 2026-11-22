@@ -3,7 +3,8 @@ manifest"; docs/writing-an-addon.md). Plain data: nothing here imports the
 rest of the app.
 
 Manifest values: :class:`Page` / :class:`Nav` (a page in the web app),
-:class:`Worker` (a sidecar), :class:`LlmJob` (an LLM purpose), and the
+:class:`Worker` (a sidecar), :class:`LlmJob` (an LLM purpose),
+:class:`Need` (what running it takes) / :class:`Touches` (what it may touch), and the
 schedule helpers :func:`minutes` / :func:`hours` for ``@addon.job(every=)``.
 
 What hooks get besides the user: :class:`NowContext`, :class:`BriefingContext`,
@@ -78,6 +79,126 @@ class Worker:
     (docs/operations.md, "Workers")."""
     port: int
     url_env: str
+
+
+# What a Need can be: a server env value, an account at a service, hardware or a server you run, the
+# Dana phone app, a place it only works in, another addon.
+ENV, ACCOUNT, HARDWARE, APP, REGION, ADDON = "env", "account", "hardware", "app", "region", "addon"
+NEED_KINDS = (ENV, ACCOUNT, HARDWARE, APP, REGION, ADDON)
+ENV_NAME = re.compile(r"^[A-Z][A-Z0-9_]*$")
+ADDON_NAME = re.compile(r"^[a-z][a-z0-9_]*$")
+MAX_WHAT = 80
+MAX_WHY = 160
+MAX_HOST = 80
+
+
+def _line(owner: str, what: str, text: Any, limit: int) -> None:
+    """Refuse ``text`` unless it is one short line of words."""
+    if not isinstance(text, str) or not text.strip() or "\n" in text:
+        raise ValueError(f"{owner}: {what} must be one line of words")
+    if len(text) > limit:
+        raise ValueError(f"{owner}: {what} is {len(text)} characters; keep it to {limit}")
+
+
+@dataclass(frozen=True)
+class Need:
+    """Something the addon needs from whoever runs it, shown before it is
+    turned on (the Addons page, ``bin/dana addons table``, the README).
+
+    ``kind`` is one of :data:`NEED_KINDS`: ``env`` (``what`` is the env
+    variable, ``GOOGLE_CLIENT_ID``), ``account`` (an account at a service),
+    ``hardware`` (a device, or a server you run: Home Assistant, WAHA),
+    ``app`` (the Dana Android app), ``region`` (where it works at all: a
+    country), ``addon`` (``what`` is the other addon's name). Other kinds'
+    ``what`` is a phrase that reads inside a sentence ("a Google account").
+    ``why`` says in one line what it is for. ``optional``: the addon works without it, with
+    less. A required ``addon`` need is loaded first and must be on for the
+    addon to work (``Addon.depends``)."""
+    kind: str
+    what: str
+    why: str
+    optional: bool = False
+
+    def __post_init__(self) -> None:
+        owner = f"Need({self.kind!r}, {self.what!r})"
+        if self.kind not in NEED_KINDS:
+            raise ValueError(f"{owner}: kind must be one of {', '.join(NEED_KINDS)}")
+        _line(owner, "what", self.what, MAX_WHAT)
+        _line(owner, "why", self.why, MAX_WHY)
+        if self.kind == ENV and not ENV_NAME.match(self.what):
+            raise ValueError(f"{owner}: an env need names the variable (upper case, digits, _)")
+        if self.kind == ADDON and not ADDON_NAME.match(self.what):
+            raise ValueError(f"{owner}: an addon need names the addon (lower case, digits, _)")
+
+    def to_json(self) -> Dict[str, Any]:
+        return {"kind": self.kind, "what": self.what, "why": self.why, "optional": self.optional}
+
+
+@dataclass(frozen=True)
+class Touches:
+    """What the addon may touch beyond Dana's own data, shown before it is
+    turned on and before it is installed: the network ``hosts`` it contacts
+    (a domain, or words for an address the user gives: "your Home Assistant
+    server"), whether it ``acts_outside`` (sends messages or mail, changes
+    things at a service or on devices for the user), whether it
+    ``stores_credentials`` (passwords, tokens, sign-ins; encrypted), and the
+    other addons whose data it ``reads``. A declaration, not a sandbox: every
+    addon runs with the server's full access (SECURITY.md). Installing or
+    updating an addon whose touches grew asks the admin again
+    (core/addons/install.py)."""
+    hosts: Tuple[str, ...] = ()
+    acts_outside: bool = False
+    stores_credentials: bool = False
+    reads: Tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        for what, items in (("hosts", self.hosts), ("reads", self.reads)):
+            if not isinstance(items, tuple):
+                raise ValueError(f"Touches: {what} must be a tuple of strings: {what}=(\"...\",)")
+            if len(set(items)) != len(items):
+                raise ValueError(f"Touches: {what} names one twice")
+        for host in self.hosts:
+            _line("Touches", "a host", host, MAX_HOST)
+        for name in self.reads:
+            if not isinstance(name, str) or not ADDON_NAME.match(name):
+                raise ValueError(f"Touches: reads names addons (lower case, digits, _), not {name!r}")
+        for what in ("acts_outside", "stores_credentials"):
+            if not isinstance(getattr(self, what), bool):
+                raise ValueError(f"Touches: {what} must be True or False")
+
+    @property
+    def empty(self) -> bool:
+        """It touches nothing beyond Dana's own data."""
+        return not (self.hosts or self.acts_outside or self.stores_credentials or self.reads)
+
+    def added_since(self, before: "Touches") -> "Touches":
+        """What this declares that ``before`` did not (empty: nothing new)."""
+        return Touches(hosts=tuple(h for h in self.hosts if h not in before.hosts),
+                       acts_outside=self.acts_outside and not before.acts_outside,
+                       stores_credentials=self.stores_credentials and not before.stores_credentials,
+                       reads=tuple(r for r in self.reads if r not in before.reads))
+
+    def to_json(self) -> Dict[str, Any]:
+        return {"hosts": list(self.hosts), "acts_outside": self.acts_outside,
+                "stores_credentials": self.stores_credentials, "reads": list(self.reads)}
+
+    @classmethod
+    def from_json(cls, data: Any) -> "Touches":
+        """The touches a payload gives (``to_json``'s shape; missing keys: none).
+
+        Raises:
+            ValueError: not that shape.
+        """
+        if not isinstance(data, dict):
+            raise ValueError("touches must be an object: {hosts, acts_outside, stores_credentials, reads}")
+        unknown = sorted(set(data) - {"hosts", "acts_outside", "stores_credentials", "reads"})
+        if unknown:
+            raise ValueError(f"touches has no {unknown[0]!r}")
+        hosts, reads = data.get("hosts", []), data.get("reads", [])
+        if not isinstance(hosts, list) or not isinstance(reads, list):
+            raise ValueError("touches: hosts and reads must be lists")
+        return cls(hosts=tuple(hosts), acts_outside=data.get("acts_outside", False),
+                   stores_credentials=data.get("stores_credentials", False), reads=tuple(reads))
 
 
 @dataclass(frozen=True)

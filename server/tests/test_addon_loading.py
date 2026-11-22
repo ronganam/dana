@@ -30,7 +30,7 @@ def write_addon(folder: Path, name: str, manifest: str = "", tools_extra: str = 
     pkg = folder / name
     pkg.mkdir(parents=True)
     (pkg / "addon.py").write_text(textwrap.dedent(f"""\
-        from core.addons import Addon, PromptPart
+        from core.addons import Addon, Field, Need, PromptPart, Touches
         addon = Addon("{name}", description="A test addon"{manifest})
         """))
     (pkg / "tools.py").write_text(textwrap.dedent(f"""\
@@ -68,11 +68,13 @@ def lines_of(out: subprocess.CompletedProcess) -> dict:
 base = Path(testenv.scratch_dir())
 one, two = base / "one", base / "two"
 write_addon(one, "zeta")
-write_addon(one, "beta", ', needs=("zeta",)')  # first by name, but it needs zeta
+write_addon(one, "beta", ', needs=(Need("addon", "zeta", "Its data"),)')  # first by name, but it needs zeta
 write_addon(two, "alpha")
 write_addon(two, "broken", tools_extra="raise RuntimeError('broken on purpose')")
 write_addon(two, "badslot", ', prompt_parts=(PromptPart("nowhere", "x"),)')
-write_addon(two, "needy", ', needs=("absent",)')
+write_addon(two, "needy", ', needs=(Need("addon", "absent", "Its data"),)')
+write_addon(two, "badneed", ', needs=(Need("gadget", "a gadget", "It needs one"),)')  # not a need kind
+write_addon(two, "quietcreds", ', credentials=(Field("token", "A token"),), touches=Touches()')  # creds undeclared
 write_addon(two, "missingpkg")
 (two / "missingpkg" / "requirements.txt").write_text("# optional dep\nnonexistent-dana-pkg-xyz>=1.0\n")
 write_addon(two, "haspkg")
@@ -105,13 +107,15 @@ check("site addons: by needs then name, folders without addon.py skipped, a miss
       lines.get("LOADED") == "['alpha', 'haspkg', 'zeta', 'beta']", out.stdout + out.stderr[-2000:])
 check("site addons: after the official addons; the addon order is the loaded order",
       lines.get("AFTER_OFFICIAL") == "True" and lines.get("ORDER_SAME") == "True", lines)
-check("failure isolation: a site addon that fails to import, names an unknown slot, needs a missing addon or "
-      "has missing requirements.txt packages is skipped, the start goes on",
-      lines.get("FAILED") == "['badslot', 'broken', 'missingpkg', 'needy']", lines.get("FAILED"))
+check("failure isolation: a site addon that fails to import, names an unknown slot, needs a missing addon, "
+      "declares a need of no known kind or credentials it does not say it stores, or has missing "
+      "requirements.txt packages is skipped, the start goes on",
+      lines.get("FAILED") == "['badneed', 'badslot', 'broken', 'missingpkg', 'needy', 'quietcreds']", lines.get("FAILED"))
 why = lines.get("WHY", "")
 check("failure isolation: each with its reason",
       "nowhere" in why and "broken on purpose" in why and "absent" in why
-      and "nonexistent-dana-pkg-xyz" in why, why)
+      and "nonexistent-dana-pkg-xyz" in why and "kind must be one of env, account, hardware, app, region, addon" in why
+      and "stores_credentials=True" in why, why)
 check("failure isolation: a skipped addon leaves no tool behind", lines.get("BROKEN_TOOL") == "False")
 check("site addons: a tool only for a user who connected the addon",
       lines.get("BEFORE") == "False" and lines.get("CONNECTED") == "True False", lines)

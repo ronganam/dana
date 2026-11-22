@@ -38,7 +38,7 @@ db.migrate()
 users.bootstrap()
 
 from core.auth import setup_auth  # noqa: E402
-from core.addons import Field, Addon, store  # noqa: E402
+from core.addons import Field, Addon, Touches, store  # noqa: E402
 from addons.google_account import api as google_api, oauth  # noqa: E402
 import addons  # noqa: E402,F401 — registers every addon
 
@@ -58,7 +58,7 @@ CONTACTS_SCOPE = "https://www.googleapis.com/auth/contacts"
 GMAIL_SCOPE = "https://www.googleapis.com/auth/gmail.modify"
 GMAIL_SETTINGS_SCOPE = "https://www.googleapis.com/auth/gmail.settings.basic"
 testmail = Addon("testmail", credentials=(Field("refresh_token"),), settings=(Field("label", default="inbox"),),
-                       requires="manage_server", connect_url=oauth.CONNECT_PATH)
+                 touches=Touches(stores_credentials=True), requires="manage_server", connect_url=oauth.CONNECT_PATH)
 oauth.register("testmail", (MAIL_SCOPE,))
 
 ADMIN = users.first_admin()

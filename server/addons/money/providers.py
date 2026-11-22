@@ -1,7 +1,7 @@
 """Where money's sources and reference data come from: the provider extension point
 (docs/money.md, "Providers").
 
-money signs in nowhere itself. A **provider** addon (``needs=("money",)``;
+money signs in nowhere itself. A **provider** addon (``Need("addon", "money", ...)``;
 ``money_il`` brings the Israeli banks) registers, when its ``addon.py`` is
 imported:
 

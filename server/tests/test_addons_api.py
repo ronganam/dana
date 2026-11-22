@@ -42,6 +42,7 @@ with open(_CATALOG, "w", encoding="utf-8") as _f:
     json.dump({"addons": [
         {"name": "weather", "title": "Weather", "description": "The weather where you are", "author": "Someone",
          "homepage": "https://example.invalid/weather", "tags": ["home"], "min_dana": "9.0.0",
+         "touches": {"hosts": ["api.weather.example"], "stores_credentials": True},
          "source": {"repo": "https://example.invalid/dana-addons.git", "path": "weather", "ref": "a" * 40}},
         {"name": "later", "source": {"repo": "https://example.invalid/x.git", "path": "", "ref": "FILL-ME"}}]}, _f)
 os.environ["DANA_CATALOG_FILE"] = _CATALOG
@@ -239,19 +240,23 @@ async def test_me_and_list(client: TestClient) -> None:
                "nav": {"label": "Calls", "icon": "phone", "order": 90, "primary": False}}]
           and [p["id"] for p in addons["tasks"]["web"]] == ["tasks"], phone_pages)
     check("list: one connection's shape (credentials only as set / not set)",
-          set(ha) == {"name", "title", "description", "version", "source", "state", "needs", "everyone", "web",
+          set(ha) == {"name", "title", "description", "version", "source", "state", "needs", "touches", "everyone", "web",
                       "worker", "connected", "requires", "can_change", "why_not", "credentials",
                       "settings", "account", "check", "options", "connect_url", "connect_label",
                       "icon", "features", "pages", "setup", "examples", "disconnect_warning"}
           and ha["icon"] == "house" and ha["title"] == "Home Assistant" and ha["pages"] == []
+          and ha["needs"][0] == {"kind": "hardware", "what": "a Home Assistant server Dana's server can reach",
+                                 "why": "Lights, devices, zones and the weather come from it", "optional": False}
+          and ha["touches"] == {"hosts": ["your Home Assistant server"], "acts_outside": True,
+                                "stores_credentials": True, "reads": []}
           and "Turn off the living room lights" in ha["examples"] and ha["disconnect_warning"] is None
           and addons["shopping"]["pages"] == ["Shopping"]
           and addons["money"]["disconnect_warning"].startswith("Your saved bank and card logins")
           and addons["whatsapp"]["setup"][0].startswith("Run a WAHA server")
           and isinstance(ha["title"], str) and ha["source"] == "official" and ha["state"] == "on"
-          and ha["needs"] == [] and ha["everyone"] is False and ha["web"] == [] and ha["worker"] is False
+          and ha["everyone"] is False and ha["web"] == [] and ha["worker"] is False
           and addons["money"]["worker"] is False and addons["money_il"]["worker"] is True
-          and addons["money_il"]["needs"] == ["money"]
+          and [(n["kind"], n["what"], n["optional"]) for n in addons["money_il"]["needs"]] == [("addon", "money", False)]
           and ha["connect_url"] is None and addons["calendar"]["connect_url"] == "/api/google/connect"
           and ha["connect_label"] is None and addons["calendar"]["connect_label"] is None
           and addons["telegram_account"]["connect_label"] == "Connect Telegram"

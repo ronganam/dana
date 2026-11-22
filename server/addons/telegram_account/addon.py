@@ -1,7 +1,7 @@
 """The ``telegram_account`` addon: the user's own Telegram account,
 read-only (docs/telegram-account.md). Not Dana's Telegram bot."""
 
-from core.addons import Field, Addon, PromptPart, LlmJob
+from core.addons import Field, Addon, PromptPart, LlmJob, Need, Touches
 from addons.telegram_account import client
 from addons.telegram_account.config import ADDON, SESSION
 
@@ -23,6 +23,10 @@ addon = Addon(
     title="Telegram account", icon="send",
     credentials=(Field(SESSION, "Telegram session (set by the QR sign-in)", label="Telegram sign-in",
                        help="Filled in by Connect Telegram; you never type it."),),
+    needs=(Need("env", "TELEGRAM_API_ID", "The server's Telegram app (my.telegram.org), for the sign-in"),
+           Need("env", "TELEGRAM_API_HASH", "That Telegram app's hash"),
+           Need("account", "a Telegram account", "Your chats and channels; Dana signs in as a linked device")),
+    touches=Touches(hosts=("Telegram's servers",), stores_credentials=True),
     description="Your own Telegram chats and channels, read-only",
     features=("Lists and summarizes your unread chats and channels",
               "Reads a chat when you ask; never marks anything read and never sends"),

@@ -36,7 +36,7 @@ def addon(folder: Path, name: str, files: Dict[str, str]) -> None:
 
 
 def manifest(name: str, extra: str = "") -> str:
-    return f"from core.addons import Addon\naddon = Addon({name!r}, description='Test addon'{extra})\n"
+    return f"from core.addons import Addon, Need\naddon = Addon({name!r}, description='Test addon'{extra})\n"
 
 
 def echo_tool(name: str, flags: str = "") -> str:
@@ -98,7 +98,7 @@ addon(case, "dupprefix", {"addon.py": manifest("dupprefix"), "hooks.py": """\
         return {}
     """})
 addon(case, "dupllm", {"addon.py": manifest("dupllm", ", llm_jobs={'task_emoji': 'fast'}")})
-addon(case, "needsbad", {"addon.py": manifest("needsbad", ", needs=('needtool',)"), "tools.py": echo_tool("needsbad")})
+addon(case, "needsbad", {"addon.py": manifest("needsbad", ", needs=(Need('addon', 'needtool', 'Its tool'),)"), "tools.py": echo_tool("needsbad")})
 
 out = run("load", """
     from core import purposes
@@ -171,7 +171,7 @@ addon(case, "mbroken", {"addon.py": manifest("mbroken"), "tools.py": echo_tool("
         conn.execute("CREATE TABLE mbroken_items (id INTEGER PRIMARY KEY)")
         raise RuntimeError("migration broken on purpose")
     """})
-addon(case, "mneeds", {"addon.py": manifest("mneeds", ", needs=('mbroken',)"), "tools.py": echo_tool("mneeds")})
+addon(case, "mneeds", {"addon.py": manifest("mneeds", ", needs=(Need('addon', 'mbroken', 'Its table'),)"), "tools.py": echo_tool("mneeds")})
 out = run("migrate", """
     from core import db
     from core.addons import loader

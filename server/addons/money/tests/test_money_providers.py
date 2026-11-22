@@ -1,7 +1,7 @@
 """Money providers: a made-up provider addon's companies, sync, code, device, investment and meal formats, rates, per user; the money_il connect migration.
 Run: bin/test test_money_providers
 
-A provider addon defined here, ``money_test`` (``needs=("money",)``), brings
+A provider addon defined here, ``money_test`` (``Need("addon", "money", ...)``), brings
 three made-up companies through money's extension point (docs/money.md,
 "Providers"): a bank that asks for an SMS code, an investment house that
 keeps a device key and a meal card, plus reference rates. Alice (the first
@@ -54,7 +54,7 @@ from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 from core import clock  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
-from core.addons import Addon, store as connections  # noqa: E402
+from core.addons import Addon, Need, store as connections  # noqa: E402
 from addons.money import (api as money_api, config, meals, otp, portfolio, providers, savings, schedule,  # noqa: E402
                           sources, store, sync)
 from addons.money.providers import Company, LoginField, SyncError, SyncJob, SyncResult  # noqa: E402
@@ -130,7 +130,7 @@ def _changed(user) -> None:
     sources.provider_changed(user, PROVIDER)
 
 
-Addon(PROVIDER, needs=("money",), title="Money (test)", description="A made-up provider", on_change=_changed)
+Addon(PROVIDER, needs=(Need("addon", "money", "Its sources and transactions"),), title="Money (test)", description="A made-up provider", on_change=_changed)
 BANK = providers.register_company(Company(
     "testbank", "Test Bank", "bank", (LoginField("login", "Login"), LoginField("password", "Password", True)),
     PROVIDER, bank_sync, sms_senders=("TestBank",), code_regex=r"code (\d{6})", id_key="tb", forget=forget))

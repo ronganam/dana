@@ -1,6 +1,6 @@
 """The ``shopping`` addon (Shopping)."""
 
-from core.addons import Field, Addon, PromptPart, LlmJob, Page, Nav
+from core.addons import Field, Addon, PromptPart, LlmJob, Page, Nav, Need
 from addons.shopping import lists
 from addons.shopping.values import ACTIVE_SETTING
 
@@ -17,6 +17,7 @@ addon = Addon(
     features=("Add, tick and remove groceries by chat or voice", "Sorted by supermarket aisle",
               "Share the list with your household, live"),
     examples=("Add milk and two loaves of bread", "What's on the shopping list?"),
+    needs=(Need("addon", "phone", "Changes pushed live to the phone app", optional=True),),
     on_connect=lists.ensure_list,
     validate=lists.validate_settings,
     prompt_parts=(

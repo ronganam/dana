@@ -217,7 +217,7 @@ def migrate(path: Optional[PathLike] = None, *, skip: Collection[str] = ()) -> M
         if tables:
             first = pending[0][1][0]
             _snapshot(db_path, f"{first.addon}-{first.version:04d}")
-        needs = {f.name: f.needs for f in addon_dirs.addon_folders()}
+        needs = {f.name: f.depends for f in addon_dirs.addon_folders()}
         applied: List[str] = []
         for addon, ms in pending:
             lost = [d for d in needs.get(addon, ()) if d in failed or d in skip]

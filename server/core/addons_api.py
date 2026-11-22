@@ -20,14 +20,17 @@
     POST   /api/addons/{name}/disable    → <addon> (for everyone; ``enable`` turns it back on)
     POST   /api/addons/{name}/enable     → <addon>
     GET    /api/addons/catalog[?fresh=1] → {origin, dana_version, entries: [<entry>], problems: [..], restart_needed}
-    POST   /api/addons/install           {name} (a catalog entry) or {repo, ref, path?, name?}
-                                         → 201 {name, repo, path, commit, replaced, restart_needed: true, message}
+    POST   /api/addons/install           {name} (a catalog entry) or {repo, ref, path?, name?}, + accept?: <touches>
+                                         → 201 {name, repo, path, commit, replaced, touches, restart_needed: true,
+                                           message}; 409 confirm_touches {name, touches, added, message}: it may
+                                           touch more than the replaced version plus ``accept`` (nothing written;
+                                           send it again with accept = touches once the admin agreed)
     POST   /api/addons/{name}/remove     → {name, removed: true, restart_needed: true}
     POST   /api/server/restart           → 202 {restarting: true}: the process exits cleanly, the supervisor
                                            starts it again (core/lifecycle.py)
 
 ``<addon>`` = ``{name, title, description, version, source, state, needs,
-everyone, web, worker, connected, requires, can_change, why_not,
+touches, everyone, web, worker, connected, requires, can_change, why_not,
 credentials: [{name, label, description, help, url, placeholder, required,
 set, type, secret, value?, can_change, why_not, rule}], settings: [{name,
 label, description, help, url, placeholder, default, value, type,
@@ -38,7 +41,11 @@ disconnect_warning}``. The onboarding words come from the manifest
 setup=, examples=, disconnect_warning=)``): ``label`` is never empty (the
 name in words by default), ``url`` and ``disconnect_warning`` are null when
 not given, ``features`` falls back to the tools' first docstring lines,
-``pages`` are the labels of the pages it adds to the navigation.
+``pages`` are the labels of the pages it adds to the navigation. ``needs``
+= ``[{kind, what, why, optional}]`` (``Addon(needs=)``: env / account /
+hardware / app / region / addon; an addon need's ``what`` is its name) and
+``touches`` = ``{hosts, acts_outside, stores_credentials, reads}``
+(``Addon(touches=)``; null for an addon that did not load).
 ``<welcome>`` = ``{show, dismissed, suggested: [addon name]}``: ``show``
 while the user has no optional addon on (beyond ``default_on`` / ``everyone``
 ones) and has not dismissed it; ``suggested`` are addons they can turn on
@@ -52,11 +59,14 @@ its pages, ``[{id, panel, style, nav: {label, icon, order, primary} | null}]`` w
 the URLs of their files;
 ``worker``: it has a sidecar. Admins also get ``installed`` (``{repo, path,
 commit}``) for an addon installed from git. ``<entry>`` = the catalog entry
-(core/addons/catalog.py) plus ``official`` (its name is an official addon:
-not installable), ``present`` (the source of an addon of that name already
-here, else null), ``installed`` (``{commit, loaded}`` for one in
-``<data dir>/addons``), ``update_available`` and ``compatible`` (this Dana
-is at least ``min_dana``). ``restart_needed``: an addon was installed,
+(core/addons/catalog.py; ``touches`` null when the entry does not say) plus
+``official`` (its name is an official addon: not installable), ``present``
+(the source of an addon of that name already here, else null),
+``installed`` (``{commit, loaded, version, touches}`` for one in ``<data
+dir>/addons``: what the installed version declares), ``update_available``,
+``touches_added`` (an update whose entry declares touches the installed
+version did not: those, else null; the page asks again before such an
+update) and ``compatible`` (this Dana is at least ``min_dana``). ``restart_needed``: an addon was installed,
 updated or removed since the server started (admins get the changes as
 ``pending: [{name, change}]``). Installed addons run with the server's full
 access (the page says so before installing).
@@ -114,6 +124,7 @@ from core.auth import request_user, requires
 from core.users import User
 from core.addons import catalog, crypto, install, loader, state, store
 from core.addons.addon import Addon, Field, InvalidValue, get_addon, all_addons
+from core.addons.hooks import Touches
 
 logger = logging.getLogger(__name__)
 
@@ -208,7 +219,7 @@ def welcome_payload(user: User) -> Dict[str, Any]:
     suggested = [a.name for a in optional
                  if a.name not in connected and a.requires is None and state.is_enabled(a.name)
                  and store.addon_rule(a, user).can_change
-                 and all(n in connected for n in a.needs)][:WELCOME_SUGGESTIONS]
+                 and all(n in connected for n in a.depends)][:WELCOME_SUGGESTIONS]
     dismissed = now_hidden.row(user, WELCOME_ID) is not None
     has_optional = any(a.name in connected for a in optional)
     return {"show": not has_optional and not dismissed and bool(suggested), "dismissed": dismissed,
@@ -258,7 +269,8 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
         "version": addon.version,
         "source": folder.source.label if folder is not None else addon_dirs.SITE,
         "state": _state(user, addon, conn is not None, can_change),
-        "needs": list(addon.needs),
+        "needs": [n.to_json() for n in addon.needs],
+        "touches": addon.touches.to_json(),
         "everyone": addon.everyone,
         "web": _web(addon) if enabled and conn is not None else [],
         "worker": addon.worker is not None,
@@ -295,7 +307,7 @@ def failed_payload(failed: loader.Failed, by: User) -> Dict[str, Any]:
     out: Dict[str, Any] = {
         "name": failed.name, "title": failed.name.replace("_", " ").capitalize(), "description": "",
         "version": "", "source": addon_dirs.SITE if failed.source == addon_dirs.EXTRA else failed.source,
-        "state": FAILED, "needs": [], "everyone": False, "web": [], "worker": False, "connected": False,
+        "state": FAILED, "needs": [], "touches": None, "everyone": False, "web": [], "worker": False, "connected": False,
         "requires": None, "can_change": False, "why_not": "It did not load", "credentials": [], "settings": [],
         "account": None, "check": False, "options": False, "connect_url": None, "connect_label": None,
         "icon": "", "features": [], "pages": [], "setup": [], "examples": [], "disconnect_warning": None,
@@ -632,13 +644,18 @@ def catalog_entry_payload(entry: catalog.Entry, present: Mapping[str, str],
     loaded_names = loader.loaded()
     version = get_addon(entry.name).version if entry.name in loaded_names else ""
     commit = record.get("commit") if record is not None else None
+    update = record is not None and commit != entry.source.ref
+    have = install.installed_touches(addon_dirs.installed_dir() / entry.name) if record is not None else None
+    added = entry.touches.added_since(have) if update and have is not None and entry.touches is not None else None
     return {**entry.to_json(),
             "official": (addon_dirs.OFFICIAL_DIR / entry.name).is_dir(),
             "present": present.get(entry.name),
             "installed": {"commit": commit, "loaded": entry.name in loaded_names
-                          and loader.loaded_commit(entry.name) == commit, "version": version}
+                          and loader.loaded_commit(entry.name) == commit, "version": version,
+                          "touches": have.to_json() if have is not None else None}
             if record is not None else None,
-            "update_available": record is not None and commit != entry.source.ref,
+            "update_available": update,
+            "touches_added": added.to_json() if added is not None and not added.empty else None,
             "compatible": catalog.compatible(entry)}
 
 
@@ -689,14 +706,23 @@ async def install_api(request: web.Request) -> web.Response:
     else:
         return _install_refused("Give the name of a catalog entry, or repo and ref (and path).")
     try:
-        done = await asyncio.to_thread(install.install, source, addon_dirs.installed_dir(), name=name, by=caller.id)
+        accept = Touches.from_json(body["accept"]) if body.get("accept") is not None else None
+    except ValueError as e:
+        return _install_refused(f"accept: {e}")
+    try:
+        done = await asyncio.to_thread(install.install, source, addon_dirs.installed_dir(), name=name,
+                                       by=caller.id, accept=accept)
+    except install.ConfirmTouches as e:
+        return web.json_response({"error": "confirm_touches", "name": e.name, "touches": e.touches.to_json(),
+                                  "added": e.added.to_json(), "message": str(e)}, status=409)
     except install.InstallError as e:
         logger.info(f"Install refused for user {caller.id}: {e}")
         return _install_refused(str(e))
     logger.warning(f"Addon {done.name} {'updated' if done.replaced else 'installed'} from {done.source.repo} "
                    f"at {done.source.ref} by user {caller.id}; a restart loads it")
     return web.json_response({"name": done.name, "repo": done.source.repo, "path": done.source.path,
-                              "commit": done.source.ref, "replaced": done.replaced, "restart_needed": True,
+                              "commit": done.source.ref, "replaced": done.replaced,
+                              "touches": done.touches.to_json(), "restart_needed": True,
                               "message": f"{'Updated' if done.replaced else 'Installed'} {done.name} at "
                                          f"{done.source.ref[:12]}. Restart the server to load it."}, status=201)
 

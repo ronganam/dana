@@ -1,7 +1,7 @@
 """The ``cameras`` addon (Frigate): no tools, only the camera
 endpoints (addons/cameras/api.py over client.py)."""
 
-from core.addons import ADDRESS, Field, Addon
+from core.addons import ADDRESS, Field, Addon, Need, Touches
 from addons.cameras import client
 from addons.cameras.config import ADDON, URL
 
@@ -16,6 +16,9 @@ addon = Addon(
                     help="The address Frigate's web page opens at.", url="https://docs.frigate.video/",
                     placeholder="http://frigate:5000"),),
     change_requires="manage_users",
+    needs=(Need("hardware", "a Frigate server with your cameras", "Live views and recent events come from it"),
+           Need("addon", "homeassistant", "Camera snapshots and streams through Home Assistant", optional=True)),
+    touches=Touches(hosts=("your Frigate server", "your Home Assistant server"), reads=("homeassistant",)),
     description="Your Frigate cameras on the dashboard",
     features=("Live camera views and recent events on the dashboard and the TV",),
     test=client.check,

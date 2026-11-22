@@ -1,7 +1,7 @@
 """The ``about`` addon (About you)."""
 
 from addons.about import facts, prompt
-from core.addons import Addon, PromptPart, LlmJob, Page, Nav
+from core.addons import Addon, PromptPart, LlmJob, Page, Nav, Touches
 
 # ``{user}``: what the agent's instructions call the user (core/agent.py).
 MEMORY_GUIDE = (
@@ -17,7 +17,9 @@ CONTACTS_GUIDE = (
 
 # Connecting it builds the user's prompt block; the block is the addon's
 # section of their system prompt (core/agent.py asks for it every turn).
-addon = Addon(facts.ADDON, web=(Page("memory", panel="memory.js", style="memory.css", nav=Nav("Memory", icon="star", order=60)),), order=50, default_on=True, llm_jobs={"about_learner": LlmJob("fast", "About you learner")}, title="About you", icon="star", description="What Dana remembers about you",
+addon = Addon(facts.ADDON, web=(Page("memory", panel="memory.js", style="memory.css", nav=Nav("Memory", icon="star", order=60)),), order=50, default_on=True, llm_jobs={"about_learner": LlmJob("fast", "About you learner")}, title="About you", icon="star",
+    touches=Touches(reads=("phone",)),
+    description="What Dana remembers about you",
                     features=("Remembers short facts about you and uses them in every answer",
                               "Learns them from your chats; see and edit them on the Memory page"),
                     on_connect=facts.refresh_prompt, prompt_section=prompt.section,

@@ -11,8 +11,8 @@ refused exactly like a tool that does not exist.
 Hooks (:func:`jobs`, :func:`services`, :func:`handlers`, :func:`channels`,
 :func:`hooks`, :func:`hook_for`) come in the fixed addon order. Those asked
 for a user come only from the addons the user has *active*
-(:func:`active_addons`: connected, enabled on the server, and every addon in
-the addon's own ``needs`` connected too); those asked without a user (``None``:
+(:func:`active_addons`: connected, enabled on the server, and every addon the
+addon ``depends`` on connected too); those asked without a user (``None``:
 the server's own view, e.g. its self-checks) from every addon enabled on the
 server. Composers look hooks up only through :func:`hooks` and
 :func:`hook_for`. The scheduler checks jobs and services itself.
@@ -253,11 +253,11 @@ def services() -> List[Service]:
 
 def active_addons(user: User) -> Tuple[str, ...]:
     """The addons ``user`` has that are active for them: connected (or
-    ``everyone``), enabled on the server, and with every addon of their
-    ``needs`` connected too; in the fixed addon order."""
+    ``everyone``), enabled on the server, and with every addon they
+    ``depends`` on connected too; in the fixed addon order."""
     connected = store.connected_addons(user)
     have = set(connected)
-    return tuple(n for n in connected if set(get_addon(n).needs) <= have)
+    return tuple(n for n in connected if set(get_addon(n).depends) <= have)
 
 
 def handlers(event: str, user: User) -> List[Handler]:

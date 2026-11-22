@@ -2,8 +2,10 @@
 (../docs/addons.md, "The catalog").
 
 ``{"addons": [{name, title, description, icon, author, homepage, tags, min_dana,
-source: {repo, path, ref}}]}`` (``icon``: optional, a Lucide icon name); ``ref`` is a full commit hash, so an entry
-always means exactly one version of the addon. Read from ``DANA_CATALOG_FILE``
+touches, source: {repo, path, ref}}]}`` (``icon``: optional, a Lucide icon name; ``touches``: optional, what
+the addon at that commit declares it may touch, ``{hosts, acts_outside, stores_credentials, reads}``, shown
+before installing and checked against the fetched manifest by core/addons/install.py); ``ref`` is a full
+commit hash, so an entry always means exactly one version of the addon. Read from ``DANA_CATALOG_FILE``
 (a local file: tests, offline servers) or ``DANA_CATALOG_URL`` (default
 :data:`DEFAULT_URL`), with a short timeout, and kept for
 :data:`CACHE_SECONDS`. When the URL cannot be read, the copy shipped with this
@@ -23,6 +25,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.addons.addon import ICON
+from core.addons.hooks import Touches
 from core.addons.install import FULL_COMMIT, InstallError, Source, check_path, check_repo
 
 logger = logging.getLogger(__name__)
@@ -52,11 +55,14 @@ class Entry:
     tags: Tuple[str, ...] = ()
     min_dana: str = ""
     icon: str = ""
+    # What the addon at that commit declares it may touch; None: the entry does not say.
+    touches: Optional[Touches] = None
 
     def to_json(self) -> Dict[str, Any]:
         return {"name": self.name, "title": self.title, "description": self.description, "icon": self.icon,
                 "author": self.author,
                 "homepage": self.homepage, "tags": list(self.tags), "min_dana": self.min_dana,
+                "touches": self.touches.to_json() if self.touches is not None else None,
                 "source": {"repo": self.source.repo, "path": self.source.path, "ref": self.source.ref}}
 
 
@@ -116,9 +122,11 @@ def _entry(raw: Any) -> Entry:
     min_dana = _text(raw.get("min_dana"))
     if min_dana and not re.match(r"^\d+(\.\d+)*$", min_dana):
         raise ValueError(f"min_dana {min_dana!r} is not a version")
+    touches = Touches.from_json(raw["touches"]) if raw.get("touches") is not None else None
     return Entry(name=name, title=_text(raw.get("title")) or name.replace("_", " ").capitalize(),
                  description=_text(raw.get("description")), source=source, author=_text(raw.get("author")),
-                 homepage=_text(raw.get("homepage")), tags=tuple(tags), min_dana=min_dana, icon=icon)
+                 homepage=_text(raw.get("homepage")), tags=tuple(tags), min_dana=min_dana, icon=icon,
+                 touches=touches)
 
 
 def parse(data: Any, where: str = "") -> Catalog:

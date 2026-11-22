@@ -1,6 +1,6 @@
 # Money
 
-Bank and credit-card transactions in Dana, investment accounts and meal cards: the `money` addon (`addons/money/`). `money` itself signs in nowhere: **provider** addons (`needs=("money",)`) bring the institutions, central-bank rates and price checks (Israeli banks, cards, Psagot Trade, Pluxee, Bank of Israel and price checks live in `money_il`, `docs/money-il.md`). `money` owns the sources and their encrypted credentials, the sync schedule and code broker, ingest, classification, dashboards, savings, tools, API and web tab.
+Bank and credit-card transactions in Dana, investment accounts and meal cards: the `money` addon (`addons/money/`). `money` itself signs in nowhere: **provider** addons (`needs=(Need("addon", "money", …),)`) bring the institutions, central-bank rates and price checks (Israeli banks, cards, Psagot Trade, Pluxee, Bank of Israel and price checks live in `money_il`, `docs/money-il.md`). `money` owns the sources and their encrypted credentials, the sync schedule and code broker, ingest, classification, dashboards, savings, tools, API and web tab.
 
 ```
  schedule (2×/day) · signal · "Sync now" · first sync ──► sync.py (one source)
@@ -23,7 +23,7 @@ Source states: `new` → `syncing` → (`needs_code` → `syncing`) → `ok` | `
 
 ## Providers
 
-`providers.py` is `money`'s extension point. A provider addon (`needs=("money",)`, e.g. `money_il`, `docs/money-il.md`) registers what it brings when its `addon.py` is imported; `money` never imports any provider. Everything a provider registers is offered to a user only while that provider addon is on for them (403 `not_connected` naming the provider addon otherwise):
+`providers.py` is `money`'s extension point. A provider addon (`Need("addon", "money", …)` in its `needs`, e.g. `money_il`, `docs/money-il.md`) registers what it brings when its `addon.py` is imported; `money` never imports any provider. Everything a provider registers is offered to a user only while that provider addon is on for them (403 `not_connected` naming the provider addon otherwise):
 
 - **`register_company(Company)`**: `id` (unique across providers), `name`, `kind` (`bank` | `card` | `investment` | `meal`), `fields` (`LoginField(name, label, secret)`), `addon`, `sync: async (SyncJob) -> SyncResult`, optional `sms_senders`, `code_regex`, `id_key`, `hash_key`, `card_line_words`, `forget: async (source_ids) -> None`. `SyncJob` gives decrypted `credentials`, kept `device`, `start_date`, `ask_code()` and `signed_in()`. `SyncResult` returns `accounts` in money's ingest format, plus optional `device` (stored encrypted) or `device_dropped=True`. Failures raise `SyncError(error_type, message)` (`LOGIN_ERRORS`, `CODE_TIMEOUT`, or `GENERIC`).
 - **`register_rates(Rates)`**: central-bank `policy_rate(today)` and `fx_rates(currency, start, end)` with `currencies` (cached; savings leaves out items that need rates when none is registered).

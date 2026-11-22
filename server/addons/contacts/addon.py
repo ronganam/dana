@@ -2,7 +2,7 @@
 
 from addons.contacts import client, sync
 from addons.contacts.config import ADDON
-from core.addons import Field, Addon, PromptPart
+from core.addons import Field, Addon, PromptPart, Need, Touches
 from addons.google_account import oauth
 
 SCOPES = ("https://www.googleapis.com/auth/contacts",)
@@ -20,6 +20,11 @@ addon = Addon(
     ADDON, order=110,
     title="Google Contacts", icon="contact",
     credentials=(Field("refresh_token", "Google OAuth refresh token", label=oauth.TOKEN_LABEL, help=oauth.TOKEN_HELP),),
+    needs=(Need("env", "GOOGLE_CLIENT_ID", "The server's Google OAuth client, for the Google sign-in"),
+           Need("env", "GOOGLE_CLIENT_SECRET", "That Google OAuth client's secret"),
+           Need("account", "a Google account", "Your Google Contacts"),
+           Need("env", "PUBLIC_URL", "The sign-in's return address, when requests reach Dana through a proxy", optional=True)),
+    touches=Touches(hosts=("people.googleapis.com", "oauth2.googleapis.com"), acts_outside=True, stores_credentials=True),
     description="Names, numbers and birthdays of the people you know",
     features=("Look up names, phone numbers, emails and birthdays",
               "Names the people Dana knows and the numbers that call you",

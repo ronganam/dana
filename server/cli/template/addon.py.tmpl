@@ -1,6 +1,6 @@
 """The ``{{name}}`` addon's manifest: everything it adds to Dana is declared on this object."""
 
-from core.addons import Addon, Field, PromptPart{{#web}}, Nav, Page{{/web}}{{#worker}}, Worker{{/worker}}
+from core.addons import Addon, Field, PromptPart, Touches{{#worker}}, Need{{/worker}}{{#web}}, Nav, Page{{/web}}{{#worker}}, Worker{{/worker}}
 
 addon = Addon(
     "{{name}}",
@@ -12,6 +12,12 @@ addon = Addon(
     features=("Greets people in your words",),
     examples=("Say hello to Noa",),
     # setup=("A step done outside Dana before connecting",), when there is one (an account, a server).
+    # What running it takes, shown before it is turned on: Need(kind, what, why, optional=False) with kind
+    # env / account / hardware / app / region / addon, e.g. Need("account", "a weather service account", "Forecasts").
+{{#worker}}    needs=(Need("env", "{{env}}", "Where Dana reaches the sidecar (default http://127.0.0.1:8091)", optional=True),),
+{{/worker}}    # What it may touch beyond Dana's own data: hosts it contacts, acting for the user outside Dana (messages,
+    # mail), stored credentials, other addons' data it reads. Shown before installing; growing it asks again.
+    touches=Touches({{#worker}}hosts=("its sidecar ({{env}})",){{/worker}}),
     # Per-user choices (plain JSON); credentials=(Field(...),) would be stored encrypted.
     settings=(Field("greeting", "How {{name}} greets people", default="Hello", label="Greeting",
                     help="The word Dana starts a greeting with.", placeholder="Hello"),),

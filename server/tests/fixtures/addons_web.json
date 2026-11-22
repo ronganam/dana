@@ -23,6 +23,15 @@
       "home"
      ],
      "title": "Weather",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "api.weather.example"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
+     "touches_added": null,
      "update_available": false
     }
    ],
@@ -65,7 +74,14 @@
    ],
    "icon": "shopping-cart",
    "name": "shopping",
-   "needs": [],
+   "needs": [
+    {
+     "kind": "addon",
+     "optional": true,
+     "what": "phone",
+     "why": "Changes pushed live to the phone app"
+    }
+   ],
    "options": false,
    "pages": [
     "Shopping"
@@ -91,6 +107,12 @@
    "source": "official",
    "state": "disabled-on-server",
    "title": "Shopping",
+   "touches": {
+    "acts_outside": false,
+    "hosts": [],
+    "reads": [],
+    "stores_credentials": false
+   },
    "version": "",
    "web": [],
    "why_not": "Disabled on this server",
@@ -169,7 +191,38 @@
    ],
    "icon": "message-circle",
    "name": "whatsapp",
-   "needs": [],
+   "needs": [
+    {
+     "kind": "hardware",
+     "optional": false,
+     "what": "a WAHA server (a WhatsApp Web bridge) Dana's server can reach",
+     "why": "Dana reads and sends WhatsApp through it"
+    },
+    {
+     "kind": "account",
+     "optional": false,
+     "what": "a WhatsApp account, linked to WAHA",
+     "why": "Your chats; WAHA signs in as a linked device"
+    },
+    {
+     "kind": "env",
+     "optional": true,
+     "what": "WAHA_WEBHOOK_SECRET",
+     "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
+    },
+    {
+     "kind": "env",
+     "optional": true,
+     "what": "GEMINI_API_KEY",
+     "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+    },
+    {
+     "kind": "env",
+     "optional": true,
+     "what": "TELEGRAM_BOT_TOKEN",
+     "why": "Sends the voice-note transcripts to your Telegram"
+    }
+   ],
    "options": false,
    "pages": [],
    "requires": null,
@@ -197,6 +250,17 @@
    "source": "official",
    "state": "available",
    "title": "WhatsApp",
+   "touches": {
+    "acts_outside": true,
+    "hosts": [
+     "your WAHA server"
+    ],
+    "reads": [
+     "knowledge",
+     "people"
+    ],
+    "stores_credentials": true
+   },
    "version": "",
    "web": [],
    "why_not": null,
@@ -227,7 +291,14 @@
    ],
    "icon": "shopping-cart",
    "name": "shopping",
-   "needs": [],
+   "needs": [
+    {
+     "kind": "addon",
+     "optional": true,
+     "what": "phone",
+     "why": "Changes pushed live to the phone app"
+    }
+   ],
    "options": false,
    "pages": [
     "Shopping"
@@ -253,6 +324,12 @@
    "source": "official",
    "state": "on",
    "title": "Shopping",
+   "touches": {
+    "acts_outside": false,
+    "hosts": [],
+    "reads": [],
+    "stores_credentials": false
+   },
    "version": "",
    "web": [
     {
@@ -326,6 +403,14 @@
      "source": "official",
      "state": "on",
      "title": "Essentials",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "DuckDuckGo and other public search engines"
+      ],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Every user has it",
@@ -352,7 +437,20 @@
      ],
      "icon": "list-checks",
      "name": "tasks",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Reminders when you arrive at a place, leave it or get in the car"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Reminders as notifications on your phone"
+      }
+     ],
      "options": false,
      "pages": [
       "Tasks"
@@ -363,6 +461,16 @@
      "source": "official",
      "state": "on",
      "title": "Tasks",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "homeassistant",
+       "people",
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [
       {
@@ -402,7 +510,14 @@
      ],
      "icon": "shopping-cart",
      "name": "shopping",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Changes pushed live to the phone app"
+      }
+     ],
      "options": false,
      "pages": [
       "Shopping"
@@ -428,6 +543,12 @@
      "source": "official",
      "state": "on",
      "title": "Shopping",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [
       {
@@ -464,7 +585,14 @@
      ],
      "icon": "folder",
      "name": "knowledge",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      }
+     ],
      "options": false,
      "pages": [
       "Projects"
@@ -475,6 +603,16 @@
      "source": "official",
      "state": "on",
      "title": "Projects",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "the sites of the links you save (YouTube, TikTok, Instagram…)"
+      ],
+      "reads": [
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [
       {
@@ -521,6 +659,14 @@
      "source": "official",
      "state": "on",
      "title": "About you",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [
       {
@@ -556,7 +702,20 @@
      ],
      "icon": "users",
      "name": "people",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "contacts",
+       "why": "Names, numbers and birthdays from your Google Contacts"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Your calls and notifications on each person's page"
+      }
+     ],
      "options": false,
      "pages": [
       "People"
@@ -567,6 +726,16 @@
      "source": "official",
      "state": "on",
      "title": "People",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "contacts",
+       "phone",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [
       {
@@ -603,7 +772,38 @@
      ],
      "icon": "smartphone",
      "name": "phone",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "app",
+       "optional": false,
+       "what": "Dana for Android on your phone, with notification access",
+       "why": "Sends your notifications and call recordings, gets Dana's push"
+      },
+      {
+       "kind": "hardware",
+       "optional": true,
+       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "why": "Call transcripts and the tasks and events suggested from them"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "FCM_SERVICE_ACCOUNT_JSON",
+       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TYPESAFE_API_KEY",
+       "why": "Sorts notifications in the Inbox; without it they stay unsorted"
+      }
+     ],
      "options": false,
      "pages": [
       "Inbox",
@@ -615,6 +815,23 @@
      "source": "official",
      "state": "on",
      "title": "Phone",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "fcm.googleapis.com",
+       "oauth2.googleapis.com",
+       "api.typesafe.ai"
+      ],
+      "reads": [
+       "calendar",
+       "homeassistant",
+       "knowledge",
+       "people",
+       "tasks",
+       "whatsapp"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [
       {
@@ -700,7 +917,26 @@
      ],
      "icon": "house",
      "name": "homeassistant",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Home Assistant server Dana's server can reach",
+       "why": "Lights, devices, zones and the weather come from it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Home Assistant long-lived access token",
+       "why": "Dana signs in to Home Assistant with it"
+      },
+      {
+       "kind": "app",
+       "optional": true,
+       "what": "the Home Assistant phone app",
+       "why": "Arrive, leave, car and wake reminders use its sensors"
+      }
+     ],
      "options": true,
      "pages": [],
      "requires": null,
@@ -836,6 +1072,14 @@
      "source": "official",
      "state": "on",
      "title": "Home Assistant",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your Home Assistant server"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -910,7 +1154,38 @@
      ],
      "icon": "message-circle",
      "name": "whatsapp",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a WAHA server (a WhatsApp Web bridge) Dana's server can reach",
+       "why": "Dana reads and sends WhatsApp through it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a WhatsApp account, linked to WAHA",
+       "why": "Your chats; WAHA signs in as a linked device"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "WAHA_WEBHOOK_SECRET",
+       "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TELEGRAM_BOT_TOKEN",
+       "why": "Sends the voice-note transcripts to your Telegram"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -938,6 +1213,17 @@
      "source": "official",
      "state": "available",
      "title": "WhatsApp",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your WAHA server"
+      ],
+      "reads": [
+       "knowledge",
+       "people"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -980,7 +1266,32 @@
      ],
      "icon": "calendar",
      "name": "calendar",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your calendars"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [
       "Calendar"
@@ -1022,6 +1333,15 @@
      "source": "official",
      "state": "available",
      "title": "Google Calendar",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "www.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1065,7 +1385,32 @@
      ],
      "icon": "contact",
      "name": "contacts",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your Google Contacts"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -1076,6 +1421,15 @@
      "source": "official",
      "state": "available",
      "title": "Google Contacts",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "people.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1119,7 +1473,32 @@
      ],
      "icon": "mail",
      "name": "gmail",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your mailbox"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -1130,6 +1509,15 @@
      "source": "official",
      "state": "available",
      "title": "Gmail",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "gmail.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1172,7 +1560,26 @@
      ],
      "icon": "send",
      "name": "telegram_account",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_ID",
+       "why": "The server's Telegram app (my.telegram.org), for the sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_HASH",
+       "why": "That Telegram app's hash"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Telegram account",
+       "why": "Your chats and channels; Dana signs in as a linked device"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -1184,6 +1591,14 @@
      "source": "official",
      "state": "available",
      "title": "Telegram account",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "Telegram's servers"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1211,7 +1626,20 @@
      ],
      "icon": "wallet",
      "name": "money",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money_il",
+       "why": "Brings the banks and cards to sync (Israel); without a provider there is nothing to sync"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Sign-in codes from your SMS, and charges from card notifications before the bank shows them"
+      }
+     ],
      "options": false,
      "pages": [
       "Money"
@@ -1224,6 +1652,14 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1252,7 +1688,12 @@
      "icon": "landmark",
      "name": "money_il",
      "needs": [
-      "money"
+      {
+       "kind": "addon",
+       "optional": false,
+       "what": "money",
+       "why": "Its logins, accounts and transactions"
+      }
      ],
      "options": false,
      "pages": [],
@@ -1265,6 +1706,12 @@
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1287,7 +1734,20 @@
      ],
      "icon": "cctv",
      "name": "cameras",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Frigate server with your cameras",
+       "why": "Live views and recent events come from it"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Camera snapshots and streams through Home Assistant"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -1311,6 +1771,17 @@
      "source": "official",
      "state": "available",
      "title": "Cameras",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "your Frigate server",
+       "your Home Assistant server"
+      ],
+      "reads": [
+       "homeassistant"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1334,7 +1805,14 @@
      ],
      "icon": "terminal",
      "name": "ops",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "Dana running in Kubernetes, with a service account allowed to read",
+       "why": "run_kubectl calls the cluster's API with it"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": "ops",
@@ -1343,6 +1821,14 @@
      "source": "official",
      "state": "available",
      "title": "Ops",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "the Kubernetes API server"
+      ],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1373,6 +1859,7 @@
      "source": "site",
      "state": "failed",
      "title": "Broken",
+     "touches": null,
      "version": "",
      "web": [],
      "why_not": "It did not load",
@@ -1431,6 +1918,14 @@
      "source": "official",
      "state": "on",
      "title": "Essentials",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "DuckDuckGo and other public search engines"
+      ],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Every user has it",
@@ -1457,7 +1952,20 @@
      ],
      "icon": "list-checks",
      "name": "tasks",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Reminders when you arrive at a place, leave it or get in the car"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Reminders as notifications on your phone"
+      }
+     ],
      "options": false,
      "pages": [
       "Tasks"
@@ -1468,6 +1976,16 @@
      "source": "official",
      "state": "available",
      "title": "Tasks",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "homeassistant",
+       "people",
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1495,7 +2013,14 @@
      ],
      "icon": "shopping-cart",
      "name": "shopping",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Changes pushed live to the phone app"
+      }
+     ],
      "options": false,
      "pages": [
       "Shopping"
@@ -1521,6 +2046,12 @@
      "source": "official",
      "state": "available",
      "title": "Shopping",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1545,7 +2076,14 @@
      ],
      "icon": "folder",
      "name": "knowledge",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      }
+     ],
      "options": false,
      "pages": [
       "Projects"
@@ -1556,6 +2094,16 @@
      "source": "official",
      "state": "available",
      "title": "Projects",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "the sites of the links you save (YouTube, TikTok, Instagram…)"
+      ],
+      "reads": [
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1590,6 +2138,14 @@
      "source": "official",
      "state": "available",
      "title": "About you",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1613,7 +2169,20 @@
      ],
      "icon": "users",
      "name": "people",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "contacts",
+       "why": "Names, numbers and birthdays from your Google Contacts"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Your calls and notifications on each person's page"
+      }
+     ],
      "options": false,
      "pages": [
       "People"
@@ -1624,6 +2193,16 @@
      "source": "official",
      "state": "available",
      "title": "People",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "contacts",
+       "phone",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1648,7 +2227,38 @@
      ],
      "icon": "smartphone",
      "name": "phone",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "app",
+       "optional": false,
+       "what": "Dana for Android on your phone, with notification access",
+       "why": "Sends your notifications and call recordings, gets Dana's push"
+      },
+      {
+       "kind": "hardware",
+       "optional": true,
+       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "why": "Call transcripts and the tasks and events suggested from them"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "FCM_SERVICE_ACCOUNT_JSON",
+       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TYPESAFE_API_KEY",
+       "why": "Sorts notifications in the Inbox; without it they stay unsorted"
+      }
+     ],
      "options": false,
      "pages": [
       "Inbox",
@@ -1660,6 +2270,23 @@
      "source": "official",
      "state": "available",
      "title": "Phone",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "fcm.googleapis.com",
+       "oauth2.googleapis.com",
+       "api.typesafe.ai"
+      ],
+      "reads": [
+       "calendar",
+       "homeassistant",
+       "knowledge",
+       "people",
+       "tasks",
+       "whatsapp"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1722,7 +2349,26 @@
      ],
      "icon": "house",
      "name": "homeassistant",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Home Assistant server Dana's server can reach",
+       "why": "Lights, devices, zones and the weather come from it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Home Assistant long-lived access token",
+       "why": "Dana signs in to Home Assistant with it"
+      },
+      {
+       "kind": "app",
+       "optional": true,
+       "what": "the Home Assistant phone app",
+       "why": "Arrive, leave, car and wake reminders use its sensors"
+      }
+     ],
      "options": true,
      "pages": [],
      "requires": null,
@@ -1858,6 +2504,14 @@
      "source": "official",
      "state": "on",
      "title": "Home Assistant",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your Home Assistant server"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -1932,7 +2586,38 @@
      ],
      "icon": "message-circle",
      "name": "whatsapp",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a WAHA server (a WhatsApp Web bridge) Dana's server can reach",
+       "why": "Dana reads and sends WhatsApp through it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a WhatsApp account, linked to WAHA",
+       "why": "Your chats; WAHA signs in as a linked device"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "WAHA_WEBHOOK_SECRET",
+       "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TELEGRAM_BOT_TOKEN",
+       "why": "Sends the voice-note transcripts to your Telegram"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -1960,6 +2645,17 @@
      "source": "official",
      "state": "on",
      "title": "WhatsApp",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your WAHA server"
+      ],
+      "reads": [
+       "knowledge",
+       "people"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2002,7 +2698,32 @@
      ],
      "icon": "calendar",
      "name": "calendar",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your calendars"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [
       "Calendar"
@@ -2044,6 +2765,15 @@
      "source": "official",
      "state": "on",
      "title": "Google Calendar",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "www.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [
       {
@@ -2099,7 +2829,32 @@
      ],
      "icon": "contact",
      "name": "contacts",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your Google Contacts"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -2110,6 +2865,15 @@
      "source": "official",
      "state": "available",
      "title": "Google Contacts",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "people.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2153,7 +2917,32 @@
      ],
      "icon": "mail",
      "name": "gmail",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your mailbox"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -2164,6 +2953,15 @@
      "source": "official",
      "state": "available",
      "title": "Gmail",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "gmail.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2206,7 +3004,26 @@
      ],
      "icon": "send",
      "name": "telegram_account",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_ID",
+       "why": "The server's Telegram app (my.telegram.org), for the sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_HASH",
+       "why": "That Telegram app's hash"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Telegram account",
+       "why": "Your chats and channels; Dana signs in as a linked device"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -2218,6 +3035,14 @@
      "source": "official",
      "state": "available",
      "title": "Telegram account",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "Telegram's servers"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2245,7 +3070,20 @@
      ],
      "icon": "wallet",
      "name": "money",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money_il",
+       "why": "Brings the banks and cards to sync (Israel); without a provider there is nothing to sync"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Sign-in codes from your SMS, and charges from card notifications before the bank shows them"
+      }
+     ],
      "options": false,
      "pages": [
       "Money"
@@ -2258,6 +3096,14 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2286,7 +3132,12 @@
      "icon": "landmark",
      "name": "money_il",
      "needs": [
-      "money"
+      {
+       "kind": "addon",
+       "optional": false,
+       "what": "money",
+       "why": "Its logins, accounts and transactions"
+      }
      ],
      "options": false,
      "pages": [],
@@ -2299,6 +3150,12 @@
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2321,7 +3178,20 @@
      ],
      "icon": "cctv",
      "name": "cameras",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Frigate server with your cameras",
+       "why": "Live views and recent events come from it"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Camera snapshots and streams through Home Assistant"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -2345,6 +3215,17 @@
      "source": "official",
      "state": "on",
      "title": "Cameras",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "your Frigate server",
+       "your Home Assistant server"
+      ],
+      "reads": [
+       "homeassistant"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2375,6 +3256,7 @@
      "source": "site",
      "state": "failed",
      "title": "Broken",
+     "touches": null,
      "version": "",
      "web": [],
      "why_not": "It did not load",
@@ -2425,6 +3307,14 @@
      "source": "official",
      "state": "on",
      "title": "Essentials",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "DuckDuckGo and other public search engines"
+      ],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Every user has it",
@@ -2451,7 +3341,20 @@
      ],
      "icon": "list-checks",
      "name": "tasks",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Reminders when you arrive at a place, leave it or get in the car"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Reminders as notifications on your phone"
+      }
+     ],
      "options": false,
      "pages": [
       "Tasks"
@@ -2462,6 +3365,16 @@
      "source": "official",
      "state": "on",
      "title": "Tasks",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "homeassistant",
+       "people",
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [
       {
@@ -2501,7 +3414,14 @@
      ],
      "icon": "shopping-cart",
      "name": "shopping",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Changes pushed live to the phone app"
+      }
+     ],
      "options": false,
      "pages": [
       "Shopping"
@@ -2527,6 +3447,12 @@
      "source": "official",
      "state": "on",
      "title": "Shopping",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [
       {
@@ -2563,7 +3489,14 @@
      ],
      "icon": "folder",
      "name": "knowledge",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      }
+     ],
      "options": false,
      "pages": [
       "Projects"
@@ -2574,6 +3507,16 @@
      "source": "official",
      "state": "available",
      "title": "Projects",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "the sites of the links you save (YouTube, TikTok, Instagram…)"
+      ],
+      "reads": [
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2608,6 +3551,14 @@
      "source": "official",
      "state": "available",
      "title": "About you",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2631,7 +3582,20 @@
      ],
      "icon": "users",
      "name": "people",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "contacts",
+       "why": "Names, numbers and birthdays from your Google Contacts"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Your calls and notifications on each person's page"
+      }
+     ],
      "options": false,
      "pages": [
       "People"
@@ -2642,6 +3606,16 @@
      "source": "official",
      "state": "available",
      "title": "People",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "contacts",
+       "phone",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2666,7 +3640,38 @@
      ],
      "icon": "smartphone",
      "name": "phone",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "app",
+       "optional": false,
+       "what": "Dana for Android on your phone, with notification access",
+       "why": "Sends your notifications and call recordings, gets Dana's push"
+      },
+      {
+       "kind": "hardware",
+       "optional": true,
+       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "why": "Call transcripts and the tasks and events suggested from them"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "FCM_SERVICE_ACCOUNT_JSON",
+       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TYPESAFE_API_KEY",
+       "why": "Sorts notifications in the Inbox; without it they stay unsorted"
+      }
+     ],
      "options": false,
      "pages": [
       "Inbox",
@@ -2678,6 +3683,23 @@
      "source": "official",
      "state": "available",
      "title": "Phone",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "fcm.googleapis.com",
+       "oauth2.googleapis.com",
+       "api.typesafe.ai"
+      ],
+      "reads": [
+       "calendar",
+       "homeassistant",
+       "knowledge",
+       "people",
+       "tasks",
+       "whatsapp"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2740,7 +3762,26 @@
      ],
      "icon": "house",
      "name": "homeassistant",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Home Assistant server Dana's server can reach",
+       "why": "Lights, devices, zones and the weather come from it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Home Assistant long-lived access token",
+       "why": "Dana signs in to Home Assistant with it"
+      },
+      {
+       "kind": "app",
+       "optional": true,
+       "what": "the Home Assistant phone app",
+       "why": "Arrive, leave, car and wake reminders use its sensors"
+      }
+     ],
      "options": true,
      "pages": [],
      "requires": null,
@@ -2876,6 +3917,14 @@
      "source": "official",
      "state": "available",
      "title": "Home Assistant",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your Home Assistant server"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -2951,7 +4000,38 @@
      ],
      "icon": "message-circle",
      "name": "whatsapp",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a WAHA server (a WhatsApp Web bridge) Dana's server can reach",
+       "why": "Dana reads and sends WhatsApp through it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a WhatsApp account, linked to WAHA",
+       "why": "Your chats; WAHA signs in as a linked device"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "WAHA_WEBHOOK_SECRET",
+       "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TELEGRAM_BOT_TOKEN",
+       "why": "Sends the voice-note transcripts to your Telegram"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -2979,6 +4059,17 @@
      "source": "official",
      "state": "on",
      "title": "WhatsApp",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your WAHA server"
+      ],
+      "reads": [
+       "knowledge",
+       "people"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3021,7 +4112,32 @@
      ],
      "icon": "calendar",
      "name": "calendar",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your calendars"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [
       "Calendar"
@@ -3063,6 +4179,15 @@
      "source": "official",
      "state": "available",
      "title": "Google Calendar",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "www.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3106,7 +4231,32 @@
      ],
      "icon": "contact",
      "name": "contacts",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your Google Contacts"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -3117,6 +4267,15 @@
      "source": "official",
      "state": "available",
      "title": "Google Contacts",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "people.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3160,7 +4319,32 @@
      ],
      "icon": "mail",
      "name": "gmail",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your mailbox"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -3171,6 +4355,15 @@
      "source": "official",
      "state": "available",
      "title": "Gmail",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "gmail.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3213,7 +4406,26 @@
      ],
      "icon": "send",
      "name": "telegram_account",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_ID",
+       "why": "The server's Telegram app (my.telegram.org), for the sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_HASH",
+       "why": "That Telegram app's hash"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Telegram account",
+       "why": "Your chats and channels; Dana signs in as a linked device"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -3225,6 +4437,14 @@
      "source": "official",
      "state": "available",
      "title": "Telegram account",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "Telegram's servers"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3252,7 +4472,20 @@
      ],
      "icon": "wallet",
      "name": "money",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money_il",
+       "why": "Brings the banks and cards to sync (Israel); without a provider there is nothing to sync"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Sign-in codes from your SMS, and charges from card notifications before the bank shows them"
+      }
+     ],
      "options": false,
      "pages": [
       "Money"
@@ -3265,6 +4498,14 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3293,7 +4534,12 @@
      "icon": "landmark",
      "name": "money_il",
      "needs": [
-      "money"
+      {
+       "kind": "addon",
+       "optional": false,
+       "what": "money",
+       "why": "Its logins, accounts and transactions"
+      }
      ],
      "options": false,
      "pages": [],
@@ -3306,6 +4552,12 @@
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3328,7 +4580,20 @@
      ],
      "icon": "cctv",
      "name": "cameras",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Frigate server with your cameras",
+       "why": "Live views and recent events come from it"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Camera snapshots and streams through Home Assistant"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -3352,6 +4617,17 @@
      "source": "official",
      "state": "available",
      "title": "Cameras",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "your Frigate server",
+       "your Home Assistant server"
+      ],
+      "reads": [
+       "homeassistant"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3382,6 +4658,7 @@
      "source": "site",
      "state": "failed",
      "title": "Broken",
+     "touches": null,
      "version": "",
      "web": [],
      "why_not": "It did not load",
@@ -3432,6 +4709,14 @@
      "source": "official",
      "state": "on",
      "title": "Essentials",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "DuckDuckGo and other public search engines"
+      ],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Every user has it",
@@ -3458,7 +4743,20 @@
      ],
      "icon": "list-checks",
      "name": "tasks",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Reminders when you arrive at a place, leave it or get in the car"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Reminders as notifications on your phone"
+      }
+     ],
      "options": false,
      "pages": [
       "Tasks"
@@ -3469,6 +4767,16 @@
      "source": "official",
      "state": "available",
      "title": "Tasks",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "homeassistant",
+       "people",
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3496,7 +4804,14 @@
      ],
      "icon": "shopping-cart",
      "name": "shopping",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Changes pushed live to the phone app"
+      }
+     ],
      "options": false,
      "pages": [
       "Shopping"
@@ -3522,6 +4837,12 @@
      "source": "official",
      "state": "available",
      "title": "Shopping",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3546,7 +4867,14 @@
      ],
      "icon": "folder",
      "name": "knowledge",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      }
+     ],
      "options": false,
      "pages": [
       "Projects"
@@ -3557,6 +4885,16 @@
      "source": "official",
      "state": "available",
      "title": "Projects",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "the sites of the links you save (YouTube, TikTok, Instagram…)"
+      ],
+      "reads": [
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3591,6 +4929,14 @@
      "source": "official",
      "state": "available",
      "title": "About you",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3614,7 +4960,20 @@
      ],
      "icon": "users",
      "name": "people",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "contacts",
+       "why": "Names, numbers and birthdays from your Google Contacts"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Your calls and notifications on each person's page"
+      }
+     ],
      "options": false,
      "pages": [
       "People"
@@ -3625,6 +4984,16 @@
      "source": "official",
      "state": "available",
      "title": "People",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "contacts",
+       "phone",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3649,7 +5018,38 @@
      ],
      "icon": "smartphone",
      "name": "phone",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "app",
+       "optional": false,
+       "what": "Dana for Android on your phone, with notification access",
+       "why": "Sends your notifications and call recordings, gets Dana's push"
+      },
+      {
+       "kind": "hardware",
+       "optional": true,
+       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "why": "Call transcripts and the tasks and events suggested from them"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "FCM_SERVICE_ACCOUNT_JSON",
+       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TYPESAFE_API_KEY",
+       "why": "Sorts notifications in the Inbox; without it they stay unsorted"
+      }
+     ],
      "options": false,
      "pages": [
       "Inbox",
@@ -3661,6 +5061,23 @@
      "source": "official",
      "state": "available",
      "title": "Phone",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "fcm.googleapis.com",
+       "oauth2.googleapis.com",
+       "api.typesafe.ai"
+      ],
+      "reads": [
+       "calendar",
+       "homeassistant",
+       "knowledge",
+       "people",
+       "tasks",
+       "whatsapp"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3723,7 +5140,26 @@
      ],
      "icon": "house",
      "name": "homeassistant",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Home Assistant server Dana's server can reach",
+       "why": "Lights, devices, zones and the weather come from it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Home Assistant long-lived access token",
+       "why": "Dana signs in to Home Assistant with it"
+      },
+      {
+       "kind": "app",
+       "optional": true,
+       "what": "the Home Assistant phone app",
+       "why": "Arrive, leave, car and wake reminders use its sensors"
+      }
+     ],
      "options": true,
      "pages": [],
      "requires": null,
@@ -3859,6 +5295,14 @@
      "source": "official",
      "state": "on",
      "title": "Home Assistant",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your Home Assistant server"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -3933,7 +5377,38 @@
      ],
      "icon": "message-circle",
      "name": "whatsapp",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a WAHA server (a WhatsApp Web bridge) Dana's server can reach",
+       "why": "Dana reads and sends WhatsApp through it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a WhatsApp account, linked to WAHA",
+       "why": "Your chats; WAHA signs in as a linked device"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "WAHA_WEBHOOK_SECRET",
+       "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TELEGRAM_BOT_TOKEN",
+       "why": "Sends the voice-note transcripts to your Telegram"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -3961,6 +5436,17 @@
      "source": "official",
      "state": "on",
      "title": "WhatsApp",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your WAHA server"
+      ],
+      "reads": [
+       "knowledge",
+       "people"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4003,7 +5489,32 @@
      ],
      "icon": "calendar",
      "name": "calendar",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your calendars"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [
       "Calendar"
@@ -4045,6 +5556,15 @@
      "source": "official",
      "state": "on",
      "title": "Google Calendar",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "www.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [
       {
@@ -4100,7 +5620,32 @@
      ],
      "icon": "contact",
      "name": "contacts",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your Google Contacts"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -4111,6 +5656,15 @@
      "source": "official",
      "state": "available",
      "title": "Google Contacts",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "people.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4154,7 +5708,32 @@
      ],
      "icon": "mail",
      "name": "gmail",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your mailbox"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -4165,6 +5744,15 @@
      "source": "official",
      "state": "available",
      "title": "Gmail",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "gmail.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4207,7 +5795,26 @@
      ],
      "icon": "send",
      "name": "telegram_account",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_ID",
+       "why": "The server's Telegram app (my.telegram.org), for the sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_HASH",
+       "why": "That Telegram app's hash"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Telegram account",
+       "why": "Your chats and channels; Dana signs in as a linked device"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -4219,6 +5826,14 @@
      "source": "official",
      "state": "available",
      "title": "Telegram account",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "Telegram's servers"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4246,7 +5861,20 @@
      ],
      "icon": "wallet",
      "name": "money",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money_il",
+       "why": "Brings the banks and cards to sync (Israel); without a provider there is nothing to sync"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Sign-in codes from your SMS, and charges from card notifications before the bank shows them"
+      }
+     ],
      "options": false,
      "pages": [
       "Money"
@@ -4259,6 +5887,14 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4287,7 +5923,12 @@
      "icon": "landmark",
      "name": "money_il",
      "needs": [
-      "money"
+      {
+       "kind": "addon",
+       "optional": false,
+       "what": "money",
+       "why": "Its logins, accounts and transactions"
+      }
      ],
      "options": false,
      "pages": [],
@@ -4300,6 +5941,12 @@
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4322,7 +5969,20 @@
      ],
      "icon": "cctv",
      "name": "cameras",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Frigate server with your cameras",
+       "why": "Live views and recent events come from it"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Camera snapshots and streams through Home Assistant"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -4346,6 +6006,17 @@
      "source": "official",
      "state": "on",
      "title": "Cameras",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "your Frigate server",
+       "your Home Assistant server"
+      ],
+      "reads": [
+       "homeassistant"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Set by an admin",
@@ -4375,6 +6046,7 @@
      "source": "site",
      "state": "failed",
      "title": "Broken",
+     "touches": null,
      "version": "",
      "web": [],
      "why_not": "It did not load",
@@ -4429,6 +6101,14 @@
      "source": "official",
      "state": "on",
      "title": "Essentials",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "DuckDuckGo and other public search engines"
+      ],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Every user has it",
@@ -4455,7 +6135,20 @@
      ],
      "icon": "list-checks",
      "name": "tasks",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Reminders when you arrive at a place, leave it or get in the car"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Reminders as notifications on your phone"
+      }
+     ],
      "options": false,
      "pages": [
       "Tasks"
@@ -4466,6 +6159,16 @@
      "source": "official",
      "state": "available",
      "title": "Tasks",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "homeassistant",
+       "people",
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4493,7 +6196,14 @@
      ],
      "icon": "shopping-cart",
      "name": "shopping",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Changes pushed live to the phone app"
+      }
+     ],
      "options": false,
      "pages": [
       "Shopping"
@@ -4519,6 +6229,12 @@
      "source": "official",
      "state": "disabled-on-server",
      "title": "Shopping",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Disabled on this server",
@@ -4543,7 +6259,14 @@
      ],
      "icon": "folder",
      "name": "knowledge",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      }
+     ],
      "options": false,
      "pages": [
       "Projects"
@@ -4554,6 +6277,16 @@
      "source": "official",
      "state": "available",
      "title": "Projects",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "the sites of the links you save (YouTube, TikTok, Instagram…)"
+      ],
+      "reads": [
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4588,6 +6321,14 @@
      "source": "official",
      "state": "available",
      "title": "About you",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4611,7 +6352,20 @@
      ],
      "icon": "users",
      "name": "people",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "contacts",
+       "why": "Names, numbers and birthdays from your Google Contacts"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Your calls and notifications on each person's page"
+      }
+     ],
      "options": false,
      "pages": [
       "People"
@@ -4622,6 +6376,16 @@
      "source": "official",
      "state": "available",
      "title": "People",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "contacts",
+       "phone",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4646,7 +6410,38 @@
      ],
      "icon": "smartphone",
      "name": "phone",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "app",
+       "optional": false,
+       "what": "Dana for Android on your phone, with notification access",
+       "why": "Sends your notifications and call recordings, gets Dana's push"
+      },
+      {
+       "kind": "hardware",
+       "optional": true,
+       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "why": "Call transcripts and the tasks and events suggested from them"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "FCM_SERVICE_ACCOUNT_JSON",
+       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TYPESAFE_API_KEY",
+       "why": "Sorts notifications in the Inbox; without it they stay unsorted"
+      }
+     ],
      "options": false,
      "pages": [
       "Inbox",
@@ -4658,6 +6453,23 @@
      "source": "official",
      "state": "available",
      "title": "Phone",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "fcm.googleapis.com",
+       "oauth2.googleapis.com",
+       "api.typesafe.ai"
+      ],
+      "reads": [
+       "calendar",
+       "homeassistant",
+       "knowledge",
+       "people",
+       "tasks",
+       "whatsapp"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4720,7 +6532,26 @@
      ],
      "icon": "house",
      "name": "homeassistant",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Home Assistant server Dana's server can reach",
+       "why": "Lights, devices, zones and the weather come from it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Home Assistant long-lived access token",
+       "why": "Dana signs in to Home Assistant with it"
+      },
+      {
+       "kind": "app",
+       "optional": true,
+       "what": "the Home Assistant phone app",
+       "why": "Arrive, leave, car and wake reminders use its sensors"
+      }
+     ],
      "options": true,
      "pages": [],
      "requires": null,
@@ -4856,6 +6687,14 @@
      "source": "official",
      "state": "on",
      "title": "Home Assistant",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your Home Assistant server"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -4930,7 +6769,38 @@
      ],
      "icon": "message-circle",
      "name": "whatsapp",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a WAHA server (a WhatsApp Web bridge) Dana's server can reach",
+       "why": "Dana reads and sends WhatsApp through it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a WhatsApp account, linked to WAHA",
+       "why": "Your chats; WAHA signs in as a linked device"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "WAHA_WEBHOOK_SECRET",
+       "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TELEGRAM_BOT_TOKEN",
+       "why": "Sends the voice-note transcripts to your Telegram"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -4958,6 +6828,17 @@
      "source": "official",
      "state": "on",
      "title": "WhatsApp",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your WAHA server"
+      ],
+      "reads": [
+       "knowledge",
+       "people"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5000,7 +6881,32 @@
      ],
      "icon": "calendar",
      "name": "calendar",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your calendars"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [
       "Calendar"
@@ -5042,6 +6948,15 @@
      "source": "official",
      "state": "on",
      "title": "Google Calendar",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "www.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [
       {
@@ -5097,7 +7012,32 @@
      ],
      "icon": "contact",
      "name": "contacts",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your Google Contacts"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -5108,6 +7048,15 @@
      "source": "official",
      "state": "available",
      "title": "Google Contacts",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "people.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5151,7 +7100,32 @@
      ],
      "icon": "mail",
      "name": "gmail",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your mailbox"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -5162,6 +7136,15 @@
      "source": "official",
      "state": "available",
      "title": "Gmail",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "gmail.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5204,7 +7187,26 @@
      ],
      "icon": "send",
      "name": "telegram_account",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_ID",
+       "why": "The server's Telegram app (my.telegram.org), for the sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_HASH",
+       "why": "That Telegram app's hash"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Telegram account",
+       "why": "Your chats and channels; Dana signs in as a linked device"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -5216,6 +7218,14 @@
      "source": "official",
      "state": "available",
      "title": "Telegram account",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "Telegram's servers"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5243,7 +7253,20 @@
      ],
      "icon": "wallet",
      "name": "money",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money_il",
+       "why": "Brings the banks and cards to sync (Israel); without a provider there is nothing to sync"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Sign-in codes from your SMS, and charges from card notifications before the bank shows them"
+      }
+     ],
      "options": false,
      "pages": [
       "Money"
@@ -5256,6 +7279,14 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5284,7 +7315,12 @@
      "icon": "landmark",
      "name": "money_il",
      "needs": [
-      "money"
+      {
+       "kind": "addon",
+       "optional": false,
+       "what": "money",
+       "why": "Its logins, accounts and transactions"
+      }
      ],
      "options": false,
      "pages": [],
@@ -5297,6 +7333,12 @@
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5319,7 +7361,20 @@
      ],
      "icon": "cctv",
      "name": "cameras",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Frigate server with your cameras",
+       "why": "Live views and recent events come from it"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Camera snapshots and streams through Home Assistant"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -5343,6 +7398,17 @@
      "source": "official",
      "state": "on",
      "title": "Cameras",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "your Frigate server",
+       "your Home Assistant server"
+      ],
+      "reads": [
+       "homeassistant"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Set by an admin",
@@ -5372,6 +7438,7 @@
      "source": "site",
      "state": "failed",
      "title": "Broken",
+     "touches": null,
      "version": "",
      "web": [],
      "why_not": "It did not load",
@@ -5426,6 +7493,14 @@
      "source": "official",
      "state": "on",
      "title": "Essentials",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "DuckDuckGo and other public search engines"
+      ],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Every user has it",
@@ -5452,7 +7527,20 @@
      ],
      "icon": "list-checks",
      "name": "tasks",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Reminders when you arrive at a place, leave it or get in the car"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Reminders as notifications on your phone"
+      }
+     ],
      "options": false,
      "pages": [
       "Tasks"
@@ -5463,6 +7551,16 @@
      "source": "official",
      "state": "available",
      "title": "Tasks",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "homeassistant",
+       "people",
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5490,7 +7588,14 @@
      ],
      "icon": "shopping-cart",
      "name": "shopping",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Changes pushed live to the phone app"
+      }
+     ],
      "options": false,
      "pages": [
       "Shopping"
@@ -5516,6 +7621,12 @@
      "source": "official",
      "state": "available",
      "title": "Shopping",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5540,7 +7651,14 @@
      ],
      "icon": "folder",
      "name": "knowledge",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcripts of the videos and audio files you save; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      }
+     ],
      "options": false,
      "pages": [
       "Projects"
@@ -5551,6 +7669,16 @@
      "source": "official",
      "state": "available",
      "title": "Projects",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "the sites of the links you save (YouTube, TikTok, Instagram…)"
+      ],
+      "reads": [
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5585,6 +7713,14 @@
      "source": "official",
      "state": "available",
      "title": "About you",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5608,7 +7744,20 @@
      ],
      "icon": "users",
      "name": "people",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "contacts",
+       "why": "Names, numbers and birthdays from your Google Contacts"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Your calls and notifications on each person's page"
+      }
+     ],
      "options": false,
      "pages": [
       "People"
@@ -5619,6 +7768,16 @@
      "source": "official",
      "state": "available",
      "title": "People",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "contacts",
+       "phone",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5643,7 +7802,38 @@
      ],
      "icon": "smartphone",
      "name": "phone",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "app",
+       "optional": false,
+       "what": "Dana for Android on your phone, with notification access",
+       "why": "Sends your notifications and call recordings, gets Dana's push"
+      },
+      {
+       "kind": "hardware",
+       "optional": true,
+       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "why": "Call transcripts and the tasks and events suggested from them"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes call recordings; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "FCM_SERVICE_ACCOUNT_JSON",
+       "why": "Direct push to the phone (a Firebase project); without it events wait for the app's next check"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TYPESAFE_API_KEY",
+       "why": "Sorts notifications in the Inbox; without it they stay unsorted"
+      }
+     ],
      "options": false,
      "pages": [
       "Inbox",
@@ -5655,6 +7845,23 @@
      "source": "official",
      "state": "available",
      "title": "Phone",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "fcm.googleapis.com",
+       "oauth2.googleapis.com",
+       "api.typesafe.ai"
+      ],
+      "reads": [
+       "calendar",
+       "homeassistant",
+       "knowledge",
+       "people",
+       "tasks",
+       "whatsapp"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5717,7 +7924,26 @@
      ],
      "icon": "house",
      "name": "homeassistant",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Home Assistant server Dana's server can reach",
+       "why": "Lights, devices, zones and the weather come from it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Home Assistant long-lived access token",
+       "why": "Dana signs in to Home Assistant with it"
+      },
+      {
+       "kind": "app",
+       "optional": true,
+       "what": "the Home Assistant phone app",
+       "why": "Arrive, leave, car and wake reminders use its sensors"
+      }
+     ],
      "options": true,
      "pages": [],
      "requires": null,
@@ -5853,6 +8079,14 @@
      "source": "official",
      "state": "available",
      "title": "Home Assistant",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your Home Assistant server"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5927,7 +8161,38 @@
      ],
      "icon": "message-circle",
      "name": "whatsapp",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a WAHA server (a WhatsApp Web bridge) Dana's server can reach",
+       "why": "Dana reads and sends WhatsApp through it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a WhatsApp account, linked to WAHA",
+       "why": "Your chats; WAHA signs in as a linked device"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "WAHA_WEBHOOK_SECRET",
+       "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "GEMINI_API_KEY",
+       "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "TELEGRAM_BOT_TOKEN",
+       "why": "Sends the voice-note transcripts to your Telegram"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -5955,6 +8220,17 @@
      "source": "official",
      "state": "available",
      "title": "WhatsApp",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your WAHA server"
+      ],
+      "reads": [
+       "knowledge",
+       "people"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -5997,7 +8273,32 @@
      ],
      "icon": "calendar",
      "name": "calendar",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your calendars"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [
       "Calendar"
@@ -6039,6 +8340,15 @@
      "source": "official",
      "state": "available",
      "title": "Google Calendar",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "www.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -6082,7 +8392,32 @@
      ],
      "icon": "contact",
      "name": "contacts",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your Google Contacts"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -6093,6 +8428,15 @@
      "source": "official",
      "state": "available",
      "title": "Google Contacts",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "people.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -6136,7 +8480,32 @@
      ],
      "icon": "mail",
      "name": "gmail",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_ID",
+       "why": "The server's Google OAuth client, for the Google sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "GOOGLE_CLIENT_SECRET",
+       "why": "That Google OAuth client's secret"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Google account",
+       "why": "Your mailbox"
+      },
+      {
+       "kind": "env",
+       "optional": true,
+       "what": "PUBLIC_URL",
+       "why": "The sign-in's return address, when requests reach Dana through a proxy"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -6147,6 +8516,15 @@
      "source": "official",
      "state": "available",
      "title": "Gmail",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "gmail.googleapis.com",
+       "oauth2.googleapis.com"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -6189,7 +8567,26 @@
      ],
      "icon": "send",
      "name": "telegram_account",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_ID",
+       "why": "The server's Telegram app (my.telegram.org), for the sign-in"
+      },
+      {
+       "kind": "env",
+       "optional": false,
+       "what": "TELEGRAM_API_HASH",
+       "why": "That Telegram app's hash"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Telegram account",
+       "why": "Your chats and channels; Dana signs in as a linked device"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -6201,6 +8598,14 @@
      "source": "official",
      "state": "available",
      "title": "Telegram account",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "Telegram's servers"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -6228,7 +8633,20 @@
      ],
      "icon": "wallet",
      "name": "money",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money_il",
+       "why": "Brings the banks and cards to sync (Israel); without a provider there is nothing to sync"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Sign-in codes from your SMS, and charges from card notifications before the bank shows them"
+      }
+     ],
      "options": false,
      "pages": [
       "Money"
@@ -6241,6 +8659,14 @@
      "source": "official",
      "state": "available",
      "title": "Money",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [
+       "phone"
+      ],
+      "stores_credentials": true
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -6269,7 +8695,12 @@
      "icon": "landmark",
      "name": "money_il",
      "needs": [
-      "money"
+      {
+       "kind": "addon",
+       "optional": false,
+       "what": "money",
+       "why": "Its logins, accounts and transactions"
+      }
      ],
      "options": false,
      "pages": [],
@@ -6282,6 +8713,12 @@
      "source": "official",
      "state": "available",
      "title": "Money (Israel)",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [],
+      "reads": [],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": null,
@@ -6304,7 +8741,20 @@
      ],
      "icon": "cctv",
      "name": "cameras",
-     "needs": [],
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Frigate server with your cameras",
+       "why": "Live views and recent events come from it"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "homeassistant",
+       "why": "Camera snapshots and streams through Home Assistant"
+      }
+     ],
      "options": false,
      "pages": [],
      "requires": null,
@@ -6328,6 +8778,17 @@
      "source": "official",
      "state": "off",
      "title": "Cameras",
+     "touches": {
+      "acts_outside": false,
+      "hosts": [
+       "your Frigate server",
+       "your Home Assistant server"
+      ],
+      "reads": [
+       "homeassistant"
+      ],
+      "stores_credentials": false
+     },
      "version": "",
      "web": [],
      "why_not": "Set by an admin",
@@ -6357,6 +8818,7 @@
      "source": "site",
      "state": "failed",
      "title": "Broken",
+     "touches": null,
      "version": "",
      "web": [],
      "why_not": "It did not load",
@@ -6518,7 +8980,38 @@
    ],
    "icon": "message-circle",
    "name": "whatsapp",
-   "needs": [],
+   "needs": [
+    {
+     "kind": "hardware",
+     "optional": false,
+     "what": "a WAHA server (a WhatsApp Web bridge) Dana's server can reach",
+     "why": "Dana reads and sends WhatsApp through it"
+    },
+    {
+     "kind": "account",
+     "optional": false,
+     "what": "a WhatsApp account, linked to WAHA",
+     "why": "Your chats; WAHA signs in as a linked device"
+    },
+    {
+     "kind": "env",
+     "optional": true,
+     "what": "WAHA_WEBHOOK_SECRET",
+     "why": "Voice notes you receive turned into text (WAHA signs its webhooks with it)"
+    },
+    {
+     "kind": "env",
+     "optional": true,
+     "what": "GEMINI_API_KEY",
+     "why": "Transcribes the voice notes you receive; the default TRANSCRIBE_MODEL is Gemini (another model, its own key)"
+    },
+    {
+     "kind": "env",
+     "optional": true,
+     "what": "TELEGRAM_BOT_TOKEN",
+     "why": "Sends the voice-note transcripts to your Telegram"
+    }
+   ],
    "options": false,
    "pages": [],
    "requires": null,
@@ -6546,6 +9039,17 @@
    "source": "official",
    "state": "on",
    "title": "WhatsApp",
+   "touches": {
+    "acts_outside": true,
+    "hosts": [
+     "your WAHA server"
+    ],
+    "reads": [
+     "knowledge",
+     "people"
+    ],
+    "stores_credentials": true
+   },
    "version": "",
    "web": [],
    "why_not": null,
