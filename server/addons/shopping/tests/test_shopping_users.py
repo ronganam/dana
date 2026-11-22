@@ -124,8 +124,8 @@ CARL = users.create("Carl", telegram_ids=[333])  # no shopping
 for who in (BOB, EVE):
     store.connect(who, "shopping")
 store.connect(BOB, "phone")
-push.register(ADMIN, devices.create(ADMIN, "phone")[1], "tok-admin")
-push.register(BOB, devices.create(BOB, "phone")[1], "tok-bob")
+push.register(ADMIN, devices.create(ADMIN, "phone")[1], "fcm", "tok-admin")
+push.register(BOB, devices.create(BOB, "phone")[1], "fcm", "tok-bob")
 TOKENS = {u.id: users.issue_token(u.id, f"test {u.name}")[0] for u in (ADMIN, BOB, EVE, CARL)}
 A_LIST, B_LIST, E_LIST = (lists.own_list_id(u) for u in (ADMIN, BOB, EVE))
 

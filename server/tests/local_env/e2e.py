@@ -46,6 +46,8 @@ STATE = HERE / ".state"
 COMPOSE = ["docker", "compose", "-f", str(HERE / "compose.yaml")]
 BASE = f"http://127.0.0.1:{os.getenv('DANA_LOCAL_PORT', '18080')}"
 CTRL = f"http://127.0.0.1:{os.getenv('DANA_LOCAL_CONTROL_PORT', '18090')}"
+PHONES: Dict[str, str] = {}  # the paired phones' device tokens, by name (section 5)
+NTFY = "http://stubs:8095"  # the ntfy stub, as the app reaches it (plain http: DANA_INSECURE_DEV=1 in app.env)
 INTERNAL_HOST = "dana.dana"  # a Host header naming the in-cluster Service: proves nothing
 
 # Identities shared with stubs.py and the generated env file (bin/local-env.sh).
@@ -548,7 +550,7 @@ WEB_LOAD = [
     ("/api/notifications/overview", has("counts", "apps")),
     ("/api/checks", has("checks")),
     ("/api/search?q=Sam", has("results")),
-    ("/api/phone/devices", has("configured", "devices", "latest_seq")),
+    ("/api/phone/devices", has("fcm_configured", "devices", "latest_seq")),
     ("/api/shopping/lists", has("active", "lists")),
 ]
 
@@ -989,13 +991,40 @@ async def reminders(c: Client, token: str, title: str) -> List[Dict[str, Any]]:
     return [e for e in evs if e["type"] == "reminder" and str(e["data"].get("task_title", "")).endswith(title)]
 
 
+async def unifiedpush(c: Client, maya_token: str, maya_phone: str) -> None:
+    """A push reaches the phone's UnifiedPush endpoint (the ntfy stub) carrying only the event's number and type."""
+    before = len((await c.ctrl("GET", "/ntfy/log"))["pings"])
+    r = await c.post("/api/phone/test", {}, maya_token)
+    pings = (await c.ctrl("GET", "/ntfy/log"))["pings"][before:]
+    latest = (await c.phone_events(maya_token)).get("latest")
+    check("unifiedpush: a push to her pings only her phone's endpoint, with {seq, type} and nothing else",
+          r.status == 200 and (r.body or {}).get("delivered") is True
+          and [p["topic"] for p in pings] == ["up-e2e-maya-phone"]
+          and [json.loads(p["body"]) for p in pings] == [{"seq": str(latest), "type": "notify"}], (r, pings, latest))
+    devs = ((await c.get("/api/phone/devices", maya_token)).body or {}).get("devices") or []
+    check("unifiedpush: her devices list the transport and the endpoint's host, never the endpoint",
+          [(d.get("transport"), d.get("endpoint_host")) for d in devs] == [("unifiedpush", "stubs")]
+          and "up-e2e" not in json.dumps(devs), devs)
+    for endpoint in ("ftp://stubs:8095/up", "http://user:secret@stubs:8095/up", ""):
+        r = await c.post("/api/phone/register", {"transport": "unifiedpush", "endpoint": endpoint}, maya_phone)
+        check(f"unifiedpush: endpoint {endpoint or '(none)'} refused, the registration kept",
+              r.status == 400 and (r.body or {}).get("error") in ("invalid_endpoint", "invalid"), r)
+
+
 async def watcher(c: Client, maya: Dict[str, str]) -> None:
     print("\n== 5. Home Assistant watcher")
     tok = maya["token"]
     for t, dev in ((ADMIN_TOKEN, "e2e-admin-phone"), (tok, "e2e-maya-phone")):
         device_token = await pair(c, t, dev)
-        r = await c.post("/api/phone/register", {"token": f"fcm-{dev}", "app_version": "e2e"}, device_token)
-        check(f"phone: {dev} paired and registered for push", bool(device_token) and r.status == 200, r)
+        PHONES[dev] = device_token
+        r = await c.post("/api/phone/register", {"transport": "fcm", "token": f"fcm-{dev}"}, device_token)
+        check(f"phone: {dev}: FCM is refused on a server without its key", r.status == 400
+              and (r.body or {}).get("error") == "fcm_not_configured", r)
+        r = await c.post("/api/phone/register", {"transport": "unifiedpush", "endpoint": NTFY + f"/up-{dev}?up=1",
+                                                 "app_version": "e2e"}, device_token)
+        check(f"phone: {dev} paired and registered for push (UnifiedPush)", bool(device_token) and r.status == 200
+              and (r.body or {}).get("transport") == "unifiedpush", r)
+    await unifiedpush(c, tok, device_token)
     mk = [(ADMIN_TOKEN, "E2E arrive work", {"location": {"location": "work", "event": "arrive"}}),
           (ADMIN_TOKEN, "E2E car enter", {"car": "enter"}),
           (ADMIN_TOKEN, "E2E arrive office", {"location": {"location": "office", "event": "arrive"}}),
@@ -1150,15 +1179,17 @@ async def waha_inbound(c: Client, maya: Dict[str, str]) -> None:
 async def phone(c: Client, maya: Dict[str, str]) -> None:
     print("\n== 7. Phone")
     tok = maya["token"]
-    a = await c.phone_events(ADMIN_TOKEN, 0, "e2e-admin-phone")
-    m = await c.phone_events(tok, 0, "e2e-maya-phone")
-    a_seq, m_seq = {e["seq"] for e in a["events"]}, {e["seq"] for e in m["events"]}
+    a = await c.phone_events(PHONES.get("e2e-admin-phone", ""), 0)
+    m = await c.phone_events(PHONES.get("e2e-maya-phone", ""), 0)
+    a_seq, m_seq = {e["seq"] for e in a.get("events", [])}, {e["seq"] for e in m.get("events", [])}
     check("phone: each device fetches only its user's events (disjoint seqs)", a_seq and m_seq and not a_seq & m_seq, (a_seq, m_seq))
-    check("phone: fetching marks the device registered", a.get("registered") is True and m.get("registered") is True, (a, m))
-    r = await c.get("/api/phone/events?after=0&device_id=e2e-admin-phone", tok)
-    check("phone: another user's device id is not hers (registered: false)", (r.body or {}).get("registered") is False, r)
+    check("phone: fetching with a phone's device token says it is registered", a.get("registered") is True
+          and m.get("registered") is True, (a, m))
+    r = await c.get(f"/api/phone/events?after=0&device_id={PHONES.get('e2e-admin-phone', '')}", tok)
+    check("phone: her user token names no device (a device id in the query is ignored: no registered)",
+          r.status == 200 and "registered" not in (r.body or {}), r)
     devs = (await c.get("/api/phone/devices", tok)).body or {}
-    check("phone: device lists are per user", ids(devs.get("devices"), "device_id") == {"e2e-maya-phone"}, devs)
+    check("phone: device lists are per user", {d.get("name") for d in devs.get("devices") or []} == {"e2e-maya-phone"}, devs)
     now_ms = int(time.time() * 1000)
     r = await c.post("/api/notifications/batch", {"posted": [{
         "key": "0|com.maya.clinic|7|null|10001", "package": "com.maya.clinic", "app_name": "Clinic",
@@ -1298,13 +1329,14 @@ async def security(c: Client, maya: Dict[str, str]) -> None:
     admin_devices = {d["device_id"]: d for d in devs.get("devices") or []}
     taken = next(iter(admin_devices), "")
     maya_phone = await pair(c, tok, "e2e-maya-second")
-    r = await c.post("/api/phone/register", {"device_id": taken, "token": "maya-fcm-token"}, maya_phone)
+    r = await c.post("/api/phone/register", {"device_id": taken, "transport": "unifiedpush",
+                                             "endpoint": NTFY + "/up-maya-second"}, maya_phone)
     after = {d["device_id"]: d for d in ((await c.get("/api/phone/devices")).body or {}).get("devices") or []}
     mine = ids(((await c.get("/api/phone/devices", tok)).body or {}).get("devices"), "device_id")
     check("devices: a device id in the body is ignored: her phone registers itself; the admin's stays theirs",
           taken and r.status == 200 and taken in after and after[taken] == admin_devices[taken] and taken not in mine
           and len(mine) == 2, (taken, r, sorted(after), sorted(mine)))
-    r = await c.post("/api/phone/register", {"token": "script-fcm-token"}, ADMIN_TOKEN)
+    r = await c.post("/api/phone/register", {"transport": "unifiedpush", "endpoint": NTFY + "/up-script"}, ADMIN_TOKEN)
     check("devices: a token of no device (API_TOKEN) cannot register for push", r.status == 400, r)
 
 

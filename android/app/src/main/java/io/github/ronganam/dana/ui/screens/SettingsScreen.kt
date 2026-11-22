@@ -200,6 +200,13 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null) {
             SectionLabel("Notifications", hue = hues.teal)
             NotificationInboxSettings(viewModel)
 
+            // --- Push (phone only: the kiosk / TV build has no PushStatus) ---
+            if (!BuildConfig.KIOSK && !BuildConfig.TV) {
+                Spacer(Modifier.height(8.dp))
+                SectionLabel("Push", hue = hues.teal)
+                PushSettings()
+            }
+
             // --- App update ---
             Spacer(Modifier.height(8.dp))
             SectionLabel("About & updates", hue = hues.sky)
@@ -574,6 +581,93 @@ private fun PopUpSettings() {
                 },
                 modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
             ) { Text("Allow full-screen notifications") }
+        }
+    }
+}
+
+/**
+ * How the server wakes the phone: the transport (UnifiedPush through a
+ * distributor app, or FCM in a build with your own Firebase project), the
+ * distributor, whether the server has this phone and when the last ping came.
+ * Without a distributor it explains installing ntfy. Coming back here (from
+ * installing ntfy, say) registers again.
+ */
+@Composable
+private fun PushSettings() {
+    val context = LocalContext.current
+    var status by remember { mutableStateOf(io.github.ronganam.dana.push.PushSetup.status(context)) }
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, e ->
+            if (e == androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+                io.github.ronganam.dana.push.PushSetup.ensureRegistered(context, force = status?.registered != true)
+                status = io.github.ronganam.dana.push.PushSetup.status(context)
+            }
+        }
+        lifecycle.addObserver(obs)
+        onDispose { lifecycle.removeObserver(obs) }
+    }
+    // Registering answers asynchronously (the distributor, then the server): follow it while shown.
+    LaunchedEffect(Unit) {
+        while (true) {
+            kotlinx.coroutines.delay(2_000)
+            status = io.github.ronganam.dana.push.PushSetup.status(context)
+        }
+    }
+    status?.let { PushStatusCard(it) }
+}
+
+@Composable
+private fun PushStatusCard(s: io.github.ronganam.dana.push.PushStatus) {
+    val context = LocalContext.current
+    val unifiedPush = s.transport == io.github.ronganam.dana.push.PushTransport.UNIFIEDPUSH
+    GlassCard(modifier = Modifier.fillMaxWidth()) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                "Dana wakes the phone with a ping that carries no content; the app then fetches what's new from your server.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text("Transport: ${s.transport.label}", style = MaterialTheme.typography.titleSmall)
+            if (unifiedPush) {
+                Text(
+                    if (s.distributor != null) "Push app: ${s.distributor}" else "No distributor installed",
+                    style = MaterialTheme.typography.titleSmall
+                )
+            }
+            Text(
+                if (s.registered) "Registered with your server" else "Not registered with your server yet",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text(
+                "Last ping: " + if (s.lastPingAt == 0L) "never" else android.text.format.DateUtils.getRelativeTimeSpanString(
+                    s.lastPingAt, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS
+                ).toString(),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            s.problem?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            if (unifiedPush && s.distributor == null) {
+                Text(
+                    "Push comes through a distributor app. Install ntfy (free, on Google Play or F-Droid) and come back: " +
+                        "Dana registers with it by itself. ntfy uses the public ntfy.sh unless you point it at your own " +
+                        "ntfy server. Until then, reminders and alerts wait for the app's next check.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                OutlinedButton(
+                    onClick = {
+                        fun open(uri: String) = context.startActivity(
+                            Intent(Intent.ACTION_VIEW, uri.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        )
+                        try {
+                            open(io.github.ronganam.dana.push.Distributors.NTFY_STORE)
+                        } catch (e: android.content.ActivityNotFoundException) {
+                            open(io.github.ronganam.dana.push.Distributors.NTFY_FDROID)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) { Text("Get ntfy") }
+            }
         }
     }
 }

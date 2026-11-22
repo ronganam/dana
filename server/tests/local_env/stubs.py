@@ -11,6 +11,7 @@ network (the app reaches them as ``http://stubs:<port>``):
 9100  OpenAI-compatible model endpoint for LiteLLM (chat, streamed or not,
       structured output, audio transcription)
 8081  Telegram Bot API (getUpdates long polling, sendMessage, …)
+8095  ntfy (a UnifiedPush server: records the pings Dana POSTs to an endpoint)
 9000  control API, used by the end-to-end script (tests/local_env/e2e.py)
 ====  =========================================================================
 
@@ -417,6 +418,27 @@ class FakeTelegram:
                         "from": self.BOT, "text": "…"}}})
 
 
+# --- ntfy (UnifiedPush) ---------------------------------------------------------------------------
+
+class FakeNtfy:
+    """A UnifiedPush server like ntfy: a POST to ``/<topic>`` is a ping for the
+    app holding that endpoint; records topic, body and the TTL header. Topics
+    starting ``gone-`` answer 404 (the app unregistered)."""
+
+    def __init__(self) -> None:
+        self.pings: List[Dict[str, Any]] = []
+        app = web.Application()
+        app.router.add_post("/{topic}", self.publish)
+        self.app = app
+
+    async def publish(self, request: web.Request) -> web.Response:
+        topic = request.match_info["topic"]
+        self.pings.append({"topic": topic, "body": await request.text(), "ttl": request.headers.get("TTL")})
+        if topic.startswith("gone-"):
+            return web.json_response({"code": 40401, "error": "topic not found"}, status=404)
+        return web.json_response({"id": uuid.uuid4().hex[:12], "topic": topic, "event": "message"})
+
+
 # --- Control API ---------------------------------------------------------------------------------
 
 class Stubs:
@@ -433,6 +455,7 @@ class Stubs:
         self.frigate = FakeFrigate()
         self.model = FakeModel()
         self.telegram = FakeTelegram()
+        self.ntfy = FakeNtfy()
 
     def control_app(self) -> web.Application:
         app = web.Application()
@@ -450,6 +473,7 @@ class Stubs:
         r.add_post("/telegram/message", self.tg_message)
         r.add_post("/telegram/callback", self.tg_callback)
         r.add_get("/telegram/log", self.tg_log)
+        r.add_get("/ntfy/log", self.ntfy_log)
         return app
 
     async def reset(self, request: web.Request) -> web.Response:
@@ -464,7 +488,11 @@ class Stubs:
         self.model.requests.clear()
         self.model.script.clear()
         self.telegram.sent.clear()
+        self.ntfy.pings.clear()
         return web.json_response({"ok": True})
+
+    async def ntfy_log(self, request: web.Request) -> web.Response:
+        return web.json_response({"pings": self.ntfy.pings})
 
     def _ha(self, request: web.Request) -> FakeHA:
         which = request.match_info["which"]
@@ -534,13 +562,13 @@ async def main() -> None:
     sites = [
         (stubs.ha["a"].server.app, 8123), (stubs.ha["b"].server.app, 8124), (stubs.waha.server.app, 3000),
         (stubs.frigate.app, 5000), (stubs.model.app, 9100), (stubs.telegram.app, 8081),
-        (stubs.control_app(), 9000),
+        (stubs.ntfy.app, 8095), (stubs.control_app(), 9000),
     ]
     for app, port in sites:
         runner = web.AppRunner(app, access_log=None)
         await runner.setup()
         await web.TCPSite(runner, "0.0.0.0", port).start()
-    log.info("stubs listening: HA A 8123, HA B 8124, WAHA 3000, Frigate 5000, model 9100, Telegram 8081, control 9000")
+    log.info("stubs listening: HA A 8123, HA B 8124, WAHA 3000, Frigate 5000, model 9100, Telegram 8081, ntfy 8095, control 9000")
     await asyncio.Event().wait()
 
 

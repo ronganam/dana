@@ -172,7 +172,7 @@ async def fake_fcm_token():
 
 phone_push._access_token = fake_fcm_token
 _owner = users.first_admin()
-phone_push.register(_owner, devices.create(_owner, "phone", "Fold")[1], "tok-1")
+phone_push.register(_owner, devices.create(_owner, "phone", "Fold")[1], "fcm", "tok-1")
 
 
 def fake_list_events(conn, time_min, time_max, limit=50):

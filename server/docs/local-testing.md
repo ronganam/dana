@@ -61,12 +61,13 @@ misconfigured URL cannot reach a real service.
 | 5000 | Frigate | events, activity, previews, clips, WebRTC, version |
 | 9100 | the model provider | OpenAI-compatible: streamed and plain chat, structured output (the minimal instance of the schema; the shopping aisle lookup gets an aisle per item from common English and Hebrew grocery words, else `pantry`), audio transcription. LiteLLM reaches it as `openai/…` models through `OPENAI_API_BASE`. Agent turns (requests with tools) get scripted replies, else "Done." |
 | 8081 | Telegram Bot API | getUpdates long polling fed by the control API, sendMessage etc. recorded. The app points aiogram at it with `TELEGRAM_API_BASE` (`docs/configuration.md`) |
-| 9000 | control API | `POST /ha/{a,b}/state {entity_id, state, attributes?}` (pushes the change to subscribers), `GET /ha/{a,b}/log`, `GET /waha/log`, `GET /frigate/log`, `POST /llm/script [{match, reply: {text} \| {tool: {name, args}} \| {tools: [...]}, reasoning?}]`, `GET /llm/requests?match=` (system message, tool names, conversation of every model call), `POST /llm/transcript {text}`, `POST /telegram/message {from_id, chat_id?, text}`, `POST /telegram/callback`, `GET /telegram/log`, `POST /reset` (forget the records) |
+| 8095 | ntfy (a UnifiedPush server) | records each ping Dana POSTs to an endpoint (`http://stubs:8095/<topic>`: topic, body, `TTL`); topics starting `gone-` answer 404. The phones in the rehearsal register UnifiedPush endpoints here (plain http, allowed by `DANA_INSECURE_DEV=1` in the env file) |
+| 9000 | control API | `POST /ha/{a,b}/state {entity_id, state, attributes?}` (pushes the change to subscribers), `GET /ha/{a,b}/log`, `GET /waha/log`, `GET /frigate/log`, `POST /llm/script [{match, reply: {text} \| {tool: {name, args}} \| {tools: [...]}, reasoning?}]`, `GET /llm/requests?match=` (system message, tool names, conversation of every model call), `POST /llm/transcript {text}`, `POST /telegram/message {from_id, chat_id?, text}`, `POST /telegram/callback`, `GET /telegram/log`, `GET /ntfy/log`, `POST /reset` (forget the records) |
 
 Not stubbed: **Google Calendar** (unreachable: calendar reads come back empty,
 `POST /api/addons/calendar/test` answers `ok: false`), **FCM** (not
-configured: push events queue and the phone fetches them with `GET
-/api/phone/events`), **TypeSafe** (no key: triage asks the model stub, whose
+configured: an FCM registration is refused, phones push through the ntfy
+stub), **TypeSafe** (no key: triage asks the model stub, whose
 minimal structured reply judges nothing, so notifications stay pending and end
 `failed`), web search, kubectl.
 
@@ -77,7 +78,8 @@ minimal structured reply judges nothing, so notifications stay pending and end
 `APP_PUBLISH_TOKEN` and `WAHA_WEBHOOK_SECRET` (the rehearsal signs its
 webhook posts with it), the first user's profile (`OWNER_NAME=Robin`,
 `OWNER_CONTEXT`, `ALLOWED_TELEGRAM_USER_IDS=111111111`, `TELEGRAM_CHAT_ID`),
-the Google OAuth client, `MEMBER_ALLOWED_ORIGINS=homeassistant=http://stubs:8124`
+`DANA_INSECURE_DEV=1` (with `API_TOKEN` set it only lets push go to the
+plain-http ntfy stub), the Google OAuth client, `MEMBER_ALLOWED_ORIGINS=homeassistant=http://stubs:8124`
 (the second user's Home Assistant stub, which no admin uses, so a member may
 connect it) and `TIMEZONE`. The models are `openai/dana-local-*` on the stub.
 `down` deletes it. The admin's Home Assistant, WhatsApp, calendar, cameras and
@@ -130,7 +132,10 @@ seeing her change, typed text moved to its aisles by the model stub's answer
 unsharing); the Home
 Assistant watcher (zones and car per user, a flap, a settings change, a
 disconnect); WAHA inbound routing by account and the internal-host rule; phone
-events and notifications per user; Telegram (admin, member, unknown id,
+events and notifications per user; push through UnifiedPush (each paired phone
+registers an endpoint on the ntfy stub, FCM refused without its key, a test
+push reaches only her endpoint with `{seq, type}`, devices list only the
+endpoint's host, bad endpoints refused); Telegram (admin, member, unknown id,
 proactive reminders to the right chat); usage per user; the security rules
 (docs/access.md: a member's debug export has no environment and the admin's
 masks credentials, a member's cameras PUT / DELETE 403, refused addresses,

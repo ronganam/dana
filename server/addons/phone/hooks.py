@@ -277,7 +277,8 @@ def _ago_or_never(dt: Optional[datetime.datetime], now: datetime.datetime) -> st
 def check_push(user: User, now: datetime.datetime) -> Check:
     with get_db_connection() as conn:
         devs = [dict(r) for r in conn.execute(
-            "SELECT p.device_id, d.name, p.app_version, p.updated_at, p.last_fetch_at FROM phone_push p "
+            "SELECT p.device_id, d.name, p.transport, p.address, p.app_version, p.updated_at, p.last_fetch_at "
+            "FROM phone_push p "
             "JOIN devices d ON d.id = p.device_id WHERE p.user_id = ?", (user.id,)).fetchall()]
         m = dict(conn.execute("SELECT * FROM system_marks WHERE key = ?",
                               (mark_key("push", user.id),)).fetchone() or {})
@@ -286,7 +287,8 @@ def check_push(user: User, now: datetime.datetime) -> Check:
     seen = _latest(fetch, *(helpers.parse_time(d.get("updated_at")) for d in devs))
     facts = []
     for d in devs[:3]:
-        facts.append(f"{d.get('name') or 'Phone'}" + (f" · app {d['app_version']}" if d.get("app_version") else "")
+        via = (f"UnifiedPush via {push.endpoint_host(d['address'])}" if d.get("transport") == "unifiedpush" else "FCM")
+        facts.append(f"{d.get('name') or 'Phone'} · {via}" + (f" · app {d['app_version']}" if d.get("app_version") else "")
                      + f" · last check-in {_ago_or_never(helpers.parse_time(d.get('last_fetch_at')) or helpers.parse_time(d.get('updated_at')), now)}")
     if last_ok:
         facts.append(f"Last push accepted {_ago_or_never(last_ok, now)}")
@@ -295,8 +297,10 @@ def check_push(user: User, now: datetime.datetime) -> Check:
                      + (f": {m.get('detail')}" if m.get("detail") else ""))
     blocks = [{"type": "facts", "label": "Push", "items": facts}] if facts else []
     why = "Reminders, alerts and the briefing may not reach the phone."
-    if not push.configured():
-        return Check(False, "FCM key missing on the server", None, title="Push isn't configured", why=why, blocks=blocks)
+    if not push.configured() and any(d.get("transport") == "fcm" for d in devs):
+        return Check(False, "FCM key missing on the server", None, title="Push isn't configured",
+                     why=why + " A phone is registered for FCM but the server has no FCM_SERVICE_ACCOUNT_JSON.",
+                     blocks=blocks)
     if not devs:
         return Check(False, "No phone registered", last_ok, title="No phone registered for push",
                      why=why + " Open the paired Dana app once so it registers again "

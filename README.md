@@ -72,7 +72,7 @@ Each feature is an addon you turn on per user. Before you turn one on, this says
 | Projects | Projects, decisions and saved notes, links and files | — | `GEMINI_API_KEY` | Any |
 | About you | What Dana remembers about you | — | — | Any |
 | People | The people you talk to and a brief on each | — | the Google Contacts addon; the Phone addon | Any |
-| Phone | The Android phone: notifications Inbox, calls and suggestions, push | Dana for Android on your phone, with notification access | a dialer that saves call recordings to Recordings/Call (Samsung's); `GEMINI_API_KEY`; `FCM_SERVICE_ACCOUNT_JSON`; `TYPESAFE_API_KEY` | Any |
+| Phone | The Android phone: notifications Inbox, calls and suggestions, push | Dana for Android on your phone, with notification access | a dialer that saves call recordings to Recordings/Call (Samsung's); `GEMINI_API_KEY`; the ntfy app on your phone (UnifiedPush); `FCM_SERVICE_ACCOUNT_JSON`; `TYPESAFE_API_KEY` | Any |
 | Home Assistant | Lights, devices and the TV, reminders when you arrive or get in the car | a Home Assistant server Dana's server can reach; a Home Assistant long-lived access token | the Home Assistant phone app | Any |
 | WhatsApp | Read and send WhatsApp messages, voice notes as text | a WAHA server (a WhatsApp Web bridge) Dana's server can reach; a WhatsApp account, linked to WAHA | `WAHA_WEBHOOK_SECRET`; `GEMINI_API_KEY`; `TELEGRAM_BOT_TOKEN` | Any |
 | Google Calendar | Your events in chat, on the Now screen and in the briefing | `GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET`; a Google account | `PUBLIC_URL` | Any |

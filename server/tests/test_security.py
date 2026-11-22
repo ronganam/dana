@@ -1151,22 +1151,22 @@ async def test_task_moves_http(http: TestClient) -> None:
 
 async def test_devices(http: TestClient) -> None:
     admin_phone = devices.create(ADMIN, "phone", "Admin phone")[1]
-    push.register(ADMIN, admin_phone, "token-admin")
+    push.register(ADMIN, admin_phone, "fcm", "token-admin")
     bob_token = devices.create(BOB, "phone", "Bob phone")[0]
-    r = await http.post("/api/phone/register", json={"device_id": admin_phone.id, "token": "token-bob"},
+    r = await http.post("/api/phone/register", json={"device_id": admin_phone.id, "transport": "fcm", "token": "token-bob"},
                         headers=h(bob_token))
     check("devices: a device id in the body is ignored: Bob's phone registers itself, the admin's stays theirs",
           r.status == 200 and [d["device_id"] for d in push.devices(ADMIN)] == [admin_phone.id]
           and [d["device_id"] for d in push.devices(BOB)] != [admin_phone.id] and len(push.devices(BOB)) == 1,
           r.status)
     with db.get_db_connection() as c:
-        admin_token = c.execute("SELECT fcm_token FROM phone_push WHERE user_id = ? AND device_id = ?",
+        admin_token = c.execute("SELECT address FROM phone_push WHERE user_id = ? AND device_id = ?",
                                 (ADMIN.id, admin_phone.id)).fetchone()
     check("devices: the admin's registration keeps the admin's FCM token", admin_token and admin_token[0] == "token-admin")
-    r = await http.post("/api/phone/register", json={"token": "token-x"}, headers=h(BOB_TOKEN))
+    r = await http.post("/api/phone/register", json={"transport": "fcm", "token": "token-x"}, headers=h(BOB_TOKEN))
     check("devices: a token of no device cannot register for push", r.status == 400)
     carl_phone = devices.create(CARL, "phone", "Carl took the phone")[1]
-    push.register(CARL, carl_phone, "token-admin")
+    push.register(CARL, carl_phone, "fcm", "token-admin")
     check("devices: the same FCM token from another device (the app paired again) moves the registration",
           not push.devices(ADMIN) and len(push.devices(CARL)) == 1 and len(push.devices(BOB)) == 1)
 
