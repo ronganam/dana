@@ -40,8 +40,8 @@ from its device token, so cookie requests carry the device too.
 ## Pairing
 
 1. A signed-in user starts a pairing for themselves: `POST /api/devices/pairings {kind, name?, room?, role?}`.
-   With `manage_users` they may start one for another user (`user_id`, household invites); anyone else gets
-   403 `forbidden`.
+   With `manage_users` they may start one for another user (`user_id`: the Household screen's invites, a phone
+   and a browser code at once: `docs/household.md`); anyone else gets 403 `forbidden`.
 2. The answer has a **code**: 8 characters from `23456789ABCDEFGHJKLMNPQRSTUVWXYZ` (no 0/O, 1/I), valid 5
    minutes, used once, stored as its SHA-256 only; and **`qr`**, the string the QR code holds:
    `dana://pair?server=<public base URL>&code=<code>`. The base URL is `PUBLIC_URL` when set, else the
@@ -110,7 +110,8 @@ A core screen (`devices`, in the navigation's core group and a Settings tile; `/
 with the kind's icon, name, room / role, when last seen ("This device" for the one in use), rename (and room
 and role for a tablet or TV) and remove with a confirmation (removing the device in use signs it out). "Pair
 a device" asks the kind (and for a tablet or TV, who it is for and the room), then shows the QR code (the
-vendored qrcode-generator, `static/vendor/qrcode.js`; dark on white in both themes) and the code in two groups
+vendored qrcode-generator, `static/vendor/qrcode.js`, drawn by `DanaDevicesCore.qrSvg`, which the Household
+screen's invites reuse; dark on white in both themes) and the code in two groups
 of four with a five-minute countdown, polls every 2 s and says when the device has paired (or that the code
 expired, with "New code"). A browser gets no QR: it types the code on `/login`.
 

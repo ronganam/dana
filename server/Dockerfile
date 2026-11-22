@@ -52,9 +52,11 @@ COPY --from=site_addons --exclude=*/worker / ./addons-site/
 RUN set -e; for req in addons/*/requirements.txt addons-site/*/requirements.txt; do \
         if [ -f "$req" ]; then pip install --no-cache-dir -r "$req"; fi; \
     done
-# The administration CLI (users, addons; docs/access.md, "Managing users"): kubectl exec … bin/dana users list
+# The administration CLI (users, addons; docs/access.md, "Managing users"), on PATH:
+# docker compose exec dana dana users list, kubectl exec … dana addons install NAME (into the data volume)
 COPY bin/dana ./bin/dana
 COPY cli/ ./cli/
+ENV PATH="/app/bin:${PATH}"
 # The release name bin/deploy builds ("<VERSION>-<commit>"): /api/health reports it and the
 # dashboard's ?v= cache-buster uses it, so every deploy reaches cached clients.
 ARG RELEASE=""

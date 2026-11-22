@@ -6,7 +6,8 @@ folders of every source (core/addon_dirs.py), and for each one imports, as
 
 1. ``addon.py`` — the manifest (``addon = Addon("<name>", ...)``, the name the
    folder's);
-2. then, in the addon order: ``tools.py``, ``hooks.py`` and the modules its
+2. then, in the addon order: ``tools.py``, ``hooks.py``, ``demo.py`` (its sample data for
+   the demo household: core/demo.py) and the modules its
    manifest names (``modules=``), when present, then ``api.py`` (its routes,
    registered by core/server.py through :func:`apis`).
 
@@ -52,7 +53,7 @@ from core.agent import SLOTS
 logger = logging.getLogger(__name__)
 
 # The modules of an addon imported after its manifest, in this order, when present.
-STANDARD_MODULES = ("tools", "hooks")
+STANDARD_MODULES = ("tools", "hooks", "demo")
 
 
 class LoadError(RuntimeError):

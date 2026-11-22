@@ -2,7 +2,7 @@
 #
 #   curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
 #   docker compose up -d
-#   docker compose logs app        # open the setup link it prints, on this machine
+#   docker compose logs dana       # open the setup link it prints, on this machine
 #
 # Settings: an optional .env next to this file (server/docs/configuration.md); none are needed to start.
 # Upgrading: docker compose pull && docker compose up -d. Building from source instead: server/compose.yaml.
@@ -12,7 +12,7 @@
 name: dana
 
 services:
-  app:
+  dana:
     image: ghcr.io/ronganam/dana:latest
     env_file:
       - path: .env

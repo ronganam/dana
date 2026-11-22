@@ -90,6 +90,7 @@ tides/
   addon.py          addon = Addon("tides", ...)          the manifest (required)
   tools.py          @addon.tool() functions              imported when present
   hooks.py          jobs, handlers, Now cards…           imported when present
+  demo.py           @addon.demo: sample data for the demo household (docs/household.md)   imported when present
   api.py            setup(app): its HTTP routes          registered automatically
   web/              its pages: scripts, styles           served at /addons/<name>/web/<file>
   worker/           a sidecar's Dockerfile and code      built by bin/deploy as <image>-<name>
@@ -99,7 +100,7 @@ tides/
   README.md         what it does, settings, events       shown in the catalog
 ```
 
-The loader imports `addon.py`, then `tools.py`, `hooks.py`, the modules named in `modules=(...)`, then `api.py`, as `addons.<name>.*`; another module of the addon imports the manifest as `from addons.tides.addon import addon`. Sources: `server/addons/` (official), the site's `addons/`, `/app/addons-site` in an image built by `bin/deploy`, `<data dir>/addons/` (installed); `DANA_ADDON_DIRS` (folders joined by `:`) replaces all but the official one. A non-official addon that fails to load is skipped with the reason (`loader.failed()`, the Addons page); the server runs without it.
+The loader imports `addon.py`, then `tools.py`, `hooks.py`, `demo.py`, the modules named in `modules=(...)`, then `api.py`, as `addons.<name>.*`; another module of the addon imports the manifest as `from addons.tides.addon import addon`. Sources: `server/addons/` (official), the site's `addons/`, `/app/addons-site` in an image built by `bin/deploy`, `<data dir>/addons/` (installed); `DANA_ADDON_DIRS` (folders joined by `:`) replaces all but the official one. A non-official addon that fails to load is skipped with the reason (`loader.failed()`, the Addons page); the server runs without it.
 
 ### The manifest
 

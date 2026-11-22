@@ -608,6 +608,7 @@ def test_cli() -> None:
           and "Market test" not in out and "`GOOGLE_CLIENT_ID`" in out, out[:800])
     rc, out, err = run("addons", "remove", "fresh", "--dir", str(target))
     check("cli remove", rc == 0 and not (target / "fresh").exists(), err)
+    test_cli_default_root()
     rc, out, err = run("addons", "disable", "mk")
     check("cli disable: off for everyone, mkplus with it", rc == 0 and not state.is_enabled("mk")
           and "mkplus" in out, out + err)
@@ -618,6 +619,32 @@ def test_cli() -> None:
     check("cli enable", rc == 0 and state.is_enabled("mk"))
     rc, out, err = run("addons", "disable", "essentials")
     check("cli disable: essentials refused", rc == 1 and "every user has it" in err, err)
+
+
+def test_cli_default_root() -> None:
+    """Without --dir / --data: the site's addons/ when there is a site folder, else the data dir's (the
+    container image, where `docker compose exec dana dana addons install NAME` runs)."""
+    from core import addon_dirs
+    data = addon_dirs.installed_dir()
+    os.environ["DANA_SITE"] = str(SCRATCH / "no_site_here")
+    try:
+        rc, out, err = run("addons", "install", f"{REPO}@{COMMIT1}:addons/fresh")
+        check("cli install without a site: into the data dir's addons/, which the server loads at start",
+              rc == 0 and (data / "fresh" / ".installed.json").is_file() and "Restart the server" in out
+              and any(f.name == "fresh" and f.source.kind == addon_dirs.INSTALLED for f in addon_dirs.addon_folders()),
+              out + err)
+        rc, out, err = run("addons", "remove", "fresh")
+        check("cli remove without a site: from the data dir's addons/", rc == 0 and not (data / "fresh").exists(),
+              out + err)
+        site = SCRATCH / "a_site"
+        (site / "addons").mkdir(parents=True)
+        os.environ["DANA_SITE"] = str(site)
+        rc, out, err = run("addons", "install", f"{REPO}@{COMMIT1}:addons/fresh")
+        check("cli install with a site folder: into the site's addons/ (what bin/deploy builds in)",
+              rc == 0 and (site / "addons" / "fresh" / "addon.py").is_file() and not (data / "fresh").exists(),
+              out + err)
+    finally:
+        os.environ.pop("DANA_SITE", None)
 
 
 def test_worker_image() -> None:

@@ -7,6 +7,12 @@ resolve to them, and the Telegram chat proactive messages go to. The person
 who runs the server is the first user, created at startup with access
 ``admin`` (:func:`bootstrap`). ``bin/dana users`` manages users on the server.
 
+**Demo users** (``User.demo``; core/demo.py, docs/household.md) are the made-up members of the sample household an admin can load.
+Their ids are kept in ``system_marks[DEMO_MARK]``; they are left out of
+:func:`list_users` (so no background job, composer, sharing target, household
+list or count of the household sees them) and found only by id (:func:`get`)
+or with :func:`demo_users`.
+
 Tokens are stored hashed: the SHA-256 of the token (Bearer lookups) and the
 SHA-256 of the web session cookie made from it (cookie lookups). A raw token
 is returned once, by :func:`issue_token` (or by pairing a device:
@@ -31,6 +37,7 @@ import contextlib
 import contextvars
 import hashlib
 import hmac
+import json
 import logging
 import os
 import secrets
@@ -38,7 +45,7 @@ import sqlite3
 import time
 import uuid
 from dataclasses import dataclass
-from typing import Dict, Iterable, Iterator, List, Optional, Tuple
+from typing import Dict, FrozenSet, Iterable, Iterator, List, Optional, Sequence, Tuple
 
 from core import access, user_rows
 from core.db import get_db_connection
@@ -53,6 +60,8 @@ DEFAULT_FIRST_USER_NAME = user_rows.DEFAULT_FIRST_USER_NAME
 # token's stored session_hash was computed with it, so it never changes: a new
 # value would leave no existing token able to sign in on the web.
 _SESSION_KEY = b"ganam-web-session"
+# system_marks row whose detail is the JSON list of the demo users' ids.
+DEMO_MARK = "users:demo"
 
 
 @dataclass(frozen=True)
@@ -71,6 +80,8 @@ class User:
     # Their own languages (comma list) and currency; "" = the server's (core/user_locale.py).
     languages: str = ""
     currency: str = ""
+    # A member of the sample household (core/demo.py), not a real person.
+    demo: bool = False
 
     @property
     def level(self) -> access.AccessLevel:
@@ -107,6 +118,7 @@ class _Snapshot:
     token_by_hash: Dict[str, Tuple[str, str]]  # token_hash -> (token id, user id)
     token_by_session: Dict[str, Tuple[str, str]]  # session_hash -> (token id, user id)
     by_telegram: Dict[int, str]  # telegram user id -> user id
+    demo_ids: FrozenSet[str] = frozenset()
 
 
 _snapshot: Optional[_Snapshot] = None
@@ -149,6 +161,7 @@ def _load() -> _Snapshot:
         tg_by_user: Dict[str, List[int]] = {}
         for r in tg_rows:
             tg_by_user.setdefault(r["user_id"], []).append(int(r["telegram_user_id"]))
+        demo_ids = _read_demo_ids(conn)
         users: Dict[str, User] = {}
         first_admin_id: Optional[str] = None
         for r in conn.execute("SELECT * FROM users ORDER BY created_at, rowid").fetchall():
@@ -156,8 +169,9 @@ def _load() -> _Snapshot:
                                   telegram_chat_id=r["telegram_chat_id"], created_at=r["created_at"],
                                   telegram_ids=tuple(tg_by_user.get(r["id"], ())), context=r["context"],
                                   pronoun=r["pronoun"], other_names=r["other_names"],
-                                  prompt_name=r["prompt_name"], languages=r["languages"], currency=r["currency"])
-            if first_admin_id is None and r["access"] == access.ADMIN:
+                                  prompt_name=r["prompt_name"], languages=r["languages"], currency=r["currency"],
+                                  demo=r["id"] in demo_ids)
+            if first_admin_id is None and r["access"] == access.ADMIN and r["id"] not in demo_ids:
                 first_admin_id = r["id"]
         tokens = conn.execute("SELECT id, user_id, token_hash, session_hash FROM user_tokens").fetchall()
     return _Snapshot(
@@ -167,7 +181,30 @@ def _load() -> _Snapshot:
         token_by_hash={t["token_hash"]: (t["id"], t["user_id"]) for t in tokens},
         token_by_session={t["session_hash"]: (t["id"], t["user_id"]) for t in tokens},
         by_telegram={int(r["telegram_user_id"]): r["user_id"] for r in tg_rows},
+        demo_ids=frozenset(demo_ids & set(users)),
     )
+
+
+def _read_demo_ids(conn: sqlite3.Connection) -> FrozenSet[str]:
+    row = conn.execute("SELECT detail FROM system_marks WHERE key = ?", (DEMO_MARK,)).fetchone()
+    try:
+        ids = json.loads(row["detail"]) if row and row["detail"] else []
+    except ValueError:
+        logger.warning("The demo users' mark is not readable; treating nobody as demo")
+        return frozenset()
+    return frozenset(str(i) for i in ids if isinstance(i, str))
+
+
+def write_demo_ids(conn: sqlite3.Connection, ids: Sequence[str]) -> None:
+    """Store the demo users' ids on ``conn`` (no commit; call :func:`invalidate`
+    after committing); an empty list removes the mark."""
+    if not ids:
+        conn.execute("DELETE FROM system_marks WHERE key = ?", (DEMO_MARK,))
+        return
+    now = _now_iso()
+    conn.execute("INSERT INTO system_marks (key, last_at, ok, last_ok_at, detail) VALUES (?, ?, 1, ?, ?) "
+                 "ON CONFLICT(key) DO UPDATE SET last_at = excluded.last_at, detail = excluded.detail",
+                 (DEMO_MARK, now, now, json.dumps(sorted(set(ids)))))
 
 
 def _current() -> _Snapshot:
@@ -206,8 +243,13 @@ def get(user_id: str) -> Optional[User]:
 
 
 def list_users() -> List[User]:
-    """Every user, oldest first."""
-    return list(_current().users.values())
+    """Every real user (not the demo household's), oldest first."""
+    return [u for u in _current().users.values() if not u.demo]
+
+
+def demo_users() -> List[User]:
+    """The demo household's users (core/demo.py), oldest first."""
+    return [u for u in _current().users.values() if u.demo]
 
 
 def first_admin() -> Optional[User]:
@@ -313,20 +355,27 @@ def acting_as(user: Optional[User]) -> Iterator[Optional[User]]:
 # --- Changes ----------------------------------------------------------------------
 
 def create(name: str, access_level: str = access.MEMBER, *, telegram_ids: Iterable[int] = (),
-           telegram_chat_id: Optional[int] = None, profile: Optional[user_rows.Profile] = None) -> User:
-    """Add a user (``profile``: what prompts know about them; default none, "they").
+           telegram_chat_id: Optional[int] = None, profile: Optional[user_rows.Profile] = None,
+           demo: bool = False) -> User:
+    """Add a user (``profile``: what prompts know about them; default none,
+    "they"). ``demo``: a member of the demo household, marked in the same
+    transaction (core/demo.py).
 
     Raises:
-        ValueError: empty name, unknown access level or pronoun, or a
-            Telegram id that already belongs to someone.
+        ValueError: empty name, unknown access level or pronoun, a Telegram
+            id that already belongs to someone, or a demo user that is not a member.
     """
     name = (name or "").strip()
     if not name:
         raise ValueError("A user needs a name.")
+    if demo and access_level != access.MEMBER:
+        raise ValueError("A demo user is a member.")
     try:
         with get_db_connection() as conn:
             user_id = user_rows.insert_user(conn, name, access_level, telegram_ids, telegram_chat_id)
             user_rows.write_profile(conn, user_id, profile or user_rows.Profile())
+            if demo:
+                write_demo_ids(conn, [*_read_demo_ids(conn), user_id])
             conn.commit()
     except sqlite3.IntegrityError as e:
         raise ValueError(f"Could not add {name!r}: a Telegram id already belongs to another user ({e}).") from e
@@ -361,6 +410,8 @@ def update(user_id: str, *, name: Optional[str] = None, access_level: Optional[s
         raise ValueError("A user needs a name.")
     if access_level is not None:
         access.level(access_level)
+        if user.demo and access_level != access.MEMBER:
+            raise ValueError("A demo user is a member.")
         if user.is_admin and access_level != access.ADMIN and _admin_count() <= 1:
             raise ValueError(f"{user.name} is the last admin; make someone else admin first.")
     profile = user_rows.Profile(

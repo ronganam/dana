@@ -8,7 +8,7 @@ Manifest values: :class:`Page` / :class:`Nav` (a page in the web app),
 schedule helpers :func:`minutes` / :func:`hours` for ``@addon.job(every=)``.
 
 What hooks get besides the user: :class:`NowContext`, :class:`BriefingContext`,
-:class:`ContextRequest`. What they return (``to_json()`` gives a payload):
+:class:`ContextRequest`, :class:`DemoContext`. What they return (``to_json()`` gives a payload):
 
 - :class:`Card` — a card on the Now screen (``@addon.now_cards``);
 - :class:`DayItem` — an item in the Now screen's day strip (``@addon.day_items``);
@@ -43,7 +43,7 @@ class Nav:
 
 
 # The web app's own screens: no addon page may take one of these ids (static/app-nav.js, CORE_SCREENS).
-CORE_SCREENS = ("now", "chat", "settings", "addons", "devices", "usage", "debug", "review")
+CORE_SCREENS = ("now", "chat", "settings", "addons", "devices", "household", "usage", "debug", "review")
 PAGE_ID = re.compile(r"^[a-z][a-z0-9_-]*$")
 
 
@@ -350,6 +350,20 @@ class NowContext:
     now: datetime.datetime
     hidden: Dict[str, Any]
     events: Optional[List[Dict[str, Any]]] = None
+
+
+@dataclass(frozen=True)
+class DemoContext:
+    """What ``@addon.demo`` gets besides the user: the moment, the demo
+    household's users (oldest first; ``household[0]`` is the one an admin
+    views first) and the user's place in it."""
+    now: datetime.datetime
+    household: Tuple[Any, ...]
+    index: int
+
+    def ago(self, days: float = 0, hours: float = 0, minutes: float = 0) -> datetime.datetime:
+        """``now`` minus the given time (aware, the server's zone)."""
+        return self.now - datetime.timedelta(days=days, hours=hours, minutes=minutes)
 
 
 # --- Briefing / weekly review ---------------------------------------------------------

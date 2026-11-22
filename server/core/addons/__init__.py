@@ -18,11 +18,11 @@
 from core.addons.addon import (ADDRESS, NAME, TELEGRAM_CHAT, TEXT, Field, Addon, InvalidValue,
                                PromptPart, Tool)
 from core.addons.data import UserTable
-from core.addons.hooks import (Approval, BriefingContext, Card, Check, ContextRequest, DayItem, Hit, LlmJob, Nav,
-                               Need, NowContext, Page, Section, Touches, Worker, hours, minutes)
+from core.addons.hooks import (Approval, BriefingContext, Card, Check, ContextRequest, DayItem, DemoContext, Hit,
+                               LlmJob, Nav, Need, NowContext, Page, Section, Touches, Worker, hours, minutes)
 from core.addons.store import Connection, Forbidden, NotConnected
 
-__all__ = ["ADDRESS", "Approval", "BriefingContext", "Card", "Check", "Connection", "ContextRequest", "DayItem",
+__all__ = ["ADDRESS", "Approval", "BriefingContext", "Card", "Check", "Connection", "ContextRequest", "DayItem", "DemoContext",
            "Field", "Forbidden", "Addon", "Hit", "InvalidValue", "LlmJob", "NAME", "Nav", "Need", "NotConnected",
            "NowContext", "Page", "PromptPart", "Section", "TELEGRAM_CHAT", "TEXT", "Tool", "Touches", "UserTable",
            "Worker", "hours", "minutes"]
