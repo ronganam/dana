@@ -15,6 +15,21 @@
     "path": "examples/addons/hello",
     "ref": "2841637e4b90cac67b1c845c80b32277eda28e54"
    }
+  },
+  {
+   "name": "israel_rail",
+   "title": "Israel Railways",
+   "description": "Train times and live delays in chat and voice, your commute on Now, and alerts when a watched train is late.",
+   "icon": "train-front",
+   "author": "ronganam",
+   "homepage": "https://github.com/ronganam/dana-addon-israel-rail",
+   "tags": ["transport", "israel"],
+   "min_dana": "10.0.0",
+   "source": {
+    "repo": "https://github.com/ronganam/dana-addon-israel-rail",
+    "path": "israel_rail",
+    "ref": "f8c3ed200acb88c88b97acd3d00cd958ea7882e7"
+   }
   }
  ]
 }

@@ -232,7 +232,7 @@ async def test_list(c: TestClient) -> None:
     check("list: mk's shape (title, version, state, needs, web URLs and nav while on, no worker)",
           mk["title"] == "Market test" and mk["version"] == "1.2.3" and mk["state"] == "on" and mk["needs"] == []
           and mk["web"] == [{"id": "mk", "panel": "/addons/mk/web/panel.js", "style": "/addons/mk/web/panel.css",
-                             "nav": {"label": "Market", "icon": "store", "order": 70}}] and mk["worker"] is False, mk)
+                             "nav": {"label": "Market", "icon": "store", "order": 70, "primary": False}}] and mk["worker"] is False, mk)
     check("list: needs are listed", items["mkplus"]["needs"] == ["mk"])
     check("list: the admin sees where an installed addon came from",
           greeter["installed"] == {"repo": str(REPO), "path": "addons/greeter", "commit": COMMIT1}
@@ -362,7 +362,7 @@ async def test_disable(c: TestClient) -> None:
 async def test_catalog(c: TestClient) -> None:
     shipped = catalog.parse(json.loads(catalog.BUNDLED.read_text(encoding="utf-8")))
     check("server/catalog.json (shipped in the image): every entry is valid, hello among them",
-          [e.name for e in shipped.entries] == ["hello"] and shipped.problems == [], shipped.problems)
+          [e.name for e in shipped.entries] == ["hello", "israel_rail"] and shipped.problems == [], shipped.problems)
     saved_file = os.environ.pop("DANA_CATALOG_FILE")
     os.environ["DANA_CATALOG_URL"] = "http://127.0.0.1:9/catalog.json"
     try:
@@ -371,7 +371,7 @@ async def test_catalog(c: TestClient) -> None:
         os.environ["DANA_CATALOG_FILE"] = saved_file
         del os.environ["DANA_CATALOG_URL"]
     check("catalog URL unreachable: the shipped copy is used, with a notice naming the URL",
-          [e.name for e in fallback.entries] == ["hello"] and "127.0.0.1:9" in fallback.notice
+          [e.name for e in fallback.entries] == ["hello", "israel_rail"] and "127.0.0.1:9" in fallback.notice
           and fallback.origin == "http://127.0.0.1:9/catalog.json", fallback.notice)
     check("catalog from a file: no notice", catalog.load(fresh=True).notice == "")
     src = {"repo": "https://example.invalid/r.git", "path": "", "ref": "c" * 40}
