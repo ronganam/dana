@@ -1,0 +1,452 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dana — the assistant that doesn't wait to be asked</title>
+  <meta name="description" content="Dana is a self-hosted, open-source assistant for a household. It watches the trains, reads your notifications, listens to your calls, knows when you get in the car, and meets you on your phone, watch, wall tablet, TV and the web.">
+  <meta name="theme-color" content="#2b2521">
+  <meta property="og:title" content="Dana — the assistant that doesn't wait to be asked">
+  <meta property="og:description" content="Self-hosted and open source. Proactive, on every screen in the house, and undo-first.">
+  <link rel="icon" href="favicon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <a class="skip" href="#reel">Skip to the showreel</a>
+
+  <header class="top">
+    <a class="brand" href="#" aria-label="Dana, home"><span class="brand-mark" aria-hidden="true"></span>Dana</a>
+    <nav class="top-nav" aria-label="Sections">
+      <a href="#reel">A day</a>
+      <a href="#why">Why it's different</a>
+      <a href="#caps">What it does</a>
+      <a href="#everywhere">Everywhere</a>
+      <a href="#build">Make it yours</a>
+    </nav>
+    <a class="btn btn-quiet btn-sm" href="https://github.com/ronganam/dana">GitHub</a>
+  </header>
+
+  <main>
+    <!-- ============ HERO ============ -->
+    <section class="hero">
+      <p class="eyebrow reveal">Self-hosted · Open source · Built for a household</p>
+      <h1 class="reveal">The assistant that <em>doesn't wait</em> to be asked.</h1>
+      <p class="lede reveal">Dana keeps an eye on the trains, your notifications, your calls, your car and your bank, all day. It tells you the one thing that matters, right when it matters. Then it gets out of the way.</p>
+      <div class="cta reveal">
+        <a class="btn btn-primary" href="#reel">Watch a day with Dana</a>
+        <a class="btn btn-quiet" href="#build">Run it yourself</a>
+      </div>
+      <ul class="hero-chips reveal" aria-label="Where Dana runs">
+        <li>Phone</li><li>Watch</li><li>Wall tablet</li><li>TV</li><li>Web</li><li>Telegram</li><li>Raycast</li>
+      </ul>
+    </section>
+
+    <!-- ============ SHOWREEL ============ -->
+    <section id="reel" class="reel" aria-roledescription="showreel" aria-label="A day with Dana">
+      <div class="reel-sky" aria-hidden="true"></div>
+      <div class="reel-head">
+        <div class="reel-clock" aria-hidden="true"><span class="reel-time">06:52</span><span class="reel-day">Tuesday</span></div>
+        <button class="reel-toggle" type="button" aria-label="Pause the showreel" aria-pressed="false">
+          <svg class="i-pause" viewBox="0 0 24 24" aria-hidden="true"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+          <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg>
+        </button>
+      </div>
+
+      <div class="scenes">
+        <!-- 1 · Wake → briefing on the watch -->
+        <article class="scene" data-time="06:52" data-sky="dawn" aria-label="06:52, the watch">
+          <div class="scene-device">
+            <div class="watch">
+              <div class="watch-face">
+                <p class="w-mono s" style="--d:0">Good morning</p>
+                <p class="w-title s" style="--d:1">Robin</p>
+                <ul class="w-list">
+                  <li class="s" style="--d:2"><i class="dot sky"></i>Standup 09:30</li>
+                  <li class="s" style="--d:3"><i class="dot amber"></i>Rain after 16:00</li>
+                  <li class="s" style="--d:4"><i class="dot teal"></i>08:12 runs 6 min late</li>
+                </ul>
+              </div>
+            </div>
+            <span class="tag s" style="--d:0"><i class="dot sage"></i>Sleep ended · from the watch</span>
+          </div>
+          <div class="scene-copy">
+            <p class="scene-kicker">06:52 · Wake</p>
+            <h2>It knows you're <em>up</em>.</h2>
+            <p>No alarm to set, no app to open. When your watch says you're awake, Dana puts together your morning: the meetings, the weather, the train, and what's due today. It's waiting on your wrist.</p>
+          </div>
+        </article>
+
+        <!-- 2 · Trains -->
+        <article class="scene" data-time="08:01" data-sky="morning" aria-label="08:01, trains">
+          <div class="scene-device">
+            <div class="phone">
+              <div class="phone-screen lock">
+                <p class="lock-time">08:01</p>
+                <p class="lock-date">Tuesday, 24 November</p>
+                <div class="notif s" style="--d:1">
+                  <div class="notif-head"><span class="app-dot sky"></span>Dana · Trains<span class="notif-when">now</span></div>
+                  <p class="notif-title">Leave at 08:14, not 08:08</p>
+                  <p class="notif-body">Your 08:12 to Tel Aviv HaShalom is 6 min late. Platform changed to 3. 40% full.</p>
+                </div>
+                <div class="notif ghost s" style="--d:3">
+                  <div class="notif-head"><span class="app-dot sky"></span>Dana · Trains<span class="notif-when">08:13</span></div>
+                  <p class="notif-title">Leaving in 5 minutes · platform 3</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="scene-copy">
+            <p class="scene-kicker">08:01 · Commute</p>
+            <h2>It watches the train <em>so you don't</em>.</h2>
+            <p>Tell Dana your commute once. It follows the live timetable, delays, platform changes and how full the trains are, and only buzzes when you need to change something. This is an add-on anyone can write, published in Dana's catalog.</p>
+          </div>
+        </article>
+
+        <!-- 3 · Notifications triage -->
+        <article class="scene" data-time="10:47" data-sky="day" aria-label="10:47, notifications">
+          <div class="scene-device">
+            <div class="phone">
+              <div class="phone-screen app">
+                <p class="app-eyebrow">Inbox</p>
+                <div class="triage s" style="--d:0">
+                  <span class="triage-n"><b class="count" data-to="43">43</b> notifications</span>
+                  <span class="triage-bar"><i class="t-need"></i><i class="t-later"></i><i class="t-noise"></i></span>
+                  <span class="triage-key"><i class="dot ember"></i>1 needs you <i class="dot amber"></i>6 later <i class="dot mute"></i>36 noise</span>
+                </div>
+                <div class="card ember s" style="--d:2">
+                  <p class="card-src">WhatsApp · School parents</p>
+                  <p class="card-title">Pickup moved to 13:00 today</p>
+                  <p class="card-why">Maya's class. You usually pick up at 16:00.</p>
+                  <div class="card-acts"><span class="b-fill">Remind me 12:30</span><span class="b-q">Tell Gal</span></div>
+                </div>
+                <div class="folded s" style="--d:3">
+                  <span>36 noise, folded away</span>
+                  <span class="fold-chips"><i>Promos ×14</i><i>Groups ×12</i><i>Delivery ×6</i></span>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="scene-copy">
+            <p class="scene-kicker">10:47 · Notifications</p>
+            <h2>It reads 43 notifications. <em>Shows you one.</em></h2>
+            <p>Dana reads every notification your phone gets: WhatsApp groups, the bank, the school, deliveries. It sorts them into "needs you", "later" and noise, says why something matters to <i>you</i>, and keeps buzzing about the urgent ones until you look.</p>
+          </div>
+        </article>
+
+        <!-- 4 · Calls → suggestions -->
+        <article class="scene" data-time="13:46" data-sky="day" aria-label="13:46, a phone call">
+          <div class="scene-device">
+            <div class="phone">
+              <div class="phone-screen app">
+                <div class="call s" style="--d:0">
+                  <span class="avatar plum">D</span>
+                  <div><p class="call-name">Dor · plumber</p><p class="call-meta">Call ended · 4:12 · transcribed</p></div>
+                </div>
+                <p class="app-eyebrow s" style="--d:1">From this call</p>
+                <div class="sugg s" style="--d:2"><i class="dot sky"></i><div><p>Dor comes Thursday 09:00</p><span>Add to calendar</span></div><b class="chk">✓</b></div>
+                <div class="sugg s" style="--d:3"><i class="dot amber"></i><div><p>Send him a photo of the boiler</p><span>Reminder · tonight 20:00</span></div><b class="chk">✓</b></div>
+                <div class="sugg s" style="--d:4"><i class="dot sage"></i><div><p>Quote: ₪650 including parts</p><span>Saved to “Bathroom” project</span></div><b class="chk">✓</b></div>
+              </div>
+            </div>
+          </div>
+          <div class="scene-copy">
+            <p class="scene-kicker">13:46 · Calls</p>
+            <h2>It was on the call. <em>It took the notes.</em></h2>
+            <p>Your call recordings are transcribed and read. Dates turn into calendar events, promises turn into reminders, prices land in the right project. When the same person calls again, a card shows who they are and what you last talked about, before you answer.</p>
+          </div>
+        </article>
+
+        <!-- 5 · Car trigger -->
+        <article class="scene" data-time="17:58" data-sky="dusk" aria-label="17:58, in the car">
+          <div class="scene-device">
+            <div class="phone">
+              <div class="phone-screen drive">
+                <div class="road" aria-hidden="true"><i></i><i></i><i></i></div>
+                <span class="tag in s" style="--d:0"><i class="dot sage"></i>Car connected</span>
+                <div class="notif solid s" style="--d:1">
+                  <div class="notif-head"><span class="app-dot amber"></span>Dana · Reminder<span class="notif-when">now</span></div>
+                  <p class="notif-title">Dry cleaning, on your way home</p>
+                  <p class="notif-body">Closes at 19:00. You asked on Sunday: “next time I'm in the car”.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="scene-copy">
+            <p class="scene-kicker">17:58 · Places</p>
+            <h2>Reminders that fire <em>where they make sense</em>.</h2>
+            <p>“When I get in the car.” “When I get home.” “When I wake up.” Dana hears your car, your location and your sleep through Home Assistant, so a reminder shows up at the moment you can actually do something about it, not at some random time.</p>
+          </div>
+        </article>
+
+        <!-- 6 · Kitchen tablet + shared list -->
+        <article class="scene" data-time="19:24" data-sky="evening" aria-label="19:24, the kitchen tablet">
+          <div class="scene-device duo">
+            <div class="tablet">
+              <div class="tablet-screen">
+                <div class="voice s" style="--d:0"><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></span><p>“Hey Dana, we're out of milk and eggs”</p></div>
+                <div class="t-list">
+                  <p class="app-eyebrow">Shopping · shared with Gal</p>
+                  <p class="t-row s" style="--d:2"><i class="dot sage"></i>Milk<span>Dairy</span></p>
+                  <p class="t-row s" style="--d:2.4"><i class="dot sage"></i>Eggs<span>Dairy</span></p>
+                  <p class="t-row old">Pita<span>Bakery</span></p>
+                </div>
+              </div>
+            </div>
+            <div class="phone mini s" style="--d:3.2">
+              <div class="phone-screen app">
+                <p class="app-eyebrow">Gal's phone</p>
+                <p class="t-row"><i class="dot sage"></i>Milk</p>
+                <p class="t-row"><i class="dot sage"></i>Eggs</p>
+                <p class="mini-note">Gal is at the supermarket</p>
+              </div>
+            </div>
+          </div>
+          <div class="scene-copy">
+            <p class="scene-kicker">19:24 · Home</p>
+            <h2>The kitchen <em>talks back</em>.</h2>
+            <p>The tablet on the wall wakes when someone says “Hey Dana”. The list is shared, sorted by supermarket aisle, and it's already on Gal's phone at the store. One server for the whole family: everyone has their own accounts and data, and you share only what you choose.</p>
+          </div>
+        </article>
+
+        <!-- 7 · Money on the TV -->
+        <article class="scene" data-time="21:40" data-sky="night" aria-label="21:40, money">
+          <div class="scene-device">
+            <div class="tv">
+              <div class="tv-screen">
+                <div class="money-head s" style="--d:0">
+                  <div><p class="app-eyebrow">End of month</p><p class="money-big">+<span class="cur">₪</span><span class="count" data-to="1240">1,240</span></p><p class="money-sub">above your usual, not counting one-offs</p></div>
+                  <span class="pill sage">On track</span>
+                </div>
+                <svg class="forecast s" style="--d:1" viewBox="0 0 400 110" preserveAspectRatio="none" aria-hidden="true">
+                  <path class="fc-area" d="M0 70 L40 62 L80 66 L120 48 L160 54 L200 40 L240 46 L240 110 L0 110 Z"/>
+                  <path class="fc-line" d="M0 70 L40 62 L80 66 L120 48 L160 54 L200 40 L240 46"/>
+                  <path class="fc-proj" d="M240 46 L280 52 L320 38 L360 44 L400 30"/>
+                  <line class="fc-now" x1="240" y1="8" x2="240" y2="110"/>
+                </svg>
+                <div class="save s" style="--d:2.4"><i class="dot amber"></i><p><b>Your phone plan went up <span class="cur">₪</span>38 a month.</b> Two carriers offer the same for less. Want a comparison?</p></div>
+              </div>
+            </div>
+          </div>
+          <div class="scene-copy">
+            <p class="scene-kicker">21:40 · Money</p>
+            <h2>It did the <em>money math</em>.</h2>
+            <p>Your bank and card accounts sync every night. Dana sorts the spending into fixed, yearly, everyday and one-off, predicts your balance at the end of the month, and spots things like a price that went up. You decide what to act on, and Dana checks later whether you actually saved.</p>
+          </div>
+        </article>
+
+        <!-- 8 · All clear -->
+        <article class="scene" data-time="23:05" data-sky="late" aria-label="23:05, all clear">
+          <div class="scene-device">
+            <div class="phone">
+              <div class="phone-screen app nowscr">
+                <p class="now-date s" style="--d:0">Tuesday · 24 November</p>
+                <p class="now-lede s" style="--d:1">All clear.</p>
+                <div class="now-day s" style="--d:2"><i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><b class="now-mark"></b><i></i></div>
+                <p class="now-tomorrow s" style="--d:3">Tomorrow: Dor at 09:00 · bring the umbrella</p>
+              </div>
+            </div>
+          </div>
+          <div class="scene-copy">
+            <p class="scene-kicker">23:05 · Now</p>
+            <h2>And then it <em>gets out of the way</em>.</h2>
+            <p>The Now screen shows only what needs you, and each thing takes one tap: done, snooze, or not today. When nothing's left, it just says “All clear.”</p>
+          </div>
+        </article>
+      </div>
+
+      <ol class="chapters" aria-label="Moments of the day"></ol>
+    </section>
+
+    <!-- ============ WHY ============ -->
+    <section id="why" class="why">
+      <p class="eyebrow reveal">Why it's different</p>
+      <h2 class="h-section reveal">Not another chat box <em>with access to your email</em>.</h2>
+      <p class="sub reveal">Chat assistants wait for you to type. Dana lives in what's happening around you: your notifications, your calls, the car, the train, the bank. It acts on what it sees, and it can undo anything.</p>
+      <div class="vs reveal">
+        <div class="vs-head"><span>A chat assistant</span><span>Dana</span></div>
+        <div class="vs-row"><span>Waits for your question</span><span>Comes to you when something changes: a delay, a call, a bill</span></div>
+        <div class="vs-row"><span>Lives in one browser tab</span><span>On your wrist, the fridge wall, the TV, your phone's long-press, Telegram</span></div>
+        <div class="vs-row"><span>Gets a screenshot of your life</span><span>Notifications, call recordings, car, location, sleep and bank accounts, all the time</span></div>
+        <div class="vs-row"><span>Forgets you when the chat ends</span><span>Picks up facts about you in the background and keeps them in every conversation</span></div>
+        <div class="vs-row"><span>Asks permission for everything, or for nothing</span><span>Acts right away with <b>Undo</b>, and asks first before it messages someone for you</span></div>
+        <div class="vs-row"><span>Someone else's cloud</span><span>Your server, your keys, open source (MIT)</span></div>
+      </div>
+    </section>
+
+    <!-- ============ CAPABILITIES ============ -->
+    <section id="caps" class="caps">
+      <p class="eyebrow reveal">What it does</p>
+      <h2 class="h-section reveal">One assistant, <em>wired into the whole house</em>.</h2>
+      <div class="bento">
+        <article class="cell c-wide reveal" style="--hue:var(--ember)">
+          <p class="cell-k">Now</p>
+          <h3>One queue for everything that needs you.</h3>
+          <p>Approvals, reminders, messages worth answering, a train to catch, a payment that looks wrong. Every add-on adds its own cards, and each card takes one tap.</p>
+          <div class="mini-queue" aria-hidden="true">
+            <span style="--h:var(--ember)">Approve: reply to Gal</span>
+            <span style="--h:var(--amber)">Passport renewal · due Fri</span>
+            <span style="--h:var(--sky)">08:12 · platform 3</span>
+            <span style="--h:var(--rose)">Card charged twice?</span>
+          </div>
+        </article>
+        <article class="cell reveal" style="--hue:var(--teal)">
+          <p class="cell-k">Notifications</p>
+          <h3>Sorted, explained, escalated.</h3>
+          <p>Noise folds away, and the urgent ones keep at you until you see them. Dana also suggests rules from what you keep ignoring.</p>
+        </article>
+        <article class="cell reveal" style="--hue:var(--sage)">
+          <p class="cell-k">Calls</p>
+          <h3>Every call becomes the next step.</h3>
+          <p>Recordings are transcribed and turned into tasks, events and notes. Incoming calls show who's calling, even unknown numbers.</p>
+        </article>
+        <article class="cell reveal" style="--hue:var(--amber)">
+          <p class="cell-k">Triggers</p>
+          <h3>Time, place, car, waking up.</h3>
+          <p>Reminders that wait for the moment you can act: leaving work, getting in the car, getting out of bed.</p>
+        </article>
+        <article class="cell reveal" style="--hue:var(--plum)">
+          <p class="cell-k">People</p>
+          <h3>A short brief on everyone.</h3>
+          <p>Who they are, what you last talked about, what you promised them. It's ready before a meeting or a call.</p>
+        </article>
+        <article class="cell c-wide reveal" style="--hue:var(--sage)">
+          <p class="cell-k">Money</p>
+          <h3>Your banks and cards, explained.</h3>
+          <p>A nightly sync of your accounts, with spending split into fixed, yearly, everyday and one-off. You get a balance forecast, ways to save that Dana checks back on, and your investments and meal card, read-only.</p>
+          <svg class="mini-bars" viewBox="0 0 300 60" aria-hidden="true"><rect x="0" y="22" width="34" height="38" rx="4"/><rect x="44" y="30" width="34" height="30" rx="4"/><rect x="88" y="14" width="34" height="46" rx="4"/><rect x="132" y="26" width="34" height="34" rx="4"/><rect x="176" y="34" width="34" height="26" rx="4"/><rect class="hl" x="220" y="6" width="34" height="54" rx="4"/><rect class="pj" x="264" y="18" width="34" height="42" rx="4"/></svg>
+        </article>
+        <article class="cell reveal" style="--hue:var(--sky)">
+          <p class="cell-k">Your accounts</p>
+          <h3>Calendar, Gmail, Contacts, WhatsApp, Telegram.</h3>
+          <p>Read, search, summarize, draft. Nothing goes out without asking you first. Text written by other people can never make Dana act on its own.</p>
+        </article>
+        <article class="cell reveal" style="--hue:var(--teal)">
+          <p class="cell-k">Home</p>
+          <h3>Home Assistant and cameras.</h3>
+          <p>Lights, heating, locks and a map of the house, by voice or text. Camera clips on the TV and the wall tablet.</p>
+        </article>
+        <article class="cell reveal" style="--hue:var(--rose)">
+          <p class="cell-k">Projects</p>
+          <h3>Decisions, side by side.</h3>
+          <p>Renovating? Buying a car? Options in columns, with notes, files, links, a budget and a date, all searchable.</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ SAFETY ============ -->
+    <section class="safety">
+      <div class="safety-copy">
+        <p class="eyebrow reveal">Safe by default</p>
+        <h2 class="h-section reveal">It acts first, <em>and can always undo</em>.</h2>
+        <p class="sub reveal">Things you can take back happen right away, with Undo. Sending something in your name, or deleting something for good, waits for your yes. If an email or a message tells Dana to do something, it ignores it.</p>
+      </div>
+      <div class="safety-demo reveal" aria-hidden="true">
+        <div class="chat-bubble me">Move my dentist to Thursday and tell Gal I'll be late</div>
+        <div class="chat-bubble dana">
+          <p class="act done"><i class="dot sage"></i>Dentist moved to Thu 10:00 <span class="undo">Undo</span></p>
+          <div class="approve">
+            <p class="card-src">Asks first · WhatsApp to Gal</p>
+            <p>“Running late, home by 19:30”</p>
+            <div class="card-acts"><span class="b-fill">Send</span><span class="b-q">Edit</span><span class="b-q">Deny</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ EVERYWHERE ============ -->
+    <section id="everywhere" class="everywhere">
+      <p class="eyebrow reveal">Everywhere</p>
+      <h2 class="h-section reveal">Wherever you are, <em>Dana is already there</em>.</h2>
+      <div class="lineup">
+        <div class="lu reveal"><div class="lu-ico">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="13" y="4" width="22" height="40" rx="5"/><path d="M21 38h6"/></svg></div>
+          <h3>Phone</h3><p>The Now screen, the inbox and chat. Long-press for an assistant that sees your screen. A card about the caller on every incoming call.</p></div>
+        <div class="lu reveal"><div class="lu-ico">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="12"/><path d="M19 12l1-7h8l1 7M19 36l1 7h8l1-7"/></svg></div>
+          <h3>Watch</h3><p>Tiles, a watch face with live complications, and push-to-talk on your wrist.</p></div>
+        <div class="lu reveal"><div class="lu-ico">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="10" width="40" height="28" rx="4"/><circle cx="24" cy="24" r="3"/></svg></div>
+          <h3>Wall tablet</h3><p>A kiosk with "Hey Dana": the family calendar, shopping and cameras, plus a bedside mode.</p></div>
+        <div class="lu reveal"><div class="lu-ico">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="3" y="8" width="42" height="26" rx="3"/><path d="M16 42h16M24 34v8"/></svg></div>
+          <h3>TV</h3><p>A home screen for the living room: the day ahead, the doorbell camera, and voice.</p></div>
+        <div class="lu reveal"><div class="lu-ico">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="8" width="40" height="30" rx="4"/><path d="M4 16h40M10 12h.01M15 12h.01"/></svg></div>
+          <h3>Web</h3><p>The full app in your browser: Now, chat, tasks, inbox, projects, money.</p></div>
+        <div class="lu reveal"><div class="lu-ico">
+          <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 23l34-14-6 30-10-8-6 6v-9l14-12-18 10z"/></svg></div>
+          <h3>Telegram &amp; Raycast</h3><p>Talk to Dana from any chat app, or right from your Mac.</p></div>
+      </div>
+      <p class="bilingual reveal"><span>Speaks your language.</span> <span dir="rtl" lang="he">מדברת גם עברית.</span></p>
+    </section>
+
+    <!-- ============ BUILD ============ -->
+    <section id="build" class="build">
+      <div class="build-copy">
+        <p class="eyebrow reveal">Make it yours</p>
+        <h2 class="h-section reveal">Your server. <em>Your add-ons.</em></h2>
+        <p class="sub reveal">Dana runs on one small server you own: a mini PC, a NAS or a homelab. Each feature is an add-on with its own tools and screens. The train add-on in the showreel lives in its own repository. You can write yours in an afternoon: an add-on is just typed Python functions with docstrings, and Dana takes it from there.</p>
+        <ul class="facts reveal">
+          <li><b>Any model</b> through LiteLLM. Claude is the default.</li>
+          <li><b>Several users</b> on one server, each with their own accounts, data and tokens.</li>
+          <li><b>Docker</b> or Kubernetes and SQLite. You need just two settings to start.</li>
+          <li><b>MIT licensed.</b> Your data stays on your server.</li>
+        </ul>
+      </div>
+      <div class="code reveal">
+        <div class="code-tabs" role="tablist" aria-label="Examples">
+          <button role="tab" aria-selected="true" aria-controls="code-addon" id="tab-addon" type="button">tools.py</button>
+          <button role="tab" aria-selected="false" aria-controls="code-run" id="tab-run" type="button" tabindex="-1">terminal</button>
+        </div>
+        <pre id="code-addon" role="tabpanel" aria-labelledby="tab-addon"><code><span class="c"># addons/israel_rail/tools.py</span>
+<span class="k">@rail.tool</span>()
+<span class="k">def</span> <span class="f">next_trains</span>(conn, origin: <span class="t">str</span>, destination: <span class="t">str</span>,
+                count: <span class="t">int</span> = <span class="n">3</span>) -> <span class="t">dict</span>:
+    <span class="s">"""The next trains between two stations.
+
+    Args:
+        origin: Station name, Hebrew or English.
+        destination: Station name.
+        count: How many trains to list.
+    """</span>
+    trips = client.search(origin, destination)
+    <span class="k">return</span> present.trips(trips[:count])
+
+<span class="c"># Dana writes the schema, offers the tool to users
+# who connected the add-on, and the trains show up on Now.</span></code></pre>
+        <pre id="code-run" role="tabpanel" aria-labelledby="tab-run" hidden><code><span class="c"># run Dana</span>
+<span class="p">$</span> git clone https://github.com/ronganam/dana
+<span class="p">$</span> cd dana/server &amp;&amp; cp .env.example .env
+<span class="c"># set ANTHROPIC_API_KEY and API_TOKEN</span>
+<span class="p">$</span> docker compose up -d
+<span class="o">✓ dana is up on http://127.0.0.1:8080</span>
+
+<span class="c"># add the trains from the catalog</span>
+<span class="p">$</span> bin/dana addons install israel_rail
+<span class="o">✓ israel_rail installed, pinned to a commit</span>
+
+<span class="c"># or write your own</span>
+<span class="p">$</span> bin/dana addons new my_thing</code></pre>
+      </div>
+    </section>
+
+    <section class="closer">
+      <h2 class="reveal">Stop checking. <em>Start living.</em></h2>
+      <div class="cta reveal">
+        <a class="btn btn-primary" href="https://github.com/ronganam/dana">Get Dana on GitHub</a>
+        <a class="btn btn-quiet" href="#reel">Watch the day again</a>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span class="brand"><span class="brand-mark" aria-hidden="true"></span>Dana</span>
+    <span>Self-hosted personal assistant · MIT · The names in this page are made up.</span>
+  </footer>
+
+  <script src="site.js"></script>
+</body>
+</html>

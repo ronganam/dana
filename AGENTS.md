@@ -8,6 +8,7 @@
 | `android/` | Gradle project: `:app` (flavors `phone`, `kiosk`, `tv`), `:wear` (watch), `:watchface` (the Dana watch face), `:protocol` (phone↔watch Data Layer contract) | `android/AGENTS.md`, `android/docs/` |
 | `extensions/raycast-assistant/` | Raycast extension (macOS) | its `README.md` |
 | `examples/addons/hello/` | The example addon, loaded as a site addon by `server/tests/test_addon_loading.py` | `server/docs/writing-an-addon.md` |
+| `website/` | The project's one-page site (static, no build) | its `README.md` |
 | `site.example/` | The template of a deployment's **site** folder: `site/` (gitignored, often a link to a private repository) holds one deployment's config, site addons, app defaults and notes | `docs/site.md` |
 | `.githooks/pre-push` | Pushing master runs the server tests, then deploys when `site/deploy.env` exists (`server/docs/operations.md`) | |
 | `.github/` | CI (server tests, Android unit tests / debug builds / lint, Raycast build & lint, Docker image builds), Dependabot, issue and PR templates | |

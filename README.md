@@ -20,6 +20,7 @@ It is one person's daily driver, published as is: opinionated, built around one 
 | [`android/`](android/) | The phone app, the wall-tablet kiosk and the TV home screen (flavors of one app), and the Wear OS watch app (Kotlin, Compose) |
 | [`extensions/raycast-assistant/`](extensions/raycast-assistant/) | A Raycast extension |
 | [`examples/addons/`](examples/addons/) | A working example of an addon you write yourself |
+| [`website/`](website/) | The project's one-page site: open `website/index.html` |
 
 ## Run the server
 
