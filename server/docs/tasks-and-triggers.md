@@ -23,8 +23,18 @@ The `tasks` addon (`addons/tasks/`) owns lists, tasks, links and the trigger eng
 | `links.py` | task links (`task_links`: task → `call` / `session` / `whatsapp` / `memory` / `project` / `notification` / `person` ref) |
 | `titles.py` | emoji and list picking for new tasks (model at `llm.complete`, purposes `task_emoji` / `task_group`) |
 | `triggers.py` | the trigger engine: `fire(user, type, action=, target=)`, the time checker, refire / flap / cooldown marks |
-| `tools.py` | the agent tools |
+| `tools.py` | the agent tools (below) |
 | `web/tasks.js`, `web/tasks-core.js`, `web/tasks.css` | the web page `tasks` (Reminders: filters, the list by group / priority / due date, the detail pane, the new-reminder and group modals; above them the core Today strip through `api.piece("today", el)`); the pure part is tested by `tests/test_web_tasks.mjs` |
+
+## The agent tools (`tools.py`)
+
+`add_task`, `update_task`, `delete_task` (asks first), `list_tasks`, `get_zones`, `list_task_groups`, `add_task_group`, `remove_task_group` (asks first). Every write but the two that ask runs at once and registers an undo.
+
+- A task is named by its id (anywhere in the text) or its title (`service.find_task`): among open tasks, the title with or without its leading emoji (the user's own task wins a tie), else the one title containing the words. Several titles containing them answer with the candidates and their ids; nothing matching points at `list_tasks`.
+- `add_task` asks the model for the emoji and the list at the same time; a time trigger already past moves to the next day (also in `update_task`); a `call_id` that is not one of the user's calls is reported, not linked.
+- `update_task` changes only the fields it is given (`''` removes one); triggers are merged, so removing the car trigger keeps the time. It writes only what differs, says which fields changed (or that nothing did), and completing a task emits `tasks.task.completed` like the app's Done.
+- `list_tasks` shows open tasks (newest first) or completed ones (latest first), optionally one list, at most `limit` (default 50, a line says when there are more); a description is cut at 200 characters with a visible mark.
+- Errors start with `Error:` and name the valid values (priorities, the user's lists, their zones).
 
 ## Per user
 

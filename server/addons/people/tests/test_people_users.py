@@ -224,10 +224,10 @@ def test_tools() -> None:
           tool(ADMIN, "get_person", {"person": "0501112222"}).startswith("Gal Robin")
           and tool(BOB, "get_person", {"person": "0501112222"}).startswith("Galit Bob"))
     out = tool(BOB, "get_person", {"person": P["robin_only"]})
-    check("tools: another user's person id is unknown", out.startswith("No person matching"), out)
-    check("tools: another user's person name is unknown", tool(BOB, "get_person", {"person": "Zehava"}).startswith("No person"))
+    check("tools: another user's person id is unknown", out.startswith("Error: no person matching"), out)
+    check("tools: another user's person name is unknown", tool(BOB, "get_person", {"person": "Zehava"}).startswith("Error: no person"))
     check("tools: Sam (the first admin's old person) is not Bob's", tool(BOB, "get_person", {"person": "Sam Example"})
-          .startswith("No person"))
+          .startswith("Error: no person"))
     out = tool(BOB, "update_person", {"person": "Galit Bob", "relation": "friend"})
     with get_db_connection() as conn:
         rel = {r["id"]: r["relation"] for r in conn.execute("SELECT id, relation FROM people")}
@@ -240,6 +240,17 @@ def test_tools() -> None:
           out.startswith("Created Zehava Admin") and sorted((r["user_id"], r["relation"]) for r in z)
           == sorted([(ADMIN.id, ""), (BOB.id, "aunt")]), str([tuple(r) for r in z]))
     P["bob_zehava"] = people_store.resolve(BOB, "Zehava Admin")
+    out = tool(BOB, "update_person", {"person": "Nobody Like This", "rename_to": "Someone"})
+    check("tools: update_person renaming nobody is an error, nobody created",
+          out.startswith("Error: ") and people_store.resolve(BOB, "Nobody Like This") is None, out)
+    tool(BOB, "update_person", {"person": "Zehava Admin", "notes": "Lives in Haifa"})
+    out = tool(BOB, "update_person", {"person": "Zehava Admin", "append_note": "Likes tea"})
+    with get_db_connection() as conn:
+        notes = conn.execute("SELECT notes FROM people WHERE id = ?", (P["bob_zehava"],)).fetchone()[0]
+    check("tools: append_note keeps the notes and reports only the added line",
+          notes == "Lives in Haifa\nLikes tea" and "Haifa" not in out and "Likes tea" in out, out)
+    check("tools: update_person with nothing to change says so",
+          tool(BOB, "update_person", {"person": "Zehava Admin"}).startswith("Error: nothing to change"))
     check("tools: no people tools offered without the addon",
           not PEOPLE_TOOLS & {t["function"]["name"] for t in registry.tool_schemas(CARL)}
           and PEOPLE_TOOLS <= {t["function"]["name"] for t in registry.tool_schemas(BOB)})
@@ -468,7 +479,7 @@ def test_task_links_shared_list() -> None:
     sharing.set_level(ADMIN, "task_list", shared, BOB.id, "edit")
     tid = tasks_service.create_task(ADMIN, title="Book the venue", group_id=shared)
     out = tool(ADMIN, "link_task_to_person", {"task_id": tid, "person": "Gal Robin"})
-    check("task links: the first admin links a shared-list task to their person", out == "Linked.", out)
+    check("task links: the first admin links a shared-list task to their person", out.startswith("Linked '") and out.endswith(" to Gal Robin."), out)
     robin_links = task_links.links_for_tasks(ADMIN, [tid]).get(tid, [])
     bob_links = task_links.links_for_tasks(BOB, [tid]).get(tid, [])
     check("task links: the person link resolves for its owner only (Bob sees the task, not the link)",
@@ -481,9 +492,9 @@ def test_task_links_shared_list() -> None:
           any(t["id"] == tid for t in detail.get_person(ADMIN, P["robin_gal"], schedule_brief=False)["tasks"])
           and not any(t["id"] == tid for t in detail.get_person(BOB, P["bob_gal"], schedule_brief=False)["tasks"]))
     out = tool(BOB, "link_task_to_person", {"task_id": tid, "person": "Gal Robin"})
-    check("task links: Bob's tool can't find the first admin's person", out.startswith("No person matching"), out)
+    check("task links: Bob's tool can't find the first admin's person", out.startswith("Error: no person matching"), out)
     out = tool(BOB, "link_task_to_person", {"task_id": tid, "person": P["robin_gal"]})
-    check("task links: …not by id either", out.startswith("No person matching"), out)
+    check("task links: …not by id either", out.startswith("Error: no person matching"), out)
     check("task links: owns() is per user", people_store.owns(ADMIN, P["robin_gal"])
           and not people_store.owns(BOB, P["robin_gal"]) and not people_store.owns(CARL, P["bob_gal"]))
 

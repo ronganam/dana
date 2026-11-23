@@ -18,6 +18,7 @@ Events (core/events.py) for the user who acted: ``tasks.task.created``
 """
 
 import logging
+import re
 import sqlite3
 import uuid
 from typing import Any, Dict, List, Optional, Sequence, Tuple
@@ -39,6 +40,8 @@ TASK_COLUMNS = ("title", "description", "priority", "due_date", "status", "trigg
 OWNER_COLUMNS = ("user_id", "created_by")
 # An undo refused because the user lost write access.
 NO_LONGER = "You can no longer change this task, so it was left as it is."
+# A task id (a UUID), also found inside a longer text.
+TASK_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
 
 
 class ReadOnly(PermissionError):
@@ -127,21 +130,30 @@ def check_still_writable(user: Optional[User], task_id: str) -> None:
                 raise UndoConflict(NO_LONGER) from None
 
 
-def find_task(user: Optional[User], ref: str, uuid_like: bool) -> Optional[Dict[str, Any]]:
-    """A task by id (``uuid_like``) or, among open tasks, by exact then partial
-    title; the user's own task wins a tie (the tools' lookup)."""
+def find_task(user: Optional[User], ref: str) -> Tuple[Optional[Dict[str, Any]], List[Dict[str, Any]]]:
+    """The task ``ref`` names (the tools' lookup): the id anywhere in it, else
+    among open tasks the title, with or without its emoji (the user's own task
+    wins a tie), else the one title that contains it. ``(None, candidates)``
+    when it contains several titles and none equals it; ``(None, [])`` when nothing matches."""
     where, args = visible_sql(user, "")
-    own = user.id if user else ""
+    found = TASK_ID.search(ref or "")
     with get_db_connection() as db:
-        if uuid_like:
-            row = db.execute(f"SELECT * FROM tasks WHERE id = ? AND {where}", (ref, *args)).fetchone()
-        else:
-            row = db.execute(f"SELECT * FROM tasks WHERE LOWER(title) = ? AND status = 'needs_action' AND {where} "
-                             "ORDER BY user_id = ? DESC", (ref.lower().strip(), *args, own)).fetchone()
-            if not row:
-                row = db.execute(f"SELECT * FROM tasks WHERE title LIKE ? AND status = 'needs_action' AND {where} "
-                                 "ORDER BY user_id = ? DESC", (f"%{ref.strip()}%", *args, own)).fetchone()
-    return dict(row) if row else None
+        if found:
+            row = db.execute(f"SELECT * FROM tasks WHERE id = ? AND {where}", (found.group(0), *args)).fetchone()
+            return (dict(row) if row else None), []
+        rows = [dict(r) for r in db.execute(
+            f"SELECT * FROM tasks WHERE title LIKE ? AND status = 'needs_action' AND {where} "
+            "ORDER BY user_id = ? DESC, created_at DESC", (f"%{(ref or '').strip()}%", *args, user.id if user else ""))]
+    wanted = _bare_title(ref or "")
+    exact = [r for r in rows if _bare_title(r["title"]) == wanted]
+    if exact or len(rows) == 1:
+        return (exact or rows)[0], []
+    return None, rows
+
+
+def _bare_title(title: str) -> str:
+    """A title without its leading emoji / symbols, lower case (what a person types)."""
+    return re.sub(r"^\W+", "", title.strip()).lower()
 
 
 def public_task(user: User, task: Dict[str, Any]) -> Dict[str, Any]:

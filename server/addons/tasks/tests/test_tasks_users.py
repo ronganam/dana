@@ -251,13 +251,9 @@ def test_triggers_per_user() -> None:
           and triggers.last_transition("car", CARL) is None)
 
     # Location triggers name one of the user's own zones (core/zones.py), with or without Home Assistant.
-    try:  # like any bad argument, the error reaches the agent loop as the tool's error
-        tool(BOB, "add_task", title="Milk", location="home", location_event="arrive")
-        out = ""
-    except service.UnknownZone as e:
-        out = str(e)
+    out = tool(BOB, "add_task", title="Milk", location="home", location_event="arrive")
     check("a location reminder without any zone: a clear message, no task",
-          "Settings → Zones" in out and "time, car or wake-up" in out and "Milk" not in tool(BOB, "list_tasks"), out)
+          out.startswith("Error: ") and "Settings → Zones" in out and "time, car or wake-up" in out and "Milk" not in tool(BOB, "list_tasks"), out)
     zones.create(BOB, "Home", 40.1, -74.0, is_home=True)
     zones.create(BOB, "Bakery", 40.2, -74.1)
     zones.create(CARL, "Carl Gym", 40.3, -74.2)
@@ -288,6 +284,50 @@ def test_triggers_per_user() -> None:
         n_bob = run(fire_location(BOB, "arrive", "Bakery"))
     check("location: arriving at Bob's Dana zone fires his reminder, to him only (no Home Assistant)",
           n_carl == 0 and n_bob == 1 and [u for u, _ in sent] == [BOB.id], str(sent))
+
+
+# --- 4b. The tools: lookups by title, partial updates, bounded lists ---------------------------
+
+def test_task_tools() -> None:
+    from core import events
+    gid = groups.create_group(BOB, "Errands")
+    a = service.create_task(BOB, title="📝 Pay rent", group_id=gid)
+    service.create_task(BOB, title="📝 Pay rent to Gal", group_id=gid)
+    service.create_task(BOB, title="📝 Pay water bill", group_id=gid, description="x" * 500)
+    out = tool(BOB, "update_task", item="pay", priority="high")
+    check("update_task by a title several tasks contain: an error listing them with ids, nothing changed",
+          out.startswith("Error: ") and a in out and "Pay water bill" in out
+          and service.get_task(BOB, a)["priority"] == "medium", out)
+    out = tool(BOB, "update_task", item="pay rent", priority="high")
+    check("update_task by the exact title without its emoji: that task, only priority changed",
+          service.get_task(BOB, a)["priority"] == "high" and out.endswith(": priority.")
+          and service.get_task(BOB, a)["title"] == "📝 Pay rent", out)
+    out = tool(BOB, "update_task", item=a, priority="high")
+    check("update_task with nothing new: says so", out.startswith("Nothing to change"), out)
+    out = tool(BOB, "update_task", item=a, priority="urgent")
+    check("update_task with a bad priority: the valid values", "'low', 'medium' or 'high'" in out, out)
+    out = tool(BOB, "update_task", item=a, group="Nope")
+    check("update_task to an unknown group: the groups listed", out.startswith("Error: ") and "Errands" in out, out)
+    tool(BOB, "update_task", item=a, time_trigger="2099-01-02 09:00", car_trigger="enter")
+    out = tool(BOB, "update_task", item=a, car_trigger="")
+    check("update_task merges triggers: removing the car keeps the time",
+          json.loads(service.get_task(BOB, a)["triggers"]) == {"time": "2099-01-02 09:00"}, out)
+    with patch.object(events, "emit") as emitted:
+        tool(BOB, "update_task", item=a, status="completed")
+    check("completing with update_task emits tasks.task.completed",
+          [c.args[0] for c in emitted.call_args_list] == ["tasks.task.completed"], str(emitted.call_args_list))
+    out = tool(BOB, "update_task", item="no such thing")
+    check("update_task on an unknown title: Error naming list_tasks", out.startswith("Error: ") and "list_tasks" in out)
+    out = tool(BOB, "list_tasks", group="Errands", limit=1)
+    check("list_tasks: one group, limited, says there are more",
+          out.count("(ID: ") == 1 and "there are more" in out, out)
+    out = tool(BOB, "list_tasks", group="Errands")
+    check("list_tasks: a long description is cut visibly", "x" * 200 + "… (cut)" in out and "x" * 201 not in out)
+    check("list_tasks: an unknown group lists the groups",
+          tool(BOB, "list_tasks", group="Nope").startswith("Error: no task group"))
+    out = run(registry.execute(BOB, "add_task_group", {"name": "errands"}))
+    check("add_task_group for a name taken: a clear error",
+          out == "Error: you already have a task group called 'errands'.", out)
 
 
 # --- 5. Sharing --------------------------------------------------------------------------------
@@ -495,6 +535,7 @@ async def http_main() -> None:
 test_lists_per_user()
 test_tasks_per_user()
 test_triggers_per_user()
+test_task_tools()
 test_share_tool()
 test_sharing_read_edit()
 run(http_main())

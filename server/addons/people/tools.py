@@ -1,8 +1,9 @@
 """Agent tools for people: who someone is, what's going on with them, what's open between us."""
 import json
-from typing import Optional
+from typing import Literal, Optional
 
 from core.addons import Connection
+from core.db import get_db_connection
 from addons.people.addon import addon
 from core.undoable import UndoConflict, safe_record
 from core.users import User
@@ -10,12 +11,15 @@ from addons.people import cadence, detail, store
 from addons.people.values import shown_phone
 from addons.tasks import links as task_links, service as tasks_service
 
-# What update_person can change, as returned by detail.get_person / store.to_api.
+# What update_person can change, as returned by store.to_api.
 _PERSON_FIELDS = ("name", "aliases", "phones", "relation", "notes", "birthday", "pinned")
 
 
 def _person_state(user: User, pid: str) -> Optional[dict]:
-    p = detail.get_person(user, pid, schedule_brief=False)
+    """The fields update_person changes, as they are now (None when not ``user``'s person)."""
+    with get_db_connection() as conn:
+        r = store.row(conn, user, pid)
+        p = store.to_api(r, conn) if r else None
     if not p:
         return None
     return {k: (sorted(p.get(k) or []) if k in ("aliases", "phones") else p.get(k)) for k in _PERSON_FIELDS}
@@ -55,18 +59,21 @@ def _person_line(p: dict) -> str:
 
 # Names come from contacts and from senders' own display names (chosen by others).
 @addon.tool(untrusted_result=True)
-async def list_people(conn: Connection, query: Optional[str] = None, sort: str = "recent", limit: int = 15) -> str:
+async def list_people(conn: Connection, query: Optional[str] = None,
+                      sort: Literal["recent", "drifting", "pinned", "name"] = "recent", limit: int = 15) -> str:
     """List the people the user talks to (built from calls and messages), e.g. who he talked to lately or who he hasn't talked to in a while.
 
     Args:
         query: Optional name, relation or phone number to filter by (in any language or script).
         sort: 'recent' (last contact first), 'drifting' (only people he talks to regularly but not lately), 'pinned' or 'name'.
-        limit: Max people to return (default 15).
+        limit: Max people to return (default 15, at most 50).
     """
     items = cadence.list_people(conn.user, q=query or "", sort=sort if sort in ("recent", "drifting", "pinned", "name") else "recent")
     if not items:
         return "No people found."
-    return "\n".join(_person_line(p) for p in items[:max(1, min(limit, 50))])
+    shown = max(1, min(limit, 50))
+    more = f"\n({len(items) - shown} more: narrow with query or raise limit.)" if len(items) > shown else ""
+    return "\n".join(_person_line(p) for p in items[:shown]) + more
 
 
 @addon.tool(untrusted_result=True)
@@ -77,11 +84,9 @@ async def get_person(conn: Connection, person: str) -> str:
         person: The person's name (in any language or script, partial is fine), phone number or id.
     """
     pid = store.resolve(conn.user, person)
-    if not pid:
-        return f"No person matching '{person}'. Use list_people to search."
-    p = detail.get_person(conn.user, pid, schedule_brief=True)
+    p = detail.get_person(conn.user, pid, schedule_brief=True) if pid else None
     if not p:
-        return "Person not found."
+        return f"Error: no person matching '{person}'. Use list_people to search."
     s = p["stats"]
     b = p.get("brief") or {}
     out = [f"{p['name']} [{p['id']}]" + (f" — {p['relation']}" if p["relation"] else "")]
@@ -123,23 +128,25 @@ async def update_person(conn: Connection, person: str, relation: Optional[str] =
                         append_note: Optional[str] = None, birthday: Optional[str] = None,
                         add_alias: Optional[str] = None, add_phone: Optional[str] = None,
                         pinned: Optional[bool] = None, rename_to: Optional[str] = None) -> str:
-    """Update what Dana knows about a person (creates them if nobody matches and rename_to is not given).
+    """Update what Dana knows about a person; only what you pass changes. Creates them when nobody matches (unless rename_to is given).
 
     Args:
         person: The person's name, phone number or id.
         relation: Who they are to the user, e.g. 'mother', 'colleague at Wix', 'plumber'.
-        notes: Replace the free-text notes.
+        notes: Replace the free-text notes ('' clears them).
         append_note: Add a line to the notes (keeps what's there).
         birthday: YYYY-MM-DD, or MM-DD when the year is unknown.
         add_alias: Another name they go by (e.g. their name in another script, a nickname).
         add_phone: Another phone number for them.
         pinned: Pin (true) or unpin (false) them in the People list and the home-screen widget.
-        rename_to: A new display name.
+        rename_to: A new display name (the old one stays as an alias).
     """
     user = conn.user
     pid = store.resolve(user, person)
     try:
         if not pid:
+            if rename_to:
+                return f"Error: no person matching '{person}' to rename. Use list_people to find them."
             p = store.create_person(user, person, phones=[add_phone] if add_phone else [],
                                      aliases=[add_alias] if add_alias else [], relation=relation or "",
                                      notes=(notes or append_note or ""), birthday=birthday or "", pinned=bool(pinned))
@@ -157,17 +164,19 @@ async def update_person(conn: Connection, person: str, relation: Optional[str] =
             return f"Created {p['name']} [{p['id']}]."
         before = _person_state(user, pid)
         changes = {"relation": relation, "birthday": birthday, "pinned": pinned, "add_alias": add_alias,
-                   "add_phone": add_phone, "name": rename_to}
-        if notes is not None:
-            changes["notes"] = notes
-        elif append_note:
-            current = detail.get_person(user, pid, schedule_brief=False) or {}
-            changes["notes"] = "\n".join(x for x in (current.get("notes") or "", append_note) if x)
-        p = store.update_person(user, pid, {k: v for k, v in changes.items() if v is not None})
+                   "add_phone": add_phone, "name": rename_to, "notes": notes}
+        if notes is None and append_note:
+            changes["notes"] = "\n".join(x for x in ((before or {}).get("notes") or "", append_note) if x)
+        changes = {k: v for k, v in changes.items() if v is not None}
+        if not changes:
+            return "Error: nothing to change: pass at least one field."
+        p = store.update_person(user, pid, changes)
         if before:
             _record_person_restore(user, pid, before, _person_state(user, pid))
-        return f"Updated {p['name']}: " + json.dumps({k: v for k, v in changes.items() if v is not None}, ensure_ascii=False)
-    except ValueError as e:
+        if notes is None and append_note:  # report the line added, not the whole notes
+            changes = {**{k: v for k, v in changes.items() if k != "notes"}, "append_note": append_note}
+        return f"Updated {p['name']} [{p['id']}]: " + json.dumps(changes, ensure_ascii=False)
+    except (LookupError, ValueError) as e:
         return f"Error: {e}"
 
 
@@ -176,25 +185,34 @@ async def link_task_to_person(conn: Connection, task_id: str, person: str) -> st
     """Attach a task to a person so it shows on their page and on the card when they call.
 
     Args:
-        task_id: The task id.
+        task_id: The task's ID (from list_tasks) or its title.
         person: The person's name, phone number or id.
     """
-    pid = store.resolve(conn.user, person)
+    user = conn.user
+    pid = store.resolve(user, person)
     if not pid:
-        return f"No person matching '{person}'."
+        return f"Error: no person matching '{person}'. Use list_people to search."
+    task, candidates = tasks_service.find_task(user, task_id)
+    if task is None:
+        if candidates:
+            return "Error: several open tasks match: " + "; ".join(
+                f"{c['title']} (ID: {c['id']})" for c in candidates[:8]) + ". Call again with the ID."
+        return f"Error: no task matches '{task_id}'. Use list_tasks to find it."
+    task_id = task["id"]
     try:
-        tasks_service.writable_task(conn.user, task_id)
+        tasks_service.writable_task(user, task_id)
     except LookupError:
-        return f"No task with id {task_id}."
+        return f"Error: no task matches '{task_id}'. Use list_tasks to find it."
     except tasks_service.ReadOnly as e:
         return f"Error: {e}"
     already = task_links.is_linked(task_id, "person", pid)
     task_links.link_task(task_id, "person", pid, "related")
-    if not already:
-        user = conn.user
+    name = store.name_of(user, pid) or person
+    if already:
+        return f"'{task['title']}' was already linked to {name}."
 
-        def _undo() -> None:
-            tasks_service.check_still_writable(user, task_id)  # the task's list may have been unshared since
-            task_links.unlink_task(task_id, "person", pid)
-        safe_record("Linked the task to the person", _undo, "link_task_to_person")
-    return "Linked."
+    def _undo() -> None:
+        tasks_service.check_still_writable(user, task_id)  # the task's list may have been unshared since
+        task_links.unlink_task(task_id, "person", pid)
+    safe_record("Linked the task to the person", _undo, "link_task_to_person")
+    return f"Linked '{task['title']}' to {name}."
