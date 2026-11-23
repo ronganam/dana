@@ -56,6 +56,11 @@ const SHELL = [
   "/static/vendor/marked.min.js",
   "/static/vendor/purify.min.js",
   "/static/vendor/qrcode.js",
+  "/static/vendor/fonts/inter-latin.woff2",
+  "/static/vendor/fonts/inter-latin-ext.woff2",
+  "/static/vendor/fonts/dm-mono-regular.woff2",
+  "/static/vendor/fonts/instrument-serif-regular.woff2",
+  "/static/vendor/fonts/instrument-serif-italic.woff2",
   "/manifest.json"
 ];
 

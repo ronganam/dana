@@ -81,14 +81,14 @@
     const meta = [item.reconnect ? "Reconnect" : item.server ? "This server" : item.label, item.since,
                   item.ignoredUntil ? `card hidden until ${untilText(item.ignoredUntil)}` : ""].filter(Boolean);
     const fix = item.target
-      ? `<button class="btn-primary" data-fix="${esc(item.key)}"${busy ? " disabled" : ""}>${busy ? "Working…" : esc(item.fix.label)}</button>` : "";
+      ? `<button type="button" class="dn-pill" data-fix="${esc(item.key)}"${busy ? " disabled" : ""}>${busy ? "Working…" : esc(item.fix.label)}</button>` : "";
     const ignore = item.ignoredUntil
-      ? `<button class="btn-secondary" data-ignore="${esc(item.key)}" data-days="0">Show on Now again</button>`
-      : `<button class="btn-secondary" data-ignore="${esc(item.key)}" data-days="${item.reconnect ? 1 : 7}">${item.reconnect ? "Not today" : "Ignore for a week"}</button>`;
+      ? `<button type="button" class="att-quiet" data-ignore="${esc(item.key)}" data-days="0">Show on Now again</button>`
+      : `<button type="button" class="att-quiet" data-ignore="${esc(item.key)}" data-days="${item.reconnect ? 1 : 7}">${item.reconnect ? "Not today" : "Ignore for a week"}</button>`;
     const status = u.status && u.status.key === item.key
       ? `<p class="att-status ${esc(u.status.tone)}" role="status" dir="auto">${esc(u.status.text)}</p>` : "";
     return `<li class="att-row${item.reconnect ? " reconnect" : ""}${u.focus === item.key ? " focus" : ""}${item.ignoredUntil ? " ignored" : ""}" data-key="${esc(item.key)}">
-        <span class="att-bar" aria-hidden="true"></span>
+        <span class="att-dot" aria-hidden="true"></span>
         <div class="att-text">
           <span class="att-meta">${meta.map((m) => `<span dir="auto">${esc(m)}</span>`).join(" · ")}</span>
           <h3 class="att-title" dir="auto">${esc(item.title)}</h3>
@@ -102,11 +102,11 @@
   /** The screen's body: the rows, or "All clear." when nothing fails. */
   function renderList(items, ui) {
     if (!items.length) {
-      return `<div class="att-clear"><span class="now-mark" aria-hidden="true"></span><p class="now-allclear">All clear.</p>
+      return `<div class="att-clear"><p class="now-allclear">All clear.</p>
         <p class="att-muted">Every connection and signal Dana depends on works. Anything that stops working shows up here, with the button that fixes it.</p></div>`;
     }
     const open = items.filter((i) => !i.ignoredUntil).length;
-    return `<h2 class="now-section-h">Needs attention <span class="now-count">${open}</span></h2>
+    return `<h2 class="now-section-h">Needs attention <span class="now-count">· ${open}</span></h2>
       <ul class="att-list">${items.map((i) => renderItem(i, ui)).join("")}</ul>`;
   }
 

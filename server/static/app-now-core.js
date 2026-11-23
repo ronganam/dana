@@ -2,7 +2,7 @@
  * the DOM is static/app-now.js). Sets globalThis.DanaNow; no DOM here, tested by tests/test_web_now.mjs.
  *
  * Everything comes from one GET /api/now payload (server/docs/now.md): the header (the date, the lede or a
- * calm line), the day strip's cells, the hue of a card by its kind, what an action sends, what a client
+ * calm line), the day track and the day's items, the hue of a card by its kind, what an action sends, what a client
  * action opens, an action applied optimistically (and undone on an error), a refresh reconciled with what
  * is on screen (only new cards rise in), the notifications line and the "Updated … ago" note.
  * A card is rendered from its fields and blocks only: no addon is named, a kind only picks a hue.
@@ -93,32 +93,18 @@
   const isHour = (slot) => /^\d{1,2}$/.test(String(slot && slot.key));
   const hourLabel = (key) => `${String(key).padStart(2, "0")}:00`;
 
-  /** The day strip: {show, calendarNote, cells}. Cells, in order: hour slots with items, a run of empty
-   *  hours between them as one narrow `gap` cell ("16:00–18:00"; the run before the first item too), then
-   *  "At home" / "On waking" when they hold something. Each item gets its hue, its `ref`, `past` (its time
-   *  has gone by on the user's clock) and `next` (the first one still to come). Nothing in any slot: hidden
-   *  (`show` false); the calendar note still shows when the calendar couldn't be read. */
+  /** The day's items: {show, calendarNote, cells}. Cells, in order: the hour slots with items, then "At home" /
+   *  "On waking" when they hold something (empty slots are left out: the track shows the free hours). Each item
+   *  gets its hue, its `ref`, `past` (its time has gone by on the user's clock) and `next` (the first one still
+   *  to come). Nothing in any slot: hidden (`show` false); the calendar note still shows when the calendar
+   *  couldn't be read. */
   function dayCells(day, minutes) {
     const slots = (day && Array.isArray(day.slots)) ? day.slots : [];
     const calendarNote = Boolean(day && day.calendar === false);
-    const any = slots.some(s => s && Array.isArray(s.items) && s.items.length);
-    if (!any) return { show: false, calendarNote, cells: [] };
     const cells = [];
-    let gap = null;
-    const flush = () => {
-      if (!gap) return;
-      cells.push({ key: `gap-${gap.from}`, type: "gap", hours: gap.n,
-                   label: gap.n === 1 ? hourLabel(gap.from) : `${hourLabel(gap.from)}–${hourLabel(gap.to)}`, items: [] });
-      gap = null;
-    };
     for (const s of slots) {
-      if (!s) continue;
-      const items = Array.isArray(s.items) ? s.items : [];
-      if (!items.length) {
-        if (isHour(s)) gap = gap ? { ...gap, to: s.key, n: gap.n + 1 } : { from: s.key, to: s.key, n: 1 };
-        continue;
-      }
-      if (isHour(s)) flush(); else gap = null;   // a run of empty hours before At home / On waking is left out
+      const items = s && Array.isArray(s.items) ? s.items : [];
+      if (!items.length) continue;
       cells.push({
         key: String(s.key), type: isHour(s) ? "hour" : String(s.key), label: s.label || hourLabel(s.key),
         items: items.map(it => {
@@ -127,11 +113,31 @@
         }),
       });
     }
+    if (!cells.length) return { show: false, calendarNote, cells: [] };
     // The next item: the first timed one still to come, else the first one of all.
     const all = cells.flatMap(c => c.items);
     const next = all.find(it => it.time && !it.past) || all.find(it => !it.past);
     if (next) next.next = true;
     return { show: true, calendarNote, cells };
+  }
+
+  const DAY_FIRST_HOUR = 6;    // the track's hours: the waking day the server plans (server/docs/now.md, Day slots)
+  const DAY_LAST_HOUR = 23;
+
+  /** The day track under the lede: a 4 px segment per hour of the waking day (06–23), {hours, mark, now}.
+   *  An hour that has begun on the user's clock is `past`; a later one is `busy` when its slot holds something.
+   *  `mark` is where the now-mark stands (the number of past hours; −1 when the time does not read), `now` the
+   *  time as "HH:MM". */
+  function dayTrack(day, minutes) {
+    const slots = (day && Array.isArray(day.slots)) ? day.slots : [];
+    const busy = new Set(slots.filter(s => s && isHour(s) && Array.isArray(s.items) && s.items.length).map(s => Number(s.key)));
+    const known = minutes !== null && minutes !== undefined;
+    const hours = [];
+    for (let h = DAY_FIRST_HOUR; h <= DAY_LAST_HOUR; h++) {
+      const past = known && h * 60 <= minutes;
+      hours.push({ hour: h, past, busy: !past && busy.has(h) });
+    }
+    return { hours, mark: known ? hours.filter(h => h.past).length : -1, now: known ? clock(minutes) : "" };
   }
 
   /** The selected option of a card's `choices` block (its index in `form.choices[key]`, else the one the
@@ -290,7 +296,7 @@
   const isRtl = (s) => /[֐-׿؀-ۿיִ-﷿ﹰ-﻿]/.test(String(s || ""));
 
   globalThis.DanaNow = {
-    KIND_HUES, hueOf, dayHue, parts, dateLine, minutesNow, clock, ledeLine, dayRef, dayCells,
+    KIND_HUES, hueOf, dayHue, parts, dateLine, minutesNow, clock, ledeLine, dayRef, dayCells, dayTrack,
     chosen, isChecked, primaryLabel, chosenMessage, actBody, clientTarget, canDo,
     removeItem, restoreItem, reconcile, notificationsLine, updatedAgo, step, isRtl,
   };

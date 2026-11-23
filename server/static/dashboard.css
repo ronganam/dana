@@ -1,4 +1,5 @@
-/* Self-hosted Inter (variable, 400-700) — no external font CDN at runtime. */
+/* Self-hosted fonts (static/vendor/fonts) — no external font CDN at runtime: Inter (variable, 400-700), DM Mono
+   for the eyebrows, Instrument Serif for big values (Latin only). */
 @font-face {
     font-family: 'Inter'; font-style: normal; font-weight: 400 700; font-display: swap;
     src: url('/static/vendor/fonts/inter-latin-ext.woff2') format('woff2');
@@ -8,6 +9,14 @@
     font-family: 'Inter'; font-style: normal; font-weight: 400 700; font-display: swap;
     src: url('/static/vendor/fonts/inter-latin.woff2') format('woff2');
     unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+    font-family: 'DM Mono'; font-style: normal; font-weight: 300 500; font-display: swap;
+    src: url('/static/vendor/fonts/dm-mono-regular.woff2') format('woff2');
+}
+@font-face {
+    font-family: 'Instrument Serif'; font-style: normal; font-weight: 400; font-display: swap;
+    src: url('/static/vendor/fonts/instrument-serif-regular.woff2') format('woff2');
 }
 
 /* ==========================================================================
@@ -55,6 +64,8 @@
     --ease-standard: cubic-bezier(.2, 0, 0, 1);
 
     --font-inter: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'DM Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --font-serif: 'Instrument Serif', Georgia, serif;
 
     --radius-sm: 3px;
     --radius-md: 4px;
@@ -111,10 +122,11 @@ html[data-layout="narrow"] .dash-grid { --cols: 2; overflow-y: auto; grid-auto-r
     border-radius: var(--radius-card);
     overflow: hidden;
 }
+/* The title line: a mono eyebrow (server/docs/web-design.md, "Type"). */
 .dw-head {
     flex: 0 0 auto;
-    padding: 7px 10px 0;
-    font-size: 10.5px; font-weight: 600; letter-spacing: 0.8px; text-transform: uppercase;
+    padding: 8px 10px 0;
+    font-family: var(--font-mono); font-size: 10.5px; font-weight: 400; letter-spacing: 0.15em; text-transform: uppercase;
     color: var(--mute);
 }
 .dw-body { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 6px 10px 8px; overflow: hidden; }
@@ -123,7 +135,7 @@ html[data-layout="narrow"] .dash-grid { --cols: 2; overflow-y: auto; grid-auto-r
 .dw-note { font-size: 12.5px; color: var(--mute); line-height: 1.4; }
 
 /* Shared pieces a widget script may use. */
-.dw-big { font-size: 30px; font-weight: 600; letter-spacing: -0.5px; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.dw-big { font-family: var(--font-serif); font-size: 36px; font-weight: 400; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; line-height: 1.05; }
 .dw-sub { font-size: 12.5px; color: var(--body); line-height: 1.35; }
 .dw-mute { color: var(--mute); }
 .dw-list { list-style: none; display: flex; flex-direction: column; gap: 4px; min-height: 0; overflow: hidden; }
@@ -158,7 +170,7 @@ html[data-layout="narrow"] .dash-grid { --cols: 2; overflow-y: auto; grid-auto-r
     max-width: 520px; margin: 0 auto; padding: 24px; gap: 10px;
 }
 .dash-message[hidden] { display: none; }
-.dash-message h1 { font-size: 22px; }
+.dash-message h1 { font-family: var(--font-serif); font-size: 34px; font-weight: 400; letter-spacing: -0.01em; }
 .dash-message p { color: var(--body); font-size: 14px; }
 .dash-message a { color: var(--ember-text); }
 .dash-message ul { list-style: none; display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }

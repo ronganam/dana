@@ -198,15 +198,15 @@
     const brief = b && b.briefing;
     const hour = new Date().getHours();
     if (brief && hour < 14 && store("today.hidden") !== brief.date) {
-      cards.push(`<div class="today-card"><i data-lucide="sun"></i><div class="main"><div class="head"${rtl(brief.headline)}>${esc(brief.headline)}</div>
+      cards.push(`<div class="today-card"><div class="main"><div class="dn-eyebrow">This morning</div><div class="head"${rtl(brief.headline)}>${esc(brief.headline)}</div>
         <div class="pts">${brief.points.map((p) => `<span${rtl(p)}>${esc(p)}</span>`).join("")}</div></div>
-        <div class="acts"><button class="icon-btn" data-hide-brief="${esc(brief.date)}" title="Hide for today"><i data-lucide="x"></i></button></div></div>`);
+        <div class="acts"><button class="dn-overflow" data-hide-brief="${esc(brief.date)}" title="Hide for today" aria-label="Hide the briefing for today"><i data-lucide="x"></i></button></div></div>`);
     }
     const rv = r && r.review;
     if (rv && rv.status === "pending" && rv.items.length) {
-      cards.push(`<div class="today-card"><i data-lucide="calendar-check"></i><div class="main"><div class="head">Weekly review is ready</div>
+      cards.push(`<div class="today-card"><div class="main"><div class="dn-eyebrow">Weekly review</div><div class="head">Your week is ready to review</div>
         <div class="pts"><span${rtl(rv.headline)}>${esc(rv.headline)}</span><span>${rv.items.length} items to decide</span></div></div>
-        <div class="acts"><button class="btn-primary" data-open-review>Review</button></div></div>`);
+        <div class="acts"><button type="button" class="dn-pill" data-open-review>Review</button></div></div>`);
     }
     host.innerHTML = cards.join("");
     host.classList.toggle("hidden", !cards.length);

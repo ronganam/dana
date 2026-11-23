@@ -16,7 +16,7 @@
  *   });
  *
  * `api` is the same object every time: { addon, page, me, base, fetch, json, call, stream, toast, open,
- * openSession, badge, visible, piece, icons, esc, store, motion } (each described where it is built, `makeApi`;
+ * openSession, badge, visible, piece, icons, esc, store, motion, menu } (each described where it is built, `makeApi`;
  * `motion` is `Dana.motion`, below).
  * Nothing else of the shell is a page's business: no globals, no other page's elements.
  *
@@ -142,6 +142,95 @@
     },
   };
 
+  /* The overflow menu ("⋯"): a row shows one action and keeps the rest here (server/docs/web-design.md, "One
+   * visible action"). A popup of buttons anchored to the button that opened it: role="menu", arrows / Home /
+   * End move, Enter or Space picks, Escape, Tab or a click outside closes, and the keyboard goes back to the
+   * button. One menu at a time. */
+  let openMenu = null;   // {el, anchor, close}
+
+  /** Opens the menu of `items` ({label, onSelect, disabled, hint, danger, icon}; null draws a line) under (or
+   *  above, when there is no room) `anchor`, end-aligned; again on the same anchor closes it. */
+  function menu(anchor, items, opts) {
+    const doc = root.document;
+    if (!doc || !anchor) return;
+    const wasOpen = openMenu && openMenu.anchor === anchor;
+    if (openMenu) openMenu.close(false);
+    if (wasOpen) return;
+    const o = opts || {};
+    const el = doc.createElement("div");
+    el.className = "dn-menu";
+    el.setAttribute("role", "menu");
+    if (o.label) el.setAttribute("aria-label", o.label);
+    const buttons = [];
+    for (const item of items || []) {
+      if (!item) { const hr = doc.createElement("div"); hr.className = "dn-menu-sep"; hr.setAttribute("role", "separator"); el.appendChild(hr); continue; }
+      const b = doc.createElement("button");
+      b.type = "button";
+      b.className = "dn-menu-item" + (item.danger ? " danger" : "");
+      b.setAttribute("role", "menuitem");
+      b.tabIndex = -1;
+      if (item.disabled) b.setAttribute("aria-disabled", "true");
+      b.innerHTML = (item.icon ? `<i data-lucide="${esc(item.icon)}" aria-hidden="true"></i>` : "")
+        + `<span class="dn-menu-label" dir="auto">${esc(item.label)}</span>`
+        + (item.hint ? `<span class="dn-menu-hint">${esc(item.hint)}</span>` : "");
+      b.addEventListener("click", () => {
+        if (item.disabled) return;
+        close(true);
+        if (typeof item.onSelect === "function") item.onSelect();
+      });
+      el.appendChild(b);
+      buttons.push(b);
+    }
+    if (!buttons.length) return;
+    doc.body.appendChild(el);
+    try { root.lucide?.createIcons(); } catch (_) { /* ignore */ }
+    // Place it: under the anchor, its end edge on the anchor's; above when it would leave the window.
+    const a = anchor.getBoundingClientRect();
+    const m = el.getBoundingClientRect();
+    const rtl = root.getComputedStyle(anchor).direction === "rtl";
+    const vw = root.innerWidth, vh = root.innerHeight;
+    let left = rtl ? a.left : a.right - m.width;
+    left = Math.max(8, Math.min(left, vw - m.width - 8));
+    let top = a.bottom + 4;
+    if (top + m.height > vh - 8 && a.top - m.height - 4 >= 8) top = a.top - m.height - 4;
+    el.style.left = `${Math.round(left)}px`;
+    el.style.top = `${Math.round(Math.max(8, top))}px`;
+    if (!reduced()) el.classList.add("dn-menu-in");
+    anchor.setAttribute("aria-expanded", "true");
+    const focusAt = (i) => { const n = buttons.length; buttons[((i % n) + n) % n].focus(); };
+    focusAt(0);
+    const onKey = (e) => {
+      const i = buttons.indexOf(doc.activeElement);
+      if (e.key === "ArrowDown") focusAt(i + 1);
+      else if (e.key === "ArrowUp") focusAt(i < 0 ? -1 : i - 1);
+      else if (e.key === "Home") focusAt(0);
+      else if (e.key === "End") focusAt(-1);
+      else if (e.key === "Escape") close(true);
+      else if (e.key === "Tab") { close(false); return; }
+      else if (e.key !== "Enter" && e.key !== " ") { e.stopPropagation(); return; }
+      else return;   // Enter / Space: the button's own click
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    const onDown = (e) => { if (!el.contains(e.target) && !anchor.contains(e.target)) close(false); };
+    const onAway = (e) => { if (!e || !e.target || !el.contains(e.target)) close(false); };
+    el.addEventListener("keydown", onKey);
+    doc.addEventListener("pointerdown", onDown, true);
+    root.addEventListener("resize", onAway);
+    root.addEventListener("scroll", onAway, true);
+    function close(refocus) {
+      if (!openMenu || openMenu.el !== el) return;
+      openMenu = null;
+      el.remove();
+      doc.removeEventListener("pointerdown", onDown, true);
+      root.removeEventListener("resize", onAway);
+      root.removeEventListener("scroll", onAway, true);
+      anchor.setAttribute("aria-expanded", "false");
+      if (refocus && anchor.isConnected) anchor.focus();
+    }
+    openMenu = { el, anchor, close };
+  }
+
   function makeApi(addon, page, panelUrl) {
     return {
       /** The addon this page belongs to. */
@@ -199,6 +288,9 @@
       store,
       /** Shared motion: arrive(el), flash(el), complete(el) → Promise, number(el, text), reduced(). */
       motion,
+      /** The overflow menu: menu(button, [{label, onSelect, disabled, hint, danger, icon} | null]) opens the
+       *  row's other actions under its "⋯" button (give the button aria-haspopup="menu" aria-expanded="false"). */
+      menu,
     };
   }
 
@@ -263,6 +355,7 @@
     expect(url, addon, page) { owners.set(bare(absolute(url)), { addon, page }); },
     sibling,
     motion,
+    menu,
     store,
   };
 })();

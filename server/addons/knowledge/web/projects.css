@@ -13,7 +13,7 @@
 .prj-crumb { font-size: 14px; color: var(--mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 32vw;
   padding: 4px 6px; border-radius: var(--radius-md); }
 button.prj-crumb:hover { color: var(--ink); background: var(--prj-soft); }
-.prj-crumb.current { color: var(--ink); font-weight: 600; font-size: 15px; }
+.prj-crumb.current { color: var(--ink); font-family: var(--font-serif); font-weight: 400; font-size: 28px; line-height: 1.1; letter-spacing: -0.01em; }
 .prj-crumb-sep { width: 14px; height: 14px; color: var(--mute); flex-shrink: 0; }
 .prj-back { display: none; }
 #prj-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }

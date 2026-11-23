@@ -2,18 +2,17 @@
 
 /* --- Today strip (Tasks) --- */
 #panel-tasks .three-pane-container { flex: 1; height: auto; min-height: 0; }
-.today-strip { display: flex; flex-direction: column; gap: 8px; padding: 10px 16px 0; }
+/* A row on the canvas per greeting: the mono eyebrow, the serif headline, the points as one muted line. */
+.today-strip { display: flex; flex-direction: column; padding: 6px 20px 0; border-bottom: 1px solid var(--hairline); }
 .today-strip.hidden { display: none; }
-.today-card {
-  display: flex; align-items: flex-start; gap: 12px; padding: 12px 14px; border: 1px solid var(--hairline);
-  border-radius: var(--radius-card); background: var(--canvas-soft);
-}
-.today-card > svg { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; margin-top: 2px; }
-.today-card .main { flex: 1; min-width: 0; }
-.today-card .head { font-size: 14px; font-weight: 600; color: var(--ink); }
-.today-card .pts { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 4px; font-size: 13px; color: var(--body); }
-.today-card .pts span::before { content: "· "; color: var(--mute); }
-.today-card .acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.today-card { display: flex; align-items: flex-start; gap: 16px; padding: 12px 0 14px; }
+.today-card + .today-card { border-top: 1px solid var(--hairline); }
+.today-card .main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.today-card .head { font-family: var(--font-serif); font-size: 24px; font-weight: 400; line-height: 1.15; color: var(--ink); }
+.today-card .head[dir="auto"] { font-family: var(--font-inter); font-size: 18px; font-weight: 500; }
+.today-card .pts { display: flex; flex-wrap: wrap; gap: 2px 14px; font-size: 13.5px; color: var(--mute); }
+.today-card .pts span:not(:first-child)::before { content: "· "; margin-inline-end: 2px; }
+.today-card .acts { display: flex; align-items: center; gap: 6px; flex-shrink: 0; align-self: center; }
 
 /* --- Weekly review --- */
 #panel-review .top-bar { gap: 10px; }
