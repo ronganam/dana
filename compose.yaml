@@ -13,7 +13,12 @@
 # It runs on the CPU; the first transcription downloads the model (WHISPER_MODEL) into its volume.
 #
 # Everything Dana writes (database, credentials key, recordings, uploads, app updates) lives in the
-# `data` volume: back it up.
+# `data` volume. Backups (server/docs/backups.md): Settings → Backups makes them on a schedule into
+# /backups, the `backups` volume below; to keep them on another disk or a NAS, bind-mount a host
+# folder there instead (writable by UID 1001), e.g. `- /mnt/nas/dana-backups:/backups`. Restore:
+#   docker compose stop dana
+#   docker compose run --rm --no-deps dana dana backups restore /backups/<archive>.tar.gz --yes
+#   docker compose start dana
 name: dana
 
 services:
@@ -30,6 +35,7 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - data:/app/db
+      - backups:/backups
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
       interval: 30s
@@ -51,4 +57,5 @@ services:
 
 volumes:
   data:
+  backups:
   whisper-models:

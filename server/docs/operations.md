@@ -13,8 +13,8 @@
   The setup link creates the first admin in the browser and opens the first-run wizard (you, Home, the model and its key, your phone, add-ons, sample data); settings go in an optional `.env` next to `compose.yaml` (`docs/configuration.md`). Headless (no browser at hand): put `API_TOKEN` in that `.env` before the first start. Upgrade: `docker compose pull && docker compose up -d`. The administration CLI is `dana` on the image's PATH: `docker compose exec dana dana users list`, `docker compose exec dana dana addons install <name>` (into `<data dir>/addons`, in the volume, kept across upgrades; then `docker compose restart dana`). The image ships no add-on catalog: it reads the `dana-catalog` repository's `catalog.json` (`DANA_CATALOG_URL`; offline, set `DANA_CATALOG_FILE`). Phones, tablets and TVs find the server on the home network when something advertises `_dana._tcp` (`docs/devices.md`, "Finding the server on the home network": an Avahi example). The data lives in the `data` volume; the port is `127.0.0.1:8080` (reverse proxy or VPN to reach it from elsewhere, below).
 - **Locally**: `python main.py` (README). The web UI and API on `:8080`, Telegram if `TELEGRAM_BOT_TOKEN` is set. It needs only an LLM key: a fresh database starts in setup mode and logs the setup link (`docs/devices.md`); `API_TOKEN` instead creates the first admin from env (headless), and `DANA_INSECURE_DEV=1` turns authentication off (`127.0.0.1` only).
 - **Docker Compose from source** (contributors): `docker compose up -d` in `server/` builds the image and keeps the data in the `data` volume (`compose.yaml`; an addon's worker runs under its profile, e.g. `docker compose --profile money_il up -d`: "Workers" below). The port is published on `127.0.0.1:8080` only: to reach Dana from other machines, put a reverse proxy with HTTPS in front of it (Caddy, Traefik, nginx) or change the mapping knowingly. The healthcheck polls `/api/health`.
-- **Data to back up**: the database directory (`DATABASE_PATH`'s folder: the database, `recordings/`, `media/`, `uploads/`…) including `credentials.key` when `CREDENTIALS_KEY` is not set (the generated key: without it the stored addon credentials are lost).
-- **Kubernetes** (one replica: SQLite): the image (`Dockerfile`, `app` stage) runs as UID 1001 and keeps everything it writes in the directory holding the database (`DATABASE_PATH`, default `/app/db/db.sqlite3`; `core/paths.py`), so mount one volume there. Secrets come in as env vars (`docs/configuration.md`). Probes: TCP on 8080. An addon's worker runs as a sidecar in the same pod ("Workers" below; e.g. `money_il`'s on `127.0.0.1:8090`, mounting only `<data dir>/money`). Backups: copy `<data dir>/snapshots/db.sqlite3` after `python3 -m core.db_snapshot` (a consistent copy; a raw copy of a live SQLite file can catch it mid-write), e.g. from a Velero pre-backup hook.
+- **Data to back up**: the database directory (`DATABASE_PATH`'s folder: the database, `recordings/`, `media/`, `uploads/`…) including `credentials.key` when `CREDENTIALS_KEY` is not set (the generated key: without it the stored addon credentials are lost). Settings → Backups makes one archive of all of it on a schedule ("Backups" below).
+- **Kubernetes** (one replica: SQLite): the image (`Dockerfile`, `app` stage) runs as UID 1001 and keeps everything it writes in the directory holding the database (`DATABASE_PATH`, default `/app/db/db.sqlite3`; `core/paths.py`), so mount one volume there. Secrets come in as env vars (`docs/configuration.md`). Probes: TCP on 8080. An addon's worker runs as a sidecar in the same pod ("Workers" below; e.g. `money_il`'s on `127.0.0.1:8090`, mounting only `<data dir>/money`). Backups: "Backups" below.
 
 ## Dependencies
 
@@ -92,6 +92,23 @@ The server offers the Android phone and watch apps' updates (`core/app_updates.p
 - **Startup data steps** (not schema) are core's `users.bootstrap()` (the first admin, `docs/access.md`) and the addons' `@addon.job(at_start=True)` jobs (e.g. tasks gives each user any default list they lack; about loads each user's prompt block).
 
 **Secrets**: `docs/configuration.md`.
+
+## Backups
+
+What an archive holds, the settings, the API and the CLI: `docs/backups.md`. In short: Settings → Backups (admins) picks a schedule (off, daily or weekly at a time, in the server's timezone), a destination folder on the server (default `/backups` when a volume is mounted there, else `<data dir>/backups`) and how many to keep; "Back up now" and "Download backup" make one at once. Each archive is `dana-backup-<date>-<time>.tar.gz`: a consistent copy of the database, the generated credentials key file (not a `CREDENTIALS_KEY` from env: keep that in your secret store), the data folders and a manifest. A failed backup is the admins' `backups` self-check.
+
+- **Docker Compose**: `compose.yaml` mounts the `backups` volume at `/backups` (the image creates that folder for UID 1001). To keep backups off the machine's data disk, bind-mount a folder there instead (`- /mnt/nas/dana-backups:/backups`, writable by UID 1001). Restore, from an archive in that folder:
+
+  ```bash
+  docker compose stop dana
+  docker compose run --rm --no-deps dana dana backups restore /backups/dana-backup-20261123-033000.tar.gz          # what it would do
+  docker compose run --rm --no-deps dana dana backups restore /backups/dana-backup-20261123-033000.tar.gz --yes
+  docker compose start dana
+  ```
+
+  An archive downloaded in the browser: add `-v ./dana-backup-….tar.gz:/restore.tar.gz:ro` to `run` and restore `/restore.tar.gz`.
+- **Kubernetes**: mount a second volume (another PVC, NFS) at `/backups` in the pod, or set the destination to a folder on it; with only the data volume, backups go to `<data dir>/backups` on the same volume (protects against mistakes, not a lost volume: copy them off, e.g. with your volume backups). Restore with the pod stopped: scale the deployment to 0, run a one-off pod with the same image and both volumes (`kubectl run … --overrides` or a Job), `dana backups restore /backups/<archive> --yes` in it, delete it, scale back to 1. A volume-level backup (Velero) can still run `python3 -m core.db_snapshot` as its pre-backup hook: it writes a consistent `<data dir>/snapshots/db.sqlite3` (a raw copy of a live SQLite file can catch it mid-write).
+- **Restore** (`bin/dana backups restore`, the server stopped) keeps the database it replaces as `snapshots/db-before-restore-<time>.sqlite3`; an older backup's database is migrated at the next start, a newer one does not start on an older Dana. When the manifest says the key came from env, start with that same `CREDENTIALS_KEY`.
 
 ## Debugging production
 

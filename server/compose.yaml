@@ -10,7 +10,8 @@
 # addon. A catalog addon's worker runs the image its repository publishes, pinned to the commit you
 # installed (set its tag in .env; `latest` follows the addon's main branch).
 #
-# Everything Dana writes (database, recordings, uploads, snapshots) lives in the `data` volume.
+# Everything Dana writes (database, recordings, uploads, snapshots) lives in the `data` volume; the
+# backups Settings → Backups makes go to /backups, the `backups` volume (docs/backups.md).
 name: dana
 
 services:
@@ -28,6 +29,7 @@ services:
       - "127.0.0.1:8080:8080"
     volumes:
       - data:/app/db
+      - backups:/backups
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/health"]
       interval: 30s
@@ -68,3 +70,4 @@ services:
 
 volumes:
   data:
+  backups:

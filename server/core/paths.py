@@ -27,6 +27,10 @@ MONEY_DIR = DATA_DIR / "money"
 KNOWLEDGE_FILES_DIR = DATA_DIR / "knowledge"
 # Addons installed from the catalog, one folder each (core/addon_dirs.py).
 ADDONS_DIR = DATA_DIR / "addons"
+# Backups (core/backups.py): the default destination when no /backups mount exists, and the
+# scratch folder where a backup for the browser is built (both left out of every backup).
+BACKUPS_DIR = DATA_DIR / "backups"
+BACKUP_WORK_DIR = DATA_DIR / ".backup-work"
 # The credentials key generated at the first start when CREDENTIALS_KEY is not set (core/addons/crypto.py).
 CREDENTIALS_KEY_FILE = DATA_DIR / "credentials.key"
 
