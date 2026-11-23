@@ -19,15 +19,17 @@
 
   <header class="top">
     <a class="brand" href="#" aria-label="Dana, home"><span class="brand-mark" aria-hidden="true"></span>Dana</a>
+    <span class="top-here" aria-hidden="true"></span>
     <nav class="top-nav" aria-label="Sections">
       <a href="#reel">A day</a>
-      <a href="#why">Why it's different</a>
-      <a href="#caps">What it does</a>
+      <a href="#flow">How it works</a>
+      <a href="#why">Why Dana</a>
       <a href="#everywhere">Everywhere</a>
       <a href="#build">Make it yours</a>
-        <a href="#cost">Cost</a>
+      <a href="#cost">Cost</a>
     </nav>
     <a class="btn btn-quiet btn-sm" href="https://github.com/ronganam/dana">GitHub</a>
+    <span class="top-progress" aria-hidden="true"><i></i></span>
   </header>
 
   <main>
@@ -40,9 +42,6 @@
         <a class="btn btn-primary" href="#reel">Watch a day with Dana</a>
         <a class="btn btn-quiet" href="#build">Run it yourself</a>
       </div>
-      <ul class="hero-chips reveal" aria-label="Where Dana runs">
-        <li>Phone</li><li>Watch</li><li>Wall tablet</li><li>TV</li><li>Web</li><li>Telegram</li><li>Mac &amp; Linux</li>
-      </ul>
     </section>
 
     <!-- ============ SHOWREEL ============ -->
@@ -55,7 +54,7 @@
           <svg class="i-play" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5Z"/></svg>
         </button>
       </div>
-
+  
       <div class="scenes">
         <!-- 1 · Wake → briefing on the watch -->
         <article class="scene" data-time="06:52" data-sky="dawn" aria-label="06:52, the watch">
@@ -79,7 +78,7 @@
             <p>No alarm to set, no app to open. When your sleep ends, or you unlock your phone for the first time in the morning, Dana puts together your morning: the meetings, the weather, what's due today and, with the trains add-on, your train. It's waiting on your wrist.</p>
           </div>
         </article>
-
+  
         <!-- 2 · Trains -->
         <article class="scene" data-time="08:01" data-sky="morning" aria-label="08:01, trains">
           <div class="scene-device">
@@ -105,7 +104,7 @@
             <p>Set your commute once and the next trains are on your Now screen: live times, delays, platforms and how full they are. Watch a train and Dana speaks up only when something changes: a delay, a new platform, time to go. This is an add-on anyone can write, published in Dana's catalog.</p>
           </div>
         </article>
-
+  
         <!-- 3 · Notifications triage -->
         <article class="scene" data-time="10:47" data-sky="day" aria-label="10:47, notifications">
           <div class="scene-device">
@@ -136,7 +135,7 @@
             <p>Dana reads every notification your phone gets: WhatsApp groups, the bank, the school, deliveries. It sorts them into "needs you", "can wait" and noise, says why something matters to <i>you</i>, and keeps buzzing about the urgent ones until you look.</p>
           </div>
         </article>
-
+  
         <!-- 4 · Calls → suggestions -->
         <article class="scene" data-time="13:46" data-sky="day" aria-label="13:46, a phone call">
           <div class="scene-device">
@@ -159,7 +158,7 @@
             <p>Your call recordings are transcribed and read. Dates turn into calendar events, promises turn into reminders, and the call is filed under the project it was about. When someone you know calls again, a card shows who they are and what you last talked about, before you answer.</p>
           </div>
         </article>
-
+  
         <!-- 5 · Car trigger -->
         <article class="scene" data-time="17:58" data-sky="dusk" aria-label="17:58, in the car">
           <div class="scene-device">
@@ -178,10 +177,10 @@
           <div class="scene-copy">
             <p class="scene-kicker">17:58 · Places</p>
             <h2>Reminders that fire <em>where they make sense</em>.</h2>
-            <p>“When I get in the car.” “When I get home.” “When I wake up.” Dana's phone app notices the car (Bluetooth, Android Auto or driving), the places you saved and when you wake up, and Home Assistant can fill in too. So a reminder shows up at the moment you can actually do something about it, not at some random time.</p>
+            <p>“When I get in the car.” “When I get home.” “When I wake up.” Dana's phone app notices the car (Bluetooth, Android Auto or driving), the places you saved and when you wake up. So a reminder shows up at the moment you can actually do something about it, not at some random time.</p>
           </div>
         </article>
-
+  
         <!-- 6 · Kitchen tablet + shared list -->
         <article class="scene" data-time="19:24" data-sky="evening" aria-label="19:24, the kitchen tablet">
           <div class="scene-device duo">
@@ -211,7 +210,7 @@
             <p>The tablet on the wall wakes when someone says “Hey Dana”. The list is shared, sorted by supermarket aisle, and it's already on Gal's phone at the store. One server for the whole family: everyone has their own accounts and data, and you share only what you choose.</p>
           </div>
         </article>
-
+  
         <!-- 7 · Money on the TV -->
         <article class="scene" data-time="21:40" data-sky="night" aria-label="21:40, money">
           <div class="scene-device">
@@ -237,7 +236,7 @@
             <p>Your bank and card accounts sync twice a day. Dana sorts the spending into fixed, yearly, everyday and one-off, predicts your balance at the end of the month, and spots things like a price that went up. You decide what to act on, and Dana checks later whether you actually saved. The money add-on reads Israeli banks and cards today; an add-on for your bank can be written the same way.</p>
           </div>
         </article>
-
+  
         <!-- 8 · All clear -->
         <article class="scene" data-time="23:05" data-sky="late" aria-label="23:05, all clear">
           <div class="scene-device">
@@ -256,136 +255,159 @@
           </div>
         </article>
       </div>
-
+  
       <ol class="chapters" aria-label="Moments of the day"></ol>
     </section>
 
-    <!-- ============ WHY ============ -->
-    <section id="why" class="why">
-      <p class="eyebrow reveal">Why it's different</p>
-      <h2 class="h-section reveal">Not another chat box <em>with access to your email</em>.</h2>
-      <p class="sub reveal">Chat assistants wait for you to type. Dana lives in what's happening around you: your notifications, your calls, the car, the train, the bank. It acts on what it sees, and it can undo anything.</p>
-      <div class="vs reveal">
-        <div class="vs-head"><span>A chat assistant</span><span>Dana</span></div>
-        <div class="vs-row"><span>Waits for your question</span><span>Comes to you when something changes: a delay, a call, a bill</span></div>
-        <div class="vs-row"><span>Lives in one browser tab</span><span>On your wrist, the fridge wall, the TV, your phone's long-press, Telegram</span></div>
-        <div class="vs-row"><span>Gets a screenshot of your life</span><span>Notifications, call recordings, car, location, sleep and bank accounts, all the time</span></div>
-        <div class="vs-row"><span>Forgets you when the chat ends</span><span>Picks up facts about you in the background and keeps them in every conversation</span></div>
-        <div class="vs-row"><span>Asks permission for everything, or for nothing</span><span>Acts right away with <b>Undo</b>, and asks first before it messages someone for you</span></div>
-        <div class="vs-row"><span>Someone else's cloud</span><span>Your server, your keys, open source (MIT)</span></div>
+    <!-- ============ HOW IT WORKS: the live diagram ============ -->
+    <section id="flow" class="flow" aria-labelledby="flow-h">
+      <div class="flow-head">
+        <div>
+          <p class="eyebrow reveal">How it works</p>
+          <h2 class="h-section reveal" id="flow-h">Everything in. <em>One thing out.</em></h2>
+        </div>
+        <p class="sub reveal">Dana reads what happens around you on your own server, sorts it, understands it, remembers what matters and decides when to tell you. Most of it, you never hear about.</p>
       </div>
-    </section>
 
-    <!-- ============ CAPABILITIES ============ -->
-    <section id="caps" class="caps">
-      <p class="eyebrow reveal">What it does</p>
-      <h2 class="h-section reveal">One assistant, <em>wired into the whole house</em>.</h2>
-      <div class="bento">
-        <article class="cell c-wide reveal" style="--hue:var(--ember)">
-          <p class="cell-k">Now</p>
-          <h3>One queue for everything that needs you.</h3>
-          <p>Approvals, reminders, messages worth answering, a train to catch, a payment that looks wrong. Every add-on adds its own cards, and each card takes one tap.</p>
-          <div class="mini-queue" aria-hidden="true">
-            <span style="--h:var(--ember)">Approve: reply to Gal</span>
-            <span style="--h:var(--amber)">Passport renewal · due Fri</span>
-            <span style="--h:var(--sky)">08:12 · platform 3</span>
-            <span style="--h:var(--rose)">Card charged twice?</span>
+      <ul class="sr-only">
+        <li>In: your phone's notifications, call recordings, your phone's signals (waking up, the car, saved places, sleep), your accounts (Gmail, Calendar, WhatsApp, Contacts), your bank and cards through an add-on, and you (chat, voice, the watch).</li>
+        <li>On your server, each one is sorted (needs you, can wait, noise), understood (calls transcribed, dates, promises and people pulled out), remembered (facts about you, briefs on people) and Dana decides when and where to tell you.</li>
+        <li>Out: the Now queue, your watch, the wall tablet and TV, or a push to your phone. Most things are folded away and never reach you.</li>
+        <li>The model provider gets only the text a step needs, one call at a time, with your own key.</li>
+      </ul>
+
+      <div class="dia reveal" aria-hidden="true">
+        <svg class="dia-wires"></svg>
+
+        <ul class="dia-in">
+          <li class="node" data-node="notif" style="--h:var(--teal)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg></span>
+            <span class="node-t">Phone notifications<small>Every app, every group chat</small></span>
+          </li>
+          <li class="node" data-node="call" style="--h:var(--sage)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><path d="M4 12h1M8 8v8M12 5v14M16 8v8M20 12h-1"/></svg></span>
+            <span class="node-t">Call recordings<small>Transcribed and read</small></span>
+          </li>
+          <li class="node" data-node="signal" style="--h:var(--amber)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><path d="M3 12h4l2-5 4 10 2-5h6"/></svg></span>
+            <span class="node-t">Your phone's signals<small>Wake, car, places, sleep</small></span>
+          </li>
+          <li class="node" data-node="account" style="--h:var(--sky)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="M3.5 7l8.5 6 8.5-6"/></svg></span>
+            <span class="node-t">Accounts<small>Gmail, Calendar, WhatsApp</small></span>
+          </li>
+          <li class="node" data-node="bank" style="--h:var(--rose)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h4"/></svg></span>
+            <span class="node-t">Bank &amp; cards<small>An add-on, synced twice a day</small></span>
+          </li>
+          <li class="node" data-node="you" style="--h:var(--plum)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H10l-5 4v-4H4z"/></svg></span>
+            <span class="node-t">You<small>Chat, voice, the watch</small></span>
+          </li>
+        </ul>
+
+        <div class="dia-server">
+          <div class="dia-server-head">
+            <span class="dia-label"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="7" rx="2"/><rect x="4" y="13" width="16" height="7" rx="2"/><path d="M8 7.5h.01M8 16.5h.01"/></svg>Your server</span>
+            <span class="dia-count"><b data-read>0</b> read <i>·</i> <b data-told>0</b> told you</span>
           </div>
-        </article>
-        <article class="cell reveal" style="--hue:var(--teal)">
-          <p class="cell-k">Notifications</p>
-          <h3>Sorted, explained, escalated.</h3>
-          <p>Noise folds away, and the urgent ones keep at you until you see them. Dana also suggests rules from what you keep ignoring.</p>
-        </article>
-        <article class="cell reveal" style="--hue:var(--sage)">
-          <p class="cell-k">Calls</p>
-          <h3>Every call becomes the next step.</h3>
-          <p>Recordings are transcribed and turned into tasks and events. When someone you know calls, you see who they are and what's open with them.</p>
-        </article>
-        <article class="cell reveal" style="--hue:var(--amber)">
-          <p class="cell-k">Triggers</p>
-          <h3>Time, place, car, waking up.</h3>
-          <p>Reminders that wait for the moment you can act: leaving work, getting in the car, getting out of bed.</p>
-        </article>
-        <article class="cell reveal" style="--hue:var(--plum)">
-          <p class="cell-k">People</p>
-          <h3>A short brief on everyone.</h3>
-          <p>Who they are, what you last talked about, what you promised them. It's ready before a meeting or a call.</p>
-        </article>
-        <article class="cell c-wide reveal" style="--hue:var(--sage)">
-          <p class="cell-k">Money</p>
-          <h3>Your banks and cards, explained.</h3>
-          <p>A twice-daily sync of your accounts, with spending split into fixed, yearly, everyday and one-off. You get a balance forecast, ways to save that Dana checks back on, and your investments and meal card, read-only.</p>
-          <svg class="mini-bars" viewBox="0 0 300 60" aria-hidden="true"><rect x="0" y="22" width="34" height="38" rx="4"/><rect x="44" y="30" width="34" height="30" rx="4"/><rect x="88" y="14" width="34" height="46" rx="4"/><rect x="132" y="26" width="34" height="34" rx="4"/><rect x="176" y="34" width="34" height="26" rx="4"/><rect class="hl" x="220" y="6" width="34" height="54" rx="4"/><rect class="pj" x="264" y="18" width="34" height="42" rx="4"/></svg>
-        </article>
-        <article class="cell reveal" style="--hue:var(--sky)">
-          <p class="cell-k">Your accounts</p>
-          <h3>Gmail, WhatsApp, Calendar, Contacts, Telegram.</h3>
-          <p>Read, search and summarize; write email and WhatsApp messages. Nothing goes out without asking you first. Text written by other people can never make Dana act on its own.</p>
-        </article>
-        <article class="cell reveal" style="--hue:var(--teal)">
-          <p class="cell-k">Home</p>
-          <h3>Home Assistant and cameras.</h3>
-          <p>Lights, heating and locks, room by room, by voice or text. Camera clips and live views on the TV and the dashboard.</p>
-        </article>
-        <article class="cell reveal" style="--hue:var(--rose)">
-          <p class="cell-k">Projects</p>
-          <h3>Decisions, side by side.</h3>
-          <p>Renovating? Buying a car? Options in columns, with notes, files, links, a budget and a date, all searchable.</p>
-        </article>
+          <ol class="dia-steps">
+            <li class="dia-step" data-step="sort"><span class="dia-step-n">Sort</span><span class="dia-step-o" data-idle="needs you · can wait · noise">needs you · can wait · noise</span></li>
+            <li class="dia-step" data-step="understand"><span class="dia-step-n">Understand</span><span class="dia-step-o" data-idle="dates, promises, people">dates, promises, people</span></li>
+            <li class="dia-step" data-step="remember"><span class="dia-step-n">Remember</span><span class="dia-step-o" data-idle="facts about you, briefs on people">facts about you, briefs on people</span></li>
+            <li class="dia-step" data-step="decide"><span class="dia-step-n">Decide</span><span class="dia-step-o" data-idle="when and where to tell you">when and where to tell you</span></li>
+          </ol>
+          <div class="dia-bus"></div>
+          <div class="dia-tray"><span class="tray-k">Kept quiet <b data-folded>0</b></span><span class="tray-chips"></span></div>
+        </div>
+
+        <div class="dia-model">
+          <span class="dia-model-k">Model provider</span>
+          <span class="dia-model-t">Only the text a step needs, one call at a time, on your key</span>
+        </div>
+
+        <ul class="dia-out">
+          <li class="node" data-node="now" style="--h:var(--ember)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="5" rx="1.5"/><rect x="4" y="11" width="16" height="5" rx="1.5"/><path d="M7 20h10"/></svg></span>
+            <span class="node-t">The Now queue<small data-idle="One tap: done, snooze, dismiss">One tap: done, snooze, dismiss</small></span>
+          </li>
+          <li class="node" data-node="watch" style="--h:var(--ember)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M9 6l.6-3h4.8l.6 3M9 18l.6 3h4.8l.6-3M12 10v2l1.5 1"/></svg></span>
+            <span class="node-t">Your watch<small data-idle="The briefing, tiles, the face">The briefing, tiles, the face</small></span>
+          </li>
+          <li class="node" data-node="wall" style="--h:var(--ember)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 20h6"/></svg></span>
+            <span class="node-t">Wall tablet &amp; TV<small data-idle="Lists, calendar, cameras">Lists, calendar, cameras</small></span>
+          </li>
+          <li class="node" data-node="push" style="--h:var(--ember)">
+            <span class="node-ico"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><circle cx="17" cy="5" r="2.6" class="fill"/></svg></span>
+            <span class="node-t">A push to your phone<small data-idle="Urgent ones repeat until seen">Urgent ones repeat until seen</small></span>
+          </li>
+        </ul>
+
+        <div class="dia-pills"></div>
       </div>
+
+      <p class="flow-also reveal"><b>And when you ask:</b> lights, heating and locks through Home Assistant, by voice or text · camera clips on the TV · projects with options side by side · email and WhatsApp replies that wait for your yes.</p>
     </section>
 
-    <!-- ============ SAFETY ============ -->
-    <section class="safety">
-      <div class="safety-copy">
-        <p class="eyebrow reveal">Safe by default</p>
-        <h2 class="h-section reveal">It acts first, <em>and can always undo</em>.</h2>
-        <p class="sub reveal">Things you can take back happen right away, with Undo. Sending something in your name, or deleting something for good, waits for your yes. If an email or a message tells Dana to do something, it ignores it.</p>
+    <!-- ============ WHY + SAFE ============ -->
+    <section id="why" class="why">
+      <div class="why-copy">
+        <p class="eyebrow reveal">Why Dana</p>
+        <h2 class="h-section reveal">Not another chat box <em>with access to your email</em>.</h2>
+        <div class="vs reveal">
+          <div class="vs-head"><span>A chat assistant</span><span>Dana</span></div>
+          <div class="vs-row"><span>Waits for your question</span><span>Comes to you when something changes: a delay, a call, a bill</span></div>
+          <div class="vs-row"><span>Lives in one browser tab</span><span>On your wrist, the fridge wall, the TV, your phone's long-press, Telegram</span></div>
+          <div class="vs-row"><span>Gets a screenshot of your life</span><span>Notifications, call recordings, car, location, sleep and bank accounts, all the time</span></div>
+          <div class="vs-row"><span>Forgets you when the chat ends</span><span>Picks up facts about you in the background and keeps them in every conversation</span></div>
+          <div class="vs-row"><span>Someone else's cloud</span><span>Your server, your keys, open source (MIT)</span></div>
+        </div>
       </div>
-      <div class="safety-demo reveal" aria-hidden="true">
-        <div class="chat-bubble me">Move my dentist to Thursday and tell Gal I'll be late</div>
-        <div class="chat-bubble dana">
-          <p class="act done"><i class="dot sage"></i>Dentist moved to Thu 10:00 <span class="undo">Undo</span></p>
-          <div class="approve">
-            <p class="card-src">Asks first · WhatsApp to Gal</p>
-            <p>“Running late, home by 19:30”</p>
-            <div class="card-acts"><span class="b-fill">Send</span><span class="b-q">Edit</span><span class="b-q">Deny</span></div>
+      <div class="safety">
+        <div class="safety-demo reveal" aria-hidden="true">
+          <div class="chat-bubble me">Move my dentist to Thursday and tell Gal I'll be late</div>
+          <div class="chat-bubble dana">
+            <p class="act done"><i class="dot sage"></i>Dentist moved to Thu 10:00 <span class="undo">Undo</span></p>
+            <div class="approve">
+              <p class="card-src">Asks first · WhatsApp to Gal</p>
+              <p>“Running late, home by 19:30”</p>
+              <div class="card-acts"><span class="b-fill">Send</span><span class="b-q">Edit</span><span class="b-q">Deny</span></div>
+            </div>
           </div>
         </div>
+        <h3 class="reveal">It acts first, <em>and can always undo</em>.</h3>
+        <p class="reveal">Things you can take back happen right away, with Undo. Sending something in your name, or deleting something for good, waits for your yes. If an email or a message tells Dana to do something, it ignores it.</p>
       </div>
     </section>
 
     <!-- ============ EVERYWHERE ============ -->
     <section id="everywhere" class="everywhere">
-      <p class="eyebrow reveal">Everywhere</p>
-      <h2 class="h-section reveal">Wherever you are, <em>Dana is already there</em>.</h2>
-      <div class="lineup">
-        <div class="lu reveal"><div class="lu-ico">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="13" y="4" width="22" height="40" rx="5"/><path d="M21 38h6"/></svg></div>
-          <h3>Phone</h3><p>The Now screen, the inbox and chat. Long-press for an assistant that sees your screen. A card about the caller on every incoming call.</p></div>
-        <div class="lu reveal"><div class="lu-ico">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="12"/><path d="M19 12l1-7h8l1 7M19 36l1 7h8l1-7"/></svg></div>
-          <h3>Watch</h3><p>Tiles, a watch face with live complications, and push-to-talk on your wrist.</p></div>
-        <div class="lu reveal"><div class="lu-ico">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="10" width="40" height="28" rx="4"/><circle cx="24" cy="24" r="3"/></svg></div>
-          <h3>Wall tablet</h3><p>A kiosk with "Hey Dana": the family calendar, shopping and cameras, plus a bedside mode.</p></div>
-        <div class="lu reveal"><div class="lu-ico">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="3" y="8" width="42" height="26" rx="3"/><path d="M16 42h16M24 34v8"/></svg></div>
-          <h3>TV</h3><p>A home screen for the living room: your apps, a dashboard of the day, cameras in picture-in-picture, and voice.</p></div>
-        <div class="lu reveal"><div class="lu-ico">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="8" width="40" height="30" rx="4"/><path d="M4 16h40M10 12h.01M15 12h.01"/></svg></div>
-          <h3>Web</h3><p>The full app in your browser: Now, chat, tasks, inbox, projects, money.</p></div>
-        <div class="lu reveal"><div class="lu-ico">
-          <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 23l34-14-6 30-10-8-6 6v-9l14-12-18 10z"/></svg></div>
-          <h3>Telegram &amp; desktops</h3><p>Talk to Dana in Telegram, from Raycast on a Mac, or with a keystroke on an Omarchy Linux desktop.</p></div>
+      <div class="ew-head">
+        <p class="eyebrow reveal">Everywhere</p>
+        <h2 class="h-section reveal">Wherever you are, <em>Dana is already there</em>.</h2>
       </div>
+      <ul class="lineup">
+        <li class="lu reveal"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="13" y="4" width="22" height="40" rx="5"/><path d="M21 38h6"/></svg>
+          <h3>Phone</h3><p>Now, the inbox and chat. Long-press for an assistant that sees your screen; a card about every caller.</p></li>
+        <li class="lu reveal"><svg viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="12"/><path d="M19 12l1-7h8l1 7M19 36l1 7h8l1-7"/></svg>
+          <h3>Watch</h3><p>Tiles, a watch face with live complications, push-to-talk.</p></li>
+        <li class="lu reveal"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="10" width="40" height="28" rx="4"/><circle cx="24" cy="24" r="3"/></svg>
+          <h3>Wall tablet</h3><p>“Hey Dana”, the family calendar, shopping, cameras and a bedside mode.</p></li>
+        <li class="lu reveal"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="3" y="8" width="42" height="26" rx="3"/><path d="M16 42h16M24 34v8"/></svg>
+          <h3>TV</h3><p>A home screen: your apps, the day, cameras in picture-in-picture, voice.</p></li>
+        <li class="lu reveal"><svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="8" width="40" height="30" rx="4"/><path d="M4 16h40M10 12h.01M15 12h.01"/></svg>
+          <h3>Web</h3><p>The full app: Now, chat, tasks, inbox, projects, money.</p></li>
+        <li class="lu reveal"><svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 23l34-14-6 30-10-8-6 6v-9l14-12-18 10z"/></svg>
+          <h3>Telegram &amp; desktops</h3><p>Telegram, Raycast on a Mac, a keystroke on Omarchy Linux.</p></li>
+      </ul>
       <p class="bilingual reveal"><span>Speaks your language.</span> <span dir="rtl" lang="he">מדברת גם עברית.</span></p>
     </section>
 
-    <!-- ============ BUILD ============ -->
-    <section id="build" class="build">
-      <div class="build-copy">
+    <!-- ============ MAKE IT YOURS + COST ============ -->
+    <div class="pair">
+      <section id="build" class="make">
         <p class="eyebrow reveal">Make it yours</p>
         <h2 class="h-section reveal">Your server. <em>Your add-ons.</em></h2>
         <p class="sub reveal">Dana runs on one small server you own: a mini PC, a NAS or a homelab. Each feature is an add-on with its own tools and screens. The train add-on in the showreel lives in its own repository and installs from the catalog. You can write yours in an afternoon: an add-on is just typed Python functions with docstrings, and Dana takes it from there.</p>
@@ -395,13 +417,24 @@
           <li><b>Docker</b> and SQLite. Nothing to configure: open the setup link and paste one model key.</li>
           <li><b>MIT licensed.</b> Your data stays on your server.</li>
         </ul>
-      </div>
-      <div class="code reveal">
-        <div class="code-tabs" role="tablist" aria-label="Examples">
-          <button role="tab" aria-selected="true" aria-controls="code-addon" id="tab-addon" type="button">tools.py</button>
-          <button role="tab" aria-selected="false" aria-controls="code-run" id="tab-run" type="button" tabindex="-1">terminal</button>
-        </div>
-        <pre id="code-addon" role="tabpanel" aria-labelledby="tab-addon"><code><span class="c"># israel_rail/tools.py (shortened)</span>
+        <div class="code reveal">
+          <div class="code-tabs" role="tablist" aria-label="Examples">
+            <button role="tab" aria-selected="true" aria-controls="code-run" id="tab-run" type="button">terminal</button>
+            <button role="tab" aria-selected="false" aria-controls="code-addon" id="tab-addon" type="button" tabindex="-1">tools.py</button>
+          </div>
+          <pre id="code-run" role="tabpanel" aria-labelledby="tab-run" tabindex="0"><code><span class="c"># run Dana: no checkout, no settings</span>
+<span class="p">$</span> curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
+<span class="p">$</span> docker compose up -d
+<span class="p">$</span> docker compose logs dana
+<span class="o">  Open http://127.0.0.1:8080/setup?code=… to create the first admin.</span>
+<span class="c"># the setup page asks for one model key, then pairs your phone</span>
+
+<span class="c"># add the trains from the catalog (or Settings → Add-ons)</span>
+<span class="p">$</span> docker compose exec dana dana addons install israel_rail
+<span class="o">✓ israel_rail installed, pinned to a commit</span>
+<span class="c"># or write your own, in a checkout</span>
+<span class="p">$</span> bin/dana addons new my_thing</code></pre>
+          <pre id="code-addon" role="tabpanel" aria-labelledby="tab-addon" tabindex="0" hidden><code><span class="c"># israel_rail/tools.py (shortened)</span>
 <span class="k">@addon.tool</span>()
 <span class="k">async def</span> <span class="f">rail_trains</span>(conn, from_station: <span class="t">str</span> = <span class="s">""</span>,
                       to_station: <span class="t">str</span> = <span class="s">""</span>, count: <span class="t">int</span> = <span class="n">4</span>) -> <span class="t">str</span>:
@@ -419,42 +452,28 @@
 
 <span class="c"># Dana writes the schema, offers the tool to users
 # who connected the add-on, and the trains show up on Now.</span></code></pre>
-        <pre id="code-run" role="tabpanel" aria-labelledby="tab-run" hidden><code><span class="c"># run Dana: no checkout, no settings</span>
-<span class="p">$</span> curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
-<span class="p">$</span> docker compose up -d
-<span class="p">$</span> docker compose logs dana
-<span class="o">  Open http://127.0.0.1:8080/setup?code=… to create the first admin.</span>
-<span class="c"># the setup page asks for one model key, then pairs your phone</span>
+        </div>
+      </section>
 
-<span class="c"># add the trains from the catalog (or Settings → Add-ons)</span>
-<span class="p">$</span> docker compose exec dana dana addons install israel_rail
-<span class="o">✓ israel_rail installed, pinned to a commit</span>
-<span class="c"># or write your own, in a checkout</span>
-<span class="p">$</span> bin/dana addons new my_thing</code></pre>
-      </div>
-    </section>
-
-    <!-- ============ COST ============ -->
-    <section id="cost" class="cost">
-      <div class="cost-copy">
+      <section id="cost" class="cost">
         <p class="eyebrow reveal">What it costs</p>
         <h2 class="h-section reveal">About <em>$15 a month</em> in model calls.</h2>
-        <p class="sub reveal">That's what one real household's Dana spends, with every call to a model counted: chats, every notification read and sorted, call recordings, briefings. Measured over eight full days in November 2026 on the default models (Claude for chat, Gemini Flash-Lite for the background work). You pay your model provider directly; the server is yours, so there's no subscription. Set a monthly budget and Dana warns you at 80% and pauses its background work at 100%.</p>
-      </div>
-      <div class="cost-split reveal" role="img" aria-label="Where the money goes: chat 49%, reading notifications 32%, calls 8%, people briefs 5%, money 5%, everything else 1%">
-        <div class="cost-bar" aria-hidden="true">
-          <i style="--w:49;--h:var(--ember)"></i><i style="--w:32;--h:var(--teal)"></i><i style="--w:8;--h:var(--sage)"></i><i style="--w:5;--h:var(--plum)"></i><i style="--w:5;--h:var(--amber)"></i><i style="--w:1;--h:var(--sky)"></i>
+        <div class="cost-split reveal" role="img" aria-label="Where the money goes: chat 49%, reading notifications 32%, calls 8%, people briefs 5%, money 5%, everything else 1%">
+          <div class="cost-bar" aria-hidden="true">
+            <i style="--w:49;--h:var(--ember)"></i><i style="--w:32;--h:var(--teal)"></i><i style="--w:8;--h:var(--sage)"></i><i style="--w:5;--h:var(--plum)"></i><i style="--w:5;--h:var(--amber)"></i><i style="--w:1;--h:var(--sky)"></i>
+          </div>
+          <ul class="cost-key" aria-hidden="true">
+            <li style="--h:var(--ember)"><b>49%</b>Chat with Dana</li>
+            <li style="--h:var(--teal)"><b>32%</b>Reading and sorting notifications</li>
+            <li style="--h:var(--sage)"><b>8%</b>Transcribing and reading calls</li>
+            <li style="--h:var(--plum)"><b>5%</b>People briefs</li>
+            <li style="--h:var(--amber)"><b>5%</b>Money</li>
+            <li style="--h:var(--sky)"><b>1%</b>Everything else: briefings, voice notes, learning about you</li>
+          </ul>
         </div>
-        <ul class="cost-key" aria-hidden="true">
-          <li style="--h:var(--ember)"><b>49%</b>Chat with Dana</li>
-          <li style="--h:var(--teal)"><b>32%</b>Reading and sorting notifications</li>
-          <li style="--h:var(--sage)"><b>8%</b>Transcribing and reading calls</li>
-          <li style="--h:var(--plum)"><b>5%</b>People briefs</li>
-          <li style="--h:var(--amber)"><b>5%</b>Money</li>
-          <li style="--h:var(--sky)"><b>1%</b>Everything else: briefings, voice notes, learning about you</li>
-        </ul>
-      </div>
-    </section>
+        <p class="sub reveal">That's what one real household's Dana spends, with every call to a model counted: chats, every notification read and sorted, call recordings, briefings. Measured over eight full days in November 2026 on the default models (Claude for chat, Gemini Flash-Lite for the background work). You pay your model provider directly; the server is yours, so there's no subscription. Set a monthly budget and Dana warns you at 80% and pauses its background work at 100%.</p>
+      </section>
+    </div>
 
     <section class="closer">
       <h2 class="reveal">Stop checking. <em>Start living.</em></h2>
