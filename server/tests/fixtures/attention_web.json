@@ -1,0 +1,655 @@
+{
+ "addon_reconnect": {
+  "body": {
+   "addons": [
+    {
+     "account": null,
+     "can_change": true,
+     "check": true,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": true,
+     "credentials": [
+      {
+       "can_change": true,
+       "description": "Home Assistant base URL, e.g. https://home.example.com",
+       "help": "The address you open Home Assistant at in a browser, with http(s):// and the port if it has one.",
+       "label": "Address",
+       "name": "host",
+       "placeholder": "https://home.example.com",
+       "required": true,
+       "rule": "Only an address an admin has allowed for this service.",
+       "secret": false,
+       "set": true,
+       "type": "address",
+       "url": null,
+       "value": "http://ha-gal.example.test",
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "description": "Long-lived access token",
+       "help": "In Home Assistant: click your name at the bottom left → Security → Long-lived access tokens → Create token, then copy it here.",
+       "label": "Access token",
+       "name": "token",
+       "placeholder": "",
+       "required": true,
+       "rule": null,
+       "secret": true,
+       "set": true,
+       "type": "text",
+       "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile",
+       "why_not": null
+      }
+     ],
+     "description": "Lights, devices and the TV, reminders when you arrive or get in the car",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Turn off the living room lights",
+      "Remind me to take out the trash when I get home",
+      "Is the gate open?"
+     ],
+     "features": [
+      "Turn lights, the AC, gates and other devices on and off",
+      "Reminders when you arrive at a place, leave it or get in the car",
+      "Knows which devices are in which room",
+      "Controls the TV",
+      "The weather for your morning briefing"
+     ],
+     "icon": "house",
+     "name": "homeassistant",
+     "needs": [
+      {
+       "kind": "hardware",
+       "optional": false,
+       "what": "a Home Assistant server Dana's server can reach",
+       "why": "Lights, devices, zones and the weather come from it"
+      },
+      {
+       "kind": "account",
+       "optional": false,
+       "what": "a Home Assistant long-lived access token",
+       "why": "Dana signs in to Home Assistant with it"
+      },
+      {
+       "kind": "app",
+       "optional": true,
+       "what": "the Home Assistant phone app",
+       "why": "Arrive, leave, car and wake reminders use its sensors"
+      }
+     ],
+     "options": true,
+     "pages": [],
+     "reconnect": [
+      {
+       "fix": {
+        "addon": "homeassistant",
+        "kind": "connect",
+        "label": "Reconnect"
+       },
+       "label": "",
+       "part": "",
+       "reason": "Home Assistant refused the token (HTTP 401).",
+       "since": "2026-11-22T08:30:00+02:00"
+      }
+     ],
+     "requires": null,
+     "settings": [
+      {
+       "can_change": true,
+       "default": null,
+       "description": "The user's person entity: zone enter / leave triggers",
+       "help": "Your person in Home Assistant (Settings → People), for reminders when you arrive or leave.",
+       "label": "You in Home Assistant",
+       "name": "person",
+       "placeholder": "person.noa",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "The phone's Bluetooth connection sensor: car enter / leave triggers",
+       "help": "From the Home Assistant phone app, for reminders when you get in the car.",
+       "label": "Phone's Bluetooth sensor",
+       "name": "car_sensor",
+       "placeholder": "sensor.pixel_bluetooth_connection",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "The car's Bluetooth name, as it shows in that sensor's connected_paired_devices",
+       "help": "The name your car has in your phone's Bluetooth list.",
+       "label": "Car's Bluetooth name",
+       "name": "car_device",
+       "placeholder": "My Car",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Phone screen-on (interactive) binary sensor: confirms the wake signal",
+       "help": "From the Home Assistant phone app; tells Dana you are awake.",
+       "label": "Phone's screen-on sensor",
+       "name": "phone_interactive_sensor",
+       "placeholder": "binary_sensor.pixel_interactive",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Phone battery level sensor (a dashboard's Batteries widget when it names none)",
+       "help": "From the Home Assistant phone app; shown on dashboards.",
+       "label": "Phone's battery sensor",
+       "name": "phone_battery_sensor",
+       "placeholder": "sensor.pixel_battery_level",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "The phone's mobile_app notify service suffix (reported by /api/client-config)",
+       "help": "Set by the Dana phone app; change it only if it is wrong.",
+       "label": "Phone's notify service",
+       "name": "phone_notify_service",
+       "placeholder": "mobile_app_pixel",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": "weather.forecast_home",
+       "description": "Weather entity for the wake briefing and the Now screen",
+       "help": "The weather entity your forecast comes from (Settings → Devices & services).",
+       "label": "Weather",
+       "name": "weather_entity",
+       "placeholder": "weather.forecast_home",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": "weather.forecast_home",
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+       "help": "Your Android TV's media player (the Android Debug Bridge one), if Dana should control it.",
+       "label": "TV",
+       "name": "tv_entity",
+       "placeholder": "media_player.living_room_tv",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      },
+      {
+       "can_change": true,
+       "default": null,
+       "description": "ADB command that tunes the TV to a channel, with {channel} in it (e.g. your TV provider app's deep link); unset: no channel changes",
+       "help": "Optional, for changing channels: a command with {channel} where the number goes.",
+       "label": "TV channel command",
+       "name": "tv_channel_command",
+       "placeholder": "",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": null,
+       "why_not": null
+      }
+     ],
+     "setup": [],
+     "source": "official",
+     "state": "on",
+     "title": "Home Assistant",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [
+       "your Home Assistant server"
+      ],
+      "reads": [],
+      "stores_credentials": true
+     },
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    }
+   ]
+  },
+  "status": 200
+ },
+ "checks_maya": {
+  "body": {
+   "checks": []
+  },
+  "status": 200
+ },
+ "checks_phone_reconnect": {
+  "body": {
+   "checks": [
+    {
+     "addon": "phone",
+     "blocks": [],
+     "detail": "The phone's push registration was refused by its push service, so Dana can't reach your phone. Open the Dana app on it, or pair it again.",
+     "fix": {
+      "kind": "screen",
+      "label": "Open Devices",
+      "screen": "devices"
+     },
+     "ignored_until": null,
+     "key": "reconnect:phone",
+     "label": "Phone",
+     "ok": false,
+     "server": false,
+     "since": "2026-11-22T08:30:00+02:00",
+     "title": "Reconnect Phone",
+     "why": "The phone's push registration was refused by its push service, so Dana can't reach your phone. Open the Dana app on it, or pair it again. Dana can't use it until you connect it again."
+    }
+   ]
+  },
+  "status": 200
+ },
+ "checks_push_failing": {
+  "body": {
+   "checks": [
+    {
+     "addon": "phone",
+     "blocks": [
+      {
+       "items": [
+        "Pixel · FCM · last check-in just now",
+        "Last push failure just now: notify: 0/1 device(s)"
+       ],
+       "label": "Push",
+       "type": "facts"
+      }
+     ],
+     "detail": "Last push failed just now",
+     "fix": {
+      "action": "test",
+      "kind": "server",
+      "label": "Send a test push"
+     },
+     "ignored_until": null,
+     "key": "push",
+     "label": "Push to the phone",
+     "ok": false,
+     "server": false,
+     "since": null,
+     "title": "Push to the phone is failing",
+     "why": "Reminders, alerts and the briefing may not reach the phone."
+    }
+   ]
+  },
+  "status": 200
+ },
+ "checks_reconnect": {
+  "body": {
+   "checks": [
+    {
+     "addon": "homeassistant",
+     "blocks": [],
+     "detail": "Home Assistant refused the token (HTTP 401).",
+     "fix": {
+      "addon": "homeassistant",
+      "kind": "connect",
+      "label": "Reconnect"
+     },
+     "ignored_until": null,
+     "key": "reconnect:homeassistant",
+     "label": "Home Assistant",
+     "ok": false,
+     "server": false,
+     "since": "2026-11-22T08:30:00+02:00",
+     "title": "Reconnect Home Assistant",
+     "why": "Home Assistant refused the token (HTTP 401). Dana can't use it until you connect it again."
+    },
+    {
+     "addon": null,
+     "blocks": [
+      {
+       "items": [
+        "Wake: Dana's phone app",
+        "Car: Dana's phone app",
+        "Location: Dana's phone app"
+       ],
+       "label": "Sources",
+       "type": "facts"
+      }
+     ],
+     "detail": "every signal has a source",
+     "fix": null,
+     "ignored_until": null,
+     "key": "signals",
+     "label": "Wake, car and place signals",
+     "ok": true,
+     "server": false,
+     "since": null,
+     "title": "",
+     "why": ""
+    },
+    {
+     "addon": null,
+     "blocks": [
+      {
+       "cells": [
+        {
+         "label": "Tue",
+         "ok": false,
+         "value": "–"
+        },
+        {
+         "label": "Wed",
+         "ok": false,
+         "value": "–"
+        },
+        {
+         "label": "Thu",
+         "ok": false,
+         "value": "–"
+        },
+        {
+         "label": "Fri",
+         "ok": false,
+         "value": "–"
+        },
+        {
+         "label": "Sat",
+         "ok": false,
+         "value": "–"
+        },
+        {
+         "label": "Sun",
+         "ok": false,
+         "value": "–"
+        },
+        {
+         "label": "Mon",
+         "ok": null,
+         "value": "–"
+        }
+       ],
+       "label": "Last 7 mornings",
+       "type": "week"
+      },
+      {
+       "items": [
+        "Wake window 05:00–12:00",
+        "Dana's phone app: no wake signal yet",
+        "Home Assistant: no wake signal yet (Set phone_interactive_sensor in the Home Assistant addon)"
+       ],
+       "label": "Signals",
+       "type": "facts"
+      }
+     ],
+     "detail": "no wake confirmed yet",
+     "fix": null,
+     "ignored_until": null,
+     "key": "wake",
+     "label": "Wake signal",
+     "ok": false,
+     "server": false,
+     "since": null,
+     "title": "No wake signal yet",
+     "why": "Morning reminders and the briefing depend on it."
+    },
+    {
+     "addon": null,
+     "blocks": [],
+     "detail": "not due yet",
+     "fix": null,
+     "ignored_until": null,
+     "key": "briefing",
+     "label": "Morning briefing",
+     "ok": true,
+     "server": false,
+     "since": null,
+     "title": "",
+     "why": ""
+    },
+    {
+     "addon": "phone",
+     "blocks": [
+      {
+       "items": [
+        "Pixel · FCM · last check-in just now"
+       ],
+       "label": "Push",
+       "type": "facts"
+      }
+     ],
+     "detail": "Last check-in just now",
+     "fix": null,
+     "ignored_until": null,
+     "key": "push",
+     "label": "Push to the phone",
+     "ok": true,
+     "server": false,
+     "since": "2026-11-22T08:30:00+02:00",
+     "title": "",
+     "why": ""
+    },
+    {
+     "addon": "phone",
+     "blocks": [],
+     "detail": "No batch received yet",
+     "fix": null,
+     "ignored_until": null,
+     "key": "notification_sync",
+     "label": "Notification sync",
+     "ok": false,
+     "server": false,
+     "since": null,
+     "title": "No notifications from the phone yet",
+     "why": "Dana can't see what needs you. Check notification access for the Dana app."
+    },
+    {
+     "addon": "phone",
+     "blocks": [],
+     "detail": "nothing to sort",
+     "fix": null,
+     "ignored_until": null,
+     "key": "triage",
+     "label": "Notification sorting",
+     "ok": true,
+     "server": false,
+     "since": null,
+     "title": "",
+     "why": ""
+    },
+    {
+     "addon": "phone",
+     "blocks": [],
+     "detail": "no calls yet",
+     "fix": null,
+     "ignored_until": null,
+     "key": "calls",
+     "label": "Call recordings",
+     "ok": true,
+     "server": false,
+     "since": null,
+     "title": "",
+     "why": ""
+    },
+    {
+     "addon": "homeassistant",
+     "blocks": [],
+     "detail": "never received",
+     "fix": {
+      "addon": "homeassistant",
+      "kind": "connect",
+      "label": "Reconnect"
+     },
+     "ignored_until": null,
+     "key": "location",
+     "label": "Location updates",
+     "ok": false,
+     "server": false,
+     "since": null,
+     "title": "No location updates received yet",
+     "why": "Reminders for arriving at or leaving places won't fire."
+    },
+    {
+     "addon": "homeassistant",
+     "blocks": [],
+     "detail": "never received",
+     "fix": {
+      "addon": "homeassistant",
+      "kind": "connect",
+      "label": "Reconnect"
+     },
+     "ignored_until": null,
+     "key": "car",
+     "label": "Car updates",
+     "ok": false,
+     "server": false,
+     "since": null,
+     "title": "No car updates received yet",
+     "why": "In-the-car reminders won't fire."
+    },
+    {
+     "addon": "homeassistant",
+     "blocks": [],
+     "detail": "nothing selected",
+     "fix": null,
+     "ignored_until": null,
+     "key": "ha_entities",
+     "label": "Home Assistant entities",
+     "ok": true,
+     "server": false,
+     "since": null,
+     "title": "",
+     "why": ""
+    },
+    {
+     "addon": "homeassistant",
+     "blocks": [],
+     "detail": "nothing to watch",
+     "fix": null,
+     "ignored_until": null,
+     "key": "ha_watcher",
+     "label": "Home Assistant connection",
+     "ok": true,
+     "server": false,
+     "since": null,
+     "title": "",
+     "why": ""
+    }
+   ]
+  },
+  "status": 200
+ },
+ "fix_ok": {
+  "body": {
+   "message": "Your phone accepted the test push",
+   "ok": true
+  },
+  "status": 200
+ },
+ "fix_refused": {
+  "body": {
+   "error": "“Push to the phone” is fine now: nothing to fix.",
+   "ok": false
+  },
+  "status": 409
+ },
+ "now_fix_card": {
+  "blocks": [
+   {
+    "items": [
+     "Pixel · FCM · last check-in just now",
+     "Last push failure just now: notify: 0/1 device(s)"
+    ],
+    "label": "Push",
+    "type": "facts"
+   }
+  ],
+  "id": "check:push",
+  "kind": "check",
+  "primary": {
+   "action": "fix",
+   "args": {
+    "fix": "test"
+   },
+   "label": "Send a test push"
+  },
+  "ref": {
+   "id": "push",
+   "type": "check"
+  },
+  "schedulable": true,
+  "secondary": [
+   {
+    "action": "open",
+    "client": true,
+    "label": "Details"
+   },
+   {
+    "action": "ignore",
+    "args": {
+     "days": 7
+    },
+    "label": "Ignore for a week"
+   }
+  ],
+  "source": "Dana check",
+  "title": "Push to the phone is failing",
+  "why": "Reminders, alerts and the briefing may not reach the phone."
+ },
+ "now_reconnect_card": {
+  "blocks": [],
+  "id": "check:reconnect:homeassistant",
+  "kind": "reconnect",
+  "primary": {
+   "action": "connect",
+   "args": {
+    "addon": "homeassistant"
+   },
+   "client": true,
+   "label": "Reconnect"
+  },
+  "ref": {
+   "id": "reconnect:homeassistant",
+   "type": "check"
+  },
+  "schedulable": false,
+  "secondary": [
+   {
+    "action": "ignore",
+    "args": {
+     "days": 1
+    },
+    "label": "Not today"
+   }
+  ],
+  "source": "Reconnect · Home Assistant",
+  "title": "Reconnect Home Assistant",
+  "why": "Home Assistant refused the token (HTTP 401). Dana can't use it until you connect it again."
+ }
+}

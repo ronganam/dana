@@ -53,9 +53,10 @@ def missing(error: Exception) -> bool:
     return status_of(error) in (400, 404)
 
 
-def failure(error: Exception) -> str:
-    """A short reason for a failed request, safe to show (never a token)."""
-    return oauth.failure_reason(error, SERVICE)
+def failure(conn: Connection, error: Exception) -> str:
+    """A short reason for a failed request of ``conn``, safe to show (never a
+    token); a refused sign-in marks it for reconnecting (``oauth.failed``)."""
+    return oauth.failed(conn, error, SERVICE)
 
 
 def batch(svc: Any, requests: Mapping[str, Any]) -> Tuple[Dict[str, Any], Dict[str, Exception]]:
@@ -96,7 +97,7 @@ def own_address(conn: Connection, svc: Optional[Any] = None) -> str:
     try:
         return profile_address(conn, svc) or ""
     except Exception as e:
-        logger.info(f"Gmail address of user {conn.user.id} not known: {failure(e)}")
+        logger.info(f"Gmail address of user {conn.user.id} not known: {failure(conn, e)}")
         return ""
 
 
@@ -104,7 +105,7 @@ def _check_blocking(conn: Connection) -> Optional[str]:
     try:
         service(conn).users().getProfile(userId=ME).execute()
     except Exception as e:
-        return failure(e)
+        return failure(conn, e)
     return None
 
 
@@ -127,7 +128,7 @@ async def learn_account(user: User) -> Optional[str]:
     try:
         address = await run(profile_address, conn)
     except Exception as e:
-        logger.info(f"Gmail address of user {user.id} not learned: {failure(e)}")
+        logger.info(f"Gmail address of user {user.id} not learned: {failure(conn, e)}")
         return None
     if address and address != conn.account:
         try:

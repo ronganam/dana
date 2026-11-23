@@ -90,10 +90,22 @@ def signature(conn: Connection) -> Tuple[str, str, str]:
 # REST
 # ---------------------------------------------------------------------------
 
+REFUSED = "Home Assistant refused the token"
+
+
+def _answered(conn: Connection, r: httpx.Response) -> httpx.Response:
+    """A token Home Assistant refused (HTTP 401) marks the connection for
+    reconnecting (a new long-lived token fixes it: docs/now.md, "Reconnect")."""
+    if r.status_code == 401:
+        store.needs_reconnect(conn.user, ADDON, f"{REFUSED} (HTTP 401).")
+    return r
+
+
 async def get(conn: Connection, path: str, *, timeout: float, params: Optional[Dict[str, Any]] = None
               ) -> httpx.Response:
     async with httpx.AsyncClient() as client:
-        return await client.get(url(conn, path), params=params, headers=headers(conn), timeout=timeout)
+        return _answered(conn, await client.get(url(conn, path), params=params, headers=headers(conn),
+                                                timeout=timeout))
 
 
 async def post(conn: Connection, path: str, *, json_body: Dict[str, Any], timeout: float,
@@ -101,7 +113,7 @@ async def post(conn: Connection, path: str, *, json_body: Dict[str, Any], timeou
     """POST ``path``; ``flag`` is a fixed query word added as is (``return_response``)."""
     target = url(conn, path) + (f"?{flag}" if flag else "")
     async with httpx.AsyncClient() as client:
-        return await client.post(target, headers=headers(conn), json=json_body, timeout=timeout)
+        return _answered(conn, await client.post(target, headers=headers(conn), json=json_body, timeout=timeout))
 
 
 async def entity_state(conn: Connection, entity_id: str, timeout: float = 6.0) -> Optional[Dict[str, Any]]:
@@ -220,13 +232,18 @@ async def zones(conn: Connection) -> List[Dict[str, Any]]:
 async def authenticate(ws: Any, conn: Connection) -> None:
     """The WebSocket handshake (``auth_required`` → ``auth`` → ``auth_ok``).
 
+    A refused token marks the connection for reconnecting; an accepted one
+    clears that.
+
     Raises:
         PermissionError: Home Assistant refused the token.
     """
     await ws.recv()  # auth_required
     await ws.send(json.dumps({"type": "auth", "access_token": token(conn)}))
     if json.loads(await ws.recv()).get("type") != "auth_ok":
+        store.needs_reconnect(conn.user, ADDON, f"{REFUSED} when Dana signed in to watch your home.")
         raise PermissionError("Home Assistant authentication failed. Check the connection's token.")
+    store.reconnected(conn.user, ADDON)
 
 
 async def fetch_registry(conn: Connection) -> Tuple[Set[str], Dict[str, Dict[str, Any]]]:
@@ -315,7 +332,8 @@ async def check(conn: Connection) -> Optional[str]:
     except Exception as e:
         return f"Could not reach Home Assistant at {host(conn)} ({type(e).__name__})."
     if r.status_code in (401, 403):
-        return f"Home Assistant refused the token (HTTP {r.status_code})."
+        store.needs_reconnect(conn.user, ADDON, f"{REFUSED} (HTTP {r.status_code}).")
+        return f"{REFUSED} (HTTP {r.status_code})."
     if r.status_code != 200:
         return f"Home Assistant answered HTTP {r.status_code}."
     return None

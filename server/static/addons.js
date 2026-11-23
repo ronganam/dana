@@ -96,7 +96,7 @@
 
   /**
    * Where an addon stands for this user, from the server's answer (and the last check this page ran):
-   * {key: on | error | setup | off | locked | server-off | failed, label, reason}.
+   * {key: on | reconnect | error | setup | off | locked | server-off | failed, label, reason}.
    */
   function statusOf(item, ui) {
     if (item.state === "failed") {
@@ -111,6 +111,7 @@
       if (item.account_conflict) {
         return { key: "error", label: "Error", reason: `This WhatsApp number (${accountText(item.account_conflict)}) is already connected by another user, so Dana doesn't use this connection. Use a different session, or ask an admin.` };
       }
+      if ((item.reconnect || []).length) return { key: "reconnect", label: "Reconnect", reason: reconnectText(item) };
       if (item.problem) return { key: "error", label: "Error", reason: `${fieldLabel(item, item.problem.field)}: ${item.problem.message} Set it again.` };
       const t = ui && ui.test;
       if (t && t.checked && t.ok === false) return { key: "error", label: "Error", reason: checkFailedText(item, t.reason) };
@@ -118,6 +119,31 @@
     }
     if (!item.can_change) return { key: "locked", label: "Admin only", reason: item.why_not || "Only an admin can turn it on." };
     return needsSetup(item) ? { key: "setup", label: "Needs setup", reason: "" } : { key: "off", label: "Off", reason: "" };
+  }
+
+  /** Why a connection needs reconnecting, from its `reconnect` entries (one per source when the addon has several). */
+  function reconnectText(item) {
+    const lines = (item.reconnect || []).map((r) => {
+      const why = String(r.reason || "Its sign-in stopped working.").replace(/[.\s]+$/, "");
+      return `${r.label ? `${r.label}: ` : ""}${why}.`;
+    });
+    return `${lines.join(" ")} Dana can't use it until you connect it again.`;
+  }
+
+  /**
+   * The Reconnect button of an addon that needs it (its entries' fix, server/docs/now.md "Fixes"), or null:
+   * {kind: "link", href, label} (the addon's sign-in, or a fix's https link), {kind: "screen", id, label}
+   * (the page where its sources are fixed), {kind: "fields", label} (enter the credentials again below).
+   */
+  function reconnectAction(item) {
+    const fix = ((item.reconnect || [])[0] || {}).fix;
+    if (!fix || !item.can_change) return null;
+    const label = fix.label || "Reconnect";
+    if (fix.kind === "screen" && fix.screen) return { kind: "screen", id: fix.screen, label };
+    if (fix.kind === "url" && safeUrl(fix.url)) return { kind: "link", href: fix.url, label };
+    if (fix.kind !== "connect") return null;
+    if (item.connect_url) return { kind: "link", href: item.connect_url, label };
+    return fieldsOf(item).some((f) => f.group === "credentials") ? { kind: "fields", label } : null;
   }
 
   /** The list's groups: On, Available (you can turn it on), Not available (an admin's choice, off on the server, failed). */
@@ -406,7 +432,7 @@
     const st = statusOf(item, ui);
     const meta = item.account ? accountText(item.account) : "";
     const badge = sourceLabel(item) ? `<span class="itg-badge ${esc(item.source)}">${esc(sourceLabel(item))}</span>` : "";
-    const reason = st.key === "error" || st.key === "failed" ? `<span class="itg-row-reason">${esc(st.reason)}</span>` : "";
+    const reason = ["error", "failed", "reconnect"].includes(st.key) ? `<span class="itg-row-reason">${esc(st.reason)}</span>` : "";
     return `<button class="itg-row" data-open="${esc(item.name)}">
         <span class="itg-icon"><i data-lucide="${esc(iconOf(item))}"></i></span>
         <span class="itg-row-text">
@@ -563,7 +589,11 @@
     ui = ui || {};
     const st = statusOf(item, ui);
     const busy = ui.busy || "";
-    const reason = st.reason ? `<div class="itg-note ${st.key === "locked" ? "" : "warn"}"><i data-lucide="${st.key === "locked" ? "lock" : "triangle-alert"}"></i><span>${esc(st.reason)}</span></div>` : "";
+    const fix = st.key === "reconnect" ? reconnectAction(item) : null;
+    const fixButton = !fix ? "" : fix.kind === "link" ? `<a class="btn-primary" href="${esc(fix.href)}"${fix.href === item.connect_url ? "" : ' target="_blank" rel="noopener"'}>${esc(fix.label)}</a>`
+      : fix.kind === "screen" ? `<button class="btn-primary" data-screen="${esc(fix.id)}">${esc(fix.label)}</button>`
+      : `<button class="btn-primary" data-act="reconnect">${esc(fix.label)}</button>`;
+    const reason = st.reason ? `<div class="itg-note ${st.key === "locked" ? "" : "warn"}"><i data-lucide="${st.key === "locked" ? "lock" : st.key === "reconnect" ? "plug-zap" : "triangle-alert"}"></i><span>${esc(st.reason)}</span>${fixButton ? `<div class="itg-actions">${fixButton}</div>` : ""}</div>` : "";
     const status = ui.status ? `<div class="itg-status ${esc(ui.status.tone || "")}" role="status">${esc(ui.status.text)}</div>` : `<div class="itg-status hidden" role="status"></div>`;
     let settings = "";
     if (item.connected && !item.everyone) {
@@ -670,7 +700,7 @@
   }
 
   const core = { FULL_ACCESS, KEY_TEXT, esc, displayName, iconOf, safeUrl, fieldLabel, isService, needsSetup, accountText,
-                 statusOf, groupItems, connectFields, stepsFor, fieldModel, typedValue, buildChanges, path, errorText,
+                 statusOf, reconnectText, reconnectAction, groupItems, connectFields, stepsFor, fieldModel, typedValue, buildChanges, path, errorText,
                  checkFailedText, testText, connectedText, disconnectText, welcomeModel, sourceLabel, serverActions,
                  catalogState, installBody, installConfirm, touchesConfirm, needLines, touchLines, renderHeader, renderRow,
                  renderWelcome, renderList, renderField, renderSteps, renderAdds, renderNeeds, renderExamples, renderDetail, renderBody, renderRestartBanner,
@@ -1042,10 +1072,16 @@
       else if ((n = t.closest("[data-open]"))) openDetail(n.dataset.open);
       else if (t.closest("[data-close]")) openDetail(null);
       else if ((n = t.closest("[data-ask]"))) tryExample(n.dataset.ask);
+      else if ((n = t.closest("[data-screen]"))) window.openScreen?.(n.dataset.screen);
       else if ((n = t.closest("[data-act]"))) {
         const addon = n.dataset.addon || n.closest("[data-detail]")?.dataset.detail;
         if (!addon || uiOf(addon).busy) return;
-        if (n.dataset.act === "save") save(addon);
+        if (n.dataset.act === "reconnect") {
+          // The secret to enter again (a token, a password), else the first field.
+          const view = n.closest("[data-detail]");
+          (view?.querySelector("input[type=password]") || view?.querySelector("input.settings-input"))?.focus();
+        }
+        else if (n.dataset.act === "save") save(addon);
         else if (n.dataset.act === "test") test(addon);
         else if (n.dataset.act === "disconnect") askDisconnect(addon);
         else if (["disable", "enable", "remove"].includes(n.dataset.act)) askServer(n.dataset.act, addon);

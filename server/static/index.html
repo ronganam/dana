@@ -24,6 +24,7 @@
     <link rel="stylesheet" href="/static/kit.css">
     <link rel="stylesheet" href="/static/review.css">
     <link rel="stylesheet" href="/static/usage.css">
+    <link rel="stylesheet" href="/static/attention.css">
     <link rel="stylesheet" href="/static/addons.css">
     <link rel="stylesheet" href="/static/devices.css">
     <link rel="stylesheet" href="/static/household.css">
@@ -51,6 +52,7 @@
     <script src="/static/app.js" defer></script>
     <script src="/static/review.js" defer></script>
     <script src="/static/usage.js" defer></script>
+    <script src="/static/attention.js" defer></script>
     <script src="/static/addons.js" defer></script>
     <script src="/static/profile.js" defer></script>
     <script src="/static/devices.js" defer></script>
@@ -286,6 +288,10 @@
                                     <i data-lucide="sparkles"></i>
                                     <span>Setup wizard</span>
                                 </a>
+                                <button class="settings-link-tile" id="btn-open-attention-tab">
+                                    <i data-lucide="life-buoy"></i>
+                                    <span>Needs attention</span>
+                                </button>
                                 <button class="settings-link-tile" id="btn-open-devices-tab">
                                     <i data-lucide="smartphone"></i>
                                     <span>Devices</span>
@@ -367,6 +373,23 @@
                     </div>
                 </div>
                 <div class="ibx-modal hidden" id="hh-modal"></div>
+            </section>
+
+            <!-- ════ NEEDS ATTENTION (static/attention.js) — opened from Settings, the nav, a check's Now card or /#attention ════ -->
+            <section class="screen-panel" id="panel-attention">
+                <header class="top-bar">
+                    <button class="icon-btn" id="att-back" title="Back to settings" aria-label="Back to settings"><i data-lucide="arrow-left"></i></button>
+                    <span class="top-bar-title" style="flex:1;margin-left:8px;">Needs attention</span>
+                    <div class="top-bar-actions">
+                        <button class="icon-btn" id="att-refresh" title="Refresh" aria-label="Refresh"><i data-lucide="refresh-cw"></i></button>
+                    </div>
+                </header>
+                <div class="dev-scroll">
+                    <div class="dev-inner">
+                        <p class="dev-intro">What needs you to keep Dana working: a connection to sign in to again, a signal that stopped arriving. Each has the button that fixes it.</p>
+                        <div id="att-list"></div>
+                    </div>
+                </div>
             </section>
 
             <!-- ════ USAGE & COST (static/usage.js) ════ -->

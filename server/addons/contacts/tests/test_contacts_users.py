@@ -450,6 +450,10 @@ async def test_sync() -> None:
     check("loop: Bob's failure is his alone: the others are synced, his copy is left as it was",
           BOB.id not in out and out[ADMIN.id]["full"] == 0 and out[EVE.id]["contacts"] == 1
           and copy_ids(BOB) == ["people/b1", "people/b2"] and contacts_store.sync_token(BOB) == "bob-sync-2", out)
+    check("loop: Bob's refused sign-in marks his Contacts for reconnecting, nobody else's",
+          [r.addon for r in store.reconnects(BOB)] == ["contacts"] and store.reconnects(ADMIN) == []
+          and store.reconnects(EVE) == [], (store.reconnects(BOB), store.reconnects(ADMIN)))
+    store.reconnected(BOB, "contacts")
     ACCOUNTS["bob-refresh"].put(person("b2", "Bob Only", phones=("+972502220002",), emails=("only@bob.example",)))
     with users.acting_as(BOB):
         await sync.sync_user(BOB)
@@ -588,8 +592,11 @@ async def test_tools() -> None:
     out = await tool(ADMIN, "update_contact", contact_id="people/r2", name="Unreachable")
     robin.fail = False
     check("update: a failure is a short reason and leaves the copy as it was",
-          out == "Error: Google Contacts answered HTTP 401."
+          out == "Error: Google Contacts refused the sign-in (HTTP 401); connect Google again."
           and contacts_store.get(ADMIN, "people/r2")["name"] == "Rachel Levi-Cohen", out)
+    check("update: the refused sign-in marks Robin's Contacts for reconnecting, not Bob's",
+          [r.addon for r in store.reconnects(ADMIN)] == ["contacts"] and store.reconnects(BOB) == [], store.reconnects(ADMIN))
+    store.reconnected(ADMIN, "contacts")
     requests()
 
     # add_contact.
@@ -642,7 +649,7 @@ async def test_tools() -> None:
     robin.fail = False
     check("check: one cheap request to the user's own account; a failure is a short reason",
           ok is None and len(reqs) == 1 and reqs[0]["account"] == "bob" and reqs[0]["pageSize"] == 1
-          and "requestSyncToken" not in reqs[0] and failing == "Google Contacts answered HTTP 401.", (ok, reqs, failing))
+          and "requestSyncToken" not in reqs[0] and failing == "Google Contacts refused the sign-in (HTTP 401); connect Google again.", (ok, reqs, failing))
     requests()
 
     # Without the addon.

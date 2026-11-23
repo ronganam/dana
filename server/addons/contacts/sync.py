@@ -78,7 +78,9 @@ async def sync_user(user: User) -> Optional[Dict[str, int]]:
 
 def _log_failure(user: User, error: Exception) -> None:
     # The reason only: Google's own message carries the request URL (the sync token).
-    logger.error(f"Contacts sync for user {user.id} failed: {client.failure_reason(error)}",
+    conn = connections.get(user, ADDON)
+    reason = client.failure_reason(conn, error) if conn is not None else oauth.failure_reason(error, client.SERVICE_NAME)
+    logger.error(f"Contacts sync for user {user.id} failed: {reason}",
                  exc_info=None if getattr(error, "resp", None) is not None else error)
 
 

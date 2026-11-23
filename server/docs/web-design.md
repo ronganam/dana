@@ -36,7 +36,7 @@ Every colour is a token on `:root`; a screen never hardcodes one.
   `--connecting-amber`) point at the hues.
 - **Where colour goes**: the current place in the rail / bottom nav (accent pill and a 3 px accent line),
   active chips, selected rows and segmented buttons (accent tint + accent text), navigation counts
-  (accent), status pills (tint + hue text: the Addons page's On / Needs setup / Error), avatars (people,
+  (accent), status pills (tint + hue text: the Addons page's On / Needs setup / Reconnect / Error), avatars (people,
   callers, inbox app tiles) on a hue picked by a stable hash of the name (inbox: messaging teal, calendar
   sky, calls sage, contacts plum), a reminder's group colour as a 3 px start bar on its row, money in sage
   and out / over in rose or amber, the approval box in ember. A faint static ember glow sits at the top of
@@ -45,7 +45,7 @@ Every colour is a token on `:root`; a screen never hardcodes one.
 ## Navigation (`static/app-places.js`, `static/app-nav.js`)
 
 The shell draws the navigation from **places**: the lead places Now and Chat, then every addon page with a
-`Nav` (the main places, in `Nav` order), and the core group (Settings, Addons, Devices, Household for a user with `manage_users`, Usage, Debug for a user with `manage_server`, and the
+`Nav` (the main places, in `Nav` order), and the core group (Settings, Needs attention (with the count of failing checks not ignored), Addons, Devices, Household for a user with `manage_users`, Usage, Debug for a user with `manage_server`, and the
 Dash link to `/dashboard`), drawn quieter and last. The shell names no addon page: which pages appear, and
 in what order, comes from `GET /api/addons`.
 
@@ -100,7 +100,7 @@ blocks, so an addon's own cards (any `kind`) need nothing here.
   be read".
 - **Needs you**: the count in the accent, then a hairline row per card in server order: a 3 px start bar and
   a dot in the kind's hue (approval ember, notification teal, suggestion plum or sage for a call's,
-  reminder amber, a charge rose, other money sage, check rose, review and any other kind sky), `source` in
+  reminder amber, a charge rose, other money sage, check and reconnect rose, review and any other kind sky), `source` in
   mono caps (each " · " part isolated, so a Hebrew name keeps its place), the title, `why`, the blocks
   folded behind More (every block type of `docs/now.md`; `choices` change the primary's label), the
   primary filled and the secondary actions quiet. An open row sits on `--canvas-soft`.
@@ -109,7 +109,10 @@ blocks, so an addon's own cards (any `kind`) need nothing here.
   /api/undo/{id}`, then a refresh brings the card back); an error puts the card back where it was with the
   message on it. Client actions: `reply` is drawn disabled ("Reply on phone": the web cannot reach the
   phone's shade); `open` goes to an approval's thread, the weekly review, a context chat for a charge or a
-  saving, else unfolds the blocks, else opens the page for the card's `ref.type`.
+  saving, else unfolds the blocks, else opens the page for the card's `ref.type` (a self-check's card, `ref`
+  `check`: Settings → Needs attention on that check). A check's fix (`docs/now.md`, "Fixes"): `connect` opens
+  the addon's connect flow on the Addons page, `screen` that screen, `url` an https link in a new tab; a
+  server fix (`fix`) is an ordinary action.
 - **Pages by ref type**: a page says what it opens with `Dana.panel({opens: ["task"]})`
   (`writing-an-addon.md`); the shell finds it with `panelOpening(type)`, so Now names no page. Tasks opens
   `task`, Calls `call` (with the id), Inbox `notification`, Calendar `event`.
@@ -132,6 +135,25 @@ The pure part (hues, the date line and the lede's fallback, the day strip's cell
 body, what a client action opens, removing / restoring a card, reconciling a refresh, the notifications
 line, "Updated … ago", keyboard steps) is `DanaNow` in `static/app-now-core.js`, tested by
 `tests/test_web_now.mjs`.
+
+## Needs attention (`static/attention.js`, `static/attention.css`)
+
+A core screen (`attention`), opened from Settings, the navigation's core group, a check's Now card (on that
+check, brought into view and marked) or `/#attention`, drawn from `GET /api/checks` (`docs/now.md`,
+"Self-check"): the failing checks in server order (connections to reconnect first) as hairline rows with a
+3 px rose start bar (grey when the card is ignored), a mono meta line (what it concerns, "since …", "card
+hidden until …"), the title, `why`, then the fix as the primary button (its label) and "Not today" (a
+reconnect: a day) / "Ignore for a week" / "Show on Now again" quiet beside it. A server fix shows
+"Working…" and then its answer on the row. Nothing failing: Now's sage mark and italic serif "All clear."
+with a muted line. The place's badge is the count of failing checks not ignored, read at start, on window
+focus, after each fix and every five minutes while the tab is visible.
+
+The Addons page shows an addon whose connection needs reconnecting with the rose "Reconnect" status, the
+reason on its row, and on its view the reason in the note with the Reconnect button: the addon's sign-in
+link, its fields to enter again (focuses the first), or the screen its `reconnect_fix` names.
+
+The pure part (rows, badge count, "since", what a fix does, the HTML) is `DanaAttentionCore`, tested with the
+Addons page's Reconnect by `tests/test_web_attention.mjs` against `tests/fixtures/attention_web.json`.
 
 ## Motion (`static/styles.css`, section 14; `Dana.motion` in `static/dana.js`)
 

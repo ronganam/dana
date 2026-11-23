@@ -310,6 +310,14 @@ async def test_bank(client: TestClient) -> None:
     check("bank: a login error from the provider → needs_attention, no Sync now",
           source["state"] == "needs_attention" and source["error_type"] == "INVALID_PASSWORD"
           and store.source_payload(ALICE, source)["can_sync"] is False, source)
+    pending = connections.reconnects(ALICE, config.ADDON)
+    check("bank: the refused login marks that source (not the whole addon) for reconnecting, only Alice's",
+          [(r.part, r.label) for r in pending] == [(sid, store.source_name(source))]
+          and "refused the login" in pending[0].reason and connections.reconnects(BOB) == [], pending)
+    with patch.object(schedule, "sync_now", lambda *a, **k: None):  # no sync now: it would wait for a code
+        sources.update(ALICE, sid, credentials={"login": "alice.bank", "password": "pw-bank-ALICE"})
+    check("bank: new login details clear it", connections.reconnects(ALICE, config.ADDON) == [],
+          connections.reconnects(ALICE, config.ADDON))
     with get_db_connection() as conn:
         conn.execute("UPDATE money_sources SET state = 'ok', error_type = NULL, state_reason = NULL WHERE id = ?", (sid,))
         conn.commit()

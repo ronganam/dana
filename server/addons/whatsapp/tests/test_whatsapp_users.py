@@ -466,6 +466,20 @@ async def test_inbound() -> None:
                 await bot.handle_whatsapp_summary_callback(cb, ADMIN)
                 check("summarize: works for the transcript's user", summarize.await_count == 1
                       and "✨ Summary" in cb.message.edit_text.await_args.args[0])
+
+            # A session WhatsApp signed out: Bob's connection needs reconnecting, nobody else's.
+            def status_event(status: str) -> Dict[str, Any]:
+                return {"event": "session.status", "session": "bob", "engine": "NOWEB",
+                        "me": {"id": B_ACCOUNT, "pushName": "x"}, "payload": {"status": status}}
+            await post(status_event("SCAN_QR_CODE"))
+            marked = await until(lambda: bool(store.reconnects(BOB)))
+            check("session.status: signed out → Bob's WhatsApp needs reconnecting (scan the QR code), the admin's not",
+                  marked and [r.addon for r in store.reconnects(BOB)] == ["whatsapp"]
+                  and "QR code" in store.reconnects(BOB)[0].reason and store.reconnects(ADMIN) == [],
+                  store.reconnects(BOB))
+            await post(status_event("WORKING"))
+            check("session.status: working again clears it", await until(lambda: store.reconnects(BOB) == []),
+                  store.reconnects(BOB))
             phone_patch.stop()
     finally:
         notify.register_telegram(None)

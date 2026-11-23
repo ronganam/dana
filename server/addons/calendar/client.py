@@ -84,7 +84,7 @@ def _check_blocking(conn: Connection) -> Optional[str]:
         calendar_list_page = service(conn).calendarList().list(maxResults=1)
         calendar_list_page.execute()
     except Exception as e:
-        return oauth.failure_reason(e, "Google Calendar")
+        return oauth.failed(conn, e, "Google Calendar")
     return None
 
 

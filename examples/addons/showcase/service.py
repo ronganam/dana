@@ -9,7 +9,7 @@ import os
 
 from aiohttp import ClientError, ClientSession, ClientTimeout
 
-from core.addons import Connection
+from core.addons import Connection, store
 
 # --- reference: http ---
 BASE_URL = "https://api.plants.example"
@@ -27,6 +27,8 @@ async def tip(conn: Connection, plant: str) -> str:
         async with ClientSession(timeout=ClientTimeout(total=10)) as session, \
                 session.get(f"{base}/tips", params={"plant": plant}, headers=headers) as r:
             if r.status == 401:
+                # The key stopped working: a Reconnect card until the user saves a new one (or a test passes).
+                store.needs_reconnect(conn.user, conn.addon, "The plant service refused the API key.")
                 raise ServiceError("The plant service refused the API key.")
             r.raise_for_status()
             return str((await r.json())["tip"])

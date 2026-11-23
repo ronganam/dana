@@ -1,4 +1,6 @@
-"""A user's addons: connect, update, disconnect, look up (table ``connections``).
+"""A user's addons: connect, update, disconnect, look up (table ``connections``),
+and the connections whose credentials stopped working (``connection_reconnects``:
+:func:`needs_reconnect`, :func:`reconnected`, :func:`reconnects`).
 
 One row per (user, addon). Credentials are stored only encrypted
 (:mod:`core.addons.crypto`), settings as plain JSON. Addons declared
@@ -573,6 +575,8 @@ def update(user: User, name: str, *, credentials: Optional[Mapping[str, Any]] = 
                    (token, json.dumps(stored, ensure_ascii=False), row["account"] if account is None else account,
                     user_rows.now_iso(), user.id, name))
     invalidate()
+    if credentials:
+        reconnected(user, name, None)
     if credentials and addon.on_credentials_change is not None:
         try:
             addon.on_credentials_change(user)
@@ -624,6 +628,91 @@ def clear_account(user: User, name: str) -> None:
                    (user.id, name))
         db.commit()
     invalidate()
+
+
+# --- Reconnecting (docs/now.md, "Reconnect") ------------------------------------
+
+MAX_REASON = 300
+MAX_PART = 100
+
+
+@dataclass(frozen=True)
+class Reconnect:
+    """A connection (``part`` ""), or a piece of one (``part``: a money
+    source's id, named by ``label``), whose credentials stopped working:
+    ``reason`` in plain words, ``since`` (UTC ISO) when it was first reported."""
+    addon: str
+    part: str
+    label: str
+    reason: str
+    since: str
+
+
+def needs_reconnect(user: User, name: str, reason: str, *, part: str = "", label: str = "") -> bool:
+    """Record that ``user``'s connection of ``name`` (or its ``part``) needs
+    them to connect again: the service refused its credentials (HTTP 401, a
+    revoked sign-in, a session logged out, a bank login refused). The first
+    report's time is kept; a later one only updates the reason. Shown as a
+    Reconnect card on Now, on the Addons page and in Settings → Needs
+    attention until :func:`reconnected` (connecting again does it for the
+    whole connection: :func:`update` with credentials, a passing "Test
+    connection"). Never raises. Returns False when ``user`` has no such connection."""
+    reason = " ".join(str(reason or "").split())[:MAX_REASON] or "The service refused the connection."
+    part, label = str(part or "")[:MAX_PART], " ".join(str(label or "").split())[:MAX_PART]
+    try:
+        with get_db_connection() as db:
+            row = db.execute("SELECT reason, label FROM connection_reconnects WHERE user_id = ? AND addon = ? "
+                             "AND part = ?", (user.id, name, part)).fetchone()
+            if row is not None:
+                if (row["reason"], row["label"]) != (reason, label):
+                    db.execute("UPDATE connection_reconnects SET reason = ?, label = ? WHERE user_id = ? "
+                               "AND addon = ? AND part = ?", (reason, label, user.id, name, part))
+                    db.commit()
+                return True
+            if db.execute("SELECT 1 FROM connections WHERE user_id = ? AND addon = ?",
+                          (user.id, name)).fetchone() is None:
+                return False
+            db.execute("INSERT INTO connection_reconnects (user_id, addon, part, label, reason, since) "
+                       "VALUES (?, ?, ?, ?, ?, ?)", (user.id, name, part, label, reason, user_rows.now_iso()))
+            db.commit()
+    except Exception as e:
+        logger.warning(f"needs_reconnect({name}) for user {user.id} not recorded: {e}")
+        return False
+    logger.info(f"The {name} connection of user {user.id}{f' ({part})' if part else ''} needs reconnecting: {reason}")
+    return True
+
+
+def reconnected(user: User, name: str, part: Optional[str] = "") -> bool:
+    """Clear what :func:`needs_reconnect` recorded for ``user``'s ``name``
+    (its ``part``; None: every part). Commits only when something was there, so
+    the common case (nothing recorded) changes nothing. Returns whether
+    something was cleared."""
+    with get_db_connection() as db:
+        if part is None:
+            gone = db.execute("DELETE FROM connection_reconnects WHERE user_id = ? AND addon = ?",
+                              (user.id, name)).rowcount
+        else:
+            gone = db.execute("DELETE FROM connection_reconnects WHERE user_id = ? AND addon = ? AND part = ?",
+                              (user.id, name, part)).rowcount
+        if not gone:
+            db.rollback()
+            return False
+        db.commit()
+    logger.info(f"The {name} connection of user {user.id}{f' ({part})' if part else ''} reconnected")
+    return True
+
+
+def reconnects(user: User, name: Optional[str] = None) -> List[Reconnect]:
+    """What needs ``user`` to connect again (of ``name`` only, when given), in
+    the fixed addon order, the whole connection before its parts; addons
+    disabled on the server left out."""
+    with get_db_connection() as db:
+        rows = db.execute("SELECT addon, part, label, reason, since FROM connection_reconnects WHERE user_id = ? "
+                          "ORDER BY since, part", (user.id,)).fetchall()
+    active = connected_addons(user)
+    out = [Reconnect(r["addon"], r["part"], r["label"], r["reason"], r["since"]) for r in rows
+           if r["addon"] in active and (name is None or r["addon"] == name)]
+    return sorted(out, key=lambda r: (active.index(r.addon), r.part != "", r.since))
 
 
 def disconnect(user: User, name: str, *, by: Optional[User] = None) -> bool:

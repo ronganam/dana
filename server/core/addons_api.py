@@ -85,7 +85,11 @@ store's own checks go through. Only while the account the connection's
 service reports is held by another user's connection (``whatsapp``),
 ``account_conflict`` carries that account (and ``account`` is null); only
 while a stored address / name is not valid (saved before the rules),
-``problem`` = ``{field, message}``.
+``problem`` = ``{field, message}``; only while the connection's credentials
+stopped working (``store.needs_reconnect``), ``reconnect`` = ``[{part, label,
+reason, since, fix}]`` (``part`` "" for the whole connection, else e.g. a
+money source's id; ``fix``: where its Reconnect button goes, the addon's
+``reconnect_fix``). A passing ``test`` clears the whole connection's.
 
 Every loaded addon the user's level allows is listed (``essentials``, which
 everyone has, with ``everyone: true``; ``ops`` only for a level with the
@@ -293,6 +297,10 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
     if conn is not None and conn.account_conflict:
         # The account its service reports is held by another user's connection (whatsapp).
         out["account_conflict"] = conn.account_conflict
+    pending = store.reconnects(user, addon.name) if conn is not None else []
+    if pending:
+        out["reconnect"] = [{"part": r.part, "label": r.label, "reason": r.reason, "since": r.since,
+                             "fix": addon.reconnect_fix.to_json()} for r in pending]
     problem = store.stored_value_problem(conn) if conn is not None else None
     if problem is not None:
         out["problem"] = {"field": problem[0], "message": problem[1]}
@@ -567,6 +575,8 @@ async def test_addon_api(request: web.Request) -> web.Response:
     except Exception as e:
         logger.warning(f"Connection check of {addon.name} for user {target.id} failed: {type(e).__name__}")
         reason = f"The check failed ({type(e).__name__})."
+    if reason is None:
+        store.reconnected(target, addon.name, None)
     return web.json_response({"name": addon.name, "checked": True, "ok": reason is None,
                               "reason": reason or ""})
 

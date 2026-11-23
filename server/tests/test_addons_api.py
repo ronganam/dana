@@ -462,6 +462,20 @@ async def test_checks_and_options(client: TestClient) -> None:
     await call(client, "PUT", "/api/addons/calendar", BOB_AUTH, {"credentials": {"refresh_token": "revoked-token"}})
     status, body = await call(client, "POST", "/api/addons/calendar/test", BOB_AUTH)
     check("test: a refused refresh token", body["ok"] is False and "refused the refresh token" in body["reason"], body)
+    calendar = lambda b: next(i for i in b["addons"] if i["name"] == "calendar")  # noqa: E731
+    _, mine = await call(client, "GET", "/api/addons", BOB_AUTH)
+    _, admin_view = await call(client, "GET", f"/api/addons?user={BOB.id}", ADMIN_AUTH)
+    _, admins_own = await call(client, "GET", "/api/addons", ADMIN_AUTH)
+    entry = (calendar(mine).get("reconnect") or [{}])[0]
+    check("reconnect: the refused token marks Bob's Calendar, with the reason, since and the Reconnect fix",
+          len(calendar(mine)["reconnect"]) == 1 and entry["part"] == "" and entry["label"] == ""
+          and "refused the refresh token" in entry["reason"] and entry["since"]
+          and entry["fix"] == {"kind": "connect", "label": "Reconnect", "addon": "calendar"}, calendar(mine))
+    check("reconnect: an admin looking at Bob sees it; the admin's own Calendar does not",
+          calendar(admin_view).get("reconnect") == calendar(mine)["reconnect"] and "reconnect" not in calendar(admins_own))
+    await call(client, "PUT", "/api/addons/calendar", BOB_AUTH, {"credentials": {"refresh_token": "bob-refresh-token"}})
+    _, mine = await call(client, "GET", "/api/addons", BOB_AUTH)
+    check("reconnect: signing in again clears it", "reconnect" not in calendar(mine), calendar(mine))
 
 
 # --- 5. No restart needed: the watcher, the WhatsApp account, disconnect -------------------------

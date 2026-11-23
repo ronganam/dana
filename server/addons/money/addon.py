@@ -13,7 +13,7 @@ means) and a section listing the user's accounts (:func:`accounts_section`).
 Tools: ``tools.py``."""
 
 from core.users import User
-from core.addons import Addon, PromptPart, LlmJob, Page, Nav, Need, Touches
+from core.addons import Addon, Fix, PromptPart, LlmJob, Page, Nav, Need, Touches
 from addons.money import after_sync, classify, dashboard, savings, signals, sources, store
 from addons.money.config import ADDON
 
@@ -69,6 +69,7 @@ addon = Addon(
            "on the Money page: they then sync by themselves.",),
     examples=("How much did I spend on food this month?", "What subscriptions do I pay for?"),
     disconnect_warning="Your saved bank and card logins, accounts and transactions are deleted from Dana.",
+    reconnect_fix=Fix.screen("money", "Fix the login"),
     on_change=sources.on_change,
     prompt_section=accounts_section,
     prompt_parts=(

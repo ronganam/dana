@@ -27,7 +27,7 @@ import os
 from typing import Any, Dict, List, Optional
 
 from core import cards, clock
-from core.addons import BriefingContext, Check, ContextRequest, Hit, Section, helpers, hours, minutes
+from core.addons import BriefingContext, Check, ContextRequest, Fix, Hit, Section, helpers, hours, minutes
 from core.db import get_db_connection
 from core.notify import Message
 from core.users import User
@@ -337,15 +337,28 @@ def check_push(user: User, now: datetime.datetime) -> Check:
     if not devs:
         return Check(False, "No phone registered", last_ok, title="No phone registered for push",
                      why=why + " Open the paired Dana app once so it registers again "
-                     "(not paired yet: Devices → Pair a device).", blocks=blocks)
+                     "(not paired yet: Devices → Pair a device).", blocks=blocks,
+                     fix=Fix.screen("devices", "Open Devices"))
     if m.get("ok") == 0 and not (fetch and fetch > last_fail):
         return Check(False, f"Last push failed {_ago_or_never(last_fail, now)}", last_ok,
-                     title="Push to the phone is failing", why=why, blocks=blocks)
+                     title="Push to the phone is failing", why=why, blocks=blocks,
+                     fix=Fix.run(PUSH_TEST, "Send a test push"))
     if seen and (now - seen).total_seconds() > PUSH_FETCH_HOURS * 3600:
         return Check(False, f"Phone quiet for {helpers.span((now - seen).total_seconds())}", seen,
                      title=f"The phone hasn't checked in for {helpers.span((now - seen).total_seconds())}",
                      why=why, blocks=blocks)
     return Check(True, f"Last check-in {_ago_or_never(seen, now)}", seen, blocks=blocks)
+
+
+PUSH_TEST = "test"
+
+
+@addon.fix("push")
+async def fix_push(user: User, action: str) -> str:
+    """"Send a test push" on the failing push check: one notification to the user's phones, and whether one took it."""
+    if await push.notify(user, "Dana", "A test from Needs attention: push to this phone works.", tag="push_test"):
+        return "Your phone accepted the test push"
+    raise ValueError("The test push failed too: open the Dana app on your phone so it registers again.")
 
 
 @addon.selfcheck("notification_sync", "Notification sync")

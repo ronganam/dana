@@ -24,7 +24,7 @@ from core import llm, notify, users
 from core.addons import Connection
 from addons.whatsapp import accounts
 from addons.whatsapp.client import (api_url, config, download_media_bytes, get_chat_id_to_name_map,
-                                          get_message_sender_name, signature)
+                                          get_message_sender_name, session_status, signature)
 from addons.whatsapp.config import voice_chat_id
 
 logger = logging.getLogger(__name__)
@@ -155,6 +155,9 @@ async def process_event(conn: Connection, data: Dict[str, Any]) -> None:
 async def _process(conn: Connection, data: Dict[str, Any]) -> None:
     try:
         event = str(data.get("event") or "").strip()
+        if event == "session.status":
+            session_status(conn, str((data.get("payload") or {}).get("status") or ""))
+            return
         if event != "message":
             logger.debug(f"Ignoring WAHA event '{event}'")
             return

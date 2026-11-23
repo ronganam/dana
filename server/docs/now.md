@@ -45,7 +45,7 @@ Plain DB reads plus cached values; no model call. Calendar events are the caller
 
 - `why` is **optional**: present only when there is something specific to say (see each kind); clients show nothing when it's missing.
 - `id` is stable and prefixed by kind: `approval:<session_id>`, `notif:<notification id>`, `sug:<suggestion id>`, `task:<task id>`, `check:<key>`, `review:<review id>`, `budget:<YYYY-MM>`, `money:<transaction id>`, `money_save:<saving key>`, `money_target:<saving key>:<YYYY-MM>`. Send it back as is to `/api/now/act`.
-- `kind`: `approval` | `notification` | `suggestion` | `reminder` | `money` | `check` | `review` | `budget`.
+- `kind`: `approval` | `notification` | `suggestion` | `reminder` | `money` | `check` | `reconnect` | `review` | `budget`.
 - `schedulable`: the card may be dropped on a day slot (`action: "schedule"`).
 - `ref.type`: `thread` (approval → open the conversation), `call`, `notification`, `task`, `check`, `review` — what to open or pass as on-screen context (`POST /api/chat/context` accepts `call`, `notification`, `task`, `review`, `suggestion`, `person`).
 - `notification` (notification items only): `{id, key, package, app, can_reply, on_phone, actions: [{title, reply}]}` — `key` is the Android shade key, so the phone can reply / open / press a button through its own notification listener. `can_reply` = still in the shade and has a reply button.
@@ -60,7 +60,7 @@ Plain DB reads plus cached values; no model call. Calendar events are the caller
 
 **Action**: `{"action": "accept", "label": "Remind me tomorrow 09:00", "args": {…}, "client": true}`. `args` is optional (send it as `args` to `/api/now/act`, merged with what blocks contribute). `client: true` means the client handles it itself and never posts it: `open` (expand the card's blocks, or open `ref`; for approvals open the thread) and `reply` (notification: reply through the phone's listener; the web shows it disabled).
 
-Order of `items` (each group capped): approval (1, sessions waiting ≤ 48 h, thread `main` first) → needs-you notifications (newest, the same wording from the same app only once, `NOW_MAX_NOTIFICATIONS` 3) → call suggestions (newest, `NOW_MAX_SUGGESTIONS` 4) → due reminders (most recent firing first, `NOW_MAX_REMINDERS` 4) → unusual charges of the last 3 days (`money`, 3; `insights.unusual`, docs/money.md) → ways to save (`money_save`, 2: due within 14 days, or a bill increase found in the last 7 days; open or doing) and targets (`money_target`, 2: at 80 % of this month's target, last month's result in a month's first 3 days) (docs/money.md, "Savings") → failing checks (3) → weekly review (1). Cards hidden with `snooze` / `schedule` / `ignore` / `dismiss` don't appear until their time.
+Order of `items` (each group capped): approval (1, sessions waiting ≤ 48 h, thread `main` first) → needs-you notifications (newest, the same wording from the same app only once, `NOW_MAX_NOTIFICATIONS` 3) → call suggestions (newest, `NOW_MAX_SUGGESTIONS` 4) → due reminders (most recent firing first, `NOW_MAX_REMINDERS` 4) → unusual charges of the last 3 days (`money`, 3; `insights.unusual`, docs/money.md) → ways to save (`money_save`, 2: due within 14 days, or a bill increase found in the last 7 days; open or doing) and targets (`money_target`, 2: at 80 % of this month's target, last month's result in a month's first 3 days) (docs/money.md, "Savings") → connections to reconnect (`reconnect`, 3) → failing checks (3; not those of an addon that has a Reconnect card) → weekly review (1). Cards hidden with `snooze` / `schedule` / `ignore` / `dismiss` don't appear until their time.
 
 ### Blocks (rendered generically, in order)
 
@@ -86,7 +86,8 @@ Order of `items` (each group capped): approval (1, sessions waiting ≤ 48 h, th
 | `reminder` | `done` | `snooze {minutes: 60}` "1 h", `snooze {until}` "Tonight" (before 19:00), `snooze {slot: "home"}`, `snooze {until: tomorrow 08:00}`, `dismiss` | `facts` History (created when / from what, moved N times, due, reminded when), `text` Note |
 | `money` (an unusual charge, `ref {type: "transaction", id}`) | `open` (client) "Ask Dana" (chat context kind `transaction`) | `dismiss` (sticks; `snooze` / `schedule` also accepted), with Undo; another user's charge 404, without `money` 403 `not_connected` | `facts` (amount, merchant, when, account, why it stands out) |
 | `money` (a way to save or a target, `ref {type: "saving", id: <saving key>}`; "Ask Dana" opens the `saving` context chat) | `open` (client) "Ask Dana" | `dismiss`, with Undo (hides the card only: the saving's status is not changed); another user's key 404, without `money` 403 `not_connected` | `facts` Saving (the saving or the money at stake, the first step) / Target (the target, spent so far, or what was saved against the usual pace) |
-| `check` | `open` (client) "Details" | `ignore {days: 7}` | `week` (wake), `facts`, `text` (what it is / how to fix) |
+| `check` | the check's fix (below, "Fixes") or else `open` (client) "Details" | `open` (client) "Details" when the primary is a fix, `ignore {days: 7}` | `week` (wake), `facts`, `text` (what it is / how to fix) |
+| `reconnect` (a connection whose credentials stopped working, `id` `check:reconnect:<addon>[:<part>]`, `source` "Reconnect · <addon>[ · <source>]", `ref {type: "check", id: <key>}`) | its fix: the addon's connect flow (`connect` client, `args.addon`) or the screen its addon names (`screen` client) | `ignore {days: 1}` "Not today" (any `ignore` / `snooze` is cut to a day) | — (`why` says what was refused) |
 | `budget` (admins, from 80 % of the monthly budget until it is spent; docs/usage.md, `ref {type: "usage", id: <YYYY-MM>}`) | `open` (client) "Details" | `dismiss` "Dismiss for this month" (hidden until the next month, with Undo; a past month 409, without `manage_server` 400) | `facts` This month (spent, budget, forecast) |
 | `review` | `apply` (with the `checks` block, key `items`) or `open` (client) when nothing is proposed | `skip` | `facts` This week, `facts` Money (with `money`, when there is something to say), `checks` Proposed (actions other than keep) |
 
@@ -135,7 +136,8 @@ Time args, wherever `snooze` / `schedule` take them: `{minutes}`, `{until: ISO}`
 | `task:` | `schedule` | `slot` | As snooze, message "Moved to …" | ✓ |
 | `task:` | `dismiss` | | Out of Now until its next firing; the reminder stays open | ✓ |
 | `money_save:` / `money_target:` | `dismiss` / `snooze` / `schedule` | time / `slot` | Hides the card (a target card for its month); the saving item stays as it was | ✓ |
-| `check:` | `ignore` / `dismiss` | `days` (7; 0 = stop ignoring) | Hides the card for that long (`ignored_until` in `/api/checks`) | ✓ |
+| `check:` | `ignore` / `dismiss` | `days` (7; 0 = stop ignoring; a reconnect at most 1) | Hides the card for that long (`ignored_until` in `/api/checks`) | ✓ |
+| `check:` | `fix` | `fix`: the action of the check's server fix | Runs it for the caller (`POST /api/checks/{key}/fix`); a check that is fine or offers no such fix 409 | as the fix |
 | `check:` | `snooze` / `schedule` | time / `slot` (`wake` → tomorrow 06:00, `home` → 4 h) | Hides the card | ✓ |
 | `review:` | `apply` | `items`: checked refs (omitted = the stored proposals) | `weekly_review.apply` with the unchecked ones disabled | **✗ not undoable** (many changes at once: deletes, completions, new tasks) |
 | `review:` | `skip` / `dismiss` | | `weekly_review.dismiss` | ✓ back to pending |
@@ -184,7 +186,30 @@ The `suggestions` push (full-screen review on the phone) is sent for calls that 
 
 ## Self-check
 
-`GET /api/checks` (every user; the caller's own checks: only those of the addons they have connected (see "applies to" below), the server's own `reminders` only with `see_everyone`; the first admin, with every addon, gets every key as before) → `{checks: [{key, label, ok, detail, since, ignored_until}]}`; `since` is the time of the last good signal the detail refers to (local ISO, or null). `POST /api/checks/{key}/ignore {days?: 7}` (only for the caller; a key they don't see → 404) → `{ok, message, until, undo_id}` (`days: 0` stops ignoring). A check that is not ok and not ignored is a `check:<key>` card in Now.
+`GET /api/checks` (every user; the caller's own checks: their connections to reconnect first, then those of the addons they have connected (see "applies to" below), the server's own `reminders` only with `see_everyone`; the first admin, with every addon, gets every key as before) → `{checks: [{key, label, ok, detail, since, ignored_until, title, why, blocks, fix, addon, server}]}`; `since` is the time of the last good signal the detail refers to (local ISO, or null; a reconnect: when it was first refused); `title`, `why` and `blocks` describe a failing one (null / [] otherwise), `fix` is its button (below) or null, `addon` the check's addon (null for core's), `server` a check of the server itself. `POST /api/checks/{key}/ignore {days?: 7}` (only for the caller; a key they don't see → 404) → `{ok, message, until, undo_id}` (`days: 0` stops ignoring). `POST /api/checks/{key}/fix {fix}` → `{ok, message}` runs the check's server fix for the caller (a key they don't see 404; a check that is fine, or offers another fix, 409 with `error`). A check that is not ok and not ignored is a `check:<key>` card in Now.
+
+### Fixes
+
+A check may carry a **fix**: the one button that fixes it (`core/addons/hooks.py` `Fix`, on `Check(fix=…)`), as `{kind, label, …}`:
+
+| kind | carries | the web / the phone |
+|---|---|---|
+| `connect` | `addon` | opens that addon's connect flow (the Addons page on it: its sign-in, or its fields to enter again) |
+| `screen` | `screen` | opens that screen or page (a core screen such as `devices`, or an addon page such as `money`) |
+| `url` | `url` (https) | opens the link in a new tab |
+| `server` | `action` | `POST /api/checks/{key}/fix {fix: action}`: the check's addon carries it out (`@addon.fix(key)`, `async def f(user, action) -> str`) for that user only, as them, and only while the check fails for them and offers that action; its words come back as `message`; refusing raises `ValueError` (409) |
+
+On Now a fix is the card's primary (`connect` / `screen` / `url` as client actions with `args` `{addon}` / `{screen}` / `{url}`; `server` as `fix {fix: action}`, with "Details" moved to the secondary actions). Phone's `push` check: "No phone registered" opens Devices, "Push to the phone is failing" offers "Send a test push" (`server`, action `test`: a test notification to the caller's phones, which fixes the check when it is accepted); money's `money` check opens Money.
+
+### Reconnect
+
+When an addon's credentials stop working (a call refused with 401 / 403, a revoked token, a signed-out session), the addon records it with `store.needs_reconnect(user, addon, reason, part="", label="")` (`core/addons/store.py`; table `connection_reconnects`, core migration `m0010_reconnects`, removed with its connection); a connection with several logins marks a **part** (money: one per source, `part` = the source's id, `label` = its name). Connecting again clears it: new credentials (`store.update`, the Addons page's Save or sign-in), a connection test that passes (`POST /api/addons/{addon}/test`), or the addon's own success (`store.reconnected(user, addon, part)`). Each one is a failing check of its own, `reconnect:<addon>[:<part>]`, listed first, title "Reconnect <addon>", whose fix is the addon's `reconnect_fix` (manifest; default `connect` to its own connect flow; money: the Money page; phone: Devices); while it is pending, the addon's other failing checks without a fix offer that one too, and Now shows its Reconnect card instead of their cards. The Reconnect card can be ignored for a day at most and comes back; it never goes for good: the check stays in Settings → Needs attention and the Addons page shows the addon as "Reconnect" (`reconnect` in its `GET /api/addons` entry: `[{part, label, reason, since, fix}]`, present only while one is pending) with the button.
+
+Who records it: Google (`google_account`'s `oauth.failed`: a refused refresh token, 401, or 403 for missing access, from Calendar, Contacts and Gmail), Telegram account (the session signed out or revoked), Home Assistant (401 on a REST call, a refused WebSocket sign-in, 401 / 403 in the check; cleared by a WebSocket sign-in that works), WhatsApp (WAHA refusing the key, the session in `SCAN_QR_CODE` or `FAILED`, from the check or a `session.status` event; cleared when it is `WORKING`), money (a login error `INVALID_PASSWORD`, `CHANGE_PASSWORD` or `ACCOUNT_BLOCKED` for that source; cleared by a good sync, new login details or removing the source; its `money` check then leaves that source to the reconnect), phone (the push service dropped the user's last registration; cleared when the app registers again).
+
+### Needs attention
+
+Settings → Needs attention on the web (`static/attention.js`, `docs/web-design.md`) lists every failing check of the caller from `GET /api/checks`, reconnects first, with its why, since when, whether its card is ignored, its fix button and Ignore / Not today; "All clear." when nothing fails. A check's Now card opens it on that check; the navigation's Needs attention place shows the count of failing checks not ignored.
 
 | key | ok when | source of the timestamp |
 |---|---|---|
@@ -211,6 +236,7 @@ The `suggestions` push (full-screen review on the phone) is sent for calls that 
 ## Storage (baseline tables, keyed by user since `m0015_composers_per_user`)
 
 - `now_hidden (user_id, item_id, until, reason, created_at)` — a user's hidden / snoozed / ignored cards (`core/now_hidden.py`).
+- `connection_reconnects (user_id, addon, part, label, reason, since)` — connections (or parts) whose credentials stopped working (core migration `m0010_reconnects`; `core/addons/store.py`).
 - `system_marks (key, last_at, ok, last_ok_at, last_fail_at, detail)` — signals with no other timestamp (per-user marks have `:<user id>` in the key).
 - `wake_log (user_id, date, at, why)` — one row per user and confirmed wake (the "once a day" record).
 - `notification_rule_declines (package, declined_at)`.

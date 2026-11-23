@@ -11,7 +11,7 @@ import datetime
 from typing import Any, Dict, List, Optional
 
 from core import cards, clock
-from core.addons import (BriefingContext, Card, Check, ContextRequest, DayItem, Field, Hit, NowContext, Section,
+from core.addons import (BriefingContext, Card, Check, ContextRequest, DayItem, Field, Fix, Hit, NowContext, Section,
                          WidgetContext)
 from core.addons.helpers import match_score
 from core.users import User
@@ -107,15 +107,32 @@ def search_plants(user: User, query: str, limit: int) -> List[Hit]:
 
 
 # --- reference: selfcheck ---
+def overdue(user: User, now: datetime.datetime) -> List[Dict[str, Any]]:
+    """The plants that waited twice their interval for water."""
+    return [p for p in store.plants(user) if p["last_watered"]
+            and now - datetime.datetime.fromisoformat(p["last_watered"]) > datetime.timedelta(days=2 * p["every_days"])]
+
+
 @addon.selfcheck("showcase_overdue", "Plants watered")
 def overdue_check(user: User, now: datetime.datetime) -> Check:
-    """Fails when a plant has waited twice its interval for water (a Now card says which)."""
-    late = [p["name"] for p in store.plants(user) if p["last_watered"]
-            and now - datetime.datetime.fromisoformat(p["last_watered"]) > datetime.timedelta(days=2 * p["every_days"])]
+    """Fails when a plant has waited twice its interval for water (a Now card says which, with a fix)."""
+    late = [p["name"] for p in overdue(user, now)]
     if late:
         return Check(ok=False, detail=f"{len(late)} overdue", title="Plants are overdue",
-                     why=f"{', '.join(late)} waited twice their interval")
+                     why=f"{', '.join(late)} waited twice their interval",
+                     fix=Fix.run("water_all", "Mark all watered"))
     return Check(ok=True, detail="All watered in time")
+# --- end ---
+
+
+# --- reference: fix ---
+@addon.fix("showcase_overdue")
+async def water_overdue(user: User, action: str) -> str:
+    """The check's "Mark all watered" button: runs on the server for the user who pressed it."""
+    late = overdue(user, clock.now())
+    for p in late:
+        store.water(user, p["id"], clock.now())
+    return f"{len(late)} plant{'s' if len(late) != 1 else ''} marked watered"
 # --- end ---
 
 

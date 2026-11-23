@@ -44,6 +44,9 @@ KINDS = ("bank", "card", "investment", "meal")
 # Sync errors that are login problems: Dana never retries them on its own (docs/money.md, "Sync").
 LOGIN_ERRORS = ("INVALID_PASSWORD", "CHANGE_PASSWORD", "ACCOUNT_BLOCKED", "CODE_REJECTED", "LOGIN_UNKNOWN")
 CODE_TIMEOUT = "CODE_TIMEOUT"
+# The login problems that mean its saved details stopped working: the source needs reconnecting (new details;
+# core/addons/store.py ``needs_reconnect``, one per source), not just another try.
+RECONNECT_ERRORS = ("INVALID_PASSWORD", "CHANGE_PASSWORD", "ACCOUNT_BLOCKED")
 
 
 @dataclass(frozen=True)

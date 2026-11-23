@@ -53,7 +53,7 @@ async def list_telegram_unread(conn: Connection, chat_type: str = "all", include
     try:
         chats = await tg.dialogs(conn, fresh=True)
     except Exception as e:
-        return f"Error: {tg.explain(e)}"
+        return f"Error: {tg.explain(e, conn)}"
     unread = _unread(chats, types, include_muted, include_archived)
     if not unread:
         return f"No unread Telegram chats ({chat_type}{', muted skipped' if not include_muted else ''}" \
@@ -99,7 +99,7 @@ async def read_telegram_chat(conn: Connection, chat: str, limit: int = 20, unrea
     try:
         chats = await tg.dialogs(conn)
     except Exception as e:
-        return f"Error: {tg.explain(e)}"
+        return f"Error: {tg.explain(e, conn)}"
     found, candidates = _resolve(chats, chat)
     if found is None:
         if candidates:
@@ -109,7 +109,7 @@ async def read_telegram_chat(conn: Connection, chat: str, limit: int = 20, unrea
     try:
         msgs = await tg.messages(conn, found, limit=min(max(1, limit), 100), unread_only=unread_only)
     except Exception as e:
-        return f"Error: {tg.explain(e)}"
+        return f"Error: {tg.explain(e, conn)}"
     if not msgs:
         return f"No {'unread ' if unread_only else ''}messages in {tg.describe_chat(found)}."
     head = f"{'Unread' if unread_only else 'Latest'} messages in {tg.describe_chat(found)} (showing {len(msgs)}):\n"
@@ -148,7 +148,7 @@ async def summarize_telegram_unread(conn: Connection, chat_type: str = "all", in
     try:
         chats = await tg.dialogs(conn, fresh=True)
     except Exception as e:
-        return f"Error: {tg.explain(e)}"
+        return f"Error: {tg.explain(e, conn)}"
     unread = _unread(chats, types, include_muted, include_archived)
     if not unread:
         return "No unread Telegram chats to summarize."
@@ -160,7 +160,7 @@ async def summarize_telegram_unread(conn: Connection, chat_type: str = "all", in
             try:
                 return c, await tg.messages(conn, c, limit=min(c.unread, PER_CHAT), unread_only=True), None
             except Exception as e:
-                return c, [], tg.explain(e)
+                return c, [], tg.explain(e, conn)
 
     results = await asyncio.gather(*(read(c) for c in chosen))
     blocks, failed, n_msgs, budget = [], [], 0, SUMMARY_CHARS

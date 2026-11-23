@@ -72,6 +72,7 @@ Another module of the addon imports the manifest as `from addons.<name>.addon im
 | `setup` | list of str | `()` | Steps done outside Dana before connecting, in order, one sentence each ("Install the WAHA server", "Scan its QR code with WhatsApp"); the Addons page numbers them before its own steps. |
 | `examples` | list of str | `()` | Things to say to Dana once it is on ("Turn off the living room lights"): shown after connecting. |
 | `disconnect_warning` | str | `''` | What disconnecting deletes, in one sentence (`money`: the logins and transactions); empty: nothing is deleted. |
+| `reconnect_fix` | Fix or None | `None` | Where its Reconnect button goes when `needs_reconnect` says a connection's credentials stopped working (a `Fix`); None: its own page on the Addons page (`Fix.connect`). `money` sends it to the Money page, where each bank login is fixed. |
 
 From [`examples/addons/showcase/addon.py`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/addon.py):
 
@@ -697,15 +698,42 @@ of the server itself, shown to users who may see everyone instead.
 From [`examples/addons/showcase/now.py`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/now.py):
 
 ```python
+def overdue(user: User, now: datetime.datetime) -> List[Dict[str, Any]]:
+    """The plants that waited twice their interval for water."""
+    return [p for p in store.plants(user) if p["last_watered"]
+            and now - datetime.datetime.fromisoformat(p["last_watered"]) > datetime.timedelta(days=2 * p["every_days"])]
+
+
 @addon.selfcheck("showcase_overdue", "Plants watered")
 def overdue_check(user: User, now: datetime.datetime) -> Check:
-    """Fails when a plant has waited twice its interval for water (a Now card says which)."""
-    late = [p["name"] for p in store.plants(user) if p["last_watered"]
-            and now - datetime.datetime.fromisoformat(p["last_watered"]) > datetime.timedelta(days=2 * p["every_days"])]
+    """Fails when a plant has waited twice its interval for water (a Now card says which, with a fix)."""
+    late = [p["name"] for p in overdue(user, now)]
     if late:
         return Check(ok=False, detail=f"{len(late)} overdue", title="Plants are overdue",
-                     why=f"{', '.join(late)} waited twice their interval")
+                     why=f"{', '.join(late)} waited twice their interval",
+                     fix=Fix.run("water_all", "Mark all watered"))
     return Check(ok=True, detail="All watered in time")
+```
+
+### `@addon.fix(key)`
+
+`async def f(user, action) -> str`: carries out the server action
+a failing check `key` of this addon offers (its `Check.fix` is
+`Fix.run(action, label)`) for `user`, who pressed its button;
+returns the result's words. Raise `ValueError` to refuse (the client
+shows the message). Only called while that check fails for that user
+and offers `action`.
+
+From [`examples/addons/showcase/now.py`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/now.py):
+
+```python
+@addon.fix("showcase_overdue")
+async def water_overdue(user: User, action: str) -> str:
+    """The check's "Mark all watered" button: runs on the server for the user who pressed it."""
+    late = overdue(user, clock.now())
+    for p in late:
+        store.water(user, p["id"], clock.now())
+    return f"{len(late)} plant{'s' if len(late) != 1 else ''} marked watered"
 ```
 
 ### `@addon.context(kind)`
@@ -912,8 +940,10 @@ A global-search result; `score` orders results (higher first),
 
 ### Check
 
-A self-check line (`/api/checks`; a failing one is a Now card).
-`title` / `why` / `blocks` describe the card when `ok` is False.
+A self-check line (`/api/checks`; a failing one is a Now card and a
+line of Settings → Needs attention). `title` / `why` / `blocks`
+describe the card when `ok` is False; `fix` is its button (none: the
+card only explains).
 
 | Field | Type | Default |
 |---|---|---|
@@ -923,6 +953,23 @@ A self-check line (`/api/checks`; a failing one is a Now card).
 | `title` | str | `''` |
 | `why` | str | `''` |
 | `blocks` | list of dict of str → any | `[]` |
+| `fix` | Fix or None | `None` |
+
+### Fix
+
+The button that fixes a failing check (docs/now.md, "Fixes"): its
+`label` and what it does. Build one with `connect` (the addon's
+connect page on the Addons page: sign in again, type a new key),
+`screen` (a screen of the app: `devices`, `money`),
+`link` (an https address) or `run` (an action the check's
+addon carries out on the server, its `@addon.fix(<check key>)`
+receiving `target` as the action's name).
+
+| Field | Type | Default |
+|---|---|---|
+| `kind` | str | required |
+| `target` | str | required |
+| `label` | str | required |
 
 ### ContextRequest
 
@@ -975,7 +1022,7 @@ See the manifest's `credentials=` and `settings=` above, and `Field` under Manif
 
 ### Calling a service over HTTP
 
-Every host it calls is in `touches=Touches(hosts=...)`; an env value it reads is a `Need("env", ...)` (`bin/dana addons check` compares both with the code).
+Every host it calls is in `touches=Touches(hosts=...)`; an env value it reads is a `Need("env", ...)` (`bin/dana addons check` compares both with the code). When the service refuses the stored credentials, `store.needs_reconnect(user, addon, reason, part=, label=)` puts a Reconnect card on Now and the Addons page (its button: the manifest's `reconnect_fix`, else the addon's own page) until new credentials are saved, a "Test connection" passes or the addon calls `store.reconnected(user, addon, part)`.
 
 From [`examples/addons/showcase/service.py`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/service.py):
 
@@ -995,6 +1042,8 @@ async def tip(conn: Connection, plant: str) -> str:
         async with ClientSession(timeout=ClientTimeout(total=10)) as session, \
                 session.get(f"{base}/tips", params={"plant": plant}, headers=headers) as r:
             if r.status == 401:
+                # The key stopped working: a Reconnect card until the user saves a new one (or a test passes).
+                store.needs_reconnect(conn.user, conn.addon, "The plant service refused the API key.")
                 raise ServiceError("The plant service refused the API key.")
             r.raise_for_status()
             return str((await r.json())["tip"])
@@ -1316,6 +1365,17 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
   "disconnect_warning": {
    "type": "string",
    "description": "What disconnecting deletes, in one sentence (``money``: the logins and transactions); empty: nothing is deleted."
+  },
+  "reconnect_fix": {
+   "anyOf": [
+    {
+     "$ref": "#/$defs/Fix"
+    },
+    {
+     "type": "null"
+    }
+   ],
+   "description": "Where its Reconnect button goes when :func:`core.addons.store.needs_reconnect` says a connection's credentials stopped working (a :class:`~core.addons.hooks.Fix`); None: its own page on the Addons page (``Fix.connect``). ``money`` sends it to the Money page, where each bank login is fixed."
   }
  },
  "required": [
@@ -1361,6 +1421,27 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
    },
    "required": [
     "name"
+   ],
+   "additionalProperties": false
+  },
+  "Fix": {
+   "type": "object",
+   "description": "The button that fixes a failing check (docs/now.md, \"Fixes\"): its ``label`` and what it does. Build one with :meth:`connect` (the addon's connect page on the Addons page: sign in again, type a new key), :meth:`screen` (a screen of the app: ``devices``, ``money``), :meth:`link` (an https address) or :meth:`run` (an action the check's addon carries out on the server, its ``@addon.fix(<check key>)`` receiving ``target`` as the action's name).",
+   "properties": {
+    "kind": {
+     "type": "string"
+    },
+    "target": {
+     "type": "string"
+    },
+    "label": {
+     "type": "string"
+    }
+   },
+   "required": [
+    "kind",
+    "target",
+    "label"
    ],
    "additionalProperties": false
   },

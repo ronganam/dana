@@ -715,7 +715,8 @@ async def test_checks(client: TestClient) -> None:
     check("checks: the first admin (every addon) sees every check in the usual order",
           list(a) == list(checks.all_keys()), list(a))
     check("checks: the payload shape is unchanged",
-          all(set(x) == {"key", "label", "ok", "detail", "since", "ignored_until"} for x in a.values()))
+          all(set(x) == {"key", "label", "ok", "detail", "since", "ignored_until", "title", "why", "blocks", "fix",
+                         "addon", "server"} for x in a.values()))
     check("checks: Bob sees only the checks of his addons (no server check)",
           set(b) == {"push", "notification_sync", "location", "car", "ha_entities", "ha_watcher", "wake", "triage",
                      "calls", "calendar", "briefing", "signals"}, list(b))

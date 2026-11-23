@@ -62,9 +62,10 @@ def _token_expired(error: Exception) -> bool:
     return _status(error) == 410 or (_status(error) == 400 and ("expired_sync_token" in text or "sync token" in text))
 
 
-def failure_reason(error: Exception) -> str:
-    """A short reason (never a token or a request URL) for a failed request."""
-    return oauth.failure_reason(error, SERVICE_NAME)
+def failure_reason(conn: Connection, error: Exception) -> str:
+    """A short reason (never a token or a request URL) for a failed request of
+    ``conn``; a refused sign-in marks it for reconnecting (``oauth.failed``)."""
+    return oauth.failed(conn, error, SERVICE_NAME)
 
 
 def list_changes(conn: Connection, sync_token: str = "") -> Tuple[List[Dict[str, Any]], str]:
@@ -142,7 +143,7 @@ def _check_blocking(conn: Connection) -> Optional[str]:
     try:
         service(conn).people().connections().list(resourceName=ME, personFields="names", pageSize=1).execute()
     except Exception as e:
-        return failure_reason(e)
+        return failure_reason(conn, e)
     return None
 
 

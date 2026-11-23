@@ -41,8 +41,8 @@ def _guarded(doing: str, missing: str = "There is no such email in this Gmail ac
             except Exception as e:
                 if client.missing(e):
                     return f"Error: {missing}"
-                logger.error(f"Gmail tool failed while {doing}: {client.failure(e)}", exc_info=True)
-                return f"Error {doing}: {client.failure(e)}"
+                logger.error(f"Gmail tool failed while {doing}: {client.failure(conn, e)}", exc_info=True)
+                return f"Error {doing}: {client.failure(conn, e)}"
         return run
     return wrap
 

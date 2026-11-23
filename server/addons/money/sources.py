@@ -5,7 +5,7 @@ A source is one login at one company of a provider addon the user has
 stored encrypted (``CREDENTIALS_KEY``) and decrypted only by ``sync.py``;
 nothing returns or logs them. A new source, and a source given new
 credentials, syncs at once (``trigger="connect"``); new credentials also clear
-``needs_attention``. Removing a source asks its provider to forget what it
+``needs_attention`` and the source's Reconnect (``store.reconnected``). Removing a source asks its provider to forget what it
 keeps for it (``Company.forget``: browser profiles)."""
 
 import asyncio
@@ -118,6 +118,7 @@ def update(user: User, source_id: str, *, label: Optional[str] = None,
                          "WHERE id = ? AND user_id = ?", (token, now, now, source_id, user.id))
     if credentials is not None:
         logger.info(f"Money source {source_id} of user {user.id}: new login details")
+        connections.reconnected(user, config.ADDON, source_id)
         _sync_at_once(user, source_id)
     return store.source_payload(user, store.get_source(user, source_id) or {})
 
@@ -136,6 +137,7 @@ async def remove(user: User, source_id: str, delete_transactions: bool = False) 
         if delete_transactions:
             conn.execute("DELETE FROM money_accounts WHERE user_id = ? AND source_id = ?", (user.id, source_id))
         conn.execute("DELETE FROM money_sources WHERE id = ? AND user_id = ?", (source_id, user.id))
+    connections.reconnected(user, config.ADDON, source_id)
     logger.info(f"Money source {source_id} of user {user.id} removed"
                 + (" with its transactions" if delete_transactions else ""))
     await _provider_forget({source["company"]: [source_id]})
@@ -206,5 +208,7 @@ def provider_changed(user: User, addon: str) -> None:
             conn.execute("UPDATE money_code_requests SET status = 'cancelled' WHERE user_id = ? AND source_id = ? "
                          "AND status = 'pending'", (user.id, s["id"]))
             conn.execute("DELETE FROM money_sources WHERE id = ? AND user_id = ?", (s["id"], user.id))
+    for s in gone:
+        connections.reconnected(user, config.ADDON, s["id"])
     logger.info(f"{addon} turned off for user {user.id}: {len(gone)} money source(s) removed")
     _in_background(_grouped(gone))

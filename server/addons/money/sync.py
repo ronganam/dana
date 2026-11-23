@@ -17,7 +17,10 @@ marks the source ``needs_attention`` and Dana never runs it again on its own
 ``store.HAND_RETRY_ERRORS``); no code in time marks it ``failing`` until the
 next regular slot, and a second one in a row ``needs_attention``; anything
 else marks it ``failing`` and retries after 30 minutes, then 2 hours, then at
-the regular slots."""
+the regular slots. A refused login (``RECONNECT_ERRORS``) also marks that source
+for reconnecting (``store.needs_reconnect``, part = the source's id: a Reconnect
+card that opens the Money page); a good sync, new credentials or removing the
+source clear it."""
 
 import asyncio
 import datetime
@@ -28,9 +31,9 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from core import clock, users
 from core.users import User
-from core.addons import NotConnected, crypto
+from core.addons import NotConnected, crypto, store as connections
 from addons.money import after_sync, config, ingest, otp, providers, slots, store
-from addons.money.providers import CODE_TIMEOUT, LOGIN_ERRORS
+from addons.money.providers import CODE_TIMEOUT, LOGIN_ERRORS, RECONNECT_ERRORS
 
 logger = logging.getLogger(__name__)
 
@@ -246,6 +249,7 @@ def _succeeded(user: User, source: Dict[str, Any], run_: _Run, result: Mapping[s
         conn.execute("UPDATE money_sources SET state = 'ok', state_reason = NULL, error_type = NULL, failures = 0, "
                      "last_ok_at = ?, next_sync_at = ?, updated_at = ? WHERE id = ? AND user_id = ?",
                      (store.iso(now), store.iso(next_at), store.iso(now), source["id"], user.id))
+    connections.reconnected(user, config.ADDON, source["id"])
     added, updated = len(result["new"]), len(result["changed"])
     _ended(user, source["id"], run_.sync_id, "done", None, None, added, updated)
     store.mark(user.id, True, f"{store.source_name(source)}: {added} new, {updated} changed")
@@ -293,6 +297,8 @@ def _failed(user: User, source: Dict[str, Any], run_: _Run, error_type: str, mes
         logger.info(f"Money sync {run_.sync_id} of source {source['id']} failed with replaced credentials")
         return
     store.mark(user.id, False, f"{store.source_name(source)}: {reason}")
+    if error_type in RECONNECT_ERRORS:
+        connections.needs_reconnect(user, config.ADDON, reason, part=source["id"], label=store.source_name(source))
     logger.warning(f"Money sync {run_.sync_id} of source {source['id']} failed: {error_type} ({message})")
 
 
