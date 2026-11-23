@@ -4,7 +4,8 @@ contacts; add or change a contact in Google only after the user approved
 
 import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 from addons.contacts import client, enrich, store
 from addons.contacts.addon import addon
@@ -33,6 +34,8 @@ def _line(contact: store.Contact) -> str:
         bits.append(", ".join(str(e["value"]) for e in contact["emails"]))
     if contact["organisation"] and contact["organisation"] != contact["name"]:
         bits.append(contact["organisation"])
+    if contact["birthday"]:
+        bits.append(f"birthday {contact['birthday']}")
     return f"- [{contact['id']}] " + " · ".join(bits)
 
 
@@ -58,13 +61,31 @@ def _not_read_yet(conn: Connection) -> Optional[str]:
     return None
 
 
+def _resolve(user: User, ref: Any) -> Tuple[Optional[store.Contact], List[store.Contact]]:
+    """The contact ``ref`` names: its id, else a name / number / email only one
+    contact matches. Returns (the contact, or None with the candidates)."""
+    text = str(ref or "").strip()
+    contact = store.get(user, text)
+    if contact is not None or not text or re.fullmatch(r"people/\S*|c\d+", text):
+        return contact, []
+    found = store.search(user, text, 6)
+    return (found[0], []) if len(found) == 1 else (None, found)
+
+
+def _unresolved(conn: Connection, ref: Any, candidates: List[store.Contact]) -> str:
+    if candidates:
+        return (f"Error: several contacts match '{ref}'; ask which one, then pass its id:\n"
+                + "\n".join(_line(c) for c in candidates))
+    return _not_read_yet(conn) or f"Error: no contact '{ref}'. Find it with search_contacts."
+
+
 @addon.tool()
 def search_contacts(conn: Connection, query: str, limit: int = 10) -> str:
-    """Search the user's Google Contacts by name (in any language or script, partial is fine), phone number or email address. Use it to find someone's phone number or email instead of asking the user.
+    """Search the user's Google Contacts by name (any language or script, partial is fine), phone number or email: use it for someone's number or email instead of asking the user.
 
     Args:
         query: A name or part of it, a phone number or an email address.
-        limit: The maximum number of contacts to return (default 10).
+        limit: The maximum number of contacts to return (default 10, at most 50).
     """
     found = store.search(conn.user, query, limit)
     if not found:
@@ -74,15 +95,13 @@ def search_contacts(conn: Connection, query: str, limit: int = 10) -> str:
 
 @addon.tool()
 def get_contact(conn: Connection, contact_id: str) -> str:
-    """Everything one Google contact has: names, phone numbers, email addresses, birthday and organisation.
+    """Everything one Google contact has, also its other names and job title (search_contacts shows the rest).
 
     Args:
-        contact_id: The contact's id as search_contacts returned it (e.g. 'people/c123').
+        contact_id: The contact's id from search_contacts (e.g. 'people/c123'), or a name only one contact has.
     """
-    contact = store.get(conn.user, contact_id)
-    if contact is None:
-        return _not_read_yet(conn) or f"No contact with id '{contact_id}'. Use search_contacts to find it."
-    return _full(contact)
+    contact, candidates = _resolve(conn.user, contact_id)
+    return _full(contact) if contact is not None else _unresolved(conn, contact_id, candidates)
 
 
 def _name_field(name: str) -> List[Dict[str, Any]]:
@@ -159,7 +178,7 @@ def _changes(contact: store.Contact, *, name: Optional[str], add_phone: Optional
 
 def _contact_name(user: Optional[User], contact_id: Any) -> str:
     try:
-        contact = store.get(user, contact_id) if user is not None else None
+        contact = _resolve(user, contact_id)[0] if user is not None else None
         return (contact or {}).get("name") or ""
     except Exception:
         return ""
@@ -191,7 +210,7 @@ async def update_contact(conn: Connection, contact_id: str, name: Optional[str] 
     """Change an existing contact in the user's Google Contacts (the user approves it first). Only the fields given change.
 
     Args:
-        contact_id: The contact's id as search_contacts returned it (e.g. 'people/c123').
+        contact_id: The contact's id from search_contacts (e.g. 'people/c123'), or a name only one contact has.
         name: A new full name.
         add_phone: A phone number to add.
         remove_phone: One of the contact's phone numbers to remove.
@@ -201,9 +220,9 @@ async def update_contact(conn: Connection, contact_id: str, name: Optional[str] 
         organisation: The company or organisation they belong to; an empty string removes it.
     """
     user = conn.user
-    contact = store.get(user, contact_id)
+    contact, candidates = _resolve(user, contact_id)
     if contact is None:
-        return f"No contact with id '{contact_id}'. Use search_contacts to find it."
+        return _unresolved(conn, contact_id, candidates)
     try:
         fields = _changes(contact, name=name, add_phone=add_phone, remove_phone=remove_phone, add_email=add_email,
                           remove_email=remove_email, birthday=birthday, organisation=organisation)
@@ -228,7 +247,7 @@ async def update_contact(conn: Connection, contact_id: str, name: Optional[str] 
         store.remove(user, contact["id"])
         return "Error: this contact no longer exists in Google Contacts."
     except Exception as e:
-        logger.error(f"Updating a Google contact failed: {client.failure_reason(conn, e)}")
+        logger.error(f"Updating a Google contact failed: {client.failure_reason(conn, e)}", exc_info=True)
         return f"Error: {client.failure_reason(conn, e)}"
     saved = store.save(user, person)
     enrich.fill_people(user)
@@ -275,7 +294,7 @@ async def add_contact(conn: Connection, name: str, phone: Optional[str] = None, 
     try:
         person = await asyncio.to_thread(client.create, conn, fields)
     except Exception as e:
-        logger.error(f"Adding a Google contact failed: {client.failure_reason(conn, e)}")
+        logger.error(f"Adding a Google contact failed: {client.failure_reason(conn, e)}", exc_info=True)
         return f"Error: {client.failure_reason(conn, e)}"
     saved = store.save(user, person)
     enrich.fill_people(user)

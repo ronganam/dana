@@ -133,9 +133,9 @@ class FakeClient:
         for d in ACCOUNTS[self.session_str]:
             yield d
 
-    async def get_messages(self, entity, limit=20, min_id=0):
+    async def get_messages(self, entity, limit=20, min_id=0, search=None):
         REQUESTS.append((self.session_str, f"get_messages:{entity.title}:{limit}:{min_id}"))
-        found = [m for m in entity.msgs if m.id > min_id]
+        found = [m for m in entity.msgs if m.id > min_id and (not search or search in (m.message or ""))]
         return list(reversed(found))[:limit]
 
 
@@ -197,7 +197,17 @@ async def test_tools() -> None:
           "[File: x.pdf (application/pdf)]" in out and registry.returns_untrusted("read_telegram_chat")
           and carries_untrusted(for_model("read_telegram_chat", out)), out)
     out = await registry.execute(ADMIN, "read_telegram_chat", {"chat": "Bob Club"})
-    check("isolation: another user's chat is not found", "No Telegram chat matches" in out, out)
+    check("isolation: another user's chat is not found", out.startswith("Error: no Telegram chat matches"), out)
+    out = await registry.execute(ADMIN, "read_telegram_chat", {"chat": "Tech News", "search": "item 5"})
+    check("read: search finds matching messages in the whole history",
+          "containing 'item 5'" in out and "news item 5\n" in out and "news item 59" in out and "news item 49" not in out, out)
+    tools.READ_MAX_CHARS, kept = 100, tools.READ_MAX_CHARS
+    try:
+        out = await registry.execute(ADMIN, "read_telegram_chat", {"chat": "Tech News", "limit": 20})
+    finally:
+        tools.READ_MAX_CHARS = kept
+    check("read: a result too long keeps the newest messages and says so",
+          "news item 60" in out and "news item 41" not in out and "only the newest" in out and "of 20 fit" in out, out)
 
     captured: List[Dict[str, Any]] = []
 

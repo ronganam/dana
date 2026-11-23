@@ -32,6 +32,8 @@ logger = logging.getLogger(__name__)
 IDLE_SECONDS = 600
 DIALOGS_TTL = 60.0
 MAX_TEXT = 1500  # characters of one message's text
+TIMEOUT = 30.0  # seconds one chat's read may take (Telethon retries inside it)
+DIALOGS_TIMEOUT = 60.0  # listing every chat of a big account takes several requests
 
 
 class TelegramUnavailable(Exception):
@@ -151,6 +153,8 @@ def explain(e: Exception, conn: Optional[Connection] = None) -> str:
     name = type(e).__name__
     if isinstance(e, TelegramUnavailable):
         return str(e)
+    if isinstance(e, asyncio.TimeoutError):
+        return "Telegram did not answer in time; try again in a minute."
     seconds = getattr(e, "seconds", None)
     if name.startswith("FloodWait") and seconds is not None:
         return f"Telegram asked to wait {seconds} seconds before reading more."
@@ -234,7 +238,9 @@ async def dialogs(conn: Connection, *, fresh: bool = False) -> List[Chat]:
     entry = _clients.get(_key(conn))
     if entry is not None and entry.dialogs is not None and not fresh and time.monotonic() - entry.dialogs_at < DIALOGS_TTL:
         return entry.dialogs
-    chats = [_to_chat(d) async for d in client.iter_dialogs()]
+    async def listed() -> List[Chat]:
+        return [_to_chat(d) async for d in client.iter_dialogs()]
+    chats = await asyncio.wait_for(listed(), DIALOGS_TIMEOUT)
     if entry is not None:
         entry.dialogs, entry.dialogs_at = chats, time.monotonic()
     return chats
@@ -292,14 +298,17 @@ def _to_message(m: Any, chat: Chat) -> Message:
     return Message(id=int(m.id), when=when, sender=sender, text=body)
 
 
-async def messages(conn: Connection, chat: Chat, *, limit: int, unread_only: bool = False) -> List[Message]:
+async def messages(conn: Connection, chat: Chat, *, limit: int, unread_only: bool = False,
+                   search: Optional[str] = None) -> List[Message]:
     """The chat's latest ``limit`` messages (only those after the read mark with
-    ``unread_only``), oldest first."""
+    ``unread_only``, only those containing ``search``), oldest first."""
     client = await acquire(conn)
     kwargs: Dict[str, Any] = {"limit": max(1, limit)}
     if unread_only:
         kwargs["min_id"] = chat.read_inbox_max_id
-    found = await client.get_messages(chat.entity, **kwargs)
+    if search:
+        kwargs["search"] = search
+    found = await asyncio.wait_for(client.get_messages(chat.entity, **kwargs), TIMEOUT)
     return [_to_message(m, chat) for m in reversed(list(found or []))]
 
 

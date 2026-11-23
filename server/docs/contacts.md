@@ -126,9 +126,13 @@ people has shows that name.
 
 | Tool | Asks first? | What |
 |---|---|---|
-| `search_contacts(query, limit=10)` | no | the copy, by name, phone number or email |
-| `get_contact(contact_id)` | no | one contact in full |
+| `search_contacts(query, limit=10)` | no | the copy, by name, phone number or email (at most 50); each line: id, name, numbers, emails, organisation, birthday |
+| `get_contact(contact_id)` | no | one contact in full (also other names and job title) |
 | `update_contact(contact_id, name, add_phone, remove_phone, add_email, remove_email, birthday, organisation)` | yes | changes an existing Google contact |
+
+`get_contact` and `update_contact` take the contact's id, or a name (number,
+email) that only one contact matches; several matches come back as an
+`Error:` listing them, an unknown or another user's id as `Error: no contact`.
 | `add_contact(name, phone, email, birthday, organisation)` | yes | adds a Google contact |
 
 There is no tool that deletes a contact. Without the addon the tools are not
