@@ -1,24 +1,21 @@
-"""Home Assistant per user (docs/access.md, "Addons", "Home Assistant triggers").
+"""Home Assistant per user (docs/access.md, "Addons").
 Run: bin/test test_homeassistant_users
 
 Two in-process fake Home Assistants (aiohttp: REST states / services /
-history / config / camera, and the WebSocket auth, entity registry and
-``subscribe_entities`` messages), each with its own token and entities. The
-first admin's addon is connected by the operator (the car entities set
-after it) and is then pointed at instance A; Bob has instance B; Carl has no
-Home Assistant. Checked: tools, proxies, the zone import, the home map, the clock's
-zone, weather and wake reads hit only the user's own instance with their own
-token; the user without the addon gets 403 / no tools / no map / no wake; the
-entity watcher fires the right user's location / car triggers (targets as the
-old webhook produced them), ignores ``not_home`` / ``unknown`` /
-``unavailable`` as the old component did, never fires on the initial state,
-fires a missed transition once after a reconnect (a duplicate does not
-refire), re-subscribes on a settings change, stops on disconnect, keeps going
-for one user while the other's Home Assistant is down; the self-check items;
-``/webhook`` is gone while ``/webhook/waha`` takes only signed events (an
-internal Host header proves nothing); nothing reads the old env names; the TV tool takes its
-TV and channel command from the user's settings (a non-numeric channel refused). Phone push / Telegram
-are mocked; no network beyond localhost.
+config / camera, and the WebSocket auth and entity registry), each with its
+own token and entities. The first admin's addon is connected by the operator
+and is then pointed at instance A; Bob has instance B; Carl has no Home
+Assistant. Checked: tools, proxies, the zone import and the home map hit only
+the user's own instance with their own token; the user without the addon
+gets 403 / no tools / no map; Home Assistant is no source of any signal (no
+wake, screen, car, location or weather source, no watcher service, no
+sensor self-checks, the clock never asks it, ``/api/client-config`` gone) and
+its first migration drops the old sensor settings, the watcher's marks and
+its signal records from a stored connection, keeping the rest; ``/webhook``
+is gone while ``/webhook/waha`` takes only signed events (an internal Host
+header proves nothing); nothing reads the old env names; the TV tool takes
+its TV and channel command from the user's settings (a non-numeric channel
+refused). No network beyond localhost.
 """
 
 import asyncio
@@ -52,21 +49,17 @@ users.bootstrap()
 from addons import bootstrap as addons_bootstrap  # noqa: E402
 addons_bootstrap.bootstrap()
 testenv.connect_admin("homeassistant", credentials={"host": "http://admin-ha.invalid", "token": "admin-token"},
-                      settings={"person": "person.robin", "phone_interactive_sensor": "binary_sensor.pixel_8_interactive",
-                                "phone_battery_sensor": "sensor.pixel_8_battery_level",
-                                "phone_notify_service": "mobile_app_pixel_8"})
+                      settings={"phone_battery_sensor": "sensor.pixel_8_battery_level"})
 ensure_default_groups_for_everyone()
 
 from addons.cameras import api as cameras_api  # noqa: E402
 from addons.homeassistant import api as homeassistant_api  # noqa: E402
 from addons.whatsapp import api as whatsapp_api  # noqa: E402
-from core import briefing, checks, clock, notify as core_notify, now as now_mod, wake, zones as core_zones  # noqa: E402
+from core import briefing, checks, clock, now as now_mod, signals, wake, zones as core_zones  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import registry, scheduler, store  # noqa: E402
-from addons.homeassistant import client as ha_client, home_map, status as ha_status  # noqa: E402
-from addons.homeassistant import watcher as ha_watcher  # noqa: E402
-from addons.tasks import service as tasks_service, triggers  # noqa: E402
+from addons.homeassistant import home_map  # noqa: E402
 from testfakes import FakeHA  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
@@ -135,14 +128,9 @@ def test_import() -> None:
     ha = store.require(ADMIN, "homeassistant")
     check("connection: the operator's host / token (env values ignored)",
           dict(ha.credentials) == {"host": "http://admin-ha.invalid", "token": "admin-token"}, dict(ha.credentials))
-    check("connection: person and phone entities as connected, no car entities, the default weather entity",
-          ha.settings["person"] == "person.robin"
-          and ha.settings["car_sensor"] is None
-          and ha.settings["car_device"] is None
-          and ha.settings["phone_interactive_sensor"] == "binary_sensor.pixel_8_interactive"
-          and ha.settings["phone_battery_sensor"] == "sensor.pixel_8_battery_level"
-          and ha.settings["phone_notify_service"] == "mobile_app_pixel_8"
-          and ha.settings["weather_entity"] == "weather.forecast_home", dict(ha.settings))
+    check("connection: the battery sensor as connected; only the settings of what it controls and shows",
+          dict(ha.settings) == {"phone_battery_sensor": "sensor.pixel_8_battery_level", "tv_entity": None,
+                                "tv_channel_command": None}, dict(ha.settings))
     old_names = ("HOMEASSISTANT_HOST", "HOMEASSISTANT_TOKEN", "HOMEASSISTANT_TODO_ENTITY_ID", "PRIMARY_PERSON",
                  "PHONE_INTERACTIVE_SENSOR", "PHONE_BATTERY_SENSOR", "PHONE_NOTIFY_SERVICE", "BRIEFING_WEATHER_ENTITY")
     root = testenv.SERVER
@@ -152,7 +140,7 @@ def test_import() -> None:
         readers += [f"{path.relative_to(root)}: {n}" for n in old_names if re.search(rf'["\']{n}["\']', text)]
     check("old env names: read by nothing", not readers, readers)
     check("no owner-specific defaults in the addon (entity settings default to nothing)",
-          all(f.default is None for f in store.get_addon("homeassistant").settings if f.name != "weather_entity"))
+          all(f.default is None for f in store.get_addon("homeassistant").settings))
     routes = "".join(p.read_text(encoding="utf-8") for p in
                      list((root / "core").glob("*.py")) + list((root / "addons").rglob("api.py")))
     check("/webhook route is gone (only /webhook/waha)", 'add_post("/webhook",' not in routes
@@ -162,17 +150,14 @@ def test_import() -> None:
 # --- 2. Connections ------------------------------------------------------------------------------
 
 def connect_users() -> None:
-    store.update(ADMIN, "homeassistant", credentials={"host": HA_A.url, "token": "tok-a"},
-                 settings={"car_sensor": "sensor.pixel_8_bluetooth_connection", "car_device": "CarKit-1234"})
+    store.update(ADMIN, "homeassistant", credentials={"host": HA_A.url, "token": "tok-a"})
     store.connect(BOB, "homeassistant", credentials={"host": HA_B.url, "token": "tok-b"},
-                  settings={"person": "person.bob", "car_sensor": "sensor.b_bt", "car_device": "CarB",
-                            "phone_interactive_sensor": "binary_sensor.b_screen", "weather_entity": "weather.b",
-                            "phone_battery_sensor": "sensor.b_battery"})
+                  settings={"phone_battery_sensor": "sensor.b_battery"})
     store.connect(BOB, "tasks")
     store.connect(BOB, "cameras", settings={"url": "http://frigate-b.invalid"})  # the HA camera proxy needs both kinds
 
 
-# --- 3. Tools, zones, home map, clock, weather, wake ------------------------------------------
+# --- 3. Tools, home map ------------------------------------------------------------------------
 
 async def test_reads() -> None:
     clear()
@@ -204,47 +189,97 @@ async def test_reads() -> None:
     check("home map: none for the user without the addon",
           registry.prompt_section(CARL, "homeassistant") == "" and home_map.cached_text(CARL) == "")
 
-    # The server's timezone: the first admin's Home Assistant.
-    saved = clock._timezone
-    clock._timezone = None
-    os.environ.pop("TIMEZONE", None)
-    try:
-        clear()
-        tz = await asyncio.to_thread(clock.get_timezone)
-        check("clock: the zone comes from the first admin's Home Assistant",
-              str(tz) == "Asia/Jerusalem" and HA_A.tokens_seen() == {"tok-a"} and not HA_B.requests, str(tz))
-    finally:
-        clock._timezone = saved
 
-    # Weather (briefing / Now) from the user's own weather entity.
+
+# --- 4. Not a source of signals ------------------------------------------------------------------
+
+async def test_no_signals() -> None:
+    for signal in signals.SIGNALS:
+        hooks = registry.providers(signals.source_key(signal), BOB)
+        check(f"signals: no {signal} source from Home Assistant for Bob",
+              all(h.addon != "homeassistant" for h in hooks), [h.addon for h in hooks])
+    check("providers: no weather / screen_sessions from Home Assistant",
+          all(h.addon != "homeassistant" for key in ("weather", "screen_sessions")
+              for h in registry.providers(key, BOB)))
+    check("no Home Assistant service (no entity watcher)",
+          not [s for s in registry.services() if s.addon == "homeassistant"], registry.services())
+    keys = {c["key"] for c in checks.compute(user=BOB)}
+    check("self-checks: no location / car / ha_entities / ha_watcher",
+          not keys & {"location", "car", "ha_entities", "ha_watcher"}, keys)
+
     clear()
     with users.acting_as(BOB):
         w = await briefing.weather(BOB)
-    check("weather: Bob's entity on B", w and w["condition"] == "rainy" and w["high"] == 30
-          and HA_B.tokens_seen() == {"tok-b"} and not HA_A.requests, w)
-    with users.acting_as(CARL):
-        check("weather: nothing without the addon", await briefing.weather(CARL) is None and now_mod.weather_cached(CARL) is None)
-
-    # Wake reads Bob's screen sensor from B; Carl is skipped.
-    clear()
+    check("weather: never read from Home Assistant (Bob has no Home zone: none)",
+          w is None and now_mod.weather_cached(BOB) is None and not HA_B.requests, w)
     since = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=10)
-    HA_B.history = [{"state": "on", "last_changed": since.isoformat()}]
     source, sessions = await wake.screen_sessions(BOB, since, datetime.datetime.now(datetime.timezone.utc))
-    check("wake: Bob's screen history from B, his own sensor",
-          source == "homeassistant" and sessions and sessions[0] > 500 and HA_B.service_calls == [("history", {"entity": "binary_sensor.b_screen"})]
-          and not HA_A.requests, (sessions, HA_B.service_calls))
-    check("wake: a user without Home Assistant is skipped",
-          await wake.unlock(CARL) == "unavailable" and not await wake.check_wake_fallback(CARL))
+    check("wake: no screen sessions from Home Assistant", source is None and sessions is None and not HA_B.requests,
+          (source, sessions))
+    check("wake: Home Assistant alone is no wake source",
+          await wake.unlock(BOB) == "unavailable" and not await wake.check_wake_fallback(BOB))
+
+    saved = clock._timezone
+    clock._timezone = None
+    tz_env = os.environ.pop("TIMEZONE", None)
+    try:
+        clear()
+        await asyncio.to_thread(clock.get_timezone)
+        check("clock: the server's zone never asks Home Assistant", not HA_A.requests and not HA_B.requests,
+              HA_A.requests)
+    finally:
+        clock._timezone = saved
+        if tz_env is not None:
+            os.environ["TIMEZONE"] = tz_env
 
 
-# --- 4. HTTP endpoints ---------------------------------------------------------------------------
+def test_migration() -> None:
+    """m0001_drop_sensor_settings on a stored connection with the old settings."""
+    old = {"person": "person.bob", "car_sensor": "sensor.b_bt", "car_device": "CarB",
+           "phone_interactive_sensor": "binary_sensor.b_screen", "weather_entity": "weather.b",
+           "phone_notify_service": "mobile_app_b", "phone_battery_sensor": "sensor.b_battery",
+           "tv_entity": "media_player.den_tv_adb"}
+    with get_db_connection() as conn:
+        creds_before = conn.execute("SELECT credentials FROM connections WHERE user_id = ? AND addon = ?",
+                                    (BOB.id, "homeassistant")).fetchone()[0]
+        conn.execute("UPDATE connections SET settings = ? WHERE user_id = ? AND addon = ?",
+                     (json.dumps(old), BOB.id, "homeassistant"))
+        conn.execute("UPDATE connections SET settings = ? WHERE user_id = ? AND addon = ?",
+                     (json.dumps({"person": "person.robin"}), ADMIN.id, "homeassistant"))
+        for key in (f"ha_watcher:{BOB.id}", f"ha_entity:{BOB.id}:person", f"ha_event:{BOB.id}:car", "backups:last"):
+            conn.execute("INSERT OR REPLACE INTO system_marks (key, last_at, ok, detail) VALUES (?, ?, 1, '')",
+                         (key, "2026-11-20T08:00:00+00:00"))
+        for source in ("homeassistant", "phone"):
+            conn.execute("INSERT OR REPLACE INTO signal_sources (user_id, signal, source, last_at, detail) "
+                         "VALUES (?, 'car', ?, '2026-11-20T08:00:00+00:00', 'enter')", (BOB.id, source))
+        conn.execute("DELETE FROM schema_migrations WHERE addon = 'homeassistant' AND version = 1")
+        conn.commit()
+    applied = db.migrate()
+    with get_db_connection() as conn:
+        rows = {r["user_id"]: (json.loads(r["settings"]), r["credentials"]) for r in conn.execute(
+            "SELECT user_id, settings, credentials FROM connections WHERE addon = 'homeassistant'")}
+        marks = {r[0] for r in conn.execute("SELECT key FROM system_marks")}
+        sources = {r[0] for r in conn.execute("SELECT source FROM signal_sources WHERE user_id = ?", (BOB.id,))}
+    check("migration: applied by the runner", "homeassistant:0001_drop_sensor_settings" in applied, applied)
+    check("migration: Bob's sensor settings gone, battery and TV kept, credentials untouched",
+          rows[BOB.id][0] == {"phone_battery_sensor": "sensor.b_battery", "tv_entity": "media_player.den_tv_adb"}
+          and rows[BOB.id][1] == creds_before, rows[BOB.id])
+    check("migration: the admin's settings emptied", rows[ADMIN.id][0] == {}, rows[ADMIN.id])
+    check("migration: the watcher's marks gone, other marks kept",
+          not any(k.startswith(("ha_watcher:", "ha_entity:", "ha_event:")) for k in marks) and "backups:last" in marks,
+          marks)
+    check("migration: Home Assistant's signal records gone, the phone's kept", sources == {"phone"}, sources)
+    conn_b = store.require(BOB, "homeassistant")
+    check("migration: the connection reads back", conn_b.settings["tv_entity"] == "media_player.den_tv_adb")
+
+
+# --- 5. HTTP endpoints ---------------------------------------------------------------------------
 
 def build_app() -> web.Application:
     app = web.Application()
     setup_auth(app)
     r = app.router
     r.add_post("/api/ha/zones/import", homeassistant_api.import_zones_api)
-    r.add_get("/api/client-config", homeassistant_api.client_config_api)
     r.add_get("/api/ha/state/{entity_id}", homeassistant_api.ha_entity_state_api)
     r.add_get("/api/ha/states", homeassistant_api.ha_states_api)
     r.add_post("/api/ha/service", homeassistant_api.ha_call_service_api)
@@ -255,17 +290,11 @@ def build_app() -> web.Application:
 
 async def test_http() -> None:
     async with TestClient(TestServer(build_app())) as client:
-        clear()
-        r = await client.get("/api/client-config", headers=ADMIN_AUTH)
-        check("client-config: the first admin's phone and person entities, byte for byte (no battery sensor: "
-              "dashboards read it through their Batteries widget)",
-              await r.text() == json.dumps({"notify_service": "mobile_app_pixel_8",
-                                            "interactive_sensor": "binary_sensor.pixel_8_interactive",
-                                            "person": "person.robin"}), await r.text())
-        r = await client.get("/api/client-config", headers=BOB_AUTH)
-        body = await r.json()
-        check("client-config: Bob's own entities", body["person"] == "person.bob"
-              and body["interactive_sensor"] == "binary_sensor.b_screen" and "battery_sensor" not in body and body["notify_service"] is None, body)
+        ha_routes = web.Application()
+        homeassistant_api.setup(ha_routes)
+        paths = {r.resource.canonical for r in ha_routes.router.routes()}
+        check("client-config: no such route any more", "/api/client-config" not in paths
+              and "/api/ha/zones/import" in paths, paths)
 
         clear()
         core_zones.create(BOB, "Work", 1.0, 2.0)  # his own Work stays as it is
@@ -309,7 +338,7 @@ async def test_http() -> None:
               and HA_A.service_calls == [("light.turn_off", {"entity_id": "light.a_kitchen"})] and not HA_B.service_calls)
         r = await client.get("/api/camera/camera.x/proxy", headers=BOB_AUTH)
         check("camera proxy: through Bob's Home Assistant", await r.read() == b"jpeg-B")
-        for path in ("/api/client-config", "/api/ha/state/light.b_den", "/api/ha/states?ids=x",
+        for path in ("/api/ha/state/light.b_den", "/api/ha/states?ids=x",
                      "/api/camera/camera.x/proxy"):
             r = await client.get(path, headers=CARL_AUTH)
             body = await r.json()
@@ -337,198 +366,12 @@ async def test_http() -> None:
         check("/webhook/waha signed with the secret → accepted", r.status == 200 and waha.await_count == 1)
 
 
-# --- 5. The watcher ----------------------------------------------------------------------------
-
-FIRED: List[Tuple[str, str, str, str, Optional[str]]] = []
-
-
-async def spy_fire(user, trigger_type, *, action="", target=""):
-    FIRED.append((user.id, trigger_type, action, target, users.current_id()))
-    return await triggers.fire(user, trigger_type, action=action, target=target)
-
-
-def fired(user=None) -> List[Tuple[str, str, str]]:
-    return [(t, a, tg) for uid, t, a, tg, _ in FIRED if user is None or uid == user.id]
-
-
-def task(user, title: str, trig: Dict[str, Any]) -> str:
-    return tasks_service.create_task(user, title=title, triggers=json.dumps(trig))
-
-
-def marks(user) -> set:
-    with get_db_connection() as conn:
-        return {r[0] for r in conn.execute("SELECT key FROM task_trigger_marks WHERE user_id = ? "
-                                           "AND key LIKE 'last_event_v2_%'", (user.id,))}
-
-
-def checks_of(user) -> Dict[str, Dict[str, Any]]:
-    return {c["key"]: c for c in checks.compute(user=user)}
-
-
-async def test_watcher() -> None:
-    ha_watcher.RETRY_MIN_SECONDS, ha_watcher.RETRY_MAX_SECONDS = 0.05, 0.2
-    t_work = task(ADMIN, "Admin at work", {"location": {"location": "Work", "event": "arrive"}})
-    t_gym = task(ADMIN, "Admin at gym", {"location": {"location": "gym", "event": "arrive"}})
-    t_bob_work = task(BOB, "Bob at work", {"location": {"location": "work", "event": "arrive"}})
-    t_bob_car = task(BOB, "Bob in the car", {"car": "enter"})
-    t_bob_car_out = task(BOB, "Bob out of the car", {"car": "leave"})
-    push = AsyncMock(return_value={"telegram": True})  # core.notify.send: what each reminder sends
-
-    def pushed(task_id: str) -> int:
-        return sum(1 for c in push.await_args_list
-                   if c.args[1].kind == "reminder" and c.args[1].data["task_id"] == task_id)
-
-    watchers = ha_watcher.Watchers(spy_fire)
-    with patch.object(core_notify, "send", push):
-        with users.acting_as(None):
-            watchers.reconcile()
-        check("watchers: one per user with entities set, none for Carl",
-              set(watchers.running()) == {ADMIN.id, BOB.id})
-        check("watchers: both connected (recorded per user)", await until(
-            lambda: ha_status.read(ADMIN.id).connected and ha_status.read(BOB.id).connected))
-        check("watchers: each subscribed only to their own entities",
-              HA_A.subscriptions == [["person.robin", "sensor.pixel_8_bluetooth_connection"]]
-              and HA_B.subscriptions == [["person.bob", "sensor.b_bt"]], (HA_A.subscriptions, HA_B.subscriptions))
-        await asyncio.sleep(0.1)
-        check("no fire on the initial state", FIRED == [], FIRED)
-        st = ha_status.read(ADMIN.id)
-        check("entities recorded as existing", st.entities["person"].exists and st.entities["car"].exists)
-
-        # Zone enter / leave: the admin's triggers only.
-        await HA_A.set_state("person.robin", "Work")
-        check("person home → Work: leave home, arrive Work (the admin's)", await until(
-            lambda: fired() == [("location", "leave", "home"), ("location", "arrive", "Work")]), FIRED)
-        check("fired as that user", all(uid == cur == ADMIN.id for uid, *_, cur in FIRED))
-        check("the admin's arrive-at-work task fired, not Bob's", await until(lambda: pushed(t_work) == 1)
-              and pushed(t_bob_work) == 0)
-        check("targets as the old webhook produced them (lower case)",
-              {"last_event_v2_location_arrive_work", "last_event_v2_location_leave_home"} <= marks(ADMIN)
-              and not marks(BOB), marks(ADMIN))
-        # Attribute-only changes and ignored states.
-        FIRED.clear()
-        await HA_A.set_state("person.robin", "Work", {"friendly_name": "Robin", "latitude": 32.1})
-        await HA_A.set_state("person.robin", "not_home")
-        await HA_A.set_state("person.robin", "unknown")
-        await HA_A.set_state("person.robin", "unavailable")
-        await HA_A.set_state("person.robin", "home")
-        check("ignored states: Work → not_home leaves Work, not_home → unknown → unavailable nothing, → home arrives",
-              await until(lambda: fired() == [("location", "leave", "Work"), ("location", "arrive", "home")]), fired())
-
-        # Car enter / leave: Bob's.
-        FIRED.clear()
-        await HA_B.set_state("sensor.b_bt", "1", {"connected_paired_devices": ["Phone speaker", "CarB (00:11)"]})
-        check("car connected: car enter for Bob only", await until(lambda: fired() == [("car", "enter", "")])
-              and fired(ADMIN) == [], FIRED)
-        check("Bob's car task reminded", await until(lambda: pushed(t_bob_car) == 1))
-        await HA_B.set_state("sensor.b_bt", "1", {"connected_paired_devices": ["Phone speaker", "CarB (00:11)"],
-                                                  "extra": 1})
-        await HA_B.set_state("sensor.b_bt", "0", {"connected_paired_devices": []})
-        check("car disconnected: car leave (an unrelated attribute change fires nothing)",
-              await until(lambda: fired() == [("car", "enter", ""), ("car", "leave", "")]), fired())
-        check("Bob's car-leave task reminded", await until(lambda: pushed(t_bob_car_out) == 1))
-        FIRED.clear()
-        await HA_A.set_state("sensor.pixel_8_bluetooth_connection", "1", {"connected_paired_devices": "['Headphones']"})
-        await asyncio.sleep(0.1)
-        check("a device that is not the car: no car enter", fired() == [], fired())
-        await HA_A.set_state("sensor.pixel_8_bluetooth_connection", "2",
-                             {"connected_paired_devices": "['Headphones', 'CarKit-1234']"})
-        check("the admin's car (the imported default name): car enter",
-              await until(lambda: fired() == [("car", "enter", "")]), fired())
-
-        # A transition missed while disconnected fires once after the reconnect.
-        FIRED.clear()
-        HA_A.subscriptions.clear()
-        await HA_A.drop_connections()
-        await HA_A.set_state("person.robin", "Gym", push=False)
-        check("reconnect: re-subscribed", await until(lambda: len(HA_A.subscriptions) == 1))
-        check("reconnect: the missed home → Gym fires once",
-              await until(lambda: fired() == [("location", "leave", "home"), ("location", "arrive", "Gym")]), fired())
-        check("reconnect: the gym task reminded once", await until(lambda: pushed(t_gym) == 1))
-        HA_A.subscriptions.clear()
-        await HA_A.drop_connections()
-        resubscribed = await until(lambda: len(HA_A.subscriptions) == 1)
-        await asyncio.sleep(0.2)
-        check("reconnect without a change: nothing fires", resubscribed
-              and fired() == [("location", "leave", "home"), ("location", "arrive", "Gym")], fired())
-        await triggers.fire(ADMIN, "location", action="arrive", target="Gym")
-        await asyncio.sleep(0.1)
-        check("a duplicate arrive (as a double-posted event) does not refire the reminder", pushed(t_gym) == 1)
-
-        # Checks: connected, entities found.
-        cs = checks_of(BOB)
-        check("checks: Bob's watcher connected, his entities found",
-              cs["ha_watcher"]["ok"] and cs["ha_watcher"]["detail"] == "connected"
-              and cs["ha_entities"]["ok"] and cs["ha_entities"]["detail"] == "all found", (cs["ha_watcher"], cs["ha_entities"]))
-        cs = checks_of(BOB)
-        check("checks: location / car per user (Bob's car update seen)", cs["car"]["ok"], cs["car"])
-        cs = checks_of(CARL)
-        check("checks: nothing to report for a user without the addon",
-              cs["ha_watcher"]["detail"] == "not connected" and cs["ha_entities"]["detail"] == "not connected")
-
-        # Settings change: re-subscribes (to an entity B does not have → check item).
-        HA_B.subscriptions.clear()
-        store.update(BOB, "homeassistant", settings={"person": "person.bobby"})
-        watchers.reconcile()
-        check("settings change: re-subscribed with the new entity", await until(
-            lambda: HA_B.subscriptions == [["person.bobby", "sensor.b_bt"]]), HA_B.subscriptions)
-        check("missing entity recorded", await until(lambda: ha_status.read(BOB.id).entities.get("person")
-                                                    and not ha_status.read(BOB.id).entities["person"].exists))
-        cs = checks_of(BOB)
-        check("checks: a selected entity that does not exist → not ok",
-              not cs["ha_entities"]["ok"] and "person.bobby" in cs["ha_entities"]["detail"], cs["ha_entities"])
-        FIRED.clear()
-        await HA_B.set_state("person.bobby", "Work")
-        await asyncio.sleep(0.1)
-        check("an entity that appears: recorded, nothing fired", fired() == [], fired())
-        await HA_B.set_state("person.bobby", "home")
-        check("…its next change fires (leave Work, arrive home)",
-              await until(lambda: fired(BOB) == [("location", "leave", "Work"), ("location", "arrive", "home")]), FIRED)
-        check("entity now exists", ha_status.read(BOB.id).entities["person"].exists)
-
-        # One instance down: the other keeps working; the check reports it.
-        HA_B.down = True
-        await HA_B.drop_connections()
-        check("B down: Bob's watcher not connected", await until(lambda: ha_status.read(BOB.id).connected is False))
-        FIRED.clear()
-        await HA_A.set_state("person.robin", "Work")
-        check("B down: the admin's watcher still fires", await until(
-            lambda: fired(ADMIN) == [("location", "leave", "Gym"), ("location", "arrive", "Work")]), FIRED)
-        from addons.homeassistant import hooks as ha_hooks
-        saved = ha_hooks.HA_WATCHER_MINUTES
-        ha_hooks.HA_WATCHER_MINUTES = 0
-        try:
-            cs = checks_of(BOB)
-            check("checks: a disconnected watcher → not ok", not cs["ha_watcher"]["ok"]
-                  and cs["ha_watcher"]["detail"].startswith("disconnected for"), cs["ha_watcher"])
-            check("checks: the admin's watcher unaffected", checks_of(ADMIN)["ha_watcher"]["ok"])
-        finally:
-            ha_hooks.HA_WATCHER_MINUTES = saved
-        HA_B.down = False
-        check("B back: Bob's watcher reconnects by itself", await until(lambda: ha_status.read(BOB.id).connected, 5))
-
-        # Disconnect stops the watcher.
-        store.disconnect(BOB, "homeassistant")
-        watchers.reconcile()
-        check("disconnect: Bob's watcher stopped", set(watchers.running()) == {ADMIN.id})
-        check("disconnect: his connection to B is closed", await until(lambda: not HA_B.sockets))
-        check("disconnect: his watcher marks are gone", ha_status.read(BOB.id).connected is None
-              and not ha_status.read(BOB.id).entities)
-        FIRED.clear()
-        await HA_B.set_state("person.bobby", "Work")
-        await asyncio.sleep(0.1)
-        check("disconnect: nothing fires for him any more", fired() == [], FIRED)
-        await watchers.stop()
-        check("stop: every watcher ended", not watchers.running() and await until(lambda: not HA_A.sockets))
-
-
 async def test_tv() -> None:
     """control_android_tv: the TV and the channel command come from the user's settings, nothing built in."""
     clear()
     out = await tool(ADMIN, "control_android_tv", action="send_key", command="HOME")
     check("tv: no TV given and no tv_entity setting → an error, nothing sent",
           out.startswith("Error: no TV given") and not HA_A.service_calls, out)
-    if store.get(BOB, "homeassistant") is None:  # the watcher test may have turned it off
-        store.connect(BOB, "homeassistant", credentials={"host": HA_B.url, "token": "tok-b"})
     store.update(BOB, "homeassistant", settings={"tv_entity": "media_player.den_tv_adb"})
     out = await tool(BOB, "control_android_tv", action="watch_channel", channel="12")
     check("tv: watch_channel without tv_channel_command → an error, nothing sent",
@@ -549,9 +392,10 @@ async def main() -> None:
     test_import()
     connect_users()
     await test_reads()
+    await test_no_signals()
     await test_http()
-    await test_watcher()
     await test_tv()
+    test_migration()
     await HA_A.server.close()
     await HA_B.server.close()
 

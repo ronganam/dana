@@ -2,9 +2,10 @@
 
 ``GET {OPEN_METEO_URL}?latitude=&longitude=&current=temperature_2m,weather_code,is_day
 &daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max
-&timezone=auto&forecast_days=1``. The answer has the shape of Home Assistant's
-weather provider: ``{condition, temperature, unit, high, low, rain_chance}``,
-the condition one of Home Assistant's words (:data:`WMO_CONDITIONS`). Cached
+&timezone=auto&forecast_days=1``. The answer is the ``weather`` provider's
+shape: ``{condition, temperature, unit, high, low, rain_chance}``, the
+condition one of Home Assistant's weather words (:data:`WMO_CONDITIONS`), which
+the clients draw icons for. Cached
 per place (the zone's rounded coordinates) for :data:`CACHE_SECONDS`, a failure
 for :data:`FAIL_SECONDS`. ``OPEN_METEO_URL``: another Open-Meteo server (it can
 run on your own); only the coordinates of Home zones are ever sent.

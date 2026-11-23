@@ -1,10 +1,10 @@
 """Fakes shared by the standalone test scripts (not a test script itself).
 
 - :class:`FakeHA`: one in-process Home Assistant (aiohttp): REST states /
-  services / history / config / camera, and the WebSocket auth, entity
-  registry and ``subscribe_entities`` messages, with its own token and
-  entities; it records every request. Used by test_homeassistant_users.py
-  and test_addons_api.py.
+  services / config / camera, and the WebSocket auth and entity registry
+  messages, with its own token and entities; it records every request. Used
+  by test_homeassistant_users.py, test_addons_api.py, test_attention.py and
+  the local environment's stubs.
 - :class:`FakeWAHA`: one WAHA instance.
 """
 
@@ -17,9 +17,7 @@ from aiohttp.test_utils import TestServer
 
 class FakeHA:
     """One Home Assistant instance: its token, states, exposed entities; it
-    records every request (path, token) and pushes state changes to its
-    ``subscribe_entities`` subscribers as Home Assistant does (``a`` / ``c``
-    with ``+`` / ``-`` diffs / ``r``)."""
+    records every request (path, token)."""
 
     def __init__(self, name: str, token: str, states: Dict[str, Tuple[str, Dict[str, Any]]],
                  exposed: Dict[str, str], tz: str) -> None:
@@ -28,17 +26,12 @@ class FakeHA:
         self.exposed = exposed  # entity id -> registry name
         self.requests: List[Tuple[str, str]] = []  # (path, bearer token or WS auth token)
         self.service_calls: List[Tuple[str, Dict[str, Any]]] = []
-        self.subscriptions: List[List[str]] = []
-        self.subs: Dict[web.WebSocketResponse, Tuple[int, List[str]]] = {}
-        self.sockets: set = set()
         self.down = False
-        self.history: List[Dict[str, Any]] = []
         app = web.Application()
         app.router.add_get("/api/websocket", self.ws)
         app.router.add_get("/api/states", self.all_states)
         app.router.add_get("/api/states/{eid}", self.one_state)
         app.router.add_post("/api/services/{domain}/{service}", self.service)
-        app.router.add_get("/api/history/period/{since}", self.history_api)
         app.router.add_get("/api/config", self.config)
         app.router.add_get("/api/camera_proxy/{eid}", self.camera)
         self.server = TestServer(app)
@@ -73,27 +66,13 @@ class FakeHA:
         body = await request.json()
         name = f"{request.match_info['domain']}.{request.match_info['service']}"
         self.service_calls.append((name, body))
-        if name == "weather.get_forecasts":
-            return web.json_response({"service_response": {body["entity_id"]: {"forecast": [
-                {"temperature": 30 if self.name == "B" else 20, "templow": 10, "precipitation_probability": 5}]}}})
         return web.json_response([])
-
-    async def history_api(self, request):
-        refused = self._auth(request)
-        if refused:
-            return refused
-        self.service_calls.append(("history", {"entity": request.query.get("filter_entity_id")}))
-        return web.json_response([self.history])
 
     async def config(self, request):
         return self._auth(request) or web.json_response({"time_zone": self.tz})
 
     async def camera(self, request):
         return self._auth(request) or web.Response(body=f"jpeg-{self.name}".encode(), content_type="image/jpeg")
-
-    @staticmethod
-    def _compressed(state: Dict[str, Any]) -> Dict[str, Any]:
-        return {"s": state["state"], "a": dict(state["attributes"]), "c": "ctx", "lc": 1.0}
 
     async def ws(self, request):
         if self.down:
@@ -109,63 +88,16 @@ class FakeHA:
             await ws.close()
             return ws
         await ws.send_json({"type": "auth_ok"})
-        self.sockets.add(ws)
-        try:
-            async for m in ws:
-                data = json.loads(m.data)
-                kind, mid = data.get("type"), data.get("id")
-                if kind == "homeassistant/expose_entity/list":
-                    await ws.send_json({"id": mid, "type": "result", "success": True, "result": {
-                        "exposed_entities": {eid: {"conversation": True} for eid in self.exposed}}})
-                elif kind == "config/entity_registry/get":
-                    await ws.send_json({"id": mid, "type": "result", "success": True, "result": {
-                        "name": self.exposed.get(data["entity_id"]), "aliases": []}})
-                elif kind == "subscribe_entities":
-                    ids = list(data["entity_ids"])
-                    self.subscriptions.append(ids)
-                    self.subs[ws] = (mid, ids)
-                    await ws.send_json({"id": mid, "type": "result", "success": True, "result": None})
-                    await ws.send_json({"id": mid, "type": "event", "event": {
-                        "a": {eid: self._compressed(self.states[eid]) for eid in ids if eid in self.states}}})
-        finally:
-            self.sockets.discard(ws)
-            self.subs.pop(ws, None)
+        async for m in ws:
+            data = json.loads(m.data)
+            kind, mid = data.get("type"), data.get("id")
+            if kind == "homeassistant/expose_entity/list":
+                await ws.send_json({"id": mid, "type": "result", "success": True, "result": {
+                    "exposed_entities": {eid: {"conversation": True} for eid in self.exposed}}})
+            elif kind == "config/entity_registry/get":
+                await ws.send_json({"id": mid, "type": "result", "success": True, "result": {
+                    "name": self.exposed.get(data["entity_id"]), "aliases": []}})
         return ws
-
-    async def set_state(self, eid: str, state: str, attrs: Optional[Dict[str, Any]] = None, push: bool = True) -> None:
-        old = self.states.get(eid)
-        new_attrs = dict(attrs) if attrs is not None else dict((old or {}).get("attributes") or {})
-        self.states[eid] = {"entity_id": eid, "state": state, "attributes": new_attrs}
-        if not push:
-            return
-        if old is None:
-            event = {"a": {eid: self._compressed(self.states[eid])}}
-        else:
-            plus: Dict[str, Any] = {"lu": 2.0}
-            if old["state"] != state:
-                plus["s"], plus["lc"] = state, 2.0
-            changed = {k: v for k, v in new_attrs.items() if old["attributes"].get(k) != v}
-            if changed:
-                plus["a"] = changed
-            diff: Dict[str, Any] = {"+": plus}
-            removed = [k for k in old["attributes"] if k not in new_attrs]
-            if removed:
-                diff["-"] = {"a": removed}
-            event = {"c": {eid: diff}}
-        await self._push(eid, event)
-
-    async def remove(self, eid: str) -> None:
-        self.states.pop(eid, None)
-        await self._push(eid, {"r": [eid]})
-
-    async def _push(self, eid: str, event: Dict[str, Any]) -> None:
-        for ws, (mid, ids) in list(self.subs.items()):
-            if eid in ids:
-                await ws.send_json({"id": mid, "type": "event", "event": event})
-
-    async def drop_connections(self) -> None:
-        for ws in list(self.sockets):
-            await ws.close()
 
     def tokens_seen(self) -> set:
         return {t for _, t in self.requests}

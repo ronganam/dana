@@ -64,14 +64,12 @@ ensure_default_groups_for_everyone()
 
 from core import assistant_api, debug_api, sessions_api
 import core.telegram_bot as tb
-from core import actions_api, notify, session, session_runner, shortcuts, undo, usage, usage_api
+from core import actions_api, events, notify, session, session_runner, shortcuts, signals, undo, usage, usage_api
 from core.agent import AgentOrchestrator
 from core.auth import setup_auth
 from core.db import get_db_connection
 from core.telegram_bot import AuthMiddleware, TelegramBot
 from addons.essentials.addon import addon as essentials_addon
-from core.addons.store import Connection
-from addons.homeassistant import watcher as ha_watcher
 from addons.homeassistant.addon import addon as homeassistant_addon
 from core.addons import store
 from addons.phone import push as phone_push
@@ -616,30 +614,20 @@ async def test_background_entry():
     try:
         with patch.object(phone_push, "send", new=AsyncMock(return_value=True)), \
                 patch.object(task_triggers, "trigger_reminder", new=watched):
-            # The member's Home Assistant watcher sees their phone connect to the car.
-            spec = ha_watcher.WatchSpec("http://ha.invalid", "fake", None, "sensor.bt", "Car")
-            watcher = ha_watcher.UserWatcher(Connection(user=MEMBER, addon="homeassistant"), spec,
-                                             task_triggers.fire, {})
-
-            async def scripted_session():
-                states = {}
-                await watcher._on_event({"a": {"sensor.bt": {"s": "on", "a": {"connected_paired_devices": "[]"}}}},
-                                        states, True)
-                await watcher._on_event({"c": {"sensor.bt": {"+": {"a": {"connected_paired_devices": "['Car']"}}}}},
-                                        states, False)
-                await asyncio.Event().wait()
-
-            watcher._session = scripted_session
-            running = asyncio.create_task(watcher.run())
+            # The member's phone reports getting in the car, from no request (as a batch handler's
+            # background work would): the trigger runs as them.
+            store.connect(MEMBER, "phone")
+            with users.acting_as(None):
+                delivered = signals.deliver(MEMBER, "car", "phone", detail="enter", action="enter")
             for _ in range(40):
+                await events.drain()
                 if channel.send_text.await_count:
                     break
                 await asyncio.sleep(0.05)
-            running.cancel()
     finally:
         notify.register_telegram(None)
-    check("background: a Home Assistant watcher's trigger runs as its user",
-          seen == [(MEMBER.id, MEMBER.id)], str(seen))
+    check("background: a car signal's trigger runs as its user",
+          delivered and seen == [(MEMBER.id, MEMBER.id)], str(seen))
     calls = channel.send_text.await_args_list
     check("background: its reminder reaches that user's chat",
           len(calls) == 1 and calls[0].args[0] == 2222 and "Take the umbrella" in calls[0].args[1], str(calls))

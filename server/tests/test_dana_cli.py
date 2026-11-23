@@ -154,26 +154,26 @@ def test_addons(tmp: Path) -> None:
     bob = next(u for u in users.list_users() if u.name == "Bob B")
     rc, out, _ = run("addons", "list")
     check("addons list: fields and the admin-only addon", rc == 0 and "credential token" in out
-          and "setting person" in out and "ops:" in out and "admins only" in out and "essentials:" in out, out)
+          and "setting tv_entity" in out and "ops:" in out and "admins only" in out and "essentials:" in out, out)
     creds = tmp / "ha.env"
     creds.write_text(f"# Bob's Home Assistant\nhost=http://ha-bob.invalid\ntoken=\"{SECRET}\"\n", encoding="utf-8")
     rc, out, err = run("addons", "connect", "bob", "homeassistant", "--credentials-file", str(creds),
-                       "person=person.bob", "car_device=Bob Car")
+                       "tv_entity=media_player.bob_tv", "phone_battery_sensor=sensor.bob_battery")
     conn = store.get(users.get(bob.id), "homeassistant")
     check("connect: credentials from a file (quotes stripped), settings from key=value",
-          rc == 0 and conn is not None and conn.credentials["token"] == SECRET and conn.settings["person"] == "person.bob"
-          and conn.settings["car_device"] == "Bob Car", out + err)
+          rc == 0 and conn is not None and conn.credentials["token"] == SECRET and conn.settings["tv_entity"] == "media_player.bob_tv"
+          and conn.settings["phone_battery_sensor"] == "sensor.bob_battery", out + err)
     check("connect: the output names credentials set, never their values",
           "token set" in out and SECRET not in out, out)
     rc, _, err = run("addons", "update", "bob", "homeassistant", f"token={SECRET}")
     check("credentials never from argv: a credential as a setting is refused", rc == 1 and "no setting token" in err
           and SECRET not in err, err)
-    rc, out, _ = run("addons", "update", "bob", "homeassistant", "--credentials-stdin", "car_device=",
-                     "weather_entity=weather.bob", stdin="token=new-secret-456\n")
+    rc, out, _ = run("addons", "update", "bob", "homeassistant", "--credentials-stdin", "phone_battery_sensor=",
+                     "tv_channel_command=tune {channel}", stdin="token=new-secret-456\n")
     conn = store.get(users.get(bob.id), "homeassistant")
     check("update: credentials from stdin merged, an empty setting back to its default",
           rc == 0 and conn.credentials == {"host": "http://ha-bob.invalid", "token": "new-secret-456"}
-          and conn.settings["car_device"] is None and conn.settings["weather_entity"] == "weather.bob"
+          and conn.settings["phone_battery_sensor"] is None and conn.settings["tv_channel_command"] == "tune {channel}"
           and "new-secret-456" not in out, out)
     check("add: on_connect ran for the default tasks addon (default task lists)",
           len(groups.list_groups(users.get(bob.id))) >= 1)
@@ -206,7 +206,7 @@ def test_addons(tmp: Path) -> None:
           rc == 1 and "line 1" in err and "just-a-value" not in err)
     rc, out, _ = run("addons", "show", "bob")
     check("show: kinds, settings, credentials set / not set, no values",
-          rc == 0 and "homeassistant" in out and "token set" in out and '"person.bob"' in out and "new-secret" not in out
+          rc == 0 and "homeassistant" in out and "token set" in out and '"media_player.bob_tv"' in out and "new-secret" not in out
           and "shopping" in out and "tasks" in out, out)
     rc, out, _ = run("users", "list")
     check("list: connected addons", "addons: tasks, shopping, knowledge, about, people, phone, homeassistant" in out, out)

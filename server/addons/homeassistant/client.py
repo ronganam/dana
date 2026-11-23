@@ -1,11 +1,10 @@
 """One user's Home Assistant, over that user's own connection: REST (states,
-services, history, config, zones) and the WebSocket API (entity registry).
+services, config, zones) and the WebSocket API (entity registry).
 
 Every function takes the user's :class:`~core.addons.Connection`
 (host and token from its credentials); nothing is shared between
 connections, caches included."""
 
-import datetime
 import json
 import logging
 import re
@@ -15,8 +14,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 import httpx
 import websockets  # type: ignore
 
-from core import clock
-from core.users import User
 from core.addons import Connection, addresses, store
 from addons.homeassistant.config import DEFAULT_HOST, ADDON
 
@@ -116,16 +113,6 @@ async def post(conn: Connection, path: str, *, json_body: Dict[str, Any], timeou
         return _answered(conn, await client.post(target, headers=headers(conn), json=json_body, timeout=timeout))
 
 
-async def entity_state(conn: Connection, entity_id: str, timeout: float = 6.0) -> Optional[Dict[str, Any]]:
-    """The state object of ``entity_id`` (None when it cannot be read)."""
-    try:
-        r = await get(conn, f"/api/states/{addresses.segment(entity_id)}", timeout=timeout)
-    except Exception as e:
-        logger.warning(f"[HA] state of {entity_id} failed: {e}")
-        return None
-    return r.json() if r.status_code == 200 else None
-
-
 async def fetch_states(conn: Connection, timeout: float = 15.0) -> List[Dict[str, Any]]:
     """Every state object (``/api/states``).
 
@@ -163,40 +150,6 @@ async def cached_states(conn: Connection) -> List[Dict[str, Any]]:
 def forget_cached_states(conn: Connection) -> None:
     """The next :func:`cached_states` asks Home Assistant again (after a service call)."""
     _states_cache.pop(signature(conn), None)
-
-
-async def history(conn: Connection, entity_id: str, since_utc: datetime.datetime,
-                  until_utc: datetime.datetime) -> Optional[List[Dict[str, Any]]]:
-    """State changes of ``entity_id`` in [since, until] (minimal rows:
-    ``state``, ``last_changed``); None when Home Assistant cannot be asked."""
-    try:
-        r = await get(conn, f"/api/history/period/{addresses.segment(since_utc.isoformat())}",
-                      params={"filter_entity_id": entity_id, "end_time": until_utc.isoformat(),
-                              "minimal_response": "", "no_attributes": ""}, timeout=10.0)
-        if r.status_code != 200:
-            logger.warning(f"[HA] history of {entity_id} returned {r.status_code}")
-            return None
-        body = r.json()
-    except Exception as e:
-        logger.warning(f"[HA] history of {entity_id} failed: {e}")
-        return None
-    return (body or [[]])[0] if body else []
-
-
-async def forecast(conn: Connection, entity_id: str) -> Optional[Dict[str, Any]]:
-    """Today's daily forecast of weather entity ``entity_id`` (``weather.get_forecasts``)."""
-    try:
-        r = await post(conn, "/api/services/weather/get_forecasts",
-                       json_body={"entity_id": entity_id, "type": "daily"}, timeout=6.0, flag="return_response")
-        if r.status_code != 200:
-            return None
-        body = r.json()
-    except Exception as e:
-        logger.debug(f"[HA] forecast of {entity_id} failed: {e}")
-        return None
-    resp = body.get("service_response", body) if isinstance(body, dict) else {}
-    days = ((resp or {}).get(entity_id) or {}).get("forecast") or []
-    return days[0] if days else None
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +194,7 @@ async def authenticate(ws: Any, conn: Connection) -> None:
     await ws.recv()  # auth_required
     await ws.send(json.dumps({"type": "auth", "access_token": token(conn)}))
     if json.loads(await ws.recv()).get("type") != "auth_ok":
-        store.needs_reconnect(conn.user, ADDON, f"{REFUSED} when Dana signed in to watch your home.")
+        store.needs_reconnect(conn.user, ADDON, f"{REFUSED} when Dana signed in to read your home.")
         raise PermissionError("Home Assistant authentication failed. Check the connection's token.")
     store.reconnected(conn.user, ADDON)
 
@@ -295,29 +248,6 @@ async def fetch_registry(conn: Connection) -> Tuple[Set[str], Dict[str, Dict[str
             }
 
     return exposed_ids, registry_map
-
-
-# ---------------------------------------------------------------------------
-# The server's timezone (core/clock.py)
-# ---------------------------------------------------------------------------
-
-def timezone_of(user: User) -> Optional[str]:
-    """The ``time_zone`` of ``user``'s Home Assistant (``/api/config``; None
-    without the addon or when it cannot be read). Blocking: core/clock.py asks
-    it once at startup, for the first admin."""
-    conn = store.get(user, ADDON)
-    if conn is None:
-        return None
-    try:
-        r = httpx.get(url(conn, "/api/config"), headers=headers(conn), timeout=3.0)
-        if r.status_code == 200:
-            return r.json().get("time_zone")
-    except Exception as e:
-        logger.warning(f"Failed to fetch timezone from Home Assistant: {e}")
-    return None
-
-
-clock.set_home_assistant_zone(timezone_of)
 
 
 # ---------------------------------------------------------------------------

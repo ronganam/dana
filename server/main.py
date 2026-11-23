@@ -62,8 +62,7 @@ async def main():
         sys.exit(1)
     # What each addon prepares for its users at start (default lists, prompt
     # blocks…) runs as its at_start jobs once the web server listens.
-    # Resolve the user's timezone up front (may query Home Assistant) so it is
-    # never resolved lazily with a blocking call inside the event loop.
+    # Resolve the server's timezone up front (logs where it came from).
     clock.get_timezone()
     
     # 1. Each user's addons and the first admin's tools (every addon loaded on import: core/addons/loader.py)

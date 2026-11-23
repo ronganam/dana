@@ -80,14 +80,14 @@ misconfigured URL cannot reach a real service.
 
 | Port | Stands in for | Notes |
 |---|---|---|
-| 8123 | Home Assistant A (the first admin's) | `testfakes.FakeHA`: REST states / services / history / config, WebSocket auth + `subscribe_entities`; the entities `bin/local-env.sh` connects |
+| 8123 | Home Assistant A (the first admin's) | `testfakes.FakeHA`: REST states / services / config, WebSocket auth + the exposed entities; the entities `bin/local-env.sh` connects |
 | 8124 | Home Assistant B (the second test user's) | another token, other entities and zones |
 | 3000 | WAHA | `testfakes.FakeWAHA`: sessions `default` (account `972500000001@c.us`) and `maya` (`972500000002@c.us`), contacts, chats, send, media; records what was sent |
 | 5000 | Frigate | events, activity, previews, clips, WebRTC, version |
 | 9100 | the model provider | OpenAI-compatible: streamed and plain chat, structured output (the minimal instance of the schema; the shopping aisle lookup gets an aisle per item from common English and Hebrew grocery words, else `pantry`), audio transcription. LiteLLM reaches it as `openai/…` models through `OPENAI_API_BASE`. Agent turns (requests with tools) get scripted replies, else "Done." |
 | 8081 | Telegram Bot API | getUpdates long polling fed by the control API, sendMessage etc. recorded. The app points aiogram at it with `TELEGRAM_API_BASE` (`docs/configuration.md`) |
 | 8095 | ntfy (a UnifiedPush server) | records each ping Dana POSTs to an endpoint (`http://stubs:8095/<topic>`: topic, body, `TTL`); topics starting `gone-` answer 404. The phones in the rehearsal register UnifiedPush endpoints here (plain http, allowed by `DANA_INSECURE_DEV=1` in the env file) |
-| 9000 | control API | `POST /ha/{a,b}/state {entity_id, state, attributes?}` (pushes the change to subscribers), `GET /ha/{a,b}/log`, `GET /waha/log`, `GET /frigate/log`, `POST /llm/script [{match, reply: {text} \| {tool: {name, args}} \| {tools: [...]}, reasoning?}]`, `GET /llm/requests?match=` (system message, tool names, conversation of every model call), `POST /llm/transcript {text}`, `POST /telegram/message {from_id, chat_id?, text}`, `POST /telegram/callback`, `GET /telegram/log`, `GET /ntfy/log`, `POST /reset` (forget the records) |
+| 9000 | control API | `GET /ha/{a,b}/log`, `GET /waha/log`, `GET /frigate/log`, `POST /llm/script [{match, reply: {text} \| {tool: {name, args}} \| {tools: [...]}, reasoning?}]`, `GET /llm/requests?match=` (system message, tool names, conversation of every model call), `POST /llm/transcript {text}`, `POST /telegram/message {from_id, chat_id?, text}`, `POST /telegram/callback`, `GET /telegram/log`, `GET /ntfy/log`, `POST /reset` (forget the records) |
 
 Not stubbed: **Google Calendar** (unreachable: calendar reads come back empty,
 `POST /api/addons/calendar/test` answers `ok: false`), **FCM** (not
@@ -158,9 +158,8 @@ share is an invitation on her screen and phone and leaves her list alone,
 `use` with moving her items and its single undo, the admin's event stream
 seeing her change, typed text moved to its aisles by the model stub's answer
 — the run writes real payloads to `.state/shopping-examples.json` — and
-unsharing); the Home
-Assistant watcher (zones and car per user, a flap, a settings change, a
-disconnect); WAHA inbound routing by account and the internal-host rule; phone
+unsharing); reminders from the phone's signals (zones and car per user,
+another user's zone refused, a flap, a disconnect of her Home Assistant); WAHA inbound routing by account and the internal-host rule; phone
 events and notifications per user; push through UnifiedPush (each paired phone
 registers an endpoint on the ntfy stub, FCM refused without its key, a test
 push reaches only her endpoint with `{seq, type}`, devices list only the
@@ -208,7 +207,7 @@ Possible, and not done by the script for you. Read all of this first.
    provider is OpenAI. It needs a route out: `DANA_LOCAL_EGRESS=1`
    (`compose.egress.yaml`). **With egress the app can reach everything its
    addons point at**: a post-upgrade copy with the real key talks to
-   the real Home Assistant, WAHA, Google and Frigate (and runs the watchers,
+   the real Home Assistant, WAHA, Google and Frigate (and runs the
    briefings and reminders against them). Before turning egress on, repoint
    or disconnect those connections with `docker exec -i dana-local-app-1
    python bin/dana addons update|disconnect …` while egress is

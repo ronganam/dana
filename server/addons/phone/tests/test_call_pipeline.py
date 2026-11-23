@@ -38,9 +38,6 @@ addons_bootstrap.bootstrap()  # the first admin's default addons
 testenv.connect_admin("calendar", credentials={"refresh_token": "test-refresh-token"})  # Google is mocked
 OWNER = users.first_admin()
 ensure_default_groups_for_everyone()
-from core.addons import store  # noqa: E402
-# The first admin has Home Assistant (location triggers need it); its client is mocked below.
-store.connect(OWNER, "homeassistant", credentials={"host": "http://ha.invalid", "token": "test-ha"})
 from core import sessions_api
 from addons.phone import api as phone_api
 from addons.phone.calls import api as calls_api

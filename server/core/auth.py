@@ -87,7 +87,7 @@ _PUBLIC_PREFIXES = ("/static/", "/api/app/download/")
 _SETUP_PATHS = frozenset({"/setup", "/api/setup", "/api/setup/admin", "/api/health", "/sw.js", "/manifest.json"})
 
 # Inbound webhooks reachable without credentials: the handler verifies the
-# sender's signature (WAHA; Home Assistant posts nothing: Dana watches it).
+# sender's signature (WAHA).
 INBOUND_PATHS = frozenset({"/webhook/waha"})
 
 # Paths answered with 401 rather than a redirect to the login page.

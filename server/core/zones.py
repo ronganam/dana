@@ -5,7 +5,7 @@ by one user (table ``zones``, core migration ``m0006_zones_wizard``). The zone
 with ``is_home`` is the user's Home (at most one). Names are unique per user,
 in any case; location reminders (the tasks addon) name a zone, and the
 reminder fires when that user arrives at or leaves it (the ``location``
-signal: the phone's geofences or their Home Assistant, core/signals.py).
+signal: the phone's geofences, core/signals.py).
 
 Every change (create, update, delete, set Home, an import that added any) is
 emitted as ``core.zones.changed`` for the user (no data); the phone addon

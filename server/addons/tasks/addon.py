@@ -7,7 +7,7 @@ from addons.tasks import groups
 addon = Addon(
     "tasks", order=20, default_on=True,
     web=(Page("tasks", panel="tasks.js", style="tasks.css", nav=Nav("Tasks", icon="check-square", order=5, primary=True)),), llm_jobs={"task_emoji": LlmJob("fast", "Task emoji"), "task_group": LlmJob("fast", "Task grouping")}, title="Tasks", icon="list-checks",
-    needs=(Need("app", "Dana's phone app, or Home Assistant", "Reminders when you arrive at a place, leave it, get in the car or wake up", optional=True),
+    needs=(Need("app", "Dana's phone app", "Reminders when you arrive at a place, leave it, get in the car or wake up", optional=True),
            Need("addon", "phone", "Reminders as notifications on your phone", optional=True)),
     touches=Touches(reads=("people", "phone")),
     description="Task lists, reminders and their triggers",

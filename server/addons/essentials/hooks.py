@@ -1,9 +1,8 @@
 """What every user gets from the essentials addon beyond its tools:
 
 - the ``weather`` provider (rank 10, source ``open_meteo``): Open-Meteo at
-  their Home zone (addons/essentials/weather.py), asked before Home
-  Assistant's weather entity; and the ``signal.weather`` source for it
-  (docs/signals.md);
+  their Home zone (addons/essentials/weather.py); and the
+  ``signal.weather`` source for it (docs/signals.md);
 - the morning briefing's ``weather`` section, from whichever weather
   provider answers first (``core.briefing.weather``);
 - the dashboard widgets every user has (docs/dashboard.md): the clock with

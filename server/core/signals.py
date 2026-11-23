@@ -4,10 +4,10 @@ A signal is one kind of fact: ``wake``, ``screen``, ``car``, ``location``,
 ``sleep``, ``weather``. Its sources are the addons that declare
 ``@addon.provide("signal.<name>", rank=, source=, label=)``: a plain function
 ``f(user) -> str`` that says what is missing before that source can deliver
-the signal for the user ("" when it can). Ranked lower ``rank`` first: Dana's
-phone app (``phone``, rank 10) before Home Assistant (``homeassistant``,
-rank 50); weather's Open-Meteo (essentials, rank 10) before Home Assistant's
-weather entity. A user has only the sources of the addons active for them.
+the signal for the user ("" when it can). Ranked lower ``rank`` first. The
+shipped sources: Dana's phone app (``phone``, rank 10) for wake, screen, car,
+location and sleep; Open-Meteo (essentials, rank 10) for weather. A user has
+only the sources of the addons active for them.
 
 Each delivery is recorded per user, signal and source (``signal_sources``:
 when, and a short word such as "unlock" or "arrive Home"; the last one only,
@@ -18,8 +18,8 @@ set up.
 
 Event signals (``wake``, ``car``, ``location``, ``sleep``) go through
 :func:`deliver`: an event from a source is ignored while a higher-ranked
-source is recent for that user (still recorded), so Home Assistant and the
-phone never both fire a reminder. An accepted ``car`` / ``location`` event is
+source is recent for that user (still recorded), so two sources never both
+fire a reminder. An accepted ``car`` / ``location`` event is
 emitted as ``core.signal.car`` (``action``: enter | leave, ``source``,
 ``late``) / ``core.signal.location`` (``action``: arrive | leave, ``target``:
 the zone's name, ``source``, ``late``); ``late`` marks an event that happened

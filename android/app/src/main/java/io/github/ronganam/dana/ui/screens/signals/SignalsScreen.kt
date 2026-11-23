@@ -107,7 +107,7 @@ fun SignalsScreen(viewModel: MainViewModel, onBack: () -> Unit) {
         ) {
             Text(
                 "When you wake up, get in the car or arrive somewhere, reminders and your briefing follow. " +
-                    "Each signal comes from the first source that has it: Dana's phone app, then Home Assistant when it's connected.",
+                    "They come from Dana's phone app; the weather comes from Open-Meteo for your Home zone.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(vertical = 8.dp)

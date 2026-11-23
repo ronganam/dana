@@ -42,20 +42,18 @@
        "why_not": null
       }
      ],
-     "description": "Lights, devices and the TV, reminders when you arrive or get in the car",
+     "description": "Lights, devices and the TV, and which room each one is in",
      "disconnect_warning": null,
      "everyone": false,
      "examples": [
       "Turn off the living room lights",
-      "Remind me to take out the trash when I get home",
+      "Which lights are on?",
       "Is the gate open?"
      ],
      "features": [
       "Turn lights, the AC, gates and other devices on and off",
-      "Reminders when you arrive at a place, leave it or get in the car",
       "Knows which devices are in which room",
-      "Controls the TV",
-      "The weather for your morning briefing"
+      "Controls the TV"
      ],
      "icon": "house",
      "name": "homeassistant",
@@ -64,19 +62,13 @@
        "kind": "hardware",
        "optional": false,
        "what": "a Home Assistant server Dana's server can reach",
-       "why": "Lights, devices, zones and the weather come from it"
+       "why": "Lights, devices and rooms come from it"
       },
       {
        "kind": "account",
        "optional": false,
        "what": "a Home Assistant long-lived access token",
        "why": "Dana signs in to Home Assistant with it"
-      },
-      {
-       "kind": "app",
-       "optional": true,
-       "what": "the Home Assistant phone app",
-       "why": "Arrive, leave, car and wake reminders use its sensors"
       }
      ],
      "options": true,
@@ -99,62 +91,6 @@
       {
        "can_change": true,
        "default": null,
-       "description": "The user's person entity: zone enter / leave triggers",
-       "help": "Your person in Home Assistant (Settings → People), for reminders when you arrive or leave.",
-       "label": "You in Home Assistant",
-       "name": "person",
-       "placeholder": "person.noa",
-       "rule": null,
-       "type": "text",
-       "url": null,
-       "value": null,
-       "why_not": null
-      },
-      {
-       "can_change": true,
-       "default": null,
-       "description": "The phone's Bluetooth connection sensor: car enter / leave triggers",
-       "help": "From the Home Assistant phone app, for reminders when you get in the car.",
-       "label": "Phone's Bluetooth sensor",
-       "name": "car_sensor",
-       "placeholder": "sensor.pixel_bluetooth_connection",
-       "rule": null,
-       "type": "text",
-       "url": null,
-       "value": null,
-       "why_not": null
-      },
-      {
-       "can_change": true,
-       "default": null,
-       "description": "The car's Bluetooth name, as it shows in that sensor's connected_paired_devices",
-       "help": "The name your car has in your phone's Bluetooth list.",
-       "label": "Car's Bluetooth name",
-       "name": "car_device",
-       "placeholder": "My Car",
-       "rule": null,
-       "type": "text",
-       "url": null,
-       "value": null,
-       "why_not": null
-      },
-      {
-       "can_change": true,
-       "default": null,
-       "description": "Phone screen-on (interactive) binary sensor: confirms the wake signal",
-       "help": "From the Home Assistant phone app; tells Dana you are awake.",
-       "label": "Phone's screen-on sensor",
-       "name": "phone_interactive_sensor",
-       "placeholder": "binary_sensor.pixel_interactive",
-       "rule": null,
-       "type": "text",
-       "url": null,
-       "value": null,
-       "why_not": null
-      },
-      {
-       "can_change": true,
-       "default": null,
        "description": "Phone battery level sensor (a dashboard's Batteries widget when it names none)",
        "help": "From the Home Assistant phone app; shown on dashboards.",
        "label": "Phone's battery sensor",
@@ -164,34 +100,6 @@
        "type": "text",
        "url": null,
        "value": null,
-       "why_not": null
-      },
-      {
-       "can_change": true,
-       "default": null,
-       "description": "The phone's mobile_app notify service suffix (reported by /api/client-config)",
-       "help": "Set by the Dana phone app; change it only if it is wrong.",
-       "label": "Phone's notify service",
-       "name": "phone_notify_service",
-       "placeholder": "mobile_app_pixel",
-       "rule": null,
-       "type": "text",
-       "url": null,
-       "value": null,
-       "why_not": null
-      },
-      {
-       "can_change": true,
-       "default": "weather.forecast_home",
-       "description": "Weather entity for the wake briefing and the Now screen",
-       "help": "The weather entity your forecast comes from (Settings → Devices & services).",
-       "label": "Weather",
-       "name": "weather_entity",
-       "placeholder": "weather.forecast_home",
-       "rule": null,
-       "type": "text",
-       "url": null,
-       "value": "weather.forecast_home",
        "why_not": null
       },
       {
@@ -391,7 +299,7 @@
         },
         {
          "label": "Mon",
-         "ok": null,
+         "ok": false,
          "value": "–"
         }
        ],
@@ -401,8 +309,7 @@
       {
        "items": [
         "Wake window 05:00–12:00",
-        "Dana's phone app: no wake signal yet",
-        "Home Assistant: no wake signal yet (Set phone_interactive_sensor in the Home Assistant addon)"
+        "Dana's phone app: no wake signal yet"
        ],
        "label": "Signals",
        "type": "facts"
@@ -422,16 +329,16 @@
     {
      "addon": null,
      "blocks": [],
-     "detail": "not due yet",
+     "detail": "not made today",
      "fix": null,
      "ignored_until": null,
      "key": "briefing",
      "label": "Morning briefing",
-     "ok": true,
+     "ok": false,
      "server": false,
      "since": null,
-     "title": "",
-     "why": ""
+     "title": "No briefing today",
+     "why": "The 10:00 fallback didn't run; the server may be stuck."
     },
     {
      "addon": "phone",
@@ -491,70 +398,6 @@
      "ignored_until": null,
      "key": "calls",
      "label": "Call recordings",
-     "ok": true,
-     "server": false,
-     "since": null,
-     "title": "",
-     "why": ""
-    },
-    {
-     "addon": "homeassistant",
-     "blocks": [],
-     "detail": "never received",
-     "fix": {
-      "addon": "homeassistant",
-      "kind": "connect",
-      "label": "Reconnect"
-     },
-     "ignored_until": null,
-     "key": "location",
-     "label": "Location updates",
-     "ok": false,
-     "server": false,
-     "since": null,
-     "title": "No location updates received yet",
-     "why": "Reminders for arriving at or leaving places won't fire."
-    },
-    {
-     "addon": "homeassistant",
-     "blocks": [],
-     "detail": "never received",
-     "fix": {
-      "addon": "homeassistant",
-      "kind": "connect",
-      "label": "Reconnect"
-     },
-     "ignored_until": null,
-     "key": "car",
-     "label": "Car updates",
-     "ok": false,
-     "server": false,
-     "since": null,
-     "title": "No car updates received yet",
-     "why": "In-the-car reminders won't fire."
-    },
-    {
-     "addon": "homeassistant",
-     "blocks": [],
-     "detail": "nothing selected",
-     "fix": null,
-     "ignored_until": null,
-     "key": "ha_entities",
-     "label": "Home Assistant entities",
-     "ok": true,
-     "server": false,
-     "since": null,
-     "title": "",
-     "why": ""
-    },
-    {
-     "addon": "homeassistant",
-     "blocks": [],
-     "detail": "nothing to watch",
-     "fix": null,
-     "ignored_until": null,
-     "key": "ha_watcher",
-     "label": "Home Assistant connection",
      "ok": true,
      "server": false,
      "since": null,

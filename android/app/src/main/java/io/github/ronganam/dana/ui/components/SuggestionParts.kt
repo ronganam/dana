@@ -562,7 +562,7 @@ fun SuggestionEditSheet(
     var carEvent by rememberSaveable(suggestion.id) { mutableStateOf(if (suggestion.triggers.car == "leave") "leave" else "enter") }
     var wakeOn by rememberSaveable(suggestion.id) { mutableStateOf(suggestion.triggers.wake == true) }
     val context = LocalContext.current
-    // Zones (Home, Work, …) come from Home Assistant; fall back to the last cached list.
+    // The user's Dana zones (Home, Work, …); fall back to the last cached list.
     var zones by remember { mutableStateOf(Zones.cached(context)) }
     LaunchedEffect(Unit) { zones = Zones.fetch(context.applicationContext) }
     // Events: shown as "YYYY-MM-DD HH:MM", sent back as "YYYY-MM-DDTHH:MM:00".

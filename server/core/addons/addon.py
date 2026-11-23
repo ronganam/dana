@@ -286,8 +286,8 @@ class Addon:
             credentials (another address or account: ``whatsapp`` learns its
             account again); a failure is logged and does not undo the change.
         on_change: Called with the user right after any connect, update or
-            disconnect of the addon for them (``homeassistant``: reconcile the
-            entity watchers now); a failure is logged.
+            disconnect of the addon for them (``money``: delete the user's
+            money data once it is disconnected); a failure is logged.
         prompt_section: The addon's section of the agent's system prompt for
             a user (``about``: their facts), asked on every turn through
             :func:`core.addons.registry.prompt_section` only while

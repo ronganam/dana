@@ -52,9 +52,6 @@ OWNER = users.first_admin()
 ensure_default_groups_for_everyone()
 from core.addons import store  # noqa: E402
 from addons.shopping import lists as shopping_lists  # noqa: E402
-from addons.homeassistant import status as ha_status  # noqa: E402
-# The first admin has Home Assistant (location triggers need it); its client is mocked.
-store.connect(OWNER, "homeassistant", credentials={"host": "http://ha.invalid", "token": "test-ha"})
 store.connect(OWNER, "money")  # every check applies to them (no bank added: the money check is ok)
 from addons.phone import api as phone_api
 from addons.phone.notifications import api as notifications_api
@@ -318,10 +315,6 @@ def seed():
                      "VALUES (?, 'main', '[]', ?, 'waiting_approval', 'Dana', CURRENT_TIMESTAMP)",
                      (OWNER.id, json.dumps({"status": "pending_approval", "tool_name": "send_whatsapp_message",
                                   "tool_args": {"chat_id": "Gal", "text": "on my way"}, "user_text": "tell Gal I'm late"}),))
-        # Signals for the checks: the watched person entity and car sensor changed (as the watcher marks it).
-        for role, at in (("person", NOW - datetime.timedelta(hours=1)), ("car", NOW - datetime.timedelta(days=1))):
-            conn.execute("INSERT OR REPLACE INTO system_marks (key, last_at, ok, detail) VALUES (?, ?, 1, '')",
-                         (f"ha_event:{OWNER.id}:{role}", at.astimezone(UTC).isoformat()))
         # The last confirmed wake: 4 days ago.
         conn.execute("INSERT INTO wake_log (user_id, date, at, why) VALUES (?, ?, ?, 'unlock')",
                      (OWNER.id, (NOW.date() - datetime.timedelta(days=4)).isoformat(),
@@ -489,7 +482,7 @@ async def main():
               wake["primary"] == {"action": "open", "label": "Details", "client": True}
               and wake["secondary"][0] == {"action": "ignore", "label": "Ignore for a week", "args": {"days": 7}})
         check("check: healthy signals make no card",
-              not any(item(p, f"check:{k}") for k in ("location", "car", "push", "notification_sync")),
+              not any(item(p, f"check:{k}") for k in ("push", "notification_sync")),
               [i["id"] for i in p["items"] if i["kind"] == "check"])
 
         rev = item(p, f"review:{IDS['review']}")
@@ -997,25 +990,20 @@ async def main():
               set(cs) == set(checks.all_keys()) and all({"label", "ok", "detail", "since"} <= set(c) for c in cs.values()), cs)
         check("checks: push ok after pings", cs["push"]["ok"] and cs["push"]["detail"].startswith("Last check-in"), cs["push"])
         check("checks: notification sync ok after a batch", cs["notification_sync"]["ok"], cs["notification_sync"])
-        check("checks: location + car ok", cs["location"]["ok"] and cs["car"]["ok"], (cs["location"], cs["car"]))
         check("checks: wake not ok, 'quiet for 4 days'", not cs["wake"]["ok"] and cs["wake"]["detail"] == "quiet for 4 days",
               cs["wake"])
         check("checks: calendar read ok", cs["calendar"]["ok"], cs["calendar"])
         with get_db_connection() as conn:
-            conn.execute("UPDATE system_marks SET last_at = ? WHERE key = ?",
-                         ((NOW - datetime.timedelta(days=5)).astimezone(UTC).isoformat(), f"ha_event:{OWNER.id}:person"))
             conn.execute("INSERT INTO wake_log (user_id, date, at, why) VALUES (?, ?, ?, 'unlock')",
                          (OWNER.id, NOW.date().isoformat(), NOW.isoformat(timespec="seconds")))
             conn.commit()
         seen["calendar_fail"] = True
         await calendar_today.refresh_now(OWNER)
         cs = {c["key"]: c for c in checks.compute()}
-        check("checks: location quiet for 5 days → not ok", not cs["location"]["ok"]
-              and cs["location"]["detail"] == "quiet for 5 days", cs["location"])
         check("checks: wake confirmed today → ok", cs["wake"]["ok"] and cs["wake"]["detail"] == "confirmed today", cs["wake"])
         check("checks: calendar failing → not ok", not cs["calendar"]["ok"], cs["calendar"])
         p = await get_now()
-        check("checks: failing ones become Now cards", item(p, "check:location") and item(p, "check:calendar")
+        check("checks: failing ones become Now cards", item(p, "check:calendar")
               and not item(p, "check:wake"), [i["id"] for i in p["items"] if i["kind"] == "check"])
         check("checks: the calendar's last events are kept for the day strip",
               p["day"]["calendar"] is True)
@@ -1026,19 +1014,14 @@ async def main():
         cs = {c["key"]: c for c in checks.compute()}
         check("checks: no phone registered → push not ok", not cs["push"]["ok"]
               and cs["push"]["detail"] == "No phone registered", cs["push"])
-        # The person entity leaving the zone "Work", as the Home Assistant watcher fires it.
-        from addons.homeassistant import watcher as ha_watcher
+        # Leaving the zone "Work" (a location signal's transition) is stored under the key the refire check reads.
         from addons.tasks import triggers as task_triggers
-        for trigger_type, action, target in ha_watcher.transitions("person", "Work", "not_home"):
-            await task_triggers.fire(OWNER, trigger_type, action=action, target=target)
+        await task_triggers.fire(OWNER, "location", action="leave", target="Work")
         with get_db_connection() as conn:
             keys = {r["key"] for r in conn.execute("SELECT key FROM task_trigger_marks WHERE user_id = ? "
                                                    "AND key LIKE 'last_event_v2_location%work'", (OWNER.id,))}
-        check("watcher: the transition is stored under the key the refire check reads",
+        check("location: the transition is stored under the key the refire check reads",
               keys == {"last_event_v2_location_work", "last_event_v2_location_leave_work"}, keys)
-        ha_status.mark_event(OWNER.id, "person", "person.robin")  # what the watcher records with the transition
-        cs = {c["key"]: c for c in checks.compute()}
-        check("checks: a fresh location transition → location ok again", cs["location"]["ok"], cs["location"])
 
         # --- search ------------------------------------------------------------------------------------
         async def search(q, limit=5):

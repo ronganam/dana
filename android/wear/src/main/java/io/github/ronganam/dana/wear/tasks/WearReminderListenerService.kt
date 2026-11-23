@@ -32,7 +32,7 @@ class WearReminderListenerService : com.google.android.gms.wearable.WearableList
             val taskTitle = alarm.title
             val priority = alarm.priority
             val triggerType = alarm.triggerType
-            // The phone's Home Assistant zones, for the alarm's place snoozes.
+            // The phone's copy of the user's zones, for the alarm's place snoozes.
             alarm.zones?.let { zones ->
                 getSharedPreferences(WearReminderSync.PREFS, MODE_PRIVATE).edit()
                     .putString(WearReminderSync.KEY_ZONES, WearJson.encodeToString(ListSerializer(String.serializer()), zones)).apply()

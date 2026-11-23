@@ -154,5 +154,9 @@ def all_migrations() -> List[Tuple[str, Tuple[Migration, ...]]]:
 
 
 def official_with_migrations() -> List[str]:
-    """The official addons that have migrations (their baselines exist in a converted 9.0 database)."""
-    return [f.name for f in addon_dirs.addon_folders() if f.source.official and discover(f.name, f.migrations)]
+    """The official addons whose first migration is a baseline (their tables
+    exist in a converted 9.0 database). An addon whose first migration is
+    something else (``homeassistant``'s settings clean-up) is not one: a
+    converted database applies it like any other pending migration."""
+    return [f.name for f in addon_dirs.addon_folders() if f.source.official
+            and any(m.version == 1 and m.name == "baseline" for m in discover(f.name, f.migrations))]

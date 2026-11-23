@@ -3,7 +3,6 @@ Assistant for the web UI, the tablet and the TV (docs/dashboard.md).
 
 - ``POST /api/ha/zones/import`` — copy their Home Assistant zones into their Dana zones
   (core/zones.py) → ``{added: [zone], skipped: [name]}``; 502 ``unreachable`` when HA fails
-- ``GET /api/client-config`` — their phone / person entity names (notify service, screen sensor, person)
 - ``GET /api/ha/state/{entity_id}``, ``GET /api/ha/states?ids=|domains=`` (compact tiles)
 - ``POST /api/ha/service {domain, service, entity_id, service_data?}``
 
@@ -42,11 +41,6 @@ async def import_zones_api(request: web.Request) -> web.Response:
                                  status=502)
     added, skipped = zones.import_zones(user, found)
     return web.json_response({"added": [z.to_dict() for z in added], "skipped": skipped})
-
-
-async def client_config_api(request: web.Request) -> web.Response:
-    """GET /api/client-config — the user's phone / person entity names (their Home Assistant settings)."""
-    return web.json_response(ha_config.client_config(_ha_conn(request)))
 
 
 async def ha_entity_state_api(request: web.Request) -> web.Response:
@@ -169,5 +163,4 @@ def setup(app: web.Application) -> None:
     app.router.add_post("/api/ha/zones/import", import_zones_api)
     app.router.add_get("/api/ha/state/{entity_id}", ha_entity_state_api)
     app.router.add_get("/api/ha/states", ha_states_api)
-    app.router.add_get("/api/client-config", client_config_api)
     app.router.add_post("/api/ha/service", ha_call_service_api)

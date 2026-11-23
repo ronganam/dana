@@ -5,15 +5,15 @@ phone's screen was on), `car` (they got in or out of the car), `location` (they 
 zones), `sleep` (a night's sleep ended), `weather` (today's weather where they live). Wake briefings, wake / car /
 place reminders and the weather in the briefing and on Now come from them.
 
-Each signal has **sources**, ranked per user. Dana's phone app (`phone`) comes first, Home Assistant
-(`homeassistant`) next when the user has it connected; for weather, Open-Meteo (`open_meteo`, everyone's, no key)
-before Home Assistant's weather entity. The consumers (the tasks addon, the wake flow, the briefing, Now) take the
-signal and never ask where it came from. A household with no Home Assistant gets all of it from the phone.
+Each signal has **sources**, ranked per user. The shipped ones: Dana's phone app (`phone`) for wake, screen, car,
+location and sleep; Open-Meteo (`open_meteo`, everyone's, no key) for the weather. Any addon may declare another
+source; it is ranked with these. The consumers (the tasks addon, the wake flow, the briefing, Now) take the signal and
+never ask where it came from.
 
 Code: `core/signals.py` (sources, ranking, delivery), `core/signals_api.py` (`GET /api/signals`),
 `core/wake.py` + `core/wake_window.py` (the wake flow and window, `docs/people.md`), `addons/phone/signals.py` (the
 phone's events and screen sessions; `POST /api/signals` in `addons/phone/api.py`), `addons/essentials/weather.py`
-(Open-Meteo), `addons/homeassistant/hooks.py` (Home Assistant's sources). Tables: `signal_sources`, `wake_windows`
+(Open-Meteo). Tables: `signal_sources`, `wake_windows`
 (core migration `m0008_signals`), `phone_screen_sessions`, `phone_signal_keys` (phone migration `m0004_signals`).
 Tests: `bin/test test_signals`; the payload is captured in `tests/fixtures/signals_web.json` (`WRITE_WEB_FIXTURE=1
 bin/test test_signals`), which the Android contract test reads.
@@ -27,11 +27,7 @@ only the sources of the addons active for them.
 | Signal | Sources (rank) | Set up when |
 |---|---|---|
 | `wake`, `screen`, `car`, `location`, `sleep` | `phone` "Dana's phone app" (10) | the user has a paired phone (`docs/devices.md`); `sleep` has no other source |
-| `wake`, `screen` | `homeassistant` (50) | their `phone_interactive_sensor` setting is set |
-| `car` | `homeassistant` (50) | `car_sensor` and `car_device` are set |
-| `location` | `homeassistant` (50) | `person` is set |
 | `weather` | `open_meteo` "Open-Meteo" (10, the essentials addon) | they have a Home zone (`docs/zones.md`) |
-| `weather` | `homeassistant` (50) | `weather_entity` is set |
 
 Every delivery is recorded as the user's `signal_sources` row for that signal and source: when it happened and a short
 word ("unlock", "arrive Home", "enter (bluetooth)", "rainy"). Only the last one is kept: never a track. A source is
@@ -40,11 +36,10 @@ highest-ranked recent one, else the highest-ranked one that is set up.
 
 **Event signals** (`wake`, `car`, `location`, `sleep`) go through `signals.deliver(user, signal, source, ...)`: an
 event from a source is ignored while a higher-ranked source is recent for that user (it is still recorded and shown on
-the overview). So Home Assistant and the phone never both fire a reminder: while the phone delivers places, Home
-Assistant's zone changes are only noted; when the phone has been quiet for 72 h (the app was removed, location access
-was taken away), Home Assistant's are used again. The window is per signal: the phone can be the car source while
-Home Assistant still delivers places. The trigger engine's own refire / flap marks (`docs/tasks-and-triggers.md`)
-drop the odd duplicate at the hand-over.
+the overview). So two sources never both fire a reminder: while the phone delivers places, a lower-ranked source's
+zone changes are only noted; when the phone has been quiet for 72 h, the next source's are used. The window is per
+signal. The trigger engine's own refire / flap marks (`docs/tasks-and-triggers.md`) drop the odd duplicate at the
+hand-over.
 
 An accepted `car` / `location` event is emitted as `core.signal.car` `{action: enter|leave, source, late}` /
 `core.signal.location` `{action: arrive|leave, target: <zone name>, source, late}`; the tasks addon fires the
@@ -54,8 +49,8 @@ the transition is recorded for the refire logic, but no reminder goes out. `wake
 
 **Data signals** are read through ranked providers (`@addon.provide(key, rank=)`, `registry.answer(key, user, ...)`
 asks each in rank order and takes the first that answers, anything but None): `screen_sessions` (the phone's stored
-sessions, None while the phone has sent none for 72 h; then Home Assistant's screen sensor history) and `weather`
-(Open-Meteo, then Home Assistant). The answering source is recorded as that signal's.
+sessions, None while the phone has sent none for 72 h) and `weather` (Open-Meteo). The answering source is recorded
+as that signal's.
 
 ## POST /api/signals (the phone addon's route)
 
@@ -95,17 +90,15 @@ The caller's own overview, for the phone's Signals page and the web:
 {"signals": [
   {"signal": "wake", "sources": [
      {"source": "phone", "label": "Dana's phone app", "active": true,
-      "last_at": "2026-11-22T07:12:03+02:00", "detail": "unlock"},
-     {"source": "homeassistant", "label": "Home Assistant", "active": false,
-      "last_at": null, "detail": ""}]},
+      "last_at": "2026-11-22T07:12:03+02:00", "detail": "unlock"}]},
   {"signal": "screen", "sources": [...]}, {"signal": "car", "sources": [...]},
   {"signal": "location", "sources": [...]}, {"signal": "sleep", "sources": [...]},
-  {"signal": "weather", "sources": [{"source": "open_meteo", "label": "Open-Meteo", ...}, ...]}],
+  {"signal": "weather", "sources": [{"source": "open_meteo", "label": "Open-Meteo", ...}]}],
  "wake_window": {"start": "05:00", "end": "12:00", "learned": false}}
 ```
 
-Every signal, always in that order; `sources` only those this user can have (Home Assistant only with the addon
-connected), highest rank first; `active` the source Dana takes the signal from now; `last_at` the last delivery in the
+Every signal, always in that order; `sources` only those this user can have (the phone only with the `phone` addon),
+highest rank first; `active` the source Dana takes the signal from now; `last_at` the last delivery in the
 server's zone (null: never); `detail` the last delivery's word, or what the source still needs ("Pair Dana's phone app
 (Settings → Devices)", "Set your Home zone (Settings → Zones)") when it never delivered. Clients ignore unknown keys.
 
@@ -118,11 +111,11 @@ The wake window (`core/wake_window.py`) is also in `GET /api/profile`, and set w
 The essentials addon (everyone has it) provides `weather` at rank 10: `GET https://api.open-meteo.com/v1/forecast`
 with the Home zone's latitude and longitude (rounded to 2 places), `current=temperature_2m,weather_code,is_day`,
 `daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max`, `timezone=auto`, `forecast_days=1`. Free,
-no key; the addon's Touches names the host. The answer has Home Assistant's shape: `{condition, temperature, unit,
-high, low, rain_chance}`, the WMO code mapped to Home Assistant's condition words (`sunny` / `clear night`,
+no key; the addon's Touches names the host. The answer is the `weather` provider's shape: `{condition, temperature,
+unit, high, low, rain_chance}`, the WMO code mapped to Home Assistant's condition words, which the clients draw (`sunny` / `clear night`,
 `partlycloudy`, `cloudy`, `fog`, `rainy`, `pouring`, `snowy`, `snowy rainy`, `lightning rainy`, `hail`; anything else
-`exceptional`). Cached per place for 30 min (a failure for 5 min). Without a Home zone, or when Open-Meteo fails, Home
-Assistant's weather entity answers (when connected). `OPEN_METEO_URL` points at another Open-Meteo server (it can run
+`exceptional`). Cached per place for 30 min (a failure for 5 min). Without a Home zone, or when Open-Meteo fails,
+there is no weather. `OPEN_METEO_URL` points at another Open-Meteo server (it can run
 on your own). The briefing's `weather` section is the essentials addon's, from whichever provider answers.
 
 ## Zones on the phone
@@ -142,5 +135,5 @@ The phone registers a geofence per zone (`GET /api/zones`). When a user's zones 
 
 `signals` (core, `core/checks.py`) for a user with reminders or a phone channel: ok when the wake, car and place
 signals each have a source that is set up or delivered recently; otherwise it says plainly what Dana can't tell ("Dana
-can't tell when you wake up, drive or arrive somewhere") and how to fix it (pair the phone app, or connect Home
-Assistant). The facts list the active source of each.
+can't tell when you wake up, drive or arrive somewhere") and how to fix it (pair the phone app). The facts list the
+active source of each.

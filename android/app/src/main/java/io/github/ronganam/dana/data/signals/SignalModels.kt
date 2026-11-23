@@ -57,7 +57,7 @@ data class SignalsPosted(val code: Int, val accepted: Int = 0, val rejected: Lis
     val ok: Boolean get() = code in 200..299
 }
 
-/** One source of a signal (`GET /api/signals`): the phone, Home Assistant, Open-Meteo… */
+/** One source of a signal (`GET /api/signals`): Dana's phone app, Open-Meteo… */
 data class SignalSource(
     val source: String,
     val label: String,

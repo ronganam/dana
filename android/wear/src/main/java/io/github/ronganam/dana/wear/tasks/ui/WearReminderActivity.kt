@@ -552,7 +552,7 @@ private fun SnoozeMarker(o: WearSnooze, tint: Color, size: Dp) {
     }
 }
 
-/** A recognisable icon for a Home Assistant zone name (English or Hebrew). */
+/** A recognisable icon for a zone name (English or Hebrew). */
 private fun zoneIcon(zone: String): ImageVector {
     val z = zone.lowercase()
     return when {

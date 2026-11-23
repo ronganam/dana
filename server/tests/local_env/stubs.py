@@ -44,23 +44,16 @@ HA_B_TOKEN = "local-ha-token-b"
 WAHA_KEY = "local-waha-key"
 ADMIN_ACCOUNT = "972500000001@c.us"   # WhatsApp account of session "default" (the first admin's)
 MEMBER_ACCOUNT = "972500000002@c.us"  # WhatsApp account of session "maya" (the second test user's)
-CAR_DEVICE_A = "CarKit-1234"     # the first admin's car (bootstrap.py's import default)
-CAR_DEVICE_B = "Maya Car"
 
 
 def _ha_a() -> FakeHA:
-    """The first admin's Home Assistant: the entities the env import names
-    (PRIMARY_PERSON etc. from the generated env file, the car sensor default)."""
+    """The first admin's Home Assistant: their entities, zones, battery sensor and devices."""
     return FakeHA("A", HA_A_TOKEN, {
         "person.robin": ("home", {"friendly_name": "Robin"}),
-        "person.robin_alt": ("home", {"friendly_name": "Robin (second tracker)"}),
         "zone.home": ("0", {"friendly_name": "Home", "latitude": 32.08, "longitude": 34.78, "radius": 100}),
         "zone.work": ("0", {"friendly_name": "Work", "latitude": 32.1, "longitude": 34.8, "radius": 150}),
         "zone.office": ("0", {"friendly_name": "Office", "latitude": 32.11, "longitude": 34.81, "radius": 50}),
-        "sensor.pixel_8_bluetooth_connection": ("0", {"connected_paired_devices": "[]"}),
-        "binary_sensor.robin_phone_interactive": ("off", {}),
-        "sensor.robin_phone_battery": ("80", {"unit_of_measurement": "%"}),
-        "weather.forecast_home": ("sunny", {"temperature": 24}),
+        "sensor.robin_phone_battery": ("80", {"unit_of_measurement": "%", "device_class": "battery"}),
         "light.living_room": ("off", {"friendly_name": "Living room light"}),
         "cover.gate": ("closed", {"friendly_name": "Gate"}),
     }, exposed={"light.living_room": "Living room light", "cover.gate": "Gate"}, tz=TZ)
@@ -72,8 +65,7 @@ def _ha_b() -> FakeHA:
         "person.maya": ("home", {"friendly_name": "Maya"}),
         "zone.home": ("0", {"friendly_name": "Home", "latitude": 31.77, "longitude": 35.21, "radius": 100}),
         "zone.gym": ("0", {"friendly_name": "Gym", "latitude": 31.78, "longitude": 35.22, "radius": 80}),
-        "sensor.maya_phone_bluetooth_connection": ("0", {"connected_paired_devices": "[]"}),
-        "weather.forecast_home": ("rainy", {"temperature": 15}),
+        "media_player.maya_tv": ("off", {"friendly_name": "Maya's TV"}),
         "light.maya_lamp": ("off", {"friendly_name": "Maya's lamp"}),
     }, exposed={"light.maya_lamp": "Maya's lamp"}, tz=TZ)
 
@@ -462,9 +454,7 @@ class Stubs:
         r = app.router
         r.add_get("/health", lambda req: web.json_response({"ok": True}))
         r.add_post("/reset", self.reset)
-        r.add_post("/ha/{which}/state", self.ha_state)
         r.add_get("/ha/{which}/log", self.ha_log)
-        r.add_post("/ha/{which}/drop", self.ha_drop)
         r.add_get("/waha/log", self.waha_log)
         r.add_get("/frigate/log", self.frigate_log)
         r.add_post("/llm/script", self.llm_script)
@@ -481,7 +471,6 @@ class Stubs:
         for ha in self.ha.values():
             ha.requests.clear()
             ha.service_calls.clear()
-            ha.subscriptions.clear()
         self.waha.requests.clear()
         self.waha.sent.clear()
         self.frigate.requests.clear()
@@ -500,23 +489,12 @@ class Stubs:
             raise web.HTTPNotFound()
         return self.ha[which]
 
-    async def ha_state(self, request: web.Request) -> web.Response:
-        body = await request.json()
-        ha = self._ha(request)
-        await ha.set_state(body["entity_id"], str(body["state"]), body.get("attributes"))
-        return web.json_response(ha.states[body["entity_id"]])
-
     async def ha_log(self, request: web.Request) -> web.Response:
         ha = self._ha(request)
         return web.json_response({
             "requests": [{"path": p, "token_ok": t == ha.token} for p, t in ha.requests],
             "service_calls": [{"service": s, "data": d} for s, d in ha.service_calls],
-            "subscriptions": ha.subscriptions, "subscribers": len(ha.subs),
             "states": {eid: s["state"] for eid, s in ha.states.items()}})
-
-    async def ha_drop(self, request: web.Request) -> web.Response:
-        await self._ha(request).drop_connections()
-        return web.json_response({"ok": True})
 
     async def waha_log(self, request: web.Request) -> web.Response:
         return web.json_response({"requests": [{"method": m, "path": p, "key_ok": k == WAHA_KEY, "session": s}
