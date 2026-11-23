@@ -1,18 +1,22 @@
 package io.github.ronganam.dana.ui.shell.destinations
 
+import android.content.Intent
 import androidx.compose.runtime.*
+import androidx.core.net.toUri
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import io.github.ronganam.dana.data.models.NowAction
 import io.github.ronganam.dana.data.models.NowItem
+import io.github.ronganam.dana.data.network.ServerConfig
 import io.github.ronganam.dana.data.notifications.PhoneNotificationActions
 import io.github.ronganam.dana.ui.screens.now.NowHandlers
 import io.github.ronganam.dana.ui.screens.now.NowListActions
 import io.github.ronganam.dana.ui.screens.now.NowListPane
 import io.github.ronganam.dana.ui.screens.now.NowListState
 import io.github.ronganam.dana.ui.screens.now.NowModel
+import io.github.ronganam.dana.ui.screens.now.NowWebLink
 import io.github.ronganam.dana.ui.screens.now.NowStage
 import io.github.ronganam.dana.ui.shell.DayItem
 import io.github.ronganam.dana.ui.shell.DaySlot
@@ -191,7 +195,16 @@ private fun perform(
         "open" -> openClient(item)
         // Reply happens in the reply box under the evidence; without one (gone from the shade) open the app.
         "reply" -> if (PhoneNotificationActions.replyButton(item.notification?.key) != null) expand(item) else openClient(item)
-        else -> expand(item)
+        else -> {
+            // A fix the phone has no screen for (reconnect an addon, a web screen, a link): the web app does it.
+            val ctx = viewModel.getApplication<android.app.Application>()
+            val target = NowWebLink.target(ServerConfig.load(ctx).url, action)
+            val opened = target != null && runCatching {
+                ctx.startActivity(Intent(Intent.ACTION_VIEW, target.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.isSuccess
+            if (!opened) expand(item)
+        }
     }
 }
 

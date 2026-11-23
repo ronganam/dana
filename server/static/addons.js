@@ -1180,6 +1180,8 @@
       window.danaSwitchTab?.("addons");
     },
   };
-  if (location.hash === "#addons") setTimeout(() => window.danaSwitchTab?.("addons"), 0);
+  const linked = /^#addons\/([a-z][a-z0-9_-]*)$/.exec(location.hash);  // a phone's Reconnect: one addon's view
+  if (linked) setTimeout(() => window.DanaAddons.openAddon(linked[1]), 0);
+  else if (location.hash === "#addons") setTimeout(() => window.danaSwitchTab?.("addons"), 0);
   else setTimeout(firstRun, 0);
 })();

@@ -199,7 +199,7 @@ A check may carry a **fix**: the one button that fixes it (`core/addons/hooks.py
 | `url` | `url` (https) | opens the link in a new tab |
 | `server` | `action` | `POST /api/checks/{key}/fix {fix: action}`: the check's addon carries it out (`@addon.fix(key)`, `async def f(user, action) -> str`) for that user only, as them, and only while the check fails for them and offers that action; its words come back as `message`; refusing raises `ValueError` (409) |
 
-On Now a fix is the card's primary (`connect` / `screen` / `url` as client actions with `args` `{addon}` / `{screen}` / `{url}`; `server` as `fix {fix: action}`, with "Details" moved to the secondary actions). Phone's `push` check: "No phone registered" opens Devices, "Push to the phone is failing" offers "Send a test push" (`server`, action `test`: a test notification to the caller's phones, which fixes the check when it is accepted); money's `money` check opens Money.
+On Now a fix is the card's primary (`connect` / `screen` / `url` as client actions with `args` `{addon}` / `{screen}` / `{url}`; `server` as `fix {fix: action}`, with "Details" moved to the secondary actions). The web app does the client ones itself; the phone app opens them in the browser on the web app (`connect` → `/#addons/<addon>`, the Addons page on that addon; `screen` → `/<screen>`; `url` → the https address), since it has no connect flows of its own. Phone's `push` check: "No phone registered" opens Devices, "Push to the phone is failing" offers "Send a test push" (`server`, action `test`: a test notification to the caller's phones, which fixes the check when it is accepted); money's `money` check opens Money.
 
 ### Reconnect
 
