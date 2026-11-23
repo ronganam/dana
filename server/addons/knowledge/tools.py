@@ -163,7 +163,8 @@ async def list_projects(conn: Connection, status: Optional[str] = None) -> str:
         return f"Error listing projects: {e}"
 
 
-@addon.tool()
+# Entry titles and previews can come from outside (a linked page's or video's title, a received file's name).
+@addon.tool(untrusted_result=True)
 async def list_project_entries(conn: Connection, project_id: str, kind: Optional[str] = None,
                                status: Optional[str] = None, limit: int = 80) -> str:
     """Show a project's structure: its sections (with their columns and summary state) and every entry
@@ -382,7 +383,8 @@ async def save_knowledge_item(conn: Connection, project_id: str, kind: str = "no
         return f"Error saving knowledge item: {e}"
 
 
-@addon.tool()
+# Matches AI summaries and transcripts of linked pages, videos and received files.
+@addon.tool(untrusted_result=True)
 async def search_knowledge(conn: Connection, query: str, project_id: Optional[str] = None) -> str:
     """Search the knowledge base (titles, bodies, AI summaries, transcripts, tags, fields) with FTS.
 

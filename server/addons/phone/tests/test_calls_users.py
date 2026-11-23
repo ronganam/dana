@@ -17,8 +17,8 @@ caller cannot see; task links to calls only for their owner; context chats
 are the owner's sessions; people linking and the About learner read only the
 owner's calls; startup resume and audio retention per user with a failing
 user not stopping the next; no ``phone`` → 403 and no call tools. The first
-admin's prompts are compared byte for byte with ``tests/fixtures/calls/``,
-written by the code before calls were per user.
+admin's prompts are compared byte for byte with ``tests/fixtures/calls/``
+(a frame's random nonce as ``{NONCE}``).
 
 The model is LiteLLM's offline ``mock_response`` (so the real usage callback
 records each call); the calendar's ``add_event`` and the
@@ -31,6 +31,7 @@ import asyncio
 import datetime
 import json
 import os
+import re
 import sqlite3
 import sys
 from typing import Any, Dict, List, Tuple
@@ -735,6 +736,8 @@ def test_prompt_fixtures() -> None:
                                 ("task", task_id, "context_task.txt")):
             got[name] = (context_chats.context_prompt(ADMIN, {"kind": kind, "ref_id": ref}) or "").replace(task_id,
                                                                                                         "{TASK_ID}")
+    # A frame's nonce is random: the fixtures hold {NONCE} in its place.
+    got = {k: re.sub(r"UNTRUSTED_TEXT [0-9a-f]{8}", "UNTRUSTED_TEXT {NONCE}", v) for k, v in got.items()}
     for name in sorted(os.listdir(FIXTURES)):
         want = fixture(name)
         check(f"first admin's prompt unchanged: {name}", got.get(name) == want,

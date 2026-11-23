@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 
 from core.addons import Approval, Connection
 from core.addons.hooks import clean
+from core.text import untrusted
 from core.users import User
 from addons.homeassistant import client as ha_api, home_map
 from addons.homeassistant.addon import addon
@@ -61,7 +62,9 @@ def _fmt_attrs(domain: str, state: str, attrs: Dict[str, Any]) -> str:
         title = attrs.get("media_title")
         artist = attrs.get("media_artist")
         if title:
-            parts.append(f"playing:\"{title}{(' – ' + artist) if artist else ''}\"")
+            # Whoever published the media chose its title: framed, so a turn that read it asks
+            # before acting outside Dana (core/agent.py); a listing with nothing playing does not.
+            parts.append("playing: " + untrusted("a media player's title", f"{title}{(' – ' + artist) if artist else ''}"))
 
     elif domain == "sensor":
         unit = attrs.get("unit_of_measurement", "")

@@ -13,6 +13,7 @@ import difflib
 from typing import Any, Dict, List, Optional
 
 from core import clock
+from core.text import untrusted
 from core.db import get_db_connection
 from core.users import User
 from addons.contacts import store as contacts
@@ -121,23 +122,26 @@ def chat_context(user: User, person_id: str) -> Dict[str, Any]:
 
 
 def context_prompt(user: User, person_id: str) -> Optional[str]:
-    """The system context of a chat opened from ``user``'s person (None when not theirs)."""
+    """The system context of a chat opened from ``user``'s person (None when not theirs). The brief,
+    the calls and the messages carry that person's words: framed as text written by others."""
     p = get_person(user, person_id, schedule_brief=False)
     if not p:
         return None
     calls = [e for e in p["timeline"] if e["type"] == "call"][:6]
     msgs = [e for e in p["timeline"] if e["type"] == "messages"][:8]
     b = p.get("brief") or {}
+    heard = (f"Brief: {'; '.join(b.get('points') or []) or '-'}. Open: {'; '.join(b.get('open') or []) or '-'}.\n"
+             "Recent calls:\n" + ("\n".join(f"- {c['at'][:10]}: {c['title']} — {c['summary'][:500]}" for c in calls) or "- none")
+             + "\nRecent messages from them:\n"
+             + ("\n".join(f"- {m['at'][:10]} ({m['count']}): {' / '.join(m['texts'])}" for m in msgs) or "- none"))
+    if b.get("points") or b.get("open") or calls or msgs:
+        heard = untrusted("their calls and messages (and the brief written from them)", heard)
     return (
         f"## Opened from a person: {p['name']}\n"
         f"Person id {p['id']}; relation: {p['relation'] or '-'}; phones: {', '.join(p['phones']) or '-'}; "
         f"birthday: {p['birthday'] or '-'}; notes: {p['notes'] or '-'}.\n"
         f"Last contact {p['stats']['last_contact_ago'] or 'unknown'}; typical gap {p['stats']['typical_gap_days'] or '?'} days.\n"
-        f"Brief: {'; '.join(b.get('points') or []) or '-'}. Open: {'; '.join(b.get('open') or []) or '-'}.\n"
-        "Recent calls:\n" + ("\n".join(f"- {c['at'][:10]}: {c['title']} — {c['summary'][:500]}" for c in calls) or "- none")
-        + "\nRecent messages from them:\n"
-        + ("\n".join(f"- {m['at'][:10]} ({m['count']}): {' / '.join(m['texts'])}" for m in msgs) or "- none")
-        + "\nOpen tasks:\n" + ("\n".join(f"- {t['title']} ({t['id']})" for t in p["tasks"]) or "- none")
+        + heard + "\nOpen tasks:\n" + ("\n".join(f"- {t['title']} ({t['id']})" for t in p["tasks"]) or "- none")
         + "\nFor full call transcripts use the call tools; to change their details use update_person; "
           "link new tasks with link_task_to_person."
     )

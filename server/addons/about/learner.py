@@ -20,6 +20,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core import budget, llm, user_profile, users
 from core.db import get_db_connection
+from core.text import untrusted
 from core.users import User
 from addons.about import facts
 from addons.about.values import (FACT_MAX_CHARS, LEARNED_KINDS, MAX_CHARS, SECTION_KEYS, clean_text,
@@ -289,7 +290,10 @@ def build_learn_prompt(user: User, items: List[Dict[str, Any]], known_facts: Lis
     known = "\n".join(f"[{f['id']}] ({f['section']}, {f['source_kind']}) {f['text']}"
                       for f in known_facts) or "(none yet)"
     removed = "\n".join(f"- {f['text']}" for f in forgotten[-60:]) or "(none)"
-    blocks = "\n\n".join(f"### {it['ref']} ({it['kind']})\n{it['text']}" for it in items)
+    # A call's summary carries the other side's words: framed, so it can inform a fact but never dictate one.
+    blocks = "\n\n".join(f"### {it['ref']} ({it['kind']})\n"
+                           + (untrusted("a phone call's summary (the other side's words)", it["text"])
+                              if it["kind"] == "call" else it["text"]) for it in items)
     return (
         f"You keep a short list of durable facts about {owner}, the owner of a personal assistant called Dana. "
         "The list is put in front of Dana in every conversation so she can understand references without asking.\n\n"

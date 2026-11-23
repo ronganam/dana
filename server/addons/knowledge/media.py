@@ -19,6 +19,7 @@ from typing import Any, Dict, Optional, Set, Tuple
 
 from core import budget, llm, outbound, paths, users
 from core.db import get_db_connection
+from core.text import untrusted
 from core.users import User
 from addons.knowledge.values import clean_str, loads_json
 
@@ -146,7 +147,7 @@ async def download_and_process_media(url: str, restricted: bool) -> dict:
                             "1. 'summary': A concise 1-2 sentence summary of what this video/media is about (in the same language as the transcript).\n"
                             "2. 'tags': 2-5 short relevant category/topic labels in the same language "
                             "(e.g. ['דולומיטים', 'קרוואן', 'איטליה', 'טיולים'] or ['Food', 'Rome', 'Pasta']).\n\n"
-                            f"Title: {title}\nTranscript: {transcript}"
+                            + untrusted("the media (its title and transcript)", f"Title: {title}\nTranscript: {transcript}")
                         )
                         try:
                             parsed = await llm.complete_json(prompt, _SUMMARY_SCHEMA, job="chat", purpose="media_summary", source="app")

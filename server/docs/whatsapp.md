@@ -40,10 +40,13 @@ described, and a caption is kept after it: a voice note transcribed, an image
 saved (below), any other file as `[File: <name> (<mimetype>)]` (`Video` /
 `Audio` for those). WAHA is asked to download only `audio/` and `image/`
 (`downloadMediaMimetypes`); other files come with their name and type and no
-download. The read tools (and `find_last_chats`, which shows last messages)
-are `untrusted_result`: their text is written by other people, so the rest
-of the turn asks before any `acts_outside` tool (docs/agent-actions.md), and
-the result starts with a line saying so.
+download. The read tools (and `find_last_chats`, which shows last messages,
+and `save_whatsapp_file`, which names the file as its sender did) are
+`untrusted_result`: their text is written by other people, so the model
+reads it framed (`core.text.untrusted`) and the rest of the turn asks before
+any `acts_outside` tool (docs/agent-actions.md, "Text written by others").
+The voice-note summary (the Telegram button) frames the transcript the same
+way.
 
 **Forwarding.** `forward_whatsapp_message(chat_id, message_id, what)`
 (`confirm`) posts WAHA's `/api/forwardMessage` with the connection's session:

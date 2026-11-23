@@ -9,6 +9,7 @@ import litellm
 from core.runs import emit, add_undos
 from core.models import ModelProfile, resolve_profile
 from core import clock, llm, undo, usage, user_locale, user_profile, users
+from core.text import carries_untrusted, untrusted
 from core.users import User
 from core.addons import registry
 
@@ -31,8 +32,9 @@ MAX_SELECTION_OPTIONS = 12
 # session history, so one oversized result (kubectl logs, a big Python print,
 # a long call list) inflates cost and latency for the rest of the conversation.
 MAX_TOOL_RESULT_CHARS = 12_000
-# ``untrusted_content`` of a turn whose chat context carries others' text (a transaction's
-# memo), as opposed to True (the shared phone screen); also the approval's ``reason``.
+# ``untrusted_content`` of a turn that starts with others' text framed by ``core.text.untrusted``
+# (a chat opened from a transaction, a call or a notification; a forwarded message), as opposed to
+# True (the shared phone screen); also the approval's ``reason``.
 UNTRUSTED_CONTEXT = "untrusted_context"
 
 # Attempts per LLM call when the stream breaks before completing.
@@ -49,6 +51,16 @@ def limit_tool_output(text: str, limit: int = MAX_TOOL_RESULT_CHARS) -> str:
         + f"\n\n[Output truncated: showing the first {limit:,} of {len(text):,} characters. "
         "Narrow the request (filters, limits, a specific ID or time range) to see the rest.]"
     )
+
+
+def for_model(tool_name: str, result: str) -> str:
+    """A tool's result as the model reads it and history keeps it: the result of an
+    ``untrusted_result`` tool framed as text other people wrote (``core.text.untrusted``), unless
+    the tool framed it itself; every other result as is."""
+    if not registry.returns_untrusted(tool_name) or carries_untrusted(result):
+        return result
+    return untrusted(f"what the {tool_name} tool returned", result)
+
 
 def home_map_section(user: Optional[User]) -> str:
     """``user``'s Home Assistant home map as a system-prompt section: the
@@ -273,9 +285,10 @@ class AgentOrchestrator:
             extra_context: Extra system context for this conversation (e.g. the
                 call suggestion a chat was opened from).
             untrusted_content: This turn carries content the user did not
-                write: True for the phone screen they shared, ``"untrusted_context"``
-                for the chat's own context (a transaction: its memo is a
-                stranger's). Every ``acts_outside`` tool asks first. Returned in a suspended result so the resume of
+                write from its first step: True for the phone screen they shared,
+                ``"untrusted_context"`` for a context or message framed by
+                ``core.text.untrusted`` (a transaction's memo, a call, a
+                forwarded message). Every ``acts_outside`` tool asks first. Returned in a suspended result so the resume of
                 the same turn keeps it (core/session_runner.py).
 
         Returns:
@@ -341,11 +354,12 @@ class AgentOrchestrator:
         if tool_result_str.startswith("Error: User denied"):
             pending_tool_calls = None
 
+        content = limit_tool_output(tool_result_str)
         tool_message = {
             "role": "tool",
             "tool_call_id": tool_call_id,
             "name": tool_name,
-            "content": limit_tool_output(tool_result_str)
+            "content": content if content.startswith("Error") else for_model(tool_name, content),
         }
         messages.append(tool_message)
         new_entries.append(tool_message)
@@ -483,13 +497,15 @@ class AgentOrchestrator:
     @staticmethod
     def _read_untrusted(messages: List[Dict[str, Any]]) -> bool:
         """A tool of this turn (the messages after the last user message)
-        returned text written by other people (``untrusted_result``: an
-        email). Read from the messages, so it holds across a suspension."""
+        returned text written by other people: an ``untrusted_result`` tool
+        (an email), or any result holding a ``core.text.untrusted`` frame.
+        Read from the messages, so it holds across a suspension."""
         for message in reversed(messages):
             role = message.get("role")
             if role == "user":
                 return False
-            if role == "tool" and registry.returns_untrusted(message.get("name")):
+            if role == "tool" and (registry.returns_untrusted(message.get("name"))
+                                   or carries_untrusted(message.get("content"))):
                 return True
         return False
 
@@ -530,7 +546,9 @@ class AgentOrchestrator:
             "duration_ms": int((time.monotonic() - started) * 1000),
             "undos": list(undos),
         })
-        return {"role": "tool", "tool_call_id": tc_id, "name": tool_name, "content": tool_result_str}
+        # The client sees the result as the tool gave it; the model (and history) sees it framed.
+        content = for_model(tool_name, tool_result_str) if ok else tool_result_str
+        return {"role": "tool", "tool_call_id": tc_id, "name": tool_name, "content": content}
 
     # Kept for callers/tests written against the old name.
     _execute_read_tool = _execute_tool
@@ -615,11 +633,16 @@ class AgentOrchestrator:
                 # needs the user.
                 # Untrusted for the calls that follow: the shared screen, or
                 # an email a tool of this turn has read.
-                untrusted = untrusted_content or self._read_untrusted(messages)
+                tainted = bool(untrusted_content) or self._read_untrusted(messages)
                 batch = []
                 for tc in tool_calls_to_process:
                     parsed = self._parse_tool_call(tc)
-                    if self._needs_user(parsed[1], parsed[2], untrusted):
+                    if self._needs_user(parsed[1], parsed[2], tainted):
+                        break
+                    # A call after an untrusted read of the same batch waits for that result:
+                    # it is decided again once the read's text is in the turn.
+                    if (not tainted and any(registry.returns_untrusted(b[1]) for b in batch)
+                            and self._needs_user(parsed[1], parsed[2], True)):
                         break
                     if self._changes_something(parsed[1]):
                         if not batch:
@@ -694,7 +717,7 @@ class AgentOrchestrator:
                 logger.info(f"Tool call '{tool_name}' requires confirmation. Suspending agent.")
                 approval = {"type": "approval_required", "id": tc_id, "name": tool_name, "args": tool_args}
                 reason = None
-                if untrusted and not registry.needs_confirmation(tool_name, tool_args):
+                if tainted and not registry.needs_confirmation(tool_name, tool_args):
                     # Asks only because this turn carries the shared phone
                     # screen, a chat context others wrote, or text a tool read
                     # that other people wrote.

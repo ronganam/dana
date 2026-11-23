@@ -7,6 +7,7 @@ import datetime
 from typing import Any, Dict, Optional
 
 from core import budget, clock, llm, user_profile
+from core.text import untrusted
 from core.users import User
 from addons.phone.calls.context import feedback_prompt, gather_context
 from addons.phone.calls.labels import LABEL_IDS, catalog_for_prompt, clean_labels
@@ -127,7 +128,7 @@ Return JSON matching the schema. Rules:
 - security_alert: one sentence when the call shows fraud, scam, account takeover or social-engineering signs (fake support, requests for codes, unexpected account changes); else null.
 {extra}
 Transcript:
-{transcript[:MAX_TRANSCRIPT_CHARS]}"""
+{untrusted("the recorded call (both speakers' words)", transcript[:MAX_TRANSCRIPT_CHARS])}"""
 
 
 async def analyze_transcript(user: Optional[User], transcript: str, call: Dict[str, Any],

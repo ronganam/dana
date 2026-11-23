@@ -110,7 +110,7 @@ async def find_last_chats(conn: Connection, limit: int = 10) -> str:
                 return "No WhatsApp chats found."
 
             mapping = await waha.get_chat_id_to_name_map(conn)
-            result = messages_fmt.UNTRUSTED_NOTE + f"Found {len(chats)} recent WhatsApp chats:\n"
+            result = f"Found {len(chats)} recent WhatsApp chats:\n"
             for chat in chats:
                 chat_id = chat.get("id", "Unknown ID")
                 is_archived = chat.get("archived") or chat.get("_chat", {}).get("archived") or False
@@ -308,8 +308,7 @@ async def read_chat_messages(conn: Connection, chat_id: str, limit: int = 10) ->
                 return f"No messages found in chat '{resolved_name}' ({resolved_id})."
 
             mapping = await waha.get_chat_id_to_name_map(conn)
-            result = messages_fmt.UNTRUSTED_NOTE
-            result += f"Recent messages in chat **{resolved_name}** (ID: `{resolved_id}`) (showing {len(messages)}):\n"
+            result = f"Recent messages in chat **{resolved_name}** (ID: `{resolved_id}`) (showing {len(messages)}):\n"
             try:
                 messages = sorted(messages, key=lambda m: m.get("timestamp", 0))
             except Exception:
@@ -617,7 +616,8 @@ async def delete_whatsapp_message(conn: Connection, chat_id: str, message_id: st
             return f"Error connecting to WAHA API: {err_msg}"
 
 
-@addon.tool(is_write=True)
+# The result names the file as its sender named it.
+@addon.tool(is_write=True, untrusted_result=True)
 async def save_whatsapp_file(conn: Connection, chat_id: str, message_id: str, item_id: str,
                              note: Optional[str] = None) -> str:
     """Keep a file someone sent on WhatsApp (a price quote PDF, a voice note, a video, a photo) on a

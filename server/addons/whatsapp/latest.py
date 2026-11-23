@@ -130,7 +130,7 @@ async def get_latest_messages(
             if not filtered_chats:
                 return f"No messages found matching read_filter='{read_filter}' and chat_filter='{chat_filter}'."
 
-            result = messages_fmt.UNTRUSTED_NOTE + f"Latest messages (read_filter='{read_filter}', chat_filter='{chat_filter}'):\n\n"
+            result = f"Latest messages (read_filter='{read_filter}', chat_filter='{chat_filter}'):\n\n"
             for fc in filtered_chats:
                 chat_id = fc["id"]
                 chat_name = fc["name"]

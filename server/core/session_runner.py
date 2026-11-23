@@ -37,6 +37,7 @@ from core.session import (
     set_session_title,
     save_session_debug,
 )
+from core.text import carries_untrusted
 from core.users import User
 from core.addons import registry
 
@@ -135,17 +136,12 @@ def screen_context_prompt(user: User, screen: Optional[Dict[str, str]]) -> Optio
     )
 
 
-# Context kinds whose prompt carries text written by other people (a transfer's memo): a turn that
-# carries one (the chat's own context or the item on screen) runs with untrusted content, so its
-# acts_outside tools ask first.
-UNTRUSTED_CONTEXT_KINDS = ("transaction", "saving")
-
-
 def _untrusted_context(user: User, session_id: str, screen: Optional[Dict[str, str]]) -> bool:
-    if screen and screen.get("kind") in UNTRUSTED_CONTEXT_KINDS:
-        return True
-    ctx = (get_session_state(user.id, session_id) or {}).get("context") or {}
-    return ctx.get("kind") in UNTRUSTED_CONTEXT_KINDS
+    """The chat's own context or the item on screen carries text other people wrote (its prompt
+    holds a ``core.text.untrusted`` frame: a transfer's memo, a call, a notification): the turn runs
+    with untrusted content, so its acts_outside tools ask first."""
+    return carries_untrusted(context_chats.session_context_prompt(user, session_id) or "") \
+        or carries_untrusted(screen_context_prompt(user, screen) or "")
 
 
 def _extra_context(user: User, session_id: str, screen: Optional[Dict[str, str]],
@@ -184,15 +180,18 @@ async def run_agent_background(user: User, session_id: str, user_text: str, is_v
 
         # Run agent loop
         extra_context = _extra_context(user, session_id, screen, device_screen)
-        # The shared phone screen (or a context others wrote) is untrusted: this turn's
-        # acts_outside tools ask first (the flag rides on the run's suspended state, not globally).
+        # The shared phone screen, a context others wrote or a message quoting others (a forwarded
+        # one) is untrusted from the turn's first step: its acts_outside tools ask first (the flag
+        # rides on the run's suspended state, not globally).
         untrusted: Any = True if device_screen else (
-            UNTRUSTED_CONTEXT if _untrusted_context(user, session_id, screen) else False)
+            UNTRUSTED_CONTEXT if carries_untrusted(extra_context or "") or carries_untrusted(user_text) else False)
         result = await agent().run(user_message_for_llm, history_for_llm, model_id=model_id,
                                    extra_context=extra_context, untrusted_content=untrusted)  # run on prior history, run() will append user_text
 
         await handle_agent_result(user, session_id, result, is_voice, user_text, model_id=model_id, device=device)
-        if not screen and not has_images and not device_screen:
+        # A phrase is learned only from a turn the user's own words steered.
+        if not screen and not has_images and not device_screen and not untrusted \
+                and not (isinstance(result, tuple) and AgentOrchestrator._read_untrusted(result[1])):
             _learn_shortcut(user, user_text, result)
         return result
 
@@ -594,7 +593,8 @@ def start_agent_task(
 
     A text message matching an active learned phrase (core/shortcuts.py) is
     answered without the model (never one with ``screen``, ``device_screen``
-    or images).
+    or images, nor one in a turn that starts with text others wrote: a
+    forwarded message, a chat opened from a call or a notification).
 
     Raises :class:`core.runs.SessionBusyError` if the session is already running.
     """
@@ -618,7 +618,8 @@ def start_agent_task(
     append_history(user.id, session_id, [user_entry], device, prune=False)
 
     shortcut = None
-    if not images and not screen and not device_screen and get_pending(user.id, session_id) is None:
+    if (not images and not screen and not device_screen and get_pending(user.id, session_id) is None
+            and not carries_untrusted(user_text) and not _untrusted_context(user, session_id, None)):
         try:
             shortcut = shortcuts.match(user, user_text)
         except Exception:

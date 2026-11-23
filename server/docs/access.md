@@ -426,12 +426,23 @@ model in [`SECURITY.md`](../../SECURITY.md). Tests: `bin/test test_security`
   mentions `user_id`), or carries `# scoped: <reason>` on its line or the line
   before (by id after an access check, a server-wide job, an owner join…). A
   new unscoped statement fails the test until it is scoped or says why.
-- **Text written by others** (`bin/test test_untrusted_tools`). Every tool
-  whose result carries third-party text (web pages, emails, chat messages,
-  notifications, calendar invitations, call transcripts, briefs and entries
-  made from them) is `untrusted_result=True`, so for the rest of that turn
-  every `acts_outside` tool asks first; every tool that sends to other people
-  is `confirm`.
+- **Text written by others** (`bin/test test_untrusted_tools`;
+  docs/agent-actions.md, "Text written by others"). Every tool whose result
+  carries third-party text (web pages, emails, chat messages and file names,
+  notifications, suggestions made from them, calendar invitations, call
+  transcripts, people's briefs and names, knowledge entries from outside,
+  bank text) declares `untrusted_result=True` in its decorator; the test
+  fails for an official tool that talks about messages, mail, notifications,
+  calls or the web and neither sets it nor is on its commented allow-list.
+  The model reads such text framed by `core.text.untrusted`, which is also
+  used wherever others' text enters a prompt without a tool (the shared
+  screen, context chats, a forwarded Telegram message, the background
+  prompts). A turn that carries it, from its start or after such a result,
+  asks before every `acts_outside` tool; every tool that sends to other
+  people is `confirm` and asks in every turn. The taint is per run (read
+  from that run's messages and flag), so one user's run never taints
+  another's. It is a speed bump for the model, not a sandbox: reversible
+  writes still run, and household members' shared text is not marked.
 - **ops** (kubectl and Python on the server, `addons/ops/`). Admin only and
   never turned on by itself (not a default, not given by startup): an admin
   turns it on. `run_kubectl` runs only read-only verbs (`get`, `describe`
