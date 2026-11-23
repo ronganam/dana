@@ -86,7 +86,7 @@ class ProjectsJsonTest {
         assertEquals("price", (cols[0] as JsonObject).text("role"))
         assertFalse((cols[1] as JsonObject).containsKey("role"))
 
-        val fields = ApiJson.encodeToJsonElement(ListSerializer(FieldBody.serializer()), ProjectsJson.fieldsBody(items.entries[0].fields)) as JsonArray
+        val fields = ApiJson.encodeToJsonElement(ListSerializer(FieldBody.serializer()), ProjectsJson.fieldsBody(items.entries.first { e -> e.fields.firstOrNull()?.name == "מחיר כולל" }.fields)) as JsonArray
         assertEquals("מחיר כולל", (fields[0] as JsonObject).text("name"))
         assertEquals(13400L, (fields[0] as JsonObject).long("value"))
     }
