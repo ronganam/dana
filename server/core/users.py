@@ -41,13 +41,14 @@ import json
 import logging
 import os
 import secrets
+import shutil
 import sqlite3
 import time
 import uuid
 from dataclasses import dataclass
 from typing import Dict, FrozenSet, Iterable, Iterator, List, Optional, Sequence, Tuple
 
-from core import access, user_rows
+from core import access, paths, user_rows
 from core.db import ChangeWatch, get_db_connection
 
 logger = logging.getLogger(__name__)
@@ -441,7 +442,8 @@ def _admin_count() -> int:
 def remove(user_id: str) -> None:
     """Delete a user and, through the database's cascades, everything they
     own (sessions, addons, tasks, calls, … ; ``bin/dana users remove``
-    says what first). Usage rows are kept (server cost history).
+    says what first), and their app icons folder. Usage rows are kept
+    (server cost history).
 
     Raises:
         LookupError: no such user.
@@ -458,6 +460,7 @@ def remove(user_id: str) -> None:
             conn.commit()
     finally:
         invalidate()
+    shutil.rmtree(paths.APP_ICONS_DIR / user_id, ignore_errors=True)
 
 
 def add_telegram_id(user_id: str, telegram_user_id: int) -> None:

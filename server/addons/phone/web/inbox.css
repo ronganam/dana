@@ -63,6 +63,10 @@
 }
 .ibx-avatar .emo { position: absolute; right: -5px; bottom: -5px; font-size: 12px; line-height: 1; }
 .ibx-avatar.lg { width: 44px; height: 44px; font-size: 18px; border-radius: 12px; }
+/* The app's icon over the letter (the letter shows until it loads, and when it fails). */
+.ibx-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; border-radius: inherit; object-fit: cover; }
+.ibx-avatar.loaded { background: transparent; }
+.ibx-avatar.loaded .ibx-letter { visibility: hidden; }
 
 .ibx-main { flex: 1; min-width: 0; }
 .ibx-line1 { display: flex; align-items: baseline; gap: 8px; }

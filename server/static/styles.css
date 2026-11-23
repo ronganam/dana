@@ -903,6 +903,16 @@ button.now-day-item:focus-visible { box-shadow: var(--focus-ring); }
 .now-card:focus-visible { box-shadow: 0 0 0 2px rgb(var(--ember-rgb) / .45); }
 .now-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: var(--radius-full); background: var(--hue); }
 .now-card > .now-dot { margin-top: 8px; }
+/* A notification's app icon in the dot's place, over its letter tile (shown until the icon loads, and when it fails). */
+.now-card.has-icon { grid-template-columns: 20px minmax(0, 1fr) auto; column-gap: 12px; }
+.now-icon {
+  position: relative; width: 20px; height: 20px; margin-top: 1px; border-radius: 5px; overflow: hidden;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--teal-tint); color: var(--teal-text); font-size: 11px; font-weight: 600; line-height: 1;
+}
+.now-icon img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.now-icon.loaded { background: transparent; }
+.now-icon.loaded .now-icon-letter { visibility: hidden; }
 .now-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .now-title { font-size: 16px; font-weight: 500; line-height: 1.4; color: var(--ink); overflow-wrap: anywhere; letter-spacing: -0.005em; }
 .now-meta { font-size: 13.5px; line-height: 1.45; color: var(--mute); overflow-wrap: anywhere; }

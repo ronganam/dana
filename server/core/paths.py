@@ -25,6 +25,8 @@ SNAPSHOTS_DIR = DATA_DIR / "snapshots"
 MONEY_DIR = DATA_DIR / "money"
 # Files kept on knowledge entries (quotes, voice notes; addons/knowledge/files.py).
 KNOWLEDGE_FILES_DIR = DATA_DIR / "knowledge"
+# Each user's app icons, uploaded by the phone: app-icons/<user id>/<package>.png (addons/phone/app_icons.py).
+APP_ICONS_DIR = DATA_DIR / "app-icons"
 # Addons installed from the catalog, one folder each (core/addon_dirs.py).
 ADDONS_DIR = DATA_DIR / "addons"
 # Backups (core/backups.py): the default destination when no /backups mount exists, and the

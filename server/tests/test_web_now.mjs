@@ -1,5 +1,5 @@
 /**
- * The web Now screen's pure part (static/app-now-core.js, DanaNow): hues by kind (unknown kinds sky), the date line and the lede's fallback, the day's items (past / next, refs, hidden when empty, the calendar note), the day track (past hours, busy hours, the now-mark), the primary's label and body with choices / checks, what client actions open, acting optimistically and restoring, reconciling a refresh (only new cards are added), the notifications line, "Updated … ago", keyboard steps.
+ * The web Now screen's pure part (static/app-now-core.js, DanaNow): hues by kind (unknown kinds sky), the date line and the lede's fallback, the day's items (past / next, refs, hidden when empty, the calendar note), the day track (past hours, busy hours, the now-mark), the primary's label and body with choices / checks, what client actions open, acting optimistically and restoring, reconciling a refresh (only new cards are added), the notifications line, "Updated … ago", keyboard steps, a notification's app icon (src, letter fallback, other kinds keep the dot).
  *
  * Run: bin/test test_web_now
  */
@@ -165,6 +165,20 @@ check("Updated … ago", N.updatedAgo(0, 20000) === "Updated just now" && N.upda
 check("keyboard steps stay inside the list", N.step(-1, 1, 3) === 0 && N.step(-1, -1, 3) === 2 && N.step(2, 1, 3) === 2
       && N.step(0, -1, 3) === 0 && N.step(1, 1, 3) === 2 && N.step(0, 1, 0) === -1);
 check("Hebrew is right-to-left", N.isRtl("להזמין טכנאי") === true && N.isRtl("Call Sam") === false);
+
+// --- App icons ------------------------------------------------------------------------------------------
+const notif = (notification) => ({ id: "notif:1", kind: "notification", notification });
+check("a notification card gets its app's icon and letter",
+      eq(N.appIcon(notif({ package: "com.whatsapp", app: "WhatsApp" })),
+         { package: "com.whatsapp", src: "/api/phone/app-icons/com.whatsapp.png", letter: "W" }));
+check("no app name: the letter is the package's last part",
+      N.appIcon(notif({ package: "com.example.bank" })).letter === "B");
+check("a package the server refuses: no src, the letter tile only",
+      eq(N.appIcon(notif({ package: "../x", app: "x" })), { package: "../x", src: "", letter: "X" })
+      && N.appIcon(notif({ package: "a." + "b".repeat(200), app: "Long" })).src === "");
+check("other kinds and a notification without a package keep the dot",
+      N.appIcon({ kind: "suggestion", notification: { package: "com.whatsapp" } }) === null
+      && N.appIcon(notif({})) === null && N.appIcon({ kind: "notification" }) === null && N.appIcon(null) === null);
 
 // --- The shell names no addon page in the Now files ----------------------------------------------------
 const src = ["app-now-core.js", "app-now.js"].map(f => fs.readFileSync(path.join(SERVER, "static", f), "utf8")).join("\n");

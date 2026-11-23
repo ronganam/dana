@@ -7,6 +7,8 @@
  *   GET  /api/notifications/requests/{rid}         (did the phone do it?)
  *   GET  /api/notifications/summaries | /apps      (AI summaries, per-app rules)
  *   GET  /api/suggestions?source=all               (tasks / events to create)
+ *   GET  /api/phone/app-icons/{package}.png        (each app's icon, uploaded by the phone; the letter tile
+ *                                                   stays when there is none)
  * The phone addon's page (Dana.panel, static/dana.js): mounted when opened, the needs-you count on its
  * navigation button kept fresh in the background.
  */
@@ -76,6 +78,26 @@
   };
   const avatarStyle = (s) => `--av:var(--${hue(s)}-tint);--av-text:var(--${hue(s)}-text)`;
   const initial = (s) => (String(s || "?").trim()[0] || "?").toUpperCase();
+  // An app's tile: its icon (from the phone, through the server) over its letter, which stays when the icon fails.
+  const PACKAGE_RE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/;
+  const iconsShown = new Set();    // packages whose icon loaded (a redraw shows it at once)
+  const iconsMissing = new Set();  // packages with no icon on the server (not asked again until a reload)
+  const avatar = (pkg, name, extra = "", cls = "") => {
+    const p = String(pkg || "");
+    const src = p.length <= 200 && PACKAGE_RE.test(p) && !iconsMissing.has(p) ? `/api/phone/app-icons/${p}.png` : "";
+    return `<span class="ibx-avatar${cls ? ` ${cls}` : ""}${src && iconsShown.has(p) ? " loaded" : ""}" data-icon="${esc(p)}" style="${avatarStyle(p)}">`
+      + `<span class="ibx-letter">${esc(initial(name))}</span>${src ? `<img src="${esc(src)}" alt="" decoding="async">` : ""}${extra}</span>`;
+  };
+  // An icon loaded or failed (neither event bubbles: listened for on the way down).
+  function onIconEvent(e) {
+    const tile = e.target.tagName === "IMG" && e.target.closest(".ibx-avatar");
+    if (!tile) return;
+    if (e.type === "load") { iconsShown.add(tile.dataset.icon); tile.classList.add("loaded"); return; }
+    iconsMissing.add(tile.dataset.icon);
+    iconsShown.delete(tile.dataset.icon);
+    tile.classList.remove("loaded");
+    e.target.remove();
+  }
 
   async function api(path, opts = {}) {
     const init = { method: opts.method || "GET", headers: {} };
@@ -242,7 +264,7 @@
         : `<button class="icon-btn" data-act="restore" title="Restore"><i data-lucide="undo-2"></i></button>`;
     return `<div class="ibx-row dn-row ${prioClass(n)}${indent ? " indent" : ""}${sel ? " selected" : ""}${S.openId === n.id ? " open" : ""}" data-id="${esc(n.id)}" role="option" aria-selected="${sel}">
       <span class="ibx-check" data-act="select" role="checkbox" aria-checked="${sel}" title="Select (x)"></span>
-      ${indent ? "" : `<span class="ibx-avatar" style="${avatarStyle(n.package)}">${esc(initial(appName(n)))}<span class="emo">${esc(n.category_emoji || "")}</span></span>`}
+      ${indent ? "" : avatar(n.package, appName(n), `<span class="emo">${esc(n.category_emoji || "")}</span>`)}
       <div class="ibx-main">
         <div class="ibx-line1"><span class="ibx-title" dir="auto">${esc(title)}</span><span class="ibx-age">${esc(age(n.posted_at))}</span></div>
         ${meta.length ? `<div class="ibx-meta" dir="auto">${meta.join(" · ")}</div>` : ""}
@@ -330,7 +352,7 @@
         const urgent = g.items.filter((n) => n.priority === "urgent" || n.priority === "important").length;
         const sum = isActiveView() && !S.q ? sums?.apps?.[g.pkg] : null;
         html += `<div class="ibx-group" data-group="${esc(g.pkg)}">
-          <span class="ibx-avatar" style="${avatarStyle(g.pkg)}">${esc(initial(g.name))}</span>
+          ${avatar(g.pkg, g.name)}
           <div class="ibx-main">
             <div class="ibx-group-name"><i data-lucide="${coll ? "chevron-right" : "chevron-down"}" style="width:14px;height:14px;color:var(--mute)"></i>${esc(g.name)}
               <span class="ibx-pill">${g.items.length}</span>${urgent ? `<span class="ibx-pill warn">${urgent} important</span>` : ""}</div>
@@ -418,7 +440,7 @@
     $.detail.innerHTML = `<div class="ibx-detail" data-id="${esc(n.id)}">
       <div class="ibx-detail-head">
         <button class="icon-btn ibx-close" data-act="close" title="Back"><i data-lucide="arrow-left"></i></button>
-        <span class="ibx-avatar lg" style="${avatarStyle(n.package)}">${esc(initial(appName(n)))}<span class="emo">${esc(n.category_emoji || "")}</span></span>
+        ${avatar(n.package, appName(n), `<span class="emo">${esc(n.category_emoji || "")}</span>`, "lg")}
         <div class="who"><div class="app">${esc(appName(n))}</div><div class="sub" dir="auto">${esc([who(n), when(n.posted_at)].filter(Boolean).join(" · "))}</div></div>
         <button class="btn-secondary" data-act="ask"><i data-lucide="sparkles"></i>Ask Dana</button>
       </div>
@@ -911,6 +933,8 @@
       group: document.getElementById("ibx-group-toggle"),
     };
     if (!$.root) return;
+    $.root.addEventListener("load", onIconEvent, true);
+    $.root.addEventListener("error", onIconEvent, true);
     $.views.addEventListener("click", (e) => { const b = e.target.closest("[data-view]"); if (b) setView(b.dataset.view); });
     $.list.addEventListener("click", onListClick);
     $.detail.addEventListener("click", onDetailClick);

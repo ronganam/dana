@@ -13,7 +13,7 @@ listing, pruning, the schedule, restoring), `core/backups_api.py` (the API), `cl
 |---|---|
 | `db.sqlite3` | A consistent copy of the database, made with SQLite's online backup API while the server runs (never a raw copy of the live file) |
 | `credentials.key` | The generated credentials key (`<data dir>/credentials.key`), when the key comes from that file. When `CREDENTIALS_KEY` is set in env the key is **not** in the archive: keep it in your secret store, a restore needs the same key to read the stored credentials. The manifest and Settings → Backups say which |
-| `files/…` | Everything else in the data directory: `recordings/`, `media/`, `uploads/`, `knowledge/`, `addons/` (installed add-ons), `money/` and any other folder or file there |
+| `files/…` | Everything else in the data directory: `recordings/`, `media/`, `uploads/`, `knowledge/`, `app-icons/`, `addons/` (installed add-ons), `money/` and any other folder or file there |
 | `manifest.json` | `format` (1), `dana_version`, `created_at`, `timezone`, `schema` (each owner's latest applied migration, `core` included), `credentials_key` (`file` / `env` / `none`), `dirs`, `files` and `files_bytes`, `left_out` |
 
 Left out on purpose: `snapshots/` (copies of the database itself, taken before migrations), `app-updates/` (offered

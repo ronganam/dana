@@ -47,7 +47,7 @@ import addons  # noqa: F401 — first: registers every addon (and the sharing it
 from core import access, db, user_locale, user_rows, users
 from core.addons import sharing, state
 from core.db import get_db_connection
-from core.paths import IMAGES_DIR, RECORDINGS_DIR
+from core.paths import APP_ICONS_DIR, IMAGES_DIR, RECORDINGS_DIR
 from core.users import User
 from core.addons import crypto, store
 from core.addons.addon import get_addon, all_addons
@@ -197,17 +197,18 @@ def _left_behind(user: User) -> List[str]:
 
 
 def _files_of(user: User) -> List[Path]:
-    """Call recordings and saved images of ``user`` (deleted with them)."""
+    """Call recordings, saved images and app icons of ``user`` (deleted with them)."""
     with get_db_connection() as conn:
         calls = [r[0] for r in conn.execute("SELECT filename FROM phone_calls WHERE user_id = ?", (user.id,))]
         images = [r[0] for r in conn.execute("SELECT name FROM uploaded_images WHERE user_id = ?", (user.id,))]
     return ([RECORDINGS_DIR / f for f in calls if f and "/" not in f]
-            + [IMAGES_DIR / f for f in images if f and "/" not in f])
+            + [IMAGES_DIR / f for f in images if f and "/" not in f]
+            + sorted((APP_ICONS_DIR / user.id).glob("*.png")))
 
 
 def remove_user(user: User) -> List[str]:
     """Delete ``user``, everything they own (database cascades), their call
-    recordings and saved images, and the shares of their items. Returns notes
+    recordings, saved images and app icons, and the shares of their items. Returns notes
     on what stays.
 
     Raises:
@@ -344,7 +345,7 @@ def cmd_remove(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     for table, n in owned.items():
         print(f"  {table}: {n}", file=out)
     if files:
-        print(f"  files: {len(files)} (call recordings, saved images)", file=out)
+        print(f"  files: {len(files)} (call recordings, saved images, app icons)", file=out)
     if not owned and not files:
         print("  nothing", file=out)
     for note in _left_behind(user):

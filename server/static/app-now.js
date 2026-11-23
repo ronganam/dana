@@ -2,7 +2,8 @@
  *
  * The screen the app opens on: what's happening today and what needs a decision, from GET /api/now
  * (server/docs/now.md; a core composer, so the shell names it). The header (the date, the lede, the day
- * track and the day's items), the needs-you rows (a dot in the kind's hue, the title, one muted line, the one
+ * track and the day's items), the needs-you rows (a dot in the kind's hue, or a notification's app icon with
+ * its letter tile as the fallback, the title, one muted line, the one
  * visible primary and every other action in the row's "⋯" menu, details folded, acted on optimistically with
  * Undo), "Can wait", the notifications line, All clear (centred). Refreshed when it
  * opens, when the window comes back, and every minute while it is on screen (never in the background);
@@ -28,6 +29,8 @@ const nowState = {
     expanded: new Set(),   // cards with their blocks open
     forms: {},             // id → {choices: {key: index}, checks: {key: [index]}}
     errors: {},            // id → the message of a failed action, shown on the card
+    iconsShown: new Set(), // app packages whose icon loaded (redrawn cards show it at once)
+    iconsMissing: new Set(), // app packages with no icon on the server (not asked again until a reload)
     quietOpen: false,
     drawn: false,          // the first data is on screen (rows rise in only then)
     loading: null,
@@ -292,13 +295,25 @@ function primaryPill(item, small) {
 const overflowBtn = (item, dom) => `<button type="button" class="dn-overflow" data-menu aria-haspopup="menu" aria-expanded="false"`
     + ` aria-label="More for ${escapeHtml(item.title || "this")}"${dom ? ` aria-controls="${dom}-b"` : ""} title="More"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>`;
 
+/** The row's mark: a notification's app icon over its letter tile (the tile stays when the icon fails), else the dot. */
+function markHtml(item) {
+    const icon = window.DanaNow.appIcon(item);
+    if (!icon) return `<span class="now-dot" aria-hidden="true"></span>`;
+    const src = icon.src && !nowState.iconsMissing.has(icon.package) ? icon.src : "";
+    const shown = src && nowState.iconsShown.has(icon.package);
+    return `<span class="now-icon${shown ? " loaded" : ""}" data-icon="${escapeHtml(icon.package)}" aria-hidden="true">`
+        + `<span class="now-icon-letter">${escapeHtml(icon.letter)}</span>`
+        + (src ? `<img src="${escapeHtml(src)}" alt="" decoding="async">` : "") + `</span>`;
+}
+
 function cardEl(item) {
     const C = window.DanaNow;
     const dom = cardDomId(item.id);
     const blocks = Array.isArray(item.blocks) ? item.blocks : [];
     const open = nowState.expanded.has(item.id);
     const el = document.createElement("article");
-    el.className = "now-card dn-row" + (open ? " open" : "") + (blocks.length ? " has-details" : "");
+    el.className = "now-card dn-row" + (open ? " open" : "") + (blocks.length ? " has-details" : "")
+        + (C.appIcon(item) ? " has-icon" : "");
     el.id = dom;
     el.dataset.id = item.id;
     el.tabIndex = -1;
@@ -310,7 +325,7 @@ function cardEl(item) {
     const meta = [source ? `<span class="now-src"${nowRtl(source)}>${nowSource(source)}</span>` : "",
                   item.why ? `<span class="now-why"${nowRtl(item.why)}>${escapeHtml(item.why)}</span>` : ""].filter(Boolean);
     el.innerHTML = `
-        <span class="now-dot" aria-hidden="true"></span>
+        ${markHtml(item)}
         <div class="now-body">
             <h3 class="now-title" id="${dom}-t"${nowRtl(item.title)}>${escapeHtml(item.title || "")}</h3>
             ${meta.length ? `<p class="now-meta">${meta.join('<span class="now-sep" aria-hidden="true"> · </span>')}</p>` : ""}
@@ -561,6 +576,21 @@ function openRowMenu(holder, anchor) {
         const notifs = t.closest("#now-notifs");
         if (notifs && notifs.dataset.page) openScreen(notifs.dataset.page);
     });
+    // An app icon loaded or failed (neither event bubbles: caught on the way down).
+    panel.addEventListener("load", (e) => {
+        const mark = e.target.tagName === "IMG" && e.target.closest(".now-icon");
+        if (!mark) return;
+        nowState.iconsShown.add(mark.dataset.icon);
+        mark.classList.add("loaded");
+    }, true);
+    panel.addEventListener("error", (e) => {
+        const mark = e.target.tagName === "IMG" && e.target.closest(".now-icon");
+        if (!mark) return;
+        nowState.iconsMissing.add(mark.dataset.icon);
+        nowState.iconsShown.delete(mark.dataset.icon);
+        mark.classList.remove("loaded");
+        e.target.remove();
+    }, true);
     panel.addEventListener("change", (e) => {
         const input = e.target;
         const card = input.closest(".now-card");

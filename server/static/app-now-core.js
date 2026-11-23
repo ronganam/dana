@@ -5,7 +5,8 @@
  * calm line), the day track and the day's items, the hue of a card by its kind, what an action sends, what a client
  * action opens, an action applied optimistically (and undone on an error), a refresh reconciled with what
  * is on screen (only new cards rise in), the notifications line and the "Updated … ago" note.
- * A card is rendered from its fields and blocks only: no addon is named, a kind only picks a hue.
+ * A card is rendered from its fields and blocks only: no addon is named, a kind only picks a hue; the one
+ * exception is a notification's app icon, served by the phone's /api/phone/app-icons (docs/notifications.md).
  */
 (() => {
   "use strict";
@@ -292,12 +293,26 @@
     return Math.max(0, Math.min(count - 1, index + delta));
   }
 
+  // An Android package name, as the server accepts it for an app icon.
+  const PACKAGE_RE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/;
+
+  /** A notification card's app icon: {package, src, letter} (src "" when the package cannot have one; the
+   *  letter tile is the fallback), or null for any other card (it keeps its dot). */
+  function appIcon(item) {
+    const n = item && item.kind === "notification" ? item.notification : null;
+    const pkg = n ? String(n.package || "") : "";
+    if (!pkg) return null;
+    const name = String(n.app || "").trim() || pkg.split(".").pop();
+    const ok = pkg.length <= 200 && PACKAGE_RE.test(pkg);
+    return { package: pkg, src: ok ? `/api/phone/app-icons/${pkg}.png` : "", letter: (Array.from(name)[0] || "?").toUpperCase() };
+  }
+
   /** A text has right-to-left letters (Hebrew, Arabic). */
   const isRtl = (s) => /[֐-׿؀-ۿיִ-﷿ﹰ-﻿]/.test(String(s || ""));
 
   globalThis.DanaNow = {
     KIND_HUES, hueOf, dayHue, parts, dateLine, minutesNow, clock, ledeLine, dayRef, dayCells, dayTrack,
     chosen, isChecked, primaryLabel, chosenMessage, actBody, clientTarget, canDo,
-    removeItem, restoreItem, reconcile, notificationsLine, updatedAgo, step, isRtl,
+    removeItem, restoreItem, reconcile, notificationsLine, updatedAgo, step, isRtl, appIcon,
   };
 })();

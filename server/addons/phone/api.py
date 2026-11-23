@@ -4,6 +4,7 @@ and direct push to the phone (docs/calls.md, docs/notifications.md).
 - ``GET /api/suggestions``, ``POST /api/suggestions/bulk``, ``PUT /api/suggestions/{id}``,
   ``POST /api/suggestions/{id}/accept``, ``POST /api/suggestions/{id}/dismiss``
 - ``POST /api/phone/register``, ``GET /api/phone/events``, ``GET /api/phone/devices``, ``POST /api/phone/test``
+- ``/api/phone/app-icons*``: the phone's app icons (``app_icons.py``)
 - ``POST /api/agent-sessions/hook``, ``GET /api/agent-sessions``, ``DELETE /api/agent-sessions/{id}``
 - ``POST /api/signals``: the phone's signals (addons/phone/signals.py; ``GET
   /api/signals``, the overview, is core's: core/signals_api.py)
@@ -25,7 +26,7 @@ from core.addons.store import NotConnected
 from addons.phone.access import phone_user
 from addons.phone.calls import api as calls_api
 from addons.phone.notifications import api as notifications_api
-from addons.phone import (agent_sessions, config as phone_config, push as phone_push, signals as phone_signals,
+from addons.phone import (agent_sessions, app_icons, config as phone_config, push as phone_push, signals as phone_signals,
                           suggestions as phone_suggestions)
 from addons.phone.calls import actions as suggestion_actions
 
@@ -224,8 +225,8 @@ async def agent_session_delete_api(request: web.Request) -> web.Response:
 
 
 def setup(app: web.Application) -> None:
-    """Register the phone addon's routes: calls (``calls/api.py``), suggestions
-    and push, then notifications (``notifications/api.py``)."""
+    """Register the phone addon's routes: calls (``calls/api.py``), suggestions,
+    push and app icons (``app_icons.py``), then notifications (``notifications/api.py``)."""
     calls_api.setup(app)
     app.router.add_get("/api/suggestions", get_suggestions_api)
     app.router.add_post("/api/suggestions/bulk", bulk_suggestions_api)
@@ -234,6 +235,7 @@ def setup(app: web.Application) -> None:
     app.router.add_post("/api/signals", post_signals_api)
     app.router.add_get("/api/phone/devices", phone_devices_api)
     app.router.add_post("/api/phone/test", phone_test_api)
+    app_icons.setup(app)
     app.router.add_put("/api/suggestions/{id}", update_suggestion_api)
     app.router.add_post("/api/suggestions/{id}/accept", accept_suggestion_api)
     app.router.add_post("/api/suggestions/{id}/dismiss", dismiss_suggestion_api)

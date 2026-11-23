@@ -149,7 +149,9 @@ blocks, so an addon's own cards (any `kind`) need nothing here.
   "Calendar couldn't be read".
 - **Needs you**: "NEEDS YOU · N", then one row per card in server order (see "Rows, not boxes"): the dot in the
   kind's hue (approval ember, notification teal, suggestion plum or sage for a call's, reminder amber, a charge
-  rose, other money sage, check and reconnect rose, review and any other kind sky), the title, one muted line
+  rose, other money sage, check and reconnect rose, review and any other kind sky; a notification shows its app's
+  icon instead, 20 px with a 5 px radius, over its letter on the teal tint, which stays when the icon fails:
+  `DanaNow.appIcon`, `docs/notifications.md` "App icons"), the title, one muted line
   (`source`, each " · " part isolated so a Hebrew name keeps its place, then `why`), the primary as the pill
   (`choices` change its label) and the "⋯" menu: the secondary actions, "Reply on phone" drawn disabled, then
   "Show details" / "Hide details" when the card has blocks. The details (every block type of `docs/now.md`) open
