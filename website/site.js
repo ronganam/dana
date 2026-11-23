@@ -182,7 +182,9 @@
     const model = dia.querySelector(".dia-model");
     const layer = dia.querySelector(".dia-pills");
     const inList = dia.querySelector(".dia-in");
-    const outList = dia.querySelector(".dia-out");
+    const outBox = dia.querySelector(".dia-out");
+    const phone = dia.querySelector(".dv-phone"), watch = dia.querySelector(".dv-watch"), tablet = dia.querySelector(".dv-tablet");
+    const rowsEl = dia.querySelector(".dv-rows"), lede = dia.querySelector(".dv-lede"), banner = dia.querySelector(".dv-banner"), shop = dia.querySelector(".dv-shop");
     const readEl = dia.querySelector("[data-read]"), toldEl = dia.querySelector("[data-told]"), foldEl = dia.querySelector("[data-folded]");
     const node = (k) => dia.querySelector(`.node[data-node="${k}"]`);
     const stepEl = (k) => dia.querySelector(`.dia-step[data-step="${k}"]`);
@@ -192,27 +194,37 @@
     const STEPS = ["sort", "understand", "remember", "decide"];
 
     // Every event and outcome is something Dana does (website/README.md lists where each lives in the code).
-    // stops: [step, outcome, needs-you?]; out: the output it reaches, said: what it shows there; quiet: the tray chip.
+    // stops: [step, outcome, needs-you?]; out: where it comes out (now: a row on the phone's Now screen, push: a banner
+    // on the phone, then its row when it has one, watch: the briefing, wall: the shared list); quiet: the tray chip.
+    // row: { ico (an app icon) or dot (the kind's hue), title, meta ("source · why"), act (the primary) }.
     const E = {
       promo:   { in: "notif", text: "Shop app · 30% off everything", stops: [["sort", "noise · folded"]], quiet: "Promo" },
-      pickup:  { in: "notif", text: "WhatsApp · School parents: pickup moved to 13:00", stops: [["sort", "needs you", 1], ["decide", "urgent · alert until seen", 1]], out: "push", said: "Pickup moved to 13:00" },
+      pickup:  { in: "notif", text: "WhatsApp · School parents: pickup moved to 13:00", stops: [["sort", "needs you", 1], ["decide", "urgent · alert until seen", 1]], out: "push",
+                 banner: { ico: "chat", k: "WhatsApp · School", title: "Pickup moved to 13:00", body: "Maya's class. Repeats until you look." },
+                 row: { ico: "chat", title: "Pickup moved to 13:00", meta: "School parents · Maya's class", act: "Remind me 12:30" } },
       news:    { in: "notif", text: "News · 12 new stories", stops: [["sort", "noise · folded"]], quiet: "News" },
-      sleep:   { in: "signal", text: "Sleep ended 06:51", stops: [["decide", "wake → briefing"]], out: "watch", said: "Good morning: standup 09:30" },
+      sleep:   { in: "signal", text: "Sleep ended 06:51", stops: [["decide", "wake → briefing"]], out: "watch" },
       parcel:  { in: "notif", text: "Delivery · Out for delivery", stops: [["sort", "can wait · inbox"]], quiet: "Delivery" },
       letter:  { in: "notif", text: "Gmail · The weekly newsletter", stops: [["sort", "noise · folded"]], quiet: "Newsletter" },
-      dor:     { in: "call", text: "Call · Dor, 4 min", stops: [["understand", "event: Thu 09:00"]], out: "now", said: "Add “Dor comes” Thu 09:00?" },
+      dor:     { in: "call", text: "Call · Dor, 4 min", stops: [["understand", "event: Thu 09:00"]], out: "now",
+                 row: { dot: "sage", title: "Dor comes Thu 09:00", meta: "From your call with Dor", act: "Add to calendar" } },
       group:   { in: "notif", text: "Building group · 14 new messages", stops: [["sort", "noise · folded"]], quiet: "Group chat" },
       grocer:  { in: "bank", text: "Card · ₪23 at the supermarket", stops: [["understand", "everyday · as usual"]], quiet: "Everyday spend" },
-      car:     { in: "signal", text: "Car connected", stops: [["decide", "reminder fires"]], out: "push", said: "Dry cleaning, on your way home" },
+      car:     { in: "signal", text: "Car connected", stops: [["decide", "reminder fires"]], out: "push",
+                 banner: { ico: "dana", k: "Dana · Reminder", title: "Dry cleaning, on your way home", body: "You asked: “next time I'm in the car”." },
+                 row: { dot: "amber", title: "Dry cleaning", meta: "Reminder · in the car now", act: "Done" } },
       game:    { in: "notif", text: "Game · Your lives are full", stops: [["sort", "noise · folded"]], quiet: "Game" },
       fact:    { in: "you", text: "“I'm vegetarian, by the way”", stops: [["remember", "a fact about you"]] },
-      maya:    { in: "account", text: "Calendar · Maya in 10 min", stops: [["remember", "brief: what's open with her"]], out: "push", said: "Maya: what you last talked about" },
+      maya:    { in: "account", text: "Calendar · Maya in 10 min", stops: [["remember", "brief: what's open with her"]], out: "push",
+                 banner: { ico: "cal", k: "Dana · Maya in 10 min", title: "Maya: what you last talked about", body: "The venue quote. She owes you an answer." } },
       cart:    { in: "notif", text: "Shop app · Your cart misses you", stops: [["sort", "noise · folded"]], quiet: "Promo" },
       work:    { in: "signal", text: "Arrived · Work", stops: [["decide", "nothing due here"]], quiet: "Arrived" },
-      plan:    { in: "bank", text: "Phone plan · ₪38 more than last month", stops: [["understand", "price went up"]], out: "now", said: "Phone plan up ₪38 · compare?" },
+      plan:    { in: "bank", text: "Phone plan · ₪38 more than last month", stops: [["understand", "price went up"]], out: "now",
+                 row: { ico: "card", title: "Phone plan went up ₪38", meta: "Money · a fixed monthly charge", act: "Compare" } },
       gal:     { in: "call", text: "Call · Gal, 2 min", stops: [["understand", "nothing to do"]], quiet: "Call" },
-      milk:    { in: "you", text: "“We're out of milk and eggs”", stops: [["understand", "Shopping +2, shared with Gal"]], out: "wall", said: "Milk, eggs · Dairy" },
+      milk:    { in: "you", text: "“We're out of milk and eggs”", stops: [["understand", "Shopping +2, shared with Gal"]], out: "wall" },
     };
+    Object.entries(E).forEach(([k, e]) => { e.key = k; });
     // the first round shows each kind once; after that, mostly noise, the way a real day is
     const FIRST = ["promo", "pickup", "news", "sleep", "parcel", "letter", "dor", "group", "grocer", "car", "game", "fact", "maya", "cart", "work", "plan", "gal", "milk"];
     const WEIGHTS = Object.entries(E).map(([k, e]) => [k, e.out ? 0.55 : e.stops[0][0] === "sort" ? 3 : 1]);
@@ -234,13 +246,15 @@
         const l = b.left - o.left, t = b.top - o.top;
         return { l, t, r: l + b.width, b: t + b.height, cx: l + b.width / 2, cy: t + b.height / 2 };
       };
-      const S = r(server), B = r(bus), T = r(tray), M = r(model), I = r(inList), O = r(outList);
-      const g = { stack: stacked.matches, width: o.width, S, busY: B.cy, trayY: T.cy, M, nodes: {}, steps: {} };
+      const S = r(server), B = r(bus), T = r(tray), M = r(model), I = r(inList), O = r(outBox);
+      const g = { stack: stacked.matches, width: o.width, S, busY: B.cy, trayY: T.cy, M, O, nodes: {}, steps: {} };
+      g.dev = { wall: r(tablet), phone: r(phone), watch: r(watch) };
+      g.rowsY = r(rowsEl).t;
       dia.querySelectorAll(".node").forEach((n) => { g.nodes[n.dataset.node] = r(n); });
       STEPS.forEach((k) => { g.steps[k] = r(stepEl(k)); });
       if (g.stack) {
         g.railL = S.l + 11; g.railR = S.r - 11;
-        g.inY = I.b + 26; g.outY = O.t - 26;
+        g.inY = I.b + 26; g.outY = O.t - 24;
         g.entry = [g.railL, g.busY]; g.exit = [g.railR, g.busY];
       } else {
         g.entry = [S.l, g.busY]; g.exit = [S.r, g.busY];
@@ -262,15 +276,30 @@
     const curve = (a, b) => { const dx = (b[0] - a[0]) * 0.55; return `M${pt(a)} C${pt([a[0] + dx, a[1]])} ${pt([b[0] - dx, b[1]])} ${pt(b)}`; };
     const port = (k) => [G.steps[k].cx, G.busY];
     const inStart = (k) => { const n = G.nodes[k]; return G.stack ? [n.cx, n.cy] : [n.r, n.cy]; };
-    const outEnd = (k) => { const n = G.nodes[k]; return G.stack ? [n.cx, n.cy] : [n.l, n.cy]; };
     function toServer(k, to) {
       const s = inStart(k);
       return G.stack ? poly([s, [s[0], G.inY], [G.railL, G.inY], G.entry, to]) : `${curve(s, G.entry)} L${pt(to)}`;
     }
-    function toOutput(from, k) {
-      const e = outEnd(k);
-      return G.stack ? poly([from, G.exit, [G.railR, G.outY], [e[0], G.outY], e]) : `M${pt(from)} L${pt(G.exit)} ${curve(G.exit, e).replace(/^M[^C]+/, "")}`;
+    // where a wire ends on the devices: beside them on a wide screen; on a phone from above (the tablet, a push at the
+    // phone's top), from the side (the Now list) or round the left (the watch)
+    function outRoute(k) {
+      const D = G.dev, ph = D.phone, nowY = G.rowsY + 24;
+      if (!G.stack) {
+        const end = { wall: [D.wall.l, D.wall.cy], push: [ph.l, ph.t + 62], now: [ph.l, nowY], watch: [D.watch.l, D.watch.cy] }[k];
+        return [curve(G.exit, end).replace(/^M[^C]+/, "")];
+      }
+      const top = [G.railR, G.outY];
+      if (k === "now") return [[G.railR, nowY], [ph.r, nowY]];
+      if (k === "wall") return [top, [D.wall.cx, G.outY], [D.wall.cx, D.wall.t]];
+      if (k === "push") return [top, [ph.cx, G.outY], [ph.cx, ph.t]];
+      const x = G.O.l - Math.min(18, G.O.l / 2);
+      return [top, [x, G.outY], [x, D.watch.cy], [D.watch.l, D.watch.cy]];
     }
+    function toOutput(from, k) {
+      const route = outRoute(k);
+      return G.stack ? poly([from, G.exit, ...route]) : `M${pt(from)} L${pt(G.exit)} ${route[0]}`;
+    }
+    const OUTS = ["wall", "push", "now", "watch"];
     const modelWire = () => {
       const x = G.stack ? G.M.cx : G.S.cx;
       return `M${pt([x, G.S.b])} L${pt([x, G.M.t])}`;
@@ -287,17 +316,15 @@
 
     function drawWires() {
       svg.textContent = "";
-      const ins = ["notif", "call", "signal", "account", "bank", "you"], outs = ["now", "watch", "wall", "push"];
+      const ins = ["notif", "call", "signal", "account", "bank", "you"];
       if (G.stack) {
         ins.forEach((k) => { const n = G.nodes[k]; path(`M${pt([n.cx, n.cy])} L${pt([n.cx, G.inY])}`, "wire"); });
         const maxIn = Math.max(...ins.map((k) => G.nodes[k].cx));
         path(poly([[maxIn, G.inY], [G.railL, G.inY], G.entry]), "wire");
-        const minOut = Math.min(...outs.map((k) => G.nodes[k].cx));
-        path(poly([G.exit, [G.railR, G.outY], [minOut, G.outY]]), "wire");
-        outs.forEach((k) => { const n = G.nodes[k]; path(`M${pt([n.cx, G.outY])} L${pt([n.cx, n.cy])}`, "wire"); });
+        OUTS.forEach((k) => path(poly([G.exit, ...outRoute(k)]), "wire"));
       } else {
         ins.forEach((k) => path(curve(inStart(k), G.entry), "wire"));
-        outs.forEach((k) => path(curve(G.exit, outEnd(k)), "wire"));
+        OUTS.forEach((k) => path(`M${pt(G.exit)} ${outRoute(k)[0]}`, "wire"));
       }
       path(`M${pt(G.entry)} L${pt(G.exit)}`, "wire bus");
       STEPS.forEach((k) => { const s = G.steps[k]; path(`M${pt([s.cx, s.b])} L${pt([s.cx, G.busY])}`, "wire"); });
@@ -320,11 +347,119 @@
       n.classList.add("ping");
       later("p" + k, ms, () => n.classList.remove("ping"));
     }
-    function deliver(k, said) {
-      const n = node(k), sm = n.querySelector("small");
-      n.classList.add("got", "ping");
-      sm.textContent = said;
-      later("o" + k, 2800, () => { n.classList.remove("got", "ping"); sm.textContent = sm.dataset.idle; });
+
+    // ---- the devices: the phone's Now screen (rows, the lede, a push banner), the watch, the wall tablet
+    const ICONS = {
+      chat: '<svg viewBox="0 0 24 24"><path d="M4.5 19.5l1.3-3.9A7.6 7.6 0 1 1 8.4 18.2z"/></svg>',
+      card: '<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10.5h18M7 14.5h3"/></svg>',
+      cal: '<svg viewBox="0 0 24 24"><rect x="4" y="5.5" width="16" height="14" rx="2"/><path d="M4 10h16M8.5 3.5v4M15.5 3.5v4"/></svg>',
+      dana: '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5" class="fill"/></svg>',
+    };
+    const icon = (k) => `<span class="dv-ico i-${k}">${ICONS[k]}</span>`;
+    const MAX_ROWS = 3;
+    const rows = []; // newest first: { key, el, due, leaving }
+    const lifetime = () => 9000 + Math.random() * 6000; // then you tap its pill: done, added, compared
+    function glow(el) { el.classList.add("got"); later("g" + el.className.split(" ")[0], 1300, () => el.classList.remove("got")); }
+    // move rows to their new places with a transform, so the list never jumps
+    function flip(mutate) {
+      const before = new Map([...rowsEl.children].map((el) => [el, el.getBoundingClientRect().top]));
+      mutate();
+      for (const el of rowsEl.children) {
+        const t0 = before.get(el), dy = t0 == null ? 0 : t0 - el.getBoundingClientRect().top;
+        if (!dy || el.classList.contains("old") || el.classList.contains("out")) continue;
+        el.style.transition = "none";
+        el.style.transform = `translateY(${f(dy)}px)`;
+        el.getBoundingClientRect();
+        el.style.transition = "transform .45s var(--decel)";
+        el.style.transform = "";
+      }
+    }
+    function setLede(now) {
+      const n = rows.filter((r) => !r.leaving).length;
+      const text = n === 0 ? "All clear." : n === 1 ? "1 thing needs you." : `${n} things need you.`;
+      if ((lede.dataset.text || lede.textContent) === text) return;
+      lede.dataset.text = text;
+      const apply = () => { lede.textContent = text; lede.classList.toggle("clear", n === 0); lede.classList.remove("swap"); };
+      if (now) { apply(); return; }
+      lede.classList.add("swap");
+      later("lede", 180, apply);
+    }
+    function rowEl(r) {
+      const li = document.createElement("li");
+      li.className = "dv-row";
+      li.innerHTML = `${r.ico ? icon(r.ico) : `<i class="dot ${r.dot}"></i>`}<div><b></b><small></small><span class="dv-pill"></span></div>`;
+      li.querySelector("b").textContent = r.title;
+      li.querySelector("small").textContent = r.meta;
+      li.querySelector(".dv-pill").textContent = r.act;
+      li.addEventListener("animationend", (ev) => { li.classList.remove(ev.pseudoElement ? "wash" : "new"); });
+      return li;
+    }
+    function dropRow(r, how) {
+      r.leaving = true;
+      r.el.classList.add(how);
+      setLede();
+      setTimeout(() => { flip(() => r.el.remove()); rows.splice(rows.indexOf(r), 1); }, 380);
+    }
+    function addRow(key, data) {
+      const same = rows.find((r) => r.key === key && !r.leaving);
+      if (same) { // it came up again: back to the top
+        rows.splice(rows.indexOf(same), 1); rows.unshift(same);
+        same.due = clock + lifetime();
+        flip(() => rowsEl.prepend(same.el));
+        same.el.classList.remove("wash"); same.el.getBoundingClientRect(); same.el.classList.add("wash");
+        return;
+      }
+      const staying = rows.filter((r) => !r.leaving);
+      if (staying.length >= MAX_ROWS) dropRow(staying[staying.length - 1], "old");
+      const el = rowEl(data);
+      el.classList.add("new", "wash");
+      flip(() => rowsEl.prepend(el));
+      rows.unshift({ key, el, due: clock + lifetime(), leaving: false });
+      setLede();
+    }
+    function tapRows() {
+      for (const r of rows) {
+        if (r.leaving || clock < r.due) continue;
+        r.leaving = true;
+        r.el.classList.add("press");
+        setTimeout(() => dropRow(r, "out"), 450);
+      }
+    }
+    let afterBanner = null;
+    function showBanner(b, then) {
+      if (afterBanner) afterBanner(); // the one showing settles into the list at once
+      banner.querySelector(".dv-ico").outerHTML = icon(b.ico);
+      banner.querySelector(".dv-banner-k").textContent = b.k;
+      banner.querySelector(".notif-title").textContent = b.title;
+      banner.querySelector(".notif-body").textContent = b.body;
+      banner.classList.add("on");
+      afterBanner = then;
+      later("banner", 2600, () => {
+        banner.classList.remove("on");
+        const t = afterBanner; afterBanner = null;
+        if (t) setTimeout(t, 260);
+      });
+    }
+    function briefing() {
+      watch.classList.add("brief");
+      later("watch", 6500, () => watch.classList.remove("brief"));
+    }
+    function addShopping(still) {
+      if (shop.querySelector("[data-k]")) { if (!still) { [...shop.querySelectorAll("[data-k]")].forEach((li) => { li.classList.remove("new"); li.getBoundingClientRect(); li.classList.add("new"); }); } return; }
+      ["Eggs", "Milk"].forEach((name) => {
+        const li = document.createElement("li");
+        li.dataset.k = "dairy";
+        li.innerHTML = `${name}<span>Dairy</span>`;
+        if (!still) li.className = "new";
+        shop.prepend(li);
+      });
+    }
+    function deliver(e) {
+      count("told");
+      if (e.out === "now") { glow(phone); addRow(e.key, e.row); }
+      else if (e.out === "push") { glow(phone); showBanner(e.banner, e.row ? () => addRow(e.key, e.row) : null); }
+      else if (e.out === "watch") { glow(watch); briefing(); }
+      else if (e.out === "wall") { glow(tablet); addShopping(false); }
     }
     const counts = { read: 0, told: 0, quiet: 0 }, quietBy = new Map();
     function count(which) { counts[which]++; ({ read: readEl, told: toldEl, quiet: foldEl })[which].textContent = counts[which]; }
@@ -344,7 +479,7 @@
       const draw = () => {
         G = measure();
         drawWires();
-        const shown = [["promo"], ["dor"], ["maya"], ["sleep"]];
+        const shown = [["promo"], ["dor"], ["sleep"], ["milk"]];
         for (const [k] of shown) {
           const e = E[k], hue = HUE[e.in], [sk, text, needs] = e.stops[0];
           light(sk, text, needs, hue);
@@ -354,11 +489,15 @@
           path(end, "trail", hue);
           const sm = node(e.in).querySelector("small");
           sm.textContent = e.text; node(e.in).classList.add("got");
-          if (e.out) { const o = node(e.out).querySelector("small"); o.textContent = e.said; node(e.out).classList.add("got"); }
         }
         if (!trayChips.children.length) { ["Promo", "News", "Group chat", "Delivery"].forEach((l, i) => { for (let j = 0; j < [14, 12, 6, 4][i]; j++) keepQuiet(l); }); }
-        readEl.textContent = 41; toldEl.textContent = 3;
+        readEl.textContent = 41; toldEl.textContent = 5;
       };
+      // the phone with three rows, the watch with its briefing, the list with milk and eggs
+      for (const k of ["pickup", "dor", "plan"].reverse()) { const r = { key: k, el: rowEl(E[k].row), due: Infinity, leaving: false }; rowsEl.prepend(r.el); rows.unshift(r); }
+      setLede(true);
+      watch.classList.add("brief");
+      addShopping(true);
       dia.querySelectorAll("small[data-idle], .dia-step-o").forEach((s) => { s.dataset.idle = s.dataset.idle || s.textContent; });
       const redraw = () => requestAnimationFrame(draw);
       (document.fonts ? document.fonts.ready : Promise.resolve()).then(redraw);
@@ -399,7 +538,7 @@
         });
       });
       const lastPort = port(e.stops[e.stops.length - 1][0]);
-      if (e.out) move(toOutput(lastPort, e.out), { end: () => { deliver(e.out, e.said); count("told"); } });
+      if (e.out) move(toOutput(lastPort, e.out), { end: () => deliver(e) });
       else if (e.quiet) move(`M${pt(lastPort)} L${pt([lastPort[0], G.trayY])}`, { shrink: true, end: () => keepQuiet(e.quiet) });
       live.push({ el, w, h, segs, i: 0, t: 0, trails: segs.filter((s) => s.p).map((s) => s.p), started: false });
     }
@@ -476,6 +615,7 @@
         clock += dt;
         if (clock >= nextSpawn) { nextSpawn = clock + SPAWN_EVERY; spawn(); }
         step(dt);
+        tapRows();
       }
       frame = requestAnimationFrame(tick);
     }
