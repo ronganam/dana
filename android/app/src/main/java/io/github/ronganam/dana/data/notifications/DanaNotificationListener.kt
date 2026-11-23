@@ -48,6 +48,8 @@ class DanaNotificationListener : NotificationListenerService() {
         io.github.ronganam.dana.data.signals.PhoneSignals.watch(this)
         // A bank sign-in code the server still waits for (only while one is armed).
         io.github.ronganam.dana.data.money.MoneyCodes.scanShade(this)
+        // The app icons already saved, to the server (when a sync is due).
+        AppIconSync.request(this)
         if (!NotificationSettings.enabled(this)) return
         // What is already in the shade (the server dedupes repeats).
         try {

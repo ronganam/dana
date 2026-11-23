@@ -3,6 +3,8 @@ package io.github.ronganam.dana.data.network
 import io.github.ronganam.dana.data.network.ApiClient.Companion.enc
 import io.github.ronganam.dana.data.network.ApiClient.Companion.jsonBody
 import kotlinx.serialization.Serializable
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.RequestBody.Companion.toRequestBody
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -31,6 +33,10 @@ data class PhoneEventsPage(val events: LenientList<PhoneEvent> = emptyList(), va
 @Serializable
 private data class Registered(val latestSeq: Long = 0)
 
+/** `GET /api/phone/app-icons`: the user's stored app icons, package → the first 8 hex chars of the PNG's sha256. */
+@Serializable
+private data class AppIconsAnswer(val icons: Map<String, String> = emptyMap())
+
 /** What the server said to a push registration (`POST /api/phone/register`). */
 sealed interface PushRegistered {
     /** Stored; [latestSeq] is the user's newest event number (a fresh install starts there). */
@@ -40,7 +46,7 @@ sealed interface PushRegistered {
     data class Refused(val code: Int, val error: String, val detail: String) : PushRegistered
 }
 
-/** This user and this device: `/api/me`, direct push, coding-agent sessions. */
+/** This user and this device: `/api/me`, direct push, app icons, coding-agent sessions. */
 class DevicesApi(private val http: ApiClient) {
 
     suspend fun me(): MeAnswer = http.decode(MeAnswer.serializer(), http.text(http.request("/api/me"), "Failed to load your account", "{}"))
@@ -67,6 +73,27 @@ class DevicesApi(private val http: ApiClient) {
         http.decode(PhoneEventsPage.serializer(),
             http.text(http.request("/api/phone/events?after=$after"), "Couldn't fetch phone events", "{}"))
 
+    /**
+     * The app icons the server keeps for this user (package → hash). Throws
+     * [ApiException] (403 when the phone addon isn't connected) or
+     * [java.io.IOException] when the server can't be reached.
+     */
+    suspend fun appIcons(): Map<String, String> =
+        http.decode(AppIconsAnswer.serializer(),
+            http.text(http.request("/api/phone/app-icons"), "Couldn't list app icons", "{}")).icons
+
+    /**
+     * Store [png] as [pkg]'s icon (`PUT /api/phone/app-icons/{package}`); the
+     * HTTP status (204 stored; 400 `bad_package` / `not_png`, 409 `too_many`,
+     * 413 `too_large`). Throws [java.io.IOException] when unreachable.
+     */
+    suspend fun putAppIcon(pkg: String, png: ByteArray): Int =
+        http.sendForCode(http.request("/api/phone/app-icons/${enc(pkg)}") { put(png.toRequestBody(PNG)) })
+
     /** Forget one of the user's coding-agent sessions (the live notification's Hide). */
     suspend fun hideAgentSession(id: String): Boolean = http.send(http.request("/api/agent-sessions/${enc(id)}") { delete() })
+
+    private companion object {
+        val PNG = "image/png".toMediaType()
+    }
 }

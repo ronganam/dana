@@ -56,6 +56,13 @@ import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.shell.DaySlot
 import io.github.ronganam.dana.ui.shell.dragToDay
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import io.github.ronganam.dana.data.notifications.AppIcons
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
 internal val NOW_GUTTER = 16.dp
@@ -77,8 +84,8 @@ class NowHandlers(
 )
 
 /**
- * A row of the queue, on the canvas: an 8dp dot in its kind's hue
- * ([NowModel.hueOf]), the title, one muted line (source · why), the one
+ * A row of the queue, on the canvas: its lead ([NowModel.rowLead]: a
+ * notification item's app icon, else an 8dp dot in its kind's hue), the title, one muted line (source · why), the one
  * visible action as a quiet pill (an ember fill for approvals) and a ⋯ menu
  * with every other action and "Ask Dana about this". On the cover screen a
  * tap opens the row in place (evidence, choices / checks, the reply box) and
@@ -108,7 +115,7 @@ fun NowRow(
     val offset = remember(item.id) { Animatable(0f) }
     val scope = rememberCoroutineScope()
     val h = hues
-    val hue = h.of(remember(item) { NowModel.hueOf(item) })
+    val lead = remember(item) { NowModel.rowLead(item) }
     val hasMore = item.blocks.isNotEmpty() || item.notification != null
 
     /** Swiped past the threshold: slide out, do it; snap back later only if the card is still here (failed / undone). */
@@ -190,8 +197,11 @@ fun NowRow(
                     .padding(top = 16.dp, bottom = 16.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                // The dot sits on the title's first line (22sp line, 8dp dot).
-                Box(Modifier.padding(top = 7.dp).size(8.dp).clip(CircleShape).background(hue))
+                // The lead sits on the title's first line (22sp line): the app icon (20dp) or the dot (8dp).
+                when (lead) {
+                    is RowLead.App -> RowAppIcon(lead, Modifier.padding(top = 1.dp))
+                    is RowLead.Dot -> Box(Modifier.padding(top = 7.dp).size(8.dp).clip(CircleShape).background(h.of(lead.hue)))
+                }
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f)) {
                     Text(
@@ -226,6 +236,31 @@ fun NowRow(
             }
         }
         Rule(Modifier.padding(horizontal = NOW_GUTTER))
+    }
+}
+
+/** A row's lead is this big when it is an app icon. */
+internal val ROW_ICON = 20.dp
+
+/**
+ * A notification item's app icon (saved by [AppIcons]), 20dp with 5dp
+ * corners; until there is one, the app's letter on the teal tint (as the
+ * Inbox's tiles). Decorative: the row's source line names the app.
+ */
+@Composable
+private fun RowAppIcon(lead: RowLead.App, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current.applicationContext
+    val icon by produceState<ImageBitmap?>(AppIcons.cached(lead.pkg)?.asImageBitmap(), lead.pkg) {
+        if (value == null) value = withContext(Dispatchers.IO) { AppIcons.load(ctx, lead.pkg) }?.asImageBitmap()
+    }
+    val h = hues
+    val bmp = icon
+    Box(
+        modifier.size(ROW_ICON).clip(RoundedCornerShape(5.dp)).background(if (bmp == null) h.tint(h.of(Hue.TEAL)) else Color.Transparent),
+        contentAlignment = Alignment.Center
+    ) {
+        if (bmp != null) Image(bmp, contentDescription = null, modifier = Modifier.size(ROW_ICON))
+        else Text(lead.letter, style = MaterialTheme.typography.labelMedium.copy(fontSize = 11.sp, lineHeight = 11.sp), color = h.text(h.of(Hue.TEAL)))
     }
 }
 
