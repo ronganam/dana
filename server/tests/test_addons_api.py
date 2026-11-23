@@ -21,14 +21,12 @@ import json
 import os
 import sys
 from typing import Any, Dict, List, Optional, Tuple
-from unittest.mock import AsyncMock
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("addons_api_test")
 os.environ["API_TOKEN"] = "addons-api-env-token"  # a test value: the first admin's token (a headless install)
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
-os.environ["HA_WATCH_RECONCILE_SECONDS"] = "3600"  # the periodic tick never comes during the test
 os.environ["GOOGLE_CLIENT_ID"] = "test-client"
 os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
 # A site addon that fails to load (listed as failed), and a catalog with one valid and one invalid entry.
@@ -64,7 +62,6 @@ from core.auth import setup_auth  # noqa: E402
 from addons.calendar import client as cal_client  # noqa: E402
 from core.addons import addresses, registry, store  # noqa: E402
 from core.addons.addon import get_addon  # noqa: E402
-from addons.homeassistant import watcher as ha_watcher  # noqa: E402
 from addons.shopping import lists as shopping_lists  # noqa: E402
 from addons.tasks import groups  # noqa: E402
 from testfakes import FakeHA  # noqa: E402
@@ -101,16 +98,14 @@ SECRETS = ["env-ha-token", "tok-a", "tok-b", "bob-wrong-token", "waha-key-1", "b
 HA_A = FakeHA("A", "tok-a", {
     "person.robin": ("home", {"friendly_name": "Robin"}),
     "zone.home": ("0", {"friendly_name": "Home"}),
-    "weather.forecast_home": ("sunny", {"friendly_name": "Forecast Home"}),
+    "media_player.robin_tv": ("on", {"friendly_name": "Robin TV"}),
 }, {}, "Asia/Jerusalem")
 HA_B = FakeHA("B", "tok-b", {
     "person.bob": ("home", {"friendly_name": "Bob"}),
-    "person.wendy": ("away", {"friendly_name": "Wendy"}),
-    "sensor.b_bt": ("1", {"friendly_name": "Bob BT", "connected_paired_devices": "['AA:BB (Bob Car)', 'CC:DD (Buds)']"}),
     "sensor.b_battery": ("80", {"friendly_name": "Bob Battery", "device_class": "battery"}),
     "sensor.b_temp": ("21", {"friendly_name": "Den temperature", "device_class": "temperature"}),
-    "binary_sensor.b_interactive": ("on", {"friendly_name": "Bob screen"}),
-    "weather.b": ("rainy", {"friendly_name": "Bob weather"}),
+    "media_player.den_tv": ("on", {"friendly_name": "Den TV"}),
+    "media_player.b_kitchen": ("off", {"friendly_name": "Bob Kitchen speaker"}),
     "light.b_den": ("off", {"friendly_name": "B Den"}),
 }, {}, "Europe/London")
 
@@ -246,7 +241,7 @@ async def test_me_and_list(client: TestClient) -> None:
                       "icon", "features", "pages", "setup", "examples", "disconnect_warning"}
           and ha["icon"] == "house" and ha["title"] == "Home Assistant" and ha["pages"] == []
           and ha["needs"][0] == {"kind": "hardware", "what": "a Home Assistant server Dana's server can reach",
-                                 "why": "Lights, devices, zones and the weather come from it", "optional": False}
+                                 "why": "Lights, devices and rooms come from it", "optional": False}
           and ha["touches"] == {"hosts": ["your Home Assistant server"], "acts_outside": True,
                                 "stores_credentials": True, "reads": []}
           and "Turn off the living room lights" in ha["examples"] and ha["disconnect_warning"] is None
@@ -275,11 +270,12 @@ async def test_me_and_list(client: TestClient) -> None:
                "url": "https://www.home-assistant.io/docs/authentication/#your-account-profile", "placeholder": "",
                "required": True, "set": True,
                "type": "text", "secret": True, "can_change": True, "why_not": None, "rule": None}]
-          and {"name": "weather_entity", "label": "Weather",
-               "description": "Weather entity for the wake briefing and the Now screen",
-               "help": get_addon("homeassistant").field("weather_entity").help, "url": None,
-               "placeholder": "weather.forecast_home",
-               "default": "weather.forecast_home", "value": "weather.forecast_home", "type": "text",
+          and [f["name"] for f in ha["settings"]] == ["phone_battery_sensor", "tv_entity", "tv_channel_command"]
+          and {"name": "tv_entity", "label": "TV",
+               "description": "Android TV media_player entity (the androidtv / ADB one) the TV tool controls by default",
+               "help": get_addon("homeassistant").field("tv_entity").help, "url": None,
+               "placeholder": "media_player.living_room_tv",
+               "default": None, "value": None, "type": "text",
                "can_change": True, "why_not": None, "rule": None} in ha["settings"], ha)
     check("list: ops says what it requires", addons["ops"]["requires"] == "ops" and addons["tasks"]["requires"] is None)
     status, body = await call(client, "GET", "/api/addons", BOB_AUTH)
@@ -333,22 +329,25 @@ async def test_put(client: TestClient) -> None:
           and "HomeAssistant control" not in agent.instructions(BOB))
 
     status, body = await call(client, "PUT", path, BOB_AUTH, {"credentials": {"host": HA_B.url, "token": "tok-b"},
-                                                              "settings": {"person": "person.bob"}})
+                                                              "settings": {"tv_entity": "media_player.den_tv"}})
     settings = {s["name"]: s["value"] for s in body.get("settings", [])}
     check("connect: 201, connected, credentials set, settings merged with defaults",
           status == 201 and body["connected"] is True and all(c["set"] for c in body["credentials"])
-          and settings["person"] == "person.bob" and settings["weather_entity"] == "weather.forecast_home", body)
+          and settings == {"phone_battery_sensor": None, "tv_entity": "media_player.den_tv",
+                           "tv_channel_command": None}, body)
     check("connect: takes effect at once (tools, the agent's instructions)",
           registry.has_tool(BOB, "call_ha_service") and "HomeAssistant control" in agent.instructions(BOB))
-    status, body = await call(client, "PUT", path, BOB_AUTH, {"settings": {"car_sensor": "sensor.b_bt",
-                                                                           "car_device": "Bob Car"}})
+    status, body = await call(client, "PUT", path, BOB_AUTH, {"settings": {"phone_battery_sensor": "sensor.b_battery"}})
     conn = store.get(BOB, "homeassistant")
     check("update: 200, settings merged, credentials kept",
-          status == 200 and conn.settings["person"] == "person.bob" and conn.settings["car_device"] == "Bob Car"
-          and conn.credentials["token"] == "tok-b", body)
-    status, body = await call(client, "PUT", path, BOB_AUTH, {"settings": {"car_device": None}})
+          status == 200 and conn.settings["tv_entity"] == "media_player.den_tv"
+          and conn.settings["phone_battery_sensor"] == "sensor.b_battery" and conn.credentials["token"] == "tok-b", body)
+    status, body = await call(client, "PUT", path, BOB_AUTH, {"settings": {"phone_battery_sensor": None}})
     check("update: a null setting goes back to its default", status == 200
-          and store.get(BOB, "homeassistant").settings["car_device"] is None)
+          and store.get(BOB, "homeassistant").settings["phone_battery_sensor"] is None)
+    status, body = await call(client, "PUT", path, BOB_AUTH, {"settings": {"person": "person.bob"}})
+    check("update: a sensor setting of the old Home Assistant signals is unknown → 400",
+          status == 400 and body["field"] == "person", body)
     status, body = await call(client, "PUT", path, BOB_AUTH, {"credentials": {"token": ""}})
     check("update: emptying a required credential → 400", status == 400 and body["field"] == "token"
           and store.get(BOB, "homeassistant").credentials["token"] == "tok-b")
@@ -414,19 +413,15 @@ async def test_checks_and_options(client: TestClient) -> None:
     s = body.get("settings", {})
     check("options: candidates from Bob's own Home Assistant",
           status == 200 and body["name"] == "homeassistant"
-          and s["person"] == [{"value": "person.bob", "label": "Bob"}, {"value": "person.wendy", "label": "Wendy"}]
-          and s["car_sensor"] == [{"value": "sensor.b_bt", "label": "Bob BT"}]
-          and s["car_device"] == [{"value": "AA:BB (Bob Car)", "label": "AA:BB (Bob Car)"},
-                                  {"value": "CC:DD (Buds)", "label": "CC:DD (Buds)"}]
-          and s["phone_interactive_sensor"] == [{"value": "binary_sensor.b_interactive", "label": "Bob screen"}]
-          and s["phone_battery_sensor"] == [{"value": "sensor.b_battery", "label": "Bob Battery"}]
-          and s["weather_entity"] == [{"value": "weather.b", "label": "Bob weather"}], s)
-    check("options: nothing of the other Home Assistant", "person.robin" not in json.dumps(s))
+          and s == {"phone_battery_sensor": [{"value": "sensor.b_battery", "label": "Bob Battery"}],
+                    "tv_entity": [{"value": "media_player.b_kitchen", "label": "Bob Kitchen speaker"},
+                                  {"value": "media_player.den_tv", "label": "Den TV"}]}, s)
+    check("options: nothing of the other Home Assistant", "robin_tv" not in json.dumps(s))
     store.update(ADMIN, "homeassistant", credentials={"host": HA_A.url, "token": "tok-a"})
     status, body = await call(client, "GET", "/api/addons/homeassistant/options", ADMIN_AUTH)
     check("options: the admin's from theirs", status == 200
-          and body["settings"]["person"] == [{"value": "person.robin", "label": "Robin"}]
-          and body["settings"]["car_sensor"] == [] and ("/api/states", "tok-a") in HA_A.requests)
+          and body["settings"]["tv_entity"] == [{"value": "media_player.robin_tv", "label": "Robin TV"}]
+          and body["settings"]["phone_battery_sensor"] == [] and ("/api/states", "tok-a") in HA_A.requests)
     status, body = await call(client, "GET", "/api/addons/homeassistant/options", CARL_AUTH)
     check("options: not connected → 403", status == 403 and body["error"] == "not_connected")
     status, body = await call(client, "GET", "/api/addons/tasks/options", CARL_AUTH)
@@ -478,33 +473,20 @@ async def test_checks_and_options(client: TestClient) -> None:
     check("reconnect: signing in again clears it", "reconnect" not in calendar(mine), calendar(mine))
 
 
-# --- 5. No restart needed: the watcher, the WhatsApp account, disconnect -------------------------
+# --- 5. No restart needed: the WhatsApp account, disconnect -------------------------------------
 
 async def test_live_effects(client: TestClient) -> None:
-    fire = AsyncMock()
-    watchers = ha_watcher.Watchers(fire)
-    task = asyncio.create_task(watchers.run_forever())
-    try:
-        check("watcher: Bob's starts (person set)", await until(lambda: BOB.id in watchers.running()))
-        await call(client, "PUT", "/api/addons/homeassistant", BOB_AUTH, {"settings": {"person": "person.wendy"}})
-        check("watcher: a settings change is picked up at once (the tick is an hour away)",
-              await until(lambda: BOB.id in watchers.running()
-                          and watchers.running()[BOB.id].person == "person.wendy"))
-        status, body = await call(client, "DELETE", "/api/addons/homeassistant", BOB_AUTH)
-        check("disconnect: 200, connected false, disconnected true",
-              status == 200 and body["connected"] is False and body["disconnected"] is True
-              and not any(c["set"] for c in body["credentials"]), body)
-        check("watcher: stops at once on disconnect", await until(lambda: BOB.id not in watchers.running()))
-        check("disconnect: tools and instructions follow at once", not registry.has_tool(BOB, "call_ha_service")
-              and "HomeAssistant control" not in agent.instructions(BOB))
-        status, body = await call(client, "DELETE", "/api/addons/homeassistant", BOB_AUTH)
-        check("disconnect: twice → disconnected false", status == 200 and body["disconnected"] is False)
-        await call(client, "PUT", "/api/addons/homeassistant", BOB_AUTH,
-                   {"credentials": {"host": HA_B.url, "token": "tok-b"}, "settings": {"person": "person.bob"}})
-        check("watcher: connecting again starts it at once", await until(lambda: BOB.id in watchers.running()))
-    finally:
-        task.cancel()
-        await asyncio.gather(task, return_exceptions=True)
+    status, body = await call(client, "DELETE", "/api/addons/homeassistant", BOB_AUTH)
+    check("disconnect: 200, connected false, disconnected true",
+          status == 200 and body["connected"] is False and body["disconnected"] is True
+          and not any(c["set"] for c in body["credentials"]), body)
+    check("disconnect: tools and instructions follow at once", not registry.has_tool(BOB, "call_ha_service")
+          and "HomeAssistant control" not in agent.instructions(BOB))
+    status, body = await call(client, "DELETE", "/api/addons/homeassistant", BOB_AUTH)
+    check("disconnect: twice → disconnected false", status == 200 and body["disconnected"] is False)
+    status, body = await call(client, "PUT", "/api/addons/homeassistant", BOB_AUTH,
+                              {"credentials": {"host": HA_B.url, "token": "tok-b"}})
+    check("connect again: tools back at once", status == 201 and registry.has_tool(BOB, "call_ha_service"))
 
     status, body = await call(client, "PUT", "/api/addons/whatsapp", BOB_AUTH,
                               {"credentials": {"url": WAHA.url, "api_key": "waha-key-1", "session": "default"}})

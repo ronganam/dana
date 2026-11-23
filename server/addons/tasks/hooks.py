@@ -4,7 +4,7 @@ docs/now.md; the hooks: docs/writing-an-addon.md):
 - jobs: every ``TIME_CHECK_INTERVAL`` seconds (30) each user's due time
   triggers fire; at start every user gets the default lists they lack;
 - events: core's ``core.signal.location`` / ``core.signal.car`` (from the
-  phone or Home Assistant, whichever is active: core/signals.py) fire
+  active source, Dana's phone app: core/signals.py) fire
   location / car triggers (a ``late`` one only records the transition),
   ``core.user.woke`` the wake ones;
   ``knowledge.project.deleted`` deletes the owner's tasks that carried the

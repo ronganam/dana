@@ -83,7 +83,7 @@ fun remindWhen(task: Task): RemindWhen = remindWhens(task).firstOrNull() ?: Remi
 
 fun isHomeZone(name: String?): Boolean = name?.trim()?.equals("home", ignoreCase = true) == true
 
-/** "Home" as the server spells it (zones come from Home Assistant), for the "At home" slot. */
+/** "Home" as the server spells it (the user's Dana zones), for the "At home" slot. */
 fun homeZoneName(zones: List<String>): String = zones.firstOrNull { isHomeZone(it) } ?: "Home"
 
 private fun zoneLabel(z: String) = z.replaceFirstChar { it.titlecase(Locale.getDefault()) }

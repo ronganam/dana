@@ -48,7 +48,7 @@ addon = Addon(
     description="Current weather and the forecast for your places.",
     version="1.0.0",
     needs=(Need("account", "an OpenWeather account", "Its forecasts"),          # what running it takes
-           Need("addon", "homeassistant", "Your home's location", optional=True)),
+           Need("addon", "phone", "Where you are", optional=True)),
     touches=Touches(hosts=("api.openweathermap.org",), stores_credentials=True), # what it may touch
     icon="cloud-sun",                           # the Addons page: a Lucide icon, what it adds, the steps, what to try
     features=("Today's weather and the week ahead",),

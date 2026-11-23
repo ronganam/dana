@@ -2,8 +2,8 @@
 
 A **zone** is one of a user's places: a name, a centre (latitude, longitude) and a radius in metres. Location
 reminders name a zone ("remind me when I arrive at the Gym"); "at home" is the user's Home zone. Zones are Dana's own,
-per user, and work with or without Home Assistant: the phone app's geofences tell Dana when the user arrives or
-leaves (`docs/signals.md`).
+per user: the phone app's geofences tell Dana when the user arrives or leaves (`docs/signals.md`). Home Assistant's
+zones can be copied in once (below); Home Assistant does not report arrivals.
 
 Code: `core/zones.py` (the zones), `core/zones_api.py` (HTTP), `core/places.py` (the place search, a country's
 currency); web: `static/zones.js` + `zones.css` (the Settings → Zones card and the place picker the wizard shares).
@@ -51,9 +51,7 @@ their zones (HTTP 400 `{"error": "'Moon' is not one of your zones. Your zones: H
 chat); with no zones at all the message says to add them in Settings → Zones. The agent lists them with the tasks
 tool `get_zones`. The trigger fires on the user's `location` signal (`docs/signals.md`): the phone app's geofences on these zones
 (`{"type": "zone", "action": "arrive" | "leave", "zone_id"}` to `POST /api/signals`: the zone's name is used, an id
-that is not one of the caller's zones is refused), or, while the phone is not the active source, their Home Assistant
-watcher from their person entity's state (the HA zone's name, `docs/tasks-and-triggers.md`), so for users with Home
-Assistant the zone names should match theirs (the import below copies them).
+that is not one of the caller's zones is refused).
 
 ## The phone's geofences
 

@@ -57,7 +57,7 @@ Another module of the addon imports the manifest as `from addons.<name>.addon im
 | `order` | int or None | `None` | Its place among the official addons (lower first; others follow by name). |
 | `on_connect` | function | `None` | Called with the user right after the addon is connected for them (e.g. `tasks` gives them the default task lists); a failure is logged and does not undo the connection. |
 | `on_credentials_change` | function | `None` | Called with the user right after `update` changed the stored credentials (another address or account: `whatsapp` learns its account again); a failure is logged and does not undo the change. |
-| `on_change` | function | `None` | Called with the user right after any connect, update or disconnect of the addon for them (`homeassistant`: reconcile the entity watchers now); a failure is logged. |
+| `on_change` | function | `None` | Called with the user right after any connect, update or disconnect of the addon for them (`money`: delete the user's money data once it is disconnected); a failure is logged. |
 | `prompt_section` | function | `None` | The addon's section of the agent's system prompt for a user (`about`: their facts), asked on every turn through `prompt_section` only while the user has the addon connected. It must be cheap (cached), never block and return "" for nothing. |
 | `test` | function | `None` | An async function of a stored connection making one cheap request: None when the connection works, else a short reason (never a secret). `POST /api/addons/{name}/test`. |
 | `options` | function | `None` | An async function of a stored connection returning values a client can offer for its settings, read from the user's own service. `GET /api/addons/{name}/options`. |
@@ -360,7 +360,7 @@ def paused(conn: Connection) -> Optional[str]:
 
 ### `on_change=`
 
-Called with the user right after any connect, update or disconnect of the addon for them (`homeassistant`: reconcile the entity watchers now); a failure is logged.
+Called with the user right after any connect, update or disconnect of the addon for them (`money`: delete the user's money data once it is disconnected); a failure is logged.
 
 ### `on_credentials_change=`
 

@@ -28,9 +28,10 @@ BASELINES = ["core:0001_baseline"] + [f"{a}:0001_baseline" for a in sorted(OFFIC
 # Core's migrations after its baseline.
 CORE_LATER = dict(migrations.all_migrations())[migrations.CORE][1:]
 CORE_LABELS = [m.label for m in CORE_LATER]
-# Every migration after a baseline (core's, then the official addons'): applied on a fresh
-# database and after converting 9.0, in the order the runner applies them.
-LATER = [m for _, ms in migrations.all_migrations() for m in ms[1:]]
+# Every migration that is not a baseline (core's, then the official addons'; homeassistant's
+# first one is a data step): applied on a fresh database and after converting 9.0, in the
+# order the runner applies them.
+LATER = [m for _, ms in migrations.all_migrations() for m in ms if not (m.version == 1 and m.name == "baseline")]
 LATER_LABELS = [m.label for m in LATER]
 LATER_ROWS = [(m.addon, m.version, m.name) for m in LATER]
 # Tables a later core migration drops (m0003: the env import is gone).

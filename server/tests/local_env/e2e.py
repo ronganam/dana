@@ -16,7 +16,7 @@ second user made with the CLI (empty data, the admin's ids 404, 403
 not_connected, own addons through the API, own tools and prompt, a
 hidden tool refused and not executed, admin-only endpoints); sharing (task
 list, project through share_item in chat, the shopping list: invitation, use
-with moving items and its undo, the live stream, aisles from the model stub); the Home Assistant watcher; WAHA inbound routing and the signed-webhook
+with moving items and its undo, the live stream, aisles from the model stub); location and car reminders from the phone's signals; WAHA inbound routing and the signed-webhook
 rule; phone events and notifications; Telegram; usage; the security rules
 (debug export, cameras admin-only, addresses, Telegram chats, the WAHA session,
 webhook and media origin, device rows); the second review's findings (a task
@@ -430,10 +430,7 @@ async def upgrade(c: Client) -> Dict[str, Any]:
           and not no_secret_in(integ.text), no_secret_in(integ.text))
     settings = {k: {s["name"]: s["value"] for s in v["settings"]} for k, v in by_kind.items()}
     check("upgrade: homeassistant settings as connected", settings.get("homeassistant") == {
-        "person": "person.robin", "car_sensor": "sensor.pixel_8_bluetooth_connection", "car_device": "CarKit-1234",
-        "phone_interactive_sensor": "binary_sensor.robin_phone_interactive",
-        "phone_battery_sensor": "sensor.robin_phone_battery", "phone_notify_service": "mobile_app_robin_phone",
-        "weather_entity": "weather.forecast_home", "tv_entity": None, "tv_channel_command": None},
+        "phone_battery_sensor": "sensor.robin_phone_battery", "tv_entity": None, "tv_channel_command": None},
         settings.get("homeassistant"))
     # bin/local-env.sh connected WhatsApp with the CLI (another process, no event loop): the server's
     # learn_account job asks WAHA within a minute (addons/whatsapp/accounts.py).
@@ -462,9 +459,8 @@ async def upgrade(c: Client) -> Dict[str, Any]:
           (code, no_secret_in(out), out[:300]))
     r = await c.get("/api/checks")
     keys = {x["key"]: x for x in (r.body or {}).get("checks", [])}
-    check("upgrade: self-check ha_watcher connected, no ha_entities missing",
-          keys.get("ha_watcher", {}).get("ok") is True and keys.get("ha_entities", {}).get("ok", True) is True,
-          {k: keys.get(k) for k in ("ha_watcher", "ha_entities")})
+    check("upgrade: no Home Assistant sensor self-checks (location, car, ha_entities, ha_watcher)",
+          r.status == 200 and not set(keys) & {"location", "car", "ha_entities", "ha_watcher"}, sorted(keys))
     # What the restart must leave unchanged: read now, after the WhatsApp account was learned.
     return {"admin_id": admin_id, "addons": (await c.get("/api/addons")).text}
 
@@ -569,7 +565,6 @@ WEB_LOAD = [
     ("/api/usage?range=30d", has("totals", "by_day", "previous")),
     ("/api/usage/events?sort=recent&limit=50", has("events", "next")),
     ("/api/zones", is_list("name", "entity_id")),
-    ("/api/client-config", has("interactive_sensor", "person", "notify_service")),
     ("/api/ha/state/sensor.robin_phone_battery", has("entity_id", "state", "attributes")),
     ("/api/shopping/items", is_list("id", "name", "checked", "quantity", "note", "category")),
     ("/api/shopping", has("list", "categories", "items", "counts", "usuals", "invites", "lists")),
@@ -810,7 +805,7 @@ async def second_user(c: Client, admin_id: str) -> Dict[str, str]:
         check(f"member: PUT /api/addons/{kind} connects (201)", r.status == 201 and (r.body or {}).get("connected"), r)
     r = await c.put("/api/addons/homeassistant", {
         "credentials": {"host": "http://stubs:8124", "token": "local-ha-token-b"},
-        "settings": {"person": "person.maya", "car_sensor": "sensor.maya_phone_bluetooth_connection", "car_device": "Maya Car"}}, token)
+        "settings": {"tv_entity": "media_player.maya_tv"}}, token)
     check("member: connects her own Home Assistant (201, token not echoed)", r.status == 201 and "local-ha-token-b" not in r.text, r)
     r = await c.put("/api/addons/whatsapp", {
         "credentials": {"url": "http://stubs:3000/api/", "api_key": "local-waha-key", "session": "maya"},
@@ -823,10 +818,8 @@ async def second_user(c: Client, admin_id: str) -> Dict[str, str]:
     check("member: her WhatsApp account learned on connect", acct == MEMBER_ACCOUNT, acct)
     r = await c.get("/api/addons/homeassistant/options", token)
     opts = json.dumps(r.body or {})
-    check("member: options come from her own Home Assistant", r.status == 200 and "person.maya" in opts
-          and "person.robin" not in opts, r)
-    r = await c.get("/api/client-config", token)
-    check("member: client-config from her settings", (r.body or {}).get("person") == "person.maya", r)
+    check("member: options come from her own Home Assistant", r.status == 200 and "media_player.maya_tv" in opts
+          and "robin" not in opts, r)
     r = await c.post("/api/ha/zones/import", token=token)
     check("member: her Home Assistant zones copied into her own", r.status == 200
           and sorted(z["name"] for z in (r.body or {}).get("added", [])) == ["Gym", "Home"], r)
@@ -1033,7 +1026,7 @@ async def sharing(c: Client, maya: Dict[str, str]) -> None:
 
 
 # =================================================================================================
-# 5. Home Assistant watcher
+# 5. Location and car from the phone
 # =================================================================================================
 
 async def reminders(c: Client, token: str, title: str) -> List[Dict[str, Any]]:
@@ -1062,8 +1055,8 @@ async def unifiedpush(c: Client, maya_token: str, maya_phone: str) -> None:
               r.status == 400 and (r.body or {}).get("error") in ("invalid_endpoint", "invalid"), r)
 
 
-async def watcher(c: Client, maya: Dict[str, str]) -> None:
-    print("\n== 5. Home Assistant watcher")
+async def phone_reminders(c: Client, maya: Dict[str, str]) -> None:
+    print("\n== 5. Location and car from the phone")
     tok = maya["token"]
     for t, dev in ((ADMIN_TOKEN, "e2e-admin-phone"), (tok, "e2e-maya-phone")):
         device_token = await pair(c, t, dev)
@@ -1083,90 +1076,77 @@ async def watcher(c: Client, maya: Dict[str, str]) -> None:
           (ADMIN_TOKEN, "E2E car enter", {"car": "enter"}),
           (ADMIN_TOKEN, "E2E arrive office", {"location": {"location": "office", "event": "arrive"}}),
           (tok, "E2E Maya gym", {"location": {"location": "gym", "event": "arrive"}}),
-          (tok, "E2E Maya car", {"car": "enter"}),
-          (tok, "E2E Maya home", {"location": {"location": "home", "event": "arrive"}})]
+          (tok, "E2E Maya car", {"car": "enter"})]
     for t, title, trig in mk:
         r = await c.post("/api/tasks", {"title": title, "triggers": trig}, t)
-        check(f"watcher: task '{title}' created", r.status == 200, r)
-    subs_b = await until(lambda: _subscribers(c, "b"), timeout=25)
-    check("watcher: her watcher subscribed on her Home Assistant", subs_b, subs_b)
+        check(f"phone signals: task '{title}' created", r.status == 200, r)
     await c.ctrl("POST", "/reset")
+    admin_phone, maya_phone = PHONES["e2e-admin-phone"], PHONES["e2e-maya-phone"]
 
-    await c.ctrl("POST", "/ha/a/state", {"entity_id": "person.robin", "state": "Work"})
+    body = await signal(c, admin_phone, {"type": "zone", "action": "arrive",
+                                         "zone_id": await zone_id(c, ADMIN_TOKEN, "Work")})
+    check("phone signals: the admin's phone arrives at Work (accepted)", body.get("accepted") == 1, body)
     got = await until(lambda: reminders(c, ADMIN_TOKEN, "E2E arrive work"), timeout=15)
-    check("watcher: admin's person enters Work → admin's reminder queued", got and len(got) == 1, got)
+    check("phone signals: … the admin's reminder queued", got and len(got) == 1, got)
     tg = await until(lambda: _tg_to(c, ADMIN_TG, "E2E arrive work"), timeout=10)
-    check("watcher: … and a Telegram message to the admin's chat", tg, await c.telegram_sent())
-    await c.ctrl("POST", "/ha/b/state", {"entity_id": "person.maya", "state": "Gym"})
+    check("phone signals: … and a Telegram message to the admin's chat", tg, await c.telegram_sent())
+    body = await signal(c, maya_phone, {"type": "zone", "action": "arrive", "zone_id": await zone_id(c, tok, "Gym")})
     got = await until(lambda: reminders(c, tok, "E2E Maya gym"), timeout=15)
-    check("watcher: her person enters Gym → her reminder queued", got and len(got) == 1, got)
+    check("phone signals: her phone arrives at the Gym → her reminder queued", body.get("accepted") == 1
+          and got and len(got) == 1, (body, got))
     tg = await until(lambda: _tg_to(c, MEMBER_TG, "E2E Maya gym"), timeout=10)
-    check("watcher: … and a Telegram message to her chat", tg, await c.telegram_sent())
+    check("phone signals: … and a Telegram message to her chat", tg, await c.telegram_sent())
     admin_titles = " | ".join(str(e["data"].get("task_title")) for e in (await c.phone_events(ADMIN_TOKEN))["events"]
                               if e["type"] == "reminder")
     maya_titles = " | ".join(str(e["data"].get("task_title")) for e in (await c.phone_events(tok))["events"]
                              if e["type"] == "reminder")
-    check("watcher: each reminder only in its user's phone events", "Maya" not in admin_titles
+    check("phone signals: each reminder only in its user's phone events", "Maya" not in admin_titles
           and "arrive work" not in maya_titles and "Water the plants" not in maya_titles, (admin_titles, maya_titles))
     sent = await c.telegram_sent()
-    check("watcher: no Telegram message crossed to the other chat",
+    check("phone signals: no Telegram message crossed to the other chat",
           not any(m["chat_id"] == ADMIN_TG and "Maya" in m["text"] for m in sent)
           and not any(m["chat_id"] == MEMBER_TG and "arrive work" in m["text"] for m in sent), sent)
+    body = await signal(c, maya_phone, {"type": "zone", "action": "arrive",
+                                        "zone_id": await zone_id(c, ADMIN_TOKEN, "Office")})
+    await asyncio.sleep(2)
+    check("phone signals: the admin's zone id from her phone → unknown_zone, nothing fired",
+          body.get("rejected") == [{"index": 0, "error": "unknown_zone"}]
+          and not await reminders(c, ADMIN_TOKEN, "E2E arrive office"), body)
 
-    await c.ctrl("POST", "/ha/a/state", {"entity_id": "sensor.pixel_8_bluetooth_connection", "state": "1",
-                                         "attributes": {"connected_paired_devices": "['CarKit-1234']"}})
+    await signal(c, admin_phone, {"type": "car", "action": "enter", "via": "bluetooth"})
     got = await until(lambda: reminders(c, ADMIN_TOKEN, "E2E car enter"), timeout=15)
-    check("watcher: admin's phone connects to the car → admin's car reminder", got and len(got) == 1, got)
-    await c.ctrl("POST", "/ha/b/state", {"entity_id": "sensor.maya_phone_bluetooth_connection", "state": "1",
-                                         "attributes": {"connected_paired_devices": "['Maya Car']"}})
+    check("phone signals: the admin's phone in the car → the admin's car reminder", got and len(got) == 1, got)
+    await signal(c, maya_phone, {"type": "car", "action": "enter", "via": "android_auto"})
     got = await until(lambda: reminders(c, tok, "E2E Maya car"), timeout=15)
-    check("watcher: her phone connects to her car → her car reminder", got and len(got) == 1, got)
-    check("watcher: car reminders did not cross", not await reminders(c, tok, "E2E car enter")
+    check("phone signals: her phone in her car → her car reminder", got and len(got) == 1, got)
+    check("phone signals: car reminders did not cross", not await reminders(c, tok, "E2E car enter")
           and not await reminders(c, ADMIN_TOKEN, "E2E Maya car"))
 
     # A flap (leave + return within TRIGGER_FLAP_MINUTES) does not refire.
-    await c.ctrl("POST", "/ha/a/state", {"entity_id": "person.robin", "state": "home"})
+    work = await zone_id(c, ADMIN_TOKEN, "Work")
+    await signal(c, admin_phone, {"type": "zone", "action": "leave", "zone_id": work})
     await asyncio.sleep(1)
-    await c.ctrl("POST", "/ha/a/state", {"entity_id": "person.robin", "state": "Work"})
+    await signal(c, admin_phone, {"type": "zone", "action": "arrive", "zone_id": work})
     await asyncio.sleep(5)
-    check("watcher: a flap (Work → home → Work) does not refire", len(await reminders(c, ADMIN_TOKEN, "E2E arrive work")) == 1,
-          await reminders(c, ADMIN_TOKEN, "E2E arrive work"))
+    check("phone signals: a flap (Work → left → Work) does not refire",
+          len(await reminders(c, ADMIN_TOKEN, "E2E arrive work")) == 1, await reminders(c, ADMIN_TOKEN, "E2E arrive work"))
 
-    # A settings change through the API takes effect without a restart.
-    r = await c.put("/api/addons/homeassistant", {"settings": {"person": "person.robin_alt"}})
-    check("watcher: admin changes the person setting (200)", r.status == 200, r)
-    subs = await until(lambda: _subscribed(c, "a", "person.robin_alt"), timeout=25)
-    check("watcher: the watcher re-subscribed to the new entity", subs, subs)
-    await c.ctrl("POST", "/ha/a/state", {"entity_id": "person.robin", "state": "Office"})
-    await asyncio.sleep(4)
-    check("watcher: the old entity no longer fires", not await reminders(c, ADMIN_TOKEN, "E2E arrive office"))
-    await c.ctrl("POST", "/ha/a/state", {"entity_id": "person.robin_alt", "state": "Office"})
-    got = await until(lambda: reminders(c, ADMIN_TOKEN, "E2E arrive office"), timeout=15)
-    check("watcher: the new entity fires", got and len(got) == 1, got)
-    r = await c.put("/api/addons/homeassistant", {"settings": {"person": "person.robin"}})
-    check("watcher: setting put back", r.status == 200, r)
-
-    # Disconnecting stops her watcher.
     r = await c.delete("/api/addons/homeassistant", tok)
-    check("watcher: she disconnects Home Assistant", r.status == 200 and (r.body or {}).get("connected") is False, r)
-    gone = await until(lambda: _no_subscribers(c, "b"), timeout=25)
-    check("watcher: her watcher stopped (no subscriber on her Home Assistant)", gone, await c.ctrl("GET", "/ha/b/log"))
-    await c.ctrl("POST", "/ha/b/state", {"entity_id": "person.maya", "state": "home"})
-    await asyncio.sleep(4)
-    check("watcher: after disconnect her zone change fires nothing", not await reminders(c, tok, "E2E Maya home"))
+    check("member: she disconnects Home Assistant", r.status == 200 and (r.body or {}).get("connected") is False, r)
 
 
-async def _subscribers(c: Client, which: str) -> int:
-    return (await c.ctrl("GET", f"/ha/{which}/log"))["subscribers"]
+async def zone_id(c: Client, token: str, name: str) -> str:
+    """The id of the caller's zone ``name`` ("" when they have none by that name)."""
+    zs = (await c.get("/api/zones", token)).body or []
+    return next((z["id"] for z in zs if z["name"].lower() == name.lower()), "")
 
 
-async def _no_subscribers(c: Client, which: str) -> bool:
-    return (await c.ctrl("GET", f"/ha/{which}/log"))["subscribers"] == 0
+async def signal(c: Client, device_token: str, event: Dict[str, Any]) -> Dict[str, Any]:
+    """One phone event, happening now, posted with the phone's device token."""
+    r = await c.post("/api/signals", {"events": [{"at": int(time.time() * 1000), **event}]}, device_token)
+    return r.body or {}
 
 
-async def _subscribed(c: Client, which: str, eid: str) -> bool:
-    log = await c.ctrl("GET", f"/ha/{which}/log")
-    return bool(log["subscriptions"]) and eid in log["subscriptions"][-1] and log["subscribers"] >= 1
 
 
 async def _tg_to(c: Client, chat: int, text: str) -> List[Dict[str, Any]]:
@@ -1348,7 +1328,7 @@ async def security(c: Client, maya: Dict[str, str]) -> None:
     r = await c.delete("/api/addons/cameras", tok)
     check("cameras: a member's DELETE → 403", r.status == 403, r)
 
-    # Her Home Assistant was disconnected by the watcher section: each of these would connect it.
+    # Her Home Assistant was disconnected in section 5: each of these would connect it.
     for host, why in [("http://stubs:9999", "an origin no admin uses"), ("http://stubs:8124/?x=", "a query"),
                       ("http://user:pw@stubs:8124", "a user name"), ("file:///etc/passwd", "not http(s)")]:
         r = await c.put("/api/addons/homeassistant", {"credentials": {"host": host, "token": "local-ha-token-b"}}, tok)
@@ -1682,7 +1662,7 @@ async def main() -> int:
             await restart_and_key_checks(c, state)
             await existing_clients(c)
             maya = await second_user(c, state["admin_id"])
-            for fn in (sharing, watcher, waha_inbound, phone, telegram, usage, security, second_review,
+            for fn in (sharing, phone_reminders, waha_inbound, phone, telegram, usage, security, second_review,
                        addons_page, shopping_page):
                 try:
                     await fn(c, maya)

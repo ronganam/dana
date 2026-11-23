@@ -13,8 +13,7 @@ calls) and says whether the signal still arrives:
   core/llm.py ``transcriber``; the last backup failed or the schedule is
   overdue, core/backups.py);
 - every addon's ``@addon.selfcheck`` (phone's ``push``, ``notification_sync``,
-  ``triage``, ``calls``; Home Assistant's ``location``, ``car``, ``ha_entities``,
-  ``ha_watcher``; tasks' ``reminders``; calendar's ``calendar``; money's
+  ``triage``, ``calls``; tasks' ``reminders``; calendar's ``calendar``; money's
   ``money``; and any installed addon's checks).
 
 Per user: :func:`for_user` gives the checks of the addons the user has active
@@ -261,7 +260,7 @@ def _check_signals(conn, now: datetime.datetime, user: Optional[User]) -> Dict[s
     return _result("signals", False, f"no source for {', '.join(missing)}", None,
                    title=f"Dana can't tell when you {phrase}",
                    why="Wake briefings and car and place reminders need a source: pair Dana's phone app "
-                       "(Settings → Devices), or connect Home Assistant.",
+                       "(Settings → Devices).",
                    blocks=[{"type": "facts", "label": "Sources", "items": facts}])
 
 

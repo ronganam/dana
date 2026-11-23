@@ -42,13 +42,16 @@ class SignalsContractTest {
     }
 
     @Test
-    fun thePhoneLeadsAndHomeAssistantIsThere() {
+    fun thePhoneIsTheSourceAndOpenMeteoTheWeathers() {
         val o = SignalsJson.overview(body)
         val wake = o.signal("wake")!!
         assertEquals("phone", wake.sources.first().source)
         assertEquals("phone", wake.activeSource?.source)
         assertNotNull(wake.activeSource?.lastAt)
-        assertTrue(o.signals.any { s -> s.sources.any { it.source == "homeassistant" } })
+        o.signals.filter { it.signal != "weather" }.forEach { s ->
+            assertEquals("${s.signal} comes from the phone", listOf("phone"), s.sources.map { it.source })
+        }
+        assertEquals(listOf("open_meteo"), o.signal("weather")!!.sources.map { it.source })
     }
 
     @Test
@@ -92,6 +95,6 @@ class SignalsContractTest {
         val now = ZonedDateTime.of(2026, 11, 22, 9, 0, 0, 0, zone)
         assertEquals("Last · 07:12 · unlock", lastLine(SignalSource("phone", "Dana's phone app", true, "2026-11-22T07:12:03Z", "unlock"), now))
         assertEquals("Last · Sat 21 Nov 18:40", lastLine(SignalSource("phone", "Dana's phone app", true, "2026-11-21T18:40:00Z", ""), now))
-        assertEquals("Nothing yet", lastLine(SignalSource("homeassistant", "Home Assistant", false, null, ""), now))
+        assertEquals("Nothing yet", lastLine(SignalSource("open_meteo", "Open-Meteo", false, null, ""), now))
     }
 }

@@ -11,10 +11,10 @@ import kotlinx.serialization.builtins.serializer
 import androidx.core.content.edit
 
 /**
- * Home Assistant zones for place reminders and snoozes (`GET /api/zones`):
+ * The user's Dana zones for place reminders and snoozes (`GET /api/zones`):
  * the last list the server sent, kept in the app's prefs so the alarm screen,
  * the suggestion editor and the watch have places even offline. Before the
- * first fetch only Home Assistant's own "Home".
+ * first fetch only "Home".
  */
 object Zones {
     private const val TAG = "Zones"

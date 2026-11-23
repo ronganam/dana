@@ -173,8 +173,8 @@ def sections(user: User, now: datetime.datetime) -> Dict[str, Section]:
 
 async def weather(user: User) -> Optional[Dict[str, Any]]:
     """``user``'s weather from the highest-ranked ``weather`` provider that
-    answers (Open-Meteo for their Home zone, then Home Assistant's weather
-    entity; recorded as the ``weather`` signal's source); None when none does."""
+    answers (Open-Meteo for their Home zone; recorded as the ``weather``
+    signal's source); None when none does."""
     hook, value = await registry.answer("weather", user)
     if hook is None:
         return None

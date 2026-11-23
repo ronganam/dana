@@ -8,7 +8,8 @@ model calls), update / merge / delete / merge candidates, model briefs
 tools, task links, snooze count, the wake flow (confirm delay → wake tasks +
 briefing push, once a day, not when still asleep), briefing compose (model and
 plain fallback), meeting cards, weekly review (candidates, proposals, apply,
-schedule) and context chats. The model (at the LiteLLM boundary) / HA / calendar / FCM are mocked.
+schedule) and context chats. The model (at the LiteLLM boundary) / Open-Meteo / calendar / FCM are mocked;
+the screen time is the phone's own screen sessions.
 
 Run: bin/test test_people
 """
@@ -43,16 +44,17 @@ from addons.tasks.groups import ensure_default_groups_for_everyone
 db.migrate()
 users.bootstrap()
 addons_bootstrap.bootstrap()  # the first admin's default addons
-testenv.connect_admin("homeassistant", credentials={"host": "http://homeassistant.local:8123", "token": "test-ha"},
-                      settings={"phone_interactive_sensor": "binary_sensor.phone_interactive"})  # wake reads its history
 testenv.connect_admin("calendar", credentials={"refresh_token": "test-refresh-token"})  # Google is mocked
 OWNER = users.first_admin()
+from core import zones  # noqa: E402
+zones.create(OWNER, "Home", 32.08, 34.78, is_home=True)  # the briefing's weather comes for it
 ensure_default_groups_for_everyone()
 from core import sessions_api
 from addons.tasks import api as tasks_api
 from core.auth import setup_auth
 from core import briefing, briefing_api, clock, context_chats, wake, wake_window, weekly_review
-from addons.phone import api as phone_api, push as phone_push
+from addons.essentials import weather as open_meteo
+from addons.phone import api as phone_api, push as phone_push, signals as phone_signals
 from addons.people import api as people_api, briefs as people_briefs, cadence, detail, linking, merge
 from addons.people import store as people_store, values as people_values
 from core.db import get_db_connection
@@ -76,7 +78,7 @@ def iso(days_ago=0, hours=0):
 
 # --- Fakes -----------------------------------------------------------------------
 
-seen = {"model": [], "push": [], "fail": set(), "history": [], "events": []}
+seen = {"model": [], "push": [], "fail": set(), "events": []}
 
 
 class FakeResponse:
@@ -145,21 +147,15 @@ async def fake_post(self, url, *args, **kwargs):
         ev = phone_push.events_after(users.first_admin(), int(msg["data"]["seq"]) - 1)["events"][0]
         seen["push"].append(ev)
         return FakeResponse({"name": "projects/dana-test/messages/1"})
-    if "/api/services/weather/get_forecasts" in url:
-        return FakeResponse({"service_response": {"weather.forecast_home": {"forecast": [
-            {"temperature": 24, "templow": 14, "precipitation_probability": 70}]}}})
     raise AssertionError(f"unexpected POST {url}")
 
 
 async def fake_get(self, url, *args, **kwargs):
-    if url.endswith("/api/states/weather.forecast_home"):
-        return FakeResponse({"state": "rainy", "attributes": {"temperature": 18, "temperature_unit": "°C"}})
-    if "/api/history/period/" in url:
-        if seen.get("history") is None:
-            return FakeResponse({}, status=500)
-        now = datetime.datetime.now(datetime.timezone.utc)
-        return FakeResponse([[{"state": st, "last_changed": (now - datetime.timedelta(seconds=ago)).isoformat()}
-                              for ago, st in seen["history"]]])
+    if url == open_meteo.URL:  # the weather at the Home zone
+        return FakeResponse({"current_units": {"temperature_2m": "°C"},
+                             "current": {"temperature_2m": 18, "weather_code": 61, "is_day": 1},
+                             "daily": {"temperature_2m_max": [24], "temperature_2m_min": [14],
+                                       "precipitation_probability_max": [70]}})
     raise AssertionError(f"unexpected GET {url}")
 
 
@@ -462,17 +458,28 @@ async def main():
                 conn.execute("DELETE FROM wake_log WHERE user_id = ?", (OWNER.id,))
                 conn.commit()
 
+        def screen(points):
+            """The phone's screen sessions, as (seconds ago, on / off) changes."""
+            now_ms = int(time.time() * 1000)
+            with get_db_connection() as conn:
+                conn.execute("DELETE FROM phone_screen_sessions WHERE user_id = ?", (OWNER.id,))
+                conn.commit()
+            for i, (ago, state) in enumerate(points):
+                end = points[i + 1][0] if i + 1 < len(points) else 0
+                if state == "on" and end < ago:
+                    phone_signals.store_screen(OWNER, now_ms - ago * 1000, now_ms - end * 1000)
+
         # Unlock, then the screen was on only 30 s (dismissed the alarm, back to sleep).
-        seen["history"] = [(40, "off"), (30, "on"), (0, "off")]
+        screen([(40, "off"), (30, "on"), (0, "off")])
         status = await wake.unlock(OWNER)
         await asyncio.sleep(0.05)
         check("wake: unlock but screen barely on → nothing fired", status == "confirming" and not pushes("reminder") and not pushes("briefing"))
         check("wake: not recorded, so the next unlock retries", not wake.done_today(OWNER, clock.now().date().isoformat()))
         # The alarm screen alone (one long session) never trips the fallback poll.
-        seen["history"] = [(1500, "off"), (1200, "on"), (600, "off")]
+        screen([(1500, "off"), (1200, "on"), (600, "off")])
         check("wake: alarm-length screen doesn't trip the fallback", not await wake.check_wake_fallback(OWNER))
         # Next unlock through the API: screen on 4 min since → up.
-        seen["history"] = [(400, "off"), (300, "on"), (60, "off"), (40, "on"), (0, "on")]
+        screen([(400, "off"), (300, "on"), (60, "off"), (40, "on"), (0, "on")])
         r = await client.post("/api/signals", json={"events": [{"type": "unlock", "at": int((time.time() - 300) * 1000)}]})
         check("api: the phone's unlock signal → accepted",
               (await r.json()) == {"accepted": 1, "rejected": []})
@@ -490,24 +497,18 @@ async def main():
         check("wake: briefing marked delivered", briefing.get_today(OWNER)["delivered_at"])
         # Fallback poll: several real sessions in the last 30 min → up, without any signal.
         clear_wake()
-        seen["history"] = [(1700, "on"), (1500, "off"), (900, "on"), (700, "off"), (300, "on"), (100, "off")]
-        check("wake: Home Assistant's screen is not the wake while the phone delivers it",
-              not await wake.check_wake_fallback(OWNER))
-        with get_db_connection() as conn:  # the phone quiet for days: Home Assistant's screen counts again
-            conn.execute("UPDATE signal_sources SET last_at = '2000-01-01T00:00:00+00:00' WHERE user_id = ?", (OWNER.id,))
-            conn.commit()
+        screen([(1700, "on"), (1500, "off"), (900, "on"), (700, "off"), (300, "on"), (100, "off")])
         check("wake: fallback poll fires on real use", await wake.check_wake_fallback(OWNER))
         check("wake: fallback recorded today's wake", wake.done_today(OWNER, clock.now().date().isoformat()))
-        # HA down: an unlock is trusted.
+        # No screen sessions from the phone: an unlock is trusted.
         clear_wake()
-        seen["history"] = None
+        screen([])
         await wake.unlock(OWNER)
         for _ in range(100):
             if wake.done_today(OWNER, clock.now().date().isoformat()):
                 break
             await asyncio.sleep(0.02)
-        check("wake: no HA history → unlock trusted", wake.done_today(OWNER, clock.now().date().isoformat()))
-        seen["history"] = []
+        check("wake: no screen sessions → unlock trusted", wake.done_today(OWNER, clock.now().date().isoformat()))
         clear_wake()
         wake_window.set_window(OWNER, {"start": "00:00", "end": "01:00"} if clock.now().hour >= 2
                                else {"start": "22:00", "end": "23:00"})

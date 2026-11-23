@@ -26,17 +26,19 @@ os.environ["API_TOKEN"] = "dashboard-test-env-token"  # a test value: with it se
 from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # throwaway: encrypts the fake credentials
 
+import httpx
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
 import addons  # noqa: F401  (loads the addons)
-from core import clock, dashboard, dashboard_api, db, devices, users
+from core import clock, dashboard, dashboard_api, db, devices, users, zones
 from core.addons import Addon, Field, WidgetContext, registry, store
 from core.addons.addon import forget, key_clash
 from core.auth import setup_auth
 from core.db import get_db_connection
 from addons import bootstrap as addons_bootstrap
 from addons.calendar import events as calendar_events
+from addons.essentials import weather as open_meteo
 from addons.shopping import items as shopping_items, lists as shopping_lists
 from addons.shopping.names import ItemInput
 from addons.tasks import service as tasks_service
@@ -74,8 +76,11 @@ HA = FakeHA("robin", "tok-robin", {
     "light.kitchen": ("off", {"friendly_name": "Kitchen"}),
     "sensor.robin_phone_battery": ("81", {"friendly_name": "Robin's phone battery", "unit_of_measurement": "%"}),
     "sensor.robin_watch_battery": ("15", {"friendly_name": "Robin's watch battery", "unit_of_measurement": "%"}),
-    "weather.forecast_home": ("sunny", {"temperature": 27, "temperature_unit": "°C"}),
 }, {}, "UTC")
+zones.create(ROBIN, "Home", 40.71, -74.01, is_home=True)  # the clock's weather comes from Open-Meteo there
+open_meteo.transport = httpx.MockTransport(lambda request: httpx.Response(200, json={
+    "current_units": {"temperature_2m": "°C"}, "current": {"temperature_2m": 27, "weather_code": 0, "is_day": 1},
+    "daily": {"temperature_2m_max": [30], "temperature_2m_min": [18], "precipitation_probability_max": [0]}}))
 
 TOKENS: Dict[str, str] = {}
 DEV: Dict[str, devices.Device] = {}
@@ -224,7 +229,7 @@ async def test_read(client: TestClient, captured: Dict[str, Any]) -> None:
           batt["data"]["batteries"] == [{"entity_id": "sensor.robin_phone_battery", "name": "Robin's phone battery",
                                          "level": 81}], batt)
     clock_w = by_widget(own, "clock")
-    check("read: the clock's weather through the weather provider (Robin's Home Assistant)",
+    check("read: the clock's weather through the weather provider (Open-Meteo at Robin's Home zone)",
           (clock_w["data"]["weather"] or {}).get("temperature") == 27, clock_w)
 
     for who, target, why in (("robin_tablet", gt, "another user's tablet"), ("robin_tablet", tv, "its own owner's TV"),

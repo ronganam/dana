@@ -33,8 +33,7 @@ from addons.whatsapp import config as wa_config, events as wa
 db.migrate()
 users.bootstrap()
 addons_bootstrap.bootstrap()
-testenv.connect_admin("homeassistant", credentials={"host": "https://ha.test/", "token": "test-token"},
-                      settings={"phone_notify_service": "mobile_app_test"})
+testenv.connect_admin("homeassistant", credentials={"host": "https://ha.test/", "token": "test-token"})
 testenv.connect_admin("whatsapp", credentials={"url": "https://waha.test/api/", "api_key": "test-waha-key",
                                                "session": "default"},
                       settings={"voice_telegram_chat_id": 555})

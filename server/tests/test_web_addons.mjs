@@ -138,15 +138,16 @@ const haNeeds = C.renderNeeds(admin.homeassistant, F.list_admin.body.addons);
 check("detail: Needs and May touch, from the payload",
       haDetail.includes("<h4>Needs</h4>") && haDetail.includes("<h4>May touch</h4>")
       && haNeeds.includes("Connects to your Home Assistant server") && haNeeds.includes("Acts for you outside Dana")
-      && haNeeds.includes("Keeps passwords, tokens or sign-ins") && haNeeds.includes("<em>optional</em>"));
+      && haNeeds.includes("Keeps passwords, tokens or sign-ins")
+      && C.renderNeeds(admin.tasks, F.list_admin.body.addons).includes("<em>optional</em>"));
 check("may touch: other addons' data by their titles; nothing declared says so; unknown (did not load) shows nothing",
       plain(C.touchLines(admin.tasks.touches, F.list_admin.body.addons)).join() === "Reads your data from People, Phone"
       && plain(C.touchLines(admin.shopping.touches)).join() === "Nothing beyond Dana's own data"
       && C.renderNeeds(admin.broken, []) === "" && plain(C.touchLines(null)).length === 0);
 check("needs: an addon needing nothing says so", C.renderNeeds(admin.essentials, []).includes("Nothing beyond Dana itself"));
 check("detail: once on, its settings with suggestions, Test again and Disconnect",
-      haDetail.includes(">Settings<") && haDetail.includes('data-name="person"') && haDetail.includes('data-act="test"')
-      && haDetail.includes('data-act="disconnect"') && haDetail.includes('list="itg-dl-homeassistant-person"'));
+      haDetail.includes(">Settings<") && haDetail.includes('data-name="tv_entity"') && haDetail.includes('data-act="test"')
+      && haDetail.includes('data-act="disconnect"') && haDetail.includes('list="itg-dl-homeassistant-tv_entity"'));
 check("detail: Try asking Dana, with the manifest's examples", haDetail.includes("Try asking Dana")
       && admin.homeassistant.examples.every((e) => haDetail.includes(`data-ask="${C.esc(e)}"`)));
 check("detail: no examples before it's on", !C.renderDetail(fresh.homeassistant, {}).includes("Try asking Dana"));
@@ -154,7 +155,7 @@ check("detail: a back link to the list", haDetail.includes("data-close"));
 const opts = F.options_member.body.settings;
 const haBob = C.renderDetail(member.homeassistant, { options: opts, optionsState: "ok" });
 check("options: the member's own candidates offered (value + label), free text still an input",
-      opts.person.every((o) => haBob.includes(`<option value="${o.value}">${o.label}</option>`)) && inputOf(haBob, "person").includes('type="text"'));
+      opts.tv_entity.every((o) => haBob.includes(`<option value="${o.value}">${o.label}</option>`)) && inputOf(haBob, "tv_entity").includes('type="text"'));
 const host = inputOf(haDetail, "host"), tokenIn = inputOf(haDetail, "token");
 check("address: the admin sees and edits the current address", host.includes('type="url"') && host.includes(`value="${admin.homeassistant.credentials[0].value}"`), host);
 check("secret: an empty password input, no value, 'saved' beside it, 'leave empty to keep'",
@@ -181,7 +182,7 @@ check("admin for the member: cameras and the Telegram chat are editable",
 // --- what is sent ----------------------------------------------------------------------------------
 check("send: nothing typed → nothing to save", C.buildChanges(admin.homeassistant, { values: {}, remove: [] }) === null);
 check("send: an untouched credential is not sent",
-      JSON.stringify(plain(C.buildChanges(admin.homeassistant, { values: { person: "person.x" } }))) === JSON.stringify({ settings: { person: "person.x" } }));
+      JSON.stringify(plain(C.buildChanges(admin.homeassistant, { values: { tv_entity: "media_player.x" } }))) === JSON.stringify({ settings: { tv_entity: "media_player.x" } }));
 check("send: an empty secret input is not sent", C.buildChanges(admin.homeassistant, { values: { token: "  " } }) === null);
 check("send: a typed secret is sent, nothing else",
       JSON.stringify(plain(C.buildChanges(admin.homeassistant, { values: { token: "new-token" } }))) === JSON.stringify({ credentials: { token: "new-token" } }));
@@ -193,11 +194,12 @@ check("send: removing an optional saved secret sends null",
       JSON.stringify(plain(C.buildChanges(member.whatsapp, { values: {}, remove: ["api_key"] }))) === JSON.stringify({ credentials: { api_key: null } }));
 check("send: a required secret is never removed", C.buildChanges(admin.homeassistant, { values: {}, remove: ["token"] }) === null);
 check("send: a Telegram chat goes as a number", plain(C.buildChanges(forMember.whatsapp, { values: { voice_telegram_chat_id: "-100123" } })).settings.voice_telegram_chat_id === -100123);
-check("send: a setting emptied goes back to its default (null)", plain(C.buildChanges(admin.homeassistant, { values: { weather_entity: "" } })).settings.weather_entity === null);
+const haTv = { ...admin.homeassistant, settings: admin.homeassistant.settings.map((f) => (f.name === "tv_entity" ? { ...f, value: "media_player.x" } : f)) };
+check("send: a setting emptied goes back to its default (null)", plain(C.buildChanges(haTv, { values: { tv_entity: "" } })).settings.tv_entity === null);
 check("send: a list setting goes as a list",
       JSON.stringify(plain(C.buildChanges(member.calendar, { values: { selected_calendars: "a@x, b@y" } })).settings.selected_calendars) === JSON.stringify(["a@x", "b@y"]));
 check("send: connecting sends what was typed",
-      JSON.stringify(plain(C.buildChanges(fresh.homeassistant, { values: { host: "http://h:1", token: "t", person: "" } }))) === JSON.stringify({ credentials: { host: "http://h:1", token: "t" } }));
+      JSON.stringify(plain(C.buildChanges(fresh.homeassistant, { values: { host: "http://h:1", token: "t", tv_entity: "" } }))) === JSON.stringify({ credentials: { host: "http://h:1", token: "t" } }));
 check("send: turning on an addon without fields sends {}", JSON.stringify(plain(C.buildChanges(fresh.tasks, {}))) === "{}");
 check("path: own addons without ?user=, another user's with it",
       C.path("homeassistant", "", meAdmin.id, meAdmin.id) === "/api/addons/homeassistant"

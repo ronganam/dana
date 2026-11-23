@@ -7,8 +7,7 @@ clock. Always take "now" from :func:`now` instead of ``datetime.now()``.
 One timezone for the whole server (a server setting). Resolution (first
 match wins, resolved once and cached): ``TIMEZONE`` env var → the one an
 admin chose in the app (the wizard's Home step: ``server_settings['timezone']``,
-:func:`set_server_timezone`) → the first admin's Home Assistant
-(``/api/config``, when they have it connected) → ``TZ`` env var → UTC.
+:func:`set_server_timezone`) → ``TZ`` env var → UTC.
 
 The week (money's "this week", the weekly review's week) starts on one day
 for the whole server too (:func:`week_start_day`): ``WEEK_START`` ("mon",
@@ -20,10 +19,9 @@ import datetime
 import logging
 import os
 import zoneinfo
-from typing import Callable, Optional
+from typing import Optional
 
-from core import server_settings, users
-from core.users import User
+from core import server_settings
 
 logger = logging.getLogger(__name__)
 
@@ -35,15 +33,6 @@ DEFAULT_REVIEW_AT = "sat 20:00"
 
 TIMEZONE_SETTING = "timezone"
 _timezone: Optional[zoneinfo.ZoneInfo] = None
-# How to ask a user's Home Assistant for its zone: registered by the
-# homeassistant addon (addons/homeassistant/client.py) when it is imported.
-_home_assistant_zone: Optional[Callable[[User], Optional[str]]] = None
-
-
-def set_home_assistant_zone(lookup: Callable[[User], Optional[str]]) -> None:
-    """Register how a user's Home Assistant is asked for its timezone."""
-    global _home_assistant_zone
-    _home_assistant_zone = lookup
 
 
 def _zone(name: Optional[str], source: str) -> Optional[zoneinfo.ZoneInfo]:
@@ -58,24 +47,13 @@ def _zone(name: Optional[str], source: str) -> Optional[zoneinfo.ZoneInfo]:
     return tz
 
 
-def _home_assistant_timezone() -> Optional[str]:
-    # The server's zone is a server setting: it comes from the first admin's
-    # Home Assistant on purpose (one timezone for the whole server).
-    admin = users.first_admin()
-    if admin is None or _home_assistant_zone is None:
-        return None
-    return _home_assistant_zone(admin)
-
-
 def get_timezone() -> zoneinfo.ZoneInfo:
-    """The user's timezone. The first call may query Home Assistant (blocking),
-    so ``main`` resolves it once at startup."""
+    """The server's timezone (resolved once, then cached)."""
     global _timezone
     if _timezone is None:
         _timezone = (
             _zone(os.getenv("TIMEZONE"), "TIMEZONE env")
             or _zone(server_settings.get(TIMEZONE_SETTING), "the server's settings")
-            or _zone(_home_assistant_timezone(), "Home Assistant")
             or _zone(os.getenv("TZ"), "TZ env")
             or zoneinfo.ZoneInfo("UTC")
         )

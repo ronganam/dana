@@ -1,16 +1,18 @@
-"""Signals without Home Assistant (docs/signals.md): POST /api/signals from the phone, the ranked sources, the
-wake flow and window, the weather from Open-Meteo, zones changed → the phone, GET /api/signals per user.
+"""Signals (docs/signals.md): POST /api/signals from the phone, the ranked sources, the wake flow and window, the
+weather from Open-Meteo, zones changed → the phone, GET /api/signals per user.
 
-Robin has the phone and Home Assistant (a FakeHA: weather entity, screen sensor history), Gal has only the phone (a
-paired phone device, whose token she posts with), Maya has neither (tasks only). Checks: every event type with its
-effect (tasks' car / location / wake reminders fired or not), per-event errors (bad_event, unknown_zone for another
-user's zone id, stale), a repeated batch accepted without effect, the ranking (a Home Assistant event used while the
-phone is quiet, ignored while the phone is active, used again once the phone goes quiet), a late event recording the
-transition without a reminder, the wake window (default, set, learned from a week of mornings, back to learned) and
-a sleep session as the wake at its exact time, the "signals" self-check for a user with no source, Open-Meteo's answer
-mapped to the weather shape (a fake HTTP answer, never the network) ranked above Home Assistant's, the
-``zones_changed`` phone event, GET /api/signals isolation. Writes tests/fixtures/signals_web.json with
-WRITE_WEB_FIXTURE=1 (else checks it for shape drift).
+Robin has the phone and, while the ranking is checked, a lower-ranked test source (``test_feed``, declared here on an
+addon only she has: location, car, wake, screen sessions, weather), Gal has only the phone (a paired phone device,
+whose token she posts with), Maya has neither (tasks only). Home Assistant is connected for Robin and is no source of
+anything. Checks: every event type with its effect (tasks' car / location / wake reminders fired or not), per-event
+errors (bad_event, unknown_zone for another user's zone id, stale), a repeated batch accepted without effect, the
+ranking (a lower-ranked source's event used while the phone is quiet, ignored while the phone is active, used again
+once the phone goes quiet), a late event recording the transition without a reminder, the wake window (default, set,
+learned from a week of mornings, back to learned) and a sleep session as the wake at its exact time, the "signals"
+self-check for a user with no source, Open-Meteo's answer mapped to the weather shape (a fake HTTP answer, never the
+network) ranked above the test source's, the ``zones_changed`` phone event, GET /api/signals isolation (only the
+phone and Open-Meteo once the test source is gone). Writes tests/fixtures/signals_web.json with WRITE_WEB_FIXTURE=1
+(else checks it for shape drift).
 
 Run: bin/test test_signals
 """
@@ -19,7 +21,6 @@ import asyncio
 import datetime
 import json
 import os
-import time
 from typing import Any, Dict, List, Tuple
 from unittest.mock import AsyncMock, patch
 
@@ -49,11 +50,9 @@ from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
 from core.addons import registry, store  # noqa: E402
 from addons.essentials import weather as open_meteo  # noqa: E402
-from addons.homeassistant import hooks as ha_hooks  # noqa: E402
 from addons.phone import api as phone_api, push  # noqa: E402
 from addons.tasks import service as tasks_service  # noqa: E402
 from addons.tasks.groups import ensure_default_groups_for_everyone  # noqa: E402
-from testfakes import FakeHA  # noqa: E402
 
 FIXTURE = os.path.join(testenv.FIXTURES, "signals_web.json")
 results: List[Tuple[str, bool]] = []
@@ -113,6 +112,30 @@ async def settle() -> None:
         await asyncio.sleep(0.05)
 
 
+# --- A lower-ranked test source, on an addon only Robin has (cameras) ------------------------------
+
+FEED = {"rank": 50, "source": "test_feed", "label": "Test feed"}
+FEED_SCREEN: List[float] = []  # what the feed's screen_sessions answers (empty: nothing)
+_cameras = store.get_addon("cameras")
+for _signal in ("wake", "screen", "car", "location", "weather"):
+    _cameras.provide(signals.source_key(_signal), **FEED)(lambda user: "")
+
+
+@_cameras.provide("screen_sessions", **FEED)
+async def feed_screen(user, since_utc, until_utc):
+    return list(FEED_SCREEN) or None
+
+
+@_cameras.provide("weather", **FEED)
+async def feed_weather(user):
+    return {"condition": "cloudy", "temperature": 14, "unit": "°C"}
+
+
+def feed(user, signal: str, *, action: str = "", target: str = "") -> bool:
+    """The test source delivers an event (as an addon's watcher would)."""
+    return signals.deliver(user, signal, "test_feed", detail=f"{action} {target}".strip(), action=action, target=target)
+
+
 def build_app() -> web.Application:
     app = web.Application()
     setup_auth(app)
@@ -163,26 +186,28 @@ async def post(client, user, events_: List[Dict[str, Any]]):
 
 # --- 1. Sources and the overview before anything arrives ------------------------------------------
 
-async def test_overview(client, ha: FakeHA) -> None:
+async def test_overview(client) -> None:
     r, g, m = await get_signals(client, ROBIN), await get_signals(client, GAL), await get_signals(client, MAYA)
     check("overview: every signal, always in that order",
           [s["signal"] for s in r["signals"]] == list(signals.SIGNALS) == [s["signal"] for s in m["signals"]])
-    check("overview: Robin's sources ranked, the phone first, Home Assistant next",
-          [s["source"] for s in sources_of(r, "wake")] == ["phone", "homeassistant"]
-          and [s["source"] for s in sources_of(r, "car")] == ["phone", "homeassistant"]
+    check("overview: Robin's sources ranked, the phone first, the test source next",
+          [s["source"] for s in sources_of(r, "wake")] == ["phone", "test_feed"]
+          and [s["source"] for s in sources_of(r, "car")] == ["phone", "test_feed"]
           and [s["source"] for s in sources_of(r, "sleep")] == ["phone"]
-          and [s["source"] for s in sources_of(r, "weather")] == ["open_meteo", "homeassistant"]
+          and [s["source"] for s in sources_of(r, "weather")] == ["open_meteo", "test_feed"]
           and sources_of(r, "wake")[0]["label"] == "Dana's phone app"
           and sources_of(r, "weather")[0]["label"] == "Open-Meteo", r)
-    check("overview: Home Assistant only for the user who has it connected",
-          all(s["source"] != "homeassistant" for sig in g["signals"] for s in sig["sources"]))
+    check("overview: the test source only for the user who has its addon",
+          all(s["source"] != "test_feed" for sig in g["signals"] for s in sig["sources"]))
+    check("overview: Home Assistant (connected for Robin) is no source of anything",
+          all(s["source"] != "homeassistant" for sig in r["signals"] for s in sig["sources"]))
     check("overview: Maya (neither) has no wake, car or place source; Open-Meteo for weather (everyone)",
           not sources_of(m, "wake") and not sources_of(m, "car") and not sources_of(m, "location")
           and [s["source"] for s in sources_of(m, "weather")] == ["open_meteo"]
           and sources_of(m, "weather")[0]["detail"] == "Set your Home zone (Settings → Zones)"
           and active_of(m, "weather") is None, m)
-    check("overview: Robin has no paired phone yet → Home Assistant (set up) is her active wake / location source",
-          active_of(r, "wake") == "homeassistant" and active_of(r, "location") == "homeassistant"
+    check("overview: Robin has no paired phone yet → the test source (set up) is her active wake / location source",
+          active_of(r, "wake") == "test_feed" and active_of(r, "location") == "test_feed"
           and sources_of(r, "wake")[0]["detail"] == "Pair Dana's phone app (Settings → Devices)"
           and sources_of(r, "wake")[0]["last_at"] is None, r)
     check("overview: Gal's paired phone is her active source",
@@ -265,7 +290,7 @@ async def test_post(client) -> None:
               all(s["last_at"] is None for sig in r["signals"] for s in sig["sources"] if s["source"] == "phone"), r)
 
 
-# --- 3. Ranking: Home Assistant while the phone is quiet ------------------------------------------
+# --- 3. Ranking: the test source while the phone is quiet ----------------------------------------
 
 async def test_ranking(client) -> None:
     PUSHED.clear()
@@ -273,31 +298,31 @@ async def test_ranking(client) -> None:
     t_leave = task(ROBIN, "Robin lock up", {"location": {"location": "home", "event": "leave"}})
     t_car_out = task(ROBIN, "Robin parking", {"car": "leave"})
     with patch.object(core_notify, "send", AsyncMock(side_effect=fake_send)):
-        await ha_hooks.emit_transition(ROBIN, "location", action="leave", target="home")
+        feed(ROBIN, "location", action="leave", target="home")
         await settle()
-        check("ranking: the phone quiet → Home Assistant's leave fires", pushed(ROBIN, t_leave) == 1, PUSHED)
+        check("ranking: the phone quiet → the test source's leave fires", pushed(ROBIN, t_leave) == 1, PUSHED)
         now = utcnow()
         home = zones.home(ROBIN)
         status, body = await post(client, ROBIN, [
             {"type": "zone", "action": "arrive", "zone_id": home.id, "at": ms(now - datetime.timedelta(minutes=1))}])
         await settle()
         check("ranking: the phone's arrive fires", body["accepted"] == 1 and pushed(ROBIN, t_home) == 1, (body, PUSHED))
-        await ha_hooks.emit_transition(ROBIN, "location", action="leave", target="home")
+        feed(ROBIN, "location", action="leave", target="home")
         await settle()
-        check("ranking: Home Assistant's event is ignored while the phone is active", pushed(ROBIN, t_leave) == 1,
+        check("ranking: the test source's event is ignored while the phone is active", pushed(ROBIN, t_leave) == 1,
               PUSHED)
         r = await get_signals(client, ROBIN)
-        ha_loc = sources_of(r, "location")[1]
+        feed_loc = sources_of(r, "location")[1]
         check("ranking: … but recorded on the overview; the phone is the active source",
-              active_of(r, "location") == "phone" and ha_loc["detail"] == "leave home" and ha_loc["last_at"]
-              and not ha_loc["active"], r)
+              active_of(r, "location") == "phone" and feed_loc["detail"] == "leave home" and feed_loc["last_at"]
+              and not feed_loc["active"], r)
         stale(ROBIN, "location", "phone")
         with patch.object(events, "emit", wraps=events.emit) as emitted:
-            await ha_hooks.emit_transition(ROBIN, "location", action="leave", target="home")
+            feed(ROBIN, "location", action="leave", target="home")
         await settle()
-        check("ranking: the phone quiet again (past the window) → Home Assistant's event used",
+        check("ranking: the phone quiet again (past the window) → the test source's event used",
               [(c.args[0], c.kwargs.get("source"), c.kwargs.get("action")) for c in emitted.call_args_list]
-              == [("core.signal.location", "homeassistant", "leave")], emitted.call_args_list)
+              == [("core.signal.location", "test_feed", "leave")], emitted.call_args_list)
         status, body = await post(client, ROBIN, [
             {"type": "car", "action": "leave", "at": ms(utcnow() - datetime.timedelta(hours=2)), "via": "android_auto"}])
         await settle()
@@ -306,20 +331,20 @@ async def test_ranking(client) -> None:
         check("late: a car event from 2 h ago records the transition, sends no reminder",
               body["accepted"] == 1 and pushed(ROBIN, t_car_out) == 0 and "last_event_v2_car_leave_-" in marks,
               (body, marks))
-        await ha_hooks.emit_transition(ROBIN, "car", action="enter")
+        feed(ROBIN, "car", action="enter")
         await settle()
         r = await get_signals(client, ROBIN)
         check("ranking: per signal — the phone's late car event makes it the active car source",
               active_of(r, "car") == "phone" and sources_of(r, "car")[1]["detail"] == "enter", r)
 
 
-# --- 4. Wake: window, unlock, Home Assistant's poll, sleep ----------------------------------------
+# --- 4. Wake: window, unlock, the poll, sleep -----------------------------------------------------
 
 def window_now() -> Dict[str, str]:
     return {"start": "00:00", "end": "23:59"}
 
 
-async def test_wake(client, ha: FakeHA) -> None:
+async def test_wake(client) -> None:
     PUSHED.clear()
     t_gal = task(GAL, "Gal vitamins", {"wake": True})
     t_robin = task(ROBIN, "Robin stretch", {"wake": True})
@@ -346,13 +371,10 @@ async def test_wake(client, ha: FakeHA) -> None:
         check("wake: her wake reminder and her briefing only", pushed(GAL, t_gal) == 1 and pushed(ROBIN, t_robin) == 0
               and [c.args[0].id for c in on_wake.await_args_list] == [GAL.id], PUSHED)
 
-        # Robin: no phone wake yet → Home Assistant's screen history is her wake source (the poll).
-        t = time.time()
-        ha.history = [{"last_changed": datetime.datetime.fromtimestamp(t - a, datetime.timezone.utc).isoformat(),
-                       "state": s} for a, s in ((1700, "on"), (1500, "off"), (900, "on"), (700, "off"), (300, "on"),
-                                                (100, "off"))]
+        # Robin: no phone wake yet → the test source's screen sessions are her wake source (the poll).
+        FEED_SCREEN[:] = [200.0, 200.0, 200.0]
         out = await wake.poll_once()
-        check("wake poll: Home Assistant's screen history wakes Robin (Gal is done for today)",
+        check("wake poll: the test source's screen sessions wake Robin (Gal is done for today)",
               out.get(ROBIN.id) is True and wake_rows(ROBIN) and out.get(GAL.id) is False, out)
         clear_wake(ROBIN)
         await client.put("/api/profile", headers=auth(ROBIN), json={"wake_window": {"start": "03:00", "end": "03:01"}})
@@ -361,7 +383,7 @@ async def test_wake(client, ha: FakeHA) -> None:
               body["accepted"] == 1 and not wake_rows(ROBIN), body)
         await client.put("/api/profile", headers=auth(ROBIN), json={"wake_window": window_now()})
         out = await wake.poll_once()
-        check("ranking: Home Assistant's wake is ignored while the phone is active", out.get(ROBIN.id) is False
+        check("ranking: the test source's wake is ignored while the phone is active", out.get(ROBIN.id) is False
               and not wake_rows(ROBIN), out)
         end = utcnow() - datetime.timedelta(minutes=20)
         sleep = [{"type": "sleep", "start": ms(end - datetime.timedelta(hours=7)), "end": ms(end), "via": "health_connect"}]
@@ -409,9 +431,9 @@ def test_learned_window() -> None:
           == {"start": "05:00", "end": "10:00", "learned": True})
 
 
-# --- 5. Weather: Open-Meteo first, Home Assistant next --------------------------------------------
+# --- 5. Weather: Open-Meteo first, the test source next -------------------------------------------
 
-async def test_weather(ha: FakeHA) -> None:
+async def test_weather() -> None:
     asked: List[httpx.URL] = []
 
     def answer(request: httpx.Request) -> httpx.Response:
@@ -443,16 +465,16 @@ async def test_weather(ha: FakeHA) -> None:
     open_meteo.clear_cache()
     open_meteo.transport = httpx.MockTransport(down)
     w = await briefing.weather(ROBIN)
-    check("weather: Open-Meteo failing → Robin's Home Assistant weather entity",
+    check("weather: Open-Meteo failing → Robin's next source (the test source)",
           w is not None and w["condition"] == "cloudy" and w["temperature"] == 14, w)
-    check("weather: Gal (no Home Assistant) → none while Open-Meteo fails", await briefing.weather(GAL) is None)
-    check("weather: WMO codes as Home Assistant's words",
+    check("weather: Gal (Open-Meteo only) → none while Open-Meteo fails", await briefing.weather(GAL) is None)
+    check("weather: WMO codes as the weather shape's words",
           open_meteo.condition(0) == "sunny" and open_meteo.condition(0, 0) == "clear night"
           and open_meteo.condition(3) == "cloudy" and open_meteo.condition(95) == "lightning rainy"
           and open_meteo.condition(42) == "exceptional" and open_meteo.condition(None) == "exceptional")
     hooks = registry.providers("weather", ROBIN)
-    check("providers: ranked (Open-Meteo 10, Home Assistant 50); Gal gets Open-Meteo only",
-          [registry.source_of(h) for h in hooks] == ["open_meteo", "homeassistant"]
+    check("providers: ranked (Open-Meteo 10, the test source 50); Gal gets Open-Meteo only",
+          [registry.source_of(h) for h in hooks] == ["open_meteo", "test_feed"]
           and [registry.source_of(h) for h in registry.providers("weather", GAL)] == ["open_meteo"])
     open_meteo.clear_cache()
     open_meteo.transport = httpx.MockTransport(answer)
@@ -520,9 +542,11 @@ async def test_fixture(client) -> None:
     await client.put("/api/profile", headers=auth(ROBIN), json={"wake_window": {"start": "06:00", "end": "10:30"}})
     await settle()
     body = await get_signals(client, ROBIN)
-    check("fixture: Robin's phone is active for wake, car, location and sleep; Home Assistant connected",
-          all(active_of(body, s) == "phone" for s in ("wake", "screen", "car", "location", "sleep"))
-          and any(s["source"] == "homeassistant" for s in sources_of(body, "wake")), body)
+    check("fixture: Robin's phone is the only source of wake, screen, car, location and sleep, Open-Meteo of the "
+          "weather (Home Assistant connected, the test source gone)",
+          all([x["source"] for x in sources_of(body, s)] == ["phone"] and active_of(body, s) == "phone"
+              for s in ("wake", "screen", "car", "location", "sleep"))
+          and [x["source"] for x in sources_of(body, "weather")] == ["open_meteo"], body)
     if os.getenv("WRITE_WEB_FIXTURE"):
         with open(FIXTURE, "w", encoding="utf-8") as f:
             f.write(json.dumps(body, indent=1, ensure_ascii=False) + "\n")
@@ -538,22 +562,18 @@ async def test_fixture(client) -> None:
 
 
 async def main() -> None:
-    ha = FakeHA("R", "tok-robin", {"weather.robin": ("cloudy", {"temperature": 14, "temperature_unit": "°C"})},
-                {}, ZONE)
-    await ha.start()
-    store.connect(ROBIN, "homeassistant", credentials={"host": ha.url, "token": "tok-robin"},
-                  settings={"weather_entity": "weather.robin", "phone_interactive_sensor": "binary_sensor.robin_screen",
-                            "person": "person.robin", "car_sensor": "sensor.robin_bt", "car_device": "Car"})
+    store.connect(ROBIN, "homeassistant", credentials={"host": "http://ha-robin.invalid", "token": "tok-robin"})
+    store.connect(ROBIN, "cameras", settings={"url": "http://frigate-robin.invalid"})  # carries the test source
     async with TestClient(TestServer(build_app())) as client:
-        await test_overview(client, ha)
+        await test_overview(client)
         await test_post(client)
         await test_ranking(client)
-        await test_wake(client, ha)
+        await test_wake(client)
         test_learned_window()
-        await test_weather(ha)
+        await test_weather()
         await test_zones_changed()
+        store.disconnect(ROBIN, "cameras")  # the test source gone: what a user can have
         await test_fixture(client)
-    await ha.server.close()
 
 
 asyncio.run(main())

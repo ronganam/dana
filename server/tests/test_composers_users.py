@@ -11,8 +11,8 @@ cards, wake dates, briefings, reviews) is per user; every loop runs per
 eligible user, as that user (usage rows theirs), and one failing user does
 not stop the next; the first admin's prompts are byte for byte the old ones.
 
-Home Assistant and Google Calendar are faked at their client functions (per
-connection), FCM at httpx, Telegram at ``notify``'s channel; the model is
+Google Calendar is faked at its client functions (per connection), Open-Meteo
+at its transport (by the Home zone's place), FCM at httpx, Telegram at ``notify``'s channel; the model is
 LiteLLM's offline ``mock_response`` (so the real usage callback records each
 call).
 
@@ -28,6 +28,7 @@ import sqlite3
 import sys
 import uuid
 from typing import Any, Dict, List, Optional, Tuple
+from unittest.mock import patch
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 DB_PATH = testenv.isolate("composers_users_test")
@@ -69,7 +70,8 @@ from core.db import get_db_connection
 from core.session import get_session_state
 from addons.calendar import events as calendar_events
 from core.addons import sharing, store
-from addons.homeassistant import client as ha_client
+from addons.essentials import weather as open_meteo
+from addons.phone import signals as phone_signals
 from addons.people import store as people_store
 from addons.phone import api as phone_api, push
 from addons.shopping import lists as shopping_lists
@@ -115,27 +117,25 @@ test_migration()
 
 # --- Users and their addons -------------------------------------------------------------------------
 
-HA_HOSTS = {"admin": "http://ha-admin.invalid", "bob": "http://ha-bob.invalid"}
 for _kind in ("phone", "tasks", "people", "knowledge", "shopping", "about", "money"):
     if not store.is_connected(ADMIN, _kind):
         store.connect(ADMIN, _kind)
-store.connect(ADMIN, "homeassistant", credentials={"host": HA_HOSTS["admin"], "token": "tok-admin"},
-              settings={"weather_entity": "weather.admin", "phone_interactive_sensor": "binary_sensor.admin_screen"})
+store.connect(ADMIN, "homeassistant", credentials={"host": "http://ha-admin.invalid", "token": "tok-admin"})
 store.connect(ADMIN, "calendar", credentials={"refresh_token": "admin-refresh"})
 
 BOB = users.create("Bob Stone")
 for _kind in ("phone", "tasks", "people", "knowledge"):
     store.connect(BOB, _kind)
-store.connect(BOB, "homeassistant", credentials={"host": HA_HOSTS["bob"], "token": "tok-bob"},
-              settings={"weather_entity": "weather.bob", "phone_interactive_sensor": "binary_sensor.bob_screen"})
+store.connect(BOB, "homeassistant", credentials={"host": "http://ha-bob.invalid", "token": "tok-bob"})
 store.connect(BOB, "calendar", credentials={"refresh_token": "bob-refresh"})
 CARL = users.create("Carl Weiss", telegram_chat_id=7001)
 store.connect(CARL, "tasks")
 store.connect(CARL, "calendar", credentials={"refresh_token": "carl-refresh"})
 EVE = users.create("Eve")
 from core import zones  # noqa: E402
-for _u in (ADMIN, BOB):  # a Home zone each (Dana's own): Now's "At home" slot and choices
-    zones.create(_u, "Home", 32.08, 34.78, is_home=True)
+# A Home zone each (Dana's own): Now's "At home" slot and choices, and the weather's place.
+zones.create(ADMIN, "Home", 32.08, 34.78, is_home=True)
+zones.create(BOB, "Home", 40.71, -74.01, is_home=True)
 task_groups.ensure_default_groups_for_everyone()
 shopping_lists.ensure_lists_for_everyone()
 TOKENS = {u.id: users.issue_token(u.id, "test")[0] for u in (ADMIN, BOB, CARL, EVE)}
@@ -150,40 +150,21 @@ def auth(user) -> Dict[str, str]:
 
 NOW = clock.now()
 TODAY = NOW.date()
-SEEN: Dict[str, Any] = {"ha": [], "calendar": [], "pings": [], "model": [], "telegram": [],
-                        "ha_fail": set(), "cal_fail": set(), "history": {}}
+SEEN: Dict[str, Any] = {"calendar": [], "pings": [], "model": [], "telegram": [],
+                        "cal_fail": set()}
 
 
-def _ha_who(conn) -> str:
-    return next(k for k, v in HA_HOSTS.items() if v == ha_client.host(conn))
+def fake_open_meteo(request: httpx.Request) -> httpx.Response:
+    """Open-Meteo by place: rain at the first admin's Home, sun at Bob's."""
+    admins = request.url.params.get("latitude") == "32.08"
+    return httpx.Response(200, json={
+        "current_units": {"temperature_2m": "°C"},
+        "current": {"temperature_2m": 18 if admins else 27, "weather_code": 61 if admins else 0, "is_day": 1},
+        "daily": {"temperature_2m_max": [24 if admins else 31], "temperature_2m_min": [14],
+                  "precipitation_probability_max": [70 if admins else 0]}})
 
 
-async def fake_entity_state(conn, entity_id, timeout=6.0):
-    who = _ha_who(conn)
-    SEEN["ha"].append((conn.user.id, who, "state", entity_id))
-    return {"state": "rainy" if who == "admin" else "sunny",
-            "attributes": {"temperature": 18 if who == "admin" else 27, "temperature_unit": "°C"}}
-
-
-async def fake_forecast(conn, entity_id):
-    who = _ha_who(conn)
-    SEEN["ha"].append((conn.user.id, who, "forecast", entity_id))
-    return {"temperature": 24 if who == "admin" else 31, "templow": 14, "precipitation_probability": 70 if who == "admin" else 0}
-
-
-async def fake_history(conn, entity_id, since_utc, until_utc):
-    who = _ha_who(conn)
-    SEEN["ha"].append((conn.user.id, who, "history", entity_id))
-    if who in SEEN["ha_fail"]:
-        raise RuntimeError(f"{who}'s Home Assistant is down")
-    now = datetime.datetime.now(datetime.timezone.utc)
-    spec = SEEN["history"].get(who, [])
-    return [{"state": st, "last_changed": (now - datetime.timedelta(seconds=ago)).isoformat()} for ago, st in spec]
-
-
-ha_client.entity_state = fake_entity_state
-ha_client.forecast = fake_forecast
-ha_client.history = fake_history
+open_meteo.transport = httpx.MockTransport(fake_open_meteo)
 
 EVENTS: Dict[str, List[Dict[str, Any]]] = {"admin-refresh": [], "bob-refresh": [], "carl-refresh": []}
 
@@ -518,9 +499,9 @@ def test_prompts() -> None:
 
 def test_briefing_content() -> None:
     a, b, c = run(briefing.gather(ADMIN)), run(briefing.gather(BOB)), run(briefing.gather(CARL))
-    check("briefing: weather from each user's own Home Assistant",
+    check("briefing: weather for each user's own Home zone (Open-Meteo)",
           a["weather"]["condition"] == "rainy" and b["weather"]["condition"] == "sunny", (a["weather"], b["weather"]))
-    check("briefing: no weather without Home Assistant (Carl)", c["weather"] is None)
+    check("briefing: no weather without a Home zone (Carl)", c["weather"] is None)
     check("briefing: events from each user's own calendar",
           [e["title"] for e in a["events"]] == ["Admin board meeting"]
           and [e["title"] for e in b["events"]] == ["Coffee with Dafna Levi"]
@@ -545,7 +526,6 @@ def test_briefing_content() -> None:
 # --- 4. Wake --------------------------------------------------------------------------------------
 
 async def test_wake(client: TestClient) -> None:
-    SEEN["history"] = {"admin": [(200, "on")], "bob": [(200, "on")]}
     SEEN["pings"].clear()
     r = await client.post("/api/signals", json=unlock_body(), headers=auth(BOB))
     check("wake: Bob's unlock accepted", (r.status, await r.json()) == (200, {"accepted": 1, "rejected": []}))
@@ -591,24 +571,31 @@ async def test_wake(client: TestClient) -> None:
 
 
 async def test_wake_poll() -> None:
-    """The fallback poll per user: a failing Home Assistant does not stop the next user."""
+    """The fallback poll per user, from each user's own phone screen sessions: a failing read does not stop the
+    next user."""
     today = clock.now().date().isoformat()
     with get_db_connection() as conn:
         conn.execute("DELETE FROM wake_log WHERE date = ?", (today,))
-        # the phones quiet for days: Home Assistant's screen sensors are the wake source again
-        conn.execute("UPDATE signal_sources SET last_at = '2000-01-01T00:00:00+00:00'")
         conn.commit()
-    SEEN["ha_fail"] = {"admin"}
-    SEEN["history"] = {"bob": [(1700, "on"), (1500, "off"), (900, "on"), (700, "off"), (300, "on"), (100, "off")]}
-    SEEN["ha"].clear()
-    out = await wake.poll_once()
-    check("wake poll: Bob's wake fired although the first admin's Home Assistant failed first",
+    now_ms = int(datetime.datetime.now(datetime.timezone.utc).timestamp() * 1000)
+    for start, end in ((1700, 1500), (900, 700), (300, 100)):
+        phone_signals.store_screen(BOB, now_ms - start * 1000, now_ms - end * 1000)
+    asked: List[str] = []
+    real = phone_signals.screen_seconds
+
+    def screen_seconds(user, since_utc, until_utc):
+        asked.append(user.id)
+        if user.id == ADMIN.id:
+            raise RuntimeError("the first admin's screen sessions cannot be read")
+        return real(user, since_utc, until_utc)
+
+    with patch.object(phone_signals, "screen_seconds", screen_seconds):
+        out = await wake.poll_once()
+    check("wake poll: Bob's wake fired although the first admin's read failed first",
           out.get(BOB.id) is True and out.get(ADMIN.id) is False and wake.done_today(BOB, today)
           and not wake.done_today(ADMIN, today), out)
-    asked = {(u, who) for u, who, fn, _ in SEEN["ha"] if fn == "history"}
-    check("wake poll: each user's own Home Assistant asked, only users with the flow",
-          asked == {(ADMIN.id, "admin"), (BOB.id, "bob")}, asked)
-    SEEN["ha_fail"] = set()
+    check("wake poll: each user's own screen sessions read, only users with the flow",
+          set(asked) == {ADMIN.id, BOB.id}, asked)
 
 
 # --- 5. Now ---------------------------------------------------------------------------------------
@@ -718,8 +705,7 @@ async def test_checks(client: TestClient) -> None:
           all(set(x) == {"key", "label", "ok", "detail", "since", "ignored_until", "title", "why", "blocks", "fix",
                          "addon", "server"} for x in a.values()))
     check("checks: Bob sees only the checks of his addons (no server check)",
-          set(b) == {"push", "notification_sync", "location", "car", "ha_entities", "ha_watcher", "wake", "triage",
-                     "calls", "calendar", "briefing", "signals"}, list(b))
+          set(b) == {"push", "notification_sync", "wake", "triage", "calls", "calendar", "briefing", "signals"}, list(b))
     check("checks: Carl sees calendar, briefing and signals (reminders with no wake, car or place source)",
           set(c) == {"calendar", "briefing", "signals"} and not c["signals"]["ok"] and b["signals"]["ok"],
           (list(c), c.get("signals"), b.get("signals")))

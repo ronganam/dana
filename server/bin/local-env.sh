@@ -202,11 +202,8 @@ wait_healthy() {
 # values that tests/local_env/e2e.py knows too). Skipped for one already connected.
 connect_addons() {
     echo "==> Connecting the admin's addons to the stubs (bin/dana addons connect)"
-    _connect homeassistant 'host=http://stubs:8123\ntoken=local-ha-token-a\n' person=person.robin \
-        car_sensor=sensor.pixel_8_bluetooth_connection car_device=CarKit-1234 \
-        phone_interactive_sensor=binary_sensor.robin_phone_interactive \
-        phone_battery_sensor=sensor.robin_phone_battery phone_notify_service=mobile_app_robin_phone \
-        weather_entity=weather.forecast_home
+    _connect homeassistant 'host=http://stubs:8123\ntoken=local-ha-token-a\n' \
+        phone_battery_sensor=sensor.robin_phone_battery
     _connect whatsapp 'url=http://stubs:3000/api\napi_key=local-waha-key\nsession=default\n' \
         voice_telegram_chat_id=111111111
     _connect calendar 'refresh_token=local-google-refresh-token\n' calendar_id=primary

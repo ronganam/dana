@@ -24,7 +24,7 @@ four-column grid (two on a narrow screen), filled in order, gaps back-filled.
 
 | Widget | Addon | Data | Settings |
 |---|---|---|---|
-| `clock` Clock and weather | essentials | `weather` from the highest-ranked `weather` provider that answers (`core.briefing.weather`: Open-Meteo at the Home zone, then Home Assistant), or null; the time is the page's own clock | |
+| `clock` Clock and weather | essentials | `weather` from the highest-ranked `weather` provider that answers (`core.briefing.weather`: Open-Meteo at the Home zone), or null; the time is the page's own clock | |
 | `now` Now | essentials | the top of the user's Now screen: `lede`, `total`, `items` (3 / 5 / 8 by size) | |
 | `shopping` Shopping list | shopping | the active list: `list`, `to_buy`, `items` (6 / 12 / 30); live: the script follows `/api/shopping/events` | |
 | `calendar` Calendar | calendar | `days`: today and tomorrow with their events (the user's Google Calendar) | |
@@ -156,6 +156,5 @@ is `/api/frigate/event/{id}/preview.gif|clip.mp4`.
   Assistant tiles and `/api/camera/{entity}/proxy` for snapshots; camera picture-in-picture plays go2rtc RTSP
   directly (`rtsp://<frigate host>:8554/<camera>`).
 - **Home Assistant endpoints** (`/api/ha/state/{entity}`, `/api/ha/states`, `POST /api/ha/service`,
-  `/api/client-config`, `/api/camera/{entity}/proxy`, the MJPEG `/api/frigate/{camera}`) each go to the caller's own
-  Home Assistant; without the addon: 403 `{"error": "not_connected", "addon": "homeassistant"}`.
-  `/api/client-config` returns the caller's `notify_service`, `interactive_sensor` and `person` for the phone app.
+  `/api/camera/{entity}/proxy`, the MJPEG `/api/frigate/{camera}`) each go to the caller's own Home Assistant; without
+  the addon: 403 `{"error": "not_connected", "addon": "homeassistant"}`.

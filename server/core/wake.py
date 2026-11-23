@@ -2,7 +2,7 @@
 ``core.user.woke`` (``why``; the tasks addon fires the wake-trigger tasks) and
 their morning briefing (docs/people.md, "Wake detection"; docs/signals.md).
 A composer: a delivery channel plus a source of the ``wake`` signal
-(core/signals.py: Dana's phone app, else Home Assistant). Anyone without both
+(core/signals.py: Dana's phone app). Anyone without both
 is skipped.
 
 Inside the user's wake window (core/wake_window.py), today:
@@ -11,8 +11,7 @@ Inside the user's wake window (core/wake_window.py), today:
   :data:`WAKE_CONFIRM_SECONDS` the screen must have been on at least
   :data:`WAKE_MIN_SCREEN_SECONDS` since (the highest-ranked
   ``screen_sessions`` provider that answers: the phone's own screen
-  sessions, else Home Assistant's screen sensor history; none → the unlock
-  is trusted);
+  sessions; none → the unlock is trusted);
 - a **sleep** session (:func:`sleep_ended`, Health Connect through the
   phone) ending in the window is the wake, at that exact time;
 - the **poll** (:func:`poll_once`) fires on enough screen use in the last
