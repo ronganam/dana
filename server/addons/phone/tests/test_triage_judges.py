@@ -3,6 +3,7 @@
 Run: bin/test test_triage_judges
 """
 import asyncio
+import datetime
 import json
 import os
 import sys
@@ -21,7 +22,7 @@ import litellm
 from aiohttp import web
 from aiohttp.test_utils import TestClient, TestServer
 
-from core import db, llm, user_profile, users
+from core import clock, db, llm, user_profile, users
 
 db.migrate()
 users.bootstrap()
@@ -147,7 +148,8 @@ def add(user, texts: List[str]) -> List[str]:
     for t in texts:
         _n[0] += 1
         posted.append({"key": f"k{_n[0]}", "package": "com.whatsapp", "app_name": "WhatsApp", "title": "Gal",
-                       "text": t, "sender": "Gal", "posted_at": "2026-11-22T09:00:00+02:00"})
+                       "text": t, "sender": "Gal",
+                       "posted_at": (clock.now() - datetime.timedelta(hours=1)).isoformat(timespec="seconds")})
     ids = ingest.ingest(user, posted)["ids"]
     assert len(ids) == len(texts), "a text repeated an earlier one"
     return ids
