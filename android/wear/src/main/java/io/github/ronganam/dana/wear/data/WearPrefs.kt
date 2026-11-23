@@ -24,6 +24,9 @@ class WearPrefs(context: Context) {
     /** The watch's device on the Devices page. */
     val deviceName: String get() = prefs.getString("device_name", "") ?: ""
 
+    /** Whose watch it is (the pairing's user; "" before a pairing that said). */
+    val userName: String get() = prefs.getString("user_name", "") ?: ""
+
     /** The server the phone is paired with, as its config last said ("" when it isn't). */
     var phoneServerUrl: String
         get() = prefs.getString("phone_server_url", "") ?: ""
@@ -39,6 +42,7 @@ class WearPrefs(context: Context) {
             putString("api_token", answer.token)
             putString("device_id", answer.device.id)
             putString("device_name", answer.device.name)
+            putString("user_name", answer.user.name)
         }
     }
 

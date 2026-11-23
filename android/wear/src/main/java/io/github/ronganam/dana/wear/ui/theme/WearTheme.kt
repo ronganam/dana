@@ -45,6 +45,8 @@ object DanaWear {
     val Rose = Color(0xFFF0709A)
 
     val Accent = Ember
+    /** The accent as text on the black canvas (eyebrows): ember lifted towards ink, like the web's `--ember-text`. */
+    val EmberText = Color(0xFFFD9371)
 
     /** A hue as a fill or chip background: 14% on the dark canvas. Never in ambient. */
     fun tint(hue: Color): Color = hue.copy(alpha = 0.14f)

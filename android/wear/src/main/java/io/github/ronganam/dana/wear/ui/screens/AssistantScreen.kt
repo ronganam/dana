@@ -50,6 +50,8 @@ import io.github.ronganam.dana.wear.ui.WearViewModel
 import io.github.ronganam.dana.wear.ui.components.WearMarkdownText
 import io.github.ronganam.dana.wear.perf.WearPerf
 import io.github.ronganam.dana.wear.R
+import io.github.ronganam.dana.wear.cards.SnapshotStore
+import io.github.ronganam.dana.wear.data.WearPrefs
 import androidx.compose.ui.res.stringResource
 
 @OptIn(ExperimentalWearFoundationApi::class)
@@ -73,6 +75,15 @@ fun AssistantScreen(
         }
     }
 
+    // The phone's snapshot and the pairing's name, read off the main thread; again when the screen empties.
+    val context = androidx.compose.ui.platform.LocalContext.current.applicationContext
+    val today by produceState(WatchToday.build(null, java.time.LocalTime.now().hour, ""), chatMessages.isEmpty()) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            WatchToday.build(SnapshotStore.load(context), java.time.LocalTime.now().hour, WearPrefs(context).userName)
+        }
+    }
+
+    val idle = chatMessages.isEmpty() && pendingApproval == null && pendingSelection == null && pendingExtension == null
     val listState = rememberScalingLazyListState()
     val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     val coroutineScope = rememberCoroutineScope()
@@ -101,7 +112,9 @@ fun AssistantScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .rotaryScroll(listState, focusRequester, active = active),
-                contentPadding = PaddingValues(top = 28.dp, bottom = 72.dp, start = 12.dp, end = 12.dp),
+                contentPadding = PaddingValues(top = if (idle) 22.dp else 28.dp, bottom = 72.dp, start = 12.dp, end = 12.dp),
+                // Idle, the day's block sits from the top (above the mic) instead of centring the first line.
+                autoCentering = if (idle) null else androidx.wear.compose.foundation.lazy.AutoCenteringParams(),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 if (status != ready) {
@@ -120,6 +133,11 @@ fun AssistantScreen(
                             )
                         }
                     }
+                }
+
+                // Nothing said yet: the day at a glance, the showreel's 06:52.
+                if (idle) {
+                    item(key = "today") { TodayBlock(today) }
                 }
 
                 items(chatMessages, key = { it.id }) { msg ->

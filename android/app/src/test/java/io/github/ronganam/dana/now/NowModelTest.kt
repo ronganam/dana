@@ -162,15 +162,15 @@ class NowModelTest {
     fun rowActionsAndDismiss() {
         val s = NowModel.rowActions(sug)
         assertEquals("accept", s.primary?.action)
-        assertEquals(listOf("edit", "dismiss"), s.inline.map { it.action })
-        assertTrue(s.more.isEmpty())
+        assertEquals(listOf("edit", "dismiss"), s.overflow.map { it.action })
         assertEquals("dismiss", s.dismiss?.action)
 
-        // A reminder with four others: the first snooze and Skip inline, the other snoozes under the evidence.
+        // A reminder with four others: only Done shows; every snooze and Skip wait in the overflow, in server order.
         val t = NowModel.rowActions(task)
-        assertEquals(listOf("1 h", "Skip"), t.inline.map { it.label })
-        assertEquals(listOf("Tonight", "Tomorrow"), t.more.map { it.label })
+        assertEquals("done", t.primary?.action)
+        assertEquals(listOf("1 h", "Tonight", "Tomorrow", "Skip"), t.overflow.map { it.label })
         assertEquals("Skip", t.dismiss?.label)
+        assertEquals("1 h", t.snooze?.label)
     }
 
     @Test

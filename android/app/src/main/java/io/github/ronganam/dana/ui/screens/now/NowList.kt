@@ -31,7 +31,11 @@ import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.NowItem
 import io.github.ronganam.dana.data.models.NowPayload
 import io.github.ronganam.dana.data.models.QuietEntry
+import io.github.ronganam.dana.ui.components.ActionPill
 import io.github.ronganam.dana.ui.components.HueMark
+import io.github.ronganam.dana.ui.components.MenuEntry
+import io.github.ronganam.dana.ui.components.OverflowMenu
+import androidx.compose.ui.text.font.FontWeight
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
 import io.github.ronganam.dana.ui.components.MonoLabel
@@ -79,11 +83,12 @@ class NowListActions(
 
 /**
  * Now, the list pane, top to bottom: the date (mono) and the lede (serif);
- * on the cover screen today's timeline from `day.slots` (unfolded the shell's
- * day strip is above); "Needs you · N" and the cards — or "All clear." before
- * the day; "Can wait · N" folded; the notifications line. Pull to refresh.
- * Only the first load's cards arrive staggered; later only new cards rise
- * in, and a card acted on fades out while the others close the gap.
+ * on the cover screen the day (the strip of hours and what is left today;
+ * unfolded the shell's day strip is above); "Needs you · N" and the rows;
+ * "Can wait · N" folded; the notifications line. With an empty queue the
+ * top is one centred block instead ([AllClear]). Pull to refresh. Only the
+ * first load's rows arrive staggered; later only new rows rise in, and a row
+ * acted on fades out while the others close the gap.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -108,30 +113,35 @@ fun NowListPane(state: NowListState, handlers: NowHandlers, actions: NowListActi
             )
         }
     ) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)) {
-            item(key = "head") { Header(state) }
-            if (allClear) item(key = "clear") { AllClear() }
-            if (!wide && loaded) item(key = "day") {
-                Column(Modifier.padding(top = 18.dp)) {
-                    NowDayTimeline(slots, state.now.toLocalTime(), actions.openDay)
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 24.dp, bottom = 32.dp)) {
+            if (allClear) item(key = "clear") {
+                AllClear(state, if (wide) null else slots, calendarOk, actions.openDay, Modifier.fillParentMaxHeight(0.78f))
+            } else {
+                item(key = "head") { Header(state, wide) }
+                if (!wide && loaded) item(key = "day") {
+                    Column(Modifier.padding(horizontal = NOW_GUTTER).padding(top = 22.dp)) {
+                        NowDayBlock(slots, state.now.toLocalTime(), actions.openDay, centred = false)
+                    }
                     if (!calendarOk) CalendarNote()
+                } else if (wide && loaded && !calendarOk) item(key = "cal") { CalendarNote() }
+                item(key = "needs") {
+                    Row(
+                        Modifier.fillMaxWidth().padding(horizontal = NOW_GUTTER).padding(top = 30.dp, bottom = 2.dp).semantics(mergeDescendants = true) { heading() },
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        MonoLabel(if (state.items.isNotEmpty()) "Needs you · " else "Needs you")
+                        if (state.items.isNotEmpty()) RollingText(
+                            state.items.size.toString(),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.weight(1f))
+                        if (state.items.isNotEmpty() && !wide) MonoLabel(
+                            "← dismiss · snooze →",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
-            } else if (wide && loaded && !calendarOk) item(key = "cal") { CalendarNote() }
-            if (!allClear) item(key = "needs") {
-                Row(
-                    Modifier.fillMaxWidth().padding(horizontal = NOW_GUTTER).padding(top = 22.dp, bottom = 8.dp).semantics(mergeDescendants = true) { heading() },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    MonoLabel(if (state.items.isNotEmpty()) "Needs you · " else "Needs you")
-                    if (state.items.isNotEmpty()) RollingText(
-                        state.items.size.toString(),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(Modifier.weight(1f))
-                    if (state.items.isNotEmpty() && !wide) MonoLabel("← dismiss · snooze →")
-                }
-                Rule(Modifier.padding(horizontal = NOW_GUTTER))
             }
             when {
                 state.items.isNotEmpty() -> itemsIndexed(state.items, key = { _, it -> "i_" + it.id }) { index, item ->
@@ -182,44 +192,77 @@ private val DATE = DateTimeFormatter.ofPattern("EEEE · d MMMM", Locale.ENGLISH)
 
 /** The date in mono caps, the lede as a large serif line, and how old the data is when the last refresh failed. */
 @Composable
-private fun Header(state: NowListState) {
+private fun Header(state: NowListState, wide: Boolean) {
     val lede = state.payload?.lede?.takeIf { it.isNotBlank() }
         ?: if (state.payload != null) NowModel.ledeFallback(state.now.hour, state.items.isEmpty()) else null
     Column(Modifier.padding(horizontal = NOW_GUTTER)) {
         MonoLabel(state.now.format(DATE))
         if (lede != null) Text(
             lede,
-            style = MaterialTheme.typography.headlineMedium.copy(
-                fontFamily = DanaSerif, fontSize = 31.sp, lineHeight = 36.sp, textDirection = TextDirection.Content
+            style = MaterialTheme.typography.displayMedium.copy(
+                fontSize = if (wide) 34.sp else 40.sp, lineHeight = if (wide) 38.sp else 44.sp, textDirection = TextDirection.Content
             ),
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 10.dp).fillMaxWidth().semantics { heading() }
+            modifier = Modifier.padding(top = 12.dp).fillMaxWidth().semantics { heading() }
         )
-        val at = state.updatedAt
-        if (state.payload != null && state.failed && at != null) MonoLabel(
-            NowModel.updatedAgo(at, System.currentTimeMillis()),
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-            modifier = Modifier.padding(top = 8.dp)
-        )
+        UpdatedAgo(state, Modifier.padding(top = 10.dp))
     }
 }
 
-/** Nothing in the queue: one small hue mark and an italic serif line; the day follows. */
+/** "Updated N min ago", only when the last refresh failed. */
 @Composable
-private fun AllClear() {
-    Column(Modifier.padding(horizontal = NOW_GUTTER).padding(top = 26.dp)) {
-        HueMark(hues.sage, Modifier.padding(bottom = 10.dp))
-        Text("All clear.", style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic, fontSize = 27.sp))
+private fun UpdatedAgo(state: NowListState, modifier: Modifier = Modifier) {
+    val at = state.updatedAt
+    if (state.payload != null && state.failed && at != null) MonoLabel(
+        NowModel.updatedAgo(at, System.currentTimeMillis()),
+        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+        modifier = modifier
+    )
+}
+
+/**
+ * Nothing in the queue, centred: the date in mono caps, the italic serif
+ * "All clear." with a sage dot under it, the day ([slots]; null unfolded,
+ * where the shell's strip is the day) and the server's lede as one quiet line.
+ */
+@Composable
+private fun AllClear(state: NowListState, slots: List<io.github.ronganam.dana.data.models.DaySlotInfo>?, calendarOk: Boolean, openDay: (DayEntry) -> Unit, modifier: Modifier = Modifier) {
+    val lede = state.payload?.lede?.takeIf { it.isNotBlank() }
+    Column(
+        modifier.fillMaxWidth().padding(horizontal = NOW_GUTTER),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
+    ) {
+        MonoLabel(state.now.format(DATE))
+        Text(
+            "All clear.",
+            style = MaterialTheme.typography.displayLarge.copy(fontStyle = FontStyle.Italic, fontSize = 46.sp, lineHeight = 50.sp),
+            color = MaterialTheme.colorScheme.onSurface,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(top = 12.dp).semantics { heading() }
+        )
+        Box(Modifier.padding(top = 14.dp).size(8.dp).clip(CircleShape).background(hues.sage))
+        if (slots != null) NowDayBlock(slots, state.now.toLocalTime(), openDay, centred = true, modifier = Modifier.padding(top = 26.dp))
+        if (!calendarOk) CalendarNote(centred = true)
+        if (lede != null) Text(
+            lede,
+            style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 19.sp, textDirection = TextDirection.Content),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            modifier = Modifier.padding(top = 22.dp).widthIn(max = 260.dp)
+        )
+        UpdatedAgo(state, Modifier.padding(top = 10.dp))
     }
 }
 
 @Composable
-private fun CalendarNote() {
+private fun CalendarNote(centred: Boolean = false) {
     Text(
         "Calendar couldn't be read",
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
-        modifier = Modifier.padding(horizontal = NOW_GUTTER).padding(top = 8.dp)
+        textAlign = if (centred) androidx.compose.ui.text.style.TextAlign.Center else null,
+        modifier = Modifier.fillMaxWidth().padding(horizontal = NOW_GUTTER).padding(top = 8.dp)
     )
 }
 
@@ -252,25 +295,27 @@ private fun CanWait(total: Int, open: Boolean, onClick: () -> Unit) {
     }
 }
 
-/** A compact quiet row: dot in its kind's hue, title, source, its primary and ×. */
+/** A quiet row: the dot in its kind's hue, the title, its source; its primary as a pill and the rest under ⋯. */
 @Composable
 private fun QuietRow(q: QuietEntry, actions: NowListActions) {
     val hue = hues.of(remember(q) { NowModel.hueOf(q) })
     Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = NOW_GUTTER, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(6.dp).clip(CircleShape).background(hue))
-            Spacer(Modifier.width(10.dp))
+        Row(Modifier.fillMaxWidth().padding(start = NOW_GUTTER, end = NOW_GUTTER - 10.dp).padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(hue))
+            Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text(q.title, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content), color = MaterialTheme.colorScheme.onSurface)
-                if (q.source.isNotBlank()) MonoLabel(io.github.ronganam.dana.ui.screens.common.isolatedParts(q.source), modifier = Modifier.padding(top = 2.dp))
+                Text(q.title, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium, textDirection = TextDirection.Content), color = MaterialTheme.colorScheme.onSurface)
+                if (q.source.isNotBlank()) Text(
+                    io.github.ronganam.dana.ui.screens.common.isolatedParts(q.source),
+                    style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Content),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 2.dp)
+                )
             }
             Spacer(Modifier.width(8.dp))
-            q.primary?.let { InkButton(it.label) { actions.quietAct(q, true) } }
-            q.secondary.firstOrNull()?.let { s ->
-                InkButton("×", emphasis = InkEmphasis.BARE, modifier = Modifier.padding(start = 4.dp).semantics(mergeDescendants = true) {
-                    contentDescription = s.label
-                }) { actions.quietAct(q, false) }
-            }
+            q.primary?.let { ActionPill(it.label) { actions.quietAct(q, true) } }
+            q.secondary.firstOrNull()?.let { s -> OverflowMenu(listOf(MenuEntry(s.label) { actions.quietAct(q, false) })) }
         }
         Rule(Modifier.padding(horizontal = NOW_GUTTER))
     }

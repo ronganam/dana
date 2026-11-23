@@ -80,9 +80,8 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
     private val _lastAssistantResponse = MutableStateFlow(str(R.string.tap_mic_to_speak))
     val lastAssistantResponse: StateFlow<String> = _lastAssistantResponse.asStateFlow()
 
-    private val _chatMessages = MutableStateFlow<List<WearChatMessage>>(
-        listOf(WearChatMessage(UUID.randomUUID().toString(), str(R.string.tap_mic_to_start), false))
-    )
+    /** Empty = nothing said yet: the screen shows the day (TodayBlock) above the mic. */
+    private val _chatMessages = MutableStateFlow<List<WearChatMessage>>(emptyList())
     val chatMessages: StateFlow<List<WearChatMessage>> = _chatMessages.asStateFlow()
 
     private val _pendingApproval = MutableStateFlow<WearToolApproval?>(null)
@@ -125,9 +124,7 @@ class WearViewModel(app: Application) : AndroidViewModel(app), MessageClient.OnM
         appContext = context.applicationContext
         prefs = WearPrefs(appContext)
 
-        _chatMessages.value = listOf(
-            WearChatMessage(UUID.randomUUID().toString(), str(R.string.tap_mic_to_start), false)
-        )
+        _chatMessages.value = emptyList()
         _lastAssistantResponse.value = str(R.string.tap_mic_to_speak)
         _statusText.value = str(R.string.status_ready)
 
