@@ -404,9 +404,9 @@ async def create_email_draft(conn: Connection, to: str, subject: str, body: str,
     look at, finish or send from Gmail. It is saved at once and can be undone (the draft is deleted).
 
     Args:
-        to: The recipient's email address; several separated by commas. May be empty; with
-            reply_to_message_id empty means the sender of that message.
-        subject: The subject line. With reply_to_message_id empty means the usual "Re: …".
+        to: The recipient's email address; several separated by commas. With reply_to_message_id it may be
+            empty: the sender of that message.
+        subject: The subject line. With reply_to_message_id it may be empty: the usual "Re: …".
         body: The text of the message (plain text).
         reply_to_message_id: Optional ID of a message this draft answers: it is saved in that conversation.
     """

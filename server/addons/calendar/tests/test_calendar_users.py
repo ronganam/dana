@@ -298,10 +298,12 @@ async def test_tools() -> None:
     out_b, _ = await run_tool(BOB, "list_calendars")
     hit_b = accounts_hit()
     check("list_calendars: each user's own calendars and selection",
-          "Robin work" in out_a and "Bob" not in out_a and "ID: robin-other\n  Primary (personal): No\n  Searched by default: No"
-          in out_a and "ID: robin-work\n  Primary (personal): No\n  Searched by default: Yes" in out_a
-          and "Bob family" in out_b and "Robin" not in out_b and "ID: primary\n  Primary (personal): Yes\n  Searched by "
-          "default: Yes" in out_b and "ID: bob-family\n  Primary (personal): No\n  Searched by default: No" in out_b,
+          "Robin work" in out_a and "Bob" not in out_a and "- Robin other (not selected) · ID: robin-other" in out_a
+          and "- Robin work · ID: robin-work · searched by default\n" in out_a
+          and "- Robin · ID: robin-cal · primary, searched by default, new events go here" in out_a
+          and "Bob family" in out_b and "Robin" not in out_b
+          and "- Bob · ID: primary · primary, searched by default, new events go here" in out_b
+          and out_b.endswith("- Bob family · ID: bob-family"),
           (out_a, out_b))
     check("list_calendars: only the user's own account was asked", hit_a == {"robin"} and hit_b == {"bob"}, (hit_a, hit_b))
 
@@ -382,6 +384,60 @@ async def test_tools() -> None:
     except registry.ToolNotAvailable:
         refused = True
     check("Carl: a calendar tool call is refused like an unknown tool, Google not asked", refused and not requests())
+    await test_tool_inputs()
+
+
+async def test_tool_inputs() -> None:
+    """Dates as the model writes them, calendars by name, a move keeps the length, long text is cut."""
+    bob = ACCOUNTS["bob-refresh"].calendars
+    out, _ = await run_tool(BOB, "add_event", summary="Bob day off", start_time="2030-02-01", end_time="2030-02-02")
+    eid = re.search(r"ID: (\S+?)\.$", out).group(1)
+    check("add_event: an all-day end names the last day (Google's exclusive end is the day after)",
+          bob["primary"]["events"][eid]["start"] == {"date": "2030-02-01"}
+          and bob["primary"]["events"][eid]["end"] == {"date": "2030-02-03"} and "(all day)" in out, out)
+    del bob["primary"]["events"][eid]  # the fake's search reads timed events only
+    out, _ = await run_tool(BOB, "add_event", summary="Bob call", start_time="2030-02-05T09:30",
+                            calendar_id="bob family")
+    eid = re.search(r"ID: (\S+?)\.$", out).group(1)
+    ev = bob["bob-family"]["events"][eid]
+    check("add_event: a calendar by its name; no end_time is an hour",
+          _when(ev["end"]["dateTime"]) - _when(ev["start"]["dateTime"]) == datetime.timedelta(hours=1), (out, ev))
+    out, _ = await run_tool(BOB, "update_event", event_id=eid, start_time="2030-02-06T14:00",
+                            calendar_id="bob-family")
+    check("update_event: a new start alone keeps the event's length",
+          _when(ev["start"]["dateTime"]).hour == 14
+          and _when(ev["end"]["dateTime"]) - _when(ev["start"]["dateTime"]) == datetime.timedelta(hours=1), (out, ev))
+    out, _ = await run_tool(BOB, "update_event", event_id=eid, summary="x")
+    check("update_event: an event of another calendar without calendar_id says how to find it",
+          out.startswith("Error: no event") and "calendar_id" in out, out)
+    requests()
+    out, _ = await run_tool(BOB, "add_event", summary="x", start_time="next tuesday")
+    check("add_event: a time it cannot read is an error naming the format, Google not asked",
+          out.startswith("Error: start_time") and "YYYY-MM-DD" in out
+          and not [r for r in requests() if r[1] == "events.insert"], out)
+    out, _ = await run_tool(BOB, "search_calendar", calendar_id="Nope")
+    check("search_calendar: an unknown calendar lists the real ones", out.startswith("Error: no calendar")
+          and "Bob family (ID: bob-family)" in out, out)
+    bob["primary"]["events"]["long"] = _ev("long", "Bob offsite", "2030-03-10T10:00:00", description="<p>" + "plan " * 400)
+    bob["primary"]["events"]["other"] = _ev("other", "Bob other", "2030-03-11T10:00:00", description="plan " * 400)
+    asked = []
+    real_list = FakeEvents.list
+
+    def spy(self, calendarId, **kw):
+        asked.append(kw)
+        return real_list(self, calendarId, **kw)
+    FakeEvents.list = spy
+    try:
+        out, _ = await run_tool(BOB, "search_calendar", start_time="2030-03-10", end_time="2030-03-11")
+    finally:
+        FakeEvents.list = real_list
+    check("search_calendar: dates become the bounds of whole days in the user's zone",
+          asked and asked[0]["timeMin"].startswith("2030-03-10T00:00:00") and asked[0]["timeMax"].startswith("2030-03-12T00:00:00")
+          and "Bob offsite" in out and "Bob other" in out, (asked, out))
+    check("search_calendar: long descriptions are cut with a note, HTML left out",
+          "[cut: 1,999 characters]" in out and "<p>" not in out and len(out) < 1500, out)
+    for k in ("long", "other"):
+        del bob["primary"]["events"][k]
 
 
 # --- 3. Token cache per connection ---------------------------------------------------------------

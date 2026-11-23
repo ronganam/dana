@@ -473,8 +473,14 @@ def found(out: str) -> List[str]:
 async def test_tools() -> None:
     requests()
     out = await tool(ADMIN, "search_contacts", query="GAL  cohen!")
-    check("search: a name whatever the case and punctuation, with numbers, emails and the organisation",
-          out == "- [people/r1] Gal Cohen · +972501110001 (mobile), +97235550001 (work) · gal@example.com · Wix", out)
+    check("search: a name whatever the case and punctuation, with numbers, emails, the organisation and the birthday",
+          out == "- [people/r1] Gal Cohen · +972501110001 (mobile), +97235550001 (work) · gal@example.com · Wix"
+          " · birthday 1990-03-14", out)
+    by_name = await tool(ADMIN, "get_contact", contact_id="gal cohen")
+    several = await tool(ADMIN, "get_contact", contact_id="cohen")
+    check("get_contact: a name only one contact has stands for its id; several are listed to choose from",
+          by_name.startswith("Gal Cohen [people/r1]") and several.startswith("Error: several contacts match 'cohen'")
+          and "- [people/r1] Gal Cohen" in several, (by_name, several))
     by_word = found(await tool(ADMIN, "search_contacts", query="cohen"))
     by_start = found(await tool(ADMIN, "search_contacts", query="rach"))
     by_nick = found(await tool(ADMIN, "search_contacts", query="gali"))
@@ -512,9 +518,9 @@ async def test_tools() -> None:
           full == ("Gal Cohen [people/r1]\nAlso known as: Gali\nPhones: +972501110001 (mobile), +97235550001 (work)\n"
                    "Emails: gal@example.com (home)\nBirthday: 1990-03-14\nOrganisation: Wix — Engineer"), full)
     check("get_contact: another user's contact id answers like an unknown one",
-          (await tool(BOB, "get_contact", contact_id="people/r1")).startswith("No contact with id")
-          and (await tool(ADMIN, "get_contact", contact_id="people/b1")).startswith("No contact with id")
-          and (await tool(ADMIN, "get_contact", contact_id="people/nope")).startswith("No contact with id"))
+          (await tool(BOB, "get_contact", contact_id="people/r1")).startswith("Error: no contact")
+          and (await tool(ADMIN, "get_contact", contact_id="people/b1")).startswith("Error: no contact")
+          and (await tool(ADMIN, "get_contact", contact_id="people/nope")).startswith("Error: no contact"))
     check("reads: no Google call (the local copy)", not requests())
 
     # update_contact: the stored etag goes to Google, the copy is refreshed from the answer.
@@ -562,7 +568,7 @@ async def test_tools() -> None:
           (same, bad))
     theirs = await tool(BOB, "update_contact", contact_id="people/r2", name="Hacked")
     check("update: another user's contact is unknown to the caller (no Google call, nothing changed)",
-          theirs.startswith("No contact with id") and not requests()
+          theirs.startswith("Error: no contact") and not requests()
           and ACCOUNTS["robin-refresh"].people["people/r2"]["names"][0]["displayName"] == "Rachel Levi-Cohen", theirs)
 
     # Changed in Google since the last sync: refused, read again, nothing overwritten.

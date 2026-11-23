@@ -21,6 +21,8 @@ CHAT_TYPES = {"all": None, "channels": {"channel"}, "groups": {"group"}, "privat
 PER_CHAT = 40            # newest unread messages read per chat for a summary
 SUMMARY_CHARS = 60000    # text given to the summarizer at most
 CONCURRENCY = 3          # chats read at once (Telegram rate-limits)
+READ_MAX_CHARS = 10000   # one chat's messages in a result (under core/agent.py's MAX_TOOL_RESULT_CHARS)
+MAX_LIST = 100           # chats one listing shows at most
 
 
 def _types(chat_type: str) -> Tuple[bool, Optional[set]]:
@@ -45,7 +47,7 @@ async def list_telegram_unread(conn: Connection, chat_type: str = "all", include
         chat_type: 'all' (default), 'channels', 'groups' or 'private' (people and bots).
         include_muted: Also list muted chats (default False: muted ones are skipped).
         include_archived: Also list archived chats (default False: archived ones are skipped).
-        limit: At most this many chats (default 30).
+        limit: At most this many chats (default 30, at most 100).
     """
     ok, types = _types(chat_type)
     if not ok:
@@ -58,7 +60,7 @@ async def list_telegram_unread(conn: Connection, chat_type: str = "all", include
     if not unread:
         return f"No unread Telegram chats ({chat_type}{', muted skipped' if not include_muted else ''}" \
                f"{', archived skipped' if not include_archived else ''})."
-    shown = unread[:max(1, limit)]
+    shown = unread[:max(1, min(limit, MAX_LIST))]
     lines = [f"- {tg.describe_chat(c)}" for c in shown]
     more = f"\n…and {len(unread) - len(shown)} more." if len(unread) > len(shown) else ""
     total = sum(c.unread for c in unread)
@@ -88,13 +90,15 @@ def _resolve(chats: List[tg.Chat], query: str) -> Tuple[Optional[tg.Chat], List[
 
 
 @addon.tool(untrusted_result=True)
-async def read_telegram_chat(conn: Connection, chat: str, limit: int = 20, unread_only: bool = False) -> str:
-    """Read recent messages from one of the user's own Telegram chats, groups or channels.
+async def read_telegram_chat(conn: Connection, chat: str, limit: int = 20, unread_only: bool = False,
+                             search: Optional[str] = None) -> str:
+    """Read messages from one of the user's own Telegram chats, groups or channels, newest last.
 
     Args:
         chat: The chat's name (or part of it), @username, or id from list_telegram_unread.
         limit: How many of the latest messages (default 20, at most 100).
         unread_only: Only messages after the user's read mark (default False).
+        search: Only messages containing these words (searches the chat's whole history).
     """
     try:
         chats = await tg.dialogs(conn)
@@ -105,15 +109,21 @@ async def read_telegram_chat(conn: Connection, chat: str, limit: int = 20, unrea
         if candidates:
             return (f"Several Telegram chats match '{chat}'; ask which one:\n"
                     + "\n".join(f"- {tg.describe_chat(c)}" for c in candidates))
-        return f"No Telegram chat matches '{chat}'."
+        return f"Error: no Telegram chat matches '{chat}'; list_telegram_unread shows the chats with unread messages."
+    search = (search or "").strip() or None
     try:
-        msgs = await tg.messages(conn, found, limit=min(max(1, limit), 100), unread_only=unread_only)
+        msgs = await tg.messages(conn, found, limit=min(max(1, limit), 100), unread_only=unread_only, search=search)
     except Exception as e:
         return f"Error: {tg.explain(e, conn)}"
+    what = ("unread " if unread_only else "") + "messages" + (f" containing '{search}'" if search else "")
     if not msgs:
-        return f"No {'unread ' if unread_only else ''}messages in {tg.describe_chat(found)}."
-    head = f"{'Unread' if unread_only else 'Latest'} messages in {tg.describe_chat(found)} (showing {len(msgs)}):\n"
-    return head + "\n".join(tg.format_message(m) for m in msgs) + f"\n{NOT_MARKED}"
+        return f"No {what} in {tg.describe_chat(found)}."
+    lines = [tg.format_message(m) for m in msgs]
+    while len(lines) > 1 and sum(len(x) + 1 for x in lines) > READ_MAX_CHARS:
+        lines.pop(0)  # the oldest go first: the newest are what was asked for
+    cut = f"; only the newest {len(lines)} of {len(msgs)} fit here" if len(lines) < len(msgs) else ""
+    return (f"{what[0].upper() + what[1:]} in {tg.describe_chat(found)} (showing {len(lines)}{cut}, oldest first):\n"
+            + "\n".join(lines) + f"\n{NOT_MARKED}")
 
 
 SUMMARY_PROMPT = """You summarize unread Telegram chats and channels for {name}.
@@ -177,7 +187,7 @@ async def summarize_telegram_unread(conn: Connection, chat_type: str = "all", in
         blocks.append(block)
         n_msgs += len(msgs)
     if not blocks:
-        return "Could not read any unread Telegram chat." + (f" Errors: {'; '.join(failed)}" if failed else "")
+        return "Error: could not read any unread Telegram chat." + (f" Errors: {'; '.join(failed)}" if failed else "")
     words = user_profile.for_user(conn.user)
     prompt = SUMMARY_PROMPT.format(name=words.first_name or "the user",
                                    focus=f"Pay special attention to: {focus}.\n" if focus else "")
@@ -186,7 +196,7 @@ async def summarize_telegram_unread(conn: Connection, chat_type: str = "all", in
                                       {"role": "user", "content": untrusted("Telegram chats", "\n\n".join(blocks))}],
                                      job="telegram", purpose="telegram_summary", source="telegram")
     except Exception as e:
-        logger.error(f"Telegram summary failed for user {conn.user.id}: {type(e).__name__}: {e}")
+        logger.error(f"Telegram summary failed for user {conn.user.id}: {type(e).__name__}: {e}", exc_info=True)
         return f"Error: the summary could not be written ({type(e).__name__})."
     rest = len(unread) - len(chosen)
     footer = [f"Covered {len(blocks)} chats, {n_msgs} messages. {NOT_MARKED}"]
