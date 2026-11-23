@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Dana — the assistant that doesn't wait to be asked</title>
-  <meta name="description" content="Dana is a self-hosted, open-source assistant for a household. It watches the trains, reads your notifications, listens to your calls, knows when you get in the car, and meets you on your phone, watch, wall tablet, TV and the web.">
+  <meta name="description" content="Dana is a self-hosted, open-source assistant for a household. It reads your notifications and your call recordings, knows when you wake up and get in the car, and meets you on your phone, watch, wall tablet, TV and the web.">
   <meta name="theme-color" content="#2b2521">
   <meta property="og:title" content="Dana — the assistant that doesn't wait to be asked">
   <meta property="og:description" content="Self-hosted and open source. Proactive, on every screen in the house, and undo-first.">
@@ -25,6 +25,7 @@
       <a href="#caps">What it does</a>
       <a href="#everywhere">Everywhere</a>
       <a href="#build">Make it yours</a>
+        <a href="#cost">Cost</a>
     </nav>
     <a class="btn btn-quiet btn-sm" href="https://github.com/ronganam/dana">GitHub</a>
   </header>
@@ -40,7 +41,7 @@
         <a class="btn btn-quiet" href="#build">Run it yourself</a>
       </div>
       <ul class="hero-chips reveal" aria-label="Where Dana runs">
-        <li>Phone</li><li>Watch</li><li>Wall tablet</li><li>TV</li><li>Web</li><li>Telegram</li><li>Raycast</li>
+        <li>Phone</li><li>Watch</li><li>Wall tablet</li><li>TV</li><li>Web</li><li>Telegram</li><li>Mac &amp; Linux</li>
       </ul>
     </section>
 
@@ -70,12 +71,12 @@
                 </ul>
               </div>
             </div>
-            <span class="tag s" style="--d:0"><i class="dot sage"></i>Sleep ended · from the watch</span>
+            <span class="tag s" style="--d:0"><i class="dot sage"></i>Sleep ended · Health Connect</span>
           </div>
           <div class="scene-copy">
             <p class="scene-kicker">06:52 · Wake</p>
             <h2>It knows you're <em>up</em>.</h2>
-            <p>No alarm to set, no app to open. When your watch says you're awake, Dana puts together your morning: the meetings, the weather, the train, and what's due today. It's waiting on your wrist.</p>
+            <p>No alarm to set, no app to open. When your sleep ends, or you unlock your phone for the first time in the morning, Dana puts together your morning: the meetings, the weather, what's due today and, with the trains add-on, your train. It's waiting on your wrist.</p>
           </div>
         </article>
 
@@ -88,12 +89,12 @@
                 <p class="lock-date">Tuesday, 24 November</p>
                 <div class="notif s" style="--d:1">
                   <div class="notif-head"><span class="app-dot sky"></span>Dana · Trains<span class="notif-when">now</span></div>
-                  <p class="notif-title">Leave at 08:14, not 08:08</p>
-                  <p class="notif-body">Your 08:12 to Tel Aviv HaShalom is 6 min late. Platform changed to 3. 40% full.</p>
+                  <p class="notif-title">Your 08:12 runs 6 min late</p>
+                  <p class="notif-body">To Tel Aviv HaShalom. Platform changed to 3. 40% full.</p>
                 </div>
                 <div class="notif ghost s" style="--d:3">
-                  <div class="notif-head"><span class="app-dot sky"></span>Dana · Trains<span class="notif-when">08:13</span></div>
-                  <p class="notif-title">Leaving in 5 minutes · platform 3</p>
+                  <div class="notif-head"><span class="app-dot sky"></span>Dana · Trains<span class="notif-when">08:08</span></div>
+                  <p class="notif-title">Leaves in 10 minutes · platform 3</p>
                 </div>
               </div>
             </div>
@@ -101,7 +102,7 @@
           <div class="scene-copy">
             <p class="scene-kicker">08:01 · Commute</p>
             <h2>It watches the train <em>so you don't</em>.</h2>
-            <p>Tell Dana your commute once. It follows the live timetable, delays, platform changes and how full the trains are, and only buzzes when you need to change something. This is an add-on anyone can write, published in Dana's catalog.</p>
+            <p>Set your commute once and the next trains are on your Now screen: live times, delays, platforms and how full they are. Watch a train and Dana speaks up only when something changes: a delay, a new platform, time to go. This is an add-on anyone can write, published in Dana's catalog.</p>
           </div>
         </article>
 
@@ -114,17 +115,17 @@
                 <div class="triage s" style="--d:0">
                   <span class="triage-n"><b class="count" data-to="43">43</b> notifications</span>
                   <span class="triage-bar"><i class="t-need"></i><i class="t-later"></i><i class="t-noise"></i></span>
-                  <span class="triage-key"><i class="dot ember"></i>1 needs you <i class="dot amber"></i>6 later <i class="dot mute"></i>36 noise</span>
+                  <span class="triage-key"><i class="dot ember"></i>1 needs you <i class="dot amber"></i>6 can wait <i class="dot mute"></i>36 noise</span>
                 </div>
                 <div class="card ember s" style="--d:2">
                   <p class="card-src">WhatsApp · School parents</p>
                   <p class="card-title">Pickup moved to 13:00 today</p>
                   <p class="card-why">Maya's class. You usually pick up at 16:00.</p>
-                  <div class="card-acts"><span class="b-fill">Remind me 12:30</span><span class="b-q">Tell Gal</span></div>
+                  <div class="card-acts"><span class="b-fill">Remind me 12:30</span><span class="b-q">Reply</span></div>
                 </div>
                 <div class="folded s" style="--d:3">
                   <span>36 noise, folded away</span>
-                  <span class="fold-chips"><i>Promos ×14</i><i>Groups ×12</i><i>Delivery ×6</i></span>
+                  <span class="fold-chips"><i>Shop app ×14</i><i>News ×12</i><i>Delivery ×6</i></span>
                 </div>
               </div>
             </div>
@@ -132,7 +133,7 @@
           <div class="scene-copy">
             <p class="scene-kicker">10:47 · Notifications</p>
             <h2>It reads 43 notifications. <em>Shows you one.</em></h2>
-            <p>Dana reads every notification your phone gets: WhatsApp groups, the bank, the school, deliveries. It sorts them into "needs you", "later" and noise, says why something matters to <i>you</i>, and keeps buzzing about the urgent ones until you look.</p>
+            <p>Dana reads every notification your phone gets: WhatsApp groups, the bank, the school, deliveries. It sorts them into "needs you", "can wait" and noise, says why something matters to <i>you</i>, and keeps buzzing about the urgent ones until you look.</p>
           </div>
         </article>
 
@@ -148,14 +149,14 @@
                 <p class="app-eyebrow s" style="--d:1">From this call</p>
                 <div class="sugg s" style="--d:2"><i class="dot sky"></i><div><p>Dor comes Thursday 09:00</p><span>Add to calendar</span></div><b class="chk">✓</b></div>
                 <div class="sugg s" style="--d:3"><i class="dot amber"></i><div><p>Send him a photo of the boiler</p><span>Reminder · tonight 20:00</span></div><b class="chk">✓</b></div>
-                <div class="sugg s" style="--d:4"><i class="dot sage"></i><div><p>Quote: ₪650 including parts</p><span>Saved to “Bathroom” project</span></div><b class="chk">✓</b></div>
+                <div class="sugg s" style="--d:4"><i class="dot sage"></i><div><p>Quote: ₪650 including parts</p><span>Call filed under “Bathroom”</span></div><b class="chk">✓</b></div>
               </div>
             </div>
           </div>
           <div class="scene-copy">
             <p class="scene-kicker">13:46 · Calls</p>
             <h2>It was on the call. <em>It took the notes.</em></h2>
-            <p>Your call recordings are transcribed and read. Dates turn into calendar events, promises turn into reminders, prices land in the right project. When the same person calls again, a card shows who they are and what you last talked about, before you answer.</p>
+            <p>Your call recordings are transcribed and read. Dates turn into calendar events, promises turn into reminders, and the call is filed under the project it was about. When someone you know calls again, a card shows who they are and what you last talked about, before you answer.</p>
           </div>
         </article>
 
@@ -169,7 +170,7 @@
                 <div class="notif solid s" style="--d:1">
                   <div class="notif-head"><span class="app-dot amber"></span>Dana · Reminder<span class="notif-when">now</span></div>
                   <p class="notif-title">Dry cleaning, on your way home</p>
-                  <p class="notif-body">Closes at 19:00. You asked on Sunday: “next time I'm in the car”.</p>
+                  <p class="notif-body">You asked on Sunday: “next time I'm in the car”.</p>
                 </div>
               </div>
             </div>
@@ -177,7 +178,7 @@
           <div class="scene-copy">
             <p class="scene-kicker">17:58 · Places</p>
             <h2>Reminders that fire <em>where they make sense</em>.</h2>
-            <p>“When I get in the car.” “When I get home.” “When I wake up.” Dana hears your car, your location and your sleep through Home Assistant, so a reminder shows up at the moment you can actually do something about it, not at some random time.</p>
+            <p>“When I get in the car.” “When I get home.” “When I wake up.” Dana's phone app notices the car (Bluetooth, Android Auto or driving), the places you saved and when you wake up, and Home Assistant can fill in too. So a reminder shows up at the moment you can actually do something about it, not at some random time.</p>
           </div>
         </article>
 
@@ -200,7 +201,7 @@
                 <p class="app-eyebrow">Gal's phone</p>
                 <p class="t-row"><i class="dot sage"></i>Milk</p>
                 <p class="t-row"><i class="dot sage"></i>Eggs</p>
-                <p class="mini-note">Gal is at the supermarket</p>
+                <p class="mini-note">Updated just now</p>
               </div>
             </div>
           </div>
@@ -226,14 +227,14 @@
                   <path class="fc-proj" d="M240 46 L280 52 L320 38 L360 44 L400 30"/>
                   <line class="fc-now" x1="240" y1="8" x2="240" y2="110"/>
                 </svg>
-                <div class="save s" style="--d:2.4"><i class="dot amber"></i><p><b>Your phone plan went up <span class="cur">₪</span>38 a month.</b> Two carriers offer the same for less. Want a comparison?</p></div>
+                <div class="save s" style="--d:2.4"><i class="dot amber"></i><p><b>Your phone plan went up <span class="cur">₪</span>38 a month.</b> Want me to check what other carriers charge?</p></div>
               </div>
             </div>
           </div>
           <div class="scene-copy">
             <p class="scene-kicker">21:40 · Money</p>
             <h2>It did the <em>money math</em>.</h2>
-            <p>Your bank and card accounts sync every night. Dana sorts the spending into fixed, yearly, everyday and one-off, predicts your balance at the end of the month, and spots things like a price that went up. You decide what to act on, and Dana checks later whether you actually saved.</p>
+            <p>Your bank and card accounts sync twice a day. Dana sorts the spending into fixed, yearly, everyday and one-off, predicts your balance at the end of the month, and spots things like a price that went up. You decide what to act on, and Dana checks later whether you actually saved. The money add-on reads Israeli banks and cards today; an add-on for your bank can be written the same way.</p>
           </div>
         </article>
 
@@ -245,14 +246,13 @@
                 <p class="now-date s" style="--d:0">Tuesday · 24 November</p>
                 <p class="now-lede s" style="--d:1">All clear.</p>
                 <div class="now-day s" style="--d:2"><i class="past"></i><i class="past"></i><i class="past"></i><i class="past"></i><b class="now-mark"></b><i></i></div>
-                <p class="now-tomorrow s" style="--d:3">Tomorrow: Dor at 09:00 · bring the umbrella</p>
-              </div>
+                              </div>
             </div>
           </div>
           <div class="scene-copy">
             <p class="scene-kicker">23:05 · Now</p>
             <h2>And then it <em>gets out of the way</em>.</h2>
-            <p>The Now screen shows only what needs you, and each thing takes one tap: done, snooze, or not today. When nothing's left, it just says “All clear.”</p>
+            <p>The Now screen shows only what needs you, and each thing takes one tap: done, snooze or dismiss. When nothing's left, it just says “All clear.”</p>
           </div>
         </article>
       </div>
@@ -300,7 +300,7 @@
         <article class="cell reveal" style="--hue:var(--sage)">
           <p class="cell-k">Calls</p>
           <h3>Every call becomes the next step.</h3>
-          <p>Recordings are transcribed and turned into tasks, events and notes. Incoming calls show who's calling, even unknown numbers.</p>
+          <p>Recordings are transcribed and turned into tasks and events. When someone you know calls, you see who they are and what's open with them.</p>
         </article>
         <article class="cell reveal" style="--hue:var(--amber)">
           <p class="cell-k">Triggers</p>
@@ -315,18 +315,18 @@
         <article class="cell c-wide reveal" style="--hue:var(--sage)">
           <p class="cell-k">Money</p>
           <h3>Your banks and cards, explained.</h3>
-          <p>A nightly sync of your accounts, with spending split into fixed, yearly, everyday and one-off. You get a balance forecast, ways to save that Dana checks back on, and your investments and meal card, read-only.</p>
+          <p>A twice-daily sync of your accounts, with spending split into fixed, yearly, everyday and one-off. You get a balance forecast, ways to save that Dana checks back on, and your investments and meal card, read-only.</p>
           <svg class="mini-bars" viewBox="0 0 300 60" aria-hidden="true"><rect x="0" y="22" width="34" height="38" rx="4"/><rect x="44" y="30" width="34" height="30" rx="4"/><rect x="88" y="14" width="34" height="46" rx="4"/><rect x="132" y="26" width="34" height="34" rx="4"/><rect x="176" y="34" width="34" height="26" rx="4"/><rect class="hl" x="220" y="6" width="34" height="54" rx="4"/><rect class="pj" x="264" y="18" width="34" height="42" rx="4"/></svg>
         </article>
         <article class="cell reveal" style="--hue:var(--sky)">
           <p class="cell-k">Your accounts</p>
-          <h3>Calendar, Gmail, Contacts, WhatsApp, Telegram.</h3>
-          <p>Read, search, summarize, draft. Nothing goes out without asking you first. Text written by other people can never make Dana act on its own.</p>
+          <h3>Gmail, WhatsApp, Calendar, Contacts, Telegram.</h3>
+          <p>Read, search and summarize; write email and WhatsApp messages. Nothing goes out without asking you first. Text written by other people can never make Dana act on its own.</p>
         </article>
         <article class="cell reveal" style="--hue:var(--teal)">
           <p class="cell-k">Home</p>
           <h3>Home Assistant and cameras.</h3>
-          <p>Lights, heating, locks and a map of the house, by voice or text. Camera clips on the TV and the wall tablet.</p>
+          <p>Lights, heating and locks, room by room, by voice or text. Camera clips and live views on the TV and the dashboard.</p>
         </article>
         <article class="cell reveal" style="--hue:var(--rose)">
           <p class="cell-k">Projects</p>
@@ -372,13 +372,13 @@
           <h3>Wall tablet</h3><p>A kiosk with "Hey Dana": the family calendar, shopping and cameras, plus a bedside mode.</p></div>
         <div class="lu reveal"><div class="lu-ico">
           <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="3" y="8" width="42" height="26" rx="3"/><path d="M16 42h16M24 34v8"/></svg></div>
-          <h3>TV</h3><p>A home screen for the living room: the day ahead, the doorbell camera, and voice.</p></div>
+          <h3>TV</h3><p>A home screen for the living room: your apps, a dashboard of the day, cameras in picture-in-picture, and voice.</p></div>
         <div class="lu reveal"><div class="lu-ico">
           <svg viewBox="0 0 48 48" aria-hidden="true"><rect x="4" y="8" width="40" height="30" rx="4"/><path d="M4 16h40M10 12h.01M15 12h.01"/></svg></div>
           <h3>Web</h3><p>The full app in your browser: Now, chat, tasks, inbox, projects, money.</p></div>
         <div class="lu reveal"><div class="lu-ico">
           <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M6 23l34-14-6 30-10-8-6 6v-9l14-12-18 10z"/></svg></div>
-          <h3>Telegram &amp; Raycast</h3><p>Talk to Dana from any chat app, or right from your Mac.</p></div>
+          <h3>Telegram &amp; desktops</h3><p>Talk to Dana in Telegram, from Raycast on a Mac, or with a keystroke on an Omarchy Linux desktop.</p></div>
       </div>
       <p class="bilingual reveal"><span>Speaks your language.</span> <span dir="rtl" lang="he">מדברת גם עברית.</span></p>
     </section>
@@ -388,11 +388,11 @@
       <div class="build-copy">
         <p class="eyebrow reveal">Make it yours</p>
         <h2 class="h-section reveal">Your server. <em>Your add-ons.</em></h2>
-        <p class="sub reveal">Dana runs on one small server you own: a mini PC, a NAS or a homelab. Each feature is an add-on with its own tools and screens. The train add-on in the showreel lives in its own repository. You can write yours in an afternoon: an add-on is just typed Python functions with docstrings, and Dana takes it from there.</p>
+        <p class="sub reveal">Dana runs on one small server you own: a mini PC, a NAS or a homelab. Each feature is an add-on with its own tools and screens. The train add-on in the showreel lives in its own repository and installs from the catalog. You can write yours in an afternoon: an add-on is just typed Python functions with docstrings, and Dana takes it from there.</p>
         <ul class="facts reveal">
           <li><b>Any model</b> through LiteLLM. Claude is the default.</li>
           <li><b>Several users</b> on one server, each with their own accounts, data and tokens.</li>
-          <li><b>Docker</b> or Kubernetes and SQLite. You need just two settings to start.</li>
+          <li><b>Docker</b> and SQLite. Nothing to configure: open the setup link and paste one model key.</li>
           <li><b>MIT licensed.</b> Your data stays on your server.</li>
         </ul>
       </div>
@@ -401,35 +401,58 @@
           <button role="tab" aria-selected="true" aria-controls="code-addon" id="tab-addon" type="button">tools.py</button>
           <button role="tab" aria-selected="false" aria-controls="code-run" id="tab-run" type="button" tabindex="-1">terminal</button>
         </div>
-        <pre id="code-addon" role="tabpanel" aria-labelledby="tab-addon"><code><span class="c"># addons/israel_rail/tools.py</span>
-<span class="k">@rail.tool</span>()
-<span class="k">def</span> <span class="f">next_trains</span>(conn, origin: <span class="t">str</span>, destination: <span class="t">str</span>,
-                count: <span class="t">int</span> = <span class="n">3</span>) -> <span class="t">dict</span>:
-    <span class="s">"""The next trains between two stations.
+        <pre id="code-addon" role="tabpanel" aria-labelledby="tab-addon"><code><span class="c"># israel_rail/tools.py (shortened)</span>
+<span class="k">@addon.tool</span>()
+<span class="k">async def</span> <span class="f">rail_trains</span>(conn, from_station: <span class="t">str</span> = <span class="s">""</span>,
+                      to_station: <span class="t">str</span> = <span class="s">""</span>, count: <span class="t">int</span> = <span class="n">4</span>) -> <span class="t">str</span>:
+    <span class="s">"""Trains between two stations: times, platform,
+    live delay and crowding. Without stations, the commute.
 
     Args:
-        origin: Station name, Hebrew or English.
-        destination: Station name.
+        from_station: Hebrew or English name. Empty: the commute.
+        to_station: Hebrew or English name. Empty: the commute.
         count: How many trains to list.
     """</span>
-    trips = client.search(origin, destination)
-    <span class="k">return</span> present.trips(trips[:count])
+    frm, to = commute.route_for(from_station, to_station, ...)
+    trips = <span class="k">await</span> client.search_trains(frm.id, to.id, count=count)
+    <span class="k">return</span> <span class="s">"\n"</span>.join(present.trip_lines(trips))
 
 <span class="c"># Dana writes the schema, offers the tool to users
 # who connected the add-on, and the trains show up on Now.</span></code></pre>
-        <pre id="code-run" role="tabpanel" aria-labelledby="tab-run" hidden><code><span class="c"># run Dana</span>
-<span class="p">$</span> git clone https://github.com/ronganam/dana
-<span class="p">$</span> cd dana/server &amp;&amp; cp .env.example .env
-<span class="c"># set ANTHROPIC_API_KEY and API_TOKEN</span>
+        <pre id="code-run" role="tabpanel" aria-labelledby="tab-run" hidden><code><span class="c"># run Dana: no checkout, no settings</span>
+<span class="p">$</span> curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
 <span class="p">$</span> docker compose up -d
-<span class="o">✓ dana is up on http://127.0.0.1:8080</span>
+<span class="p">$</span> docker compose logs dana
+<span class="o">  Open http://127.0.0.1:8080/setup?code=… to create the first admin.</span>
+<span class="c"># the setup page asks for one model key, then pairs your phone</span>
 
-<span class="c"># add the trains from the catalog</span>
-<span class="p">$</span> bin/dana addons install israel_rail
+<span class="c"># add the trains from the catalog (or Settings → Add-ons)</span>
+<span class="p">$</span> docker compose exec dana dana addons install israel_rail
 <span class="o">✓ israel_rail installed, pinned to a commit</span>
-
-<span class="c"># or write your own</span>
+<span class="c"># or write your own, in a checkout</span>
 <span class="p">$</span> bin/dana addons new my_thing</code></pre>
+      </div>
+    </section>
+
+    <!-- ============ COST ============ -->
+    <section id="cost" class="cost">
+      <div class="cost-copy">
+        <p class="eyebrow reveal">What it costs</p>
+        <h2 class="h-section reveal">About <em>$15 a month</em> in model calls.</h2>
+        <p class="sub reveal">That's what one real household's Dana spends, with every call to a model counted: chats, every notification read and sorted, call recordings, briefings. Measured over eight full days in November 2026 on the default models (Claude for chat, Gemini Flash-Lite for the background work). You pay your model provider directly; the server is yours, so there's no subscription. Set a monthly budget and Dana warns you at 80% and pauses its background work at 100%.</p>
+      </div>
+      <div class="cost-split reveal" role="img" aria-label="Where the money goes: chat 49%, reading notifications 32%, calls 8%, people briefs 5%, money 5%, everything else 1%">
+        <div class="cost-bar" aria-hidden="true">
+          <i style="--w:49;--h:var(--ember)"></i><i style="--w:32;--h:var(--teal)"></i><i style="--w:8;--h:var(--sage)"></i><i style="--w:5;--h:var(--plum)"></i><i style="--w:5;--h:var(--amber)"></i><i style="--w:1;--h:var(--sky)"></i>
+        </div>
+        <ul class="cost-key" aria-hidden="true">
+          <li style="--h:var(--ember)"><b>49%</b>Chat with Dana</li>
+          <li style="--h:var(--teal)"><b>32%</b>Reading and sorting notifications</li>
+          <li style="--h:var(--sage)"><b>8%</b>Transcribing and reading calls</li>
+          <li style="--h:var(--plum)"><b>5%</b>People briefs</li>
+          <li style="--h:var(--amber)"><b>5%</b>Money</li>
+          <li style="--h:var(--sky)"><b>1%</b>Everything else: briefings, voice notes, learning about you</li>
+        </ul>
       </div>
     </section>
 

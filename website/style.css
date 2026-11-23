@@ -418,3 +418,14 @@ section { padding: clamp(72px, 11vw, 140px) var(--gutter); }
   *, *::before, *::after { animation: none !important; transition-duration: 0s !important; transition-delay: 0s !important; }
   .reveal { opacity: 1; transform: none; }
 }
+
+/* Cost */
+.cost { display: grid; grid-template-columns: 1fr 1fr; gap: clamp(32px, 6vw, 80px); align-items: center; }
+.cost-split { min-width: 0; }
+.cost-bar { display: flex; gap: 3px; height: 14px; border-radius: 8px; overflow: hidden; }
+.cost-bar i { flex: var(--w) 1 0; min-width: 4px; background: var(--h); }
+.cost-key { list-style: none; padding: 0; margin: 24px 0 0; display: grid; gap: 12px; }
+.cost-key li { display: grid; grid-template-columns: 12px 3.2em 1fr; align-items: baseline; gap: 10px; font-size: 15px; color: var(--body); }
+.cost-key li::before { content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--h); align-self: center; }
+.cost-key b { font: 500 15px var(--mono); color: var(--ink); }
+@media (max-width: 960px) { .cost { grid-template-columns: 1fr; } }
