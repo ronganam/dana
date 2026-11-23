@@ -2,13 +2,16 @@
 a call or a notification): the attachment card and the system context,
 rebuilt from the DB on every turn, both for the chat's user and only from
 their own suggestions, calls and notifications (core/context_chats.py
-dispatches by kind)."""
+dispatches by kind). What the call or notification says is framed as text
+written by others (``core.text.untrusted``), which makes such a chat's turns
+ask before acting outside Dana (core/session_runner.py)."""
 from __future__ import annotations
 
 import json
 from typing import Any, Dict, List, Optional, Tuple
 
 from core import user_profile
+from core.text import untrusted
 from core.db import get_db_connection
 from core.users import User
 from addons.phone import suggestions as phone_suggestions
@@ -63,8 +66,9 @@ def call_block(user: Optional[User], call_id: str, transcript_chars: int = 6000)
     block = (
         f"Call {c['id']} with {c['contact']} on {c['call_timestamp']}"
         f"{' (' + c['direction'] + ')' if c.get('direction') else ''}\n"
-        f"Title: {c['title']}\nLabels: {labels}\nSummary:\n{c['summary']}\nKey facts:\n{facts}\n"
-        f"Transcript (may be cut):\n{transcript}"
+        + untrusted("a phone call (its summary and transcript carry the other side's words)",
+                    f"Title: {c['title']}\nLabels: {labels}\nSummary:\n{c['summary']}\nKey facts:\n{facts}\n"
+                    f"Transcript (may be cut):\n{transcript}")
     )
     return c, block
 
@@ -76,10 +80,11 @@ def _notification_block(user: Optional[User], notification_id: str) -> str:
                          (notification_id, user.id if user is not None else "")).fetchone()
     if not n:
         return "(the notification was deleted)"
-    return (f"Notification {n['id']} from the app {n['app_name']} at {n['posted_at']}"
-            f"{' in group ' + n['conversation'] if n['is_group'] and n['conversation'] else ''}\n"
-            f"Title: {n['title'] or ''}\nSender: {n['sender'] or ''}\nText:\n{(n['text'] or '')[:4000]}\n"
-            f"Category: {n['category'] or 'untriaged'}, priority: {n['priority'] or 'unknown'}")
+    return (f"Notification {n['id']} from the app {n['app_name']} at {n['posted_at']}\n"
+            + untrusted("a phone notification",
+                        f"{'Group: ' + n['conversation'] + chr(10) if n['is_group'] and n['conversation'] else ''}"
+                        f"Title: {n['title'] or ''}\nSender: {n['sender'] or ''}\nText:\n{(n['text'] or '')[:4000]}")
+            + f"\nCategory: {n['category'] or 'untriaged'}, priority: {n['priority'] or 'unknown'}")
 
 
 # --- Cards ------------------------------------------------------------------------------

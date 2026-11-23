@@ -389,8 +389,10 @@ Args:
         undone (home devices, the TV, the cluster, running code), or it
         writes something that feeds every later prompt (what Dana
         remembers about the user). It runs at once normally, but asks
-        first in a turn that carries untrusted content (the phone
-        screen the user shared, `device_screen`): see
+        first in a turn that carries text other people wrote (the
+        phone screen the user shared, an `untrusted_result` tool's
+        result, a context or message framed by
+        `core.text.untrusted`): see
         `needs_confirmation`.
     needs: Other addons the tool also requires; it is offered and runs
         only for a user who has all of them connected.
@@ -400,9 +402,11 @@ Args:
         user on the server). It must be cheap (asked for every tool
         list) and never raise.
     untrusted_result: The tool's result carries text written by other
-        people (an email). Once it ran, the rest of that turn counts
-        as carrying untrusted content: every `acts_outside` tool
-        asks first (`core/agent.py`).
+        people (an email, a chat message, a notification, a web page).
+        The model reads the result framed by `core.text.untrusted`
+        (unless the tool framed it itself), and once it ran the rest
+        of that turn counts as carrying untrusted content: every
+        `acts_outside` tool asks first (`core/agent.py`).
     describe: The Approve card's words for one call: ``f(user,
         args)`` returning a `Approval`
         (`core/approval_text.py` uses it before its own

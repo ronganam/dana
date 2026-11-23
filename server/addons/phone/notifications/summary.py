@@ -31,6 +31,7 @@ from typing import Any, Dict, List, Optional
 from core import budget, clock, llm, user_locale, user_profile, users
 from core.db import get_db_connection
 from core.user_profile import Profile
+from core.text import untrusted
 from core.users import User
 
 logger = logging.getLogger(__name__)
@@ -229,7 +230,7 @@ def app_prompt(user: User, items: List[Dict[str, Any]]) -> str:
 
 {who.about()}Now: {clock.describe_now()}
 
-{_sections(items[:PER_APP], who.first_name)}
+{untrusted(f"the {name} notifications", _sections(items[:PER_APP], who.first_name))}
 
 Return `summary`: 1–3 points, most important first (fewer is better when there's little to say).
 {_lang_rule(language(user))}
@@ -254,9 +255,8 @@ def overall_prompt(user: User, apps: Dict[str, List[Dict[str, Any]]], summaries:
 
 {who.about()}Now: {clock.describe_now()}
 
-By app:
-{chr(10).join(lines)}
-{need}
+{untrusted("the notifications, by app (and the summaries written from them)", "By app:" + chr(10) + chr(10).join(lines) + need)}
+
 Return `overall`: 2–4 points — first what needs {me} (who wants what), then one point for the rest ("PR reviews, login alerts, news").
 {_lang_rule(language(user))}
 {_style(me)}

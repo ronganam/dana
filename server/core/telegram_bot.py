@@ -17,7 +17,7 @@ from core.agent import AgentOrchestrator
 from core import llm
 from core.voice import summarize_text
 from core import debug_env, notify, session_runner, users
-from core.text import escape_markdown
+from core.text import escape_markdown, untrusted
 from core.session import (build_session_debug_payload, clear_history, get_pending, save_session_debug,
                           waiting_for_someone_else)
 from core.session_runner import start_agent_task, start_resume_task, start_resume_selection_task
@@ -80,6 +80,25 @@ class AuthMiddleware:
 # addon it answers with NO_MEMORY_TEXT instead of the registry's refusal.
 MEMORY_KIND = "about"
 NO_MEMORY_TEXT = "🧠 Memory isn't set up for you: the About you addon is not connected."
+
+def forwarded_from(origin: Any) -> str:
+    """Who a forwarded message came from, in words (Telegram's ``forward_origin``)."""
+    user = getattr(origin, "sender_user", None)
+    chat = getattr(origin, "sender_chat", None) or getattr(origin, "chat", None)
+    name = (getattr(origin, "sender_user_name", None)
+            or (" ".join(p for p in (getattr(user, "first_name", ""), getattr(user, "last_name", "")) if p) if user else "")
+            or (getattr(chat, "title", "") if chat else ""))
+    return f"a Telegram message forwarded from {name}" if name else "a forwarded Telegram message"
+
+
+def forwarded_text(message: Any, text: str) -> str:
+    """``text`` of an incoming message; a forwarded one (someone else's words, possibly aimed at
+    Dana) framed as untrusted, so its turn starts tainted (core/session_runner.py)."""
+    origin = getattr(message, "forward_origin", None)
+    if not origin or not text:
+        return text
+    return "I forwarded this message:\n" + untrusted(forwarded_from(origin), text)
+
 
 def api_session() -> Optional[AiohttpSession]:
     """The Bot API server from ``TELEGRAM_API_BASE`` (e.g. a self-hosted
@@ -405,7 +424,7 @@ class TelegramBot:
         if not user_text:
             # Skip messages with no text content (images, stickers, etc.)
             return
-            
+
         logger.info(f"Received message from user {user_id}: '{user_text}'")
         
         # Check if the user is in an interactive memory input state
@@ -455,6 +474,7 @@ class TelegramBot:
         await self.bot.send_chat_action(chat_id=message.chat.id, action="typing")
         
         session_id = f"tg_{message.chat.id}"
+        user_text = forwarded_text(message, user_text)
 
         # Start background agent task
         try:

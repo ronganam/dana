@@ -43,6 +43,8 @@ users.bootstrap()
 from core import addons_api  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
+from core.agent import for_model  # noqa: E402
+from core.text import carries_untrusted  # noqa: E402
 from core.addons import addon as addon_mod, registry, store  # noqa: E402
 from addons.telegram_account import api as tg_api, client as tg, login, tools  # noqa: E402
 from addons.telegram_account.config import ADDON  # noqa: E402
@@ -191,8 +193,9 @@ async def test_tools() -> None:
     check("read: an ambiguous name lists the candidates", "Several Telegram chats match" in out
           and "Tech News" in out and "Tech Talk" in out, out)
     out = await registry.execute(ADMIN, "read_telegram_chat", {"chat": "-1005"})
-    check("read: by id; a file in words; the text framed as others'",
-          "[File: x.pdf (application/pdf)]" in out and out.startswith(tools.UNTRUSTED_NOTE), out)
+    check("read: by id; a file in words; the model reads it framed as others' text",
+          "[File: x.pdf (application/pdf)]" in out and registry.returns_untrusted("read_telegram_chat")
+          and carries_untrusted(for_model("read_telegram_chat", out)), out)
     out = await registry.execute(ADMIN, "read_telegram_chat", {"chat": "Bob Club"})
     check("isolation: another user's chat is not found", "No Telegram chat matches" in out, out)
 
@@ -207,10 +210,10 @@ async def test_tools() -> None:
         out = await registry.execute(ADMIN, "summarize_telegram_unread", {"focus": "the wedding"})
     sent = captured[0]["messages"][1]["content"] if captured else ""
     check("summary: the model's text, then what was covered; nothing marked read",
-          out.startswith(tools.UNTRUSTED_NOTE) and "things happened" in out and "Covered 3 chats" in out
+          out.startswith("**Tech News**") and "things happened" in out and "Covered 3 chats" in out
           and "Nothing was marked as read." in out, out)
     check("summary: only unread, unmuted, unarchived chats, fenced",
-          sent.startswith("<<<MESSAGES") and sent.rstrip().endswith("MESSAGES>>>") and "dinner at 8?" in sent
+          carries_untrusted(sent) and "data from Telegram chats" in sent and "dinner at 8?" in sent
           and "deal" not in sent and "archived post" not in sent and "seen" not in sent, sent[:300])
     check("summary: each chat capped at its newest unread messages",
           "(the newest 40 of 50)" in sent and "news item 60" in sent and "news item 20" not in sent

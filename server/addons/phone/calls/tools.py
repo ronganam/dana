@@ -322,7 +322,8 @@ def _call_extras(user: User, call_id: str, analysis_raw) -> str:
     return out
 
 
-@addon.tool()
+# Suggestions are written by the model from calls and notifications (others' words).
+@addon.tool(untrusted_result=True)
 async def list_call_suggestions(conn: Connection, status: str = "pending") -> str:
     """List tasks, calendar events and security alerts suggested from the user's phone calls and phone notifications.
 

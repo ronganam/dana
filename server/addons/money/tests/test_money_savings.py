@@ -781,15 +781,18 @@ def test_chat() -> None:
             errors.append(exc)
     check("chat: Robin's saving for Bob → not found; for Carl (no money) → not connected", errors == [LookupError, NotConnected], errors)
     prompt = context_chats.context_prompt(ROBIN, card) or ""
-    fenced = re.search(r"<<external (\w+)>>\n(.*)\n<</external \1>>", prompt, re.S)
+    fenced = re.search(r"<<<UNTRUSTED_TEXT (\w+)\n(.*)\nUNTRUSTED_TEXT \1>>>", prompt, re.S)
     check("chat: the context states the facts and fences the item's words (merchant names written by others)",
           prompt.startswith(f"## Opened from a saving idea\nSaving {PHONE}: group ways to save; type bill; status open; "
                             "saves ₪480 a year (increase); ₪1,308.00 a year at stake.")
           and fenced and "Title: סלולר הצפון went up ₪40 a month" in fenced.group(2) and "update_saving" in prompt, prompt)
     check("chat: no context for another user's key or without money",
           context_chats.context_prompt(BOB, card) is None and context_chats.context_prompt(CARL, card) is None)
-    check("chat: a saving's chat counts as untrusted context (merchant names)",
-          "saving" in session_runner.UNTRUSTED_CONTEXT_KINDS and "saving" in session_runner.SCREEN_KINDS)
+    plain = str(uuid.uuid4())
+    check("chat: a saving's chat, or a saving on screen, counts as untrusted context (merchant names)",
+          session_runner._untrusted_context(ROBIN, context_chats.start_context_session(ROBIN, "saving", PHONE)["session_id"], None)
+          and session_runner._untrusted_context(ROBIN, plain, {"kind": "saving", "id": PHONE})
+          and not session_runner._untrusted_context(ROBIN, plain, None) and "saving" in session_runner.SCREEN_KINDS)
 
 
 # --- Lifecycle, outcomes, targets ------------------------------------------------------------------------

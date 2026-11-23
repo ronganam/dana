@@ -21,6 +21,7 @@ from typing import Dict, List, Optional
 
 from core import budget, clock, llm, user_locale, user_profile, users
 from core.db import get_db_connection
+from core.text import untrusted
 from core.users import User
 from core.addons import store as connections
 from addons.people import activity, linking, person_tasks, store
@@ -69,6 +70,10 @@ def brief_prompt(conn: sqlite3.Connection, user: User, r: sqlite3.Row) -> str:
     msg_lines = [f"- {str(m['posted_at'])[:16].replace('T', ' ')}"
                  f"{' in ' + repr(m['conversation']) if m['is_group'] else ''}: {re.sub(chr(10), ' ', m['text'] or '')[:220]}"
                  for m in msgs] or ["- (no messages)"]
+    heard = untrusted(f"calls with {r['name']} and messages from them",
+                      "Recent calls (newest first):\n" + "\n".join(call_lines) + "\n\n"
+                      f"Recent messages from them (newest first; {me}'s replies aren't captured):\n"
+                      + "\n".join(msg_lines))
     lang = _language(user)
     names = ", ".join(loads(r["aliases"], []))
     about = f"About {me}:\n{who.context}\n\n" if who.context else ""
@@ -78,11 +83,7 @@ def brief_prompt(conn: sqlite3.Connection, user: User, r: sqlite3.Row) -> str:
 {me}'s notes: {r['notes'] or '(none)'}
 Now: {clock.describe_now()}
 
-Recent calls (newest first):
-{chr(10).join(call_lines)}
-
-Recent messages from them (newest first; {me}'s replies aren't captured):
-{chr(10).join(msg_lines)}
+{heard}
 
 {me}'s open tasks that involve them:
 {chr(10).join('- ' + t['title'] for t in tasks) or '- (none)'}

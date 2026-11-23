@@ -27,6 +27,7 @@ from typing import Any, Dict, Iterable, List, Optional, Sequence, Set
 
 from core import budget, clock, events, llm, user_profile, users
 from core.db import get_db_connection
+from core.text import untrusted
 from core.users import User
 from addons.phone import popups, suggestions
 from addons.phone.calls.analysis import analysis_schema, normalize_analysis
@@ -304,15 +305,14 @@ def build_extraction_prompt(user: User, n: Dict[str, Any], ctx: Dict[str, Any]) 
     zones = ", ".join(ctx.get("zones") or []) or "(unavailable — do not set location triggers)"
     groups = ", ".join(ctx.get("groups") or [])
     who = n.get("sender") or n.get("title") or ""
-    conv = f" in the group \"{n['conversation']}\"" if n.get("conversation") and n.get("is_group") else ""
+    conv = f"In the group \"{n['conversation']}\"\n" if n.get("conversation") and n.get("is_group") else ""
+    shown = untrusted("the notification", f"{conv}Title: {n.get('title') or ''}\nSender: {who}\n"
+                                          f"Text:\n{(n.get('text') or '')[:6000]}")
     return f"""A notification appeared on {who_am_i.name}'s phone. Decide whether {who_am_i.called} needs a to-do or calendar event because of it — most notifications need none.
 
 {who_am_i.about()}Now: {clock.describe_now()}
-Notification from the app "{n.get('app_name')}", posted {str(n.get('posted_at') or '')[:16].replace('T', ' ')}{conv}:
-Title: {n.get('title') or ''}
-Sender: {who}
-Text:
-{(n.get('text') or '')[:6000]}
+Notification from the app "{n.get('app_name')}", posted {str(n.get('posted_at') or '')[:16].replace('T', ' ')}:
+{shown}
 
 Return JSON with action_items: an empty list unless there is a clear thing {me} must remember to do later (at most 2).
 A good suggestion is something nothing else will remind {me} of: a person asking {him} to do something, a benefit or form with a deadline, a bill {he} must pay {himself} before it is due, a pickup.

@@ -80,13 +80,13 @@ there.
 ## Tools
 
 All three are read-only and `untrusted_result` (the rest of the turn asks
-before any `acts_outside` tool, docs/agent-actions.md); each result starts by
-saying the messages are others' text. Chat only (`realtime=False`, as gmail).
+before any `acts_outside` tool, docs/agent-actions.md); the model reads each
+result framed as others' text (`core.text.untrusted`). Chat only (`realtime=False`, as gmail).
 
 | Tool | What |
 |---|---|
 | `list_telegram_unread(chat_type, include_muted, include_archived, limit)` | unread chats, muted and archived skipped unless asked; `chat_type`: `all` · `channels` · `groups` · `private` |
 | `read_telegram_chat(chat, limit, unread_only)` | one chat by id, `@username`, exact or partial name (several matches: the candidates) |
-| `summarize_telegram_unread(chat_type, include_muted, include_archived, max_chats, focus)` | reads the newest 40 unread messages of each unread chat (up to 30 chats, three at a time), at most 60,000 characters, fenced between `<<<MESSAGES` / `MESSAGES>>>`, and has the `telegram` job (`TELEGRAM_SUMMARY_MODEL` → `BACKGROUND_MODEL`, purpose `telegram_summary`) write 1–4 bullets per chat; then what it covered and what it could not read |
+| `summarize_telegram_unread(chat_type, include_muted, include_archived, max_chats, focus)` | reads the newest 40 unread messages of each unread chat (up to 30 chats, three at a time), at most 60,000 characters, framed by `core.text.untrusted` (data from Telegram chats), and has the `telegram` job (`TELEGRAM_SUMMARY_MODEL` → `BACKGROUND_MODEL`, purpose `telegram_summary`) write 1–4 bullets per chat; then what it covered and what it could not read |
 
 Tests: `bin/test test_telegram_account` (a fake Telethon client per session).

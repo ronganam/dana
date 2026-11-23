@@ -66,6 +66,8 @@ from core import images, notify, usage  # noqa: E402
 from addons.phone.calls import context as call_context  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.db import get_db_connection  # noqa: E402
+from core.agent import for_model  # noqa: E402
+from core.text import carries_untrusted  # noqa: E402
 from core.addons import registry, scheduler, store  # noqa: E402
 from addons.whatsapp import accounts, client as wa_client, events, messages as messages_fmt  # noqa: E402
 from testfakes import FakeWAHA  # noqa: E402
@@ -267,7 +269,8 @@ async def test_read_and_forward() -> None:
           all(f"(id: `false_{WA_A.contact_id}_{m}`)" in out for m in ("m1", "m2", "m3")), out)
     check("read: a file by name and type, with its caption",
           "[File: quote-A.pdf (application/pdf)] quote from A" in out, out)
-    check("read: the result says the messages are others' text", out.startswith(messages_fmt.UNTRUSTED_NOTE), out)
+    check("read: the model reads the messages framed as others' text",
+          registry.returns_untrusted("read_chat_messages") and carries_untrusted(for_model("read_chat_messages", out)), out)
     check("read: WAHA downloads only voice notes and images",
           WA_A.message_queries and WA_A.message_queries[-1].get("downloadMediaMimetypes") == ["audio/", "image/"]
           and WA_A.message_queries[-1].get("downloadMedia") == ["true"], WA_A.message_queries)

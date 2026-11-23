@@ -53,7 +53,8 @@ def _person_line(p: dict) -> str:
     return f"- [{p['id']}] " + " · ".join(bits)
 
 
-@addon.tool()
+# Names come from contacts and from senders' own display names (chosen by others).
+@addon.tool(untrusted_result=True)
 async def list_people(conn: Connection, query: Optional[str] = None, sort: str = "recent", limit: int = 15) -> str:
     """List the people the user talks to (built from calls and messages), e.g. who he talked to lately or who he hasn't talked to in a while.
 

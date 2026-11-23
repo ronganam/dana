@@ -26,7 +26,10 @@ so a client can attach at any time, replay what it missed and keep following:
                                                       phone screen (core/device_screen.py),
                                                       "untrusted_result" when only because a
                                                       tool of the turn read text other people
-                                                      wrote (an email)
+                                                      wrote (an email), "untrusted_context" when
+                                                      the turn started with such text (a chat
+                                                      opened from a call, a notification or a
+                                                      transaction; a forwarded message)
     selection_required {prompt, options, multiple}
     iterations_exceeded{iteration, max_iterations, summary}
     cancelled          {}
