@@ -782,7 +782,7 @@
       {
        "kind": "hardware",
        "optional": true,
-       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "what": "a phone or recorder app that saves call recordings to a folder",
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
@@ -2187,7 +2187,7 @@
       {
        "kind": "hardware",
        "optional": true,
-       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "what": "a phone or recorder app that saves call recordings to a folder",
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
@@ -3550,7 +3550,7 @@
       {
        "kind": "hardware",
        "optional": true,
-       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "what": "a phone or recorder app that saves call recordings to a folder",
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
@@ -4878,7 +4878,7 @@
       {
        "kind": "hardware",
        "optional": true,
-       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "what": "a phone or recorder app that saves call recordings to a folder",
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
@@ -6220,7 +6220,7 @@
       {
        "kind": "hardware",
        "optional": true,
-       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "what": "a phone or recorder app that saves call recordings to a folder",
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
@@ -7562,7 +7562,7 @@
       {
        "kind": "hardware",
        "optional": true,
-       "what": "a dialer that saves call recordings to Recordings/Call (Samsung's)",
+       "what": "a phone or recorder app that saves call recordings to a folder",
        "why": "Call transcripts and the tasks and events suggested from them"
       },
       {
