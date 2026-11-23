@@ -45,7 +45,11 @@ import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.NowAction
 import io.github.ronganam.dana.data.models.NowItem
 import io.github.ronganam.dana.data.notifications.PhoneNotificationActions
+import io.github.ronganam.dana.ui.components.ActionPill
 import io.github.ronganam.dana.ui.components.InkButton
+import io.github.ronganam.dana.ui.components.MenuEntry
+import io.github.ronganam.dana.ui.components.OverflowMenu
+import androidx.compose.ui.text.style.TextOverflow
 import io.github.ronganam.dana.ui.components.InkEmphasis
 import io.github.ronganam.dana.ui.components.MonoLabel
 import io.github.ronganam.dana.ui.components.Rule
@@ -73,15 +77,16 @@ class NowHandlers(
 )
 
 /**
- * A card of the queue: a 3dp start bar in its kind's hue ([NowModel.hueOf]),
- * a small dot and the mono source in that hue, the title, why it is here, a
- * filled primary and the quiet others. Its evidence (every block) waits
- * behind "More" / a tap. On the cover screen it swipes: towards the start =
- * dismiss, towards the end = the card's own snooze (each only when the card
- * offers it; the revealed side says which; both answer with Undo). Unfolded,
- * the selected card is highlighted (its evidence is on the stage) and a
- * schedulable one can be long-pressed onto the day strip. Swipe, expand and
- * the actions are also accessibility actions.
+ * A row of the queue, on the canvas: an 8dp dot in its kind's hue
+ * ([NowModel.hueOf]), the title, one muted line (source · why), the one
+ * visible action as a quiet pill (an ember fill for approvals) and a ⋯ menu
+ * with every other action and "Ask Dana about this". On the cover screen a
+ * tap opens the row in place (evidence, choices / checks, the reply box) and
+ * it swipes: towards the start = dismiss, towards the end = the card's own
+ * snooze (each only when the card offers it; the revealed side says which;
+ * both answer with Undo). Unfolded, the selected row is highlighted (its
+ * evidence is on the stage) and a schedulable one can be long-pressed onto
+ * the day strip. Swipe, open and the actions are also accessibility actions.
  */
 @Composable
 fun NowRow(
@@ -104,7 +109,7 @@ fun NowRow(
     val scope = rememberCoroutineScope()
     val h = hues
     val hue = h.of(remember(item) { NowModel.hueOf(item) })
-    val hasMore = item.blocks.isNotEmpty() || actions.more.isNotEmpty() || item.notification != null
+    val hasMore = item.blocks.isNotEmpty() || item.notification != null
 
     /** Swiped past the threshold: slide out, do it; snap back later only if the card is still here (failed / undone). */
     fun swipeOut(action: NowAction, direction: Float, width: Float) {
@@ -119,7 +124,7 @@ fun NowRow(
     Column(modifier.fillMaxWidth()) {
         BoxWithConstraints(Modifier.fillMaxWidth().clipToBounds()) {
             val width = constraints.maxWidth.toFloat()
-            // What a swipe will do, revealed under the card as it moves (cover only).
+            // What a swipe will do, revealed under the row as it moves (cover only).
             if (!wide && offset.value != 0f) {
                 Row(
                     Modifier.matchParentSize().padding(horizontal = NOW_GUTTER),
@@ -138,16 +143,16 @@ fun NowRow(
                     )
                 }
             }
-            Column(
+            Row(
                 Modifier
                     .fillMaxWidth()
                     .offset { IntOffset(offset.value.roundToInt(), 0) }
                     .then(
                         when {
                             wide && selected -> Modifier.background(canvas).startBar(accent)
-                            wide -> Modifier.startBar(hue)
+                            wide -> Modifier
                             // Canvas only while swiping (to cover what the swipe reveals), so the canvas glow shows through at rest.
-                            else -> Modifier.drawBehind { if (offset.value != 0f) drawRect(canvas) }.startBar(hue)
+                            else -> Modifier.drawBehind { if (offset.value != 0f) drawRect(canvas) }
                         }
                     )
                     .then(
@@ -181,82 +186,61 @@ fun NowRow(
                         }
                     }
                     .clickable(onClickLabel = if (wide) "Open" else if (expanded) "Less" else "More") { handlers.toggle(item) }
-                    .padding(start = NOW_GUTTER + 3.dp, end = NOW_GUTTER)
-                    .padding(top = 14.dp, bottom = 13.dp)
+                    .padding(start = NOW_GUTTER, end = NOW_GUTTER - 10.dp)
+                    .padding(top = 16.dp, bottom = 16.dp),
+                verticalAlignment = Alignment.Top
             ) {
-                if (item.source.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
-                    Box(Modifier.size(6.dp).clip(CircleShape).background(hue))
-                    Spacer(Modifier.width(7.dp))
+                // The dot sits on the title's first line (22sp line, 8dp dot).
+                Box(Modifier.padding(top = 7.dp).size(8.dp).clip(CircleShape).background(hue))
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
                     Text(
-                        io.github.ronganam.dana.ui.screens.common.isolatedParts(item.source.uppercase()),
-                        style = MaterialTheme.typography.labelSmall.copy(textDirection = TextDirection.Ltr),
-                        color = h.text(hue),
-                        maxLines = 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        item.title,
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium, fontSize = 16.sp, lineHeight = 22.sp, textDirection = TextDirection.Content),
+                        color = MaterialTheme.colorScheme.onSurface,
+                        modifier = Modifier.fillMaxWidth().semantics { heading() }
                     )
-                }
-                Text(
-                    item.title,
-                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold, fontSize = 16.sp, lineHeight = 21.sp, textDirection = TextDirection.Content),
-                    color = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.fillMaxWidth().padding(top = 5.dp).semantics { heading() }
-                )
-                if (item.why.isNotBlank() && (!wide || selected)) Text(
-                    item.why,
-                    style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
-                )
-                Row(Modifier.fillMaxWidth().padding(top = 10.dp), verticalAlignment = Alignment.Top) {
-                    ActionButtons(item, draft, actions, handlers, Modifier.weight(1f), solidPrimary = true)
-                    if (hasMore && !wide) InkButton(if (expanded) "Less" else "More", emphasis = InkEmphasis.BARE, modifier = Modifier.padding(start = 6.dp)) {
-                        handlers.toggle(item)
+                    val meta = remember(item) { NowModel.metaLine(item.source, item.why) }
+                    if (meta.isNotEmpty()) Text(
+                        io.github.ronganam.dana.ui.screens.common.isolatedParts(meta),
+                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, lineHeight = 18.sp, textDirection = TextDirection.Content),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = if (expanded) Int.MAX_VALUE else 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().padding(top = 3.dp)
+                    )
+                    // Open: the evidence and the choices come before the decision.
+                    if (expanded && !wide) Expanded(item, draft, handlers)
+                    actions.primary?.let { p ->
+                        ActionPill(
+                            NowModel.primaryLabel(item, draft) ?: p.label,
+                            solid = NowModel.solidPrimary(item),
+                            modifier = Modifier.padding(top = if (expanded && !wide) 16.dp else 12.dp)
+                        ) { handlers.perform(item, p, true) }
                     }
+                    if (expanded && !wide) ReplyBox(item, handlers)
                 }
-                if (expanded && !wide) Expanded(item, draft, actions.more, handlers)
+                Spacer(Modifier.width(4.dp))
+                // Centred on the title's first line.
+                ItemOverflow(item, actions, handlers, Modifier.offset(y = (-9).dp))
             }
         }
-        Rule(Modifier.padding(horizontal = if (wide) NOW_GUTTER else 0.dp))
+        Rule(Modifier.padding(horizontal = NOW_GUTTER))
     }
 }
 
-/** The primary (accent outline, or filled with [solidPrimary]) + the inline others as quiet buttons. */
-@OptIn(ExperimentalLayoutApi::class)
+/** The ⋯ of a row or the stage: every secondary in server order, then "Ask Dana about this". */
 @Composable
-fun ActionButtons(
-    item: NowItem,
-    draft: ItemDraft?,
-    actions: RowActions,
-    handlers: NowHandlers,
-    modifier: Modifier = Modifier,
-    solidPrimary: Boolean = false,
-    includeMore: Boolean = false
-) {
-    FlowRow(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        actions.primary?.let { p ->
-            InkButton(NowModel.primaryLabel(item, draft) ?: p.label, emphasis = if (solidPrimary) InkEmphasis.SOLID else InkEmphasis.PRIMARY) {
-                handlers.perform(item, p, true)
-            }
-        }
-        (actions.inline + if (includeMore) actions.more else emptyList()).forEach { a ->
-            InkButton(a.label) { handlers.perform(item, a, false) }
-        }
-    }
+fun ItemOverflow(item: NowItem, actions: RowActions, handlers: NowHandlers, modifier: Modifier = Modifier) {
+    val entries = actions.overflow.map { a -> MenuEntry(a.label) { handlers.perform(item, a, false) } } +
+        MenuEntry("Ask Dana about this") { handlers.ask(item) }
+    OverflowMenu(entries, modifier, divideBefore = actions.overflow.size)
 }
 
-/** The cover screen's open row: evidence, choices / checks, the other actions, the reply box, Ask Dana. */
-@OptIn(ExperimentalLayoutApi::class)
+/** The cover screen's open row, above its primary: evidence, choices / checks and their confirmation (the reply box follows the primary). */
 @Composable
-private fun Expanded(item: NowItem, draft: ItemDraft?, more: List<NowAction>, handlers: NowHandlers) {
-    Column(
-        Modifier
-            .padding(top = 12.dp)
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .padding(horizontal = 12.dp)
-            .padding(bottom = 10.dp)
-    ) {
+private fun Expanded(item: NowItem, draft: ItemDraft?, handlers: NowHandlers) {
+    Column(Modifier.padding(top = 4.dp).fillMaxWidth()) {
         item.blocks.filterNot { it.isDecide() }.forEach { EvidenceBlock(it) }
         item.blocks.filter { it.isDecide() }.forEach { b ->
             DecideBlock(b, draft, { k, i -> handlers.choice(item, k, i) }, { k, i -> handlers.check(item, k, i) })
@@ -264,23 +248,6 @@ private fun Expanded(item: NowItem, draft: ItemDraft?, more: List<NowAction>, ha
         // The chosen option's confirmation, so the primary says what will happen.
         NowModel.choiceBlocks(item).firstNotNullOfOrNull { b -> b.options.getOrNull(NowModel.chosenIndex(b, draft))?.message }?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
-        }
-        if (more.isNotEmpty()) {
-            MoreActions(item, more, handlers)
-        }
-        ReplyBox(item, handlers)
-        InkButton("Ask Dana about this →", emphasis = InkEmphasis.BARE, modifier = Modifier.padding(top = 8.dp)) { handlers.ask(item) }
-    }
-}
-
-/** The actions that didn't fit the row ("Later" when they are snoozes). */
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-fun MoreActions(item: NowItem, more: List<NowAction>, handlers: NowHandlers) {
-    Column(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(top = 14.dp, bottom = 6.dp)) { MonoLabel(if (more.all { it.action == "snooze" }) "Later" else "More") }
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            more.forEach { a -> InkButton(a.label) { handlers.perform(item, a, false) } }
         }
     }
 }

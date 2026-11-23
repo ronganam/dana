@@ -33,11 +33,10 @@ data class ItemDraft(
     val checks: Map<String, Set<Int>> = emptyMap()
 )
 
-/** What a row offers: the primary, up to two more inline, the rest folded under the evidence. */
+/** What a row offers: the one visible primary, and every other action in its overflow menu (server order). */
 data class RowActions(
     val primary: NowAction?,
-    val inline: List<NowAction>,
-    val more: List<NowAction>,
+    val overflow: List<NowAction>,
     /** What swiping towards the start does (null: nothing). */
     val dismiss: NowAction?,
     /** What swiping towards the end does: the card's own first snooze (null: nothing). */
@@ -117,19 +116,16 @@ object NowModel {
         DISMISS_LIKE.firstNotNullOfOrNull { a -> item.secondary.firstOrNull { it.action == a } }
             ?: item.primary?.takeIf { it.action in DISMISS_LIKE }
 
-    /**
-     * Row buttons: the primary, then — when there are more than two others —
-     * the first non-dismiss one and the dismiss; the rest wait under the
-     * evidence ("Later" for a reminder's snoozes).
-     */
-    fun rowActions(item: NowItem): RowActions {
-        val dismiss = dismissAction(item)
-        val others = item.secondary
-        val inline = if (others.size <= 2) others else {
-            listOfNotNull(others.firstOrNull { it !== dismiss }, dismiss.takeIf { it in others })
-        }
-        return RowActions(item.primary, inline, others.filter { it !in inline }, dismiss, snoozeAction(item))
-    }
+    /** A row's actions: only the primary shows; the secondaries (snoozes, dismiss, …) wait in the overflow, in server order. */
+    fun rowActions(item: NowItem): RowActions =
+        RowActions(item.primary, item.secondary, dismissAction(item), snoozeAction(item))
+
+    /** A row's muted line: "source · why", either left out when blank. */
+    fun metaLine(source: String, why: String): String =
+        listOf(source, why).map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" · ")
+
+    /** Only an approval's primary is filled (ember); every other is a quiet pill. */
+    fun solidPrimary(item: NowItem): Boolean = item.kind == "approval"
 
     /** The card's first `snooze` secondary (the shortest, server order); never invented for a kind that offers none. */
     fun snoozeAction(item: NowItem): NowAction? = item.secondary.firstOrNull { it.action == "snooze" }

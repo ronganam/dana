@@ -14,6 +14,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.NowItem
+import io.github.ronganam.dana.ui.components.ActionPill
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
 import io.github.ronganam.dana.ui.components.MonoLabel
@@ -88,7 +89,13 @@ private fun ItemDetail(item: NowItem, draft: ItemDraft?, handlers: NowHandlers) 
     NowModel.choiceBlocks(item).firstNotNullOfOrNull { b -> b.options.getOrNull(NowModel.chosenIndex(b, draft))?.message }?.let {
         Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 8.dp))
     }
-    ActionButtons(item, draft, actions, handlers, Modifier.padding(top = 14.dp), solidPrimary = true, includeMore = true)
+    Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        actions.primary?.let { p ->
+            ActionPill(NowModel.primaryLabel(item, draft) ?: p.label, solid = NowModel.solidPrimary(item)) { handlers.perform(item, p, true) }
+        }
+        Spacer(Modifier.width(6.dp))
+        ItemOverflow(item, actions, handlers)
+    }
     ReplyBox(item, handlers)
     InkButton("Ask Dana about this →", emphasis = InkEmphasis.BARE, modifier = Modifier.padding(top = 14.dp)) { handlers.ask(item) }
 }

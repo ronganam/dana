@@ -5,10 +5,18 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.R
 
-// Inter for every display/body/label role; DM Mono reserved for terminal/code blocks.
+/*
+ * Three faces ("the showreel look"): Instrument Serif for display (screen titles,
+ * ledes, names, big values; italic for a state line such as "All clear."), Inter
+ * for body and titles (user content, Hebrew), DM Mono for eyebrows and metadata
+ * (`label*`: uppercase through `MonoLabel`, tracked ~.14em).
+ */
+
+/** Body face: Inter. */
 val DanaFontFamily = FontFamily(
     Font(R.font.inter_regular, FontWeight.Normal),
     Font(R.font.inter_medium, FontWeight.Medium),
@@ -20,6 +28,9 @@ val DanaSerif = FontFamily(
     Font(R.font.instrument_serif_regular, FontWeight.Normal),
     Font(R.font.instrument_serif_italic, FontWeight.Normal, androidx.compose.ui.text.font.FontStyle.Italic)
 )
+
+/** Eyebrow tracking: mono caps spaced like the web's `.14em`. */
+val EYEBROW_TRACKING = 0.14.em
 
 val DmMono = FontFamily(
     Font(R.font.dm_mono_regular, FontWeight.Normal)
@@ -122,13 +133,13 @@ val DanaTypography = Typography(
         fontWeight = FontWeight.Normal,
         fontSize = 11.sp,
         lineHeight = 14.sp,
-        letterSpacing = 0.6.sp
+        letterSpacing = EYEBROW_TRACKING
     ),
     labelSmall = TextStyle(
         fontFamily = DmMono,
         fontWeight = FontWeight.Normal,
         fontSize = 10.sp,
         lineHeight = 14.sp,
-        letterSpacing = 0.6.sp
+        letterSpacing = EYEBROW_TRACKING
     )
 )

@@ -56,7 +56,6 @@
     <string name="status_wrapping_up">Wrapping up...</string>
     <string name="status_submitting">Submitting...</string>
     <string name="tap_mic_to_speak">Tap the microphone to speak.</string>
-    <string name="tap_mic_to_start">Tap the microphone below to start talking.</string>
     <string name="say_something">Say something to Dana.</string>
     <string name="heard_nothing">Didn\'t hear anything. Tap the mic to talk.</string>
     <string name="tap_mic_to_talk">Tap the mic to talk.</string>
@@ -177,6 +176,16 @@
     <string name="to_buy">To buy</string>
     <string name="undo_item">Undo %1$s</string>
     <string name="undo">Undo</string>
+
+    <!-- The idle screen's greeting (TodayBlock) -->
+    <string name="greeting_morning">Good morning</string>
+    <string name="greeting_afternoon">Good afternoon</string>
+    <string name="greeting_evening">Good evening</string>
+    <string name="greeting_night">Late night</string>
+    <plurals name="today_needs_you">
+        <item quantity="one">%1$d needs you</item>
+        <item quantity="other">%1$d need you</item>
+    </plurals>
 
     <!-- Tiles -->
     <string name="tile_shopping">SHOPPING</string>

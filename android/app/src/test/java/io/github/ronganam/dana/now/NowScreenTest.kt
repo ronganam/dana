@@ -2,7 +2,6 @@ package io.github.ronganam.dana.now
 
 import io.github.ronganam.dana.data.models.NowBlock
 import io.github.ronganam.dana.data.network.NowApi
-import io.github.ronganam.dana.ui.screens.now.DayColumn
 import io.github.ronganam.dana.ui.screens.now.NewCards
 import io.github.ronganam.dana.ui.screens.now.NowDay
 import io.github.ronganam.dana.ui.screens.now.NowModel
@@ -110,39 +109,53 @@ class NowScreenTest {
     """
 
     @Test
-    fun dayTimelineColumnsPastAndNext() {
+    fun dayUpcomingInOrderWithNext() {
         val slots = NowApi.parse(slotsJson).daySlots
-        val cols = NowDay.columns(slots, LocalTime.of(14, 30))
-        assertEquals(listOf("now", "15", "19", "home"), cols.map { it.key })
-        assertEquals(listOf(DayColumn.Type.NOW, DayColumn.Type.HOUR, DayColumn.Type.HOUR, DayColumn.Type.PLACE), cols.map { it.type })
-        // Before the first hour slot: under the now marker, by time; earlier than now = past.
-        val now = cols[0].entries
-        assertEquals(listOf("Coffee", "Call the plumber"), now.map { it.title })
-        assertTrue(now[0].past)
-        assertTrue(now[1].next)
-        assertEquals(1, cols.flatMap { it.entries }.count { it.next })
-        assertEquals(listOf("Pick up the parcel"), cols[1].entries.map { it.title })
-        assertEquals("israel_rail", cols[2].entries.single().kind)
-        assertEquals("t3", cols[3].entries.single().taskId)
+        val up = NowDay.upcoming(slots, LocalTime.of(14, 30))
+        // Coffee (14:10) is gone; timed ones by time, then the place slot's.
+        assertEquals(listOf("Call the plumber", "Pick up the parcel", "Train 19:05 A → B", "Take out the trash"), up.map { it.title })
+        assertTrue(up[0].next)
+        assertEquals(1, up.count { it.next })
+        assertEquals("israel_rail", up[2].kind)
+        assertEquals("At home", up[3].place)
+        assertEquals("t3", up[3].taskId)
+        assertNull(up[0].place)
     }
 
     @Test
-    fun emptyDayHasNoTimeline() {
+    fun dayStripHoursPastAndBusy() {
+        val slots = NowApi.parse(slotsJson).daySlots
+        val seg = NowDay.segments(slots, LocalTime.of(14, 30))
+        // 07:00 to 23:00, one per hour; before 14:00 past (never busy).
+        assertEquals((7..23).toList(), seg.map { it.hour })
+        assertEquals((7..13).toList(), seg.filter { it.past }.map { it.hour })
+        // Busy by the item's own time (14:40 → 14, 15:20 → 15, 19:05 → 19); 14:10 is earlier but still in the current hour.
+        assertEquals(listOf(14, 15, 19), seg.filter { it.busy }.map { it.hour })
+        assertTrue(seg.none { it.past && it.busy })
+    }
+
+    @Test
+    fun emptyDayStillHasItsStrip() {
         val empty = NowApi.parse("""{"day":{"slots":[{"key":"15","label":"15:00","items":[]},{"key":"home","label":"At home","items":[]}]}}""").daySlots
-        assertTrue(NowDay.columns(empty, LocalTime.of(14, 0)).isEmpty())
-        assertTrue(NowDay.columns(emptyList(), LocalTime.of(14, 0)).isEmpty())
+        assertTrue(NowDay.upcoming(empty, LocalTime.of(14, 0)).isEmpty())
+        val seg = NowDay.segments(emptyList(), LocalTime.of(23, 5))
+        assertEquals(17, seg.size)
+        assertEquals(16, seg.count { it.past })
+        assertTrue(seg.none { it.busy })
     }
 
     @Test
     fun nightAndUntimedItems() {
-        // 01:00: hour slots start at 06:00; a 02:30 reminder sits under the marker and is next.
+        // 01:00: the strip starts at 01:00; a 02:30 reminder is next, an untimed one counts in its slot's hour.
         val night = NowApi.parse(
-            """{"day":{"slots":[{"key":"6","label":"06:00","items":[{"title":"Early","kind":"reminder","time":"02:30"},{"title":"Run","kind":"event","time":"06:15"}]}]}}"""
+            """{"day":{"slots":[{"key":"6","label":"06:00","items":[{"title":"Early","kind":"reminder","time":"02:30"},{"title":"Run","kind":"event"}]}]}}"""
         ).daySlots
-        val cols = NowDay.columns(night, LocalTime.of(1, 0))
-        assertEquals(listOf("Early"), cols[0].entries.map { it.title })
-        assertTrue(cols[0].entries[0].next)
-        assertEquals(listOf("Run"), cols[1].entries.map { it.title })
+        val up = NowDay.upcoming(night, LocalTime.of(1, 0))
+        assertEquals(listOf("Early", "Run"), up.map { it.title })
+        assertTrue(up[0].next)
+        val seg = NowDay.segments(night, LocalTime.of(1, 0))
+        assertEquals(1, seg.first().hour)
+        assertEquals(listOf(2, 6), seg.filter { it.busy }.map { it.hour })
         assertEquals(null, NowDay.minutesOf("soon"))
         assertEquals(19 * 60 + 5, NowDay.minutesOf("19:05"))
     }

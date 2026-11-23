@@ -7,11 +7,16 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.compositionLocalOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -288,5 +293,82 @@ fun InkButton(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+    }
+}
+
+/**
+ * A row's one visible action ("the showreel look"): a quiet pill, the accent's
+ * tint with the accent's text; [solid] fills it with the accent (approvals).
+ * 34dp tall.
+ */
+@Composable
+fun ActionPill(text: String, modifier: Modifier = Modifier, solid: Boolean = false, enabled: Boolean = true, onClick: () -> Unit) {
+    val accent = MaterialTheme.colorScheme.primary
+    val shape = RoundedCornerShape(50)
+    Box(
+        modifier = modifier
+            .heightIn(min = 34.dp)
+            .clip(shape)
+            .then(if (solid) Modifier.background(emberGradient(enabled)) else Modifier.background(hues.tint(accent)))
+            .clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
+            .padding(horizontal = 15.dp, vertical = 7.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 13.5.sp,
+                fontWeight = FontWeight.Medium,
+                textDirection = androidx.compose.ui.text.style.TextDirection.Content
+            ),
+            color = (if (solid) MaterialTheme.colorScheme.onPrimary else hues.text(accent)).let { if (enabled) it else it.copy(alpha = 0.5f) },
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+    }
+}
+
+/** One entry of an [OverflowMenu]. */
+class MenuEntry(val label: String, val onClick: () -> Unit)
+
+/**
+ * The ⋯ that holds a row's other actions: a 40dp button ("More actions" to a
+ * screen reader) opening a menu of [entries], in order; [divideBefore] puts a
+ * hairline before that index (e.g. before "Ask Dana about this").
+ */
+@Composable
+fun OverflowMenu(entries: List<MenuEntry>, modifier: Modifier = Modifier, divideBefore: Int = -1, label: String = "More actions") {
+    var open by rememberSaveable { mutableStateOf(false) }
+    Box(modifier) {
+        IconButton(onClick = { open = true }, modifier = Modifier.size(40.dp)) {
+            Icon(
+                Icons.Filled.MoreHoriz,
+                contentDescription = label,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(20.dp)
+            )
+        }
+        DropdownMenu(
+            expanded = open,
+            onDismissRequest = { open = false },
+            shape = RoundedCornerShape(14.dp),
+            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 0.dp,
+            border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+        ) {
+            entries.forEachIndexed { i, e ->
+                if (i == divideBefore && i > 0) HorizontalDivider(Modifier.padding(vertical = 4.dp), thickness = 1.dp, color = MaterialTheme.colorScheme.outlineVariant)
+                DropdownMenuItem(
+                    text = {
+                        Text(
+                            e.label,
+                            style = MaterialTheme.typography.bodyMedium.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Content),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    },
+                    onClick = { open = false; e.onClick() }
+                )
+            }
+        }
     }
 }

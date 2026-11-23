@@ -2,9 +2,7 @@ package io.github.ronganam.dana.ui.screens.now
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -13,48 +11,49 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.hideFromAccessibility
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.DaySlotInfo
 import io.github.ronganam.dana.ui.components.MonoLabel
-import io.github.ronganam.dana.ui.components.startBar
-import io.github.ronganam.dana.ui.theme.DanaSerif
+import io.github.ronganam.dana.ui.theme.Hue
 import io.github.ronganam.dana.ui.theme.hues
 import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 
-/** One thing on today's timeline (from `day.slots`). [past] is dimmed, [next] emphasised. */
+/**
+ * One thing left today (from `day.slots`): [time] for a timed one, [place]
+ * ("At home", "On waking") for one tied to a place slot; [next] is the first
+ * timed one still ahead.
+ */
 data class DayEntry(
     val title: String,
     val kind: String,
     val time: String?,
     val taskId: String?,
     val eventId: String?,
-    val past: Boolean = false,
+    val place: String? = null,
     val next: Boolean = false
 )
 
-/** A column of the timeline: the now marker's, an hour with something in it, or a place slot ("At home", "On waking"). */
-data class DayColumn(val key: String, val label: String, val type: Type, val entries: List<DayEntry>) {
-    enum class Type { NOW, HOUR, PLACE }
-}
+/** One hour of the day strip: [past] before the current hour, [busy] when something happens in it. */
+data class DaySegment(val hour: Int, val past: Boolean, val busy: Boolean)
 
 /*
- * Pure rules of Now's day timeline (tested in NowDayTest): which column an
- * item lands in, which items are past and which one is next.
+ * Pure rules of Now's day (tested in NowScreenTest): the strip's hours (which
+ * are past, which hold something) and the list of what is left today.
  */
 object NowDay {
+
+    /** The strip starts at 07:00 (earlier when it is earlier) and runs to 23:00 (later when a slot does). */
+    private const val FIRST_HOUR = 7
+    private const val LAST_HOUR = 23
 
     /** "19:30" → minutes since midnight; null when it isn't a time. */
     fun minutesOf(hhmm: String?): Int? {
@@ -64,130 +63,128 @@ object NowDay {
         return if (h in 0..23 && min in 0..59) h * 60 + min else null
     }
 
-    /**
-     * The timeline's columns: NOW first (the marker, with anything timed
-     * before the first hour slot — the server lists those in the first slot
-     * with their own time), then the hour slots that have items, then the
-     * place slots that have items. Empty when nothing happens today (the
-     * strip is hidden).
-     */
-    fun columns(slots: List<DaySlotInfo>, now: LocalTime): List<DayColumn> {
-        val nowMin = now.hour * 60 + now.minute
-        val early = mutableListOf<DayEntry>()
-        val hours = mutableListOf<DayColumn>()
-        val places = mutableListOf<DayColumn>()
-        slots.forEach { slot ->
-            val hour = slot.key.toIntOrNull()?.takeIf { it in 0..23 }
-            val entries = slot.items.map { DayEntry(it.title, it.kind, it.time, it.taskId, it.eventId) }
-            if (hour == null) {
-                if (entries.isNotEmpty()) places += DayColumn(slot.key, slot.label, DayColumn.Type.PLACE, entries)
-                return@forEach
-            }
-            val (before, inHour) = entries.partition { e -> minutesOf(e.time)?.let { it < hour * 60 } == true }
-            early += before
-            if (inHour.isNotEmpty()) hours += DayColumn(slot.key, slot.label, DayColumn.Type.HOUR, inHour)
-        }
-        if (early.isEmpty() && hours.isEmpty() && places.isEmpty()) return emptyList()
+    private fun hourOf(slot: DaySlotInfo): Int? = slot.key.toIntOrNull()?.takeIf { it in 0..23 }
 
-        val nowCol = DayColumn("now", "Now", DayColumn.Type.NOW, early.sortedBy { minutesOf(it.time) ?: 0 })
-        // Past = timed earlier than now (an answer from a little while ago); next = the first one that isn't.
-        var nextFound = false
-        fun mark(col: DayColumn): DayColumn = col.copy(entries = col.entries.map { e ->
-            val m = minutesOf(e.time)
-            val past = m != null && m < nowMin
-            val next = !past && !nextFound
-            if (next) nextFound = true
-            e.copy(past = past, next = next)
-        })
-        return listOf(mark(nowCol)) + hours.map(::mark) + places
+    /**
+     * The day strip, one segment per hour: the past hours (before the current
+     * one), then the current hour and the rest. An hour is busy when a slot
+     * item falls in it (by its own time, else by its slot). The server lists
+     * only the hours still ahead, so past hours are never busy.
+     */
+    fun segments(slots: List<DaySlotInfo>, now: LocalTime): List<DaySegment> {
+        val busy = HashSet<Int>()
+        slots.forEach { slot ->
+            val hour = hourOf(slot) ?: return@forEach
+            slot.items.forEach { item -> busy += (minutesOf(item.time)?.div(60) ?: hour) }
+        }
+        val last = maxOf(LAST_HOUR, slots.mapNotNull(::hourOf).maxOrNull() ?: 0)
+        val first = minOf(FIRST_HOUR, now.hour)
+        return (first..last).map { h -> DaySegment(h, past = h < now.hour, busy = h >= now.hour && h in busy) }
+    }
+
+    /**
+     * What is left today, in order: timed items from now on (one timed before
+     * now is gone), then the place slots' items. The first timed one is next.
+     */
+    fun upcoming(slots: List<DaySlotInfo>, now: LocalTime): List<DayEntry> {
+        val nowMin = now.hour * 60 + now.minute
+        val timed = mutableListOf<Pair<Int, DayEntry>>()
+        val places = mutableListOf<DayEntry>()
+        slots.forEach { slot ->
+            val hour = hourOf(slot)
+            slot.items.forEach { item ->
+                val e = DayEntry(item.title, item.kind, item.time, item.taskId, item.eventId, place = if (hour == null) slot.label else null)
+                if (hour == null) places += e
+                else {
+                    val at = minutesOf(item.time) ?: (hour * 60)
+                    if (at >= nowMin) timed += at to e
+                }
+            }
+        }
+        val ordered = timed.sortedBy { it.first }.mapIndexed { i, (_, e) -> if (i == 0) e.copy(next = true) else e }
+        return ordered + places
     }
 }
 
-private val HM = DateTimeFormatter.ofPattern("HH:mm")
-private val COLUMN = 128.dp
+/** Up to this many of the day's entries show under the strip; the rest are "+N later". */
+private const val UPCOMING_SHOWN = 3
 
 /**
- * Today as a horizontal timeline: the now marker (an ember line with "NOW"
- * and the time), the hours with something in them, then "At home" / "On
- * waking". Past items are dimmed, the next one is emphasised; tapping an item
- * with a reminder behind it opens it. Static: nothing animates here.
+ * Today in one line: 4dp segments, one per hour, sky where something happens
+ * and a hairline where nothing does, past hours at 30 %, and a 2dp ember
+ * now-mark before the current hour. Static and decorative (the list under it
+ * says the same in words).
  */
 @Composable
-fun NowDayTimeline(slots: List<DaySlotInfo>, now: LocalTime, onOpen: (DayEntry) -> Unit, modifier: Modifier = Modifier) {
-    val columns = remember(slots, now.hour, now.minute) { NowDay.columns(slots, now) }
-    if (columns.isNotEmpty()) {
-        val accent = MaterialTheme.colorScheme.primary
-        val rule = MaterialTheme.colorScheme.outlineVariant
-        Row(
-            modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState())
-                .padding(horizontal = NOW_GUTTER)
-                .height(IntrinsicSize.Min)
-        ) {
-            columns.forEachIndexed { i, col ->
-                val isNow = col.type == DayColumn.Type.NOW
-                // A place slot after the hours starts after a little gap.
-                if (col.type == DayColumn.Type.PLACE && columns.getOrNull(i - 1)?.type != DayColumn.Type.PLACE) Spacer(Modifier.width(10.dp))
-                Column(
-                    Modifier
-                        .width(if (isNow && col.entries.isEmpty()) 104.dp else COLUMN)
-                        .fillMaxHeight()
-                        .drawBehind {
-                            // The axis under the labels, and the now marker across the strip.
-                            val y = 22.dp.toPx()
-                            drawLine(rule, Offset(0f, y), Offset(size.width, y), 1.dp.toPx())
-                            if (isNow) {
-                                val x = if (layoutDirection == LayoutDirection.Rtl) size.width - 1.dp.toPx() else 1.dp.toPx()
-                                drawLine(accent, Offset(x, 0f), Offset(x, size.height), 2.dp.toPx())
-                                drawCircle(accent, 3.5.dp.toPx(), Offset(x, y))
-                            }
-                        }
-                        .padding(start = if (isNow) 10.dp else 0.dp, end = 10.dp, bottom = 4.dp)
-                ) {
-                    Row(Modifier.height(18.dp), verticalAlignment = Alignment.CenterVertically) {
-                        if (isNow) {
-                            MonoLabel("Now", color = accent)
-                            Text(
-                                " " + now.format(HM),
-                                style = MaterialTheme.typography.bodySmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic, fontSize = 14.sp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1
-                            )
-                        } else MonoLabel(col.label)
-                    }
-                    Spacer(Modifier.height(10.dp))
-                    col.entries.forEach { e -> DayEntryLine(e, onOpen) }
-                }
-            }
+fun NowDayStrip(segments: List<DaySegment>, modifier: Modifier = Modifier) {
+    val accent = MaterialTheme.colorScheme.primary
+    val sky = hues.of(Hue.SKY)
+    val idle = MaterialTheme.colorScheme.outlineVariant
+    val mark = segments.count { it.past }
+    Row(
+        modifier.widthIn(max = 300.dp).fillMaxWidth().height(18.dp).semantics { hideFromAccessibility() },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        segments.forEachIndexed { i, s ->
+            if (i == mark) NowMark(accent)
+            val color = if (s.busy) sky else idle
+            Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (s.past) color.copy(alpha = color.alpha * 0.3f) else color))
+        }
+        if (mark == segments.size) NowMark(accent)
+    }
+}
+
+@Composable
+private fun NowMark(color: Color) {
+    Box(Modifier.width(2.dp).height(18.dp).clip(RoundedCornerShape(1.dp)).background(color))
+}
+
+/**
+ * The strip and what is left today under it as a dot list (a dot in the
+ * kind's hue, the title, its time or place in mono): the first three, then
+ * "+N later". An entry with a reminder behind it opens it. [centred] is the
+ * all-clear layout: the strip and the list's block centred, lines at their start.
+ */
+@Composable
+fun NowDayBlock(slots: List<DaySlotInfo>, now: LocalTime, onOpen: (DayEntry) -> Unit, centred: Boolean, modifier: Modifier = Modifier) {
+    val segments = remember(slots, now.hour) { NowDay.segments(slots, now) }
+    val upcoming = remember(slots, now.hour, now.minute) { NowDay.upcoming(slots, now) }
+    Column(modifier.fillMaxWidth(), horizontalAlignment = if (centred) Alignment.CenterHorizontally else Alignment.Start) {
+        NowDayStrip(segments)
+        if (upcoming.isNotEmpty()) Column(Modifier.padding(top = 12.dp).then(if (centred) Modifier.width(IntrinsicSize.Max) else Modifier)) {
+            upcoming.take(UPCOMING_SHOWN).forEach { e -> DayEntryLine(e, onOpen) }
+            if (upcoming.size > UPCOMING_SHOWN) MonoLabel("+${upcoming.size - UPCOMING_SHOWN} later", modifier = Modifier.padding(start = 16.dp, top = 2.dp))
         }
     }
 }
 
 @Composable
 private fun DayEntryLine(e: DayEntry, onOpen: (DayEntry) -> Unit) {
-    val h = hues
-    val hue = h.of(NowModel.dayHue(e.kind))
-    val opens = e.taskId != null
-    val style = MaterialTheme.typography.bodySmall.copy(
-        fontSize = 12.5.sp, lineHeight = 15.sp, textDirection = TextDirection.Content,
-        fontWeight = if (e.next) FontWeight.SemiBold else FontWeight.Normal
-    )
-    val color = if (e.next) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant
-    Column(
+    val hue = hues.of(NowModel.dayHue(e.kind))
+    Row(
         Modifier
-            .padding(bottom = 6.dp)
-            .fillMaxWidth()
-            .alpha(if (e.past) 0.45f else 1f)
             .clip(RoundedCornerShape(6.dp))
-            .then(if (e.kind == "event") Modifier.background(h.tint(hue)).startBar(hue, 2.dp) else Modifier)
-            .then(if (opens) Modifier.clickable { onOpen(e) } else Modifier)
-            .semantics { contentDescription = listOfNotNull(e.time, e.title, if (e.next) "next" else null).joinToString(", ") }
-            .padding(start = if (e.kind == "event") 8.dp else 0.dp, end = 4.dp, top = 3.dp, bottom = 3.dp)
+            .then(if (e.taskId != null) Modifier.clickable(onClickLabel = "Open") { onOpen(e) } else Modifier)
+            .semantics(mergeDescendants = true) {
+                contentDescription = listOfNotNull(e.title, e.time ?: e.place, if (e.next) "next" else null).joinToString(", ")
+            }
+            .heightIn(min = 30.dp)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (e.kind != "event") Box(Modifier.padding(end = 5.dp).size(5.dp).clip(CircleShape).background(hue))
-            e.time?.let { MonoLabel(it, color = if (e.next) h.text(hue) else MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-        Text(e.title, style = style, color = color, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Box(Modifier.size(8.dp).clip(CircleShape).background(hue))
+        Spacer(Modifier.width(8.dp))
+        Text(
+            e.title,
+            style = MaterialTheme.typography.bodyMedium.copy(
+                fontSize = 13.5.sp, textDirection = TextDirection.Content,
+                fontWeight = if (e.next) FontWeight.Medium else FontWeight.Normal
+            ),
+            color = if (e.next) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f, fill = false)
+        )
+        (e.time ?: e.place)?.let { MonoLabel(it, modifier = Modifier.padding(start = 8.dp)) }
     }
 }

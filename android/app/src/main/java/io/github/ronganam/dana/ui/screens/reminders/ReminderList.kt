@@ -264,8 +264,9 @@ private class CompletionFlow {
 private fun part(p: Float, from: Float, to: Float) = ((p - from) / (to - from)).coerceIn(0f, 1f)
 
 /**
- * One reminder: circle, title (● when important), mono "when" line with its
- * list as a chip tinted in the list's [hue], and a 3dp start bar in that hue.
+ * One reminder, a row on the canvas: the circle (its ring softly in the
+ * list's [hue]), title (● when important), mono "when" line with its list as
+ * a chip tinted in that hue; no start bar.
  * Selected (unfolded) = canvas + accent bar. Done = the circle filled with the
  * hue and checked.
  *
@@ -317,12 +318,11 @@ fun ReminderRow(
             }
             .fillMaxWidth()
             .then(
-                if (selected) Modifier.background(canvas).startBar(accent)
-                else Modifier.startBar(hue.copy(alpha = if (done) 0.45f else 1f))
+                if (selected) Modifier.background(canvas).startBar(accent) else Modifier
             )
             .clickable(onClick = onClick)
     ) {
-        Row(Modifier.fillMaxWidth().padding(start = GUTTER - 6.dp, end = GUTTER, top = 7.dp, bottom = 7.dp), verticalAlignment = Alignment.Top) {
+        Row(Modifier.fillMaxWidth().padding(start = GUTTER - 6.dp, end = GUTTER, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.Top) {
             Box(
                 Modifier
                     .size(32.dp)
@@ -337,7 +337,8 @@ fun ReminderRow(
                     val r = size.minDimension / 2f
                     val stroke = 1.5.dp.toPx()
                     if (fill > 0f) drawCircle(hue.copy(alpha = fill), r)
-                    drawCircle(lerp(outline, hue, fill), r - stroke / 2, style = Stroke(stroke))
+                    // At rest the ring carries the list's hue, softly (the row has no bar).
+                    drawCircle(lerp(lerp(outline, hue, 0.55f), hue, fill), r - stroke / 2, style = Stroke(stroke))
                     if (tick > 0f) {
                         // The check draws itself: down-stroke, then the long up-stroke.
                         val a = Offset(size.width * 0.28f, size.height * 0.52f)
@@ -360,8 +361,8 @@ fun ReminderRow(
                         append(task.title)
                     },
                     style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = if (done) FontWeight.Normal else FontWeight.SemiBold,
-                        fontSize = 14.5.sp,
+                        fontWeight = if (done) FontWeight.Normal else FontWeight.Medium,
+                        fontSize = 15.sp,
                         textDirection = TextDirection.Content,
                         textDecoration = if (done) TextDecoration.LineThrough else null
                     ),
