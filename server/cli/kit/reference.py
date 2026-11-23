@@ -48,6 +48,7 @@ HOOKS: Tuple[Tuple[str, Sequence[str], str], ...] = (
     ("review_action", ("review",), ""),
     ("search", ("search",), ""),
     ("selfcheck", ("selfcheck",), ""),
+    ("fix", ("fix",), ""),
     ("context", ("context",), ""),
     ("context_card", (), "context"),
     ("context_block", (), "context"),
@@ -61,7 +62,8 @@ CALLBACKS: Tuple[Tuple[str, str], ...] = (
 )
 # The types hooks get and return (core/addons/hooks.py).
 RESULT_TYPES = (hook_types.Card, hook_types.DayItem, hook_types.NowContext, hook_types.BriefingContext,
-                hook_types.Section, hook_types.Hit, hook_types.Check, hook_types.ContextRequest, hook_types.Approval,
+                hook_types.Section, hook_types.Hit, hook_types.Check, hook_types.Fix, hook_types.ContextRequest,
+                hook_types.Approval,
                 hook_types.WidgetContext)
 # More examples: (heading, showcase keys, words before them).
 MORE = (
@@ -69,7 +71,11 @@ MORE = (
      "them from `conn.settings` / `conn.credentials` (decrypted only for the connection's own user). Secrets go in "
      "`credentials` only: never in code, settings, env or logs."),
     ("Calling a service over HTTP", ("http",), "Every host it calls is in `touches=Touches(hosts=...)`; an env value "
-     "it reads is a `Need(\"env\", ...)` (`bin/dana addons check` compares both with the code)."),
+     "it reads is a `Need(\"env\", ...)` (`bin/dana addons check` compares both with the code). When the service "
+     "refuses the stored credentials, `store.needs_reconnect(user, addon, reason, part=, label=)` puts a Reconnect "
+     "card on Now and the Addons page (its button: the manifest's `reconnect_fix`, else the addon's own page) until "
+     "new credentials are saved, a \"Test connection\" passes or the addon calls `store.reconnected(user, addon, "
+     "part)`."),
     ("Its own tables", ("migration", "data"), "`migrations/m0001_<name>.py`, `m0002_…` (numbered per addon, never "
      "edited once shipped), and queries that always name the user (`UserTable` does)."),
     ("A route", ("route",), "`api.py` with `setup(app)`, behind the same sign-in as every route."),

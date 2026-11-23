@@ -18,6 +18,7 @@ from core.db import get_db_connection
 from core.users import User
 from core.addons import Connection, store
 from addons.calendar import client, events
+from addons.google_account import oauth
 from addons.calendar.config import ADDON
 
 logger = logging.getLogger(__name__)
@@ -84,8 +85,9 @@ async def _fetch(conn: Connection, entry: _Today) -> None:
         logger.debug(f"Calendar of {conn.user.id} not configured ({e})")
         entry.date, entry.events = now.date().isoformat(), []
     except Exception as e:
-        logger.info(f"Calendar of {conn.user.id} unavailable ({e})")
-        _mark(conn.user.id, False, str(e)[:200])
+        reason = oauth.failed(conn, e, "Google Calendar")
+        logger.info(f"Calendar of {conn.user.id} unavailable ({reason})")
+        _mark(conn.user.id, False, reason[:200])
     finally:
         entry.at = time.monotonic()
 

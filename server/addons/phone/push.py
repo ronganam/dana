@@ -64,6 +64,7 @@ from urllib.parse import urlsplit
 import aiohttp
 import httpx
 
+from core import users
 from core.db import get_db_connection
 from core.devices import Device
 from core.users import INSECURE_DEV_ENV, User
@@ -237,6 +238,7 @@ def register(user: User, device: Device, transport: str, address: str, app_versi
             "address = excluded.address, app_version = excluded.app_version, updated_at = excluded.updated_at",
             (device.id, user.id, transport, address, (app_version or "")[:40] or None, now))
         conn.commit()
+    store.reconnected(user, ADDON)
     via = f"UnifiedPush via {endpoint_host(address)}" if transport == "unifiedpush" else "FCM"
     logger.info(f"Phone push: registered device {device.id} of user {user.id} ({device.kind}, {via}, "
                 f"{app_version or '?'})" + (f"; {moved} older registration(s) with its address replaced" if moved else ""))
@@ -261,11 +263,28 @@ def devices(user: User) -> List[Dict[str, Any]]:
     return out
 
 
+# Why a phone needs pairing again once its push service dropped the last registration of its user.
+UNREGISTERED = "The phone's push registration was refused by its push service, so Dana can't reach your phone"
+
+
 def _drop(transport: str, address: str) -> None:
+    """Remove the registration its push service reported gone; a user left
+    with none needs to reconnect their phone (``store.needs_reconnect``: open
+    the app, or pair it again), cleared by the next :func:`register`."""
     with get_db_connection() as conn:
         # scoped: an address its push service reported gone: the registration holding it goes, whoever's
+        owners = {r["user_id"] for r in conn.execute("SELECT user_id FROM phone_push WHERE transport = ? "
+                                                    "AND address = ?", (transport, address)).fetchall()}
+        # scoped: as above
         conn.execute("DELETE FROM phone_push WHERE transport = ? AND address = ?", (transport, address))
+        left = {r["user_id"] for r in conn.execute(
+            f"SELECT DISTINCT user_id FROM phone_push WHERE user_id IN ({','.join('?' * len(owners))})",
+            tuple(owners)).fetchall()} if owners else set()
         conn.commit()
+    for user_id in owners - left:
+        user = users.get(user_id)
+        if user is not None:
+            store.needs_reconnect(user, ADDON, f"{UNREGISTERED}. Open the Dana app on it, or pair it again.")
 
 
 # --- Events ------------------------------------------------------------------

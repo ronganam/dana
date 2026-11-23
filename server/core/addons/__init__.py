@@ -4,7 +4,7 @@
 - :mod:`.addon` — :class:`Addon` (declare an addon, ``@addon.tool``, ``@addon.job``…), :class:`Field`, :class:`PromptPart`.
 - :mod:`.hooks` — what the manifest and the hooks use: :class:`Page`, :class:`Nav`, :class:`Worker`,
   :class:`LlmJob`, :class:`Need`, :class:`Touches`, :func:`minutes`, :class:`Card`, :class:`DayItem`, :class:`Section`, :class:`Hit`,
-  :class:`Check`, :class:`Approval`, :class:`WidgetContext`…
+  :class:`Check`, :class:`Fix`, :class:`Approval`, :class:`WidgetContext`…
 - :mod:`.loader` — finding and importing every addon (official, site, image, installed).
 - :mod:`.scheduler` — running jobs and services.
 - :mod:`.store` — connect / update / disconnect / get a user's addon; :class:`Connection`.
@@ -18,12 +18,12 @@
 from core.addons.addon import (ADDRESS, NAME, TELEGRAM_CHAT, TEXT, Field, Addon, InvalidValue,
                                PromptPart, Tool)
 from core.addons.data import UserTable
-from core.addons.hooks import (Approval, BriefingContext, Card, Check, ContextRequest, DayItem, DemoContext, Hit,
+from core.addons.hooks import (Approval, BriefingContext, Card, Check, ContextRequest, DayItem, DemoContext, Fix, Hit,
                                LlmJob, Nav, Need, NowContext, Page, Section, Touches, WidgetContext, Worker, hours,
                                minutes)
 from core.addons.store import Connection, Forbidden, NotConnected
 
 __all__ = ["ADDRESS", "Approval", "BriefingContext", "Card", "Check", "Connection", "ContextRequest", "DayItem", "DemoContext",
-           "Field", "Forbidden", "Addon", "Hit", "InvalidValue", "LlmJob", "NAME", "Nav", "Need", "NotConnected",
+           "Field", "Fix", "Forbidden", "Addon", "Hit", "InvalidValue", "LlmJob", "NAME", "Nav", "Need", "NotConnected",
            "NowContext", "Page", "PromptPart", "Section", "TELEGRAM_CHAT", "TEXT", "Tool", "Touches", "UserTable",
            "WidgetContext", "Worker", "hours", "minutes"]

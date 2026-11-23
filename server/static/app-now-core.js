@@ -16,7 +16,7 @@
 
   // A card's hue by its kind (web-design.md, the hues); a kind Dana does not know (an addon's own) is sky.
   const KIND_HUES = { approval: "ember", notification: "teal", suggestion: "plum", reminder: "amber",
-                      money: "sage", check: "rose", review: "sky" };
+                      money: "sage", check: "rose", reconnect: "rose", review: "sky" };
 
   /** The hue of a Now card: by kind; a call's suggestion is sage, a charge that stands out rose. */
   function hueOf(item) {
@@ -199,16 +199,26 @@
    *  - `open`: the thread of an approval → {type: "session", id}; a review → {type: "screen", id: "review"};
    *    a charge or a saving ("Ask Dana") → {type: "context", kind, id}; a card with blocks still folded →
    *    {type: "expand"}; a page that opens the ref's type (`opens(type)` → page id) → {type: "page", id, arg};
-   *    else blocks to fold back → {type: "expand"}; else {type: "none"}. */
+   *    else blocks to fold back → {type: "expand"}; else {type: "none"}. A self-check's card (ref
+   *    `check`) opens Settings → Needs attention once its blocks are unfolded: {type: "screen", id: "attention", arg}.
+   *  - a check's fix (server/docs/now.md, "Fixes"): `connect` → {type: "connect", addon} (the addon's connect
+   *    flow on the Addons page); `screen` → {type: "screen", id}; `url` → {type: "url", url} (https only, else
+   *    {type: "none"}). */
   function clientTarget(item, action, ctx) {
     const c = ctx || {};
-    if (action && action.action === "reply") return { type: "reply" };
+    const name = action && action.action;
+    const args = (action && action.args) || {};
+    if (name === "reply") return { type: "reply" };
+    if (name === "connect") return args.addon ? { type: "connect", addon: String(args.addon) } : { type: "none" };
+    if (name === "screen") return args.screen ? { type: "screen", id: String(args.screen) } : { type: "none" };
+    if (name === "url") return /^https:\/\//.test(String(args.url || "")) ? { type: "url", url: String(args.url) } : { type: "none" };
     const ref = (item && item.ref) || {};
     if (ref.type === "thread" && ref.id) return { type: "session", id: String(ref.id) };
     if (ref.type === "review") return { type: "screen", id: "review" };
     if (CONTEXT_REFS.includes(ref.type) && ref.id) return { type: "context", kind: ref.type, id: String(ref.id) };
     const hasBlocks = blocksOf(item).length > 0;
     if (hasBlocks && !c.expanded) return { type: "expand" };
+    if (ref.type === "check" && ref.id) return { type: "screen", id: "attention", arg: String(ref.id) };
     const page = ref.type && typeof c.opens === "function" ? c.opens(ref.type) : null;
     if (page) return { type: "page", id: page, arg: ref.id === undefined ? null : String(ref.id) };
     return hasBlocks ? { type: "expand" } : { type: "none" };

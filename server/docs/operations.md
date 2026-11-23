@@ -244,6 +244,7 @@ The web server listens on port 8080. Every path but the public ones (`docs/acces
 | `GET /api/people/lookup?phone=` | The incoming-call card for a number |
 | `POST /api/signals` | The caller's phone events (unlock, screen, car, zone, sleep) → `{accepted, rejected}` (phone addon; `docs/signals.md`) |
 | `GET /api/signals` | The caller's signals and their sources, the wake window (`core/signals_api.py`) |
+| `POST /api/checks/{key}/fix {fix}` | Run a failing self-check's server fix for the caller → `{ok, message}` (`core/now_api.py`, `docs/now.md`) |
 | `GET` / `PUT /api/backups`, `POST /api/backups/run`, `GET /api/backups/download`, `GET /api/backups/files/{name}` | Backups: settings, the list, back up now, a fresh archive to the browser, a stored archive (admin; `core/backups_api.py`, `docs/backups.md`) |
 | `GET /api/briefing/today` | Today's wake briefing (`?generate=1` makes it) |
 | `GET /api/review/latest` | The latest weekly review with its proposals |

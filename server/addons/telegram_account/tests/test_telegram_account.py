@@ -235,6 +235,10 @@ async def test_tools() -> None:
     check("signed out: reported, with what to do", "signed out" in out and "Addons page" in out, out)
     check("check: reports it too", "signed out" in (await tg.check(store.require(BOB, ADDON)) or ""))
     check("check: a good session passes", await tg.check(store.require(ADMIN, ADDON)) is None)
+    check("reconnect: Bob's signed-out session needs reconnecting, Robin's does not",
+          [r.addon for r in store.reconnects(BOB)] == [ADDON] and store.reconnects(ADMIN) == [], store.reconnects(BOB))
+    store.update(BOB, ADDON, credentials={"session": "S-BOB"})
+    check("reconnect: signing in again (a new session) clears it", store.reconnects(BOB) == [], store.reconnects(BOB))
 
 
 # --- QR sign-in --------------------------------------------------------------------------------

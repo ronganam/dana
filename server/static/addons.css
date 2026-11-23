@@ -52,8 +52,8 @@
 .itg-state.on .itg-dot { background: var(--itg-ok); }
 .itg-state.setup { color: var(--itg-warn-text); background: var(--amber-tint); }
 .itg-state.setup .itg-dot { background: transparent; border: 1.5px solid var(--itg-warn); }
-.itg-state.error, .itg-state.failed { color: var(--itg-bad-text); background: var(--rose-tint); }
-.itg-state.error .itg-dot, .itg-state.failed .itg-dot { background: var(--itg-bad); }
+.itg-state.error, .itg-state.failed, .itg-state.reconnect { color: var(--itg-bad-text); background: var(--rose-tint); }
+.itg-state.error .itg-dot, .itg-state.failed .itg-dot, .itg-state.reconnect .itg-dot { background: var(--itg-bad); }
 .itg-state.server-off .itg-dot, .itg-state.locked .itg-dot { background: transparent; border: 1px solid var(--mute); }
 .itg-badge { display: inline-block; margin-inline-start: 8px; padding: 1px 6px; border-radius: var(--radius-sm); border: 1px solid var(--hairline-strong);
   font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; letter-spacing: .4px; text-transform: uppercase; color: var(--body-strong); vertical-align: 1px; }
@@ -137,6 +137,8 @@
   border: 1px solid var(--hairline); color: var(--body); font-size: 13px; line-height: 1.45; }
 .itg-note.warn { background: rgb(var(--amber-rgb) / .08); border-color: rgb(var(--amber-rgb) / .35); color: var(--itg-warn-text); }
 .itg-note svg { width: 15px; height: 15px; flex-shrink: 0; margin-top: 2px; }
+.itg-note > span { flex: 1; min-width: 0; }
+.itg-note .itg-actions { flex-shrink: 0; }
 .itg-opts { font-size: 12px; color: var(--mute); }
 .itg-opts:empty { display: none; }
 .itg-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

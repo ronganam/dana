@@ -65,7 +65,10 @@ there.
   changes (`on_change`). Reading clients take no updates: nothing runs in the
   background and the account is not shown online. A session Telegram no
   longer accepts says "signed out … sign in again on the Addons page"
-  (also the `check`).
+  (also the `check`) and marks the connection for reconnecting, as does a
+  read refused because the session was revoked (`explain(e, conn)`:
+  `store.needs_reconnect`, a Reconnect card: `docs/now.md`, "Reconnect");
+  signing in again clears it.
 - `dialogs(conn)`: every chat, most recent first, with its type (`channel`,
   `group`, `private`, `bot`), unread and mention counts, `muted` (the chat's
   own mute, not Telegram's global per-type setting), `archived` and read mark;

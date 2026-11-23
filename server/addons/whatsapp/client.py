@@ -14,8 +14,8 @@ from urllib.parse import urlsplit, urlunsplit
 import httpx
 
 from core import user_locale
-from core.addons import Connection, addresses
-from addons.whatsapp.config import DEFAULT_SESSION
+from core.addons import Connection, addresses, store
+from addons.whatsapp.config import ADDON, DEFAULT_SESSION
 
 logger = logging.getLogger(__name__)
 
@@ -294,6 +294,27 @@ async def download_media_bytes(conn: Connection, media_url: str) -> Optional[byt
 
 
 # ---------------------------------------------------------------------------
+# The session's state, and reconnecting (docs/whatsapp.md)
+# ---------------------------------------------------------------------------
+
+# WAHA session states that only the user can fix: the WhatsApp account signed this session out (a new QR
+# code to scan) or WAHA gave up on it.
+LOGGED_OUT = {"SCAN_QR_CODE": "WhatsApp signed this session out: scan its QR code again in WAHA",
+              "FAILED": "The WhatsApp session failed in WAHA: restart it and scan its QR code again"}
+
+
+def session_status(conn: Connection, status: str) -> None:
+    """What WAHA reports about the connection's session (the ``session.status``
+    event, the connection check): signed out or failed marks the connection for
+    reconnecting; working clears that."""
+    status = (status or "").strip().upper()
+    if status in LOGGED_OUT:
+        store.needs_reconnect(conn.user, ADDON, f"{LOGGED_OUT[status]}.")
+    elif status == "WORKING":
+        store.reconnected(conn.user, ADDON)
+
+
+# ---------------------------------------------------------------------------
 # Connection check (Addon(check=): POST /api/addons/whatsapp/test)
 # ---------------------------------------------------------------------------
 
@@ -310,6 +331,7 @@ async def check(conn: Connection) -> Optional[str]:
     except Exception as e:
         return f"Could not reach WAHA at {url} ({type(e).__name__})."
     if r.status_code in (401, 403):
+        store.needs_reconnect(conn.user, ADDON, f"WAHA refused the API key (HTTP {r.status_code}).")
         return f"WAHA refused the API key (HTTP {r.status_code})."
     if r.status_code != 200:
         return f"WAHA answered HTTP {r.status_code}."
@@ -320,6 +342,7 @@ async def check(conn: Connection) -> Optional[str]:
     if found is None:
         return f"WAHA has no session named {sess!r}."
     status = str(found.get("status") or "")
+    session_status(conn, status)
     if status and status != "WORKING":
         return f"The WAHA session {sess!r} is {status}, not WORKING."
     return None

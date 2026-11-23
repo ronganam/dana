@@ -20,7 +20,7 @@ import re
 from typing import Any, Dict, List, Optional, Tuple
 
 from core import cards, now as now_screen, user_locale
-from core.addons import (BriefingContext, Card, Check, ContextRequest, NowContext, Section, WidgetContext, helpers,
+from core.addons import (BriefingContext, Card, Check, ContextRequest, Fix, NowContext, Section, WidgetContext, helpers,
                          minutes, store)
 from core.db import get_db_connection
 from core.users import User
@@ -269,7 +269,8 @@ def saving_context(user: User, ref_id: str, req: ContextRequest) -> Optional[str
 def check_money(user: User, now: datetime.datetime) -> Check:
     with get_db_connection() as conn:
         rows = [dict(r) for r in conn.execute(
-            "SELECT company, label, state, state_reason, last_ok_at, created_at FROM money_sources WHERE user_id = ? "
+            "SELECT company, label, state, state_reason, error_type, last_ok_at, created_at FROM money_sources "
+            "WHERE user_id = ? "
             "ORDER BY created_at, id", (user.id,)).fetchall()]
     if not rows:
         return Check(True, "no bank or card added")
@@ -280,6 +281,8 @@ def check_money(user: User, now: datetime.datetime) -> Check:
         if r["state"] == "needs_code":
             problems.append((f"{name} is waiting for a sign-in code",
                              f"{name}: waiting for the SMS sign-in code (enter it on the Money page or in Telegram)"))
+        elif r["state"] == "needs_attention" and r.get("error_type") in providers.RECONNECT_ERRORS:
+            continue  # its own Reconnect check says it (core/checks.py)
         elif r["state"] == "needs_attention":
             problems.append((f"{name} needs its login fixed", f"{name}: {r.get('state_reason') or 'the login failed'}"))
         else:
@@ -296,7 +299,8 @@ def check_money(user: User, now: datetime.datetime) -> Check:
         detail = problems[0][1] + (f" (+{len(problems) - 1} more)" if len(problems) > 1 else "")
         return Check(False, detail, latest, title=problems[0][0],
                      why="New transactions are missing from the Money page and Dana's answers.",
-                     blocks=[{"type": "facts", "label": "Banks and cards", "items": [p[1] for p in problems]}])
+                     blocks=[{"type": "facts", "label": "Banks and cards", "items": [p[1] for p in problems]}],
+                     fix=Fix.screen("money", "Open Money"))
     return Check(True, f"synced {helpers.ago(latest, now) if latest else 'never'}", latest)
 
 

@@ -381,6 +381,8 @@ async function nowClient(item, action) {
     if (t.type === "expand") { toggleCard(item.id); return; }
     if (t.type === "session") { window.danaOpenSession(t.id); return; }
     if (t.type === "screen" || t.type === "page") { openScreen(t.id, t.arg ?? null); return; }
+    if (t.type === "connect") { window.DanaAddons?.openAddon(t.addon); return; }
+    if (t.type === "url") { window.open(t.url, "_blank", "noopener"); return; }
     if (t.type === "context") {
         const r = await nowRequest("POST", "/api/chat/context", { kind: t.kind, id: t.id });
         if (r.status === 200 && r.body && r.body.session_id) window.danaOpenSession(r.body.session_id);

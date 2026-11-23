@@ -244,23 +244,60 @@ def _hook_day_items(user: User, ctx: NowContext) -> List[DayItem]:
     return out
 
 
+# The fix kinds a client carries out itself, and the arg naming their target.
+_CLIENT_FIXES = {"connect": "addon", "screen": "screen", "url": "url"}
+
+
+def fix_action(fix: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    """A check's fix (``Fix.to_json()``) as a card's action: a server fix posts
+    ``fix`` with ``args.fix`` = its action; the others are client actions
+    (``connect`` {addon}, ``screen`` {screen}, ``url`` {url})."""
+    if not fix:
+        return None
+    if fix.get("kind") == "server":
+        return cards.action("fix", fix["label"], {"fix": fix["action"]})
+    arg = _CLIENT_FIXES.get(str(fix.get("kind")))
+    return cards.action(fix["kind"], fix["label"], {arg: fix[arg]}, client=True) if arg else None
+
+
 def _check_items(user: User, now: datetime.datetime, hidden: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """``user``'s failing checks (only theirs: core/checks.py ``for_user``)."""
-    out = []
-    for c in checks.for_user(user, now):
-        if c["ok"] or f"check:{c['key']}" in hidden:
+    """``user``'s failing checks (only theirs: core/checks.py ``for_user``):
+    a Reconnect card for each connection that needs it (dismissible for a day),
+    then the other failing checks, leaving out those of an addon that already
+    has a Reconnect card (Settings → Needs attention lists them)."""
+    reconnects: List[Dict[str, Any]] = []
+    out: List[Dict[str, Any]] = []
+    failing = [c for c in checks.for_user(user, now) if not c["ok"]]
+    broken = {c["addon"] for c in failing if checks.is_reconnect(c["key"])}
+    for c in failing:
+        if f"check:{c['key']}" in hidden:
+            continue
+        fix = fix_action(c.get("fix"))
+        if checks.is_reconnect(c["key"]):
+            reconnects.append({
+                "id": f"check:{c['key']}", "kind": "reconnect", "source": f"Reconnect · {c['label']}",
+                "title": c["title"], "why": c["why"],
+                "primary": fix,
+                "secondary": [cards.action("ignore", "Not today", {"days": 1})],
+                "schedulable": False,
+                "ref": {"type": "check", "id": c["key"]},
+                "blocks": [],
+            })
+            continue
+        if c["addon"] in broken:
             continue
         out.append({
             "id": f"check:{c['key']}", "kind": "check", "source": "Dana check",
             "title": c.get("title") or f"{c['label']}: {c['detail']}",
             "why": c.get("why") or c["detail"],
-            "primary": cards.action("open", "Details", client=True),
-            "secondary": [cards.action("ignore", "Ignore for a week", {"days": 7})],
+            "primary": fix or cards.action("open", "Details", client=True),
+            "secondary": ([cards.action("open", "Details", client=True)] if fix else [])
+                         + [cards.action("ignore", "Ignore for a week", {"days": 7})],
             "schedulable": True,
             "ref": {"type": "check", "id": c["key"]},
             "blocks": c.get("blocks") or [{"type": "text", "label": c["label"], "text": c["detail"]}],
         })
-    return out[:3]
+    return reconnects[:3] + out[:3]
 
 
 def _budget_items(user: User, now: datetime.datetime, hidden: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -501,6 +538,14 @@ async def _act_approval(user, ref, action, args, now):
 async def _act_check(user, key, action, args, now):
     if key not in checks.keys_for(user):
         raise cards.ActError(f"unknown check '{key}'", 404)
+    if action == "fix":
+        try:
+            res = await checks.run_fix(user, key, str(args.get("fix") or ""))
+        except LookupError as e:
+            raise cards.ActError(str(e), 404)
+        except ValueError as e:
+            raise cards.ActError(str(e), 409)
+        return cards.result(res["message"])
     if action in ("ignore", "dismiss"):
         days = args.get("days", 7)
         try:
@@ -514,6 +559,8 @@ async def _act_check(user, key, action, args, now):
         until = hide_until_for_slot(slot, now) if slot else cards.until_from(args, now)
         if not until:
             raise cards.ActError("snooze needs minutes, until or slot")
+        if checks.is_reconnect(key):
+            until = min(until, now + datetime.timedelta(days=checks.RECONNECT_IGNORE_DAYS))
         msg = f"Hidden until {when_phrase(until, now)}"
         return cards.result(msg, cards.hide_with_undo(user, f"check:{key}", until, msg))
     raise cards.ActError(f"'{action}' isn't an action for a check")

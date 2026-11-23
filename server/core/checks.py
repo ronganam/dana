@@ -23,6 +23,17 @@ server's own (an addon check declared ``server=True``); ignoring one hides it
 only for them (core/now_hidden.py). :func:`compute` answers every check for one
 user, an addon they lack as ok "not connected".
 
+Reconnect: every connection (or part of one) whose credentials stopped working
+(core/addons/store.py ``needs_reconnect``) is a failing check of its own,
+``reconnect:<addon>`` or ``reconnect:<addon>:<part>``, listed first, whose fix
+is the addon's ``reconnect_fix`` (its connect page by default); while an addon
+needs reconnecting, its other failing checks without a fix of their own offer
+that one too. It can be ignored for a day at most: it is never hidden for good.
+
+Fixes: a check may carry a :class:`~core.addons.hooks.Fix`, the button that
+fixes it; a server one runs through :func:`run_fix` (the check's addon's
+``@addon.fix``), only while the check fails for that user and offers it.
+
 Signals without a timestamp elsewhere are recorded with :func:`mark` (table
 ``system_marks``); confirmed wakes are in ``wake_log`` (one row per user and
 date, written by core/wake.py) so the "last 7 mornings" view has a history. A
@@ -31,15 +42,17 @@ it is ignored (``POST /api/checks/{key}/ignore``).
 """
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from core import backups, briefing, budget, clock, llm, now_hidden, signals, undo, users, wake, wake_window
-from core.addons import helpers, registry
+from core.addons import helpers, registry, store
+from core.addons.addon import get_addon
 from core.addons.helpers import parse_time
-from core.addons.hooks import Check, Hook
+from core.addons.hooks import SERVER, Check, Fix, Hook
 from core.db import get_db_connection
 from core.users import User
 
@@ -57,6 +70,10 @@ LABELS: Dict[str, str] = {
 }
 # A check about the server itself (``server=True``) is shown only to users who may see everyone.
 SERVER_CAPABILITY = "see_everyone"
+# The checks of connections whose credentials stopped working: ``reconnect:<addon>[:<part>]``.
+RECONNECT = "reconnect"
+# A Reconnect card comes back after a day at most (it is never hidden for good).
+RECONNECT_IGNORE_DAYS = 1.0
 
 # Which user core's own checks apply to (a user without their prerequisites does not see them).
 APPLIES: Dict[str, Callable[[User], bool]] = {
@@ -125,7 +142,42 @@ def _iso(dt: Optional[datetime.datetime]) -> Optional[str]:
 def _result(key: str, ok: bool, detail: str, since: Optional[datetime.datetime], *,
             title: str = "", why: str = "", blocks: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     return {"key": key, "label": label_of(key), "ok": ok, "detail": detail, "since": _iso(since),
-            "title": title, "why": why, "blocks": blocks or []}
+            "title": title, "why": why, "blocks": blocks or [], "fix": None}
+
+
+# ---------------------------------------------------------------------------
+# Reconnect
+# ---------------------------------------------------------------------------
+
+def reconnect_key(r: store.Reconnect) -> str:
+    """The check key of a connection (or part) that needs reconnecting."""
+    return f"{RECONNECT}:{r.addon}" + (f":{r.part}" if r.part else "")
+
+
+def is_reconnect(key: str) -> bool:
+    return key.startswith(RECONNECT + ":")
+
+
+def _reconnects(user: Optional[User]) -> Dict[str, store.Reconnect]:
+    """``user``'s reconnects by check key (none without a user)."""
+    if user is None:
+        return {}
+    try:
+        return {reconnect_key(r): r for r in store.reconnects(user)}
+    except Exception as e:
+        logger.warning(f"Reconnects of user {user.id} not read: {e}")
+        return {}
+
+
+def _reconnect_check(r: store.Reconnect) -> Dict[str, Any]:
+    addon = get_addon(r.addon)
+    label = addon.title + (f" · {r.label}" if r.label else "")
+    since = parse_time(r.since)
+    return {"key": reconnect_key(r), "label": label, "ok": False, "detail": r.reason,
+            "since": _iso(since.astimezone(clock.get_timezone()) if since else None),
+            "title": f"Reconnect {label}",
+            "why": f"{r.reason.rstrip('.')}. Dana can't use it until you connect it again.",
+            "blocks": [], "fix": addon.reconnect_fix.to_json()}
 
 
 def wake_week(conn, now: datetime.datetime, user: User) -> List[Dict[str, Any]]:
@@ -264,6 +316,13 @@ def _check_transcription(conn, now: datetime.datetime, user: Optional[User]) -> 
                        "and set WHISPER_URL.")
 
 
+def _backups_failing(key: str, ok: bool, detail: str, since: Optional[datetime.datetime], **kw: Any) -> Dict[str, Any]:
+    """A failing backups check, with the fix that opens Settings (where Backups lives)."""
+    out = _result(key, ok, detail, since, **kw)
+    out["fix"] = Fix.screen("settings", "Open Backups").to_json()
+    return out
+
+
 def _check_backups(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
     if user is None or not APPLIES["backups"](user):
         return _result("backups", True, "not connected", None)
@@ -275,13 +334,13 @@ def _check_backups(conn, now: datetime.datetime, user: Optional[User]) -> Dict[s
         facts.append(f"Last good backup: {last_ok.get('name')} ({ago(parse_time(last_ok.get('at')), now)})")
     blocks = [{"type": "facts", "label": "Backups", "items": facts}]
     if last and not last.get("ok"):
-        return _result("backups", False, "the last backup failed", parse_time(last.get("at")),
+        return _backups_failing("backups", False, "the last backup failed", parse_time(last.get("at")),
                        title="The last backup failed",
                        why=f"{last.get('error') or 'It failed.'} Check the destination in Settings → Backups, "
                            "then back up now.", blocks=blocks)
     due = backups.next_due(now)
     if due is not None and due + backups.OVERDUE < now:
-        return _result("backups", False, "overdue", due, title="The scheduled backup did not run",
+        return _backups_failing("backups", False, "overdue", due, title="The scheduled backup did not run",
                        why=f"It was due {ago(due, now)}; the server may be stuck. Back up now in Settings → Backups.",
                        blocks=blocks)
     if s["schedule"]["every"] == "off":
@@ -306,7 +365,7 @@ def _hooks() -> List[Hook]:
     """The addons' checks (every addon enabled on the server), skipping any under a key of core's own checks."""
     out = []
     for h in registry.hooks("selfcheck", None):
-        if h.key in LABELS:
+        if h.key in LABELS or is_reconnect(h.key):
             logger.warning(f"The check {h.key!r} of {h.addon} is one of core's own; left out")
             continue
         out.append(h)
@@ -330,6 +389,11 @@ def label_of(key: str) -> str:
     """How the check ``key`` is named."""
     if key in LABELS:
         return LABELS[key]
+    if is_reconnect(key):
+        try:
+            return f"Reconnect {get_addon(key.split(':')[1]).title}"
+        except KeyError:
+            return key
     hook = _hook(key)
     return str(hook.option("label", key)) if hook else key
 
@@ -341,31 +405,56 @@ def _hook_check(hook: Hook, now: datetime.datetime, user: Optional[User]) -> Dic
     return c.to_json(hook.key, label_of(hook.key))
 
 
+def addon_of(key: str) -> Optional[str]:
+    """The addon a check belongs to (None for core's own)."""
+    if is_reconnect(key):
+        return key.split(":")[1]
+    hook = _hook(key)
+    return hook.addon if hook is not None else None
+
+
 def compute(now: Optional[datetime.datetime] = None, user: Optional[User] = None,
             keys: Optional[Tuple[str, ...]] = None) -> List[Dict[str, Any]]:
     """Every check (or only ``keys``) for ``user`` (default: the current user),
-    with ``ignored_until`` when they chose to ignore it; a check of an addon
-    they lack is ok "not connected". Internal fields (``title``, ``why``,
-    ``blocks``) feed the Now card."""
+    with ``ignored_until`` when they chose to ignore it, ``addon`` (the
+    check's addon, None for core's) and ``server`` (a check of the server
+    itself); a check of an addon they lack is ok "not connected". The
+    reconnects of ``user`` come first. ``title``, ``why``, ``blocks`` and
+    ``fix`` describe a failing one (the Now card, Settings → Needs attention)."""
     now = now or clock.now()
     user = user or users.current()
     hooks = {h.key: h for h in _hooks()}
+    pending = _reconnects(user)
     out = []
     with get_db_connection() as conn:
-        for key in all_keys():
+        for key in (*pending, *all_keys()):
             if keys is not None and key not in keys:
                 continue
             try:
-                c = _hook_check(hooks[key], now, user) if key in hooks else _CHECKS[key](conn, now, user)
+                if key in pending:
+                    c = _reconnect_check(pending[key])
+                elif key in hooks:
+                    c = _hook_check(hooks[key], now, user)
+                else:
+                    c = _CHECKS[key](conn, now, user)
             except Exception as e:
                 logger.warning(f"Check {key} failed: {e}", exc_info=True)
                 c = _result(key, True, "couldn't check", None)
+            c["addon"] = addon_of(key)
+            c["server"] = bool(key in hooks and hooks[key].option("server", False))
             c["ignored_until"] = now_hidden.until(user, f"check:{key}") if user is not None else None
             out.append(c)
+    # While an addon needs reconnecting, its other failing checks without a fix offer that one.
+    broken = {pending[k].addon for k in pending}
+    for c in out:
+        if not c["ok"] and c.get("fix") is None and c["addon"] in broken and not is_reconnect(c["key"]):
+            c["fix"] = get_addon(c["addon"]).reconnect_fix.to_json()
     return out
 
 
 def _applies(key: str, user: User) -> bool:
+    if is_reconnect(key):
+        return key in _reconnects(user)
     hook = _hook(key)
     if hook is None:
         return APPLIES[key](user)
@@ -375,9 +464,10 @@ def _applies(key: str, user: User) -> bool:
 
 
 def keys_for(user: User) -> Tuple[str, ...]:
-    """The checks ``user`` sees: those of the addons they have connected, and
-    the server's own when they may see everyone (in :func:`all_keys` order)."""
-    out = []
+    """The checks ``user`` sees: their reconnects, then those of the addons
+    they have connected, and the server's own when they may see everyone
+    (in :func:`all_keys` order)."""
+    out = list(_reconnects(user))
     for key in all_keys():
         try:
             if _applies(key, user):
@@ -392,8 +482,13 @@ def for_user(user: User, now: Optional[datetime.datetime] = None) -> List[Dict[s
     return compute(now, user, keys_for(user))
 
 
+PUBLIC = ("key", "label", "ok", "detail", "since", "ignored_until", "title", "why", "blocks", "fix", "addon",
+          "server")
+
+
 def public(c: Dict[str, Any]) -> Dict[str, Any]:
-    return {k: c.get(k) for k in ("key", "label", "ok", "detail", "since", "ignored_until")}
+    """A check as ``GET /api/checks`` gives it."""
+    return {k: c.get(k) for k in PUBLIC}
 
 
 def ignore(user: User, key: str, days: float = 7) -> Dict[str, Any]:
@@ -405,15 +500,45 @@ def ignore(user: User, key: str, days: float = 7) -> Dict[str, Any]:
     """
     if key not in keys_for(user):
         raise LookupError(f"unknown check '{key}'")
+    if is_reconnect(key):
+        days = min(float(days), RECONNECT_IGNORE_DAYS)
     item = f"check:{key}"
     before = now_hidden.row(user, item)
     if days and days > 0:
         until = clock.now() + datetime.timedelta(days=float(days))
         now_hidden.hide(user, item, until, "ignore")
-        label = f"Ignored “{label_of(key)}” for {int(days) if float(days).is_integer() else days} days"
+        n = int(days) if float(days).is_integer() else days
+        label = f"Ignored “{label_of(key)}” for {n} day{'' if n == 1 else 's'}"
     else:
         now_hidden.unhide(user, item)
         until = None
         label = f"Watching “{label_of(key)}” again"
     uid = undo.record(label, lambda: now_hidden.restore(user, item, before), source="checks.ignore")
     return {"ok": True, "message": label, "until": _iso(until), "undo_id": uid}
+
+
+async def run_fix(user: User, key: str, action: str) -> Dict[str, Any]:
+    """Carry out the server fix ``action`` of ``user``'s check ``key``: its
+    addon's ``@addon.fix(key)``, as ``user``, only while the check fails for
+    them and offers that action. Returns {ok, message}.
+
+    Raises:
+        LookupError: not one of the checks they see.
+        ValueError: the check is fine, offers no such fix, or the addon refused it.
+    """
+    if key not in keys_for(user):
+        raise LookupError(f"unknown check '{key}'")
+    found = await asyncio.to_thread(compute, None, user, (key,))
+    c = found[0] if found else None
+    fix = (c or {}).get("fix") or {}
+    if c is None or c["ok"]:
+        raise ValueError(f"“{label_of(key)}” is fine now: nothing to fix.")
+    if fix.get("kind") != SERVER or fix.get("action") != action:
+        raise ValueError(f"“{c['label']}” has no fix '{action}'.")
+    hook = registry.hook_for("fix", key, None if c["server"] else user)
+    if hook is None or hook.addon != c["addon"]:
+        raise ValueError(f"“{c['label']}” has no fix '{action}'.")
+    with users.acting_as(user):
+        message = await hook.func(user, action)
+    logger.info(f"Fix {action} of check {key} ran for user {user.id}")
+    return {"ok": True, "message": str(message or "Done")}

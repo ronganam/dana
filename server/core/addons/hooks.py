@@ -14,7 +14,7 @@ What hooks get besides the user: :class:`NowContext`, :class:`BriefingContext`,
 - :class:`DayItem` — an item in the Now screen's day strip (``@addon.day_items``);
 - :class:`Section` — a part of the morning briefing (``@addon.briefing``) or the weekly review (``@addon.review``);
 - :class:`Hit` — a result of the global search (``@addon.search``);
-- :class:`Check` — a line of the self-checks (``@addon.selfcheck``);
+- :class:`Check` — a line of the self-checks (``@addon.selfcheck``), with an optional :class:`Fix`;
 - :class:`Approval` — the Approve card of a tool call (``@addon.tool(describe=)``).
 
 What the framework keeps per hook registration: :class:`Job`,
@@ -43,7 +43,7 @@ class Nav:
 
 
 # The web app's own screens: no addon page may take one of these ids (static/app-nav.js, CORE_SCREENS).
-CORE_SCREENS = ("now", "chat", "settings", "addons", "devices", "household", "usage", "debug", "review")
+CORE_SCREENS = ("now", "chat", "settings", "attention", "addons", "devices", "household", "usage", "debug", "review")
 PAGE_ID = re.compile(r"^[a-z][a-z0-9_-]*$")
 
 
@@ -283,9 +283,9 @@ class Hook:
     """A hook declared with ``@addon.<kind>`` (``now_cards``, ``day_items``,
     ``now_action``, ``briefing``, ``review``, ``review_action``, ``search``,
     ``selfcheck``, ``context``, ``context_card``, ``context_block``,
-    ``provide``, ``widget``): ``key`` names what it is for when the hook has one (the card
+    ``provide``, ``widget``, ``fix``): ``key`` names what it is for when the hook has one (the card
     prefix it acts on, the section key, the item type, the context kind, the
-    check, provider or widget key; unique across addons), ``options`` its decorator's
+    check (``selfcheck``, ``fix``), provider or widget key; unique across addons), ``options`` its decorator's
     other values."""
     addon: str
     kind: str
@@ -437,21 +437,85 @@ class Hit:
 # --- Self-checks ----------------------------------------------------------------------
 
 
+# What a fix does: open the addon's connect page, open a screen of the app, open a web address (each done by
+# the client), or run an action the check's addon handles on the server (``@addon.fix``).
+CONNECT, SCREEN, URL, SERVER = "connect", "screen", "url", "server"
+FIX_KINDS = (CONNECT, SCREEN, URL, SERVER)
+FIX_ACTION = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
+MAX_FIX_LABEL = 40
+
+
+@dataclass(frozen=True)
+class Fix:
+    """The button that fixes a failing check (docs/now.md, "Fixes"): its
+    ``label`` and what it does. Build one with :meth:`connect` (the addon's
+    connect page on the Addons page: sign in again, type a new key),
+    :meth:`screen` (a screen of the app: ``devices``, ``money``),
+    :meth:`link` (an https address) or :meth:`run` (an action the check's
+    addon carries out on the server, its ``@addon.fix(<check key>)``
+    receiving ``target`` as the action's name)."""
+    kind: str
+    target: str
+    label: str
+
+    def __post_init__(self) -> None:
+        owner = f"Fix({self.kind!r}, {self.target!r})"
+        if self.kind not in FIX_KINDS:
+            raise ValueError(f"{owner}: kind must be one of {', '.join(FIX_KINDS)}")
+        _line(owner, "label", self.label, MAX_FIX_LABEL)
+        if self.kind == CONNECT and not ADDON_NAME.match(self.target):
+            raise ValueError(f"{owner}: a connect fix names the addon")
+        if self.kind == SCREEN and not PAGE_ID.match(self.target):
+            raise ValueError(f"{owner}: a screen fix names a screen id (lower case, digits, _ or -)")
+        if self.kind == URL and not re.match(r"^https://[^\s\"'<>]+$", self.target):
+            raise ValueError(f"{owner}: a link fix is an https:// address")
+        if self.kind == SERVER and not FIX_ACTION.match(self.target):
+            raise ValueError(f"{owner}: a server fix names its action (lower case, digits, _)")
+
+    @classmethod
+    def connect(cls, addon: str, label: str = "Reconnect") -> "Fix":
+        """Open ``addon``'s page on the Addons page (its sign-in or its credentials)."""
+        return cls(CONNECT, addon, label)
+
+    @classmethod
+    def screen(cls, screen: str, label: str) -> "Fix":
+        """Open a screen of the app: a core screen (``devices``, ``usage``…) or an addon's page id."""
+        return cls(SCREEN, screen, label)
+
+    @classmethod
+    def link(cls, url: str, label: str) -> "Fix":
+        """Open an https address (the service's own settings page)."""
+        return cls(URL, url, label)
+
+    @classmethod
+    def run(cls, action: str, label: str) -> "Fix":
+        """Run ``action`` on the server: the check's addon's ``@addon.fix`` gets the user and the action."""
+        return cls(SERVER, action, label)
+
+    def to_json(self) -> Dict[str, Any]:
+        key = {CONNECT: "addon", SCREEN: "screen", URL: "url", SERVER: "action"}[self.kind]
+        return {"kind": self.kind, "label": self.label, key: self.target}
+
+
 @dataclass
 class Check:
-    """A self-check line (``/api/checks``; a failing one is a Now card).
-    ``title`` / ``why`` / ``blocks`` describe the card when ``ok`` is False."""
+    """A self-check line (``/api/checks``; a failing one is a Now card and a
+    line of Settings → Needs attention). ``title`` / ``why`` / ``blocks``
+    describe the card when ``ok`` is False; ``fix`` is its button (none: the
+    card only explains)."""
     ok: bool
     detail: str
     since: Optional[datetime.datetime] = None
     title: str = ""
     why: str = ""
     blocks: List[Dict[str, Any]] = field(default_factory=list)
+    fix: Optional[Fix] = None
 
     def to_json(self, key: str, label: str) -> Dict[str, Any]:
         return {"key": key, "label": label, "ok": self.ok, "detail": self.detail,
                 "since": self.since.isoformat(timespec="seconds") if self.since else None,
-                "title": self.title, "why": self.why, "blocks": list(self.blocks)}
+                "title": self.title, "why": self.why, "blocks": list(self.blocks),
+                "fix": self.fix.to_json() if self.fix is not None else None}
 
 
 # --- Context chats --------------------------------------------------------------------

@@ -111,14 +111,43 @@ def credentials(conn: Connection) -> Credentials:
     return creds
 
 
+def refused(error: Exception) -> bool:
+    """Google refused the connection's sign-in itself: the refresh token was
+    revoked or expired, the access token was not accepted (HTTP 401), or the
+    sign-in lacks a scope this request needs (HTTP 403 "insufficient"): only
+    signing in again fixes it."""
+    if type(error).__name__ == "RefreshError":
+        return True
+    status = getattr(getattr(error, "resp", None), "status", None)
+    if status == 401:
+        return True
+    if status == 403:
+        content = getattr(error, "content", b"") or b""
+        text = (content.decode("utf-8", "replace") if isinstance(content, bytes) else str(content)).lower()
+        return "insufficient" in text or "insufficient" in str(error).lower()
+    return False
+
+
+def failed(conn: Connection, error: Exception, service: str) -> str:
+    """A short reason (never a token) for a failed request of ``conn`` to
+    ``service`` ("Google Calendar"); when Google refused the sign-in
+    (:func:`refused`), the connection is marked for reconnecting
+    (``store.needs_reconnect``: a Reconnect card until the user signs in again)."""
+    reason = failure_reason(error, service)
+    if refused(error):
+        store.needs_reconnect(conn.user, conn.addon, reason)
+    return reason
+
+
 def failure_reason(error: Exception, service: str) -> str:
-    """A short reason (never a token) for a failed request to ``service``
-    ("Google Calendar"), for an addon's connection check."""
+    """A short reason (never a token) for a failed request to ``service``."""
     if isinstance(error, ValueError):  # no OAuth client / no refresh token (names no secret)
         return str(error)
     status = getattr(getattr(error, "resp", None), "status", None)
     if status == 403:
         return f"{service} refused the request (HTTP 403): connect Google again to grant this access."
+    if status == 401:
+        return f"{service} refused the sign-in (HTTP 401); connect Google again."
     if status:
         return f"{service} answered HTTP {status}."
     if type(error).__name__ == "RefreshError":

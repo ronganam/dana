@@ -26,8 +26,8 @@ from typing import (Any, Awaitable, Callable, Collection, Dict, List, Mapping, O
 
 from core.access import CAPABILITIES
 from core.users import User
-from core.addons.hooks import (ADDON as ADDON_NEED, WIDGET_SIZES, Channel, Handler, Hook, Job, LlmJob, Need, Page,
-                               Service, Touches, Worker)
+from core.addons.hooks import (ADDON as ADDON_NEED, CONNECT, WIDGET_SIZES, Channel, Fix, Handler, Hook, Job, LlmJob,
+                               Need, Page, Service, Touches, Worker)
 from core.addons.schema import generate_schema
 
 logger = logging.getLogger(__name__)
@@ -72,7 +72,7 @@ FLEX_HOOKS = ("briefing", "provide", "widget")
 # type, a context kind): one addon per key and kind across every addon (the
 # loader fails the later addon that repeats one). A provider key (``provide``)
 # may be declared by several addons, ranked (core/addons/registry.py ``providers``).
-KEYED_HOOKS = ("now_action", "briefing", "review", "review_action", "selfcheck", "context", "context_card",
+KEYED_HOOKS = ("now_action", "briefing", "review", "review_action", "selfcheck", "fix", "context", "context_card",
                "context_block", "widget")
 _MISSING = object()
 
@@ -331,6 +331,11 @@ class Addon:
             room lights"): shown after connecting.
         disconnect_warning: What disconnecting deletes, in one sentence
             (``money``: the logins and transactions); empty: nothing is deleted.
+        reconnect_fix: Where its Reconnect button goes when
+            :func:`core.addons.store.needs_reconnect` says a connection's
+            credentials stopped working (a :class:`~core.addons.hooks.Fix`);
+            None: its own page on the Addons page (``Fix.connect``). ``money``
+            sends it to the Money page, where each bank login is fixed.
 
     Hooks are declared with the decorators below (``@addon.job``,
     ``@addon.on``, ``@addon.now_cards``…); docs/writing-an-addon.md has an
@@ -352,7 +357,8 @@ class Addon:
                  change_requires: Optional[str] = None, validate: Optional[SettingsRule] = None,
                  blocked: Optional[ConnectionBlock] = None, connect_url: Optional[str] = None,
                  connect_label: str = "", realtime: bool = True, icon: str = "", features: Sequence[str] = (),
-                 setup: Sequence[str] = (), examples: Sequence[str] = (), disconnect_warning: str = "") -> None:
+                 setup: Sequence[str] = (), examples: Sequence[str] = (), disconnect_warning: str = "",
+                 reconnect_fix: Optional[Fix] = None) -> None:
         if not name.isidentifier():
             raise ValueError(f"Addon {name!r} must be an identifier")
         owner = f"Addon {name!r}"
@@ -391,6 +397,8 @@ class Addon:
             raise TypeError(f"{owner}: touches= takes a Touches(...)")
         if credentials and not touches.stores_credentials:
             raise ValueError(f"{owner}: it declares credentials, so touches= must say stores_credentials=True")
+        if reconnect_fix is not None and (not isinstance(reconnect_fix, Fix) or reconnect_fix.kind == "server"):
+            raise TypeError(f"{owner}: reconnect_fix= takes a Fix that opens something (connect, screen or link)")
         self.name = name
         self.title = title or name.replace("_", " ").capitalize()
         self.description = description
@@ -428,6 +436,7 @@ class Addon:
         self.setup: Tuple[str, ...] = tuple(setup)
         self.examples: Tuple[str, ...] = tuple(examples)
         self.disconnect_warning = disconnect_warning
+        self.reconnect_fix: Fix = reconnect_fix or Fix(CONNECT, name, "Reconnect")
         self.tools: List[Tool] = []
         self.jobs: List[Job] = []
         self.services: List[Service] = []
@@ -681,6 +690,15 @@ class Addon:
         of the server itself, shown to users who may see everyone instead.
         ``after``: the check it is listed after (default: at the end)."""
         return self._hook("selfcheck", key, label=label, server=server, after=after)
+
+    def fix(self, key: str) -> Callable[[F], F]:
+        """``async def f(user, action) -> str``: carries out the server action
+        a failing check ``key`` of this addon offers (its ``Check.fix`` is
+        ``Fix.run(action, label)``) for ``user``, who pressed its button;
+        returns the result's words. Raise ``ValueError`` to refuse (the client
+        shows the message). Only called while that check fails for that user
+        and offers ``action``."""
+        return self._hook("fix", key)
 
     def context(self, kind: str) -> Callable[[F], F]:
         """``def f(user, ref_id, req: ContextRequest) -> str | None``: the agent's

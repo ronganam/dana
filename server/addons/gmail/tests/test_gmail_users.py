@@ -526,7 +526,13 @@ async def test_connect() -> None:
     reason = await gmail_client.check(store.require(BOB, "gmail"))
     ACCOUNTS["bob-mail"].fail = False
     check("check: a failure is a short reason without the token",
-          reason == "Gmail answered HTTP 401." and "bob-mail" not in reason, reason)
+          reason == "Gmail refused the sign-in (HTTP 401); connect Google again." and "bob-mail" not in reason, reason)
+    check("reconnect: the refused sign-in marks Bob's Gmail for reconnecting, nobody else's",
+          [(r.addon, r.reason) for r in store.reconnects(BOB)] == [("gmail", reason)] and store.reconnects(ADMIN) == [],
+          store.reconnects(BOB))
+    store.update(BOB, "gmail", credentials={"refresh_token": "bob-mail"})
+    await asyncio.gather(*gmail_client._tasks)
+    check("reconnect: signing in again clears it", store.reconnects(BOB) == [], store.reconnects(BOB))
     requests()
     os.environ["GOOGLE_CLIENT_ID"] = ""
     reason = await gmail_client.check(store.require(ADMIN, "gmail"))

@@ -18,7 +18,7 @@
 
 // The shell's own screens (core/addons/hooks.py, CORE_SCREENS: no addon page may take one of these ids);
 // every other screen is an addon's page (app-panels.js).
-const CORE_SCREENS = ["now", "chat", "settings", "addons", "devices", "household", "usage", "debug", "review"];
+const CORE_SCREENS = ["now", "chat", "settings", "attention", "addons", "devices", "household", "usage", "debug", "review"];
 
 // Core pieces an addon page can host in an element of its own (api.piece(name, el), static/dana.js).
 const CORE_PIECES = {
@@ -36,6 +36,7 @@ function coreNavPlaces(me) {
     const can = (c) => Boolean(me && Array.isArray(me.capabilities) && me.capabilities.includes(c));
     return [
         { id: "settings", label: "Settings", icon: "settings" },
+        { id: "attention", label: "Needs attention", icon: "life-buoy" },
         { id: "addons", label: "Addons", icon: "plug" },
         { id: "devices", label: "Devices", icon: "smartphone" },
         ...(can("manage_users") ? [{ id: "household", label: "Household", icon: "users" }] : []),
@@ -427,6 +428,7 @@ function switchTab(tabId, arg = null) {
     switchPanels(tabId, arg);
     if (tabId === "review") window.DanaReview?.show(); else window.DanaReview?.hide();
     if (tabId === "usage") window.DanaUsage?.show(); else window.DanaUsage?.hide();
+    if (tabId === "attention") window.DanaAttention?.show(arg); else window.DanaAttention?.hide();
     if (tabId === "addons") window.DanaAddons?.show(); else window.DanaAddons?.hide();
     if (tabId === "devices") window.DanaDevices?.show(); else window.DanaDevices?.hide();
     if (tabId === "household") window.DanaHousehold?.show(); else window.DanaHousehold?.hide();
@@ -464,6 +466,7 @@ for (const id of ["nav-rail", "bottom-nav"]) {
 document.getElementById("rail-brand")?.addEventListener("click", () => switchTab("now"));
 document.getElementById("btn-open-debug-tab")?.addEventListener("click", () => switchTab("debug"));
 document.getElementById("btn-open-usage-tab")?.addEventListener("click", () => switchTab("usage"));
+document.getElementById("btn-open-attention-tab")?.addEventListener("click", () => switchTab("attention"));
 document.getElementById("btn-open-addons-tab")?.addEventListener("click", () => switchTab("addons"));
 document.getElementById("btn-open-devices-tab")?.addEventListener("click", () => switchTab("devices"));
 document.getElementById("btn-open-household-tab")?.addEventListener("click", () => switchTab("household"));

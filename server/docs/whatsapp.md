@@ -73,12 +73,14 @@ dropped; it never reaches the model).
 
 ## Inbound events (`/webhook/waha`)
 
-- WAHA forwards `message` events to `POST /webhook/waha`, **signed**. On the
+- WAHA forwards `message` events (and `session.status`, when listed: a
+  signed-out session then shows as a Reconnect card at once instead of at
+  the next check) to `POST /webhook/waha`, **signed**. On the
   WAHA side (its environment, for every session):
 
   ```
   WHATSAPP_HOOK_URL=http://<dana's address>/webhook/waha   # e.g. the in-cluster Service
-  WHATSAPP_HOOK_EVENTS=message
+  WHATSAPP_HOOK_EVENTS=message,session.status
   WHATSAPP_HOOK_HMAC_KEY=<the same value as Dana's WAHA_WEBHOOK_SECRET>
   ```
 
@@ -137,6 +139,12 @@ dropped; it never reaches the model).
   member's own WAHA (allowed by `MEMBER_ALLOWED_ORIGINS`) from claiming the
   admin's number, and the admin's session being used under a second hostname
   of the same WAHA (the session check compares address strings).
+- **Reconnect** (`client.session_status`): WAHA refusing the API key (401 /
+  403 in the check) or the session in `SCAN_QR_CODE` (WhatsApp signed it out)
+  or `FAILED`, seen by the check or a `session.status` event, marks the
+  connection for reconnecting (`store.needs_reconnect`: a Reconnect card,
+  `docs/now.md`, "Reconnect"); the session `WORKING` again, new credentials
+  or a passing test clear it.
 - **Processing** (`events.process_event`, as the connection's user): only
   incoming 1:1 `audio/*` voice notes (`ptt`) are downloaded from the user's
   WAHA, transcribed with `core/llm.transcribe` (`source="whatsapp"`, usage

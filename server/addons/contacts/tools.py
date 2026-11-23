@@ -220,7 +220,7 @@ async def update_contact(conn: Connection, contact_id: str, name: Optional[str] 
         except client.ContactGone:
             store.remove(user, contact["id"])
         except Exception as e:
-            logger.warning(f"Reading a changed contact again failed: {client.failure_reason(e)}")
+            logger.warning(f"Reading a changed contact again failed: {client.failure_reason(conn, e)}")
         return ("Error: this contact was changed in Google Contacts since it was last read, so nothing was "
                 "changed. It has been read again: look at it with get_contact and repeat the change if it is "
                 "still needed.")
@@ -228,8 +228,8 @@ async def update_contact(conn: Connection, contact_id: str, name: Optional[str] 
         store.remove(user, contact["id"])
         return "Error: this contact no longer exists in Google Contacts."
     except Exception as e:
-        logger.error(f"Updating a Google contact failed: {client.failure_reason(e)}")
-        return f"Error: {client.failure_reason(e)}"
+        logger.error(f"Updating a Google contact failed: {client.failure_reason(conn, e)}")
+        return f"Error: {client.failure_reason(conn, e)}"
     saved = store.save(user, person)
     enrich.fill_people(user)
     return f"Updated in Google Contacts:\n{_full(saved)}"
@@ -275,8 +275,8 @@ async def add_contact(conn: Connection, name: str, phone: Optional[str] = None, 
     try:
         person = await asyncio.to_thread(client.create, conn, fields)
     except Exception as e:
-        logger.error(f"Adding a Google contact failed: {client.failure_reason(e)}")
-        return f"Error: {client.failure_reason(e)}"
+        logger.error(f"Adding a Google contact failed: {client.failure_reason(conn, e)}")
+        return f"Error: {client.failure_reason(conn, e)}"
     saved = store.save(user, person)
     enrich.fill_people(user)
     return f"Added to Google Contacts:\n{_full(saved)}"

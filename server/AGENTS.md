@@ -102,7 +102,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 | `docs/dashboard.md` | Dashboards of tablets and TVs: presets, addon widgets, the API; camera/Frigate proxies |
 | `docs/signals.md` | Signals and their ranked sources (phone app, Home Assistant, Open-Meteo), `POST` / `GET /api/signals`, the per-user wake window, battery and privacy rules |
 | `docs/agent-actions.md` | Approval policy, undo events, the shared thread, screen context, learned phrases |
-| `docs/now.md` | Now screen (`/api/now`, `/api/now/act`), notifications overview / rule suggestions, self-checks, search |
+| `docs/now.md` | Now screen (`/api/now`, `/api/now/act`), notifications overview / rule suggestions, self-checks and their fixes, Reconnect (`store.needs_reconnect` / `reconnected` / `reconnects`), Needs attention (web `static/attention.js`), search |
 | `docs/about.md` | About you facts, prompt section, learner, `/api/about`, old `/api/memories` |
 | `docs/backups.md` | Backups: the archive (database copy, key file, data folders, manifest), schedule / destination / keep, the API, the backups self-check, `bin/dana backups create / list / restore` |
 | `docs/usage.md` | Usage and cost tracking: what is captured, attribution, storage and roll-up, `/api/usage`, the Usage screen, the monthly budget |

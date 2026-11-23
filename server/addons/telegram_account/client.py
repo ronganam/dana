@@ -24,7 +24,7 @@ from typing import Any, Dict, List, Optional, Tuple
 
 from core import clock
 from core.users import User
-from core.addons import Connection
+from core.addons import Connection, store
 from addons.telegram_account import config
 
 logger = logging.getLogger(__name__)
@@ -133,21 +133,30 @@ async def acquire(conn: Connection) -> Any:
             raise TelegramUnavailable(f"Could not reach Telegram ({type(e).__name__}).")
         if not authorized:
             await _disconnect(client)
-            raise TelegramUnavailable("The Telegram session was signed out (removed from Telegram's devices?). "
-                                      "Sign in again on the Addons page.")
+            store.needs_reconnect(conn.user, config.ADDON, SIGNED_OUT)
+            raise TelegramUnavailable(f"{SIGNED_OUT} Sign in again on the Addons page.")
         _clients[key] = _Entry(client, time.monotonic())
         return client
 
 
-def explain(e: Exception) -> str:
-    """A Telethon error as a short reason for the user (never a secret)."""
+SIGNED_OUT = "The Telegram session was signed out (removed from Telegram's devices?)."
+# Telethon errors that mean the session itself is gone: only signing in again fixes them.
+REVOKED = ("AuthKeyUnregisteredError", "SessionRevokedError", "UserDeactivatedError", "AuthKeyDuplicatedError")
+
+
+def explain(e: Exception, conn: Optional[Connection] = None) -> str:
+    """A Telethon error as a short reason for the user (never a secret). With
+    ``conn`` (a read of a signed-in account), an error that means the session
+    is gone marks the connection for reconnecting."""
     name = type(e).__name__
     if isinstance(e, TelegramUnavailable):
         return str(e)
     seconds = getattr(e, "seconds", None)
     if name.startswith("FloodWait") and seconds is not None:
         return f"Telegram asked to wait {seconds} seconds before reading more."
-    if name in ("AuthKeyUnregisteredError", "SessionRevokedError", "UserDeactivatedError", "AuthKeyDuplicatedError"):
+    if name in REVOKED:
+        if conn is not None:
+            store.needs_reconnect(conn.user, config.ADDON, "The Telegram session is no longer valid.")
         return "The Telegram session is no longer valid. Sign in again on the Addons page."
     return f"Telegram error ({name})."
 
@@ -323,5 +332,5 @@ async def check(conn: Connection) -> Optional[str]:
         client = await acquire(conn)
         me = await client.get_me()
     except Exception as e:
-        return explain(e)
+        return explain(e, conn)
     return None if me is not None else "Telegram did not return the signed-in account."

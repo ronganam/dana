@@ -405,6 +405,8 @@ def test_selfcheck() -> None:
           not c["backups"]["ok"] and c["backups"]["title"] == "The last backup failed"
           and "is a file" in c["backups"]["why"]
           and any("Last good backup" in i for i in c["backups"]["blocks"][0]["items"]), c["backups"])
+    check("self-check: its fix opens Settings, where Backups lives",
+          c["backups"]["fix"] == {"kind": "screen", "label": "Open Backups", "screen": "settings"}, c["backups"]["fix"])
     gone.unlink()
     set_destination(OUTSIDE)
     backups.back_up("manual")

@@ -118,8 +118,18 @@ check("open on a folded card with blocks expands it first", target({ ref: { type
 check("open on an expanded card goes to the page that opens its ref, with the id",
       eq(target({ ref: { type: "task", id: "t1" }, blocks: [{}] }, { action: "open" }, true), { type: "page", id: "tasks", arg: "t1" }));
 check("open with no page for the ref folds an expanded card back, else does nothing",
-      target({ ref: { type: "check", id: "wake" }, blocks: [{}] }, { action: "open" }, true).type === "expand"
-      && target({ ref: { type: "check", id: "wake" } }, { action: "open" }, false).type === "none");
+      target({ ref: { type: "alert", id: "a1" }, blocks: [{}] }, { action: "open" }, true).type === "expand"
+      && target({ ref: { type: "alert", id: "a1" } }, { action: "open" }, false).type === "none");
+check("a self-check's card opens Needs attention on its check once unfolded",
+      eq(target({ ref: { type: "check", id: "wake" }, blocks: [{}] }, { action: "open" }, true), { type: "screen", id: "attention", arg: "wake" })
+      && eq(target({ ref: { type: "check", id: "reconnect:calendar" } }, { action: "open" }, false), { type: "screen", id: "attention", arg: "reconnect:calendar" }));
+check("a fix's client actions: the addon's connect flow, a screen, an https link (nothing else)",
+      eq(target({ ref: { type: "check", id: "reconnect:calendar" } }, { action: "connect", args: { addon: "calendar" }, client: true }), { type: "connect", addon: "calendar" })
+      && eq(target({ ref: { type: "check", id: "push" } }, { action: "screen", args: { screen: "devices" }, client: true }), { type: "screen", id: "devices" })
+      && eq(target({}, { action: "url", args: { url: "https://example.com/help" }, client: true }), { type: "url", url: "https://example.com/help" })
+      && target({}, { action: "url", args: { url: "javascript:alert(1)" }, client: true }).type === "none"
+      && target({}, { action: "connect", args: {}, client: true }).type === "none");
+check("a reconnect card is rose", N.hueOf({ kind: "reconnect" }) === "rose");
 
 // --- Optimistic acting, refreshes ---------------------------------------------------------------------
 const A = { id: "a", title: "A" }, B = { id: "b", title: "B" }, Cc = { id: "c", title: "C" };

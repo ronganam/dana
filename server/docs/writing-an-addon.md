@@ -209,6 +209,24 @@ async def act(user, ref: str, action: str, args: dict, now) -> dict:
     return core_cards.result("Seen")                            # core_cards.ActError(msg, 409) refuses
 ```
 
+A self-check says whether something the addon depends on still works, and can carry the button that fixes it (`Fix` from `core.addons`): Settings → Needs attention and the check's Now card show it (`docs/now.md`, "Fixes"):
+
+```python
+@addon.selfcheck("tides_feed", "Tide feed")
+def feed(user: User, now) -> Check:
+    if store.stale(user):
+        return Check(False, "no tides for 2 days", store.last_ok(user), title="Tides stopped arriving",
+                     fix=Fix.run("refetch", "Fetch again"))     # or Fix.screen("tides", "Open Tides"), Fix.link(url, label)
+    return Check(True, "fresh", store.last_ok(user))
+
+@addon.fix("tides_feed")                                         # the server fix: runs for the user who pressed it
+async def refetch(user: User, action: str) -> str:
+    await service.fetch(user)
+    return "Fetched the tides again"                             # raise ValueError("…") to refuse
+```
+
+**Credentials that stopped working**: when the service refuses the stored credentials (HTTP 401 / 403, a revoked token, a signed-out session), say so instead of failing quietly: `store.needs_reconnect(conn.user, conn.addon, "The tide service refused the API key.")` (`from core.addons import store`; `part=` / `label=` for one of several logins, as money does per source). The user gets a Reconnect card on Now, a failing `reconnect:<addon>` check and "Reconnect" on the Addons page, all opening the addon's connect flow (or the manifest's `reconnect_fix=`). New credentials and a connection test that passes clear it; when your own code sees the service accept them again, `store.reconnected(user, name)`. Never call it for a timeout or a 5xx: only the user can fix a refusal, anything else is worth a retry.
+
 `core_cards` is `from core import cards as core_cards`. Composer hooks are plain functions (they run in a worker thread); jobs, services, handlers, channels and the action hooks are `async`. Keys (a card prefix, a section, a check) are unique across addons. `core.addons.helpers` has shared time and search helpers (`parse_time`, `ago`, `when_phrase`, `match_score`, `like_pattern`…).
 
 ### Data
