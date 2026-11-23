@@ -139,8 +139,7 @@ work). One mechanism, bound in four places:
   `tasks` in turn, the About learner (`addons.about.learner.run_due` →
   `run_pass(user)`) each user with `about`, the people brief loop
   (`addons.people.briefs.run_briefs` → `refresh_briefs(user)`) each
-  user with `people`, the Home Assistant entity watchers
-  (`addons.homeassistant.watcher.UserWatcher.run`) and home-map
+  user with `people`, the Home Assistant home-map
   refreshes each their connection's user, an inbound WAHA event
   (`addons.whatsapp.events.process_event`) the user of the connection
   whose account it names.
@@ -263,8 +262,7 @@ addon and answers for the caller: the Now screen, its check cards,
 `/api/checks`, `/api/search`, `/api/briefing/*`, `/api/review/*`,
 `/api/signals` (the caller's own events and overview); `/api/phone/*` and `/api/notifications/*`, the caller's
 phone and Inbox; `/api/zones` and `/api/wizard*`, the caller's own zones and
-first-run wizard (every user, no addon needed); `/api/client-config`,
-`/api/ha/*` (including `POST /api/ha/zones/import`) and the HA
+first-run wizard (every user, no addon needed); `/api/ha/*` (including `POST /api/ha/zones/import`) and the HA
 camera proxies, the caller's Home Assistant (the proxies also need
 `cameras`); `/api/calendar/*`, the caller's Google Calendar; `/api/frigate/*`,
 the caller's Frigate; `/api/me` and `/api/addons*`, the caller's own
@@ -535,16 +533,12 @@ has a natural seam: `homeassistant/client.py` + `home_map.py`,
 - optional **options**: `Addon(options=)`, an async function of the
   `Connection` returning `{setting: [{value, label}, …]}`, candidates for its
   settings read from the service. `GET /api/addons/{name}/options`.
-  `homeassistant` (`addons/homeassistant/options.py`): `person` (person
-  entities), `car_sensor` (sensors with a `connected_paired_devices`
-  attribute), `car_device` (the device names in those attributes),
-  `phone_interactive_sensor` (binary sensors), `phone_battery_sensor`
-  (sensors of device class `battery`), `weather_entity` (weather entities),
-  `tv_entity` (media players).
+  `homeassistant` (`addons/homeassistant/options.py`): `phone_battery_sensor`
+  (sensors of device class `battery`), `tv_entity` (media players).
 - **inbound handlers** (webhooks, phone uploads) and **background jobs** (run
   once per user who has the addon connected, as that user) — not part of the
   framework: each addon runs its own per user (`tasks` time checker, `about`
-  learner, `people` briefs, `homeassistant` entity watchers and home maps,
+  learner, `people` briefs, `homeassistant` home maps,
   `whatsapp` inbound events routed by account, `phone` notification
   retention / digest / re-nudge / triage resume, call processing / resume /
   audio retention).
@@ -570,14 +564,12 @@ failure is logged, the connection stays): `tasks` seeds the default lists,
 `Addon(…, on_credentials_change=)` runs one after `store.update` changed
 the credentials (`whatsapp`: forget the account, learn it again);
 `Addon(…, on_change=)` runs one after every connect, update or
-disconnect (`homeassistant`: wake the entity watchers so they reconcile at
-once, `watcher.request_reconcile`). With these, a change through the API
+disconnect. With these, a change through the API
 needs no restart: the connection cache, the tool list and the prompt change
-at once, the watcher starts / restarts / stops, the WhatsApp account is
+at once, the WhatsApp account is
 learned, default task lists and the shopping list are made
 (`test_addons_api.py`). A change made by `bin/dana` (another
-process) reaches the server on its next lookup (`core.db.ChangeWatch`) and the watcher's
-periodic reconcile (`HA_WATCH_RECONCILE_SECONDS`); the CLI runs `on_connect`
+process) reaches the server on its next lookup (`core.db.ChangeWatch`); the CLI runs `on_connect`
 itself. Importing the `addons` package registers
 every addon (explicit imports; `ADDON_ORDER` in `addons/__init__.py` fixes
 the order). Adding an addon: the package, one import line and its name in
@@ -638,7 +630,7 @@ Rules:
 | `about` | About-you facts and learner | none | none | built in, no sharing; facts, "do not re-add", the size cap, the prompt section and the learner per user (docs/about.md) |
 | `people` | people, briefs | none | none | built in, no sharing; people, their numbers (unique per user), briefs and the call card per user; calls / notifications linked only from the user's own (both by their `user_id`, `activity.calls_sql` / `notifications_sql`) (docs/people.md) |
 | `phone` | the Android phone: push, notifications Inbox, calls and suggestions | none (each device pairs and gets its own token; its push registration is keyed by that device) | none | built in. Devices, push events (one `seq` numbering for the server, each event fetched only by its user), notifications (FTS, rules, summaries, declines, action requests, digest state), calls (uploads, recordings, transcripts, labels, FTS search, processing / reanalysis / backfill as the owner), call and notification suggestions (only their owner's: listed, accepted, dismissed, edited, undone, popped up), context chats on them, the self-check marks `push` / `notification_sync` / `triage`, the calls check and the loops per user; `/api/phone/*`, `/api/notifications/*`, `/api/calls/*` and `/api/suggestions/*` for the caller, 403 `not_connected` without the addon (docs/notifications.md, docs/calls.md) |
-| `homeassistant` | Home Assistant | `host` (an address), `token` | `person` (person entity: zone triggers), `car_sensor` (the phone's Bluetooth connection sensor) + `car_device` (the car's Bluetooth name in its `connected_paired_devices`): car triggers, `phone_interactive_sensor` (screen on: wake confirmation), `phone_battery_sensor` (the dashboards' Batteries widget default), `phone_notify_service` (only reported by `/api/client-config`), `weather_entity` (`weather.forecast_home`: briefing, Now), `tv_entity` (the Android TV media player `control_android_tv` uses when not given one) + `tv_channel_command` (an ADB command with `{channel}` for its `watch_channel`, e.g. a TV provider app's deep link; unset: no channel changes); no other defaults | no limits on Dana's side: whatever the token can do. Everything per connection: REST / WebSocket clients, zones, states cache, home map, the entity watcher (docs/tasks-and-triggers.md). Tools, `/api/ha/*` (zone import included), `/api/client-config`, the HA camera proxies (which also need `cameras`): the caller's connection, 403 `not_connected` without it |
+| `homeassistant` | Home Assistant | `host` (an address), `token` | `phone_battery_sensor` (the dashboards' Batteries widget default), `tv_entity` (the Android TV media player `control_android_tv` uses when not given one) + `tv_channel_command` (an ADB command with `{channel}` for its `watch_channel`, e.g. a TV provider app's deep link; unset: no channel changes); no other defaults | no limits on Dana's side: whatever the token can do. Everything per connection: REST / WebSocket clients, zones, states cache, home map. Tools, `/api/ha/*` (zone import included), the HA camera proxies (which also need `cameras`): the caller's connection, 403 `not_connected` without it |
 | `whatsapp` | WAHA | `url` (an address), `api_key` (optional), `session` (a name, not one another user's connection uses) | `voice_telegram_chat_id` (none): the user's voice-transcript chat (their own Telegram id unless an admin sets it) | account: the session's WhatsApp id, learned from WAHA (routes inbound events, see "Inbound"). Tools, name maps, "me", dedupe, saved contacts (`whatsapp_contacts`) and the images its tools save per connection / user (docs/whatsapp.md). No HTTP endpoint of its own besides the inbound webhook |
 | `calendar` | Google Calendar | `refresh_token` (from the Google sign-in, "Google account") | `calendar_id` (`primary`): where new events go, `selected_calendars` (none): ids of the calendars shown and searched (none chosen: `calendar_id`) | OAuth client id/secret are server-wide. Tools, `/api/calendar/*`, undo of events, accepting an event suggestion and the composers' calendar reads (Now, briefing, meeting cards, weekly review, the `calendar` self-check) use the acting user's connection; credentials (access token) and today's events cached per connection; 403 `not_connected` without it. No sharing on Dana's side: calendars Google shares with a user show through their own account (docs/now.md) |
 | `contacts` | Google Contacts | `refresh_token` (from the Google sign-in) | none | a copy of the user's contacts, synced in the background (`CONTACTS_SYNC_MINUTES`) and deleted on disconnect; search / read tools, `add_contact` / `update_contact` ask first; fills the user's people and names unknown callers (docs/contacts.md) |
@@ -720,24 +712,14 @@ server's.
 - The sign-in is the caller's own: `/api/addons` carries `connect_url`
   only for the caller's own addons, never with `?user=`.
 
-### Home Assistant triggers
+### Home Assistant
 
-Dana watches the entities selected in the user's Home Assistant settings over
-that user's own connection and fires the triggers itself: zone enter/leave
-from the person entity, car enter/leave from the car sensor
-(`addons/homeassistant/watcher.py`: one watcher per user with those
-settings, `subscribe_entities` over their WebSocket, back-off reconnects, a
-missed transition fired once after a reconnect, nothing on the initial
-state; the transitions are those of the old component → docs/tasks-and-triggers.md).
-The old `/webhook` endpoint (and with it the `wake_up` and `complete_task`
-events) and the custom HA component are gone. The self-check reports, per
-user, a selected entity that is missing (`ha_entities`), a watcher that is
-not connected (`ha_watcher`) and entities that have been silent (`location`,
-`car`).
+Home Assistant is a smart-home control only: it is no source of any signal
+(wake, screen, car, location and sleep come from Dana's phone app,
+`docs/signals.md`).
 
 **Timezone.** One for the server: `core/clock.py` resolves `TIMEZONE` → the
-first admin's Home Assistant (`users.first_admin()` on purpose: a server
-setting; the addon registers the lookup) → `TZ` → UTC, once at startup.
+first-run wizard's server setting → `TZ` → UTC, once at startup.
 
 ### Inbound
 
@@ -912,8 +894,7 @@ Now's needs-you cards and notification counts, search results; calls:
 uploads, recordings, transcripts, labels, FTS search, processing and
 reanalysis as the owner, call suggestions, pop-ups, context chats, audio
 retention, startup resume, the backfill, the calls self-check); their Home
-Assistant (tools, endpoints, zones, home map, weather, the entity watcher and
-its self-check marks); their WhatsApp (tools, caches, saved contacts, inbound
+Assistant (tools, endpoints, zones, home map); their WhatsApp (tools, caches, saved contacts, inbound
 voice notes and their Telegram chat); their Google Calendar (tools,
 `/api/calendar/*`, the selected calendars, event undo, today's events in Now,
 the briefing, meeting cards, the weekly review, the `calendar` self-check);
