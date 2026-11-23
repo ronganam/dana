@@ -443,8 +443,15 @@ model in [`SECURITY.md`](../../SECURITY.md). Tests: `bin/test test_security`
   writes still run, and household members' shared text is not marked.
 - **ops** (kubectl and Python on the server, `addons/ops/`). Admin only and
   never turned on by itself (not a default, not given by startup): an admin
-  turns it on. `run_kubectl` runs only read-only verbs (`get`, `describe`
-  except secrets, `logs`, `top`…) with the pod's service account; `run_python`
+  turns it on. `run_kubectl` runs only read-only verbs (`get`, `describe`,
+  `logs`, `top`; flags `-n`, `-A`, `-o json|yaml`, `-l`, `-c`, `--tail`) on the
+  resources it knows (`RESOURCES` in `addons/ops/tools.py`, each with its API
+  group) with the pod's service account, which needs `get` / `list` on them
+  (and on `metrics.k8s.io` for `top`); secrets only by name (a secret's values,
+  `-o` or `describe`, are refused before any request); logs are the last 200
+  lines unless `--tail` says otherwise, and every result is cut at 10,000
+  characters with a note (logs and tracebacks keep their end). `run_python`
+  runs in a thread (the event loop keeps going),
   always asks first (`confirm`) and is **not a sandbox**: a child process in
   a temporary working directory with CPU / memory / file-size limits,
   Python's isolated mode and a minimal environment (`PATH`, `HOME`, `TMPDIR`,
@@ -717,6 +724,18 @@ server's.
 Home Assistant is a smart-home control only: it is no source of any signal
 (wake, screen, car, location and sleep come from Dana's phone app,
 `docs/signals.md`).
+
+**Tools** (`addons/homeassistant/tools.py`). `get_ha_exposed_entities(search?)`:
+the voice-exposed entities with live state, only those whose id, name, alias
+or domain contains `search` when given, cut at 10,000 characters with a note.
+`call_ha_service` checks the entity id before any request and says the
+entity's new state when Home Assistant reports it. `control_android_tv`
+checks its action and arguments first (nothing is sent for a wrong one),
+asks Home Assistant for the TV's own entities one at a time (never every
+state), turns the TV on and waits for ADB only when it is off, and puts a
+YouTube / Netflix search into the ADB command as one quoted shell word. The
+WebSocket registry read gives up after 20 s (`client.REGISTRY_TIMEOUT`);
+every REST call has its own timeout.
 
 **Timezone.** One for the server: `core/clock.py` resolves `TIMEZONE` → the
 first-run wizard's server setting → `TZ` → UTC, once at startup.

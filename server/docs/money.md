@@ -418,12 +418,12 @@ Elsewhere:
 
 ## Agent tools
 
-`tools.py`, offered for every user with `money` and in realtime voice. The model passes a period name or dates; `periods.resolve` works out the dates, `queries` / `insights` the numbers; results are short text with amounts as `₪1,234.50`, errors as `Error: …` in words. An account is named by its last digits, label, company or kind (`queries.find_account`; several matches are listed back).
+`tools.py`, offered for every user with `money` and in realtime voice. The model passes a period name or dates; `periods.resolve` works out the dates, `queries` / `insights` the numbers; results are short text with amounts as `₪1,234.50`, errors as `Error: …` in words. An account is named by its last digits, label, company or kind (`queries.find_account`; several matches are listed back, and so are the user's accounts when none matches).
 
 | Tool | Flags | What |
 |---|---|---|
 | `money_summary(period, start?, end?, category?, merchant?, account?, flow?, group_by?)` | read, `untrusted_result` | The total, a breakdown (by group by default; by category when the category is a group) and the comparisons: "Spent on Food this month (1–21 Nov 2026): ₪2,140.00 in 3 transactions. By category: Groceries ₪1,320.00, Restaurants & cafés ₪820.00. At this point last month (1–21 Oct 2026): ₪2,430.00. …" |
-| `search_transactions(query?, period?, start?, end?, category?, min_amount?, max_amount?, account?)` | read, `untrusted_result` (descriptions and transfer memos are written by others) | Up to 30 rows, newest first, each with its id |
+| `search_transactions(query?, period?, start?, end?, category?, min_amount?, max_amount?, account?, cursor?)` | read, `untrusted_result` (descriptions and transfer memos are written by others) | Up to 30 rows, newest first, each with its id; when more match, the `cursor` of the older ones |
 | `money_overview()` | read, `untrusted_result` | Spent, income and the net this month (spent vs the same point last month), everyday spending vs a typical month, balances, next card bills, the lowest balance in the next 45 days, fixed costs a month, the last good sync, what needs attention |
 | `recurring_charges()` | read, `untrusted_result` | Subscriptions and standing orders ("₪600.00 every 2 months (₪300.00 a month)") with price changes and next dates, charges that come once a year, regular income |
 | `money_forecast(days=45)` | read, `untrusted_result` | The balance ahead (expected, range, lowest point), the everyday rate it assumes, what it leaves out, the events with each card bill's parts, installment plans |

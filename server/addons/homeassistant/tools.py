@@ -2,9 +2,10 @@
 home map in :mod:`.home_map`).
 
 Tools exposed to the agent:
-1. get_ha_exposed_entities  — returns all voice-exposed entities with names, aliases
-                              and live state in one call.
+1. get_ha_exposed_entities  — the voice-exposed entities with names, aliases and live
+                              state in one call (optionally only those matching a word).
 2. call_ha_service          — controls a device by calling any HA service.
+3. control_android_tv       — the Android TV over ADB (apps, channels, YouTube, Netflix, keys).
 
 The agent's system prompt also carries a cached "home map" of the exposed
 entities (ids, names, aliases, no state; see home_map.get_home_map), so most commands
@@ -14,7 +15,9 @@ go straight to call_ha_service.
 import asyncio
 import logging
 import re
-from typing import Any, Dict, List, Optional
+import shlex
+import urllib.parse
+from typing import Any, Dict, List, Literal, Optional, Tuple, get_args
 
 from core.addons import Approval, Connection
 from core.addons.hooks import clean
@@ -25,6 +28,8 @@ from addons.homeassistant.addon import addon
 from addons.homeassistant.config import TV, TV_CHANNEL, setting
 
 logger = logging.getLogger(__name__)
+
+MAX_LIST_CHARS = 10_000
 
 
 # ---------------------------------------------------------------------------
@@ -123,19 +128,13 @@ def _build_entity_line(eid: str, name: str, aliases: List[str],
 # ---------------------------------------------------------------------------
 
 @addon.tool(shortcut_prep=True)
-async def get_ha_exposed_entities(conn: Connection) -> str:
-    """Retrieve all Home Assistant entities exposed to the voice assistant, with live state.
+async def get_ha_exposed_entities(conn: Connection, search: Optional[str] = None) -> str:
+    """Live state of the Home Assistant entities exposed to the voice assistant (state, key attributes, aliases), grouped by domain. Use it for a device's current state (is it on, the temperature, what is playing) or a device missing from the Home Devices list; never just to look up ids that list already has, and never guess ids.
 
-    Call this when you need a device's current state or attributes (is it on, the
-    temperature, what is playing), or when the device the user means is not in the
-    Home Devices list of the system prompt nor known from this conversation.
-    Entity ids in the Home Devices list are already verified: do not call this just
-    to look them up. Never guess entity IDs (like 'media_player.tv_salon').
-    Returns entity_id, friendly name, live state, key attributes and aliases,
-    grouped by domain. Use aliases to map natural-language names (e.g. 'the gate', 'AC').
+    Args:
+        search: Only entities whose id, name, alias or domain contains this, e.g. "light", "kitchen", "AC"; default all.
     """
     try:
-        # Fetch registry (WS) and all states (REST) in parallel
         (exposed_ids, registry_map), states_map = await asyncio.gather(
             ha_api.fetch_registry(conn),
             ha_api.fetch_all_states(conn),
@@ -151,26 +150,29 @@ async def get_ha_exposed_entities(conn: Connection) -> str:
             "Go to Settings → Voice Assistants → Expose to enable devices."
         )
 
-    # Group by domain
+    needle = (search or "").strip().lower()
     by_domain: Dict[str, List[str]] = {}
     for eid in sorted(exposed_ids):
-        domain = eid.split(".")[0]
         reg = registry_map.get(eid, {"name": eid, "aliases": []})
-        line = _build_entity_line(
-            eid=eid,
-            name=reg["name"],
-            aliases=reg["aliases"],
-            state_obj=states_map.get(eid),
-        )
-        by_domain.setdefault(domain, []).append(line)
+        state_obj = states_map.get(eid)
+        if needle:
+            friendly = str(((state_obj or {}).get("attributes") or {}).get("friendly_name") or "")
+            if needle not in " ".join([eid, reg["name"], friendly, *reg["aliases"]]).lower():
+                continue
+        line = _build_entity_line(eid=eid, name=reg["name"], aliases=reg["aliases"], state_obj=state_obj)
+        by_domain.setdefault(eid.split(".")[0], []).append(line)
+    if not by_domain:
+        return f"No exposed entity matches '{search}' ({len(exposed_ids)} exposed): search by another word or none."
 
-    lines = [f"Home Assistant — {len(exposed_ids)} exposed entities\n"]
+    count = sum(len(v) for v in by_domain.values())
+    lines = [f"Home Assistant — {count} of {len(exposed_ids)} exposed entities" + (f" matching '{search}'" if needle else "")]
     for domain in sorted(by_domain):
         lines.append(f"[{domain}]")
         lines.extend(f"  {line}" for line in by_domain[domain])
-
-    logger.info(f"[HA] Returned {len(exposed_ids)} exposed entities across {len(by_domain)} domains.")
-    return "\n".join(lines)
+    text = "\n".join(lines)
+    if len(text) > MAX_LIST_CHARS:
+        text = text[:MAX_LIST_CHARS] + "\n[cut: more entities; pass search (a domain, room or name) to narrow]"
+    return text
 
 
 # ---------------------------------------------------------------------------
@@ -232,114 +234,113 @@ async def call_ha_service(
         entity_id: The target entity ID (from the Home Devices list or get_ha_exposed_entities).
         service_data: Optional extra parameters (e.g. {'temperature': 22.5} or {'brightness': 200}).
     """
-    payload: Dict[str, Any] = {"entity_id": entity_id}
-    if service_data:
-        payload.update(service_data)
-
+    if not ha_api.valid_entity_id(entity_id):
+        return (f"Error: '{entity_id}' is not an entity id (domain.object_id): take one from the Home Devices "
+                "list or get_ha_exposed_entities.")
+    payload: Dict[str, Any] = {**(service_data or {}), "entity_id": entity_id}
     logger.info(f"Calling HA service {domain}.{service} on {entity_id} — {service_data}")
     try:
         r = await ha_api.post(conn, ha_api.service_path(domain, service), json_body=payload, timeout=30.0)
-        if r.status_code not in (200, 201):
-            return (
-                f"Error: HA returned HTTP {r.status_code} for {domain}.{service} "
-                f"on '{entity_id}': {r.text}"
-            )
-        extra = f" with {service_data}" if service_data else ""
-        return f"Done: called {domain}.{service} on '{entity_id}'{extra}."
     except Exception as e:
         logger.error(f"Error calling HA service {domain}.{service}: {e}", exc_info=True)
-        err_msg = str(e).strip() or type(e).__name__
-        return f"Error: Failed to call Home Assistant service: {err_msg}"
+        return f"Error: Failed to call Home Assistant service: {str(e).strip() or type(e).__name__}"
+    if r.status_code not in (200, 201):
+        return f"Error: HA returned HTTP {r.status_code} for {domain}.{service} on '{entity_id}': {r.text[:300]}"
+    extra = f" with {service_data}" if service_data else ""
+    try:  # Home Assistant answers with the states the call changed
+        now = next((c.get("state") for c in r.json() if c.get("entity_id") == entity_id), None)
+    except (ValueError, TypeError, AttributeError):
+        now = None
+    return f"Done: called {domain}.{service} on '{entity_id}'{extra}." + (f" It is now {now}." if now else "")
 
 
 # ---------------------------------------------------------------------------
 # Tool 3 — control_android_tv
 # ---------------------------------------------------------------------------
 
+NOT_READY = ("off", "standby", "unavailable", "unknown")
+TvAction = Literal["launch_app", "watch_channel", "play_youtube", "play_netflix", "send_key", "run_command"]
+TV_ACTIONS = get_args(TvAction)
+YOUTUBE_ACTIVITY = "com.google.android.youtube.tv/com.google.android.apps.youtube.tv.activity.ShellActivity"
+
+
+def _tv_entities(entity_id: str) -> Tuple[str, str]:
+    """(the ADB media_player, the base name) of a TV entity (``media_player.x`` or ``media_player.x_adb``)."""
+    base = entity_id.split(".")[-1].removesuffix("_adb")
+    return f"media_player.{base}_adb", base
+
+
 async def _is_app_active(conn: Connection, app_id: str, entity_id: str) -> bool:
-    """Check if the given app_id is currently active on the TV."""
-    base_name = entity_id.split(".")[-1]
-    if base_name.endswith("_adb"):
-        base_name = base_name[:-4]
-
-    try:
-        states = await ha_api.fetch_all_states(conn)
-    except Exception as e:
-        logger.error(f"Failed to fetch states for app check: {e}")
-        return False
-
-    candidates = [
-        f"media_player.{base_name}_adb",
-        f"media_player.{base_name}",
-        f"remote.{base_name}",
-        f"remote.{base_name}_adb",
-    ]
-
-    for c in candidates:
-        s = states.get(c)
-        if not s:
-            continue
-        attrs = s.get("attributes", {})
-        # Check various attributes that might contain the app ID
-        for key in ("app_id", "app_name", "source", "current_activity"):
-            val = attrs.get(key)
-            if val and str(val).strip().lower() == app_id.strip().lower():
-                return True
+    """Whether ``app_id`` is the app in front on the TV (any of its media_player / remote entities says so)."""
+    _, base = _tv_entities(entity_id)
+    names = (f"media_player.{base}_adb", f"media_player.{base}", f"remote.{base}", f"remote.{base}_adb")
+    want = app_id.strip().lower()
+    for s in await asyncio.gather(*(ha_api.fetch_state(conn, n) for n in names)):
+        attrs = (s or {}).get("attributes") or {}
+        if any(str(attrs.get(k) or "").strip().lower() == want
+               for k in ("app_id", "app_name", "source", "current_activity")):
+            return True
     return False
 
 
-async def _ensure_tv_on(conn: Connection, entity_id: str) -> bool:
-    """Ensure the TV is powered on. Returns True if we had to turn it on."""
-    base_name = entity_id.split(".")[-1]
-    if base_name.endswith("_adb"):
-        base_name = base_name[:-4]
-        
-    adb_entity = f"media_player.{base_name}_adb"
-    
-    try:
-        states = await ha_api.fetch_all_states(conn)
-    except Exception as e:
-        logger.error(f"Failed to fetch states for TV power check: {e}")
-        return False
-
-    s = states.get(adb_entity)
-    adb_state = s.get("state", "off") if s else "off"
-    
-    if adb_state in ("off", "standby", "unavailable", "unknown"):
-        logger.info(f"TV ADB entity '{adb_entity}' is '{adb_state}'. Turning TV on...")
-        main_entity = f"media_player.{base_name}"
-        target_to_turn_on = main_entity if main_entity in states else entity_id
-        await call_ha_service(conn, "media_player", "turn_on", target_to_turn_on)
-        return True
-    return False
-
-
-async def _wait_for_adb_ready(conn: Connection, entity_id: str, timeout: float = 30.0) -> bool:
-    """Wait for the ADB media_player entity to be ready (not 'off', 'unavailable', 'unknown', or 'standby')."""
-    logger.info(f"Waiting for ADB entity '{entity_id}' to become ready...")
-    start_time = asyncio.get_event_loop().time()
-    
-    while True:
-        try:
-            states = await ha_api.fetch_all_states(conn)
-        except Exception as e:
-            logger.warning(f"Failed to fetch states while waiting for ADB: {e}")
-            await asyncio.sleep(1.0)
-            continue
-            
-        s = states.get(entity_id)
-        if s:
-            state = s.get("state", "off")
-            if state not in ("off", "standby", "unavailable", "unknown"):
-                logger.info(f"ADB entity '{entity_id}' is ready with state '{state}' after {asyncio.get_event_loop().time() - start_time:.1f}s.")
-                return True
-                
-        elapsed = asyncio.get_event_loop().time() - start_time
-        if elapsed >= timeout:
-            logger.warning(f"Timed out waiting for ADB entity '{entity_id}' to become ready (elapsed: {elapsed:.1f}s).")
-            return False
-            
+async def _wake_tv(conn: Connection, entity_id: str, timeout: float = 30.0) -> None:
+    """Turn the TV on when its ADB entity is off, then wait (at most ``timeout``) until ADB answers."""
+    adb, base = _tv_entities(entity_id)
+    state = await ha_api.fetch_state(conn, adb) or await ha_api.fetch_state(conn, entity_id)
+    if state and state.get("state") not in NOT_READY:
+        return
+    main = f"media_player.{base}"
+    await call_ha_service(conn, "media_player", "turn_on", main if await ha_api.fetch_state(conn, main) else entity_id)
+    deadline = asyncio.get_running_loop().time() + timeout
+    while asyncio.get_running_loop().time() < deadline:
         await asyncio.sleep(1.5)
+        state = await ha_api.fetch_state(conn, adb) or await ha_api.fetch_state(conn, entity_id)
+        if state and state.get("state") not in NOT_READY:
+            return
+    logger.warning(f"[HA] the TV's ADB entity {adb} was not ready after {timeout:.0f}s")
+
+
+def _tv_command(action: str, channel_command: Optional[str], channel: Optional[str], app_id: Optional[str],
+                query: Optional[str], video_id: Optional[str], title_id: Optional[str],
+                command: Optional[str]) -> Tuple[Optional[str], str]:
+    """(the ADB command, what it does) for an action, or (None, an error) when an argument is missing or wrong."""
+    if action == "watch_channel":
+        if not channel_command:
+            return None, ("Error: no channel command is set up (the Home Assistant addon's TV channel command "
+                          "setting); use launch_app or send_key instead.")
+        if not channel or not re.fullmatch(r"\d{1,5}", str(channel).strip()):
+            return None, "Error: 'channel' must be a channel number for action 'watch_channel'."
+        return channel_command.replace("{channel}", str(channel).strip()), f"tuned to channel {str(channel).strip()}"
+    if action == "play_youtube":
+        if video_id:
+            match = re.search(r"(?:v=|/|^)([A-Za-z0-9_-]{11})(?:[?&#]|$)", video_id.strip())
+            if not match:
+                return None, "Error: 'video_id' must be an 11-character YouTube video id or a YouTube URL."
+            return (f'am start -a android.intent.action.VIEW -d "https://www.youtube.com/watch?v={match.group(1)}" '
+                    f"-n {YOUTUBE_ACTIVITY}"), f"started YouTube video {match.group(1)}"
+        if query:
+            return (f"am start -a android.intent.action.SEARCH -e query {shlex.quote(query)} -n {YOUTUBE_ACTIVITY}",
+                    f"searched YouTube for '{query}'")
+        return None, "Error: Either 'video_id' or 'query' is required for action 'play_youtube'."
+    if action == "play_netflix":
+        if title_id:
+            tid = str(title_id).rstrip("/").split("/")[-1]
+            if not tid.isdigit():
+                return None, "Error: 'title_id' must be a numeric Netflix title id (or its URL)."
+            return (f"am start -n com.netflix.ninja/.MainActivity -a android.intent.action.VIEW "
+                    f"-d netflix://title/{tid} -f 0x10000020"), f"started Netflix title {tid}"
+        if query:
+            target = shlex.quote(f"netflix://search?q={urllib.parse.quote(query)}")
+            return (f"am start -a android.intent.action.VIEW -d {target} -n com.netflix.ninja/.MainActivity",
+                    f"searched Netflix for '{query}'")
+        return None, "Error: Either 'title_id' or 'query' is required for action 'play_netflix'."
+    if action in ("send_key", "run_command"):
+        if not command:
+            return None, f"Error: 'command' is required for action '{action}'."
+        return command, f"sent key {command}" if action == "send_key" else "ran the command"
+    if not app_id:
+        return None, "Error: 'app_id' is required for action 'launch_app'."
+    return "", ""
 
 
 def _shortcut_tv_allowed(args: Dict[str, Any]) -> bool:
@@ -365,7 +366,7 @@ def _describe_tv(user: Optional[User], a: Dict[str, Any]) -> Approval:
             shortcut_describe=_shortcut_tv_describe)
 async def control_android_tv(
     conn: Connection,
-    action: str,
+    action: TvAction,
     entity_id: Optional[str] = None,
     app_id: Optional[str] = None,
     channel: Optional[str] = None,
@@ -374,181 +375,55 @@ async def control_android_tv(
     title_id: Optional[str] = None,
     command: Optional[str] = None,
 ) -> str:
-    """Control an Android TV / Google TV device using the androidtv integration.
-
-    Use this tool to launch apps, change TV channels, search/play YouTube/Netflix, send remote keys,
-    or run arbitrary ADB shell commands and get the output back.
-
-    It automatically detects if an app is already open to avoid redundant launch commands and delays.
-    This tool is for ADB-based TV control only. For simple media_player operations (volume, pause, play),
-    use call_ha_service with the media_player domain instead.
-
-    Actions:
-      - "launch_app": Launch any app using its package/app ID (e.g. 'com.netflix.ninja', 'com.google.android.youtube.tv').
-      - "watch_channel": Tune to a numeric channel with the TV provider command the user set up
-        (their Home Assistant setting tv_channel_command); without one, use launch_app or send_key.
-      - "play_youtube": Play a specific video by ID/URL, or search for a video query on YouTube.
-      - "play_netflix": Play a specific Netflix title by ID, or search for a title query on Netflix.
-      - "send_key": Send a remote key press (e.g. 'HOME', 'BACK', 'UP', 'DOWN', 'ENTER', 'VOLUME_UP').
-      - "run_command": Run an arbitrary ADB shell command on the TV and return its output (e.g. 'top -n 1 -s 9 -m 5', 'dumpsys battery').
+    """Control the Android / Google TV over ADB: launch an app, tune a channel, play or search YouTube / Netflix, press a remote key, or run an ADB shell command and get its output. Turns the TV on first. For volume, play and pause use call_ha_service (media_player).
 
     Args:
-        action: The action to perform: "launch_app", "watch_channel", "play_youtube", "play_netflix", "send_key", "run_command".
-        entity_id: The Android TV media_player entity ID (defaults to the user's TV, the tv_entity setting).
-        app_id: The package/app ID to launch (required for "launch_app").
-        channel: The channel number to tune to (required for "watch_channel").
-        query: Search query for YouTube or Netflix.
-        video_id: The YouTube video ID or full YouTube video URL.
-        title_id: The Netflix title ID (numeric).
-        command: The remote key command (e.g., 'HOME', 'BACK') for "send_key", or the ADB shell command for "run_command".
+        action: launch_app (app_id), watch_channel (channel; needs the user's tv_channel_command setting), play_youtube (video_id or query), play_netflix (title_id or query), send_key (command), run_command (command).
+        entity_id: The TV's media_player entity; default the user's TV (tv_entity setting).
+        app_id: Package to launch, e.g. 'com.netflix.ninja', 'com.google.android.youtube.tv'.
+        channel: Channel number.
+        query: What to search for on YouTube or Netflix.
+        video_id: YouTube video id or URL.
+        title_id: Netflix title id (numeric) or its URL.
+        command: A key for send_key ('HOME', 'BACK', 'UP', 'ENTER', 'VOLUME_UP'), or an ADB shell command for run_command ('dumpsys battery').
     """
-    action = action.lower()
+    action = (action or "").strip().lower()
+    if action not in TV_ACTIONS:
+        return f"Error: Unknown action '{action}'. Use one of: {', '.join(TV_ACTIONS)}."
     entity_id = entity_id or setting(conn, TV)
     if not entity_id:
         return ("Error: no TV given and none set up: pass entity_id (a media_player entity) or set "
                 "the TV entity in the Home Assistant addon's settings.")
-    channel_command = setting(conn, TV_CHANNEL)
-    if action == "watch_channel":
-        if not channel_command:
-            return ("Error: no channel command is set up (the Home Assistant addon's TV channel command "
-                    "setting); use launch_app or send_key instead.")
-        if not channel or not re.fullmatch(r"\d{1,5}", str(channel).strip()):
-            return "Error: 'channel' must be a channel number for action 'watch_channel'."
-
-    # Ensure TV is powered on first
+    adb_cmd, did = _tv_command(action, setting(conn, TV_CHANNEL), channel, app_id, query, video_id, title_id, command)
+    if adb_cmd is None:
+        return did
     try:
-        await _ensure_tv_on(conn, entity_id)
+        await _wake_tv(conn, entity_id)
     except Exception as e:
-        logger.warning(f"Error ensuring TV is on: {e}")
-
-    # Wait for ADB to be ready before executing any command
-    base_name = entity_id.split(".")[-1]
-    if base_name.endswith("_adb"):
-        base_name = base_name[:-4]
-    adb_entity = f"media_player.{base_name}_adb"
-    await _wait_for_adb_ready(conn, adb_entity)
+        logger.warning(f"Error waking the TV: {e}", exc_info=True)
 
     if action == "launch_app":
-        if not app_id:
-            return "Error: 'app_id' is required for action 'launch_app'."
-        
-        is_active = await _is_app_active(conn, app_id, entity_id)
-        if is_active:
+        if await _is_app_active(conn, app_id, entity_id):
             return f"App '{app_id}' is already active on '{entity_id}'."
-        
-        logger.info(f"Launching app '{app_id}' on '{entity_id}'...")
         res = await call_ha_service(conn, "media_player", "select_source", entity_id, {"source": app_id})
-        if "Error" in res:
+        if res.startswith("Error"):
             return res
-        
-        # Sleep briefly to let the app start launching
-        await asyncio.sleep(2.0)
-        
-        # Poll for the app to become active (up to 15 seconds)
-        polled_active = False
-        for _ in range(10):
+        for _ in range(8):  # up to ~12 s for the app to come to the front
+            await asyncio.sleep(1.5)
             if await _is_app_active(conn, app_id, entity_id):
-                polled_active = True
-                break
-            await asyncio.sleep(1.0)
-            
-        await asyncio.sleep(1.5)
-        status_msg = " (detected active)" if polled_active else " (sent launch command, state unverified)"
-        return f"Successfully launched app '{app_id}' on '{entity_id}'{status_msg}."
+                return f"Launched '{app_id}' on '{entity_id}' (it is in front now)."
+        return f"Sent the launch of '{app_id}' to '{entity_id}' (not seen in front yet)."
 
-    elif action == "watch_channel" and channel and channel_command:
-        adb_cmd = channel_command.replace("{channel}", str(channel).strip())
-        logger.info(f"Tuning '{entity_id}' to channel {channel}: {adb_cmd}")
-        res = await call_ha_service(conn, "androidtv", "adb_command", entity_id, {"command": adb_cmd})
-        if "Error" in res:
-            return res
-        return f"Successfully tuned to channel {channel} on '{entity_id}'."
-
-    elif action == "play_youtube":
-        if not video_id and not query:
-            return "Error: Either 'video_id' or 'query' is required for action 'play_youtube'."
-        
-        if video_id:
-            # Extract video ID if it's a URL
-            if "youtube.com" in video_id or "youtu.be" in video_id:
-                match = re.search(r"(?:v=|\/)([a-zA-Z0-9_-]{11})", video_id)
-                if match:
-                    video_id = match.group(1)
-            
-            adb_cmd = (
-                f'am start -a android.intent.action.VIEW -d "https://www.youtube.com/watch?v={video_id}" '
-                f'-n com.google.android.youtube.tv/com.google.android.apps.youtube.tv.activity.ShellActivity'
-            )
-            detail = f"video ID '{video_id}'"
-        else:
-            adb_cmd = (
-                f"am start -a android.intent.action.SEARCH -e query '{query}' "
-                f"-n com.google.android.youtube.tv/com.google.android.apps.youtube.tv.activity.ShellActivity"
-            )
-            detail = f"query '{query}'"
-
-        logger.info(f"Playing YouTube on '{entity_id}' with command: {adb_cmd}")
-        res = await call_ha_service(conn, "androidtv", "adb_command", entity_id, {"command": adb_cmd})
-        if "Error" in res:
-            return res
-        return f"Successfully started YouTube playback/search for {detail} on '{entity_id}'."
-
-    elif action == "play_netflix":
-        if not title_id and not query:
-            return "Error: Either 'title_id' or 'query' is required for action 'play_netflix'."
-        
-        if title_id:
-            if "/" in str(title_id):
-                title_id = str(title_id).rstrip("/").split("/")[-1]
-            
-            adb_cmd = (
-                f"am start -n com.netflix.ninja/.MainActivity -a android.intent.action.VIEW "
-                f"-d netflix://title/{title_id} -f 0x10000020"
-            )
-            detail = f"title ID '{title_id}'"
-        else:
-            adb_cmd = (
-                f"am start -a android.intent.action.VIEW -d 'netflix://search?q={query}' "
-                f"-n com.netflix.ninja/.MainActivity"
-            )
-            detail = f"query '{query}'"
-
-        logger.info(f"Playing Netflix on '{entity_id}' with command: {adb_cmd}")
-        res = await call_ha_service(conn, "androidtv", "adb_command", entity_id, {"command": adb_cmd})
-        if "Error" in res:
-            return res
-        return f"Successfully started Netflix playback/search for {detail} on '{entity_id}'."
-
-    elif action == "send_key":
-        if not command:
-            return "Error: 'command' is required for action 'send_key'."
-        
-        res = await call_ha_service(conn, "androidtv", "adb_command", entity_id, {"command": command})
-        if "Error" in res:
-            return res
-        return f"Successfully sent key '{command}' to '{entity_id}'."
-
-    elif action == "run_command":
-        if not command:
-            return "Error: 'command' is required for action 'run_command'."
-
-        logger.info(f"Running ADB shell command on '{entity_id}': {command}")
-        res = await call_ha_service(conn, "androidtv", "adb_command", entity_id, {"command": command})
-        if "Error" in res:
-            return res
-
-        # Fetch entity state to get adb_response attribute
+    res = await call_ha_service(conn, "androidtv", "adb_command", entity_id, {"command": adb_cmd})
+    if res.startswith("Error"):
+        return res
+    if action == "run_command":
         await asyncio.sleep(1.0)
-        try:
-            states = await ha_api.fetch_all_states(conn)
-            s = states.get(adb_entity) or states.get(entity_id)
-            if s:
-                adb_output = (s.get("attributes") or {}).get("adb_response", "")
-                if adb_output:
-                    return f"Command executed. Output:\n{adb_output}"
-        except Exception:
-            pass
-        return f"Command sent. Check the TV's adb_response attribute for output."
-
-    else:
-        return f"Error: Unknown action '{action}'."
+        adb, _ = _tv_entities(entity_id)
+        s = await ha_api.fetch_state(conn, adb) or await ha_api.fetch_state(conn, entity_id) or {}
+        output = str((s.get("attributes") or {}).get("adb_response") or "")
+        if not output:
+            return "Command sent; it returned no output (yet)."
+        return "Command output:\n" + (output if len(output) <= MAX_LIST_CHARS
+                                       else output[:MAX_LIST_CHARS] + "\n[cut: narrow the command, e.g. with | head]")
+    return f"Done on '{entity_id}': {did}."

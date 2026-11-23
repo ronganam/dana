@@ -169,6 +169,15 @@ async def test_reads() -> None:
     check("tool get_ha_exposed_entities: the admin's entities over A's WebSocket",
           "light.a_kitchen" in out and "light.b_den" not in out and HA_A.tokens_seen() == {"tok-a"}
           and not HA_B.requests, out)
+    out = await tool(ADMIN, "get_ha_exposed_entities", search="kitchen")
+    check("tool get_ha_exposed_entities: search keeps only the matching entities",
+          "light.a_kitchen | A Kitchen | on" in out and "1 of 1" in out, out)
+    out = await tool(ADMIN, "get_ha_exposed_entities", search="garage")
+    check("tool get_ha_exposed_entities: a search matching nothing says so", out.startswith("No exposed entity matches"), out)
+    clear()
+    out = await tool(BOB, "call_ha_service", domain="light", service="turn_on", entity_id="den light")
+    check("tool call_ha_service: an entity id that is not one → an error naming where ids come from, nothing sent",
+          out.startswith("Error:") and "get_ha_exposed_entities" in out and not HA_B.service_calls, out)
     try:
         await tool(CARL, "call_ha_service", domain="light", service="turn_on", entity_id="light.b_den")
         refused = False
@@ -384,6 +393,19 @@ async def test_tv() -> None:
     check("tv: watch_channel sends the user's command with the channel, to their TV",
           ("androidtv.adb_command", {"entity_id": "media_player.den_tv_adb", "command": "am start -d \"tv://channel/12\""})
           in HA_B.service_calls and not HA_A.service_calls, (out, HA_B.service_calls))
+    clear()
+    out = await tool(BOB, "control_android_tv", action="rewind")
+    check("tv: an unknown action → an error listing the actions, nothing asked of HA",
+          out.startswith("Error: Unknown action") and "send_key" in out and not HA_B.requests, out)
+    out = await tool(BOB, "control_android_tv", action="play_youtube", query="it's a test; reboot")
+    sent = [d["command"] for name, d in HA_B.service_calls if name == "androidtv.adb_command"]
+    check("tv: a YouTube search query is one quoted shell word",
+          sent == ["am start -a android.intent.action.SEARCH -e query 'it'\"'\"'s a test; reboot' -n "
+                   "com.google.android.youtube.tv/com.google.android.apps.youtube.tv.activity.ShellActivity"]
+          and out.startswith("Done on 'media_player.den_tv_adb'"), (out, sent))
+    check("tv: the TV that is on is asked for its one state, never every state",
+          "/api/states" not in [p for p, _ in HA_B.requests]
+          and "/api/states/media_player.den_tv_adb" in [p for p, _ in HA_B.requests], HA_B.requests)
 
 
 async def main() -> None:

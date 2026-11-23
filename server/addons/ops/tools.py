@@ -1,3 +1,7 @@
+"""The ops addon's tools: read-only kubectl over the in-cluster service account
+(``run_kubectl``) and Python in a limited child process (``run_python``)."""
+
+import asyncio
 import json
 import logging
 import os
@@ -5,10 +9,10 @@ import resource
 import subprocess
 import sys
 import tempfile
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 import httpx
-from core.addons import Approval, Connection
+from core.addons import Approval, Connection, addresses
 from core.users import User
 from addons.ops.addon import addon
 
@@ -22,43 +26,109 @@ API_SERVER = os.getenv("KUBERNETES_SERVICE_HOST", "")
 API_PORT = os.getenv("KUBERNETES_SERVICE_PORT", "443")
 API_BASE = f"https://{API_SERVER}:{API_PORT}" if API_SERVER else None
 
+# Below core.agent.MAX_TOOL_RESULT_CHARS, so a long result is cut here with a note that says how to narrow it.
+MAX_OUTPUT_CHARS = 10_000
+MAX_LINES = 150
+DEFAULT_TAIL = 200
 
-def _load_sa_token() -> Optional[str]:
-    try:
-        with open(SA_TOKEN_PATH) as f:
-            return f.read().strip()
-    except (FileNotFoundError, OSError):
-        return None
-
-
-def _load_sa_ca() -> Optional[str]:
-    try:
-        return SA_CA_PATH
-    except (FileNotFoundError, OSError):
-        return None
-
-
-def _load_namespace() -> Optional[str]:
-    try:
-        with open(SA_NAMESPACE_PATH) as f:
-            return f.read().strip()
-    except (FileNotFoundError, OSError):
-        return None
-
-
-def _build_headers() -> dict:
-    token = _load_sa_token()
-    if not token:
-        return {}
-    return {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-    }
+# resource → (API path prefix, namespaced)
+RESOURCES: Dict[str, Tuple[str, bool]] = {
+    **{r: ("/api/v1", True) for r in ("pods", "services", "events", "configmaps", "secrets", "endpoints",
+                                       "persistentvolumeclaims")},
+    **{r: ("/api/v1", False) for r in ("nodes", "namespaces", "persistentvolumes")},
+    **{r: ("/apis/apps/v1", True) for r in ("deployments", "statefulsets", "daemonsets", "replicasets")},
+    **{r: ("/apis/batch/v1", True) for r in ("jobs", "cronjobs")},
+    **{r: ("/apis/networking.k8s.io/v1", True) for r in ("ingresses", "networkpolicies")},
+    "storageclasses": ("/apis/storage.k8s.io/v1", False),
+}
+ALIASES = {"po": "pods", "svc": "services", "ev": "events", "cm": "configmaps", "ep": "endpoints",
+           "pvc": "persistentvolumeclaims", "pv": "persistentvolumes", "no": "nodes", "ns": "namespaces",
+           "deploy": "deployments", "sts": "statefulsets", "ds": "daemonsets", "rs": "replicasets",
+           "cj": "cronjobs", "ing": "ingresses", "netpol": "networkpolicies", "sc": "storageclasses"}
+VALUE_FLAGS = {"-n": "namespace", "--namespace": "namespace", "-o": "output", "--output": "output",
+               "-c": "container", "--container": "container", "--tail": "tail", "-l": "selector",
+               "--selector": "selector"}
 
 
-def _verify() -> bool:
-    return API_BASE is not None and _load_sa_token() is not None
+def _bounded(text: str, keep_end: bool = False) -> str:
+    """``text`` cut to :data:`MAX_OUTPUT_CHARS` with a visible note (its end kept for logs and tracebacks)."""
+    if len(text) <= MAX_OUTPUT_CHARS:
+        return text
+    note = f"[cut: {len(text):,} characters, showing the {'last' if keep_end else 'first'} {MAX_OUTPUT_CHARS:,}]"
+    return f"{note}\n{text[-MAX_OUTPUT_CHARS:]}" if keep_end else f"{text[:MAX_OUTPUT_CHARS]}\n{note}"
+
+
+def _resource(word: str) -> Optional[str]:
+    w = ALIASES.get(word.lower(), word.lower())
+    return next((r for r in (w, w + "s", w + "es") if r in RESOURCES), None)
+
+
+def _parse(command: str) -> Tuple[List[str], Dict[str, str]]:
+    """kubectl words → (positional words, flags by name; ``all`` for -A)."""
+    words, flags = command.split(), {}
+    positional: List[str] = []
+    i = 0
+    while i < len(words):
+        w = words[i]
+        key, _, value = w.partition("=")
+        if w in ("-A", "--all-namespaces"):
+            flags["all"] = "1"
+        elif key in VALUE_FLAGS:
+            if not value and i + 1 < len(words):
+                i += 1
+                value = words[i]
+            flags[VALUE_FLAGS[key]] = value
+        else:
+            positional.append(w)
+        i += 1
+    return positional, flags
+
+
+def _age(ts: Optional[str]) -> str:
+    return (ts or "")[:16].replace("T", " ")
+
+
+def _row(kind: str, item: Dict[str, Any]) -> str:
+    """One compact line for a listed object, like kubectl's table."""
+    meta, spec, status = item.get("metadata") or {}, item.get("spec") or {}, item.get("status") or {}
+    name = meta.get("name", "?")
+    if kind == "pods":
+        cs = status.get("containerStatuses") or []
+        waiting = next((c["state"]["waiting"].get("reason") for c in cs if (c.get("state") or {}).get("waiting")), None)
+        return (f"{name}  {waiting or status.get('phase', '?')}  ready {sum(1 for c in cs if c.get('ready'))}/{len(cs)}"
+                f"  restarts {sum(c.get('restartCount', 0) for c in cs)}  node {spec.get('nodeName', '?')}"
+                f"  started {_age(status.get('startTime'))}")
+    if kind in ("deployments", "statefulsets", "replicasets"):
+        images = ",".join(c.get("image", "") for c in (spec.get("template") or {}).get("spec", {}).get("containers", []))
+        return f"{name}  ready {status.get('readyReplicas') or 0}/{spec.get('replicas', '?')}  {images}"
+    if kind == "daemonsets":
+        return f"{name}  ready {status.get('numberReady', 0)}/{status.get('desiredNumberScheduled', '?')}"
+    if kind == "services":
+        ports = ",".join(f"{p.get('port')}/{p.get('protocol', 'TCP')}" for p in spec.get("ports") or [])
+        return f"{name}  {spec.get('type', '')}  {spec.get('clusterIP', '')}  {ports}"
+    if kind == "nodes":
+        ready = any(c.get("type") == "Ready" and c.get("status") == "True" for c in status.get("conditions") or [])
+        alloc = status.get("allocatable") or {}
+        return f"{name}  {'Ready' if ready else 'NotReady'}  cpu {alloc.get('cpu', '?')}  memory {alloc.get('memory', '?')}"
+    if kind == "events":
+        obj = item.get("involvedObject") or {}
+        return (f"{_age(item.get('lastTimestamp') or item.get('eventTime') or meta.get('creationTimestamp'))}  "
+                f"{item.get('type', '')} {item.get('reason', '')}  {obj.get('kind', '')}/{obj.get('name', '')}  "
+                f"×{item.get('count', 1)}  {(item.get('message') or '')[:160]}")
+    if kind in ("persistentvolumes", "persistentvolumeclaims"):
+        cap = (spec.get("capacity") or status.get("capacity") or {}).get("storage", "?")
+        claim = (spec.get("claimRef") or {}).get("name") or spec.get("volumeName") or ""
+        return f"{name}  {status.get('phase', '')}  {cap}  {claim}"
+    return f"{name}  created {_age(meta.get('creationTimestamp'))}"
+
+
+def _compact(data: Dict[str, Any]) -> str:
+    """An object as JSON without the bulky bookkeeping (managedFields, last-applied annotation)."""
+    for obj in data.get("items") or [data]:
+        meta = obj.get("metadata") or {}
+        meta.pop("managedFields", None)
+        (meta.get("annotations") or {}).pop("kubectl.kubernetes.io/last-applied-configuration", None)
+    return _bounded(json.dumps(data, indent=1, default=str))
 
 
 def _describe_kubectl(user: Optional[User], a: Dict[str, Any]) -> Approval:
@@ -67,374 +137,102 @@ def _describe_kubectl(user: Optional[User], a: Dict[str, Any]) -> Approval:
 
 
 @addon.tool(acts_outside=True, describe=_describe_kubectl)
-async def run_kubectl(
-    conn: Connection,
-    command: str,
-    namespace: Optional[str] = None,
-) -> str:
-    """Run a kubectl command against the Kubernetes cluster using the in-cluster service account.
+async def run_kubectl(conn: Connection, command: str, namespace: Optional[str] = None) -> str:
+    """Read the Kubernetes cluster with a kubectl-style command (read-only: get, describe, logs, top; no writes, no secret values).
 
-    Translates kubectl-style commands into direct Kubernetes API calls.
-    Supported read-only verbs: get, describe, logs, top.
-    Write operations (create, delete, patch, apply) are NOT supported.
-
-    Examples:
-      - "get pods" — list pods in namespace
-      - "get pods -o wide" — list pods with more details
-      - "get services" — list services
-      - "get deployments" — list deployments
-      - "describe pod my-pod" — describe a specific resource
-      - "logs my-pod" — get logs of a pod
-      - "logs my-pod -c my-container" — get logs for a specific container
-      - "top pods" — show pod resource usage
-      - "get nodes" — list nodes
-      - "get events" — list events
+    Examples: "get pods", "get pods -A", "get deploy -l app=dana", "get events", "describe pod NAME",
+    "get pod NAME -o json", "logs POD -c CONTAINER --tail 500", "top pods", "top nodes".
 
     Args:
-        command: The kubectl-style command to execute (e.g. 'get pods', 'describe deployment xxx').
-        namespace: The Kubernetes namespace to operate in. Defaults to the pod's own namespace.
+        command: The kubectl command without "kubectl". Flags: -n, -A, -o json|yaml, -l, -c, --tail (logs: last 200 lines by default).
+        namespace: Namespace when the command has no -n; default the pod's own.
     """
-    if not _verify():
+    token = _read(SA_TOKEN_PATH)
+    if API_BASE is None or not token:
         return "Error: Not running inside a Kubernetes pod or no service account token found."
-
-    parts = command.strip().split()
-    if not parts:
+    words, flags = _parse(command.strip().removeprefix("kubectl "))
+    if not words:
         return "Error: Command cannot be empty."
+    verb = words[0].lower()
+    if len(words) > 1 and "/" in words[1]:  # pod/NAME
+        words[1:2] = words[1].split("/", 1)
+    if verb == "logs" and len(words) == 2:
+        words = [verb, "pods", words[1]]
+    if verb not in ("get", "describe", "logs", "top"):
+        return f"Error: Unsupported verb '{verb}'. Supported: get, describe, logs, top."
+    if len(words) < 2:
+        return f"Error: '{verb}' needs a resource, e.g. '{verb} pods'."
+    kind = _resource(words[1])
+    if kind is None:
+        return f"Error: unknown resource '{words[1]}'. Known: {', '.join(sorted(RESOURCES))}."
+    name = words[2] if len(words) > 2 else None
+    if verb in ("describe", "logs") and not name:
+        return f"Error: '{verb}' needs a name: {verb} {kind} NAME."
+    if kind == "secrets" and (name or flags.get("output")):
+        return "Error: secret values are never shown; only 'get secrets' (their names) is supported."
+    prefix, namespaced = RESOURCES[kind]
+    ns = flags.get("namespace") or namespace or _read(SA_NAMESPACE_PATH) or "default"
+    scope = f"/namespaces/{addresses.segment(ns)}" if namespaced and not (flags.get("all") and not name) else ""
+    params: Dict[str, Any] = {}
+    if verb == "top":
+        if kind not in ("pods", "nodes"):
+            return "Error: 'top' supports only pods or nodes."
+        path = f"/apis/metrics.k8s.io/v1beta1{scope}/{kind}"
+    else:
+        path = f"{prefix}{scope}/{kind}" + (f"/{addresses.segment(name)}" if name else "")
+    if verb == "logs":
+        path += "/log"
+        params["tailLines"] = flags.get("tail") or DEFAULT_TAIL
+        if flags.get("container"):
+            params["container"] = flags["container"]
+    if flags.get("selector") and not name:
+        params["labelSelector"] = flags["selector"]
+    try:
+        async with httpx.AsyncClient(verify=SA_CA_PATH if os.path.exists(SA_CA_PATH) else True, timeout=30.0) as client:
+            r = await client.get(API_BASE + path, params=params, headers={"Authorization": f"Bearer {token}"})
+    except httpx.HTTPError as e:
+        logger.warning(f"run_kubectl: the API server failed: {e}", exc_info=True)
+        return f"Error: Cannot reach the Kubernetes API server ({type(e).__name__})."
+    where = "all namespaces" if not scope and namespaced else f"namespace '{ns}'" if scope else "the cluster"
+    if r.status_code == 403:
+        return (f"Error: Forbidden — the service account may not {verb} {kind}: grant it get/list on them "
+                "(docs/access.md, ops).")
+    if r.status_code == 404:
+        if verb == "top":
+            return "Error: Metrics API not available (metrics-server may not be installed)."
+        return f"Error: {kind}{' ' + repr(name) if name else ''} not found in {where}."
+    if r.status_code != 200:
+        return f"Error: Kubernetes API returned HTTP {r.status_code}: {r.text[:300]}"
+    if verb == "logs":
+        return f"Logs of pod '{name}' ({where}, last {params['tailLines']} lines):\n" + _bounded(r.text, keep_end=True) \
+            if r.text.strip() else f"Pod '{name}' has no logs."
+    data = r.json()
+    if verb == "describe" or flags.get("output") in ("json", "yaml"):
+        return _compact(data)
+    if name:
+        return _row(kind, data)
+    items = data.get("items") or []
+    if not items:
+        return f"No {kind} found in {where}."
+    if kind == "events":
+        items.sort(key=lambda e: e.get("lastTimestamp") or e.get("eventTime") or "", reverse=True)
+    if verb == "top":
+        lines = [f"{i['metadata']['name']}  cpu {i.get('usage', {}).get('cpu', '?')}  memory "
+                 f"{i.get('usage', {}).get('memory', '?')}" for i in items[:MAX_LINES]]
+    else:
+        lines = [(f"{i['metadata'].get('namespace')}/" if not scope and namespaced else "") + _row(kind, i)
+                 for i in items[:MAX_LINES]]
+    more = f"\n…and {len(items) - MAX_LINES} more (narrow with -n or -l)." if len(items) > MAX_LINES else ""
+    head = f"{len(items)} {kind} in {where}" + (" (newest first)" if kind == "events" else "") + ":\n"
+    return _bounded(head + "\n".join(lines) + more)
 
-    # Scan for -n/--namespace and -o/--output in all parts
-    ns_override = None
-    output_format = None
-    filtered = []
-    skip_next = False
-    for i, flag in enumerate(parts):
-        if skip_next:
-            skip_next = False
-            continue
-        if flag in ("-n", "--namespace"):
-            if i + 1 < len(parts):
-                ns_override = parts[i + 1]
-                skip_next = True
-        elif flag.startswith("--namespace="):
-            ns_override = flag.split("=", 1)[1]
-        elif flag in ("-o", "--output"):
-            if i + 1 < len(parts):
-                output_format = parts[i + 1]
-                skip_next = True
-        elif flag.startswith("-o=") or flag.startswith("--output="):
-            output_format = flag.split("=", 1)[1]
-        else:
-            filtered.append(flag)
 
-    # Re-parse verb/resource/name from filtered tokens
-    if not filtered:
-        return "Error: Command cannot be empty."
-    verb = filtered[0].lower()
-    resource = filtered[1].lower() if len(filtered) > 1 else ""
-    name = filtered[2] if len(filtered) > 2 else None
-    extra_flags = filtered[3:] if len(filtered) > 3 else []
-
-    # 'logs' takes a pod name directly, not a resource type.
-    # Fix: "logs my-pod" → verb=logs, name=my-pod (not resource=my-pod)
-    if verb == "logs" and resource and not name:
-        name = resource
-        resource = "pods"
-    if verb == "describe" and resource in ("secret", "secrets"):
-        return "Error: describing a secret would show its values; only listing secret names is supported."
-
-    effective_ns = ns_override or namespace or _load_namespace() or "default"
-
-    headers = _build_headers()
-    ca_path = _load_sa_ca()
-    verify = ca_path if ca_path else True
-
-    api_url = f"{API_BASE}/api/v1"
-    if resource in ("deployments", "deployment", "statefulsets", "statefulset",
-                    "daemonsets", "daemonset", "ingresses", "ingress",
-                    "networkpolicies", "networkpolicy"):
-        api_url = f"{API_BASE}/apis/apps/v1"
-    elif resource in ("services", "service", "endpoints", "endpoint"):
-        api_url = f"{API_BASE}/api/v1"
-    elif resource in ("nodes", "node"):
-        api_url = f"{API_BASE}/api/v1"
-        effective_ns = None
-    elif resource in ("events", "event"):
-        api_url = f"{API_BASE}/api/v1"
-    elif resource in ("all",):
-        api_url = f"{API_BASE}/api/v1"
-
-    async with httpx.AsyncClient(verify=verify, timeout=30.0) as client:
-        if verb == "get":
-            if resource == "all":
-                return "Error: 'get all' is not supported via API. Use specific resource types."
-            resource_plural = resource + "s" if not resource.endswith("s") else resource
-            if resource in ("deployment", "service", "node", "pod", "event"):
-                resource_plural = resource + "s" if resource != "services" else "services"
-
-            # Map to proper k8s API plurals
-            plural_map = {
-                "pod": "pods", "pods": "pods",
-                "service": "services", "services": "services",
-                "deployment": "deployments", "deployments": "deployments",
-                "node": "nodes", "nodes": "nodes",
-                "event": "events", "events": "events",
-                "namespace": "namespaces", "namespaces": "namespaces",
-                "secret": "secrets", "secrets": "secrets",
-                "configmap": "configmaps", "configmaps": "configmaps",
-                "ingress": "ingresses", "ingresses": "ingresses",
-                "statefulset": "statefulsets", "statefulsets": "statefulsets",
-                "daemonset": "daemonsets", "daemonsets": "daemonsets",
-                "endpoint": "endpoints", "endpoints": "endpoints",
-                "pv": "persistentvolumes", "persistentvolume": "persistentvolumes",
-                "pvc": "persistentvolumeclaims", "persistentvolumeclaim": "persistentvolumeclaims",
-                "sc": "storageclasses", "storageclass": "storageclasses",
-                "ns": "namespaces",
-            }
-            resource_plural = plural_map.get(resource, resource + "s")
-
-            if name:
-                url = f"{api_url}/namespaces/{effective_ns}/{resource_plural}/{name}"
-            elif effective_ns and resource_plural != "nodes" and resource_plural != "namespaces":
-                url = f"{api_url}/namespaces/{effective_ns}/{resource_plural}"
-            elif resource_plural == "nodes" or resource_plural == "namespaces":
-                url = f"{api_url}/{resource_plural}"
-            else:
-                url = f"{api_url}/namespaces/{effective_ns}/{resource_plural}"
-
-            try:
-                r = await client.get(url, headers=headers)
-            except httpx.ConnectError as e:
-                return f"Error: Cannot connect to Kubernetes API server: {e}"
-
-            if r.status_code == 403:
-                return (
-                    f"Error: Forbidden — the service account does not have permission to {verb} {resource}.\n"
-                    "To fix, the cluster admin needs to grant RBAC permissions. Apply:\n"
-                    "---\n"
-                    "apiVersion: rbac.authorization.k8s.io/v1\n"
-                    "kind: ClusterRole\n"
-                    "metadata:\n"
-                    "  name: dana-reader\n"
-                    "rules:\n"
-                    "- apiGroups: [\"\"]\n"
-                    "  resources: [\"pods\", \"services\", \"events\", \"nodes\", \"namespaces\",\n"
-                    "              \"persistentvolumes\", \"persistentvolumeclaims\",\n"
-                    "              \"secrets\", \"configmaps\", \"endpoints\"]\n"
-                    "  verbs: [\"get\", \"list\", \"watch\"]\n"
-                    "- apiGroups: [\"apps\"]\n"
-                    "  resources: [\"deployments\", \"statefulsets\", \"daemonsets\"]\n"
-                    "  verbs: [\"get\", \"list\", \"watch\"]\n"
-                    "- apiGroups: [\"metrics.k8s.io\"]\n"
-                    "  resources: [\"pods\", \"nodes\"]\n"
-                    "  verbs: [\"get\", \"list\"]\n"
-                    "- apiGroups: [\"networking.k8s.io\"]\n"
-                    "  resources: [\"ingresses\", \"networkpolicies\"]\n"
-                    "  verbs: [\"get\", \"list\", \"watch\"]\n"
-                    "- nonResourceURLs: [\"/api\", \"/apis\"]\n"
-                    "  verbs: [\"get\"]\n"
-                    "---\n"
-                    "apiVersion: rbac.authorization.k8s.io/v1\n"
-                    "kind: ClusterRoleBinding\n"
-                    "metadata:\n"
-                    "  name: dana-reader-binding\n"
-                    "roleRef:\n"
-                    "  apiGroup: rbac.authorization.k8s.io\n"
-                    "  kind: ClusterRole\n"
-                    "  name: dana-reader\n"
-                    "subjects:\n"
-                    "- kind: ServiceAccount\n"
-                    "  name: default\n"
-                    "  namespace: <your namespace>\n"
-                )
-            if r.status_code == 404:
-                return f"Error: Resource not found. Check the resource type and name."
-            if r.status_code != 200:
-                return f"Error: Kubernetes API returned HTTP {r.status_code}: {r.text[:500]}"
-
-            data = r.json()
-
-            if output_format == "yaml" or output_format == "json":
-                return json.dumps(data, indent=2, default=str)
-
-            items = data.get("items", [data] if not data.get("items") else [])
-            if not items:
-                return f"No {resource_plural} found in namespace '{effective_ns}'."
-
-            lines = []
-            for item in items:
-                meta = item.get("metadata", {})
-                item_name = meta.get("name", "?")
-                status = item.get("status", {})
-                phase = status.get("phase", status.get("state", ""))
-                kind = item.get("kind", resource.capitalize())
-                api_ver = item.get("apiVersion", "")
-                creation_ts = meta.get("creationTimestamp", "")[:10] if meta.get("creationTimestamp") else ""
-
-                if resource_plural == "pods":
-                    host_ip = status.get("hostIP", "")
-                    pod_ip = status.get("podIP", "")
-                    node_name = status.get("hostIP", status.get("nodeName", ""))
-                    containers = (item.get("spec") or {}).get("containers", [])
-                    container_str = ",".join(c.get("name", "") for c in containers[:3])
-                    lines.append(f"{item_name:40s} {phase:15s} IP={pod_ip:15s} Node={node_name:15s} Containers=[{container_str}]")
-                elif resource_plural == "services":
-                    spec = item.get("spec", {})
-                    cluster_ip = spec.get("clusterIP", "")
-                    ports = spec.get("ports", [])
-                    port_str = ",".join(f"{p.get('port','?')}/{p.get('protocol','TCP')}" for p in ports[:5])
-                    lines.append(f"{item_name:40s} CLUSTER_IP={cluster_ip:15s} PORTS={port_str}")
-                elif resource_plural == "deployments":
-                    spec = item.get("spec", {})
-                    replicas = spec.get("replicas", "?")
-                    ready = (status.get("readyReplicas") or status.get("availableReplicas") or 0)
-                    image = ""
-                    containers = (spec.get("template", {}).get("spec", {})).get("containers", [])
-                    if containers:
-                        image = containers[0].get("image", "")[:30]
-                    lines.append(f"{item_name:40s} replicas={replicas} ready={ready} image={image}")
-                elif resource_plural == "nodes":
-                    alloc = status.get("allocatable", {})
-                    cpu = alloc.get("cpu", "?")
-                    mem = alloc.get("memory", "?")
-                    conds = status.get("conditions", [])
-                    node_status = "Ready" if any(c.get("type") == "Ready" and c.get("status") == "True" for c in conds) else "NotReady"
-                    lines.append(f"{item_name:40s} STATUS={node_status:10s} CPU={cpu:8s} MEM={mem}")
-                elif resource_plural == "events":
-                    count = item.get("count", "?")
-                    reason = item.get("reason", "")
-                    msg = item.get("message", "")[:80]
-                    lines.append(f"{creation_ts} | {reason:20s} | count={str(count):>5s} | {msg}")
-                elif resource_plural == "secrets" or resource_plural == "configmaps":
-                    lines.append(f"{item_name:40s} created={creation_ts}")
-                elif resource_plural == "persistentvolumes":
-                    spec = item.get("spec", {})
-                    capacity = (spec.get("capacity") or {}).get("storage", "?")
-                    claim = (spec.get("claimRef") or {}).get("name", "")
-                    lines.append(f"{item_name:40s} CAP={capacity:10s} CLAIM={claim}")
-                elif resource_plural == "persistentvolumeclaims":
-                    spec = item.get("spec", {})
-                    capacity = (status.get("capacity") or {}).get("storage", "?")
-                    phase_s = status.get("phase", "")
-                    lines.append(f"{item_name:40s} STATUS={phase_s:10s} CAP={capacity}")
-                else:
-                    lines.append(f"{item_name:40s} kind={kind:15s} created={creation_ts}")
-
-            if not lines:
-                return json.dumps(data, indent=2, default=str)
-
-            summary = f"Found {len(items)} {resource_plural} in namespace '{effective_ns}':\n"
-            summary += "\n".join(lines)
-            return summary
-
-        elif verb == "describe":
-            if not name:
-                return f"Error: 'describe' requires a resource name. Usage: describe {resource} <name>"
-            resource_plural = resource + "s" if not resource.endswith("s") else resource
-            plural_map = {
-                "pod": "pods", "pods": "pods",
-                "service": "services", "services": "services",
-                "deployment": "deployments", "deployments": "deployments",
-                "node": "nodes", "nodes": "nodes",
-                "event": "events", "events": "events",
-                "secret": "secrets", "secrets": "secrets",
-                "configmap": "configmaps", "configmaps": "configmaps",
-            }
-            resource_plural = plural_map.get(resource, resource + "s")
-
-            if resource_plural == "nodes":
-                url = f"{api_url}/{resource_plural}/{name}"
-            else:
-                url = f"{api_url}/namespaces/{effective_ns}/{resource_plural}/{name}"
-
-            try:
-                r = await client.get(url, headers=headers)
-            except httpx.ConnectError as e:
-                return f"Error: Cannot connect to Kubernetes API server: {e}"
-
-            if r.status_code == 403:
-                return f"Error: Forbidden — the service account does not have permission to describe {resource}."
-            if r.status_code == 404:
-                return f"Error: {resource} '{name}' not found in namespace '{effective_ns}'."
-            if r.status_code != 200:
-                return f"Error: HTTP {r.status_code}: {r.text[:500]}"
-
-            return json.dumps(r.json(), indent=2, default=str)
-
-        elif verb == "logs":
-            if not name:
-                return "Error: 'logs' requires a pod name."
-            resource_plural = "pods"
-            url = f"{api_url}/namespaces/{effective_ns}/{resource_plural}/{name}/log"
-
-            container_param = ""
-            if extra_flags:
-                for i, flag in enumerate(extra_flags):
-                    if flag == "-c" and i + 1 < len(extra_flags):
-                        container_param = f"?container={extra_flags[i+1]}"
-
-            try:
-                r = await client.get(url + container_param, headers=headers)
-            except httpx.ConnectError as e:
-                return f"Error: Cannot connect to Kubernetes API server: {e}"
-
-            if r.status_code == 403:
-                return f"Error: Forbidden — the service account does not have permission to read logs of pod '{name}'."
-            if r.status_code == 404:
-                return f"Error: Pod '{name}' not found in namespace '{effective_ns}'."
-            if r.status_code != 200:
-                return f"Error: HTTP {r.status_code}: {r.text[:500]}"
-
-            log_text = r.text
-            if len(log_text) > 100_000:
-                log_text = log_text[:100_000] + "\n... (truncated to 100K chars)"
-            if not log_text.strip():
-                return f"Pod '{name}' has no logs."
-            return f"Logs for pod '{name}' (namespace: {effective_ns}):\n{log_text}"
-
-        elif verb == "top":
-            if resource not in ("pods", "pod", "nodes", "node"):
-                return "Error: 'top' supports only 'pods' or 'nodes'."
-            resource_plural = "pods" if resource in ("pods", "pod") else "nodes"
-
-            # Use the metrics API
-            metrics_url = f"{API_BASE}/apis/metrics.k8s.io/v1beta1"
-            if resource_plural == "nodes":
-                url = f"{metrics_url}/{resource_plural}"
-            else:
-                url = f"{metrics_url}/namespaces/{effective_ns}/{resource_plural}"
-
-            try:
-                r = await client.get(url, headers=headers)
-            except httpx.ConnectError as e:
-                return f"Error: Cannot connect to Kubernetes metrics API: {e}"
-
-            if r.status_code == 404:
-                return "Error: Metrics API not available (metrics-server may not be installed)."
-            if r.status_code == 403:
-                return (
-                    "Error: Forbidden — service account cannot access metrics API.\n"
-                    "The ClusterRole needs metrics.k8s.io access (see the 'dana-reader' ClusterRole)."
-                )
-            if r.status_code != 200:
-                return f"Error: HTTP {r.status_code}: {r.text[:500]}"
-
-            data = r.json()
-            items = data.get("items", [])
-            if not items:
-                return f"No metrics found for {resource_plural}."
-
-            lines = []
-            for item in items:
-                meta = item.get("metadata", {})
-                item_name = meta.get("name", "?")
-                usage = item.get("usage", {})
-                cpu = usage.get("cpu", "?")
-                mem = usage.get("memory", "?")
-                lines.append(f"{item_name:40s} CPU={cpu:10s} MEM={mem}")
-
-            return f"Resource usage for {resource_plural}:\n" + "\n".join(lines)
-
-        else:
-            return f"Error: Unsupported verb '{verb}'. Supported: get, describe, logs, top."
+def _read(path: str) -> Optional[str]:
+    try:
+        with open(path) as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -442,14 +240,15 @@ async def run_kubectl(
 # ---------------------------------------------------------------------------
 
 MAX_MEMORY_BYTES = 256 * 1024 * 1024
-MAX_OUTPUT_CHARS = 100_000
+MAX_FILE_BYTES = 64 * 1024 * 1024
 DEFAULT_TIMEOUT = 30
 MAX_TIMEOUT = 60
 
 
-def _set_limits(timeout: int):
+def _set_limits(timeout: int) -> None:
     resource.setrlimit(resource.RLIMIT_CPU, (timeout, timeout + 10))
     resource.setrlimit(resource.RLIMIT_AS, (MAX_MEMORY_BYTES, MAX_MEMORY_BYTES))
+    resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_FILE_BYTES, MAX_FILE_BYTES))
 
 
 def child_environment(workdir: str) -> dict:
@@ -460,78 +259,41 @@ def child_environment(workdir: str) -> dict:
             "PYTHONIOENCODING": "utf-8", "PYTHONDONTWRITEBYTECODE": "1"}
 
 
+def _run(code: str, timeout: int) -> str:
+    with tempfile.TemporaryDirectory(prefix="dana-python-") as tmpdir:
+        script_path = os.path.join(tmpdir, "script.py")
+        with open(script_path, "w") as f:
+            f.write(code)
+        try:
+            proc = subprocess.run([sys.executable, "-I", "-u", script_path], capture_output=True,
+                                  env=child_environment(tmpdir), stdin=subprocess.DEVNULL, text=True,
+                                  timeout=timeout, preexec_fn=lambda: _set_limits(timeout), cwd=tmpdir)
+        except subprocess.TimeoutExpired:
+            return f"Error: timed out after {timeout} s; make the code faster or raise timeout (at most {MAX_TIMEOUT})."
+    stdout, stderr = (proc.stdout or "").strip(), (proc.stderr or "").strip()
+    if proc.returncode != 0:
+        out = f"Output before the failure:\n{_bounded(stdout)}\n" if stdout else ""
+        return f"Error: exit code {proc.returncode}.\n{out}Stderr:\n{_bounded(stderr or '(none)', keep_end=True)}"
+    if not stdout:
+        return "(no output: print() what should be returned)" + (f"\nStderr:\n{_bounded(stderr, keep_end=True)}"
+                                                                   if stderr else "")
+    return _bounded(stdout) + (f"\nStderr:\n{_bounded(stderr, keep_end=True)}" if stderr else "")
+
+
 def _describe_python(user: Optional[User], a: Dict[str, Any]) -> Approval:
     return Approval("Run Python code", "Code", "🐍", "Run this code?", body_label="Code", body=a.get("code"))
 
 
 @addon.tool(confirm=True, acts_outside=True, describe=_describe_python)
-def run_python(conn: Connection, code: str, timeout: Optional[int] = None) -> str:
-    """Run Python code on the server (asks the user first) and return its output.
-
-    Use this for calculations, data processing, JSON manipulation, text parsing,
-    format conversion, or file generation. Only use when no other specialized tool
-    fits the task — prefer using dedicated tools for Home Assistant (call_ha_service),
-    WhatsApp (send_whatsapp_message), Calendar (search_calendar), etc. instead of
-    reimplementing their logic in Python.
-
-    IMPORTANT: The provided code MUST use print() to produce any output that
-    should be visible — only printed text is captured and returned. Do not use
-    input() or interactive functions.
+async def run_python(conn: Connection, code: str, timeout: Optional[int] = None) -> str:
+    """Run Python code on the server (asks the user first) and return what it prints: calculations, data or text processing, format conversion. Prefer a dedicated tool when one fits.
 
     Args:
-        code: The Python code to execute. Use print() to return results.
-        timeout: Maximum execution time in seconds (default 30, max 60).
+        code: The Python code; only print() output comes back (no input()).
+        timeout: Seconds (default 30, max 60).
     """
-    effective_timeout = min(timeout or DEFAULT_TIMEOUT, MAX_TIMEOUT)
-
-    with tempfile.TemporaryDirectory(prefix="dana-python-") as tmpdir:
-        script_path = os.path.join(tmpdir, "script.py")
-        try:
-            with open(script_path, "w") as f:
-                f.write(code)
-        except OSError as e:
-            return f"Error: Failed to write script to temp directory: {e}"
-
-        try:
-            proc = subprocess.run(
-                [sys.executable, "-I", "-u", script_path],
-                capture_output=True,
-                env=child_environment(tmpdir),
-                stdin=subprocess.DEVNULL,
-                text=True,
-                timeout=effective_timeout,
-                preexec_fn=lambda: _set_limits(effective_timeout),
-                cwd=tmpdir,
-            )
-        except subprocess.TimeoutExpired:
-            return (
-                f"Execution timed out after {effective_timeout} seconds.\n"
-                f"The code took too long to finish. Consider optimizing it or "
-                f"increasing the timeout."
-            )
-        except OSError as e:
-            return f"Error: Failed to run subprocess: {e}"
-
-        if proc.returncode != 0:
-            stderr = proc.stderr.strip() or "(no stderr output)"
-            return f"Execution failed with exit code {proc.returncode}:\n{stderr}"
-
-        stdout = (proc.stdout or "").strip()
-        stderr = (proc.stderr or "").strip()
-
-        if not stdout and stderr:
-            return f"Warning — stderr was produced (non-fatal):\n{stderr}"
-
-        if not stdout:
-            return (
-                "(no output — your code did not call print())\n"
-                f"Stderr was:\n{stderr}"
-            )
-
-        if len(stdout) > MAX_OUTPUT_CHARS:
-            stdout = stdout[:MAX_OUTPUT_CHARS]
-            stdout += (
-                f"\n\n--- Output truncated at {MAX_OUTPUT_CHARS} characters ---"
-            )
-
-        return stdout
+    try:
+        return await asyncio.to_thread(_run, code, max(1, min(int(timeout or DEFAULT_TIMEOUT), MAX_TIMEOUT)))
+    except OSError as e:
+        logger.warning(f"run_python failed to start: {e}", exc_info=True)
+        return f"Error: could not run the code: {e}"

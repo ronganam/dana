@@ -47,7 +47,7 @@ import moneyfakes  # noqa: E402  (the made-up provider: moneyfakes.py)
 from core import agent, clock, context_chats, now as now_mod, session_runner, undo, weekly_review  # noqa: E402
 from core.cards import ActError  # noqa: E402
 from core.addons import registry, store as connections  # noqa: E402
-from addons.money import ingest, queries, store, sync  # noqa: E402
+from addons.money import ingest, queries, store, sync, tools as money_tools  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
 
@@ -203,6 +203,19 @@ async def test_search_tool() -> None:
     by_amount = await run(ROBIN, "search_transactions", query="709")
     check("search_transactions: nothing found", by_amount == "No transactions match.", by_amount)
     check("search_transactions: Bob never sees Robin's rows", "שופרסל" not in await run(BOB, "search_transactions"))
+    rows, money_tools.MAX_ROWS = money_tools.MAX_ROWS, 1
+    try:
+        first = await run(ROBIN, "search_transactions", query="שופרסל")
+        cursor = re.search(r'cursor="([^"]+)"', first)
+        older = await run(ROBIN, "search_transactions", query="שופרסל", cursor=cursor.group(1) if cursor else "")
+    finally:
+        money_tools.MAX_ROWS = rows
+    check("search_transactions: a page names the cursor of the next; the next page has the older row",
+          f"[id: {T['shufersal']}]" in first and cursor and "- 4 Oct · שופרסל" in older
+          and T["shufersal"] not in older and "cursor=" not in older, (first, older))
+    missing = await run(ROBIN, "search_transactions", account="1111")
+    check("search_transactions: an unknown account names the user's accounts",
+          missing.startswith("Error: no account matches '1111'; the accounts: ") and "Sample Card 8763" in missing, missing)
 
 
 async def test_overview_and_recurring_tools() -> None:
@@ -258,7 +271,7 @@ async def test_forecast_and_insights_tools() -> None:
                        "- Everyday spending ₪2,750.00: ₪2,550.00 more than a typical month (₪200.00)."]
           and not any("NETFLIX" in line or "balance" in line for line in past), past)
     check("money_insights: a bad month is refused", await run(ROBIN, "money_insights", month="Oct") ==
-          "month must look like YYYY-MM.")
+          "Error: month must look like YYYY-MM.")
 
 
 async def test_categorize_tool() -> None:

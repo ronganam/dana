@@ -2,7 +2,7 @@
 (search, list, summarize, dismiss, snooze), each on the acting user's own
 notifications (``conn.user``)."""
 import datetime
-from typing import Optional
+from typing import Literal, Optional
 
 from core import clock
 from core.db import get_db_connection
@@ -12,6 +12,15 @@ from core.addons import Connection
 from addons.phone.addon import addon
 from addons.phone.notifications import shade, store, summary as ns
 from addons.phone.notifications.values import BUCKETS
+
+Bucket = Literal["needs_you", "normal", "dismiss"]
+
+
+def _bad_bucket(bucket: Optional[str]) -> Optional[str]:
+    if bucket and bucket not in BUCKETS:
+        return f"Error: unknown bucket '{bucket}': use {', '.join(BUCKETS)}."
+    return None
+
 
 def _line(n: dict) -> str:
     when = str(n.get("posted_at") or "")[:16].replace("T", " ")
@@ -30,8 +39,10 @@ async def search_notifications(conn: Connection, query: str, limit: int = 15) ->
 
     Args:
         query: Words to search for (any language).
-        limit: Max results (default 15).
+        limit: Max results (default 15, at most 50).
     """
+    if not query.strip():
+        return "Error: give words to search for."
     items = store.list_notifications(conn.user, status="all", q=query, limit=max(1, min(limit, 50)))
     if not items:
         return f"No notifications match '{query}'."
@@ -39,8 +50,8 @@ async def search_notifications(conn: Connection, query: str, limit: int = 15) ->
 
 
 @addon.tool(untrusted_result=True)
-async def list_notifications(conn: Connection, bucket: Optional[str] = None, app: Optional[str] = None, hours: int = 24,
-                             include_dismissed: bool = False, limit: int = 30) -> str:
+async def list_notifications(conn: Connection, bucket: Optional[Bucket] = None, app: Optional[str] = None,
+                             hours: int = 24, include_dismissed: bool = False, limit: int = 30) -> str:
     """List recent phone notifications with Dana's triage (priority, category, whether they need the user).
 
     Args:
@@ -48,17 +59,19 @@ async def list_notifications(conn: Connection, bucket: Optional[str] = None, app
         app: Only this app (app name or Android package, e.g. 'WhatsApp').
         hours: How far back to look (default 24).
         include_dismissed: Include notifications already dismissed/opened.
-        limit: Max results (default 30).
+        limit: Max results (default 30, at most 100).
     """
+    if _bad_bucket(bucket):
+        return _bad_bucket(bucket)
+    limit = max(1, min(limit, 100))
     since = (clock.now() - datetime.timedelta(hours=max(1, hours))).isoformat(timespec="seconds")
     items = store.list_notifications(
         conn.user, status="all" if include_dismissed else "active",
-        bucket=bucket if bucket in BUCKETS else None,
-        since=since, limit=500)
+        bucket=bucket or None, since=since, limit=500 if app else limit)
     if app:
         a = app.strip().lower()
         items = [n for n in items if a in (n.get("app_name") or "").lower() or a in n["package"].lower()]
-    items = items[:max(1, min(limit, 100))]
+    items = items[:limit]
     if not items:
         return "No matching notifications."
     c = store.counts(conn.user)
@@ -150,7 +163,7 @@ def _record_snooze_undo(user: User, ids: list, before: dict) -> None:
 
 
 @addon.tool(is_write=True)
-async def dismiss_notifications(conn: Connection, notification_ids: str = "", bucket: Optional[str] = None) -> str:
+async def dismiss_notifications(conn: Connection, notification_ids: str = "", bucket: Optional[Bucket] = None) -> str:
     """Dismiss notifications in Dana's Inbox (they are also cleared from the phone's notification shade on its next sync).
 
     Pass either specific IDs or a bucket. Dismissed notifications can be restored from the app.
@@ -159,19 +172,23 @@ async def dismiss_notifications(conn: Connection, notification_ids: str = "", bu
         notification_ids: Comma-separated notification IDs (from list_notifications / search_notifications).
         bucket: Dismiss every active notification in this bucket instead, usually 'dismiss' (suggested to dismiss).
     """
+    if _bad_bucket(bucket):
+        return _bad_bucket(bucket)
     user = conn.user
     ids = [i.strip() for i in (notification_ids or "").split(",") if i.strip()]
-    if not ids and bucket in BUCKETS:
+    if not ids and bucket:
         ids = [n["id"] for n in store.list_notifications(user, status="active", bucket=bucket, limit=1000,
                                                          with_suggestions=False)]
     if not ids:
-        return "Nothing to dismiss: give notification_ids or a bucket."
+        return ("Nothing to dismiss: no active notification in that bucket." if bucket
+                else "Error: give notification_ids or a bucket.")
     before = _snapshot(user, ids)
     result = shade.set_status(user, ids, "dismissed", reason="dana")
     was_active = [i for i, r in before.items() if r["status"] == "active"]
     if result["updated"] and was_active:
         _record_dismiss_undo(user, was_active, before)
-    return f"Dismissed {result['updated']} notification(s)."
+    missed = f" ({len(ids) - result['updated']} not found: take ids from list_notifications)" if result["updated"] < len(ids) else ""
+    return f"Dismissed {result['updated']} notification(s){missed}."
 
 
 @addon.tool(is_write=True)
@@ -188,7 +205,7 @@ async def snooze_notifications(conn: Connection, notification_ids: str, minutes:
     user = conn.user
     ids = [i.strip() for i in (notification_ids or "").split(",") if i.strip()]
     if not ids:
-        return "Nothing to snooze: give notification_ids."
+        return "Error: give notification_ids."
     try:
         if until:
             t = datetime.datetime.fromisoformat(until)
@@ -196,11 +213,11 @@ async def snooze_notifications(conn: Connection, notification_ids: str, minutes:
         elif minutes and minutes > 0:
             when = clock.now() + datetime.timedelta(minutes=minutes)
         else:
-            return "Give minutes or until."
+            return "Error: give minutes or until."
         before = _snapshot(user, ids)
         result = shade.snooze(user, ids, when)
     except ValueError as e:
-        return f"Couldn't snooze: {e}"
+        return f"Error: couldn't snooze: {e}"
     if result["updated"]:
         _record_snooze_undo(user, [i for i, r in before.items() if r["status"] == "active"], before)
     return f"Snoozed {result['updated']} notification(s) until {str(result['until'])[:16].replace('T', ' ')}."
