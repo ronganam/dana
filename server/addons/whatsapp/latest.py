@@ -2,6 +2,7 @@
 filtered by read status and chat type (registered after the tools in
 :mod:`addons.whatsapp.tools`, so the tool order stays the same)."""
 
+import asyncio
 import logging
 
 import httpx
@@ -23,19 +24,20 @@ async def get_latest_messages(
 ) -> str:
     """Fetch recent messages from WhatsApp chats with filters for read status and chat type.
 
-    Media is described like in read_chat_messages (voice transcribed, images saved, other files
-    by name and type), and each message ends with its id (`id: ...`) for forward_whatsapp_message,
-    replies, edits and deletes.
+    Media is described like in read_chat_messages (voice transcribed, other files by name and
+    type: read_whatsapp_file reads one), and each message ends with its id (`id: ...`) for
+    read_whatsapp_file, forward_whatsapp_message, replies, edits and deletes.
 
     Args:
         read_filter: Filter by read status. Options: 'unread' (only unread messages/chats), 'read' (only read messages/chats), 'both' (all messages/chats). Default is 'both'.
         chat_filter: Filter by chat type. Options: 'dm' (direct messages/individual chats), 'groups' (group chats), 'both' (all chats). Default is 'both'.
-        limit_chats: Maximum number of recent chats to check (default is 15).
-        messages_per_chat: Maximum number of recent messages to return per chat (default is 5).
+        limit_chats: Maximum number of recent chats to check (default 15, at most 30).
+        messages_per_chat: Maximum number of recent messages per chat (default 5, at most 30).
     """
     url, headers, session = waha.config(conn)
     endpoint = waha.api_url(conn, session, "chats", "overview")
 
+    limit_chats, messages_per_chat = max(1, min(limit_chats, 30)), max(1, min(messages_per_chat, 30))
     read_filter = read_filter.lower().strip()
     chat_filter = chat_filter.lower().strip()
 
@@ -130,16 +132,25 @@ async def get_latest_messages(
             if not filtered_chats:
                 return f"No messages found matching read_filter='{read_filter}' and chat_filter='{chat_filter}'."
 
+            async def fetch(chat_id: str) -> "httpx.Response | Exception":
+                try:
+                    return await client.get(waha.api_url(conn, session, "chats", chat_id, "messages"), headers=headers,
+                                            params=messages_fmt.message_query(messages_per_chat), timeout=20.0)
+                except Exception as e:  # one chat failing leaves the others
+                    return e
+
+            # Every chat's messages at once, and who "me" is once (not per chat).
+            responses = await asyncio.gather(*(fetch(fc["id"]) for fc in filtered_chats))
+            my_jid, my_lid = await waha.get_my_identifiers(conn, client)
             result = f"Latest messages (read_filter='{read_filter}', chat_filter='{chat_filter}'):\n\n"
-            for fc in filtered_chats:
+            for fc, msg_res in zip(filtered_chats, responses):
                 chat_id = fc["id"]
                 chat_name = fc["name"]
 
-                # Fetch recent messages for this chat
-                msg_endpoint = waha.api_url(conn, session, "chats", chat_id, "messages")
-                msg_res = await client.get(msg_endpoint, headers=headers, params=messages_fmt.message_query(messages_per_chat), timeout=20.0)
-
-                if msg_res.status_code == 200:
+                if isinstance(msg_res, Exception):
+                    result += f"### Chat: **{chat_name}** (ID: `{chat_id}`):\n"
+                    result += f"  *(Error retrieving messages: {str(msg_res) or type(msg_res).__name__})*\n\n"
+                elif msg_res.status_code == 200:
                     messages = msg_res.json()
                     if not messages:
                         result += f"### Chat: **{chat_name}** (ID: `{chat_id}`):\n"
@@ -155,9 +166,6 @@ async def get_latest_messages(
                     is_group_chat = fc["is_group"]
                     u_count = fc["unread_count"]
                     u_mention_count = fc["unread_mention_count"]
-
-                    # Get our identifiers for filtering individual messages
-                    my_jid, my_lid = await waha.get_my_identifiers(conn, client)
 
                     if read_filter == "unread":
                         if is_group_chat:

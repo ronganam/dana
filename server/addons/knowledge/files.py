@@ -4,8 +4,10 @@
 Stored under ``paths.KNOWLEDGE_FILES_DIR`` with a generated name (table
 ``entry_files``); served by ``GET /api/entries/{id}/files/{file_id}`` only to a
 user who can see the entry. Adding or removing one is a change of the entry
-(a ``read`` share is refused). An audio file is transcribed in the background
-as the entry's owner (``transcript``), so Dana can read what it says.
+(a ``read`` share is refused). A file Dana can read (audio, a PDF, a photo,
+text: ``llm.readable``) is read in the background as the entry's owner, and its
+text kept in ``transcript``; :func:`fill_texts` reads one that has none yet
+(an older file, a read that failed) when Dana opens the entry.
 """
 
 import asyncio
@@ -13,7 +15,7 @@ import logging
 import mimetypes
 import uuid
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Set
+from typing import Any, Dict, Iterable, List, Optional
 
 from core import llm, paths, users
 from core.db import get_db_connection
@@ -24,11 +26,10 @@ from addons.knowledge.values import clean_str, serialize_file
 logger = logging.getLogger(__name__)
 
 MAX_BYTES = 60 * 1024 * 1024
-# Audio up to this size is transcribed (llm.transcribe sends it inline).
-MAX_TRANSCRIBE_BYTES = 14 * 1024 * 1024
 SOURCES = ("upload", "whatsapp")
 
-_tasks: Set["asyncio.Task[None]"] = set()
+# file id → its read in progress, so a file is never read twice at once.
+_reading: Dict[str, "asyncio.Task[str]"] = {}
 
 
 class TooLarge(ValueError):
@@ -67,7 +68,7 @@ def add_file(user: User, entry_id: str, name: str, mime: str, data: bytes, *, so
              note: str = "", transcript: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Keep ``data`` on an entry ``user`` may change; returns the file (API
     shape), or None when they cannot see the entry. Audio without a
-    ``transcript`` is transcribed in the background.
+    ``transcript`` that Dana can read is read in the background.
 
     Raises:
         projects.ReadOnly: its project is shared with them read-only.
@@ -96,34 +97,72 @@ def add_file(user: User, entry_id: str, name: str, mime: str, data: bytes, *, so
         conn.execute("UPDATE entries SET updated_at = CURRENT_TIMESTAMP WHERE id = ?", (entry_id,))
         conn.commit()
         saved = conn.execute("SELECT * FROM entry_files WHERE id = ?", (file_id,)).fetchone()
-    if mime.startswith("audio/") and not transcript and len(data) <= MAX_TRANSCRIBE_BYTES:
-        _start_transcript(file_id, data, mime, row["user_id"])
+    if not transcript and llm.readable(mime, len(data)):
+        _start_reading(file_id, data, mime, row["user_id"])
     return serialize_file(saved)
 
 
-def _start_transcript(file_id: str, data: bytes, mime: str, owner_id: str) -> None:
+def _start_reading(file_id: str, data: bytes, mime: str, owner_id: str) -> Optional["asyncio.Task[str]"]:
+    if file_id in _reading:
+        return _reading[file_id]
     try:
-        task = asyncio.get_running_loop().create_task(_transcribe(file_id, data, mime, owner_id))
+        task = asyncio.get_running_loop().create_task(_read(file_id, data, mime, owner_id))
     except RuntimeError:
-        return  # no loop (a script): the file stays without a transcript
-    _tasks.add(task)
-    task.add_done_callback(_tasks.discard)
+        return None  # no loop (a script): the file stays without its text
+    _reading[file_id] = task
+    task.add_done_callback(lambda _: _reading.pop(file_id, None))
+    return task
 
 
-async def _transcribe(file_id: str, data: bytes, mime: str, owner_id: str) -> None:
+async def _read(file_id: str, data: bytes, mime: str, owner_id: str) -> str:
     owner = users.get(owner_id)
     if owner is None:
-        return
+        return ""
     try:
         with users.acting_as(owner):
-            text = await llm.transcribe(data, mime, timeout=180.0, purpose="knowledge_file", ref=file_id)
+            text = await llm.read_file(data, mime, purpose="knowledge_file", ref=file_id)
     except Exception as e:
-        logger.warning(f"Transcribing knowledge file {file_id} failed: {e}")
-        return
+        logger.warning(f"Reading knowledge file {file_id} failed: {e}")
+        return ""
     if text:
         with get_db_connection() as conn:
             conn.execute("UPDATE entry_files SET transcript = ? WHERE id = ?", (text, file_id))
             conn.commit()
+    return text
+
+
+async def fill_texts(owner_id: str, entry_files: List[Dict[str, Any]], timeout: float = 90.0) -> None:
+    """Fill in ``transcript`` on ``entry_files`` (API shape, of one entry the
+    caller may see, owned by ``owner_id``) that Dana can read but has no text
+    for, reading them now as the owner, up to ``timeout`` seconds; a file still
+    being read is marked ``reading``."""
+    waiting = {}
+    for f in entry_files:
+        if f.get("transcript") or not llm.readable(f.get("mime") or "", f.get("size") or 0):
+            continue
+        task = _reading.get(f["id"])
+        if task is None:
+            stored = _stored_path(f["id"])
+            if stored is None:
+                continue
+            task = _start_reading(f["id"], stored.read_bytes(), f["mime"], owner_id)
+        if task is not None:
+            waiting[task] = f
+    if not waiting:
+        return
+    done, _ = await asyncio.wait(waiting, timeout=timeout)
+    for task, f in waiting.items():
+        if task in done:
+            f["transcript"] = task.result() or None
+        else:
+            f["reading"] = True
+
+
+def _stored_path(file_id: str) -> Optional[Path]:
+    with get_db_connection() as conn:
+        row = conn.execute("SELECT stored FROM entry_files WHERE id = ?", (file_id,)).fetchone()
+    path = (_dir() / row["stored"]).resolve() if row else None
+    return path if path is not None and path.parent == _dir().resolve() and path.is_file() else None
 
 
 def file_row(user: Optional[User], entry_id: str, file_id: str) -> Optional[Dict[str, Any]]:

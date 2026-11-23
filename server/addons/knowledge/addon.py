@@ -34,12 +34,15 @@ KNOWLEDGE_GUIDE = (
     "Keep every fact, number, date and name verbatim.\n"
     "  - money values are plain numbers in {currency} (13400, not \"13,400 {currency}\"); a range stays text.\n"
     "  - `tags`: 2-4 short labels in the user's language.\n"
+    "DOCUMENTS: a quote, contract or invoice beats what a chat says about it. Before writing its "
+    "figures, read the newest one (`get_knowledge_item` shows the text of an entry's files); if you "
+    "could not read it, say which figures are unverified.\n"
     "EDITING: fix or extend earlier saves with `update_knowledge_item` / `update_section` (same ID) — "
-    "never duplicate. `update_project` handles project metadata; finished projects: status='archived'.\n"
+    "never duplicate; send only what changes (`fields` by name, `body_edits`). `update_project` handles project metadata; finished projects: status='archived'.\n"
     "-----------------------------------\n\n"
 )
 
-addon = Addon("knowledge", web=(Page("projects", panel="projects.js", style="projects.css", nav=Nav("Projects", icon="folder", order=50)),), order=40, default_on=True, llm_jobs={"media_summary": LlmJob("fast", "Link / media summaries", background=True), "knowledge_file": LlmJob("fast", "Project file transcripts")}, title="Projects", icon="folder",
+addon = Addon("knowledge", web=(Page("projects", panel="projects.js", style="projects.css", nav=Nav("Projects", icon="folder", order=50)),), order=40, default_on=True, llm_jobs={"media_summary": LlmJob("fast", "Link / media summaries", background=True), "knowledge_file": LlmJob("fast", "Reading project files (PDFs, photos, audio)")}, title="Projects", icon="folder",
     needs=(Need("account", "a transcription model: an OpenAI or Gemini key, or your own Whisper server", "Transcripts of the videos and audio files you save (Claude does not hear audio)", optional=True),),
     touches=Touches(hosts=("the sites of the links you save (YouTube, TikTok, Instagram…)",), reads=("tasks",)),
     description="Projects, decisions and saved notes, links and files",

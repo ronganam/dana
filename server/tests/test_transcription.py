@@ -4,7 +4,9 @@ a local Whisper server (an OpenAI-compatible fake: the model downloaded once on 
 transcript), and the unavailable path: a typed error before anything is sent, the admins'
 `transcription` self-check, and each caller saying it needs a transcription model (the web voice
 upload's 503, the voice stream's error frame, the Telegram reply, a call recording marked failed,
-a WhatsApp voice note skipped or read as not transcribed).
+a WhatsApp voice note skipped or read as not transcribed); `llm.read_file`: a PDF and a photo sent
+to the chat model as a file / image part, text decoded, unknown kinds and oversized files refused,
+audio without a transcription model raising the typed error.
 
 Run: bin/test test_transcription
 """
@@ -262,8 +264,38 @@ async def test_whatsapp():
           "not transcribed" in text and "transcription model" in text, text)
 
 
+async def test_read_file():
+    env()
+    sent = []
+
+    async def fake(**kwargs):
+        sent.append(kwargs["messages"][0]["content"][1])
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=" the contract "))])
+
+    with patch.object(llm.litellm, "acompletion", new=fake):
+        pdf = await llm.read_file(b"%PDF-1.4", "application/pdf; x=1", purpose="knowledge_file")
+        photo = await llm.read_file(b"jpeg", "image/jpeg", purpose="knowledge_file")
+        plain = await llm.read_file("שלום".encode(), "text/plain", purpose="knowledge_file")
+        zip_ = await llm.read_file(b"PK", "application/zip", purpose="knowledge_file")
+        big = await llm.read_file(b"x" * (llm.MAX_READ_BYTES + 1), "application/pdf", purpose="knowledge_file")
+    check("read_file: a PDF goes as a file part, a photo as an image part; the reply is the text",
+          pdf == photo == "the contract" and len(sent) == 2
+          and sent[0]["file"]["file_data"].startswith("data:application/pdf;base64,")
+          and sent[1]["image_url"]["url"].startswith("data:image/jpeg;base64,"), sent)
+    check("read_file: text is decoded without a model; other kinds and oversized files are ''",
+          plain == "שלום" and zip_ == "" and big == "" and len(sent) == 2
+          and llm.readable("audio/ogg") and not llm.readable("video/mp4"), (plain, zip_, big))
+    try:
+        await llm.read_file(b"ogg", "audio/ogg", purpose="knowledge_file")
+        raised = False
+    except llm.TranscriptionUnavailable:
+        raised = True
+    check("read_file: audio without a transcription model raises the typed error", raised)
+
+
 async def main():
     test_order()
+    await test_read_file()
     await test_whisper()
     await test_unavailable()
     await test_voice_endpoints()

@@ -19,7 +19,7 @@ columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
 | `projects.py` | projects for a user (with their stats: sections, decisions made, the committed sum): `visible_sql`, `access`, `list_projects`, `get_project`, `create_project`, `update_project` / `delete_project` (owner only), `writable_project`, `project_tasks`, `active_projects`, `search_titles`; registers the sharing item type `project` |
 | `entries.py` | entries for a user: `visible_sql`, `entry_row`, `writable_entry`, `get_entry`, `list_entries`, `entry_previews`, `create_entry` / `update_entry` / `delete_entry`, `search_entries` (FTS), `matching_ids` / `search_rows` (the search box), `retry_media`, `media_file` |
 | `sections.py` | sections of a project: `list_sections`, `get_section`, `find_section` (id or title), `create_section`, `update_section` (renaming a column renames that field in the section's entries), `delete_section` (its entries become loose, or go with it) |
-| `files.py` | files on entries (`paths.KNOWLEDGE_FILES_DIR`, table `entry_files`, up to 60 MB each): `add_file` (an audio file without a transcript is transcribed in the background as the owner, purpose `knowledge_file`), `files_of`, `file_path`, `update_file`, `delete_file`, `forget_entries` (rows and disk files when entries go) |
+| `files.py` | files on entries (`paths.KNOWLEDGE_FILES_DIR`, table `entry_files`, up to 60 MB each): `add_file` (a file Dana can read, `llm.readable`: audio, a PDF, a photo, text, is read in the background as the owner with `llm.read_file`, purpose `knowledge_file`, into `transcript`), `fill_texts` (reads the files of an entry that have no text yet, waiting up to 90 s), `files_of`, `file_path`, `update_file`, `delete_file`, `forget_entries` (rows and disk files when entries go) |
 | `media.py` | link processing: yt-dlp download, transcript (`llm.transcribe`), summary + tags (`llm.complete_json`, purpose `media_summary`), stored on the entry; `file_for` (the `/media/` files) |
 | `tools.py` | the 13 agent tools (`create_project`, `list_projects`, `list_project_entries`, `get_knowledge_item`, `save_knowledge_item`, `search_knowledge`, `update_project`, `delete_project`, `update_knowledge_item`, `delete_knowledge_item`, `create_section`, `update_section`, `delete_section` (`confirm`)) and their undos; `record_file_added` registers the undo of a file a tool attached |
 
@@ -50,7 +50,10 @@ columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
   /api/entries/{id}/files/{file_id}` serves the file inline (`?download=1` as
   an attachment) to whoever sees the entry; `PUT` changes its `name` / `note`
   / `transcript`, `DELETE` removes it (both need write access). An entry's
-  payload lists its `files` with their `url`.
+  payload lists its `files` with their `url`. A file's `transcript` is the
+  text read from it (a recording's transcript, a PDF written out, a photo
+  described); `get_knowledge_item` shows it (up to 6,000 characters each) and
+  reads a file that has none yet first (an older file, a read that failed).
 - **Payloads.** `GET /api/projects/{id}/items` is `{project, sections,
   entries, tasks}`; `POST /api/projects/{id}/sections`, `PUT` / `DELETE
   /api/sections/{id}` (`?with_entries=1` deletes its entries too). Writes
@@ -61,7 +64,12 @@ columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
   body, files attached), the comparison in the section's summary, and sets
   `decision` only when the user says so (`KNOWLEDGE_GUIDE` in `addon.py`).
   `list_project_entries` prints a project by section with each option's
-  values and decision.
+  values and decision. `update_knowledge_item` changes only what it is given:
+  `fields` merge by name (a null value removes one), `body_edits` replace
+  exact passages of the body or append; its result names what changed and,
+  when a price or decision changed under a written summary, asks to refresh
+  it. A quote or contract beats a chat about it: the guide has Dana read the
+  newest one before writing its figures.
 
 ## The web panel
 

@@ -22,6 +22,8 @@ from addons.tasks import service as tasks_service
 from addons.knowledge.values import (DECISIONS, KINDS, STATUSES, as_number, clean_str, loads_json,
                                            norm_section_kind)
 
+# A file's text shown by get_knowledge_item (tool results are capped at 12,000 characters).
+FILE_TEXT_CHARS = 6000
 DECISION_WORDS = {"": "option", "shortlist": "shortlisted", "chosen": "CHOSEN", "rejected": "rejected"}
 
 logger = logging.getLogger(__name__)
@@ -245,8 +247,8 @@ async def list_project_entries(conn: Connection, project_id: str, kind: Optional
 
 @addon.tool(untrusted_result=True)
 async def get_knowledge_item(conn: Connection, item_id: str) -> str:
-    """Read one saved entry in full — its complete Markdown body, structured fields, summary,
-    transcript, tags and comments.
+    """Read one saved entry in full: its Markdown body, fields, summary, tags, comments and the
+    text of its files (a PDF's or a photo's text, a recording's transcript; read now if not yet).
 
     `search_knowledge` and `list_project_entries` only return a short preview. Use this whenever
     you need the actual details of a specific item (prices, contacts, decisions, dates).
@@ -255,9 +257,11 @@ async def get_knowledge_item(conn: Connection, item_id: str) -> str:
         item_id: The entry ID, as returned by `search_knowledge` or `list_project_entries`.
     """
     try:
-        entry = entries.get_entry(conn.user, item_id)
+        row = entries.entry_row(conn.user, item_id)
+        entry = entries.get_entry(conn.user, item_id) if row else None
         if entry is None:
             return f"Error: No entry with ID `{item_id}`. Use `list_project_entries` or `search_knowledge` to find valid IDs."
+        await files.fill_texts(row["user_id"], entry.get("files") or [])
 
         title = escape_markdown(entry.get("title") or "Untitled")
         res = f"### {title}\n"
@@ -292,8 +296,13 @@ async def get_knowledge_item(conn: Connection, item_id: str) -> str:
             for f in entry["files"]:
                 note = f" — {escape_markdown(f['note'])}" if f.get("note") else ""
                 res += f"- {escape_markdown(f['name'])} ({f['mime']}, {round((f.get('size') or 0) / 1024)} KB){note}\n"
-                if f.get("transcript"):
-                    res += f"  Transcript: {escape_markdown(f['transcript'])}\n"
+                text = f.get("transcript") or ""
+                if text:
+                    cut = f" … (cut, {len(text):,} chars)" if len(text) > FILE_TEXT_CHARS else ""
+                    label = "Transcript" if f["mime"].startswith("audio/") else "Text"
+                    res += f"  {label}:\n{escape_markdown(text[:FILE_TEXT_CHARS])}{cut}\n"
+                elif f.get("reading"):
+                    res += "  (still being read: open the entry again in a minute)\n"
         if entry.get("comments"):
             res += "\n\n**Comments:**\n"
             for c in entry["comments"]:
@@ -313,49 +322,25 @@ async def save_knowledge_item(conn: Connection, project_id: str, kind: str = "no
                               priority: str = "medium", due_at: Optional[str] = None,
                               url: Optional[str] = None, section: Optional[str] = None,
                               decision: str = "") -> str:
-    """Save a knowledge entry (note, record, or link) into a project and return its ID. The returned
-    ID is used later with update_knowledge_item / delete_knowledge_item / save_whatsapp_file.
-    In an 'options' section (a decision such as photographers or venues) the entry is one option:
-    give `fields` exactly the section's column names (see `list_project_entries`), in the column's
-    type. Follow these AUTHORING RULES:
-    - title is a SHORT label (max ~8 words) in the user's language, with NO markdown and NO punctuation.
-      Example: "Photographer — Yanai Budget". Never paste a whole paragraph into the title.
-    - body holds the full details written as clean Markdown: '##' or '###' headings, **bold** for key
-      figures and names, '-' bullet lists, and a blank line between paragraphs. Preserve the user's
-      facts, numbers, dates and wording (in whatever language) exactly. Example body:
-        ## Contact
-        - Phone: **555-0100**
-        - Email: yanai@example.com
-        ## Budget
-        - Price: 4,500
-        - Deposit paid: **yes** (12/06/2026)
-    - kind: 'note' for free text (ideas, general notes), 'record' for structured data (contacts,
-      vendors, prices, contracts) — pair with fields, 'link' when saving a URL (auto-processed for
-      transcript, summary and media).
-    - fields: capture the few facts you might want to query later as
-      [{"name": "<label>", "type": "<type>", "value": <value>}] where type is one of
-      text, number, money (a plain number in the user's currency), phone, checkbox, date, url, select, rating (1-5). Example:
-      [{"name": "Phone", "type": "text", "value": "050-1234567"},
-       {"name": "Price", "type": "number", "value": 4500},
-       {"name": "Paid", "type": "checkbox", "value": true}]
-    - tags: 2-4 short labels (words or short phrases) in the user's language to enable cross-project
-      search, e.g. ["צלם", "תקציב"] or ["vendor"], ["budget"].
-    - status: 'open' (default) | 'in_progress' | 'done' | 'archived'.
-    - priority: 'low' | 'medium' | 'high'.
-    - due_at: ISO date 'YYYY-MM-DD' only when a deadline or timing matters.
-    - url: full URL to attach and auto-process; typically combined with kind 'link'.
+    """Save an entry (note, record or link) into a project and return its ID (for
+    update_knowledge_item / delete_knowledge_item / save_whatsapp_file). Check `list_project_entries`
+    first so you never duplicate one. In an 'options' section the entry is one option: name its
+    `fields` exactly as the section's columns, in their types.
 
     Args:
-        project_id: The ID of the project this entry belongs to.
-        kind: 'note' for free text, 'record' for structured data, or 'link' for a URL.
-        title: Short human-readable label; never a whole paragraph.
-        body: Markdown body with the full details or description.
-        fields: Optional structured fields as [{"name": "...", "type": "...", "value": ...}].
-                type is one of: text, number, checkbox, date, url, select.
-        tags: Optional list of short labels (e.g. ["venue", "vendor"]).
+        project_id: The project's ID.
+        kind: 'note' (free text), 'record' (structured: a vendor, a contract; give fields) or 'link'
+            (a URL, auto-processed into a transcript, summary and media).
+        title: Short label (max ~8 words, no markdown) in the user's language, e.g. "Photographer — Yanai".
+        body: The full details as clean Markdown ('##' headings, **bold** key figures, '-' bullets);
+            keep the user's facts, numbers, dates and wording verbatim.
+        fields: Optional facts to compare or query later: [{"name": "Price", "type": "money", "value": 4500}];
+            type: text, number, money (a plain number in the user's currency), phone, checkbox, date,
+            url, select, rating (1-5).
+        tags: Optional 2-4 short labels in the user's language (e.g. ["צלם", "תקציב"]).
         priority: 'low', 'medium' or 'high'.
-        due_at: Optional ISO date (YYYY-MM-DD) for a deadline.
-        url: Optional URL to attach and auto-process.
+        due_at: Optional ISO date (YYYY-MM-DD) when a deadline matters.
+        url: Optional URL to attach and auto-process (usually with kind 'link').
         section: Optional section (title or ID) of the project to put the entry in.
         decision: For an option: '' (just an option), 'shortlist', 'chosen' or 'rejected'.
     """
@@ -408,8 +393,8 @@ async def search_knowledge(conn: Connection, query: str, project_id: Optional[st
             title = escape_markdown(item["title"] or "Untitled")
             snippet = escape_markdown((item.get("body") or "")[:200])
             suffix = f" — {snippet}" if snippet else ""
-            res += f"- **[{proj}] {title}** ({item['kind']}): {suffix}\n"
-        return res
+            res += f"- **[{proj}] {title}** (`{item['id']}`, {item['kind']}){suffix}\n"
+        return res + "Use `get_knowledge_item(item_id)` to read one in full."
     except Exception as e:
         logger.error(f"Error searching knowledge: {e}", exc_info=True)
         return f"Error searching knowledge: {e}"
@@ -483,28 +468,72 @@ async def delete_project(conn: Connection, project_id: str) -> str:
         return f"Error deleting project: {e}"
 
 
+def _merged_fields(current: list, changes: list) -> list:
+    """``current`` fields with ``changes`` applied by name: a known name is updated, a new one
+    added, one whose value is null removed."""
+    out = [dict(f) for f in current if isinstance(f, dict)]
+    for change in changes:
+        name = clean_str(change.get("name")) if isinstance(change, dict) else ""
+        if not name:
+            continue
+        at = next((i for i, f in enumerate(out) if clean_str(f.get("name")).casefold() == name.casefold()), None)
+        if change.get("value") is None:
+            if at is not None:
+                out.pop(at)
+        elif at is None:
+            out.append(change)
+        else:
+            out[at] = {**out[at], **change, "name": out[at].get("name")}
+    return out
+
+
+def _edited_body(body: str, edits: list) -> str:
+    """``body`` with each {"old", "new"} edit applied; an empty "old" appends.
+
+    Raises:
+        LookupError: an "old" passage is not in the body exactly once.
+    """
+    for edit in edits:
+        old, new = (str(edit.get(k) or "") for k in ("old", "new")) if isinstance(edit, dict) else ("", "")
+        if not old:
+            body = f"{body.rstrip()}\n\n{new.strip()}" if body.strip() else new.strip()
+            continue
+        found = body.count(old)
+        if found != 1:
+            raise LookupError(f"body_edits: {'no' if not found else found} matches for {old[:60]!r}; quote one exact, "
+                              "unique passage of the body as `get_knowledge_item` shows it.")
+        body = body.replace(old, new, 1)
+    return body
+
+
+CHANGE_WORDS = {"title": "title", "body": "body", "kind": "kind", "fields": "fields", "tags": "tags",
+                "status": "status", "priority": "priority", "due_at": "due date", "url": "URL",
+                "section_id": "section", "decision": "decision"}
+
+
 @addon.tool(is_write=True)
 async def update_knowledge_item(conn: Connection, item_id: str, title: Optional[str] = None, body: Optional[str] = None,
-                                kind: Optional[str] = None, fields: Optional[list] = None,
-                                tags: Optional[list] = None, status: Optional[str] = None,
-                                priority: Optional[str] = None, due_at: Optional[str] = None,
-                                url: Optional[str] = None, section: Optional[str] = None,
-                                decision: Optional[str] = None) -> str:
-    """Edit an existing knowledge entry (partial update: only the arguments you provide change).
-    Record a decision on an option with decision='chosen' / 'shortlist' / 'rejected' ('' resets).
-
-    Use this to correct/extend an earlier save instead of creating a duplicate — pass the item ID
-    shown when the entry was saved. To move an entry along its workflow, change status to
-    'in_progress' or 'done'; to sweep it away from active views, use 'archived'. Apply the same
-    authoring rules (short title, markdown body, structured fields) as in save_knowledge_item.
+                                body_edits: Optional[list] = None, kind: Optional[str] = None,
+                                fields: Optional[list] = None, tags: Optional[list] = None,
+                                status: Optional[str] = None, priority: Optional[str] = None,
+                                due_at: Optional[str] = None, url: Optional[str] = None,
+                                section: Optional[str] = None, decision: Optional[str] = None) -> str:
+    """Edit an existing entry; only the arguments you pass change. Send only what changes: the
+    fields that change (not the whole list) and `body_edits` for a few lines (not the whole body).
+    Record a decision on an option with decision='chosen' / 'shortlist' / 'rejected' ('' resets);
+    move it along with status 'in_progress' / 'done', or 'archived' to sweep it away.
 
     Args:
         item_id: The ID of the entry to update.
         title: Optional new short title.
-        body: Optional new markdown body.
+        body: Optional whole new Markdown body (to rewrite it; prefer body_edits for changes).
+        body_edits: Optional exact replacements in the body, applied in order:
+            [{"old": "Price: 13,400", "new": "Price: 12,400"}]; each "old" must appear exactly once.
+            {"old": "", "new": "## Update\n- ..."} appends at the end.
         kind: Optional new kind ('note', 'record' or 'link').
-        fields: Optional new structured fields list.
-        tags: Optional new list of labels.
+        fields: Optional fields to set, matched by name (others are kept):
+            [{"name": "Price", "type": "money", "value": 12400}]; "value": null removes that field.
+        tags: Optional new list of labels (replaces them).
         status: Optional new status ('open', 'in_progress', 'done' or 'archived').
         priority: Optional new priority ('low', 'medium' or 'high').
         due_at: Optional new ISO date, or "" to clear.
@@ -516,9 +545,17 @@ async def update_knowledge_item(conn: Connection, item_id: str, title: Optional[
     try:
         if decision is not None and decision not in DECISIONS:
             return "Error: decision must be '', 'shortlist', 'chosen' or 'rejected'."
-        before = undoable.row("entries", "id", item_id, cols)
+        if body is not None and body_edits:
+            return "Error: pass either body (the whole new body) or body_edits, not both."
         current = entries.entry_row(conn.user, item_id)
-        section_id = _section_id(conn.user, current.get("project_id"), section) if current else None
+        if current is None:
+            return f"Error: Knowledge item `{item_id}` not found. Use `list_project_entries` or `search_knowledge`."
+        if body_edits:
+            body = _edited_body(current.get("body") or "", body_edits)
+        if fields is not None:
+            fields = _merged_fields(loads_json(current.get("fields"), []), fields)
+        before = undoable.row("entries", "id", item_id, cols)
+        section_id = _section_id(conn.user, current.get("project_id"), section)
         updated = entries.update_entry(
             conn.user, item_id, title=title, body=body, kind=kind, fields=fields, tags=tags,
             status=status, priority=priority, due_at=due_at, url=url, section_id=section_id, decision=decision,
@@ -526,11 +563,18 @@ async def update_knowledge_item(conn: Connection, item_id: str, title: Optional[
         if updated is None:
             return f"Error: Knowledge item `{item_id}` not found."
         after = undoable.row("entries", "id", item_id, cols)
-        if before and after and not undoable.same(after, before, cols):
+        changed = [w for k, w in CHANGE_WORDS.items() if before and after and before.get(k) != after.get(k)]
+        if changed:
             undoable.restore_row(f"Changed “{after['title'] or 'Untitled'}”", "entries", "id", item_id,
                                  before, after, cols, "update_knowledge_item",
                                  guard=_entry_guard(conn.user, item_id))
-        return f"Successfully updated knowledge item `{item_id}`."
+        out = (f"Updated “{escape_markdown(after['title'] or 'Untitled')}” (`{item_id}`): {', '.join(changed)}."
+               if changed and after else f"Nothing changed on `{item_id}`.")
+        sec = sections.get_section(conn.user, after["section_id"]) if after and after.get("section_id") else None
+        if sec and sec.get("summary") and {"fields", "decision"} & set(changed):
+            out += (f" The summary of section “{escape_markdown(sec['title'])}” was written before this change: "
+                    "refresh it with `update_section` if it mentions this entry.")
+        return out
     except (projects.ReadOnly, outbound.Refused, entries.WrongSection, LookupError) as e:
         return _error(e)
     except Exception as e:

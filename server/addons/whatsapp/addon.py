@@ -8,7 +8,7 @@ from addons.whatsapp.config import ADDON, VOICE_CHAT
 # Addons page or with bin/dana. The account (the session's own
 # WhatsApp id, routing inbound events) is learned from WAHA (accounts.py).
 addon = Addon(
-    ADDON, order=90, modules=('latest',), llm_jobs={"whatsapp_match": LlmJob("fast", "WhatsApp name matching")},
+    ADDON, order=90, modules=('latest',), llm_jobs={"whatsapp_match": LlmJob("fast", "WhatsApp name matching"), "whatsapp_file": LlmJob("fast", "Reading WhatsApp files (PDFs, photos, audio)")},
     title="WhatsApp", icon="message-circle",
     credentials=(
         Field("url", "WAHA API base URL", type=ADDRESS, label="WAHA address",

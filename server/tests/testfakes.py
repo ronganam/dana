@@ -194,7 +194,7 @@ class FakeWAHA:
                             "_data": {"pushName": self.contact_name}}}])
 
     async def messages(self, request):
-        """A text, an image (downloaded) and a PDF with a caption (listed by name only:
+        """A text, an image and a PDF with a caption (listed by name only:
         WAHA downloads just the mimetypes asked in ``downloadMediaMimetypes``)."""
         refused = await self._auth(request)
         if refused:
@@ -214,7 +214,7 @@ class FakeWAHA:
 
     async def one_message(self, request):
         return await self._auth(request) or web.json_response(
-            {"media": {"url": f"{self.root}/api/files/voice.ogg"}})
+            {"timestamp": 1792271421, "media": {"url": f"{self.root}/api/files/quote", "mimetype": "application/pdf"}})
 
     async def edit(self, request):
         return await self._auth(request) or web.json_response({}, status=200)

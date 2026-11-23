@@ -8,14 +8,15 @@ the operator and is then pointed at instance A; Bob has instance B; Carl has
 no WhatsApp. Checked: nothing reads the old env names; inbound events only
 when WAHA signed them; every tool hits only the user's own WAHA with their own key and
 session; name maps / "me" caches / dedupe are per connection; Carl has no
-tools; saved contacts and the call pipeline's known people per user; an image
-a tool saved is served only to its user; the account is learned at connect,
+tools; saved contacts and the call pipeline's known people per user; a saved
+image is served only to its user; the account is learned at connect,
 by the startup loop (WAHA down → retried) and lazily; inbound events routed by
 ``me.id`` to the right user (transcript to that user's Telegram chat only,
 usage row theirs, phone push addressed to the routed user), an unknown
 account dropped, no ``me`` with one / several candidate connections; reading
-shows each message's id and files by name (only voice and images downloaded),
-the read tools are untrusted, forwarding by id from the user's own session (a
+shows each message's id and files by name (only voice notes downloaded),
+read_whatsapp_file reads a file by id (untrusted; a made-up id refused), the
+read tools are untrusted, forwarding by id from the user's own session (a
 made-up or unknown id refused) and its approval card; ✨
 Summarize only for the transcript's user. LiteLLM runs offline
 (``mock_response``); Telegram and phone push are mocked; no network beyond
@@ -199,8 +200,8 @@ TOOL_ARGS = {
     "check_whatsapp_number": {"phone": "0501234567"},
     "send_whatsapp_file": {"chat_id": "CONTACT", "file_url": "https://example.invalid/f.pdf",
                            "mimetype": "application/pdf"},
-    "edit_whatsapp_message": {"chat_id": "CONTACT", "message_id": "true_x_1", "new_text": "hey"},
-    "delete_whatsapp_message": {"chat_id": "CONTACT", "message_id": "true_x_1"},
+    "edit_whatsapp_message": {"chat_id": "CONTACT", "message_id": "true_x@c.us_1", "new_text": "hey"},
+    "delete_whatsapp_message": {"chat_id": "CONTACT", "message_id": "true_x@c.us_1"},
     "forward_whatsapp_message": {"chat_id": "CONTACT", "message_id": "false_CONTACT_m3"},
     "get_latest_messages": {},
 }
@@ -239,10 +240,10 @@ async def test_tools() -> None:
     check("caches: 'me' per connection", {k[0]: v[0] for k, v in wa_client._me_cache.items()}
           == {ADMIN.id: A_ACCOUNT, BOB.id: B_ACCOUNT})
 
-    # An image a tool saved belongs to its user.
-    m = re.search(r"\[Image: (/api/images/[0-9a-f]+\.jpg)\]", a["read_chat_messages"])
-    check("images: read_chat_messages saved the image for the admin", m is not None, a["read_chat_messages"])
-    url = m.group(1) if m else "/api/images/none.jpg"
+    # A saved image belongs to its user.
+    check("images: a chat's photo is listed by type, not downloaded", "[Image (image/jpeg)]" in a["read_chat_messages"],
+          a["read_chat_messages"])
+    url = images.save_image(b"bytes of A", "image/jpeg", ADMIN)
     app = web.Application()
     setup_auth(app)
     app.router.add_get("/api/images/{filename}", assistant_api.serve_image_api)
@@ -271,8 +272,8 @@ async def test_read_and_forward() -> None:
           "[File: quote-A.pdf (application/pdf)] quote from A" in out, out)
     check("read: the model reads the messages framed as others' text",
           registry.returns_untrusted("read_chat_messages") and carries_untrusted(for_model("read_chat_messages", out)), out)
-    check("read: WAHA downloads only voice notes and images",
-          WA_A.message_queries and WA_A.message_queries[-1].get("downloadMediaMimetypes") == ["audio/", "image/"]
+    check("read: WAHA downloads only voice notes",
+          WA_A.message_queries and WA_A.message_queries[-1].get("downloadMediaMimetypes") == ["audio/"]
           and WA_A.message_queries[-1].get("downloadMedia") == ["true"], WA_A.message_queries)
     latest = str(await registry.execute(BOB, "get_latest_messages", {}))
     check("latest: ids and files too, from Bob's own WAHA",
@@ -282,6 +283,13 @@ async def test_read_and_forward() -> None:
           all(registry.returns_untrusted(n) for n in ("read_chat_messages", "get_latest_messages", "find_last_chats"))
           and not registry.returns_untrusted("forward_whatsapp_message"))
     check("forward: asks first", registry.needs_confirmation("forward_whatsapp_message", {}))
+    read = str(await registry.execute(ADMIN, "read_whatsapp_file", {"chat_id": WA_A.contact_id, "message_id": pdf_id}))
+    check("read file: the file's text, read by the model, from the admin's own WAHA",
+          read.startswith("Noa ") and "application/pdf" in read and "transcript for" in read
+          and registry.returns_untrusted("read_whatsapp_file") and not registry.needs_confirmation("read_whatsapp_file", {}),
+          read)
+    read = str(await registry.execute(ADMIN, "read_whatsapp_file", {"chat_id": WA_A.contact_id, "message_id": "the pdf"}))
+    check("read file: a made-up id is refused", read.startswith("Error: message_id"), read)
 
     WA_A.forwarded.clear(), WA_B.forwarded.clear(), WA_A.calls(), WA_B.calls()
     res = str(await registry.execute(ADMIN, "forward_whatsapp_message",

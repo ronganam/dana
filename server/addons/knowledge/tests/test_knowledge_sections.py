@@ -15,8 +15,10 @@ files: multipart upload, inline GET (Range) for whoever sees the entry, 404
 for others, no writes through a read share, gone from disk with their entry /
 project; the tools: create_section, save into a section by title with a
 decision, list_project_entries shows sections, columns and values,
-update_section writes the summary, get_knowledge_item lists files and
-transcripts, the undo of create_section; save_whatsapp_file keeps a WhatsApp
+update_section writes the summary, get_knowledge_item lists files with the
+text read from them, update_knowledge_item merges fields by name, edits /
+appends to the body, says what changed and asks to refresh a written summary,
+the undo of create_section; save_whatsapp_file keeps a WhatsApp
 file on an entry (and its undo removes it).
 
 Run: bin/test test_knowledge_sections
@@ -50,6 +52,17 @@ from core.db import get_db_connection
 from core.addons import registry, sharing, store
 from addons.knowledge import api as knowledge_api, files, projects
 from testfakes import FakeWAHA
+from core import llm
+
+READS: List[Tuple[str, int]] = []  # (mime, size) of every file the model was asked to read
+
+
+async def fake_read_file(data: bytes, mime: str, **_: Any) -> str:
+    READS.append((mime, len(data)))
+    return f"text of {len(data)} bytes"
+
+
+llm.read_file = fake_read_file
 
 results: List[Tuple[str, bool]] = []
 
@@ -270,12 +283,51 @@ async def main() -> None:
               "צלמים" in out2 and "Columns: מחיר כולל (money, price)" in out2 and "CHOSEN" in out2
               and "13,400 ILS" in out2 and "budget 150,000 ILS" in out2 and "Summary: written" in out2 and "DJ Noa" in out2, out2)
         out = await tool(EVE, "get_knowledge_item", item_id=ori)
-        check("tool: get_knowledge_item lists the section, decision and files",
-              "Section: צלמים" in out and "Decision: CHOSEN" in out and "הצעת מחיר.pdf" in out, out)
+        check("tool: get_knowledge_item lists the section, decision and files with their text",
+              "Section: צלמים" in out and "Decision: CHOSEN" in out and "הצעת מחיר.pdf" in out
+              and "Text:\ntext of 14 bytes" in out, out)
+        check("files: an uploaded PDF is read once, in the background", sorted(READS) == [("application/pdf", 14)], READS)
+        with get_db_connection() as conn:
+            conn.execute("UPDATE entry_files SET transcript = NULL WHERE id = ?", (f["id"],))
+            conn.commit()
+        out = await tool(ROBIN, "get_knowledge_item", item_id=ori)
+        with get_db_connection() as conn:
+            kept = conn.execute("SELECT transcript FROM entry_files WHERE id = ?", (f["id"],)).fetchone()["transcript"]
+        check("files: a file without text is read when the entry is opened, and kept",
+              "text of 14 bytes" in out and kept == "text of 14 bytes" and len(READS) == 2, (out, READS))
+
         out = await tool(EVE, "update_section", section_id=sid, summary="x")
         check("tool: a read share can't change a section", out.startswith("Error"), out)
 
         await web_fixture(c, pid)
+
+        out = await tool(ROBIN, "update_knowledge_item", item_id=ori,
+                         fields=[{"name": "מחיר כולל", "type": "money", "value": 12400},
+                                 {"name": "אלבומים", "type": "text", "value": "3"}],
+                         body_edits=[{"old": "", "new": "## חוזה\n- סכום: 12,400"}])
+        with get_db_connection() as conn:
+            row = conn.execute("SELECT fields, body FROM entries WHERE id = ?", (ori,)).fetchone()
+        check("update: fields merge by name (changed, added, others kept) and body_edits append",
+              json.loads(row["fields"]) == [{"name": "מחיר כולל", "type": "money", "value": 12400},
+                                            {"name": "טלפון", "type": "phone", "value": "052-0000000"},
+                                            {"name": "אלבומים", "type": "text", "value": "3"}]
+              and row["body"] == "## חוזה\n- סכום: 12,400", (row["fields"], row["body"]))
+        check("update: says what changed and that the written summary may be stale",
+              "body, fields" in out and "update_section" in out, out)
+        out = await tool(ROBIN, "update_knowledge_item", item_id=ori, fields=[{"name": "אלבומים", "value": None}],
+                         body_edits=[{"old": "12,400", "new": "12,500"}])
+        with get_db_connection() as conn:
+            row = conn.execute("SELECT fields, body FROM entries WHERE id = ?", (ori,)).fetchone()
+        check("update: a null value removes the field; an edit replaces its passage",
+              [x["name"] for x in json.loads(row["fields"])] == ["מחיר כולל", "טלפון"]
+              and row["body"] == "## חוזה\n- סכום: 12,500", (row["fields"], row["body"]))
+        out = await tool(ROBIN, "update_knowledge_item", item_id=ori, title="x", body_edits=[{"old": "nope", "new": "x"}])
+        with get_db_connection() as conn:
+            title = conn.execute("SELECT title FROM entries WHERE id = ?", (ori,)).fetchone()["title"]
+        check("update: an edit whose passage is missing is an error and changes nothing",
+              out.startswith("Error: body_edits: no matches") and title == "אורי עשור", out)
+        out = await tool(EVE, "update_knowledge_item", item_id=ori, title="x")
+        check("update: a read share can't change an entry", out.startswith("Error"), out)
 
         # undo of create_section: an empty one goes; one with entries stays
         out = await tool(ROBIN, "create_section", project_id=pid, title="Cake", kind="notes")

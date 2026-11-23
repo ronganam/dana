@@ -166,6 +166,15 @@ def describe_delete(user: User, a: dict) -> Approval:
 
 Other flags: `acts_outside`, `untrusted_result` (`agent-actions.md`), `needs`, `available`, `shortcut` / `shortcut_prep` / `shortcut_describe` (learned phrases); each is described in `Addon.tool`'s docstring. An unknown flag is a `TypeError`.
 
+What makes a tool work well for the model:
+
+- **The docstring is a prompt paid every turn.** Its first line says what the tool does and when to use it rather than a sibling; each argument gets its format and an example. Keep it short and true (a "partial update" must really be partial).
+- **Take what the model has.** A name or an id, resolved either way; a clear `Error: …` that names the valid values or the tool to call next.
+- **Updates change only what they are given.** Lists merge by name or key instead of being replaced, and long text takes edits (old → new) rather than a full rewrite, so one change is one small call.
+- **Results are bounded and actionable.** Limits with a ceiling, long text cut with a visible note (results over 12,000 characters are cut blindly), the ids the next call needs, and what changed.
+- **Reliable and cheap.** A timeout on every request, independent requests run together (`asyncio.gather`), nothing fetched or computed again that a short cache can keep, errors caught and logged rather than raised.
+- **Content, not handles.** If the answer is inside a file, return its text (`llm.read_file` reads PDFs, photos and audio); a path or a file name alone leaves the model guessing.
+
 ### Background work
 
 ```python

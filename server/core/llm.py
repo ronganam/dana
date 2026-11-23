@@ -45,6 +45,9 @@ OpenAI-compatible speech-to-text server such as speaches, the root compose.yaml'
 :class:`TranscriptionUnavailable` (``code`` ``no_transcription_model``): each
 feature that transcribes says it needs a transcription model.
 
+``read_file`` turns a file into text for the model: audio through ``transcribe``,
+a PDF or a photo through the purpose's chat model (inline, up to ``MAX_READ_BYTES``).
+
 The monthly budget (core/budget.py): :func:`complete`, :func:`complete_json`,
 :func:`search` and :func:`transcribe` refuse a background purpose with
 ``budget.Paused`` while the month's budget is spent.
@@ -666,6 +669,48 @@ async def transcribe(audio: bytes, mime_type: str, *, timeout: float = 30.0, not
     logger.info("Transcribed %d bytes of %s with %s in %.2fs", len(audio), mime_type, t.model,
                 time.perf_counter() - started)
     return transcript
+
+
+# Files :func:`read_file` reads inline (providers take requests of ~20-30 MB).
+MAX_READ_BYTES = 14 * 1024 * 1024
+_READ_PROMPT = ("Write out the full text of this file in its original language: keep headings, lists and "
+                "tables (as Markdown tables), no commentary. For a photo, or a scan with little text, first "
+                "describe in one short paragraph what it shows, then write out any text in it.")
+
+
+def _plain_mime(mime: str) -> str:
+    return (mime or "").split(";")[0].strip().lower()
+
+
+def readable(mime: str, size: int = 0) -> bool:
+    """Whether :func:`read_file` reads this kind (and size) of file."""
+    m = _plain_mime(mime)
+    return size <= MAX_READ_BYTES and (m.split("/")[0] in ("audio", "image", "text")
+                                       or m in ("application/pdf", "application/json"))
+
+
+async def read_file(data: bytes, mime: str, *, purpose: str, ref: str = "", source: str = "",
+                    timeout: float = 180.0) -> str:
+    """A file's content as text: audio transcribed (:func:`transcribe`), text
+    decoded, a PDF written out and a photo described by the purpose's chat
+    model. "" for a kind :func:`readable` refuses.
+
+    Raises:
+        TranscriptionUnavailable: audio without a transcription model.
+        budget.Paused, Exception: as :func:`complete` / :func:`transcribe`.
+    """
+    m = _plain_mime(mime)
+    if not readable(m, len(data)):
+        return ""
+    if m.startswith("audio/"):
+        return await transcribe(data, m, timeout=timeout, purpose=purpose, ref=ref, source=source)
+    if m.startswith("text/") or m == "application/json":
+        return data.decode("utf-8", "replace").strip()
+    uri = f"data:{m};base64,{base64.b64encode(data).decode()}"
+    part = ({"type": "image_url", "image_url": {"url": uri}} if m.startswith("image/")
+            else {"type": "file", "file": {"file_data": uri}})
+    return await complete([{"role": "user", "content": [{"type": "text", "text": _READ_PROMPT}, part]}],
+                          purpose=purpose, ref=ref, source=source, timeout=timeout, max_tokens=8000)
 
 
 def cacheable_tools(tools: List[Dict[str, Any]], name: str) -> List[Dict[str, Any]]:

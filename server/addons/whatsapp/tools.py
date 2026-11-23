@@ -1,16 +1,18 @@
 """WhatsApp tools over the user's own WAHA (see :mod:`addons.whatsapp.client`):
 chats, contact search, reading (lines from :mod:`addons.whatsapp.messages`),
-sending, forwarding, editing and deleting messages, and keeping a received file
-on a project item (``save_whatsapp_file``, docs/knowledge.md "Files").
+sending, forwarding, editing and deleting messages, reading a received file
+(``read_whatsapp_file``: ``llm.read_file``) and keeping one on a project item
+(``save_whatsapp_file``, docs/knowledge.md "Files").
 ``get_latest_messages`` is in :mod:`addons.whatsapp.latest`."""
 
 import logging
 import re
-from typing import Any, Dict, Optional
+from collections import OrderedDict
+from typing import Any, Dict, NamedTuple, Optional
 
 import httpx
 
-from core import clock
+from core import clock, llm
 from core.addons import Approval, Connection
 from core.addons.hooks import clean
 from core.users import User
@@ -18,6 +20,16 @@ from addons.whatsapp import client as waha, contacts as saved_contacts, messages
 from addons.whatsapp.addon import addon
 
 logger = logging.getLogger(__name__)
+
+
+def _message_id(message_id: str) -> Optional[str]:
+    """A message id as read_chat_messages shows it (backticks dropped), or None when it is not one."""
+    message_id = (message_id or "").strip().strip("`")
+    return message_id if "_" in message_id and "@" in message_id else None
+
+
+BAD_ID = ("Error: message_id must be a message's full id as shown (`id: ...`) by read_chat_messages / "
+          "get_latest_messages (e.g. 'false_15550101234@c.us_3EB0C0FFEE'). Read the chat first.")
 
 
 def _whatsapp_who(user: Optional[User], chat_id: Any) -> str:
@@ -82,8 +94,9 @@ async def find_last_chats(conn: Connection, limit: int = 10) -> str:
     """Find the most recent WhatsApp chats (conversation history overview).
 
     Args:
-        limit: The maximum number of chats to return (default is 10).
+        limit: The maximum number of chats to return (default 10, at most 50).
     """
+    limit = max(1, min(limit, 50))
     url, headers, session = waha.config(conn)
     endpoint = waha.api_url(conn, session, "chats", "overview")
     params = {"limit": limit}
@@ -171,6 +184,7 @@ async def find_last_chats(conn: Connection, limit: int = 10) -> str:
                             pass
 
                     if body:
+                        body = body if len(body) <= 200 else body[:200] + "…"
                         last_msg_str = f"'{body}' (sent by {sender_name}){time_str}"
                     elif last_msg.get("hasMedia"):
                         mimetype = last_msg.get("media", {}).get("mimetype", "unknown media") if last_msg.get("media") else "unknown media"
@@ -263,8 +277,9 @@ async def search_whatsapp_contact_or_chat(conn: Connection, query: str) -> str:
     if not matches:
         return f"No WhatsApp contacts or chats matching '{query}' found."
 
-    res_str = f"Found {len(matches)} matching contacts/chats for '{query}':\n"
-    for m in matches:
+    res_str = f"Found {len(matches)} matching contacts/chats for '{query}'"
+    res_str += " (the first 20; narrow the query):\n" if len(matches) > 20 else ":\n"
+    for m in matches[:20]:
         name_str = m["name"] or "Unnamed"
         res_str += f"- **{name_str}** ({m['type']}) -> ID: `{m['id']}`\n"
     return res_str
@@ -278,14 +293,15 @@ async def read_chat_messages(conn: Connection, chat_id: str, limit: int = 10) ->
     It supports bilingual matching (Hebrew <-> English translations/transliterations, e.g. 'ענבל' matches 'Inbal Cohen'), nicknames, and partial searches.
     When a name matches multiple contacts, the tool automatically prefers the most recently active one.
     If the name query is still ambiguous after recency filtering, it returns all candidates so you can ask the user to clarify.
-    Voice messages are transcribed, images saved, and other files (PDFs, documents, videos)
-    listed by name and type. Each message ends with its id (`id: ...`): pass it to
-    forward_whatsapp_message to pass a file or message along, or to reply / edit / delete.
+    Voice messages are transcribed; photos and other files (PDFs, documents, videos) are listed
+    by name and type: read_whatsapp_file reads one. Each message ends with its id (`id: ...`):
+    pass it to read_whatsapp_file, forward_whatsapp_message, or to reply / edit / delete.
 
     Args:
         chat_id: The WhatsApp chat ID (with @c.us/@g.us suffix), contact name, or group name.
-        limit: The maximum number of messages to retrieve (default is 10).
+        limit: The maximum number of messages to retrieve (default 10, at most 100).
     """
+    limit = max(1, min(limit, 100))
     url, headers, session = waha.config(conn)
     try:
         resolved_id, resolved_name = await resolve.resolve_chat_id_and_name(conn, chat_id)
@@ -515,10 +531,9 @@ async def forward_whatsapp_message(conn: Connection, chat_id: str, message_id: s
         what: A few words on what is being forwarded, shown to the user on the approval card (e.g. "Ori's price quote PDF").
     """
     url, headers, session = waha.config(conn)
-    message_id = (message_id or "").strip().strip("`")
-    if "_" not in message_id or "@" not in message_id:
-        return ("Error: message_id must be a message's full id as shown by read_chat_messages / "
-                "get_latest_messages (e.g. 'false_15550101234@c.us_3EB0C0FFEE'). Read the chat first.")
+    message_id = _message_id(message_id) or ""
+    if not message_id:
+        return BAD_ID
     try:
         resolved_id, resolved_name = await resolve.resolve_chat_id_and_name(conn, chat_id)
     except ValueError as ve:
@@ -560,6 +575,9 @@ async def edit_whatsapp_message(conn: Connection, chat_id: str, message_id: str,
         message_id: The id of your own message to edit, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_15550100301@c.us_3EB01234567890').
         new_text: The new text content for the message.
     """
+    message_id = _message_id(message_id) or ""
+    if not message_id:
+        return BAD_ID
     url, headers, session = waha.config(conn)
     try:
         resolved_id, resolved_name = await resolve.resolve_chat_id_and_name(conn, chat_id)
@@ -594,6 +612,9 @@ async def delete_whatsapp_message(conn: Connection, chat_id: str, message_id: st
         chat_id: The WhatsApp chat ID (e.g. '15550100301@c.us') or contact/group name (e.g. 'John', 'ORA').
         message_id: The id of your own message to delete, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'true_15550100301@c.us_3EB01234567890').
     """
+    message_id = _message_id(message_id) or ""
+    if not message_id:
+        return BAD_ID
     url, headers, session = waha.config(conn)
     try:
         resolved_id, resolved_name = await resolve.resolve_chat_id_and_name(conn, chat_id)
@@ -616,32 +637,18 @@ async def delete_whatsapp_message(conn: Connection, chat_id: str, message_id: st
             return f"Error connecting to WAHA API: {err_msg}"
 
 
-# The result names the file as its sender named it.
-@addon.tool(is_write=True, untrusted_result=True)
-async def save_whatsapp_file(conn: Connection, chat_id: str, message_id: str, item_id: str,
-                             note: Optional[str] = None) -> str:
-    """Keep a file someone sent on WhatsApp (a price quote PDF, a voice note, a video, a photo) on a
-    saved project item, so it opens from the project. Voice notes are transcribed onto the file.
+class _Media(NamedTuple):
+    """A file someone sent: its bytes, type and name (the sender's, or the chat and date)."""
+    data: bytes
+    mime: str
+    name: str
 
-    First read the chat (read_chat_messages / get_latest_messages) and take the message's id from its
-    `id: ...`; never make one up. Save the item first (save_knowledge_item) to have its ID.
 
-    Args:
-        chat_id: The chat the message is in: chat ID (with @c.us/@g.us suffix), contact name, or group name.
-        message_id: The full id of the message carrying the file, exactly as shown.
-        item_id: The ID of the project item (entry) to keep the file on.
-        note: Optional few words on what the file is (e.g. "הצעת מחיר", "Voice note about the discount").
-    """
-    from core.addons import store
-    from addons.knowledge import files as knowledge_files, projects as knowledge_projects
-    from addons.knowledge import tools as knowledge_tools
-
-    if not store.is_connected(conn.user, knowledge_projects.ADDON):
-        return "Error: Projects (knowledge) are not connected for this user, so there is nowhere to keep the file."
-    message_id = (message_id or "").strip().strip("`")
-    if "_" not in message_id or "@" not in message_id:
-        return ("Error: message_id must be a message's full id as shown by read_chat_messages / "
-                "get_latest_messages. Read the chat first.")
+async def _fetch_media(conn: Connection, chat_id: str, message_id: str) -> "_Media | str":
+    """The file a message carries, or an error to return."""
+    message_id = _message_id(message_id) or ""
+    if not message_id:
+        return BAD_ID
     try:
         resolved_id, resolved_name = await resolve.resolve_chat_id_and_name(conn, chat_id)
     except ValueError as ve:
@@ -663,20 +670,86 @@ async def save_whatsapp_file(conn: Connection, chat_id: str, message_id: str, it
     data = await waha.download_media_bytes(conn, media["url"])
     if not data:
         return "Error: The file could not be downloaded from WhatsApp."
-    mime = str(media.get("mimetype") or "application/octet-stream")
+    mime = str(media.get("mimetype") or "application/octet-stream").split(";")[0].strip()
     name = str(media.get("filename") or "").strip()
     if not name:
         stamp = clock.from_timestamp(msg["timestamp"]).strftime("%Y-%m-%d %H.%M") if msg.get("timestamp") else ""
-        name = f"{resolved_name} {stamp}".strip()
         ext = {"audio/ogg": ".ogg", "video/mp4": ".mp4", "image/jpeg": ".jpg", "image/png": ".png",
-               "application/pdf": ".pdf"}.get(mime.split(";")[0].strip())
-        name += ext or ""
+               "application/pdf": ".pdf"}.get(mime, "")
+        name = f"{resolved_name} {stamp}".strip() + ext
+    return _Media(data, mime, name)
+
+
+# What read_whatsapp_file read lately ((user, message id) → text), so keeping the file
+# right after (save_whatsapp_file) does not read it again.
+_read_texts: "OrderedDict[tuple, str]" = OrderedDict()
+FILE_TEXT_CHARS = 10_000
+
+
+@addon.tool(untrusted_result=True)
+async def read_whatsapp_file(conn: Connection, chat_id: str, message_id: str) -> str:
+    """Read a file someone sent on WhatsApp: a PDF's or document's text (a quote, a contract), what
+    a photo shows and its text, or a voice note's transcript. Use it whenever the details are in the
+    file rather than the messages. Take the id from read_chat_messages / get_latest_messages.
+
+    Args:
+        chat_id: The chat the message is in: chat ID (with @c.us/@g.us suffix), contact name, or group name.
+        message_id: The full id of the message carrying the file, exactly as shown (`id: ...`).
+    """
+    media = await _fetch_media(conn, chat_id, message_id)
+    if isinstance(media, str):
+        return media
+    head = f"{media.name} ({media.mime}, {round(len(media.data) / 1024)} KB)"
+    if not llm.readable(media.mime, len(media.data)):
+        return f"Error: Dana can't read {head}: only PDFs, photos, audio and text files up to 14 MB."
     try:
-        saved = knowledge_files.add_file(conn.user, item_id, name, mime, data, source="whatsapp", note=note or "")
+        text = await llm.read_file(media.data, media.mime, purpose="whatsapp_file", ref=message_id)
+    except Exception as e:
+        logger.warning(f"Reading WhatsApp file {message_id} failed: {e}")
+        return f"Error: {head} could not be read ({str(e).strip() or type(e).__name__})."
+    if not text:
+        return f"{head}: no text in it."
+    _read_texts[(conn.user.id, _message_id(message_id))] = text
+    while len(_read_texts) > 32:
+        _read_texts.popitem(last=False)
+    cut = f"\n… (cut, {len(text):,} chars)" if len(text) > FILE_TEXT_CHARS else ""
+    return f"{head}:\n{text[:FILE_TEXT_CHARS]}{cut}"
+
+
+# The result names the file as its sender named it.
+@addon.tool(is_write=True, untrusted_result=True)
+async def save_whatsapp_file(conn: Connection, chat_id: str, message_id: str, item_id: str,
+                             note: Optional[str] = None) -> str:
+    """Keep a file someone sent on WhatsApp (a price quote PDF, a voice note, a video, a photo) on a
+    saved project item, so it opens from the project; Dana reads its text onto the file
+    (get_knowledge_item shows it).
+
+    Take the message's id from read_chat_messages / get_latest_messages (`id: ...`); never make one
+    up. Save the item first (save_knowledge_item) to have its ID.
+
+    Args:
+        chat_id: The chat the message is in: chat ID (with @c.us/@g.us suffix), contact name, or group name.
+        message_id: The full id of the message carrying the file, exactly as shown.
+        item_id: The ID of the project item (entry) to keep the file on.
+        note: Optional few words on what the file is (e.g. "הצעת מחיר", "Voice note about the discount").
+    """
+    from core.addons import store
+    from addons.knowledge import files as knowledge_files, projects as knowledge_projects
+    from addons.knowledge import tools as knowledge_tools
+
+    if not store.is_connected(conn.user, knowledge_projects.ADDON):
+        return "Error: Projects (knowledge) are not connected for this user, so there is nowhere to keep the file."
+    media = await _fetch_media(conn, chat_id, message_id)
+    if isinstance(media, str):
+        return media
+    text = _read_texts.get((conn.user.id, _message_id(message_id)))
+    try:
+        saved = knowledge_files.add_file(conn.user, item_id, media.name, media.mime, media.data, source="whatsapp",
+                                         note=note or "", transcript=text)
     except Exception as e:  # ReadOnly, TooLarge
         return f"Error: {e}"
     if saved is None:
         return f"Error: No project item with ID `{item_id}`. Use list_project_entries to find it."
     knowledge_tools.record_file_added(conn.user, item_id, saved)
-    extra = " It is being transcribed." if mime.startswith("audio/") else ""
-    return f"Kept '{saved['name']}' ({round(len(data) / 1024)} KB) on the item.{extra}"
+    extra = " Its text is being read." if not text and llm.readable(media.mime, len(media.data)) else ""
+    return f"Kept '{saved['name']}' ({round(len(media.data) / 1024)} KB) on the item.{extra}"

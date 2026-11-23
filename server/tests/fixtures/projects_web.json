@@ -4,7 +4,36 @@
    {
     "body": "",
     "comments": [],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:27",
+    "decision": "shortlist",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר",
+      "type": "money",
+      "value": 6000
+     }
+    ],
+    "files": [],
+    "id": "31ab956e-89b6-4d23-bff8-215392336984",
+    "kind": "record",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
+    "section_id": "4a6e584f-3581-45c5-b2a1-7702828040e0",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "DJ Noa",
+    "transcript": null,
+    "updated_at": "2026-11-23 20:26:27",
+    "url": null
+   },
+   {
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-23 20:26:26",
     "decision": "chosen",
     "due_at": null,
     "fields": [
@@ -21,37 +50,37 @@
     ],
     "files": [
      {
-      "created_at": "2026-11-21 14:03:37",
-      "entry_id": "49d46a47-6a70-45a4-827f-71f964654be3",
-      "id": "1f51f0a17cc94ae39ee8367b9cb7b117",
+      "created_at": "2026-11-23 20:26:26",
+      "entry_id": "849187f7-3af8-4423-b331-85d0686fe972",
+      "id": "44a7d2edd5d94cf098fafa4f7d59e4a0",
       "mime": "application/pdf",
       "name": "הצעת מחיר.pdf",
       "note": "הצעת מחיר",
       "size": 14,
       "source": "upload",
-      "transcript": null,
-      "url": "/api/entries/49d46a47-6a70-45a4-827f-71f964654be3/files/1f51f0a17cc94ae39ee8367b9cb7b117"
+      "transcript": "text of 14 bytes",
+      "url": "/api/entries/849187f7-3af8-4423-b331-85d0686fe972/files/44a7d2edd5d94cf098fafa4f7d59e4a0"
      }
     ],
-    "id": "49d46a47-6a70-45a4-827f-71f964654be3",
+    "id": "849187f7-3af8-4423-b331-85d0686fe972",
     "kind": "note",
     "media_path": null,
     "priority": "medium",
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
-    "section_id": "c15d2c78-c8de-4acc-aee0-f89795c07d92",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
+    "section_id": "8368a6f2-cbef-450c-b231-ae70c04c78e3",
     "source_author": null,
     "status": "open",
     "summary": null,
     "tags": [],
     "title": "אורי עשור",
     "transcript": null,
-    "updated_at": "2026-11-21 14:03:37",
+    "updated_at": "2026-11-23 20:26:26",
     "url": null
    },
    {
     "body": "",
     "comments": [],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "decision": "shortlist",
     "due_at": null,
     "fields": [
@@ -67,25 +96,25 @@
      }
     ],
     "files": [],
-    "id": "7f378b7f-89a6-474a-ade8-087a045c8f54",
+    "id": "beeac2bd-d87c-4695-b054-ee2e8ce59c8c",
     "kind": "note",
     "media_path": null,
     "priority": "medium",
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
-    "section_id": "c15d2c78-c8de-4acc-aee0-f89795c07d92",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
+    "section_id": "8368a6f2-cbef-450c-b231-ae70c04c78e3",
     "source_author": null,
     "status": "open",
     "summary": null,
     "tags": [],
     "title": "אטדגי",
     "transcript": null,
-    "updated_at": "2026-11-21 14:03:37",
+    "updated_at": "2026-11-23 20:26:26",
     "url": null
    },
    {
     "body": "",
     "comments": [],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "decision": "rejected",
     "due_at": null,
     "fields": [
@@ -101,125 +130,96 @@
      }
     ],
     "files": [],
-    "id": "c664f6f4-61c5-4c94-b390-5b39f99f7978",
+    "id": "172aaf72-2a36-4880-ae6a-fdb4504c3c5b",
     "kind": "note",
     "media_path": null,
     "priority": "medium",
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
-    "section_id": "c15d2c78-c8de-4acc-aee0-f89795c07d92",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
+    "section_id": "8368a6f2-cbef-450c-b231-ae70c04c78e3",
     "source_author": null,
     "status": "open",
     "summary": null,
     "tags": [],
     "title": "רובין קובי",
     "transcript": null,
-    "updated_at": "2026-11-21 14:03:37",
-    "url": null
-   },
-   {
-    "body": "",
-    "comments": [],
-    "created_at": "2026-11-21 14:03:37",
-    "decision": "shortlist",
-    "due_at": null,
-    "fields": [
-     {
-      "name": "מחיר",
-      "type": "money",
-      "value": 6000
-     }
-    ],
-    "files": [],
-    "id": "a6dc723b-ac86-4c06-830b-a141d3ee59b1",
-    "kind": "record",
-    "media_path": null,
-    "priority": "medium",
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
-    "section_id": "784a4ba8-aeda-4f11-9a47-c0fd4e19218f",
-    "source_author": null,
-    "status": "open",
-    "summary": null,
-    "tags": [],
-    "title": "DJ Noa",
-    "transcript": null,
-    "updated_at": "2026-11-21 14:03:37",
+    "updated_at": "2026-11-23 20:26:26",
     "url": null
    }
   ],
   "project": {
    "budget": 150000.0,
    "color": "#6366f1",
-   "created_at": "2026-11-21 14:03:37",
+   "created_at": "2026-11-23 20:26:26",
    "currency": "ILS",
    "description": "",
    "icon": "💍",
-   "id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
+   "id": "9bf90387-7217-4a40-ae03-2ced610550bf",
    "status": "active",
    "tags": [],
    "target_date": "2027-09-20",
    "title": "חתונה",
-   "updated_at": "2026-11-21 14:03:37"
+   "updated_at": "2026-11-23 20:26:26"
   },
   "sections": [
    {
     "columns": [
      {
-      "key": "2b034a27",
+      "key": "6ccdb553",
       "name": "מחיר כולל",
       "role": "price",
       "type": "money"
      },
      {
-      "key": "4198ac1d",
+      "key": "0dd8ecce",
       "name": "טלפון",
       "type": "phone"
      },
      {
-      "key": "3215a670",
+      "key": "47de4692",
       "name": "וידאו",
       "type": "checkbox"
      }
     ],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "icon": "📸",
-    "id": "c15d2c78-c8de-4acc-aee0-f89795c07d92",
+    "id": "8368a6f2-cbef-450c-b231-ae70c04c78e3",
     "kind": "options",
     "position": 0,
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
     "summary": "## TL;DR\n- אורי: 13,400",
     "title": "צלמים",
-    "updated_at": "2026-11-21 14:03:37"
+    "updated_at": "2026-11-23 20:26:27"
    },
    {
     "columns": [],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "icon": "",
-    "id": "17ca7789-fd47-4c2f-9122-5a6917e11258",
+    "id": "3f8415ac-b84e-4354-84ff-06a1a0825643",
     "kind": "notes",
     "position": 1,
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
     "summary": "",
     "title": "רעיונות",
-    "updated_at": "2026-11-21 14:03:37"
+    "updated_at": "2026-11-23 20:26:26"
    },
    {
     "columns": [
      {
-      "key": "1a1f89e3",
+      "key": "8741173d",
       "name": "מחיר",
       "role": "price",
       "type": "money"
      }
     ],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "icon": "",
-    "id": "784a4ba8-aeda-4f11-9a47-c0fd4e19218f",
+    "id": "4a6e584f-3581-45c5-b2a1-7702828040e0",
     "kind": "options",
     "position": 2,
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
     "summary": "",
     "title": "DJ",
-    "updated_at": "2026-11-21 14:03:37"
+    "updated_at": "2026-11-23 20:26:26"
    }
   ],
   "tasks": []
@@ -230,7 +230,38 @@
     "access": "read",
     "body": "",
     "comments": [],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:27",
+    "decision": "shortlist",
+    "due_at": null,
+    "fields": [
+     {
+      "name": "מחיר",
+      "type": "money",
+      "value": 6000
+     }
+    ],
+    "files": [],
+    "id": "31ab956e-89b6-4d23-bff8-215392336984",
+    "kind": "record",
+    "media_path": null,
+    "priority": "medium",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
+    "section_id": "4a6e584f-3581-45c5-b2a1-7702828040e0",
+    "shared_by": "Robin Levi",
+    "source_author": null,
+    "status": "open",
+    "summary": null,
+    "tags": [],
+    "title": "DJ Noa",
+    "transcript": null,
+    "updated_at": "2026-11-23 20:26:27",
+    "url": null
+   },
+   {
+    "access": "read",
+    "body": "",
+    "comments": [],
+    "created_at": "2026-11-23 20:26:26",
     "decision": "chosen",
     "due_at": null,
     "fields": [
@@ -247,24 +278,24 @@
     ],
     "files": [
      {
-      "created_at": "2026-11-21 14:03:37",
-      "entry_id": "49d46a47-6a70-45a4-827f-71f964654be3",
-      "id": "1f51f0a17cc94ae39ee8367b9cb7b117",
+      "created_at": "2026-11-23 20:26:26",
+      "entry_id": "849187f7-3af8-4423-b331-85d0686fe972",
+      "id": "44a7d2edd5d94cf098fafa4f7d59e4a0",
       "mime": "application/pdf",
       "name": "הצעת מחיר.pdf",
       "note": "הצעת מחיר",
       "size": 14,
       "source": "upload",
-      "transcript": null,
-      "url": "/api/entries/49d46a47-6a70-45a4-827f-71f964654be3/files/1f51f0a17cc94ae39ee8367b9cb7b117"
+      "transcript": "text of 14 bytes",
+      "url": "/api/entries/849187f7-3af8-4423-b331-85d0686fe972/files/44a7d2edd5d94cf098fafa4f7d59e4a0"
      }
     ],
-    "id": "49d46a47-6a70-45a4-827f-71f964654be3",
+    "id": "849187f7-3af8-4423-b331-85d0686fe972",
     "kind": "note",
     "media_path": null,
     "priority": "medium",
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
-    "section_id": "c15d2c78-c8de-4acc-aee0-f89795c07d92",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
+    "section_id": "8368a6f2-cbef-450c-b231-ae70c04c78e3",
     "shared_by": "Robin Levi",
     "source_author": null,
     "status": "open",
@@ -272,14 +303,14 @@
     "tags": [],
     "title": "אורי עשור",
     "transcript": null,
-    "updated_at": "2026-11-21 14:03:37",
+    "updated_at": "2026-11-23 20:26:26",
     "url": null
    },
    {
     "access": "read",
     "body": "",
     "comments": [],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "decision": "shortlist",
     "due_at": null,
     "fields": [
@@ -295,12 +326,12 @@
      }
     ],
     "files": [],
-    "id": "7f378b7f-89a6-474a-ade8-087a045c8f54",
+    "id": "beeac2bd-d87c-4695-b054-ee2e8ce59c8c",
     "kind": "note",
     "media_path": null,
     "priority": "medium",
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
-    "section_id": "c15d2c78-c8de-4acc-aee0-f89795c07d92",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
+    "section_id": "8368a6f2-cbef-450c-b231-ae70c04c78e3",
     "shared_by": "Robin Levi",
     "source_author": null,
     "status": "open",
@@ -308,14 +339,14 @@
     "tags": [],
     "title": "אטדגי",
     "transcript": null,
-    "updated_at": "2026-11-21 14:03:37",
+    "updated_at": "2026-11-23 20:26:26",
     "url": null
    },
    {
     "access": "read",
     "body": "",
     "comments": [],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "decision": "rejected",
     "due_at": null,
     "fields": [
@@ -331,12 +362,12 @@
      }
     ],
     "files": [],
-    "id": "c664f6f4-61c5-4c94-b390-5b39f99f7978",
+    "id": "172aaf72-2a36-4880-ae6a-fdb4504c3c5b",
     "kind": "note",
     "media_path": null,
     "priority": "medium",
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
-    "section_id": "c15d2c78-c8de-4acc-aee0-f89795c07d92",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
+    "section_id": "8368a6f2-cbef-450c-b231-ae70c04c78e3",
     "shared_by": "Robin Levi",
     "source_author": null,
     "status": "open",
@@ -344,38 +375,7 @@
     "tags": [],
     "title": "רובין קובי",
     "transcript": null,
-    "updated_at": "2026-11-21 14:03:37",
-    "url": null
-   },
-   {
-    "access": "read",
-    "body": "",
-    "comments": [],
-    "created_at": "2026-11-21 14:03:37",
-    "decision": "shortlist",
-    "due_at": null,
-    "fields": [
-     {
-      "name": "מחיר",
-      "type": "money",
-      "value": 6000
-     }
-    ],
-    "files": [],
-    "id": "a6dc723b-ac86-4c06-830b-a141d3ee59b1",
-    "kind": "record",
-    "media_path": null,
-    "priority": "medium",
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
-    "section_id": "784a4ba8-aeda-4f11-9a47-c0fd4e19218f",
-    "shared_by": "Robin Levi",
-    "source_author": null,
-    "status": "open",
-    "summary": null,
-    "tags": [],
-    "title": "DJ Noa",
-    "transcript": null,
-    "updated_at": "2026-11-21 14:03:37",
+    "updated_at": "2026-11-23 20:26:26",
     "url": null
    }
   ],
@@ -383,78 +383,78 @@
    "access": "read",
    "budget": 150000.0,
    "color": "#6366f1",
-   "created_at": "2026-11-21 14:03:37",
+   "created_at": "2026-11-23 20:26:26",
    "currency": "ILS",
    "description": "",
    "icon": "💍",
-   "id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
+   "id": "9bf90387-7217-4a40-ae03-2ced610550bf",
    "shared_by": "Robin Levi",
    "status": "active",
    "tags": [],
    "target_date": "2027-09-20",
    "title": "חתונה",
-   "updated_at": "2026-11-21 14:03:37"
+   "updated_at": "2026-11-23 20:26:26"
   },
   "sections": [
    {
     "columns": [
      {
-      "key": "2b034a27",
+      "key": "6ccdb553",
       "name": "מחיר כולל",
       "role": "price",
       "type": "money"
      },
      {
-      "key": "4198ac1d",
+      "key": "0dd8ecce",
       "name": "טלפון",
       "type": "phone"
      },
      {
-      "key": "3215a670",
+      "key": "47de4692",
       "name": "וידאו",
       "type": "checkbox"
      }
     ],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "icon": "📸",
-    "id": "c15d2c78-c8de-4acc-aee0-f89795c07d92",
+    "id": "8368a6f2-cbef-450c-b231-ae70c04c78e3",
     "kind": "options",
     "position": 0,
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
     "summary": "## TL;DR\n- אורי: 13,400",
     "title": "צלמים",
-    "updated_at": "2026-11-21 14:03:37"
+    "updated_at": "2026-11-23 20:26:27"
    },
    {
     "columns": [],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "icon": "",
-    "id": "17ca7789-fd47-4c2f-9122-5a6917e11258",
+    "id": "3f8415ac-b84e-4354-84ff-06a1a0825643",
     "kind": "notes",
     "position": 1,
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
     "summary": "",
     "title": "רעיונות",
-    "updated_at": "2026-11-21 14:03:37"
+    "updated_at": "2026-11-23 20:26:26"
    },
    {
     "columns": [
      {
-      "key": "1a1f89e3",
+      "key": "8741173d",
       "name": "מחיר",
       "role": "price",
       "type": "money"
      }
     ],
-    "created_at": "2026-11-21 14:03:37",
+    "created_at": "2026-11-23 20:26:26",
     "icon": "",
-    "id": "784a4ba8-aeda-4f11-9a47-c0fd4e19218f",
+    "id": "4a6e584f-3581-45c5-b2a1-7702828040e0",
     "kind": "options",
     "position": 2,
-    "project_id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
+    "project_id": "9bf90387-7217-4a40-ae03-2ced610550bf",
     "summary": "",
     "title": "DJ",
-    "updated_at": "2026-11-21 14:03:37"
+    "updated_at": "2026-11-23 20:26:26"
    }
   ],
   "tasks": []
@@ -464,21 +464,21 @@
    "budget": 150000.0,
    "color": "#6366f1",
    "committed": 13400,
-   "created_at": "2026-11-21 14:03:37",
+   "created_at": "2026-11-23 20:26:26",
    "currency": "ILS",
    "decided": 1,
    "decisions": 2,
    "description": "",
    "entry_count": 4,
    "icon": "💍",
-   "id": "8c58daa9-fe55-42de-b97c-f1477a153b17",
+   "id": "9bf90387-7217-4a40-ae03-2ced610550bf",
    "section_count": 3,
    "status": "active",
    "tags": [],
    "target_date": "2027-09-20",
    "task_count": 0,
    "title": "חתונה",
-   "updated_at": "2026-11-21 14:03:37"
+   "updated_at": "2026-11-23 20:26:26"
   }
  ]
 }

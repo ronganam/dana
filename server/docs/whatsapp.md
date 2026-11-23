@@ -36,12 +36,13 @@ message through `messages.format_message`: `[time] **sender**: content (id:
 `…`)`. The id (WAHA's serialized id, `false_<chat>_<id>`) is the handle for
 `forward_whatsapp_message`, `edit_whatsapp_message`,
 `delete_whatsapp_message` and `send_whatsapp_message(reply_to=)`. Media is
-described, and a caption is kept after it: a voice note transcribed, an image
-saved (below), any other file as `[File: <name> (<mimetype>)]` (`Video` /
-`Audio` for those). WAHA is asked to download only `audio/` and `image/`
-(`downloadMediaMimetypes`); other files come with their name and type and no
-download. The read tools (and `find_last_chats`, which shows last messages,
-and `save_whatsapp_file`, which names the file as its sender did) are
+described, and a caption is kept after it: a voice note transcribed, any
+other file as `[File: <name> (<mimetype>)]` (`Image` / `Video` / `Audio` for
+those). WAHA is asked to download only `audio/` (`downloadMediaMimetypes`);
+other files come with their name and type and no download, and
+`read_whatsapp_file` reads one when it matters. The read tools (and
+`find_last_chats`, which shows last messages, and `read_whatsapp_file` /
+`save_whatsapp_file`, which carry the file's text and name) are
 `untrusted_result`: their text is written by other people, so the model
 reads it framed (`core.text.untrusted`) and the rest of the turn asks before
 any `acts_outside` tool (docs/agent-actions.md, "Text written by others").
@@ -52,24 +53,25 @@ way.
 (`confirm`) posts WAHA's `/api/forwardMessage` with the connection's session:
 WAHA forwards the stored message itself (a PDF, photo, video, voice note or
 text), so nothing passes through Dana and no URL is needed. An id without
-`_` and `@` is refused before any request; WAHA's 422 (not in its store) is
+`_` and `@` is refused before any request (by every tool taking a message id); WAHA's 422 (not in its store) is
 reported as "no message with id". The approval card shows the recipient,
 `what` (the model's few words) and the source chat read from the id (not for
 a `@lid` chat). `send_whatsapp_file` stays for files at a public URL.
 
-**Saving a file to a project.** `save_whatsapp_file(chat_id, message_id,
-item_id, note)` (needs the knowledge addon; a write with Undo) downloads that
-message's media through WAHA (`downloadMedia=true`) and attaches it to the
-project entry `item_id` (`addons/knowledge/files.py`, source
-`whatsapp`); the file keeps its name, or gets the chat's name and the
-message's time. A voice note is transcribed onto the file. Docs/knowledge.md
-→ Sections, decisions and files.
+**Reading a file.** `read_whatsapp_file(chat_id, message_id)` downloads that
+message's media through WAHA (`downloadMedia=true`) and returns its text
+(`llm.read_file`, purpose `whatsapp_file`): a PDF or document written out, a
+photo described with its text, a voice note transcribed; up to 10,000
+characters (longer is cut, with a note). The last 32 texts are remembered per
+user and message, so keeping the file right after does not read it again.
 
-**Images** a tool fetches (`read_chat_messages`, `get_latest_messages`) are
-saved for the connection's user (`core/images.py`, table `uploaded_images`):
-`/api/images/{name}` serves a file only to its owner (404 for anyone else),
-and a message can attach only the sender's own images (another user's URL is
-dropped; it never reaches the model).
+**Saving a file to a project.** `save_whatsapp_file(chat_id, message_id,
+item_id, note)` (needs the knowledge addon; a write with Undo) downloads the
+media the same way and attaches it to the project entry `item_id`
+(`addons/knowledge/files.py`, source `whatsapp`); the file keeps its name, or
+gets the chat's name and the message's time. Its text is the one
+`read_whatsapp_file` just read, else it is read in the background.
+Docs/knowledge.md → Sections, decisions and files.
 
 ## Inbound events (`/webhook/waha`)
 

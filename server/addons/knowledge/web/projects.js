@@ -484,7 +484,7 @@
       </div>
       ${f.note ? `<div class="prj-file-note" dir="auto">${esc(f.note)}</div>` : ""}
       ${media}
-      ${f.transcript ? `<details class="prj-transcript"><summary>${t("Transcript", "תמלול")}</summary><p dir="auto">${esc(f.transcript)}</p></details>` : ""}
+      ${f.transcript ? `<details class="prj-transcript"><summary>${(f.mime || "").startsWith("audio/") ? t("Transcript", "תמלול") : t("Text", "טקסט")}</summary><p dir="auto">${esc(f.transcript)}</p></details>` : ""}
     </div>`;
   }
 
