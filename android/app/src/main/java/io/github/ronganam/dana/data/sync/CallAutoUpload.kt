@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.MediaMetadataRetriever
+import android.net.Uri
 import android.provider.CallLog
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -34,6 +35,7 @@ object CallUploadSettings {
     private const val KEY_THRESHOLD = "call_auto_threshold_seconds"
     private const val KEY_WIFI = "call_upload_wifi_only"
     private const val KEY_SKIP = "call_skip_contacts"
+    private const val KEY_PAST_RANGE = "call_past_range"
 
     private fun prefs(c: Context) = ServerConfig.prefs(c)
 
@@ -53,6 +55,10 @@ object CallUploadSettings {
     /** Calls at least this long upload by themselves; shorter ones ask first. */
     fun thresholdSeconds(c: Context): Int = prefs(c).getInt(KEY_THRESHOLD, 10)
     fun setThresholdSeconds(c: Context, v: Int) = prefs(c).edit { putInt(KEY_THRESHOLD, v.coerceIn(0, 600)) }
+
+    /** How far back "Upload past recordings" goes (the last choice). */
+    fun pastRange(c: Context): PastRecordings.Range = PastRecordings.Range.of(prefs(c).getString(KEY_PAST_RANGE, null))
+    fun setPastRange(c: Context, v: PastRecordings.Range) = prefs(c).edit { putString(KEY_PAST_RANGE, v.name) }
 
     fun wifiOnly(c: Context): Boolean = prefs(c).getBoolean(KEY_WIFI, false)
     fun setWifiOnly(c: Context, v: Boolean) = prefs(c).edit { putBoolean(KEY_WIFI, v) }
@@ -80,18 +86,27 @@ object RecordingInspector {
     private const val TAG = "RecordingInspector"
 
     /** Length of an audio file in seconds (0 when unreadable). */
-    fun durationSeconds(file: File): Int {
+    fun durationSeconds(file: File): Int = duration(file.name) { it.setDataSource(file.absolutePath) }
+
+    /** Length of the audio at a readable [uri] in seconds, without copying it (0 when unreadable). */
+    fun durationSeconds(context: Context, uri: Uri): Int = duration(uri.toString()) { it.setDataSource(context, uri) }
+
+    private fun duration(label: String, source: (MediaMetadataRetriever) -> Unit): Int {
         val r = MediaMetadataRetriever()
         return try {
-            r.setDataSource(file.absolutePath)
+            source(r)
             ((r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L) / 1000L).toInt()
         } catch (e: Exception) {
-            Log.w(TAG, "Couldn't read duration of ${file.name}", e)
+            Log.w(TAG, "Couldn't read duration of $label", e)
             0
         } finally {
             runCatching { r.release() }
         }
     }
+
+    /** Who the call was with: the file name's name, the call log's, then a number. */
+    fun contactOf(rec: RecordingName, call: LoggedCall?): String =
+        rec.name ?: call?.name ?: rec.number ?: call?.number ?: "Unknown"
 
     /** The call log from [fromMs] to [toMs], newest first (empty without READ_CALL_LOG). */
     fun callLog(context: Context, fromMs: Long, toMs: Long, limit: Int = 200): List<LoggedCall> {
@@ -146,13 +161,17 @@ object RecordingInspector {
         return describe(file, rec, matchCall(context, rec, modifiedMs), modifiedMs)
     }
 
-    /** The upload's details for [file] as the call [call] (null: what the file name and time say). */
-    fun describe(file: File, rec: RecordingName, call: LoggedCall?, modifiedMs: Long): RecordingMeta {
+    /**
+     * The upload's details for [file] as the call [call] (null: what the file name and time say).
+     * [fileDuration]: the recording's length when already read.
+     */
+    fun describe(
+        file: File, rec: RecordingName, call: LoggedCall?, modifiedMs: Long, fileDuration: Int = durationSeconds(file)
+    ): RecordingMeta {
         val zone = ZoneId.systemDefault()
-        val fileDuration = durationSeconds(file)
         // The recording is the truth for length (the log counts ringing/hold on some ROMs).
         val duration = if (fileDuration > 0) fileDuration else call?.durationSeconds ?: 0
-        val contact = rec.name ?: call?.name ?: rec.number ?: call?.number ?: "Unknown"
+        val contact = contactOf(rec, call)
         val start = when {
             call != null -> LocalDateTime.ofInstant(java.time.Instant.ofEpochMilli(call.startMs), zone)
             rec.start != null -> rec.start
