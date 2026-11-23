@@ -147,9 +147,7 @@ async def update_shopping_items(conn: Connection, action: Literal["bought", "to_
                 names, _ = store_items.set_checked(user, lst, ids, action == "bought", source="update_shopping_items")
                 state = "bought" if action == "bought" else "back on the list"
                 done = f"Marked {', '.join(names)} {state}." if names else f"Already {state}."
-    except ReadOnly as e:
-        return f"Error: {e}"
-    except (Duplicate, NotFound) as e:
+    except (ReadOnly, Duplicate, NotFound) as e:
         return f"Error: {e}"
     out = " ".join(x for x in [done] + [p + "." for p in problems] if x)
     return (out or "Error: no items named.") + _note(lst)

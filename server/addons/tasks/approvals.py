@@ -2,7 +2,6 @@
 (``@addon.tool(describe=...)``: ``f(user, args)``; core/approval_text.py shows them)."""
 
 import datetime
-import re
 from typing import Any, Dict, Optional
 
 from core import clock
@@ -10,8 +9,6 @@ from core.addons import Approval, helpers
 from core.addons.hooks import clean
 from core.users import User
 from addons.tasks import service
-
-_UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.I)
 
 
 def _quote(text: Any, limit: int = 80) -> str:
@@ -22,7 +19,7 @@ def _title(user: Optional[User], item: Any) -> str:
     """The task an ``item`` argument names: its title when it is the id of a
     task ``user`` can see, else the argument itself ("" for an unseen id)."""
     raw = clean(item, 200)
-    m = _UUID.search(raw)
+    m = service.TASK_ID.search(raw)
     if not m:
         return raw
     task = service.get_task(user, m.group(0))

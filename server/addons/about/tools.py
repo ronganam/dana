@@ -1,7 +1,7 @@
 import logging
-from typing import Any, Callable, Dict, Literal, Optional
+from typing import Any, Dict, Literal, Optional
 
-from core import undo
+from core.undoable import safe_record
 from core.text import escape_markdown
 from core.users import User
 from addons.about import facts, legacy
@@ -26,13 +26,6 @@ logger = logging.getLogger(__name__)
 Section = Literal["people", "home", "habits", "other"]
 
 
-def _record_undo(label: str, fn: Callable[[], object], source: str) -> None:
-    try:
-        undo.record(label, fn, source=source)
-    except Exception:
-        logger.warning(f"Could not register undo for {source}", exc_info=True)
-
-
 def _fmt_fact(f: dict) -> str:
     return f"- {f['text']} ({f['section']}, from {f['source']}; id {f['id']})"
 
@@ -54,9 +47,9 @@ def _describe_forget(user: Optional[User], a: Dict[str, Any]) -> Approval:
 @addon.tool(acts_outside=True, describe=_describe_remember)
 async def remember_info(conn: Connection, fact: str = "", section: Optional[Section] = None, replaces: Optional[str] = None,
                         **kwargs) -> str:
-    """Save a durable fact about the owner in "About you". It is kept at once (no approval) and the owner gets an Undo button.
+    """Save a durable fact about the owner in "About you" (kept at once, with an Undo button).
 
-    Call it on your own, without being asked, whenever you learn something that will still be true and useful in a month: who a person is to the owner, what a nickname, place or device name refers to, a standing preference or routine. Also call it when the owner says "remember ...". Never save passwords, codes, account or card numbers, health or money details, plans or one-time events, or guesses the owner did not confirm. Saved facts are already in your instructions in every conversation, so do not re-save what is there; reply briefly ("Noted.") after saving.
+    Call it without being asked for what will still be true and useful in a month (who a person is to the owner, what a nickname, place or device name means, a standing preference or routine), and when told "remember ...". Never save passwords, codes, account or card numbers, health or money details, plans, one-time events or unconfirmed guesses. Don't re-save what your instructions already list; reply briefly ("Noted.") after saving.
 
     Args:
         fact: One short plain sentence in the owner's language, e.g. "Dan is Maya's brother" or "'The gate' means the front gate". Required.
@@ -82,7 +75,7 @@ async def remember_info(conn: Connection, fact: str = "", section: Optional[Sect
             if old:
                 snapshot = facts.snapshot(user, old["id"])
                 new = facts.update_fact(user, old["id"], text=text, section=section, source_kind="told")
-                _record_undo(f"Changed back: {old['text']}", lambda: facts.restore_snapshot(user, snapshot),
+                safe_record(f"Changed back: {old['text']}", lambda: facts.restore_snapshot(user, snapshot),
                              "remember_info")
                 return f"Updated in About you: {escape_markdown(new['text'])}"
             if cands:
@@ -95,7 +88,7 @@ async def remember_info(conn: Connection, fact: str = "", section: Optional[Sect
         if not created:
             return f"Already known: {escape_markdown(new['text'])}"
         fid = new["id"]
-        _record_undo(f"Saved: {new['text']}", lambda: facts.forget_fact(user, fid), "remember_info")
+        safe_record(f"Saved: {new['text']}", lambda: facts.forget_fact(user, fid), "remember_info")
         return f"Saved in About you ({new['section']}): {escape_markdown(new['text'])}"
     except (ValueError, LookupError) as e:
         return f"Error: {e}"
@@ -144,7 +137,7 @@ async def forget_info(conn: Connection, fact: str = "", **kwargs) -> str:
         if match:
             facts.forget_fact(user, match["id"])
             fid = match["id"]
-            _record_undo(f"Forgot: {match['text']}", lambda: facts.restore_fact(user, fid), "forget_info")
+            safe_record(f"Forgot: {match['text']}", lambda: facts.restore_fact(user, fid), "forget_info")
             return f"Forgot: {escape_markdown(match['text'])}"
         if cands:
             return "Which one? Call again with its id:\n" + escape_markdown("\n".join(_fmt_fact(c) for c in cands))
@@ -152,7 +145,7 @@ async def forget_info(conn: Connection, fact: str = "", **kwargs) -> str:
         key = target.lower().replace(" ", "_")
         row = legacy.old_memory(user, key)
         if row and legacy.delete_old_memory(user, key):
-            _record_undo(f"Deleted old memory {key}", lambda: legacy.restore_old_memory(row), "forget_info")
+            safe_record(f"Deleted old memory {key}", lambda: legacy.restore_old_memory(row), "forget_info")
             return f"Deleted old memory '{escape_markdown(key)}'."
         return f"No fact matches '{escape_markdown(target)}'."
     except Exception as e:

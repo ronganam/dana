@@ -318,7 +318,7 @@ def update(user: User, lst: ShoppingList, item_id: str, changes: Dict[str, Any],
         if changes.get("category") is not None:
             category = str(changes["category"])
             if category not in aisles.RANK:
-                raise ValueError(f"Unknown aisle '{category}'.")
+                raise ValueError(f"Unknown aisle '{category}'. Aisles: {', '.join(aisles.RANK)}.")
             journal.row(conn, "shopping_aisle_choices", list_id=lst.id, name_key=sets.get("name_key", row["name_key"]))
             aisles.remember_choice(conn, lst.id, sets.get("name_key", row["name_key"]), category)
             if category != row["category"]:

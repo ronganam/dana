@@ -2,6 +2,7 @@
 to pick between options, web search, and sharing an item with another user
 (offered only on a server with more than one user)."""
 
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -13,31 +14,20 @@ from addons.essentials.addon import addon
 
 logger = logging.getLogger(__name__)
 
+SEARCH_RESULTS = 5
+SEARCH_TIMEOUT = 20  # seconds for the whole search (each engine gets half)
+
 
 @addon.tool()
 def get_current_time(conn: Connection) -> str:
-    """Get the current date, time, and day of the week.
-    
-    Use this tool whenever you need to check the current date, time, or day of the week.
-    """
-    logger.info("Fetching current local date and time")
+    """Get the current date, time, day of the week and timezone: the base for any date or time you compute."""
     now = clock.now()
-    day_name = now.strftime("%A")
-    date_str = now.strftime("%Y-%m-%d")
-    time_str = now.strftime("%I:%M:%S %p")
-    return f"The current time is {time_str}, today's date is {date_str}, and it is a {day_name}."
+    return f"The current time is {now.strftime('%Y-%m-%d %H:%M (%A)')}, timezone {now.tzinfo}."
 
 
-# Interactive user-selection prompt tool.
-#
-# The agent calls ``request_user_selection`` whenever the task depends on the user
-# choosing between distinct, discrete options (which contact to message, which AC
-# to control, which of several matching events to edit, ...). On UI channels
-# (Telegram / web / Android) the tool is intercepted by the agent loop and
-# rendered as an interactive single- or multi-select prompt; on channels without a
-# selection UI (realtime voice) the function body returns guidance for the agent
-# to ask verbally.
-
+# The agent loop shows this tool as a single- or multi-select prompt on channels
+# with a selection UI (Telegram / web / Android: core/agent.py, SELECTION_TOOL_NAME);
+# the body runs only where there is none (realtime voice).
 @addon.tool(is_write=True)
 async def request_user_selection(
     conn: Connection,
@@ -46,93 +36,50 @@ async def request_user_selection(
     multiple: bool = False,
     context: str = "",
 ) -> str:
-    """Ask the user to choose one or more options from a predefined list.
-
-    Use this whenever the next step of the task depends on a choice between
-    distinct, discrete options. Each option is a ``label`` (human-readable text
-    shown to the user) plus a ``value`` (machine-readable identifier returned to
-    you). The user's pick is fed back to you as the answer, so you can continue
-    without guessing. Do NOT use this for approvals or for open-ended questions
-    where the user could answer anything.
+    """Ask the user to pick one or more options from a list; their pick comes back to you as the answer.
 
     Args:
-        prompt: The question to present to the user, short and clear.
-        options: Available choices, each a dict with a "label" and a "value". Provide realistic, distinct options (2-6 recommended).
-        multiple: Whether the user may pick several options (True) or exactly one (False, default).
-        context: Optional one-line clarification on why the choice is needed.
+        prompt: The question, short and clear.
+        options: 2-6 distinct choices, each {"label": "shown to the user", "value": "returned to you"}.
+        multiple: True when the user may pick several.
+        context: Optional one line on why the choice is needed.
     """
     if not options:
-        raise ValueError("request_user_selection requires at least one option")
-
-    option_lines = "\n".join(
-        f"- {o.get('label') or o.get('value') or '?'}" for o in options
-    )
-    mode = "option(s)" if multiple else "option"
+        return "Error: give at least one option, each {\"label\": ..., \"value\": ...}."
+    option_lines = "\n".join(f"- {o.get('label') or o.get('value') or '?'}" for o in options)
     context_note = f"\nContext: {context}" if context else ""
-    return (
-        "Selection UI is not available on this channel, so ask the user verbally which "
-        f"of the following {mode} they want.{context_note}\n"
-        "Options:\n"
-        f"{option_lines}"
-    )
+    return ("Selection UI is not available on this channel, so ask the user verbally which "
+            f"of the following {'option(s)' if multiple else 'option'} they want.{context_note}\n"
+            f"Options:\n{option_lines}")
 
 
-# Mock fallback database for offline safety/testing
-MOCK_SEARCH_RESULTS: Dict[str, str] = {
-    "smile clinic address": "Smile Clinic is located at 123 Main St, Springfield, OR 97477. Phone: (555) 019-2834.",
-    "weather tomorrow": "Springfield weather forecast: Sunny with a high of 24°C and a low of 12°C. 0% chance of rain.",
-    "joe's coffee": "Joe's Coffee is located at 456 Elm St. Hours: 7 AM - 6 PM daily. Known for its cold brew."
-}
+def _search(query: str) -> List[Dict[str, Any]]:
+    from ddgs import DDGS
+
+    with DDGS(timeout=SEARCH_TIMEOUT // 2) as ddgs:
+        return list(ddgs.text(query, max_results=SEARCH_RESULTS))
+
 
 @addon.tool(untrusted_result=True)
-def web_search(conn: Connection, query: str) -> str:
-    """Search the web for public information using DuckDuckGo.
-    
-    Use this ONLY for looking up public, general-knowledge information (e.g. business hours, 
-    addresses, news, product specs). Do NOT use this for personal data — use recall_info for 
-    stored memories, search_calendar for schedule, search_calls for call history, or 
-    search_whatsapp_contact_or_chat for contacts instead.
-    
-    Returns up to 3 results.
-    
+async def web_search(conn: Connection, query: str) -> str:
+    """Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).
+
     Args:
         query: The search query string.
     """
-    logger.info(f"Performing web search for: '{query}'")
-    
+    if not (query or "").strip():
+        return "Error: the search query is empty."
     try:
-        from ddgs import DDGS
-
-        # Build DDG search client and run search query
-        with DDGS() as ddgs:
-            results = list(ddgs.text(query, max_results=3))
-            
-        if not results:
-            # Fallback to mock search database if results are empty
-            query_lower = query.lower()
-            for k, v in MOCK_SEARCH_RESULTS.items():
-                if k in query_lower or query_lower in k:
-                    return f"Mock search result for '{query}':\n{v}"
-            return f"No search results found for '{query}'."
-            
-        result_str = f"Search results for '{query}':\n"
-        for i, res in enumerate(results, 1):
-            title = res.get("title", "No Title")
-            snippet = res.get("body", "No description")
-            url = res.get("href", "#")
-            result_str += f"{i}. {title} - {snippet} (URL: {url})\n"
-        return result_str
-        
+        results = await asyncio.wait_for(asyncio.to_thread(_search, query), SEARCH_TIMEOUT)
     except Exception as e:
-        logger.warning(f"Live DDG search failed: {e}. Falling back to mock search database.")
-        
-        # Try to find a match in the mock database
-        query_lower = query.lower()
-        for k, v in MOCK_SEARCH_RESULTS.items():
-            if k in query_lower or query_lower in k:
-                return f"Mock search result for '{query}':\n{v}"
-                
-        return f"Mock search result: No information found for '{query}'. (Live search failed: {e})"
+        logger.warning(f"Web search failed: {e!r}", exc_info=True)
+        return f"Error: the web search failed ({str(e)[:200] or type(e).__name__}). Rephrase the query or try later."
+    if not results:
+        return f"No search results for '{query}'."
+    lines = [f"Search results for '{query}':"]
+    for i, res in enumerate(results, 1):
+        lines.append(f"{i}. {res.get('title') or 'No title'} - {res.get('body') or ''} (URL: {res.get('href') or '-'})")
+    return "\n".join(lines)
 
 
 def _find_user(owner: User, name: str) -> Optional[User]:
