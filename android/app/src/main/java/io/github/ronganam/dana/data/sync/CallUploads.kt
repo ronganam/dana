@@ -89,27 +89,44 @@ object CallUploads {
     fun enqueue(context: Context, meta: RecordingMeta, replace: Boolean = false) =
         enqueue(context, meta.file, meta.contact, meta.timestamp, replace, meta.durationSeconds, meta.direction, meta.phoneNumber)
 
+    /** What one upload attempt of a recording came to ([send]). */
+    sealed interface Outcome {
+        /** The server has it: marked UPLOADED, the local copy released. */
+        data class Uploaded(val callId: String, val status: String) : Outcome
+        /** A 4xx: sending the same file again won't help. */
+        data object Rejected : Outcome
+        /** Unreachable or a server error: worth trying again later. */
+        data class Unreachable(val reason: String) : Outcome
+        /** Anything else (unreadable file, a bug). */
+        data class Failed(val reason: String) : Outcome
+    }
+
     /**
-     * Upload every recording in the recordings folder that is long enough
-     * and was never uploaded from here. The server recognises recordings it
-     * already has (same bytes / file name), so this is safe to run any time.
+     * Upload [meta]'s file once (the code every upload path shares: the
+     * per-call [CallUploadWorker] and the backlog [PastRecordingsWorker]).
+     * On success the recording is marked UPLOADED and its copy released;
+     * the caller decides what any other outcome means.
      */
-    fun uploadPastRecordings(context: Context): Int {
-        val threshold = CallUploadSettings.thresholdSeconds(context)
-        var queued = 0
-        RecordingsFolder.list(context).filter { FolderScan.isAudio(it.name, it.mime) }.sortedBy { it.modifiedMs }.forEach { doc ->
-            val state = CallUploadStore.state(context, doc.name)
-            if (state == CallUploadStore.State.UPLOADED || state == CallUploadStore.State.QUEUED) return@forEach
-            val file = RecordingsFolder.copy(context, doc) ?: return@forEach
-            val meta = RecordingInspector.inspect(context, file, doc.name, doc.modifiedMs)
-            if (CallUploadSettings.isSkipped(context, meta.contact) || meta.durationSeconds < threshold) {
-                if (state == null) RecordingsFolder.release(context, file)
-                return@forEach
-            }
-            enqueue(context, meta)
-            queued++
+    suspend fun send(context: Context, meta: RecordingMeta): Outcome {
+        val file = meta.file
+        return try {
+            val result = ServerConfig.load(context).api().calls.upload(
+                file, meta.contact, "Me", meta.timestamp,
+                durationSeconds = meta.durationSeconds, direction = meta.direction, phoneNumber = meta.phoneNumber
+            ) ?: return Outcome.Rejected
+            CallUploadStore.mark(context, file.name, CallUploadStore.State.UPLOADED, file.absolutePath, meta.contact, meta.timestamp)
+            RecordingsFolder.release(context, file)
+            Outcome.Uploaded(result.id.orEmpty(), result.status.orEmpty())
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: IOException) {
+            Outcome.Unreachable(Texts.of(context).reason(e))
+        } catch (e: ApiException) {
+            Outcome.Unreachable(Texts.of(context).reason(e))
+        } catch (e: Exception) {
+            Log.e(TAG, "Unexpected upload error", e)
+            Outcome.Failed(Texts.of(context).reason(e))
         }
-        return queued
     }
 
     /**
@@ -211,9 +228,10 @@ class CallUploadWorker(appContext: Context, params: WorkerParameters) : Coroutin
             return Result.failure()
         }
 
-        val duration = inputData.getInt(CallUploads.KEY_DURATION, 0)
-        val direction = inputData.getString(CallUploads.KEY_DIRECTION)
-        val number = inputData.getString(CallUploads.KEY_NUMBER)
+        val meta = RecordingMeta(
+            file, contact, timestamp, inputData.getInt(CallUploads.KEY_DURATION, 0),
+            inputData.getString(CallUploads.KEY_DIRECTION), inputData.getString(CallUploads.KEY_NUMBER)
+        )
         val progress = baseNotification("Uploading call with $contact", "Sending the recording to your assistant…", android.R.drawable.stat_sys_upload)
             .setProgress(100, 0, true)
             .setOngoing(true)
@@ -226,38 +244,23 @@ class CallUploadWorker(appContext: Context, params: WorkerParameters) : Coroutin
             CallUploads.notify(ctx, file.name, progress)
         }
 
-        val failure: String = try {
-            val result = ServerConfig.load(ctx).api().calls.upload(
-                file, contact, "Me", timestamp,
-                durationSeconds = duration, direction = direction, phoneNumber = number
-            )
-            if (result != null) {
-                CallUploadStore.mark(ctx, file.name, CallUploadStore.State.UPLOADED)
-                RecordingsFolder.release(ctx, file)
-                val callId = result.id.orEmpty()
-                val status = result.status.orEmpty()
-                if (callId.isNotEmpty()) {
+        val failure = when (val outcome = CallUploads.send(ctx, meta)) {
+            is CallUploads.Outcome.Uploaded -> {
+                if (outcome.callId.isNotEmpty()) {
                     // Quiet "analysing" line; CallResultWorker replaces it with the result.
                     CallUploads.notify(ctx, file.name, baseNotification(
                         "Call with $contact uploaded", "Analysing — suggestions will show up here.",
                         android.R.drawable.stat_sys_upload_done
                     ).setPriority(NotificationCompat.PRIORITY_LOW).setSilent(true))
-                    CallResultWorker.enqueue(ctx, callId, file.name, contact,
-                        delaySeconds = if (status == "processing") 20 else 0)
+                    CallResultWorker.enqueue(ctx, outcome.callId, file.name, contact,
+                        delaySeconds = if (outcome.status == "processing") 20 else 0)
                 }
                 return Result.success()
             }
             // 4xx: retrying the same file won't help; let the user decide.
-            return failed(file, contact, timestamp, "The server rejected the recording.")
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: IOException) {
-            Texts.of(ctx).reason(e)
-        } catch (e: ApiException) {
-            Texts.of(ctx).reason(e)
-        } catch (e: Exception) {
-            Log.e(TAG, "Unexpected upload error", e)
-            return failed(file, contact, timestamp, Texts.of(ctx).reason(e))
+            CallUploads.Outcome.Rejected -> return failed(file, contact, timestamp, "The server rejected the recording.")
+            is CallUploads.Outcome.Failed -> return failed(file, contact, timestamp, outcome.reason)
+            is CallUploads.Outcome.Unreachable -> outcome.reason
         }
 
         // Unreachable or a server error: retry with backoff, then give up.
@@ -361,8 +364,15 @@ object CallUploadStore {
 
     fun isKnown(context: Context, fileName: String): Boolean = synchronized(lock) { read(context).has(fileName) }
 
-    fun state(context: Context, fileName: String): State? = synchronized(lock) {
-        read(context).optJSONObject(fileName)?.optString("state")?.let { raw -> State.values().firstOrNull { it.name == raw } }
+    /** A recording's state and when it was last set (ms). */
+    data class Entry(val state: State, val updatedMs: Long)
+
+    fun state(context: Context, fileName: String): State? = entry(context, fileName)?.state
+
+    fun entry(context: Context, fileName: String): Entry? = synchronized(lock) {
+        val json = read(context).optJSONObject(fileName) ?: return@synchronized null
+        val state = State.entries.firstOrNull { it.name == json.optString("state") } ?: return@synchronized null
+        Entry(state, json.optLong("updated_at"))
     }
 
     /** The first scan of [folder] already happened (a newly picked folder is seeded again). */
@@ -371,7 +381,8 @@ object CallUploadStore {
     /**
      * First scan of a folder: record the recordings already there as seen, so
      * it doesn't post a notification for every old call. Old calls can still
-     * be uploaded from Settings ("Upload past recordings") or the Calls screen.
+     * be uploaded from Settings ("Upload past recordings": [PastRecordings],
+     * one at a time) or picked one by one on the Calls screen.
      */
     fun seed(context: Context, folder: String, existing: List<String>) = synchronized(lock) {
         val json = read(context)

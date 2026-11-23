@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.BuildConfig
 import io.github.ronganam.dana.data.update.UpdateManager
@@ -34,15 +33,13 @@ import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import io.github.ronganam.dana.data.sync.CallUploadSettings
-import io.github.ronganam.dana.data.sync.CallUploads
+import io.github.ronganam.dana.data.sync.PastRecordings
 import io.github.ronganam.dana.data.sync.RecordingScans
 import io.github.ronganam.dana.data.sync.RecordingsFolder
 import io.github.ronganam.dana.data.notifications.NotificationExtractor
 import io.github.ronganam.dana.data.notifications.NotificationSettings
 import io.github.ronganam.dana.ui.components.InkChip
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import io.github.ronganam.dana.R
@@ -303,8 +300,6 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null, onOpe
 @Composable
 private fun CallRecordingSettings() {
     val context = LocalContext.current
-    val resources = LocalResources.current
-    val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(CallUploadSettings.enabled(context)) }
     var folder by remember { mutableStateOf(if (RecordingsFolder.readable(context)) RecordingsFolder.displayName(context) else null) }
     var auto by remember { mutableStateOf(CallUploadSettings.autoUpload(context)) }
@@ -314,7 +309,7 @@ private fun CallRecordingSettings() {
     var callLogGranted by remember {
         mutableStateOf(context.checkSelfPermission(android.Manifest.permission.READ_CALL_LOG) == PackageManager.PERMISSION_GRANTED)
     }
-    var backlogBusy by remember { mutableStateOf(false) }
+    val backlog by remember { PastRecordings.status(context) }.collectAsState(initial = PastRecordings.Backlog.Idle)
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { callLogGranted = it }
     // The folder the recorder writes to; picking one (re)starts the scans and asks for the call log.
     val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
@@ -439,24 +434,71 @@ private fun CallRecordingSettings() {
                 }
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            OutlinedButton(
-                enabled = !backlogBusy,
-                onClick = {
-                    backlogBusy = true
-                    scope.launch {
-                        val n = withContext(Dispatchers.IO) { CallUploads.uploadPastRecordings(context) }
-                        backlogBusy = false
-                        Toast.makeText(
-                            context,
-                            if (n == 0) resources.getString(R.string.toast_nothing_new_to_upload)
-                            else resources.getQuantityString(R.plurals.toast_uploading_recordings, n, n),
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-            ) { Text(if (backlogBusy) "Looking…" else "Upload past recordings") }
+            PastRecordingsRow(backlog)
         }
+    }
+}
+
+/** "Upload past recordings": the backlog run's progress and Stop, or what the last run left, how far back, and the button. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun PastRecordingsRow(backlog: PastRecordings.Backlog) {
+    val context = LocalContext.current
+    val status = when (backlog) {
+        is PastRecordings.Backlog.Running -> when {
+            backlog.total == 0 -> if (backlog.waiting) "Waiting for a connection…" else "Looking for past recordings…"
+            backlog.waiting -> "Waiting for a connection · ${backlog.done} of ${backlog.total} done"
+            else -> "Uploading past calls… ${(backlog.done + 1).coerceAtMost(backlog.total)} of ${backlog.total}"
+        }
+        is PastRecordings.Backlog.Finished -> when {
+            backlog.stopped -> "Stopped: Dana was out of reach. ${backlog.uploaded} uploaded; uploading again continues from there."
+            backlog.failed > 0 -> "${backlog.uploaded} uploaded · ${backlog.failed} couldn't be uploaded. Uploading again retries them."
+            else -> "All recordings uploaded"
+        }
+        PastRecordings.Backlog.Idle -> "Sends the recordings already in the folder, one at a time, oldest first."
+    }
+    Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    var range by remember { mutableStateOf(CallUploadSettings.pastRange(context)) }
+    var sinceMs by remember { mutableLongStateOf(CallUploadSettings.pastSinceMs(context)) }
+    // "Since a date…": the system date picker, up to today; the run takes recordings from that day's start.
+    fun pickDate() {
+        val zone = java.time.ZoneId.systemDefault()
+        val shown = if (sinceMs > 0) java.time.Instant.ofEpochMilli(sinceMs).atZone(zone).toLocalDate()
+            else java.time.LocalDate.now().minusMonths(6)
+        android.app.DatePickerDialog(context, { _, y, m, d ->
+            sinceMs = java.time.LocalDate.of(y, m + 1, d).atStartOfDay(zone).toInstant().toEpochMilli()
+            range = PastRecordings.Range.SINCE
+            CallUploadSettings.setPastSinceMs(context, sinceMs)
+            CallUploadSettings.setPastRange(context, range)
+        }, shown.year, shown.monthValue - 1, shown.dayOfMonth).apply {
+            datePicker.maxDate = System.currentTimeMillis()
+        }.show()
+    }
+    if (backlog !is PastRecordings.Backlog.Running) {
+        Text("How far back", style = MaterialTheme.typography.titleSmall)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            PastRecordings.Range.entries.forEach { r ->
+                if (r == PastRecordings.Range.SINCE) {
+                    val label = if (sinceMs > 0) "Since " + java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")
+                        .format(java.time.Instant.ofEpochMilli(sinceMs).atZone(java.time.ZoneId.systemDefault())) else r.label
+                    InkChip(label, selected = r == range, onClick = { pickDate() })
+                } else {
+                    InkChip(r.label, selected = r == range, onClick = { range = r; CallUploadSettings.setPastRange(context, r) })
+                }
+            }
+        }
+    }
+    if (backlog is PastRecordings.Backlog.Running) {
+        OutlinedButton(
+            onClick = { PastRecordings.stop(context) },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        ) { Text("Stop") }
+    } else {
+        OutlinedButton(
+            enabled = range != PastRecordings.Range.SINCE || sinceMs > 0,
+            onClick = { PastRecordings.start(context, range, sinceMs) },
+            modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+        ) { Text("Upload past recordings") }
     }
 }
 
