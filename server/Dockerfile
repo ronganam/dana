@@ -24,7 +24,7 @@ RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir --require-hashes -r requirements.lock
 
 # The test suite on the container's Python. The pre-push hook builds this stage when
-# the Dockerfile or requirements change (.githooks/pre-push): a failure stops the deploy.
+# the Dockerfile or requirements change (.githooks/pre-push): a failure stops the push.
 # Not part of the final image; `docker build .` skips it.
 FROM base AS test
 RUN apt-get update && apt-get install -y --no-install-recommends nodejs \
