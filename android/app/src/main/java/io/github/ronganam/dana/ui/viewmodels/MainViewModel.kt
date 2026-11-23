@@ -230,6 +230,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         TaskActionQueue.flushAsync(appContext)
         io.github.ronganam.dana.data.signals.SignalSync.flushAsync(appContext)
         io.github.ronganam.dana.data.signals.PhoneSignals.onForeground(appContext)
+        io.github.ronganam.dana.data.sync.RecordingScans.now(appContext)
         shoppingController.flush()
         shoppingController.fetchMe()
         callsController.fetchSuggestions()

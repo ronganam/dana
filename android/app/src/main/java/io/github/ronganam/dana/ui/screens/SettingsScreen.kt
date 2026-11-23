@@ -22,7 +22,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.BuildConfig
-import io.github.ronganam.dana.CallRecordingObserverService
 import io.github.ronganam.dana.data.update.UpdateManager
 import io.github.ronganam.dana.data.voice.DeviceSpeech
 import io.github.ronganam.dana.ui.components.GlassCard
@@ -36,6 +35,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import io.github.ronganam.dana.data.sync.CallUploadSettings
 import io.github.ronganam.dana.data.sync.CallUploads
+import io.github.ronganam.dana.data.sync.RecordingScans
+import io.github.ronganam.dana.data.sync.RecordingsFolder
 import io.github.ronganam.dana.data.notifications.NotificationExtractor
 import io.github.ronganam.dana.data.notifications.NotificationSettings
 import io.github.ronganam.dana.ui.components.InkChip
@@ -294,9 +295,9 @@ fun SettingsScreen(viewModel: MainViewModel, onBack: (() -> Unit)? = null, onOpe
 }
 
 /**
- * Call recordings: the master switch (off by default; Samsung's recorder
- * folder only), then auto-upload, length threshold, Wi-Fi only, never-upload
- * contacts, backlog.
+ * Call recordings: the master switch (off by default), the recordings folder
+ * (picked with the Storage Access Framework), then auto-upload, length
+ * threshold, Wi-Fi only, never-upload contacts, backlog.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -305,6 +306,7 @@ private fun CallRecordingSettings() {
     val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     var enabled by remember { mutableStateOf(CallUploadSettings.enabled(context)) }
+    var folder by remember { mutableStateOf(if (RecordingsFolder.readable(context)) RecordingsFolder.displayName(context) else null) }
     var auto by remember { mutableStateOf(CallUploadSettings.autoUpload(context)) }
     var threshold by remember { mutableFloatStateOf(CallUploadSettings.thresholdSeconds(context).toFloat()) }
     var wifiOnly by remember { mutableStateOf(CallUploadSettings.wifiOnly(context)) }
@@ -314,13 +316,22 @@ private fun CallRecordingSettings() {
     }
     var backlogBusy by remember { mutableStateOf(false) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { callLogGranted = it }
-    // Turning call recordings on asks for the recordings folder and the call log, then starts watching.
-    val enableLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { result ->
-        callLogGranted = result[android.Manifest.permission.READ_CALL_LOG] ?: callLogGranted
-        if (result[CallUploadSettings.storagePermission] == false) {
-            Toast.makeText(context, R.string.toast_needs_audio_access, Toast.LENGTH_LONG).show()
+    // The folder the recorder writes to; picking one (re)starts the scans and asks for the call log.
+    val folderLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+        if (tree != null) {
+            runCatching { RecordingsFolder.set(context, tree) }
+                .onFailure { Toast.makeText(context, R.string.toast_folder_not_readable, Toast.LENGTH_LONG).show() }
         }
-        CallRecordingObserverService.start(context)
+        folder = if (RecordingsFolder.readable(context)) RecordingsFolder.displayName(context) else null
+        if (folder == null) {
+            // No folder, nothing to watch.
+            enabled = false
+            CallUploadSettings.setEnabled(context, false)
+        } else if (!callLogGranted) {
+            permissionLauncher.launch(android.Manifest.permission.READ_CALL_LOG)
+        }
+        RecordingScans.schedule(context)
+        RecordingScans.now(context)
     }
 
     GlassCard(modifier = Modifier.fillMaxWidth()) {
@@ -329,8 +340,8 @@ private fun CallRecordingSettings() {
                 Column(Modifier.weight(1f)) {
                     Text("Watch for call recordings", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Works only with Samsung's built-in call recorder, which saves to Recordings/Call. " +
-                            "New recordings there are sent to your Dana server.",
+                        "Android doesn't let apps record calls: Dana uploads the recordings your phone's own call " +
+                            "recorder saves. Pick the folder it saves to and new recordings there go to your Dana server.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -339,14 +350,38 @@ private fun CallRecordingSettings() {
                 Switch(checked = enabled, onCheckedChange = {
                     enabled = it
                     CallUploadSettings.setEnabled(context, it)
-                    if (it) {
-                        enableLauncher.launch(arrayOf(CallUploadSettings.storagePermission, android.Manifest.permission.READ_CALL_LOG))
-                    } else {
-                        CallRecordingObserverService.stop(context)
+                    if (!it) RecordingScans.stop(context)
+                    else if (folder == null) folderLauncher.launch(RecordingsFolder.suggestedStart())
+                    else {
+                        RecordingScans.schedule(context)
+                        RecordingScans.now(context)
                     }
                 })
             }
+            Text(
+                "Which phones record calls: Samsung, Xiaomi, OnePlus and Oppo phones usually can, in their own " +
+                    "dialer's settings. Pixels and most others can't, or only in some countries and with an announcement " +
+                    "both sides hear. Any app that saves call recordings as audio files works. You can also share a " +
+                    "recording to Dana from any app.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
             if (!enabled) return@Column
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Recordings folder", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        folder ?: "None picked: choose the folder your call recorder saves to.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (folder == null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                Spacer(Modifier.width(12.dp))
+                OutlinedButton(onClick = { folderLauncher.launch(RecordingsFolder.tree(context) ?: RecordingsFolder.suggestedStart()) }) {
+                    Text(if (folder == null) "Choose" else "Change")
+                }
+            }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {

@@ -58,6 +58,7 @@ import io.github.ronganam.dana.data.network.long
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import androidx.core.content.edit
+import io.github.ronganam.dana.data.sync.RecordingScans
 
 /**
  * Caller card: while someone known calls (or the user calls them), a floating card
@@ -74,8 +75,10 @@ class CallerCardReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != TelephonyManager.ACTION_PHONE_STATE_CHANGED) return
         val app = context.applicationContext
-        if (!CallerCards.enabled(app)) return
         val state = intent.getStringExtra(TelephonyManager.EXTRA_STATE)
+        // A call ended: its recording is about to land in the recordings folder.
+        if (state == TelephonyManager.EXTRA_STATE_IDLE) RecordingScans.now(app, RecordingScans.AFTER_CALL_DELAY_SECONDS)
+        if (!CallerCards.enabled(app)) return
         @Suppress("DEPRECATION")
         val number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)
         val pending = goAsync()

@@ -15,16 +15,23 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.io.FileOutputStream
+import androidx.core.net.toUri
+import io.github.ronganam.dana.data.sync.CallUploadStore
+import io.github.ronganam.dana.data.sync.FolderScan
+import io.github.ronganam.dana.data.sync.RecordingInspector
+import io.github.ronganam.dana.data.sync.RecordingNames
+import io.github.ronganam.dana.data.sync.RecordingsFolder
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
 import java.util.TimeZone
 
+/** A file of the recordings folder offered for a manual upload. */
 data class PendingRecordingFile(
-    val file: File,
+    val uri: Uri,
+    val name: String,
     val contactName: String,
     val timestamp: String,
-    val isUploading: Boolean = false,
     val durationSeconds: Int = 0
 )
 
@@ -55,9 +62,6 @@ class CallsController(private val ctx: ControllerContext) {
 
     private val _uploadFormState = MutableStateFlow<UploadFormState?>(null)
     val uploadFormState: StateFlow<UploadFormState?> = _uploadFormState.asStateFlow()
-
-    private val _sharedAudioUri = MutableStateFlow<Uri?>(null)
-    val sharedAudioUri: StateFlow<Uri?> = _sharedAudioUri.asStateFlow()
 
     private val _viewingCallId = MutableStateFlow<String?>(null)
     /** The call open on screen right now (Dana gets it as on-screen context). */
@@ -157,40 +161,30 @@ class CallsController(private val ctx: ControllerContext) {
         }
     }
 
-    fun startRecordingSelection() {
+    fun startRecordingSelection(context: Context) {
         ctx.scope.launch {
             _isScanningRecordings.value = true
             val uploadedFilenames = _calls.value.map { it.filename }.toSet()
-            val results = withContext(Dispatchers.IO) { scanRecordings(uploadedFilenames) }
+            val results = withContext(Dispatchers.IO) { scanRecordings(context, uploadedFilenames) }
             _isScanningRecordings.value = false
             _recordingSelectionList.value = results
         }
     }
 
-    private fun scanRecordings(uploadedFilenames: Set<String>): List<PendingRecordingFile> = try {
-        val directory = File("/storage/emulated/0/Recordings/Call")
-        if (!directory.exists()) {
-            emptyList()
-        } else {
-            val fallbackFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply {
-                timeZone = TimeZone.getDefault()
+    /** The recordings folder's newest audio files not uploaded from here yet (empty without a folder). */
+    private fun scanRecordings(context: Context, uploadedFilenames: Set<String>): List<PendingRecordingFile> =
+        RecordingsFolder.list(context)
+            .filter { FolderScan.isAudio(it.name, it.mime) && it.name !in uploadedFilenames }
+            .filter { CallUploadStore.state(context, it.name) != CallUploadStore.State.UPLOADED }
+            .sortedByDescending { it.modifiedMs }
+            .take(100)
+            .map { doc ->
+                val rec = RecordingNames.parse(doc.name)
+                val call = RecordingInspector.matchCall(context, rec, doc.modifiedMs)
+                val contact = rec.name ?: call?.name ?: rec.number ?: call?.number ?: doc.name.substringBeforeLast('.')
+                val startMs = call?.startMs ?: rec.start?.atZone(java.time.ZoneId.systemDefault())?.toInstant()?.toEpochMilli() ?: doc.modifiedMs
+                PendingRecordingFile(doc.uri.toUri(), doc.name, contact, isoLocal(startMs), call?.durationSeconds ?: 0)
             }
-            directory.listFiles { f -> f.name.endsWith(".m4a") }
-                ?.filter { it.name !in uploadedFilenames }
-                ?.map { file ->
-                    val info = parseSamsungFilename(file.name)
-                    val contactName = info?.first ?: file.name.removeSuffix(".m4a").replace("_", " ").trim()
-                    val timestamp = info?.second ?: fallbackFormat.format(file.lastModified())
-                    PendingRecordingFile(file, contactName, timestamp)
-                }
-                ?.sortedByDescending { it.file.lastModified() }
-                ?.take(100)
-                ?: emptyList()
-        }
-    } catch (e: Exception) {
-        Log.e("CallsController", "Error scanning recordings for selection", e)
-        emptyList()
-    }
 
     fun clearRecordingSelection() {
         _recordingSelectionList.value = null
@@ -230,8 +224,8 @@ class CallsController(private val ctx: ControllerContext) {
 
     fun showUploadFormForRecording(pending: PendingRecordingFile) {
         _uploadFormState.value = UploadFormState(
-            selectedUri = Uri.fromFile(pending.file),
-            displayFileName = pending.file.name,
+            selectedUri = pending.uri,
+            displayFileName = pending.name,
             caller = pending.contactName,
             receiver = "Me",
             timestamp = pending.timestamp
@@ -289,14 +283,6 @@ class CallsController(private val ctx: ControllerContext) {
         }
     }
 
-    fun setSharedAudioUri(uri: Uri?) {
-        _sharedAudioUri.value = uri
-    }
-
-    fun clearSharedAudioUri() {
-        _sharedAudioUri.value = null
-    }
-
     private fun copyUriToTempFile(context: Context, uri: Uri, displayName: String): File? = try {
         val tempDir = File(context.cacheDir, "uploads").apply { mkdirs() }
         // Never let a provider-supplied name escape the cache directory.
@@ -310,21 +296,6 @@ class CallsController(private val ctx: ControllerContext) {
         null
     }
 
-    companion object {
-        /** Samsung names recordings "Call<name>_<yyMMdd>_<HHmmss>.m4a". */
-        internal fun parseSamsungFilename(filename: String): Pair<String, String>? {
-            if (!filename.startsWith("Call") || !filename.endsWith(".m4a")) return null
-            val parts = filename.substring(4, filename.length - 4).trim().split("_")
-            if (parts.size < 3) return null
-            val timePart = parts.last()
-            val datePart = parts[parts.size - 2]
-            if (datePart.length != 6 || timePart.length != 6) return null
-            val cleanName = parts.subList(0, parts.size - 2).joinToString("_")
-                .replace(Regex("[‎‏‪-‮]"), "")
-                .trim()
-            val iso = "20${datePart.substring(0, 2)}-${datePart.substring(2, 4)}-${datePart.substring(4, 6)}" +
-                "T${timePart.substring(0, 2)}:${timePart.substring(2, 4)}:${timePart.substring(4, 6)}"
-            return cleanName to iso
-        }
-    }
+    private fun isoLocal(ms: Long): String =
+        SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", Locale.US).apply { timeZone = TimeZone.getDefault() }.format(ms)
 }

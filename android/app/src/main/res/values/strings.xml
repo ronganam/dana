@@ -41,7 +41,8 @@
     <string name="toast_couldnt_open_settings">Could not open settings</string>
     <string name="toast_couldnt_launch_installer">Could not launch installer</string>
     <string name="toast_download_failed">Download failed — try again</string>
-    <string name="toast_needs_audio_access">Dana needs access to audio files to see call recordings</string>
+    <string name="share_audio_label">Send to Dana</string>
+    <string name="toast_folder_not_readable">Dana couldn\'t keep access to that folder. Pick it again, or another one.</string>
     <string name="toast_nothing_new_to_upload">Nothing new to upload</string>
     <plurals name="toast_uploading_recordings">
         <item quantity="one">Uploading %d recordings in the background</item>

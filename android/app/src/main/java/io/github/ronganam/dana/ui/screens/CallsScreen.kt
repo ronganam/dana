@@ -62,17 +62,10 @@ fun CallsScreen(viewModel: MainViewModel) {
     LaunchedEffect(Unit) { viewModel.callsController.fetchCalls() }
 
     val uploadFormState by viewModel.callsController.uploadFormState.collectAsState()
-    val sharedAudioUri by viewModel.callsController.sharedAudioUri.collectAsState()
     val recordingSelectionList by viewModel.callsController.recordingSelectionList.collectAsState()
 
     val audioPickerLauncher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
         uri?.let { viewModel.callsController.showUploadForm(it, getDisplayName(context, it), context) }
-    }
-    LaunchedEffect(sharedAudioUri) {
-        sharedAudioUri?.let { uri ->
-            viewModel.callsController.showUploadForm(uri, getDisplayName(context, uri), context)
-            viewModel.callsController.clearSharedAudioUri()
-        }
     }
 
     // ---- Sheets (unchanged behaviour) ----
@@ -84,7 +77,7 @@ fun CallsScreen(viewModel: MainViewModel) {
         ) {
             UploadOptionsSheet(
                 onPickFile = { showUploadOptions = false; audioPickerLauncher.launch("audio/*") },
-                onSelectRecording = { showUploadOptions = false; viewModel.callsController.startRecordingSelection() }
+                onSelectRecording = { showUploadOptions = false; viewModel.callsController.startRecordingSelection(context) }
             )
         }
     }

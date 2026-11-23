@@ -28,6 +28,7 @@ import io.github.ronganam.dana.data.sync.CallUploadStore
 import io.github.ronganam.dana.data.sync.CallUploads
 import io.github.ronganam.dana.data.sync.CallUploads.readMeta
 import io.github.ronganam.dana.data.sync.RecordingMeta
+import io.github.ronganam.dana.data.sync.RecordingsFolder
 import io.github.ronganam.dana.ui.components.MonoLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.calls.formatDuration
@@ -36,8 +37,9 @@ import io.github.ronganam.dana.ui.theme.ThemeSettings
 import kotlinx.coroutines.delay
 
 /**
- * "Short call — upload it?" as a bottom sheet over whatever is on screen.
- * Opened from the short-call notification: listen to it, then Upload, Skip,
+ * "Upload this call?" as a bottom sheet over whatever is on screen. Opened
+ * from the ask notification (a short call, or any call with auto-upload off):
+ * listen to it, then Upload, Skip,
  * or never ask again for this contact.
  */
 class ShortCallActivity : ComponentActivity() {
@@ -66,6 +68,7 @@ class ShortCallActivity : ComponentActivity() {
                     onSkip = { always ->
                         CallUploads.cancelNotification(this, meta.file.name)
                         CallUploadStore.mark(this, meta.file.name, CallUploadStore.State.SKIPPED)
+                        RecordingsFolder.release(this, meta.file)
                         if (always) CallUploadSettings.addSkipped(this, meta.contact)
                         finish()
                     },
@@ -133,7 +136,7 @@ private fun ShortCallSheet(
         ) {
             MonoLabel(
                 buildString {
-                    append("Short call · ").append(formatDuration(meta.durationSeconds))
+                    append("Call · ").append(formatDuration(meta.durationSeconds))
                     meta.direction?.let { append(" · ").append(it) }
                 },
                 color = MaterialTheme.colorScheme.primary
@@ -146,7 +149,7 @@ private fun ShortCallSheet(
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "Under your auto-upload threshold. Send it to Dana anyway?",
+                "Send this call to Dana?",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
