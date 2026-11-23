@@ -22,6 +22,7 @@ import datetime
 import json
 import os
 import re
+from unittest.mock import patch
 from typing import Any, Dict, List, Tuple
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
@@ -193,9 +194,12 @@ async def test_refused(client: TestClient) -> None:
           [(r.addon, r.part) for r in pending] == [("homeassistant", "")] and ok_robin is None
           and store.reconnects(ROBIN) == [] and store.reconnects(MAYA) == [], pending)
 
-    gal = await checks_of(client, GAL)
-    robin = await checks_of(client, ROBIN)
-    maya = await checks_of(client, MAYA)
+    # The afternoon, so the morning checks (briefing, the last 7 mornings) read the same whenever this runs.
+    afternoon = clock.now().replace(hour=15, minute=0, second=0, microsecond=0)
+    with patch.object(clock, "now", lambda: afternoon):
+        gal = await checks_of(client, GAL)
+        robin = await checks_of(client, ROBIN)
+        maya = await checks_of(client, MAYA)
     first = gal[0]
     check("checks: Gal's reconnect is listed first, failing, with why, since and the Reconnect fix",
           first["key"] == KEY and first["ok"] is False and first["title"] == "Reconnect Home Assistant"
