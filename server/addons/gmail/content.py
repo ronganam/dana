@@ -201,7 +201,8 @@ def _is_attachment(part: Mapping[str, Any]) -> bool:
 
 
 def attachments(payload: Optional[Mapping[str, Any]]) -> List[Dict[str, Any]]:
-    """The files attached to a message: ``{name, type, size}`` (size in bytes)."""
+    """The files attached to a message: ``{name, type, size, id, data}`` (size in bytes; ``id``
+    Gmail's attachmentId, or ``data`` for a small file carried inline)."""
     out = []
     for part in _leaves(payload):
         if not _is_attachment(part):
@@ -211,7 +212,9 @@ def attachments(payload: Optional[Mapping[str, Any]]) -> List[Dict[str, Any]]:
         except (TypeError, ValueError):
             size = 0
         out.append({"name": one_line(part.get("filename"), NAME_MAX_CHARS) or "(no name)",
-                    "type": one_line(part.get("mimeType"), 100) or "application/octet-stream", "size": size})
+                    "type": one_line(part.get("mimeType"), 100) or "application/octet-stream", "size": size,
+                    "id": str((part.get("body") or {}).get("attachmentId") or ""),
+                    "data": str((part.get("body") or {}).get("data") or "")})
     return out
 
 
@@ -469,7 +472,7 @@ def message_lines(message: Mapping[str, Any], limit: int = BODY_MAX_CHARS) -> Li
     ]
     files = attachments(payload)
     if files:
-        lines.append("Attachments (listed only, not downloaded): "
+        lines.append("Attachments (read_email_attachment opens one): "
                      + "; ".join(f"{f['name']} ({f['type']}, {_size(f['size'])})" for f in files))
     lines += ["Body:", readable_body(message, limit)]
     return lines

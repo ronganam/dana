@@ -8,7 +8,7 @@ to. The admin and Bob each connect their own account; Carl has no Gmail.
 Checked: the addon (scope, order, flags, kept out of realtime voice), the
 account's address learned from Gmail, the connection check; search / unread
 listing shape, body extraction (plain, HTML, multipart, charset), quoted
-chains and long bodies cut with a marker, attachments listed, thread order,
+chains and long bodies cut with a marker, attachments listed and read (inline or by id), thread order,
 result sizes; the raw message a send / reply / draft produces (headers,
 threading, Hebrew subject and body); confirm flags and the Approve card's
 words; each undo and its refusals; header-injection and bad-address
@@ -54,7 +54,7 @@ from core import agent as agent_mod, approval_text, undo  # noqa: E402
 from core.undoable import UndoConflict  # noqa: E402
 from core.addons import NotConnected, loader, registry, store  # noqa: E402
 from core.addons.addon import find_tool, get_addon  # noqa: E402
-from addons.gmail import client as gmail_client, compose, config, content, seen  # noqa: E402
+from addons.gmail import client as gmail_client, compose, config, content, seen, tools as tools_mod  # noqa: E402
 from addons.google_account import oauth  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
@@ -211,6 +211,10 @@ class FakeMessages:
             message["labelIds"] = sorted((set(message["labelIds"]) - {"INBOX"}) | {"TRASH"})
             return {"id": id}
         return _Call(self.a, "messages.trash", {"id": id}, run)
+
+    def attachments(self) -> SimpleNamespace:
+        return SimpleNamespace(get=lambda userId, messageId, id: _Call(
+            self.a, "attachments.get", {"messageId": messageId, "id": id}, lambda: {"data": b64(f"%PDF {id}".encode())}))
 
     def untrash(self, userId: str, id: str) -> _Call:
         def run():
@@ -401,7 +405,7 @@ ADMIN = users.first_admin()
 assert ADMIN is not None
 BOB = users.create("Bob Levi", "member")
 CARL = users.create("Carl Cohen", "member")
-GMAIL_TOOLS = ["search_emails", "list_unread_emails", "read_email", "read_email_thread", "send_email",
+GMAIL_TOOLS = ["search_emails", "list_unread_emails", "read_email", "read_email_attachment", "read_email_thread", "send_email",
                "reply_to_email", "create_email_draft", "archive_emails", "mark_emails_read", "trash_emails"]
 
 
@@ -458,8 +462,8 @@ def test_kind() -> None:
     check("flags: drafts, archive, read state and trash run at once (also in an untrusted turn)",
           writes == ["create_email_draft", "archive_emails", "mark_emails_read", "trash_emails"]
           and not any(registry.needs_confirmation(n, {}, untrusted=True) for n in writes), writes)
-    check("flags: the four reads return untrusted content, nothing else does",
-          reads == GMAIL_TOOLS[:4] and [t.name for t in kind.tools if t.untrusted_result] == reads
+    check("flags: the five reads return untrusted content, nothing else does",
+          reads == GMAIL_TOOLS[:5] and [t.name for t in kind.tools if t.untrusted_result] == reads
           and all(registry.returns_untrusted(n) for n in reads) and not registry.returns_untrusted("send_email")
           and not registry.returns_untrusted("get_current_time") and not registry.returns_untrusted(None))
     schema = find_tool("send_email").schema["function"]
@@ -618,8 +622,26 @@ async def test_read() -> None:
     check("read: multipart: the plain part is the body, the HTML alternative and the files' content are not",
           "Body:\nInvoice attached. PLAIN-PART" in body and "HTML-PART" not in body and "SECRET-ATTACHMENT-TEXT" not in body, body)
     check("read: attachments are listed by name, type and size",
-          "Attachments (listed only, not downloaded): invoice-2026.pdf (application/pdf, 471 KB); "
+          "Attachments (read_email_attachment opens one): invoice-2026.pdf (application/pdf, 471 KB); "
           "notes.txt (text/plain, 22 bytes)" in body, body)
+    out, _ = await run_tool(ADMIN, "read_email_attachment", message_id="r5", filename="notes")
+    check("attachment: a small text file is read from the message itself, framed as email",
+          "SECRET-ATTACHMENT-TEXT" in fenced(out)[1] and "notes.txt" in out, out)
+    read_calls: List[Tuple[bytes, str]] = []
+
+    async def fake_read(data: bytes, mime: str, **_: Any) -> str:
+        read_calls.append((data, mime))
+        return "Total: 1,234"
+    real_read, tools_mod.llm.read_file = tools_mod.llm.read_file, fake_read
+    try:
+        out, _ = await run_tool(ADMIN, "read_email_attachment", message_id="r5", filename="invoice-2026.pdf")
+    finally:
+        tools_mod.llm.read_file = real_read
+    check("attachment: a PDF is downloaded by its id and read by the model",
+          "Total: 1,234" in fenced(out)[1] and read_calls == [(b"%PDF att-invoice-2026.pdf", "application/pdf")], out)
+    out, _ = await run_tool(ADMIN, "read_email_attachment", message_id="r5", filename="contract.docx")
+    check("attachment: an unknown name is an error naming the attachments",
+          out.startswith("Error: That email has no attachment") and "invoice-2026.pdf; notes.txt" in out, out)
 
     out, _ = await run_tool(ADMIN, "read_email", message_id="r3")
     _, body, _ = fenced(out)

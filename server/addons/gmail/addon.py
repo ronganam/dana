@@ -1,6 +1,6 @@
 """The ``gmail`` addon (the user's Gmail in chat; docs/gmail.md)."""
 
-from core.addons import Field, Addon, PromptPart, Need, Touches
+from core.addons import Field, Addon, LlmJob, PromptPart, Need, Touches
 from addons.gmail import client
 from addons.gmail.config import ADDON
 from addons.google_account import oauth
@@ -12,7 +12,7 @@ SCOPES = ("https://www.googleapis.com/auth/gmail.modify", "https://www.googleapi
 EMAIL_GUIDE = (
     "Email (Gmail):\n"
     "  1. Find mail with search_emails (Gmail search syntax: from:, to:, subject:, is:unread, has:attachment, "
-    "newer_than:7d) or list_unread_emails; read one with read_email, a whole conversation with read_email_thread. "
+    "newer_than:7d) or list_unread_emails; read one with read_email, a whole conversation with read_email_thread, an attached file (an invoice, a contract) with read_email_attachment. "
     "Use only message and thread IDs these tools returned.\n"
     "  2. send_email and reply_to_email always wait for {user}'s Approve, which the system shows on its own: call "
     "them with the complete text and never ask for that approval in words. Use create_email_draft when {user} wants "
@@ -29,6 +29,7 @@ EMAIL_GUIDE = (
 # content, so mail is neither read nor sent there.
 addon = Addon(
     ADDON, order=120,
+    llm_jobs={"gmail_attachment": LlmJob("fast", "Reading email attachments (PDFs, photos)")},
     title="Gmail", icon="mail",
     credentials=(Field("refresh_token", "Google OAuth refresh token", label=oauth.TOKEN_LABEL, help=oauth.TOKEN_HELP),),
     needs=(Need("env", "GOOGLE_CLIENT_ID", "The server's Google OAuth client, for the Google sign-in"),

@@ -367,7 +367,7 @@ def test_sharing_edit() -> None:
     out = tool(ADMIN, "get_knowledge_item", item_id=IDS["bob_in_admin"])
     check("edit share: the first admin sees Bob's entry, without a 'shared' note", "Basil" in out and "Shared by" not in out, out)
     out = tool(BOB, "update_knowledge_item", item_id="e1", priority="high")
-    check("edit share: Bob changes the first admin's entry", "Successfully" in out and row("entries", "e1")["priority"] == "high", out)
+    check("edit share: Bob changes the first admin's entry", "Updated" in out and "priority" in out and row("entries", "e1")["priority"] == "high", out)
     tool(ADMIN, "update_knowledge_item", item_id="e1", priority="medium")
     check("edit share: the first admin's search finds Bob's entry", "Basil" in tool(ADMIN, "search_knowledge", query="basil"))
     out = tool(BOB, "update_project", project_id="p1", description="Bob's")

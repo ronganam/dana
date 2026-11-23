@@ -2,7 +2,7 @@
   {
     "type": "function",
     "name": "get_current_time",
-    "description": "Get the current date, time, and day of the week. Use this tool whenever you need to check the current date, time, or day of the week.",
+    "description": "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
     "parameters": {
       "type": "object",
       "properties": {},
@@ -12,13 +12,13 @@
   {
     "type": "function",
     "name": "request_user_selection",
-    "description": "Ask the user to choose one or more options from a predefined list. Use this whenever the next step of the task depends on a choice between distinct, discrete options. Each option is a ``label`` (human-readable text shown to the user) plus a ``value`` (machine-readable identifier returned to you). The user's pick is fed back to you as the answer, so you can continue without guessing. Do NOT use this for approvals or for open-ended questions where the user could answer anything.",
+    "description": "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
     "parameters": {
       "type": "object",
       "properties": {
         "prompt": {
           "type": "string",
-          "description": "The question to present to the user, short and clear."
+          "description": "The question, short and clear."
         },
         "options": {
           "items": {
@@ -28,15 +28,15 @@
             "type": "object"
           },
           "type": "array",
-          "description": "Available choices, each a dict with a \"label\" and a \"value\". Provide realistic, distinct options (2-6 recommended)."
+          "description": "2-6 distinct choices, each {\"label\": \"shown to the user\", \"value\": \"returned to you\"}."
         },
         "multiple": {
           "type": "boolean",
-          "description": "Whether the user may pick several options (True) or exactly one (False, default)."
+          "description": "True when the user may pick several."
         },
         "context": {
           "type": "string",
-          "description": "Optional one-line clarification on why the choice is needed."
+          "description": "Optional one line on why the choice is needed."
         }
       },
       "required": [
@@ -48,7 +48,7 @@
   {
     "type": "function",
     "name": "web_search",
-    "description": "Search the web for public information using DuckDuckGo. Use this ONLY for looking up public, general-knowledge information (e.g. business hours, addresses, news, product specs). Do NOT use this for personal data — use recall_info for stored memories, search_calendar for schedule, search_calls for call history, or search_whatsapp_contact_or_chat for contacts instead. Returns up to 3 results.",
+    "description": "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
     "parameters": {
       "type": "object",
       "properties": {
@@ -65,13 +65,13 @@
   {
     "type": "function",
     "name": "add_task",
-    "description": "Add a new task to the user's todo list.",
+    "description": "Add a task to the user's task list; a time, place, car or wake-up trigger makes it a reminder.",
     "parameters": {
       "type": "object",
       "properties": {
         "title": {
           "type": "string",
-          "description": "The description of the task (e.g. 'Buy groceries')."
+          "description": "What to do, e.g. 'Buy a gift for Maya'."
         },
         "due_date": {
           "anyOf": [
@@ -82,11 +82,16 @@
               "type": "null"
             }
           ],
-          "description": "The optional due date of the task in YYYY-MM-DD. Use get_current_time to compute this; do NOT pass relative expressions like 'in 1 hour'."
+          "description": "YYYY-MM-DD (compute it with get_current_time)."
         },
         "priority": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
           "type": "string",
-          "description": "The priority of the task ('low', 'medium', 'high')."
+          "description": "'low', 'medium' or 'high'."
         },
         "group": {
           "anyOf": [
@@ -97,7 +102,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional group name for this task (e.g. 'Work', 'Home', 'Shopping'). If not provided, the best fitting group will be auto-detected."
+          "description": "The task group by name, e.g. 'Work'; picked automatically when left out."
         },
         "location": {
           "anyOf": [
@@ -108,18 +113,15 @@
               "type": "null"
             }
           ],
-          "description": "The optional location or zone name to trigger this task. It must be one of the user's zones (e.g. 'home', 'office'); to map a name (like 'parents home' or 'work') to a zone, call get_zones first and choose the matching one."
+          "description": "One of the user's zones, e.g. 'home' (get_zones maps 'work' or 'my parents' to one)."
         },
         "location_event": {
-          "anyOf": [
-            {
-              "type": "string"
-            },
-            {
-              "type": "null"
-            }
+          "enum": [
+            "arrive",
+            "leave"
           ],
-          "description": "The location event action, either 'arrive' or 'leave'."
+          "type": "string",
+          "description": "'arrive' at or 'leave' the location."
         },
         "time_trigger": {
           "anyOf": [
@@ -130,18 +132,22 @@
               "type": "null"
             }
           ],
-          "description": "The optional date/time trigger (e.g. 'YYYY-MM-DD HH:MM'). Use get_current_time to compute the correct absolute datetime; do NOT pass relative expressions like 'in 1 hour from now'."
+          "description": "When to remind, 'YYYY-MM-DD HH:MM' (compute it with get_current_time); a time already past moves to the next day."
         },
         "car_trigger": {
           "anyOf": [
             {
+              "enum": [
+                "enter",
+                "leave"
+              ],
               "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "description": "The optional car status trigger ('enter' or 'leave')."
+          "description": "'enter' or 'leave' the car."
         },
         "wake_trigger": {
           "anyOf": [
@@ -152,7 +158,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional wake up trigger. Set to True to trigger when the user wakes up."
+          "description": "True to remind when the user wakes up."
         },
         "description": {
           "anyOf": [
@@ -163,7 +169,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional details or description of the task."
+          "description": "Details."
         },
         "call_id": {
           "anyOf": [
@@ -174,7 +180,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional ID of the phone call this task came from (from list_recent_calls / search_calls / get_call_transcript). Links the task to that call so the user sees where it came from."
+          "description": "The phone call it came from (from list_recent_calls / search_calls); the task is linked to it."
         }
       },
       "required": [
@@ -185,13 +191,13 @@
   {
     "type": "function",
     "name": "update_task",
-    "description": "Update an existing task in the Home Assistant todo list. Use this tool to modify an existing task's summary/title, change its status (e.g. mark completed), update its details/description, or add/change trigger options.",
+    "description": "Change a task: complete or reopen it, rename it, or change its details, group or triggers. Only what you pass changes; '' removes a field.",
     "parameters": {
       "type": "object",
       "properties": {
         "item": {
           "type": "string",
-          "description": "The UID (unique ID, e.g. '7246aef6-672e-11f1-bbb0-bc2411aeaff6') of the task. Always use the UID (found in the 'ID: ...' part of the list_tasks output) to ensure we target the correct task, especially if there are multiple tasks with similar names."
+          "description": "The task's ID (from list_tasks) or its title."
         },
         "summary": {
           "anyOf": [
@@ -202,7 +208,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional new summary/title for the task."
+          "description": "The new title."
         },
         "location": {
           "anyOf": [
@@ -213,18 +219,22 @@
               "type": "null"
             }
           ],
-          "description": "The optional location or zone name to trigger this task. Specifying this will update the location trigger. Pass empty string to remove. It must be one of the user's zones (e.g. 'home', 'office'); to map a name (like 'parents home' or 'work') to a zone, call get_zones first and choose the matching one."
+          "description": "A zone to remind at (see get_zones); '' removes the location trigger."
         },
         "location_event": {
           "anyOf": [
             {
+              "enum": [
+                "arrive",
+                "leave"
+              ],
               "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "description": "The location event action, either 'arrive' or 'leave'."
+          "description": "'arrive' or 'leave'."
         },
         "time_trigger": {
           "anyOf": [
@@ -235,7 +245,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional new date/time trigger (e.g. 'YYYY-MM-DD HH:MM'). Pass empty string to remove. Use get_current_time to compute the correct absolute datetime; do NOT pass relative expressions like 'in 1 hour from now'."
+          "description": "'YYYY-MM-DD HH:MM' (compute it with get_current_time); '' removes it."
         },
         "car_trigger": {
           "anyOf": [
@@ -246,7 +256,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional new car status trigger ('enter' or 'leave'). Pass empty string to remove."
+          "description": "'enter' or 'leave'; '' removes it."
         },
         "wake_trigger": {
           "anyOf": [
@@ -257,7 +267,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional new wake up trigger (True/False). Pass False or empty string to remove."
+          "description": "True to remind on waking, False to stop."
         },
         "description": {
           "anyOf": [
@@ -268,18 +278,22 @@
               "type": "null"
             }
           ],
-          "description": "The optional new description. If provided, it replaces the current description (except the trigger tags, which are preserved/updated)."
+          "description": "The new details (replaces them); '' clears them."
         },
         "status": {
           "anyOf": [
             {
+              "enum": [
+                "needs_action",
+                "completed"
+              ],
               "type": "string"
             },
             {
               "type": "null"
             }
           ],
-          "description": "The optional status of the task ('needs_action' or 'completed')."
+          "description": "'completed' (done) or 'needs_action' (open again)."
         },
         "priority": {
           "anyOf": [
@@ -290,7 +304,7 @@
               "type": "null"
             }
           ],
-          "description": "The priority of the task ('high', 'medium', 'low'). Pass empty string to reset."
+          "description": "'low', 'medium' or 'high'."
         },
         "due_date": {
           "anyOf": [
@@ -301,7 +315,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional due date of the task (YYYY-MM-DD). Pass empty string to remove."
+          "description": "YYYY-MM-DD; '' removes it."
         },
         "group": {
           "anyOf": [
@@ -312,7 +326,7 @@
               "type": "null"
             }
           ],
-          "description": "The optional new group name for this task. Pass empty string to reset to 'General'."
+          "description": "Move it to this task group by name; '' moves it to General."
         }
       },
       "required": [
@@ -323,13 +337,13 @@
   {
     "type": "function",
     "name": "delete_task",
-    "description": "Delete a task from the Home Assistant todo list.",
+    "description": "Delete a task for good (the user is asked first). A finished task is completed with update_task instead.",
     "parameters": {
       "type": "object",
       "properties": {
         "item": {
           "type": "string",
-          "description": "The UID (unique ID, e.g. '7246aef6-672e-11f1-bbb0-bc2411aeaff6') of the task. Always use the UID (found in the 'ID: ...' part of the list_tasks output) to ensure we target the correct task, especially if there are multiple tasks with similar names."
+          "description": "The task's ID (from list_tasks) or its title."
         }
       },
       "required": [
@@ -350,13 +364,28 @@
   {
     "type": "function",
     "name": "list_tasks",
-    "description": "List todo tasks. Call this first to find the task ID before using update_task or delete_task.",
+    "description": "List open tasks (or completed ones, latest first) with their IDs, groups, due dates and triggers. Not needed before update_task / delete_task when you know the title.",
     "parameters": {
       "type": "object",
       "properties": {
         "completed": {
           "type": "boolean",
-          "description": "If True, lists only completed tasks; if False, lists only active/incomplete tasks."
+          "description": "True for completed tasks instead of open ones."
+        },
+        "group": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only this task group, by name (e.g. 'Work')."
+        },
+        "limit": {
+          "type": "integer",
+          "description": "At most this many (default 50)."
         }
       },
       "required": []
@@ -365,7 +394,7 @@
   {
     "type": "function",
     "name": "list_task_groups",
-    "description": "List all available task groups with their emoji, color, and task count.",
+    "description": "List the task groups the user can see (their own and shared ones) with emoji and task count.",
     "parameters": {
       "type": "object",
       "properties": {},
@@ -404,7 +433,7 @@
   {
     "type": "function",
     "name": "remove_task_group",
-    "description": "Remove a task group. Tasks in this group will be reassigned to 'General'.",
+    "description": "Remove a task group (the user is asked first). Its tasks move to 'General'.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -694,7 +723,7 @@
   {
     "type": "function",
     "name": "get_knowledge_item",
-    "description": "Read one saved entry in full — its complete Markdown body, structured fields, summary, transcript, tags and comments. `search_knowledge` and `list_project_entries` only return a short preview. Use this whenever you need the actual details of a specific item (prices, contacts, decisions, dates).",
+    "description": "Read one saved entry in full: its Markdown body, fields, summary, tags, comments and the text of its files (a PDF's or a photo's text, a recording's transcript; read now if not yet). `search_knowledge` and `list_project_entries` only return a short preview. Use this whenever you need the actual details of a specific item (prices, contacts, decisions, dates).",
     "parameters": {
       "type": "object",
       "properties": {
@@ -711,25 +740,25 @@
   {
     "type": "function",
     "name": "save_knowledge_item",
-    "description": "Save a knowledge entry (note, record, or link) into a project and return its ID. The returned ID is used later with update_knowledge_item / delete_knowledge_item / save_whatsapp_file. In an 'options' section (a decision such as photographers or venues) the entry is one option: give `fields` exactly the section's column names (see `list_project_entries`), in the column's type. Follow these AUTHORING RULES: - title is a SHORT label (max ~8 words) in the user's language, with NO markdown and NO punctuation. Example: \"Photographer — Yanai Budget\". Never paste a whole paragraph into the title. - body holds the full details written as clean Markdown: '##' or '###' headings, **bold** for key figures and names, '-' bullet lists, and a blank line between paragraphs. Preserve the user's facts, numbers, dates and wording (in whatever language) exactly. Example body: ## Contact - Phone: **555-0100** - Email: yanai@example.com ## Budget - Price: 4,500 - Deposit paid: **yes** (12/06/2026) - kind: 'note' for free text (ideas, general notes), 'record' for structured data (contacts, vendors, prices, contracts) — pair with fields, 'link' when saving a URL (auto-processed for transcript, summary and media). - fields: capture the few facts you might want to query later as [{\"name\": \"<label>\", \"type\": \"<type>\", \"value\": <value>}] where type is one of text, number, money (a plain number in the user's currency), phone, checkbox, date, url, select, rating (1-5). Example: [{\"name\": \"Phone\", \"type\": \"text\", \"value\": \"050-1234567\"}, {\"name\": \"Price\", \"type\": \"number\", \"value\": 4500}, {\"name\": \"Paid\", \"type\": \"checkbox\", \"value\": true}] - tags: 2-4 short labels (words or short phrases) in the user's language to enable cross-project search, e.g. [\"צלם\", \"תקציב\"] or [\"vendor\"], [\"budget\"]. - status: 'open' (default) | 'in_progress' | 'done' | 'archived'. - priority: 'low' | 'medium' | 'high'. - due_at: ISO date 'YYYY-MM-DD' only when a deadline or timing matters. - url: full URL to attach and auto-process; typically combined with kind 'link'.",
+    "description": "Save an entry (note, record or link) into a project and return its ID (for update_knowledge_item / delete_knowledge_item / save_whatsapp_file). Check `list_project_entries` first so you never duplicate one. In an 'options' section the entry is one option: name its `fields` exactly as the section's columns, in their types.",
     "parameters": {
       "type": "object",
       "properties": {
         "project_id": {
           "type": "string",
-          "description": "The ID of the project this entry belongs to."
+          "description": "The project's ID."
         },
         "kind": {
           "type": "string",
-          "description": "'note' for free text, 'record' for structured data, or 'link' for a URL."
+          "description": "'note' (free text), 'record' (structured: a vendor, a contract; give fields) or 'link' (a URL, auto-processed into a transcript, summary and media)."
         },
         "title": {
           "type": "string",
-          "description": "Short human-readable label; never a whole paragraph."
+          "description": "Short label (max ~8 words, no markdown) in the user's language, e.g. \"Photographer — Yanai\"."
         },
         "body": {
           "type": "string",
-          "description": "Markdown body with the full details or description."
+          "description": "The full details as clean Markdown ('##' headings, **bold** key figures, '-' bullets); keep the user's facts, numbers, dates and wording verbatim."
         },
         "fields": {
           "anyOf": [
@@ -741,7 +770,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional structured fields as [{\"name\": \"...\", \"type\": \"...\", \"value\": ...}]."
+          "description": "Optional facts to compare or query later: [{\"name\": \"Price\", \"type\": \"money\", \"value\": 4500}];"
         },
         "tags": {
           "anyOf": [
@@ -753,7 +782,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional list of short labels (e.g. [\"venue\", \"vendor\"])."
+          "description": "Optional 2-4 short labels in the user's language (e.g. [\"צלם\", \"תקציב\"])."
         },
         "priority": {
           "type": "string",
@@ -768,7 +797,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional ISO date (YYYY-MM-DD) for a deadline."
+          "description": "Optional ISO date (YYYY-MM-DD) when a deadline matters."
         },
         "url": {
           "anyOf": [
@@ -779,7 +808,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional URL to attach and auto-process."
+          "description": "Optional URL to attach and auto-process (usually with kind 'link')."
         },
         "section": {
           "anyOf": [
@@ -956,7 +985,7 @@
   {
     "type": "function",
     "name": "update_knowledge_item",
-    "description": "Edit an existing knowledge entry (partial update: only the arguments you provide change). Record a decision on an option with decision='chosen' / 'shortlist' / 'rejected' ('' resets). Use this to correct/extend an earlier save instead of creating a duplicate — pass the item ID shown when the entry was saved. To move an entry along its workflow, change status to 'in_progress' or 'done'; to sweep it away from active views, use 'archived'. Apply the same authoring rules (short title, markdown body, structured fields) as in save_knowledge_item.",
+    "description": "Edit an existing entry; only the arguments you pass change. Send only what changes: the fields that change (not the whole list) and `body_edits` for a few lines (not the whole body). Record a decision on an option with decision='chosen' / 'shortlist' / 'rejected' ('' resets); move it along with status 'in_progress' / 'done', or 'archived' to sweep it away.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -984,7 +1013,19 @@
               "type": "null"
             }
           ],
-          "description": "Optional new markdown body."
+          "description": "Optional whole new Markdown body (to rewrite it; prefer body_edits for changes)."
+        },
+        "body_edits": {
+          "anyOf": [
+            {
+              "items": {},
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional exact replacements in the body, applied in order: - ...\"} appends at the end."
         },
         "kind": {
           "anyOf": [
@@ -1007,7 +1048,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional new structured fields list."
+          "description": "Optional fields to set, matched by name (others are kept):"
         },
         "tags": {
           "anyOf": [
@@ -1019,7 +1060,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional new list of labels."
+          "description": "Optional new list of labels (replaces them)."
         },
         "status": {
           "anyOf": [
@@ -1253,7 +1294,7 @@
   {
     "type": "function",
     "name": "remember_info",
-    "description": "Save a durable fact about the owner in \"About you\". It is kept at once (no approval) and the owner gets an Undo button. Call it on your own, without being asked, whenever you learn something that will still be true and useful in a month: who a person is to the owner, what a nickname, place or device name refers to, a standing preference or routine. Also call it when the owner says \"remember ...\". Never save passwords, codes, account or card numbers, health or money details, plans or one-time events, or guesses the owner did not confirm. Saved facts are already in your instructions in every conversation, so do not re-save what is there; reply briefly (\"Noted.\") after saving.",
+    "description": "Save a durable fact about the owner in \"About you\" (kept at once, with an Undo button). Call it without being asked for what will still be true and useful in a month (who a person is to the owner, what a nickname, place or device name means, a standing preference or routine), and when told \"remember ...\". Never save passwords, codes, account or card numbers, health or money details, plans, one-time events or unconfirmed guesses. Don't re-save what your instructions already list; reply briefly (\"Noted.\") after saving.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -1372,12 +1413,18 @@
           "description": "Optional name, relation or phone number to filter by (in any language or script)."
         },
         "sort": {
+          "enum": [
+            "recent",
+            "drifting",
+            "pinned",
+            "name"
+          ],
           "type": "string",
           "description": "'recent' (last contact first), 'drifting' (only people he talks to regularly but not lately), 'pinned' or 'name'."
         },
         "limit": {
           "type": "integer",
-          "description": "Max people to return (default 15)."
+          "description": "Max people to return (default 15, at most 50)."
         }
       },
       "required": []
@@ -1403,7 +1450,7 @@
   {
     "type": "function",
     "name": "update_person",
-    "description": "Update what Dana knows about a person (creates them if nobody matches and rename_to is not given).",
+    "description": "Update what Dana knows about a person; only what you pass changes. Creates them when nobody matches (unless rename_to is given).",
     "parameters": {
       "type": "object",
       "properties": {
@@ -1431,7 +1478,7 @@
               "type": "null"
             }
           ],
-          "description": "Replace the free-text notes."
+          "description": "Replace the free-text notes ('' clears them)."
         },
         "append_note": {
           "anyOf": [
@@ -1497,7 +1544,7 @@
               "type": "null"
             }
           ],
-          "description": "A new display name."
+          "description": "A new display name (the old one stays as an alias)."
         }
       },
       "required": [
@@ -1514,7 +1561,7 @@
       "properties": {
         "task_id": {
           "type": "string",
-          "description": "The task id."
+          "description": "The task's ID (from list_tasks) or its title."
         },
         "person": {
           "type": "string",
@@ -1530,13 +1577,13 @@
   {
     "type": "function",
     "name": "list_recent_calls",
-    "description": "List the most recent call recordings and voice memos with titles, labels, summaries, and durations. Use this when the user asks about recent calls or voice memos in general, or when you need to find calls from a specific person before searching deeper.",
+    "description": "The user's most recent call recordings and voice memos, newest first: id, time, who, length, title, labels and summary.",
     "parameters": {
       "type": "object",
       "properties": {
         "limit": {
           "type": "integer",
-          "description": "The max number of calls to retrieve. Defaults to 5."
+          "description": "How many, 1-30 (default 5)."
         },
         "label": {
           "anyOf": [
@@ -1547,7 +1594,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional label id to filter by: family, partner, friends, work, wedding, home, purchases, travel, car, health, pets, admin, security, tech_help, logistics, automated."
+          "description": "Only calls with this label: family, partner, friends, work, wedding, home, purchases, travel, car, health, pets, admin, security, tech_help, logistics, automated."
         }
       },
       "required": []
@@ -1556,13 +1603,13 @@
   {
     "type": "function",
     "name": "search_calls",
-    "description": "Search call recordings and voice memos by person name, topic, or both. You can search for: - A person's name (searches caller/receiver fields) - A topic or keyword (searches transcripts, summaries, titles) - A combination of person AND topic (e.g. \"אמא דגים\" finds calls with 'אמא' in the contact name and 'דגים' in the transcript) If the query contains multiple words each will be required — only calls matching ALL terms (across any field) will be returned. For broad searches like \"recent calls with אמא\", consider listing recent calls first with list_recent_calls(limit=10) to get an overview, then use get_call_transcript on the relevant call ID.",
+    "description": "Search the user's call recordings and voice memos by person, topic or both (names, transcripts, summaries, titles); best matches first, at most 30.",
     "parameters": {
       "type": "object",
       "properties": {
         "query": {
           "type": "string",
-          "description": "The keyword(s) to find. Multiple words act as AND — all must match."
+          "description": "Words that must all match, in any field: a name (\"אמא\"), a topic (\"דגים\"), or both (\"אמא דגים\")."
         }
       },
       "required": [
@@ -1573,13 +1620,17 @@
   {
     "type": "function",
     "name": "get_call_transcript",
-    "description": "Retrieve the full transcript and summary of a specific call or voice memo by ID. Use this after you have identified the relevant call via list_recent_calls or search_calls. The output includes the full dialogue so you can answer specific questions about what was said.",
+    "description": "One call or voice memo in full: details, summary, key facts, pending suggestions, tasks from it and the transcript (a long one comes in pages).",
     "parameters": {
       "type": "object",
       "properties": {
         "call_id": {
           "type": "string",
-          "description": "The unique ID of the call (e.g. UUID)."
+          "description": "The call's id, from list_recent_calls or search_calls."
+        },
+        "offset": {
+          "type": "integer",
+          "description": "Where in the transcript to start (a long transcript's result names the next offset)."
         }
       },
       "required": [
@@ -1590,13 +1641,19 @@
   {
     "type": "function",
     "name": "list_call_suggestions",
-    "description": "List tasks, calendar events and security alerts suggested from the user's phone calls and phone notifications. After each recorded call (and for notifications that ask the user to do something) the assistant extracts action items as suggestions; nothing is created until the user (or you, on their explicit request) accepts one.",
+    "description": "Tasks, calendar events and security alerts suggested from the user's calls and phone notifications (newest 50), each with its id and source; nothing is created until one is accepted.",
     "parameters": {
       "type": "object",
       "properties": {
         "status": {
+          "enum": [
+            "pending",
+            "accepted",
+            "dismissed",
+            "all"
+          ],
           "type": "string",
-          "description": "'pending' (default), 'accepted', 'dismissed' or 'all'."
+          "description": "pending (default), accepted, dismissed or all."
         }
       },
       "required": []
@@ -1785,7 +1842,7 @@
         },
         "limit": {
           "type": "integer",
-          "description": "Max results (default 15)."
+          "description": "Max results (default 15, at most 50)."
         }
       },
       "required": [
@@ -1803,6 +1860,11 @@
         "bucket": {
           "anyOf": [
             {
+              "enum": [
+                "needs_you",
+                "normal",
+                "dismiss"
+              ],
               "type": "string"
             },
             {
@@ -1832,7 +1894,7 @@
         },
         "limit": {
           "type": "integer",
-          "description": "Max results (default 30)."
+          "description": "Max results (default 30, at most 100)."
         }
       },
       "required": []
@@ -1862,6 +1924,11 @@
         "bucket": {
           "anyOf": [
             {
+              "enum": [
+                "needs_you",
+                "normal",
+                "dismiss"
+              ],
               "type": "string"
             },
             {
@@ -1902,10 +1969,22 @@
   {
     "type": "function",
     "name": "get_ha_exposed_entities",
-    "description": "Retrieve all Home Assistant entities exposed to the voice assistant, with live state. Call this when you need a device's current state or attributes (is it on, the temperature, what is playing), or when the device the user means is not in the Home Devices list of the system prompt nor known from this conversation. Entity ids in the Home Devices list are already verified: do not call this just to look them up. Never guess entity IDs (like 'media_player.tv_salon'). Returns entity_id, friendly name, live state, key attributes and aliases, grouped by domain. Use aliases to map natural-language names (e.g. 'the gate', 'AC').",
+    "description": "Live state of the Home Assistant entities exposed to the voice assistant (state, key attributes, aliases), grouped by domain. Use it for a device's current state (is it on, the temperature, what is playing) or a device missing from the Home Devices list; never just to look up ids that list already has, and never guess ids.",
     "parameters": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "search": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Only entities whose id, name, alias or domain contains this, e.g. \"light\", \"kitchen\", \"AC\"; default all."
+        }
+      },
       "required": []
     }
   },
@@ -1951,13 +2030,21 @@
   {
     "type": "function",
     "name": "control_android_tv",
-    "description": "Control an Android TV / Google TV device using the androidtv integration. Use this tool to launch apps, change TV channels, search/play YouTube/Netflix, send remote keys, or run arbitrary ADB shell commands and get the output back. It automatically detects if an app is already open to avoid redundant launch commands and delays. This tool is for ADB-based TV control only. For simple media_player operations (volume, pause, play), use call_ha_service with the media_player domain instead. Actions: - \"launch_app\": Launch any app using its package/app ID (e.g. 'com.netflix.ninja', 'com.google.android.youtube.tv'). - \"watch_channel\": Tune to a numeric channel with the TV provider command the user set up (their Home Assistant setting tv_channel_command); without one, use launch_app or send_key. - \"play_youtube\": Play a specific video by ID/URL, or search for a video query on YouTube. - \"play_netflix\": Play a specific Netflix title by ID, or search for a title query on Netflix. - \"send_key\": Send a remote key press (e.g. 'HOME', 'BACK', 'UP', 'DOWN', 'ENTER', 'VOLUME_UP'). - \"run_command\": Run an arbitrary ADB shell command on the TV and return its output (e.g. 'top -n 1 -s 9 -m 5', 'dumpsys battery').",
+    "description": "Control the Android / Google TV over ADB: launch an app, tune a channel, play or search YouTube / Netflix, press a remote key, or run an ADB shell command and get its output. Turns the TV on first. For volume, play and pause use call_ha_service (media_player).",
     "parameters": {
       "type": "object",
       "properties": {
         "action": {
+          "enum": [
+            "launch_app",
+            "watch_channel",
+            "play_youtube",
+            "play_netflix",
+            "send_key",
+            "run_command"
+          ],
           "type": "string",
-          "description": "The action to perform: \"launch_app\", \"watch_channel\", \"play_youtube\", \"play_netflix\", \"send_key\", \"run_command\"."
+          "description": "launch_app (app_id), watch_channel (channel; needs the user's tv_channel_command setting), play_youtube (video_id or query), play_netflix (title_id or query), send_key (command), run_command (command)."
         },
         "entity_id": {
           "anyOf": [
@@ -1968,7 +2055,7 @@
               "type": "null"
             }
           ],
-          "description": "The Android TV media_player entity ID (defaults to the user's TV, the tv_entity setting)."
+          "description": "The TV's media_player entity; default the user's TV (tv_entity setting)."
         },
         "app_id": {
           "anyOf": [
@@ -1979,7 +2066,7 @@
               "type": "null"
             }
           ],
-          "description": "The package/app ID to launch (required for \"launch_app\")."
+          "description": "Package to launch, e.g. 'com.netflix.ninja', 'com.google.android.youtube.tv'."
         },
         "channel": {
           "anyOf": [
@@ -1990,7 +2077,7 @@
               "type": "null"
             }
           ],
-          "description": "The channel number to tune to (required for \"watch_channel\")."
+          "description": "Channel number."
         },
         "query": {
           "anyOf": [
@@ -2001,7 +2088,7 @@
               "type": "null"
             }
           ],
-          "description": "Search query for YouTube or Netflix."
+          "description": "What to search for on YouTube or Netflix."
         },
         "video_id": {
           "anyOf": [
@@ -2012,7 +2099,7 @@
               "type": "null"
             }
           ],
-          "description": "The YouTube video ID or full YouTube video URL."
+          "description": "YouTube video id or URL."
         },
         "title_id": {
           "anyOf": [
@@ -2023,7 +2110,7 @@
               "type": "null"
             }
           ],
-          "description": "The Netflix title ID (numeric)."
+          "description": "Netflix title id (numeric) or its URL."
         },
         "command": {
           "anyOf": [
@@ -2034,7 +2121,7 @@
               "type": "null"
             }
           ],
-          "description": "The remote key command (e.g., 'HOME', 'BACK') for \"send_key\", or the ADB shell command for \"run_command\"."
+          "description": "A key for send_key ('HOME', 'BACK', 'UP', 'ENTER', 'VOLUME_UP'), or an ADB shell command for run_command ('dumpsys battery')."
         }
       },
       "required": [
@@ -2051,7 +2138,7 @@
       "properties": {
         "limit": {
           "type": "integer",
-          "description": "The maximum number of chats to return (default is 10)."
+          "description": "The maximum number of chats to return (default 10, at most 50)."
         }
       },
       "required": []
@@ -2077,7 +2164,7 @@
   {
     "type": "function",
     "name": "read_chat_messages",
-    "description": "Read recent messages from a specific WhatsApp chat by contact/group name or chat ID. The chat_id can be a chat ID (with @c.us/@g.us suffix) or contact/group name (e.g. 'John', 'ענבל'). It supports bilingual matching (Hebrew <-> English translations/transliterations, e.g. 'ענבל' matches 'Inbal Cohen'), nicknames, and partial searches. When a name matches multiple contacts, the tool automatically prefers the most recently active one. If the name query is still ambiguous after recency filtering, it returns all candidates so you can ask the user to clarify. Voice messages are transcribed, images saved, and other files (PDFs, documents, videos) listed by name and type. Each message ends with its id (`id: ...`): pass it to forward_whatsapp_message to pass a file or message along, or to reply / edit / delete.",
+    "description": "Read recent messages from a specific WhatsApp chat by contact/group name or chat ID. The chat_id can be a chat ID (with @c.us/@g.us suffix) or contact/group name (e.g. 'John', 'ענבל'). It supports bilingual matching (Hebrew <-> English translations/transliterations, e.g. 'ענבל' matches 'Inbal Cohen'), nicknames, and partial searches. When a name matches multiple contacts, the tool automatically prefers the most recently active one. If the name query is still ambiguous after recency filtering, it returns all candidates so you can ask the user to clarify. Voice messages are transcribed; photos and other files (PDFs, documents, videos) are listed by name and type: read_whatsapp_file reads one. Each message ends with its id (`id: ...`): pass it to read_whatsapp_file, forward_whatsapp_message, or to reply / edit / delete.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -2087,7 +2174,7 @@
         },
         "limit": {
           "type": "integer",
-          "description": "The maximum number of messages to retrieve (default is 10)."
+          "description": "The maximum number of messages to retrieve (default 10, at most 100)."
         }
       },
       "required": [
@@ -2278,8 +2365,30 @@
   },
   {
     "type": "function",
+    "name": "read_whatsapp_file",
+    "description": "Read a file someone sent on WhatsApp: a PDF's or document's text (a quote, a contract), what a photo shows and its text, or a voice note's transcript. Use it whenever the details are in the file rather than the messages. Take the id from read_chat_messages / get_latest_messages.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "chat_id": {
+          "type": "string",
+          "description": "The chat the message is in: chat ID (with @c.us/@g.us suffix), contact name, or group name."
+        },
+        "message_id": {
+          "type": "string",
+          "description": "The full id of the message carrying the file, exactly as shown (`id: ...`)."
+        }
+      },
+      "required": [
+        "chat_id",
+        "message_id"
+      ]
+    }
+  },
+  {
+    "type": "function",
     "name": "save_whatsapp_file",
-    "description": "Keep a file someone sent on WhatsApp (a price quote PDF, a voice note, a video, a photo) on a saved project item, so it opens from the project. Voice notes are transcribed onto the file. First read the chat (read_chat_messages / get_latest_messages) and take the message's id from its `id: ...`; never make one up. Save the item first (save_knowledge_item) to have its ID.",
+    "description": "Keep a file someone sent on WhatsApp (a price quote PDF, a voice note, a video, a photo) on a saved project item, so it opens from the project; Dana reads its text onto the file (get_knowledge_item shows it). Take the message's id from read_chat_messages / get_latest_messages (`id: ...`); never make one up. Save the item first (save_knowledge_item) to have its ID.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -2317,7 +2426,7 @@
   {
     "type": "function",
     "name": "get_latest_messages",
-    "description": "Fetch recent messages from WhatsApp chats with filters for read status and chat type. Media is described like in read_chat_messages (voice transcribed, images saved, other files by name and type), and each message ends with its id (`id: ...`) for forward_whatsapp_message, replies, edits and deletes.",
+    "description": "Fetch recent messages from WhatsApp chats with filters for read status and chat type. Media is described like in read_chat_messages (voice transcribed, other files by name and type: read_whatsapp_file reads one), and each message ends with its id (`id: ...`) for read_whatsapp_file, forward_whatsapp_message, replies, edits and deletes.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -2331,11 +2440,11 @@
         },
         "limit_chats": {
           "type": "integer",
-          "description": "Maximum number of recent chats to check (default is 15)."
+          "description": "Maximum number of recent chats to check (default 15, at most 30)."
         },
         "messages_per_chat": {
           "type": "integer",
-          "description": "Maximum number of recent messages to return per chat (default is 5)."
+          "description": "Maximum number of recent messages per chat (default 5, at most 30)."
         }
       },
       "required": []
@@ -2344,7 +2453,7 @@
   {
     "type": "function",
     "name": "list_calendars",
-    "description": "List all available Google Calendars with their IDs and which is the default (personal).",
+    "description": "List the user's Google Calendars: each one's name and ID, which are searched by default and where new events go. Needed only to pick another calendar; search_calendar already searches the default ones.",
     "parameters": {
       "type": "object",
       "properties": {},
@@ -2354,7 +2463,7 @@
   {
     "type": "function",
     "name": "search_calendar",
-    "description": "Search your calendars for events. By default searches all your selected calendars (personal, work, etc.). Use 'calendar_id' to search only one calendar (pass the exact ID from list_calendars()).",
+    "description": "Find events in the user's calendars (all the calendars they chose to see), soonest first, with each event's ID for update_event / delete_event.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -2367,7 +2476,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional text to search for in event summaries, descriptions, or locations."
+          "description": "Optional words to find in the title, description, location or attendees."
         },
         "start_time": {
           "anyOf": [
@@ -2378,7 +2487,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional start time in ISO format (YYYY-MM-DDTHH:MM:SS). Defaults to 30 days ago."
+          "description": "From (YYYY-MM-DD or YYYY-MM-DDTHH:MM, the user's time). Default: today's start; with a query, a year ago."
         },
         "end_time": {
           "anyOf": [
@@ -2389,11 +2498,11 @@
               "type": "null"
             }
           ],
-          "description": "Optional end time in ISO format (YYYY-MM-DDTHH:MM:SS). Defaults to 30 days in the future."
+          "description": "Until (same forms; a date includes that whole day). Default: 30 days after the start; with a query and no start_time, a year from now."
         },
         "limit": {
           "type": "integer",
-          "description": "The maximum number of results to return (default 20)."
+          "description": "At most this many events (default 20, at most 50)."
         },
         "calendar_id": {
           "anyOf": [
@@ -2404,7 +2513,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional specific calendar ID (from list_calendars()). If omitted, searches all selected calendars."
+          "description": "Only this calendar (its name or ID from list_calendars)."
         }
       },
       "required": []
@@ -2413,21 +2522,28 @@
   {
     "type": "function",
     "name": "add_event",
-    "description": "Add a new event to your default personal calendar. Only creates events on the default calendar configured via GOOGLE_CALENDAR_ID. Use list_calendars to see available calendars.",
+    "description": "Add an event to the user's calendar. Runs at once with Undo; asks first only when it invites people.",
     "parameters": {
       "type": "object",
       "properties": {
         "summary": {
           "type": "string",
-          "description": "The title or summary of the event."
+          "description": "The event's title."
         },
         "start_time": {
           "type": "string",
-          "description": "Start time in ISO format (YYYY-MM-DDTHH:MM:SS)."
+          "description": "YYYY-MM-DDTHH:MM in the user's time (or with an offset); YYYY-MM-DD for an all-day event."
         },
         "end_time": {
-          "type": "string",
-          "description": "End time in ISO format (YYYY-MM-DDTHH:MM:SS)."
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The same form (all day: the last day). Default: an hour after the start (all day: one day)."
         },
         "description": {
           "anyOf": [
@@ -2438,7 +2554,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional description of the event."
+          "description": "Optional notes."
         },
         "location": {
           "anyOf": [
@@ -2449,7 +2565,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional location for the event."
+          "description": "Optional place."
         },
         "attendees": {
           "anyOf": [
@@ -2460,26 +2576,36 @@
               "type": "null"
             }
           ],
-          "description": "Optional comma-separated attendee emails to invite."
+          "description": "Optional comma-separated email addresses to invite (Google emails them the invitation)."
+        },
+        "calendar_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional calendar name or ID (default: the calendar new events go to)."
         }
       },
       "required": [
         "summary",
-        "start_time",
-        "end_time"
+        "start_time"
       ]
     }
   },
   {
     "type": "function",
     "name": "update_event",
-    "description": "Update an existing event in your personal calendar.",
+    "description": "Change an event: only the fields given change; a new start_time alone keeps the event's length. Runs at once with Undo; asks first only when it invites people.",
     "parameters": {
       "type": "object",
       "properties": {
         "event_id": {
           "type": "string",
-          "description": "The ID of the event to update."
+          "description": "The event's ID from search_calendar."
         },
         "summary": {
           "anyOf": [
@@ -2490,7 +2616,7 @@
               "type": "null"
             }
           ],
-          "description": "New summary (if updating)."
+          "description": "A new title."
         },
         "start_time": {
           "anyOf": [
@@ -2501,7 +2627,7 @@
               "type": "null"
             }
           ],
-          "description": "New start time in ISO format (if updating)."
+          "description": "A new start (YYYY-MM-DDTHH:MM, or YYYY-MM-DD for all day)."
         },
         "end_time": {
           "anyOf": [
@@ -2512,7 +2638,7 @@
               "type": "null"
             }
           ],
-          "description": "New end time in ISO format (if updating)."
+          "description": "A new end (same form; all day: the last day)."
         },
         "description": {
           "anyOf": [
@@ -2523,7 +2649,7 @@
               "type": "null"
             }
           ],
-          "description": "New description (if updating)."
+          "description": "New notes (\"\" clears them)."
         },
         "location": {
           "anyOf": [
@@ -2534,7 +2660,7 @@
               "type": "null"
             }
           ],
-          "description": "New location (if updating)."
+          "description": "A new place (\"\" clears it)."
         },
         "add_attendees": {
           "anyOf": [
@@ -2545,7 +2671,18 @@
               "type": "null"
             }
           ],
-          "description": "Comma-separated new attendee emails to invite."
+          "description": "Comma-separated email addresses to invite as well (Google emails them)."
+        },
+        "calendar_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The calendar the event is in (name or ID), when search_calendar showed another one."
         }
       },
       "required": [
@@ -2556,13 +2693,24 @@
   {
     "type": "function",
     "name": "delete_event",
-    "description": "Delete an existing event from your personal calendar by its event ID.",
+    "description": "Delete an event from the user's calendar (asks first).",
     "parameters": {
       "type": "object",
       "properties": {
         "event_id": {
           "type": "string",
-          "description": "The ID of the event to delete."
+          "description": "The event's ID from search_calendar."
+        },
+        "calendar_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The calendar the event is in (name or ID), when search_calendar showed another one."
         }
       },
       "required": [
@@ -2573,13 +2721,13 @@
   {
     "type": "function",
     "name": "run_kubectl",
-    "description": "Run a kubectl command against the Kubernetes cluster using the in-cluster service account. Translates kubectl-style commands into direct Kubernetes API calls. Supported read-only verbs: get, describe, logs, top. Write operations (create, delete, patch, apply) are NOT supported. - \"get pods\" — list pods in namespace - \"get pods -o wide\" — list pods with more details - \"get services\" — list services - \"get deployments\" — list deployments - \"describe pod my-pod\" — describe a specific resource - \"logs my-pod\" — get logs of a pod - \"logs my-pod -c my-container\" — get logs for a specific container - \"top pods\" — show pod resource usage - \"get nodes\" — list nodes - \"get events\" — list events",
+    "description": "Read the Kubernetes cluster with a kubectl-style command (read-only: get, describe, logs, top; no writes, no secret values). Examples: \"get pods\", \"get pods -A\", \"get deploy -l app=dana\", \"get events\", \"describe pod NAME\", \"get pod NAME -o json\", \"logs POD -c CONTAINER --tail 500\", \"top pods\", \"top nodes\".",
     "parameters": {
       "type": "object",
       "properties": {
         "command": {
           "type": "string",
-          "description": "The kubectl-style command to execute (e.g. 'get pods', 'describe deployment xxx')."
+          "description": "The kubectl command without \"kubectl\". Flags: -n, -A, -o json|yaml, -l, -c, --tail (logs: last 200 lines by default)."
         },
         "namespace": {
           "anyOf": [
@@ -2590,7 +2738,7 @@
               "type": "null"
             }
           ],
-          "description": "The Kubernetes namespace to operate in. Defaults to the pod's own namespace."
+          "description": "Namespace when the command has no -n; default the pod's own."
         }
       },
       "required": [
@@ -2601,13 +2749,13 @@
   {
     "type": "function",
     "name": "run_python",
-    "description": "Run Python code on the server (asks the user first) and return its output. Use this for calculations, data processing, JSON manipulation, text parsing, format conversion, or file generation. Only use when no other specialized tool fits the task — prefer using dedicated tools for Home Assistant (call_ha_service), WhatsApp (send_whatsapp_message), Calendar (search_calendar), etc. instead of reimplementing their logic in Python. IMPORTANT: The provided code MUST use print() to produce any output that should be visible — only printed text is captured and returned. Do not use input() or interactive functions.",
+    "description": "Run Python code on the server (asks the user first) and return what it prints: calculations, data or text processing, format conversion. Prefer a dedicated tool when one fits.",
     "parameters": {
       "type": "object",
       "properties": {
         "code": {
           "type": "string",
-          "description": "The Python code to execute. Use print() to return results."
+          "description": "The Python code; only print() output comes back (no input())."
         },
         "timeout": {
           "anyOf": [
@@ -2618,7 +2766,7 @@
               "type": "null"
             }
           ],
-          "description": "Maximum execution time in seconds (default 30, max 60)."
+          "description": "Seconds (default 30, max 60)."
         }
       },
       "required": [

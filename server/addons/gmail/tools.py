@@ -4,11 +4,13 @@ material (``untrusted_result``: the rest of the turn asks before acting
 outside Dana); sending asks first; archive / read state / trash / drafts run
 at once and register an undo (docs/gmail.md)."""
 
+import base64
 import functools
 import logging
 import re
 from typing import Any, Awaitable, Callable, Dict, List, Mapping, Optional, Sequence, Set, Tuple
 
+from core import llm
 from core.undoable import UndoConflict, safe_record
 from core.users import User
 from core.addons import Approval, Connection, NotConnected, store
@@ -20,6 +22,8 @@ from addons.gmail.config import (BODY_MAX_CHARS, ADDON, MAX_BATCH, MAX_RESULTS, 
 from addons.gmail.addon import addon
 
 logger = logging.getLogger(__name__)
+# An attachment's text in a result (tool results are capped at 12,000 characters).
+ATTACHMENT_MAX_CHARS = 10_000
 
 _ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
 
@@ -170,7 +174,7 @@ def _within(build: Callable[[int], str], limit: int) -> str:
 @_guarded("reading the email")
 async def read_email(conn: Connection, message_id: str) -> str:
     """Read one email: who it is from and to, its subject and date, its text and the names of its
-    attachments (attachments are listed, not opened). Earlier messages quoted at the end of a reply
+    attachments (read_email_attachment opens one). Earlier messages quoted at the end of a reply
     are left out (use read_email_thread for the conversation) and a very long text is cut, both marked.
 
     Args:
@@ -180,6 +184,49 @@ async def read_email(conn: Connection, message_id: str) -> str:
     seen.remember(conn.user, message)
     return _within(lambda limit: content.framed(conn.user, "One email.", content.message_lines(message, limit)),
                    BODY_MAX_CHARS)
+
+
+def _attachment(conn: Connection, message_id: str, name: str) -> Tuple[Dict[str, Any], bytes]:
+    """The attachment of ``message_id`` named ``name`` (the first whose name contains it when none is
+    exactly it) and its bytes.
+
+    Raises:
+        compose.Refused: no such attachment, or too large to read.
+    """
+    svc = client.service(conn)
+    message = svc.users().messages().get(userId=ME, id=message_id, format="full").execute()
+    files = content.attachments(message.get("payload"))
+    wanted = name.strip().casefold()
+    found = (next((f for f in files if f["name"].casefold() == wanted), None)
+             or next((f for f in files if wanted and wanted in f["name"].casefold()), None))
+    if found is None:
+        names = "; ".join(f["name"] for f in files) or "none"
+        raise compose.Refused(f"That email has no attachment “{content.one_line(name, 60)}” (its attachments: {names}).")
+    if not llm.readable(found["type"], found["size"]):
+        raise compose.Refused(f"Dana can't read {found['name']} ({found['type']}): only PDFs, photos, audio and "
+                              "text files up to 14 MB.")
+    raw = found["data"] or (svc.users().messages().attachments()
+                            .get(userId=ME, messageId=message_id, id=found["id"]).execute().get("data") or "")
+    return found, base64.urlsafe_b64decode(raw + "==")
+
+
+@addon.tool(untrusted_result=True)
+@_guarded("reading the attachment")
+async def read_email_attachment(conn: Connection, message_id: str, filename: str) -> str:
+    """Read a file attached to an email: a PDF's text (an invoice, a contract, a ticket), what a photo
+    shows and its text, or a text file. Use it when the details are in the attachment, not the email.
+
+    Args:
+        message_id: The message ID, as search_emails / read_email returned it.
+        filename: The attachment's name as read_email lists it (part of it is enough).
+    """
+    found, data = await client.run(_attachment, conn, _one_id(message_id), str(filename or ""))
+    text = await llm.read_file(data, found["type"], purpose="gmail_attachment", ref=message_id)
+    if not text:
+        return f"{found['name']}: no text in it."
+    cut = f"\n… (cut, {len(text):,} chars)" if len(text) > ATTACHMENT_MAX_CHARS else ""
+    return content.framed(conn.user, f"The attachment {found['name']} ({found['type']}), as read.",
+                          [text[:ATTACHMENT_MAX_CHARS] + cut])
 
 
 def _get_thread(conn: Connection, thread_id: str) -> List[Dict[str, Any]]:

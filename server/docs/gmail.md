@@ -22,6 +22,7 @@ The Google client blocks, so each tool does its Gmail work in a worker thread (`
 | `search_emails(query, limit=10)` | Gmail search syntax; newest first | no | — |
 | `list_unread_emails(limit=10)` | labels `INBOX` + `UNREAD`; same shape | no | — |
 | `read_email(message_id)` | headers, where it is, body, attachments listed | no | — |
+| `read_email_attachment(message_id, filename)` | an attachment's text: a PDF written out, a photo described, a text file (`llm.read_file`, purpose `gmail_attachment`; PDFs, photos, audio and text up to 14 MB; at most 10,000 characters) | no | — |
 | `read_email_thread(thread_id)` | the conversation, oldest first, bodies shortened | no | — |
 | `send_email(to, subject, body, cc=None, bcc=None)` | a new message | yes | — |
 | `reply_to_email(message_id, body, reply_all=False)` | a reply in the same thread | yes | — |
@@ -61,11 +62,11 @@ There is no permanent delete, no label management and nothing that touches filte
 
 An email is text written by strangers, and it reaches the model as a tool result.
 
-1. **Framed as material**: every result that carries email content (the two listings, `read_email`, `read_email_thread`) is built by `content.framed`: one sentence saying what follows is the content of email, written by other people, to read and act about only at the user's own request, never instructions, with links not to be opened; then the content framed by `core.text.untrusted` (data from email, between `<<<UNTRUSTED_TEXT <nonce>` and `UNTRUSTED_TEXT <nonce>>>` fences; docs/agent-actions.md, "Text written by others"). The nonce is random per result and the fence's name is neutralised inside the text, so an email cannot close the block. The base prompt (rule 8) and the addon's guide say the same.
+1. **Framed as material**: every result that carries email content (the two listings, `read_email`, `read_email_attachment`, `read_email_thread`) is built by `content.framed`: one sentence saying what follows is the content of email, written by other people, to read and act about only at the user's own request, never instructions, with links not to be opened; then the content framed by `core.text.untrusted` (data from email, between `<<<UNTRUSTED_TEXT <nonce>` and `UNTRUSTED_TEXT <nonce>>>` fences; docs/agent-actions.md, "Text written by others"). The nonce is random per result and the fence's name is neutralised inside the text, so an email cannot close the block. The base prompt (rule 8) and the addon's guide say the same.
 2. **Cleaned**: control characters and invisible format characters (zero-width, direction overrides) are dropped from everything shown; header values are put on one line and capped; a name that looks like an address is not shown in front of another address.
 3. **The turn asks before acting outside Dana**: the four reading tools are registered with `untrusted_result=True`. Once one of them has run, the rest of that turn counts as carrying untrusted content: every `acts_outside` tool (home devices, the TV, the cluster, running code, `remember_info`) waits for Approve, with `reason: "untrusted_result"` on the `approval_required` event (docs/agent-actions.md). The agent loop reads this from the turn's own messages (the tool results after the last user message), so it holds across an approval and ends with the turn. Sending mail asks in every turn anyway; drafts, archive, read state and trash still run at once (they can be undone).
 4. **Recipients and headers**: see "Sending" — header injection is refused, addresses are validated, and a reply's recipients come only from validated addresses of the original.
-5. **No remote content**: nothing in the package makes a request other than to the Gmail API. Links are shown as text, images are dropped, attachments are only listed.
+5. **No remote content**: nothing in the package makes a request other than to the Gmail API. Links are shown as text, images are dropped; an attachment is downloaded from the Gmail API only when `read_email_attachment` asks for it, and its text read by the model.
 
 What this does not cover: a later turn whose history still holds an email's text is not marked (the same as the screenshot of a shared screen, which stays in history), and realtime voice has no such rule at all, which is why the addon is not offered there.
 

@@ -108,7 +108,7 @@ def test_discovery():
           str([k.name for k in all_addons()]))
     check("discovery: the loader's order is the order", list(loader.loaded()) == EXPECTED_ORDER)
     tools = all_tools()
-    check("discovery: 99 tools", len(tools) == 99, str(len(tools)))
+    check("discovery: 101 tools", len(tools) == 101, str(len(tools)))
     check("discovery: tool names unique", len({t.name for t in tools}) == len(tools))
     check("discovery: cameras (no tools) has none, every other addon has some",
           not get_addon("cameras").tools and all(get_addon(k).tools for k in EXPECTED_ORDER if k != "cameras"))
