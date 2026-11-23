@@ -362,8 +362,7 @@ section { padding: var(--section-y) var(--gutter); scroll-margin-top: 64px; }
 .trail.gone { opacity: 0; }
 .pulse { fill: var(--ink); }
 
-.dia-in, .dia-out { position: relative; list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
-.dia-in { grid-area: in; } .dia-out { grid-area: out; }
+.dia-in { position: relative; list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; grid-area: in; }
 .node {
   position: relative; display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 14px; min-width: 0;
   background: var(--canvas-soft); border: 1px solid var(--hairline); transition: border-color .3s var(--ease), box-shadow .3s var(--ease);
@@ -432,12 +431,99 @@ section { padding: var(--section-y) var(--gutter); scroll-margin-top: 64px; }
 .ev::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--h); flex: none; }
 .ev span { overflow: hidden; text-overflow: ellipsis; }
 
+/* what comes out: the showreel's devices, small. A wall tablet (top left), the phone on its Now screen (right) and the
+   watch over the phone's lower corner. They stay Ink in both themes, like the showreel stage. */
+.dia-out { grid-area: out; position: relative; width: 250px; height: 508px; justify-self: end; }
+.dia-out p { margin: 0; }
+.dv-tablet, .dv-phone, .dv-watch { position: absolute; zoom: 1; margin: 0; transition: box-shadow .4s var(--ease); }
+.dv-tablet.got, .dv-phone.got, .dv-watch.got { box-shadow: 0 18px 50px rgb(0 0 0 / .45), 0 0 0 1px rgb(255 106 61 / .55), 0 0 0 6px rgb(255 106 61 / .14); }
+
+.dv-phone { right: 0; top: 56px; width: 194px; height: 398px; border-radius: 32px; padding: 7px; box-shadow: 0 18px 50px rgb(0 0 0 / .45), inset 0 0 0 1px rgb(255 255 255 / .07); }
+.dv-phone::before { top: 13px; width: 50px; height: 14px; border-radius: 8px; }
+.dv-screen { border-radius: 26px; padding: 34px 13px 12px; gap: 0; background: radial-gradient(ellipse at 50% 0%, rgb(255 106 61 / .12), transparent 55%), var(--screen); }
+.dv-date { font: 500 7.5px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--s-mute); }
+.dv-lede { font: italic 400 22px/1.1 var(--serif); white-space: nowrap; color: var(--s-ink); margin-top: 7px !important; letter-spacing: -.005em; transition: opacity .18s var(--ease), transform .18s var(--ease); }
+.dv-lede.swap { opacity: 0; transform: translateY(3px); }
+.dv-lede.clear::after { content: ""; display: inline-block; width: 5px; height: 5px; margin-inline-start: 6px; border-radius: 50%; background: #5fbf8a; vertical-align: middle; }
+.dv-day { display: flex; align-items: center; gap: 3px; margin: 11px 0 6px; }
+.dv-day i { width: 9px; height: 3px; border-radius: 2px; background: rgb(247 245 240 / .14); }
+.dv-day i.busy { background: #5aa7f0; }
+.dv-day i.past { opacity: .3; }
+.dv-day b { width: 1.5px; height: 11px; border-radius: 1px; background: #ff6a3d; margin-inline: 1px; }
+
+.dv-list { position: relative; }
+.dv-quiet { position: absolute; top: 4px; left: 0; right: 0; font-size: 9px; line-height: 1.45; color: var(--s-mute); transition: opacity .3s var(--ease); }
+.dv-lede:not(.clear) ~ .dv-list .dv-quiet { opacity: 0; }
+.dv-rows { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.dv-row { position: relative; display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: 9px; padding: 8px 0; will-change: transform, opacity; }
+.dv-row + .dv-row { border-top: 1px solid var(--screen-line); }
+.dv-row > .dot { width: 6px; height: 6px; margin: 4px 5px 0; }
+.dv-row b { display: block; font-size: 10.5px; font-weight: 500; line-height: 1.3; color: var(--s-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-row small { display: block; margin-top: 1px; font-size: 8.5px; line-height: 1.35; color: var(--s-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dv-pill { display: inline-block; margin-top: 5px; padding: 3px 8px; border-radius: 999px; font-size: 8.5px; font-weight: 600; line-height: 1.3;
+  background: rgb(255 106 61 / .14); color: #fd9371; transition: background-color .2s var(--ease), color .2s var(--ease), transform .2s var(--ease); }
+.dv-row.press .dv-pill { background: #ff6a3d; color: #fff; transform: scale(.94); }
+.dv-row.new { animation: dv-row-in .5s var(--decel) .14s both; }
+.dv-row.wash::after { content: ""; position: absolute; inset: 2px -6px; border-radius: 9px; background: rgb(255 106 61 / .09); animation: dv-wash 1.6s var(--ease) both; pointer-events: none; }
+.dv-row.out { opacity: 0; transform: translateX(28px); transition: opacity .38s var(--ease), transform .38s cubic-bezier(.3, 0, .8, .15); }
+.dv-row.old { opacity: 0; transform: scale(.96); transition: opacity .35s var(--ease), transform .35s var(--ease); }
+@keyframes dv-row-in { from { opacity: 0; transform: translateY(-10px); } }
+@keyframes dv-wash { from { opacity: 1; } to { opacity: 0; } }
+
+/* an app icon: a small rounded square in the app's colour with a generic glyph */
+.dv-ico { width: 16px; height: 16px; border-radius: 5px; display: grid; place-items: center; flex: none; background: var(--h, #ff6a3d); }
+.dv-ico svg { width: 10px; height: 10px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.dv-ico .fill { fill: #fff; stroke: none; }
+.dv-ico.i-chat { --h: #3fb36b; } .dv-ico.i-card { --h: #e0607f; } .dv-ico.i-cal { --h: #4f95e0; } .dv-ico.i-dana { --h: #ff6a3d; }
+
+.dv-banner {
+  position: absolute; z-index: 2; top: 30px; left: 6px; right: 6px; padding: 8px 9px 9px; border-radius: 13px;
+  background: rgb(66 57 51 / .94); border: 1px solid rgb(255 255 255 / .07); box-shadow: 0 10px 26px rgb(0 0 0 / .4);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  opacity: 0; transform: translateY(-115%); transition: opacity .3s var(--ease), transform .45s var(--decel); pointer-events: none;
+}
+.dv-banner.on { opacity: 1; transform: none; }
+.dv-banner .notif-head { gap: 6px; font-size: 7px; white-space: nowrap; }
+.dv-banner-k { overflow: hidden; text-overflow: ellipsis; }
+.dv-banner .dv-ico { width: 12px; height: 12px; border-radius: 4px; }
+.dv-banner .dv-ico svg { width: 8px; height: 8px; }
+.dv-banner .notif-title { margin-top: 6px; font-size: 10.5px; }
+.dv-banner .notif-body { margin-top: 2px; font-size: 8.5px; line-height: 1.4; }
+
+.dv-tablet { left: 0; top: 0; width: 136px; height: 90px; border-radius: 13px; padding: 6px; background: var(--device); z-index: 2;
+  box-shadow: 0 14px 36px rgb(0 0 0 / .45), inset 0 0 0 1px rgb(255 255 255 / .07); }
+.dv-tablet-screen { height: 100%; border-radius: 8px; background: var(--screen); padding: 8px 10px; overflow: hidden; }
+.dv-eye { font: 500 6.5px/1 var(--mono); letter-spacing: .12em; text-transform: uppercase; color: var(--s-mute); }
+.dv-shop { list-style: none; margin: 4px 0 0; padding: 0; }
+.dv-shop li { display: flex; align-items: center; gap: 6px; padding: 3px 0; border-bottom: 1px solid var(--screen-line); font-size: 9.5px; line-height: 1.2; color: var(--s-ink); }
+.dv-shop li::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: #5fbf8a; flex: none; }
+.dv-shop li span { margin-inline-start: auto; font: 500 6px/1 var(--mono); letter-spacing: .06em; text-transform: uppercase; color: var(--s-mute); }
+.dv-shop li.old { color: var(--s-mute); } .dv-shop li.old::before { background: transparent; }
+.dv-shop li.new { animation: dv-row-in .5s var(--decel) both; }
+
+.dv-watch { left: 0; top: 372px; width: 118px; height: 118px; padding: 6px; z-index: 2; box-shadow: 0 16px 40px rgb(0 0 0 / .55), inset 0 0 0 1px rgb(255 255 255 / .06); }
+.dv-watch.got { border-radius: 50%; }
+.dv-watch::before, .dv-watch::after { width: 46px; height: 34px; border-radius: 10px; }
+.dv-watch::before { top: -22px; } .dv-watch::after { bottom: -22px; }
+.dv-watch .watch-face { padding: 10px; display: grid; place-items: center; }
+.dv-watch .watch-face > div { grid-area: 1 / 1; display: flex; flex-direction: column; align-items: center; transition: opacity .4s var(--ease), transform .4s var(--decel); }
+.dv-wtime { font: 400 30px/1 var(--serif); color: var(--s-ink); }
+.dv-watch .w-mono { font-size: 6px; margin-top: 4px; }
+.dv-watch .w-title { font-size: 17px; margin: 1px 0 4px; }
+.dv-watch .w-list { gap: 2px; }
+.dv-watch .w-list li { font-size: 7.5px; gap: 4px; }
+.dv-watch .w-list .dot { width: 4px; height: 4px; }
+.dv-face-brief { opacity: 0; transform: scale(.92); }
+.dv-watch.brief .dv-face-idle { opacity: 0; transform: scale(1.08); }
+.dv-watch.brief .dv-face-brief { opacity: 1; transform: none; }
+
 .flow-also { margin: 28px 0 0; font-size: 14px; color: var(--mute); max-width: 100ch; }
 .flow-also b { color: var(--body-strong); font-weight: 600; }
 
 @media (max-width: 900px) {
   .dia { grid-template-columns: minmax(0, 1fr); grid-template-areas: "in" "server" "model" "out"; row-gap: 52px; }
-  .dia-in, .dia-out { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dia-in { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .dia-out { justify-self: center; }
   .node { gap: 8px; padding: 8px 10px; border-radius: 12px; }
   .node-ico { width: 28px; height: 28px; border-radius: 8px; }
   .node-ico svg { width: 17px; height: 17px; }

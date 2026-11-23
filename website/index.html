@@ -272,7 +272,7 @@
       <ul class="sr-only">
         <li>In: your phone's notifications, call recordings, your phone's signals (waking up, the car, saved places, sleep), your accounts (Gmail, Calendar, WhatsApp, Contacts), your bank and cards through an add-on, and you (chat, voice, the watch).</li>
         <li>On your server, each one is sorted (needs you, can wait, noise), understood (calls transcribed, dates, promises and people pulled out), remembered (facts about you, briefs on people) and Dana decides when and where to tell you.</li>
-        <li>Out: the Now queue, your watch, the wall tablet and TV, or a push to your phone. Most things are folded away and never reach you.</li>
+        <li>Out: a row on your phone's Now screen (one tap: done, snooze, dismiss), a push to your phone, the morning briefing on your watch, or the shared list on the wall tablet and TV. Most things are folded away and never reach you.</li>
         <li>The model provider gets only the text a step needs, one call at a time, with your own key.</li>
       </ul>
 
@@ -326,24 +326,38 @@
           <span class="dia-model-t">Only the text a step needs, one call at a time, on your key</span>
         </div>
 
-        <ul class="dia-out">
-          <li class="node" data-node="now" style="--h:var(--ember)">
-            <span class="node-ico"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="5" rx="1.5"/><rect x="4" y="11" width="16" height="5" rx="1.5"/><path d="M7 20h10"/></svg></span>
-            <span class="node-t">The Now queue<small data-idle="One tap: done, snooze, dismiss">One tap: done, snooze, dismiss</small></span>
-          </li>
-          <li class="node" data-node="watch" style="--h:var(--ember)">
-            <span class="node-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="6"/><path d="M9 6l.6-3h4.8l.6 3M9 18l.6 3h4.8l.6-3M12 10v2l1.5 1"/></svg></span>
-            <span class="node-t">Your watch<small data-idle="The briefing, tiles, the face">The briefing, tiles, the face</small></span>
-          </li>
-          <li class="node" data-node="wall" style="--h:var(--ember)">
-            <span class="node-ico"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="12" rx="2"/><path d="M9 20h6"/></svg></span>
-            <span class="node-t">Wall tablet &amp; TV<small data-idle="Lists, calendar, cameras">Lists, calendar, cameras</small></span>
-          </li>
-          <li class="node" data-node="push" style="--h:var(--ember)">
-            <span class="node-ico"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18" rx="2.5"/><circle cx="17" cy="5" r="2.6" class="fill"/></svg></span>
-            <span class="node-t">A push to your phone<small data-idle="Urgent ones repeat until seen">Urgent ones repeat until seen</small></span>
-          </li>
-        </ul>
+        <!-- what comes out: the Now screen on a phone, a push dropping in, the watch, the wall tablet -->
+        <div class="dia-out">
+          <div class="dv-tablet">
+            <div class="dv-tablet-screen">
+              <p class="dv-eye">Shopping · with Gal</p>
+              <ul class="dv-shop"><li class="old">Pita<span>Bakery</span></li><li class="old">Tomatoes<span>Produce</span></li></ul>
+            </div>
+          </div>
+          <div class="phone dv-phone">
+            <div class="phone-screen dv-screen">
+              <div class="dv-banner">
+                <div class="notif-head"><span class="dv-ico"></span><span class="dv-banner-k"></span><span class="notif-when">now</span></div>
+                <p class="notif-title"></p>
+                <p class="notif-body"></p>
+              </div>
+              <p class="dv-date">Tuesday · 24 November</p>
+              <p class="dv-lede clear">All clear.</p>
+              <div class="dv-day"><i class="past"></i><i class="past busy"></i><i class="past"></i><i class="busy past"></i><i class="past"></i><b></b><i class="busy"></i><i></i><i class="busy"></i><i></i><i></i></div>
+              <div class="dv-list"><p class="dv-quiet">Standup at 09:30, rain likely (70%).</p><ol class="dv-rows"></ol></div>
+            </div>
+          </div>
+          <div class="watch dv-watch">
+            <div class="watch-face">
+              <div class="dv-face-idle"><p class="dv-wtime">10:47</p><p class="w-mono">Tue 24</p></div>
+              <div class="dv-face-brief">
+                <p class="w-mono">Good morning</p>
+                <p class="w-title">Robin</p>
+                <ul class="w-list"><li><i class="dot sky"></i>Standup 09:30</li><li><i class="dot amber"></i>Rain after 16:00</li></ul>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div class="dia-pills"></div>
       </div>
