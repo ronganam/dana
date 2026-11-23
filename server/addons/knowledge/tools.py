@@ -85,6 +85,52 @@ def _section_id(user: User, project_id: Optional[str], ref: Optional[str]) -> Op
     return found["id"]
 
 
+def _project_id(user: User, ref: str) -> str:
+    """The id of the project ``ref`` (id or title, an active one first) that ``user`` sees.
+
+    Raises:
+        LookupError: no such project.
+    """
+    ref = clean_str(ref)
+    found = [p for p in projects.list_projects(user) if p["id"] == ref or p["title"].lower() == ref.lower()]
+    found.sort(key=lambda p: (p["id"] != ref, p["status"] != "active"))
+    if not found:
+        raise LookupError(f"No project '{ref}'. Use `list_projects` to find it.")
+    return found[0]["id"]
+
+
+def _find_file(user: User, entry_id: str, ref: str) -> Optional[dict]:
+    """The file ``ref`` (id or name, as `get_knowledge_item` lists it) on an entry ``user`` sees."""
+    entry = entries.get_entry(user, entry_id)
+    ref = clean_str(ref)
+    for f in (entry or {}).get("files") or []:
+        if f["id"] == ref:
+            return f
+    return next((f for f in (entry or {}).get("files") or [] if f["name"].lower() == ref.lower()), None)
+
+
+def _merge_columns(current: list, given: Any) -> list:
+    """``current`` columns with ``given`` merged in by key, else name (case-insensitive): a match is
+    updated, ``"remove": true`` drops it, anything else is added; untouched ones stay."""
+    merged = [dict(c) for c in current if isinstance(c, dict)]
+    for raw in loads_json(given, []) if not isinstance(given, list) else given:
+        raw = {"name": raw} if isinstance(raw, str) else raw
+        if not isinstance(raw, dict):
+            continue
+        key, name = clean_str(raw.get("key")), clean_str(raw.get("name")).lower()
+        at = next((i for i, c in enumerate(merged) if key and c.get("key") == key), None)
+        if at is None:
+            at = next((i for i, c in enumerate(merged) if name and c.get("name", "").lower() == name), None)
+        if raw.get("remove"):
+            if at is not None:
+                merged.pop(at)
+        elif at is not None:
+            merged[at] = {**merged[at], **{k: v for k, v in raw.items() if k not in ("remove", "key")}}
+        else:
+            merged.append(raw)
+    return merged
+
+
 def _value_text(field: dict, currency: str) -> str:
     value = field.get("value")
     if value is None or value == "":
@@ -295,7 +341,8 @@ async def get_knowledge_item(conn: Connection, item_id: str) -> str:
             res += "\n\n**Files:**\n"
             for f in entry["files"]:
                 note = f" — {escape_markdown(f['note'])}" if f.get("note") else ""
-                res += f"- {escape_markdown(f['name'])} ({f['mime']}, {round((f.get('size') or 0) / 1024)} KB){note}\n"
+                res += (f"- {escape_markdown(f['name'])} (`{f['id']}`, {f['mime']}, "
+                        f"{round((f.get('size') or 0) / 1024)} KB){note}\n")
                 text = f.get("transcript") or ""
                 if text:
                     cut = f" … (cut, {len(text):,} chars)" if len(text) > FILE_TEXT_CHARS else ""
@@ -371,7 +418,8 @@ async def save_knowledge_item(conn: Connection, project_id: str, kind: str = "no
 # Matches AI summaries and transcripts of linked pages, videos and received files.
 @addon.tool(untrusted_result=True)
 async def search_knowledge(conn: Connection, query: str, project_id: Optional[str] = None) -> str:
-    """Search the knowledge base (titles, bodies, AI summaries, transcripts, tags, fields) with FTS.
+    """Search the knowledge base (titles, bodies, AI summaries, transcripts, tags, fields, the text of
+    attached files) by word prefix; shows the text around each hit.
 
     Use to answer the user's questions like 'what did I save/find about X?'. Prefer 1-2 concrete
     keywords (in the language the content is in) over full sentences. Pass project_id to scope the search to a project.
@@ -391,9 +439,22 @@ async def search_knowledge(conn: Connection, query: str, project_id: Optional[st
         for item in results:
             proj = escape_markdown(item.get("project_title") or "unknown")
             title = escape_markdown(item["title"] or "Untitled")
-            snippet = escape_markdown((item.get("body") or "")[:200])
-            suffix = f" — {snippet}" if snippet else ""
-            res += f"- **[{proj}] {title}** (`{item['id']}`, {item['kind']}){suffix}\n"
+            bits = [item["kind"]]
+            if item.get("section_title"):
+                bits.append(f"section {escape_markdown(item['section_title'])}")
+            if item.get("decision"):
+                bits.append(DECISION_WORDS.get(item["decision"], item["decision"]))
+            where = ""
+            if item.get("matched_file"):
+                where = f"in file “{escape_markdown(item['matched_file'])}”: "
+            elif item.get("matched") not in ("", "body", "title"):
+                where = f"in {item['matched']}: "
+            snippet = " ".join(escape_markdown(item.get("snippet") or "").split())
+            snippet = snippet.replace(entries.HIT[0], "**").replace(entries.HIT[1], "**")
+            if not snippet and item.get("matched") != "title":
+                snippet = " ".join(escape_markdown((item.get("body") or "")[:200]).split())
+            res += f"- **[{item['id']}]** [{proj}] {title} ({', '.join(bits)})"
+            res += f" — {where}{snippet}\n" if snippet else "\n"
         return res + "Use `get_knowledge_item(item_id)` to read one in full."
     except Exception as e:
         logger.error(f"Error searching knowledge: {e}", exc_info=True)
@@ -517,11 +578,13 @@ async def update_knowledge_item(conn: Connection, item_id: str, title: Optional[
                                 fields: Optional[list] = None, tags: Optional[list] = None,
                                 status: Optional[str] = None, priority: Optional[str] = None,
                                 due_at: Optional[str] = None, url: Optional[str] = None,
-                                section: Optional[str] = None, decision: Optional[str] = None) -> str:
+                                section: Optional[str] = None, decision: Optional[str] = None,
+                                project: Optional[str] = None) -> str:
     """Edit an existing entry; only the arguments you pass change. Send only what changes: the
     fields that change (not the whole list) and `body_edits` for a few lines (not the whole body).
     Record a decision on an option with decision='chosen' / 'shortlist' / 'rejected' ('' resets);
-    move it along with status 'in_progress' / 'done', or 'archived' to sweep it away.
+    move it along with status 'in_progress' / 'done', or 'archived' to sweep it away; move it to
+    another project with `project`.
 
     Args:
         item_id: The ID of the entry to update.
@@ -540,8 +603,11 @@ async def update_knowledge_item(conn: Connection, item_id: str, title: Optional[
         url: Optional new URL, or "" to clear.
         section: Optional section (title or ID) to move the entry to, or "" for none.
         decision: Optional decision: '', 'shortlist', 'chosen' or 'rejected'.
+        project: Optional project (ID or title) to move the entry to; its section is cleared unless
+            `section` names one of the new project's.
     """
-    cols = (*ENTRY_COLUMNS, entries.URL_SETTER)  # an undo puts the link back with who had set it
+    # An undo puts the link back with who had set it, and a moved entry back in its project and owner's hands.
+    cols = (*ENTRY_COLUMNS, entries.URL_SETTER, "project_id", "user_id")
     try:
         if decision is not None and decision not in DECISIONS:
             return "Error: decision must be '', 'shortlist', 'chosen' or 'rejected'."
@@ -555,21 +621,38 @@ async def update_knowledge_item(conn: Connection, item_id: str, title: Optional[
         if fields is not None:
             fields = _merged_fields(loads_json(current.get("fields"), []), fields)
         before = undoable.row("entries", "id", item_id, cols)
-        section_id = _section_id(conn.user, current.get("project_id"), section)
+        project_id = _project_id(conn.user, project) if clean_str(project) else None
+        section_id = _section_id(conn.user, project_id or current.get("project_id"), section)
         updated = entries.update_entry(
             conn.user, item_id, title=title, body=body, kind=kind, fields=fields, tags=tags,
             status=status, priority=priority, due_at=due_at, url=url, section_id=section_id, decision=decision,
+            project_id=project_id,
         )
         if updated is None:
             return f"Error: Knowledge item `{item_id}` not found."
         after = undoable.row("entries", "id", item_id, cols)
+        moved = bool(before and after and before["project_id"] != after["project_id"])
         changed = [w for k, w in CHANGE_WORDS.items() if before and after and before.get(k) != after.get(k)]
+        if moved:
+            changed.append("project")
         if changed:
+            entry_guard = _entry_guard(conn.user, item_id)
+
+            def _guard() -> None:
+                entry_guard()
+                if moved:  # moving it back needs the old project still writable
+                    try:
+                        projects.writable_project(conn.user, before["project_id"])
+                    except (LookupError, projects.ReadOnly):
+                        raise undoable.UndoConflict("You can no longer change the project it came from, "
+                                                    "so it was left where it is.")
+
             undoable.restore_row(f"Changed “{after['title'] or 'Untitled'}”", "entries", "id", item_id,
-                                 before, after, cols, "update_knowledge_item",
-                                 guard=_entry_guard(conn.user, item_id))
+                                 before, after, cols, "update_knowledge_item", guard=_guard)
         out = (f"Updated “{escape_markdown(after['title'] or 'Untitled')}” (`{item_id}`): {', '.join(changed)}."
                if changed and after else f"Nothing changed on `{item_id}`.")
+        if moved:
+            out += f" It is now in “{escape_markdown(projects.title_of(after['project_id']) or '')}”."
         sec = sections.get_section(conn.user, after["section_id"]) if after and after.get("section_id") else None
         if sec and sec.get("summary") and {"fields", "decision"} & set(changed):
             out += (f" The summary of section “{escape_markdown(sec['title'])}” was written before this change: "
@@ -605,6 +688,47 @@ async def delete_knowledge_item(conn: Connection, item_id: str) -> str:
     except Exception as e:
         logger.error(f"Error deleting knowledge item: {e}", exc_info=True)
         return f"Error deleting knowledge item: {e}"
+
+
+def _describe_update_file(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    found = _find_file(user, clean(a.get("item_id"), 200), clean(a.get("file"), 200)) if user else None
+    name = found["name"] if found else ""
+    return Approval(f"Remove the file “{clean(name, 80)}”" if name else "Remove a file", "Remove file", "❌",
+                    "Remove this file?")
+
+
+@addon.tool(is_write=True, confirm=lambda a: bool(a.get("remove")), describe=_describe_update_file)
+async def update_entry_file(conn: Connection, item_id: str, file: str, name: Optional[str] = None,
+                            note: Optional[str] = None, remove: bool = False) -> str:
+    """Rename a file kept on an entry, change its note, or remove it (remove=true).
+
+    Args:
+        item_id: The entry's ID.
+        file: The file's ID or name, as `get_knowledge_item` lists it.
+        name: Optional new file name.
+        note: Optional new note ("" clears it).
+        remove: Remove the file from the entry.
+    """
+    try:
+        found = _find_file(conn.user, item_id, file)
+        if found is None:
+            return f"Error: No file '{clean_str(file)}' on entry `{item_id}`. Use `get_knowledge_item` to see its files."
+        if remove:
+            files.delete_file(conn.user, item_id, found["id"])
+            return f"Removed the file '{escape_markdown(found['name'])}'."
+        before = undoable.row("entry_files", "id", found["id"], ("name", "note"))
+        saved = files.update_file(conn.user, item_id, found["id"], name=name, note=note)
+        after = undoable.row("entry_files", "id", found["id"], ("name", "note"))
+        if saved and before and after and not undoable.same(after, before, ("name", "note")):
+            undoable.restore_row(f"Changed file “{saved['name']}”", "entry_files", "id", found["id"], before, after,
+                                 ("name", "note"), "update_entry_file", touch_updated_at=False,
+                                 guard=_entry_guard(conn.user, item_id))
+        return f"Updated the file '{escape_markdown(saved['name'] if saved else found['name'])}'."
+    except projects.ReadOnly as e:
+        return _error(e)
+    except Exception as e:
+        logger.error(f"Error updating entry file: {e}", exc_info=True)
+        return f"Error updating entry file: {e}"
 
 
 # --- Sections ---
@@ -664,20 +788,22 @@ async def update_section(conn: Connection, section_id: str, title: Optional[str]
                          icon: Optional[str] = None, kind: Optional[str] = None) -> str:
     """Change a section (partial update). Use `summary` to write or refresh the section's Markdown
     write-up — for an options section: a short TL;DR comparison table, the recommendation, and what
-    is still open — after options are added or change. Passing `columns` replaces the whole list
-    (keep existing names to keep their values; a renamed column keeps its values when you pass its
-    `key`, as shown in the section's columns).
+    is still open — after options are added or change. `columns` are merged into the existing ones
+    by `key` (else name): a given column changes that one (pass its `key` to rename it, keeping its
+    values), a new one is added, {"name": ..., "remove": true} drops one; others stay.
 
     Args:
         section_id: The section's ID (from `list_project_entries`).
         title: Optional new title.
-        columns: Optional full new list of columns (see `create_section`).
+        columns: Optional columns to change, add or remove (see `create_section`).
         summary: Optional new Markdown summary ("" clears it).
         icon: Optional new emoji.
         kind: Optional 'options' or 'notes'.
     """
     try:
         before = undoable.row("project_sections", "id", section_id, SECTION_COLUMNS)
+        if columns is not None and before:
+            columns = _merge_columns(loads_json(before["columns"], []), columns)
         updated = sections.update_section(conn.user, section_id, title=title, columns=columns, summary=summary,
                                           icon=icon, kind=kind)
         if updated is None:
@@ -695,7 +821,15 @@ async def update_section(conn: Connection, section_id: str, title: Optional[str]
         return f"Error updating section: {e}"
 
 
-@addon.tool(is_write=True, confirm=True)
+def _describe_delete_section(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    section = sections.section_row(user, clean(a.get("section_id"), 200))
+    name = (section.get("title") or "") if section else ""
+    what = f"the section “{clean(name, 80)}”" if name else "a section"
+    return Approval(f"Delete {what}" + (" and the entries in it" if a.get("with_entries") else ""),
+                    "Delete section", "❌", "Delete this section?")
+
+
+@addon.tool(is_write=True, confirm=True, describe=_describe_delete_section)
 async def delete_section(conn: Connection, section_id: str, with_entries: bool = False) -> str:
     """Delete a section. Its entries stay in the project without a section, unless with_entries is true.
 

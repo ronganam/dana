@@ -10,18 +10,18 @@ page (`web/`, registered with `Dana.panel`): `web/projects.js` +
 `web/projects-core.js` (pure, tested by `bin/test test_web_projects` against
 `tests/fixtures/projects_web.json`) + `web/projects.css`. Tests: `bin/test test_knowledge_users` (per user,
 sharing, media), `bin/test test_knowledge_sections` (sections, decisions,
-columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
-`bin/test test_db` (the addon's baseline migration), `bin/test test_addons`.
+columns, files, budget, the tools, search, `save_whatsapp_file`, the web fixture),
+`bin/test test_db` (the addon's migrations), `bin/test test_addons`.
 
 | Module | What |
 |---|---|
 | `values.py` | vocabulary (`KINDS`, `STATUSES`, `PRIORITIES`, `FIELD_TYPES`, `SECTION_KINDS`, `DECISIONS`, column roles), normalisation (`clean_value`: a money / number / rating value is a number when it reads as one — "13,400 ₪" → 13400 — and stays text otherwise, e.g. a range; `clean_columns`), row → payload (`serialize_project` / `serialize_entry` / `serialize_section` / `serialize_file` leave out the owner columns and stored file names) |
 | `projects.py` | projects for a user (with their stats: sections, decisions made, the committed sum): `visible_sql`, `access`, `list_projects`, `get_project`, `create_project`, `update_project` / `delete_project` (owner only), `writable_project`, `project_tasks`, `active_projects`, `search_titles`; registers the sharing item type `project` |
-| `entries.py` | entries for a user: `visible_sql`, `entry_row`, `writable_entry`, `get_entry`, `list_entries`, `entry_previews`, `create_entry` / `update_entry` / `delete_entry`, `search_entries` (FTS), `matching_ids` / `search_rows` (the search box), `retry_media`, `media_file` |
+| `entries.py` | entries for a user: `visible_sql`, `entry_row`, `writable_entry`, `get_entry`, `list_entries`, `entry_previews`, `create_entry` / `update_entry` (also moves an entry to another project) / `delete_entry`, `fts_match_query` / `search_entries` (FTS, below), `matching_ids` / `search_rows` (the search box), `retry_media`, `media_file` |
 | `sections.py` | sections of a project: `list_sections`, `get_section`, `find_section` (id or title), `create_section`, `update_section` (renaming a column renames that field in the section's entries), `delete_section` (its entries become loose, or go with it) |
 | `files.py` | files on entries (`paths.KNOWLEDGE_FILES_DIR`, table `entry_files`, up to 60 MB each): `add_file` (a file Dana can read, `llm.readable`: audio, a PDF, a photo, text, is read in the background as the owner with `llm.read_file`, purpose `knowledge_file`, into `transcript`), `fill_texts` (reads the files of an entry that have no text yet, waiting up to 90 s), `files_of`, `file_path`, `update_file`, `delete_file`, `forget_entries` (rows and disk files when entries go) |
 | `media.py` | link processing: yt-dlp download, transcript (`llm.transcribe`), summary + tags (`llm.complete_json`, purpose `media_summary`), stored on the entry; `file_for` (the `/media/` files) |
-| `tools.py` | the 13 agent tools (`create_project`, `list_projects`, `list_project_entries`, `get_knowledge_item`, `save_knowledge_item`, `search_knowledge`, `update_project`, `delete_project`, `update_knowledge_item`, `delete_knowledge_item`, `create_section`, `update_section`, `delete_section` (`confirm`)) and their undos; `record_file_added` registers the undo of a file a tool attached |
+| `tools.py` | the 14 agent tools (`create_project`, `list_projects`, `list_project_entries`, `get_knowledge_item`, `save_knowledge_item`, `search_knowledge`, `update_project`, `delete_project`, `update_knowledge_item` (`project` moves the entry), `delete_knowledge_item`, `update_entry_file` (rename / note; `remove` asks first: the file leaves the disk, no undo), `create_section`, `update_section` (`columns` merge by key, else name; `"remove": true` drops one), `delete_section` (`confirm`, an Approve card naming it)) and their undos; `record_file_added` registers the undo of a file a tool attached |
 
 ## Sections, decisions and files
 
@@ -40,7 +40,11 @@ columns, files, budget, the tools, `save_whatsapp_file`, the web fixture),
   TL;DR, a comparison table, the recommendation). A column's `key` stays when
   it is renamed, and the entries' field follows the new name.
 - **An entry** may sit in a section (`section_id`, a section of its own
-  project, else 400 `field: section_id`); an option's `decision` is `""`,
+  project, else 400 `field: section_id`). `update_knowledge_item` with
+  `project` (id or title of a project the user can write) moves it: it then
+  belongs to that project's owner, its section is cleared unless `section`
+  names one of the new project's, and the undo moves it back (while the old
+  project is still writable); an option's `decision` is `""`,
   `shortlist`, `chosen` or `rejected`. Its values for the columns are
   ordinary `fields` named like the columns; fields no column names still show
   (as extras). Entries without a section are "Other items".
@@ -99,6 +103,17 @@ types, the budget column) are sheets too.
 - **Search.** The FTS index `entries_fts` holds every user's entries; every
   query of it (`search_knowledge`, `entries.search_entries`, the search box in
   `core/search.py`) joins `entries` and keeps only the rows the user can see.
+  Besides the entry's own text it has a `files` column: each file's name,
+  note and `transcript` (the text read from it), one per line (migration
+  `m0002_files_in_search`; triggers on `entries` and `entry_files` keep it
+  current). `search_entries` matches every word as a word prefix (`"word"*`);
+  a Hebrew word also without its leading prefix letter (ה ו ב ל מ ש כ:
+  "באביב" finds "אביב") and with one ("צלם" finds "הצלם"); when no entry
+  has every word, any word. Each hit carries an FTS `snippet` around it,
+  `matched` (the column), `matched_file` (when it is in a file's text),
+  `section_title` and the entry's files (one query for all hits);
+  `search_knowledge` prints the entry id, project, section, decision and
+  that snippet.
 - **Media files** (`paths.MEDIA_DIR`, URL `/media/<file>` in
   `entries.media_path`) are served by `GET /media/{name}` only to a user who
   can see an entry with that file (else 404; a file no entry names is never

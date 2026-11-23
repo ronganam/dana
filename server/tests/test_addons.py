@@ -108,7 +108,7 @@ def test_discovery():
           str([k.name for k in all_addons()]))
     check("discovery: the loader's order is the order", list(loader.loaded()) == EXPECTED_ORDER)
     tools = all_tools()
-    check("discovery: 101 tools", len(tools) == 101, str(len(tools)))
+    check("discovery: 102 tools", len(tools) == 102, str(len(tools)))
     check("discovery: tool names unique", len({t.name for t in tools}) == len(tools))
     check("discovery: cameras (no tools) has none, every other addon has some",
           not get_addon("cameras").tools and all(get_addon(k).tools for k in EXPECTED_ORDER if k != "cameras"))
@@ -182,7 +182,7 @@ def test_per_user_lists():
     check("tools: the admin's list is the tools of their addons, in addon then definition order",
           # two users: core has share_item (the admin has tasks, an addon with shareable items) and shopping
           # has choose_shopping_list
-          admin_tools == expected and len(admin_tools) == 4 + 7 + 5 + 14 + 4 + 4 + 11, str(len(admin_tools)))
+          admin_tools == expected and len(admin_tools) == 4 + 7 + 5 + 15 + 4 + 4 + 11, str(len(admin_tools)))
     check("tools: no HA / WhatsApp / calendar tools without those addons",
           not {"call_ha_service", "send_whatsapp_message", "add_event"} & set(admin_tools))
     check("tools: the order is deterministic (same list every time, realtime too)",

@@ -834,7 +834,7 @@
   {
     "type": "function",
     "name": "search_knowledge",
-    "description": "Search the knowledge base (titles, bodies, AI summaries, transcripts, tags, fields) with FTS. Use to answer the user's questions like 'what did I save/find about X?'. Prefer 1-2 concrete keywords (in the language the content is in) over full sentences. Pass project_id to scope the search to a project.",
+    "description": "Search the knowledge base (titles, bodies, AI summaries, transcripts, tags, fields, the text of attached files) by word prefix; shows the text around each hit. Use to answer the user's questions like 'what did I save/find about X?'. Prefer 1-2 concrete keywords (in the language the content is in) over full sentences. Pass project_id to scope the search to a project.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -985,7 +985,7 @@
   {
     "type": "function",
     "name": "update_knowledge_item",
-    "description": "Edit an existing entry; only the arguments you pass change. Send only what changes: the fields that change (not the whole list) and `body_edits` for a few lines (not the whole body). Record a decision on an option with decision='chosen' / 'shortlist' / 'rejected' ('' resets); move it along with status 'in_progress' / 'done', or 'archived' to sweep it away.",
+    "description": "Edit an existing entry; only the arguments you pass change. Send only what changes: the fields that change (not the whole list) and `body_edits` for a few lines (not the whole body). Record a decision on an option with decision='chosen' / 'shortlist' / 'rejected' ('' resets); move it along with status 'in_progress' / 'done', or 'archived' to sweep it away; move it to another project with `project`.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -1127,6 +1127,17 @@
             }
           ],
           "description": "Optional decision: '', 'shortlist', 'chosen' or 'rejected'."
+        },
+        "project": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional project (ID or title) to move the entry to; its section is cleared unless `section` names one of the new project's."
         }
       },
       "required": [
@@ -1148,6 +1159,54 @@
       },
       "required": [
         "item_id"
+      ]
+    }
+  },
+  {
+    "type": "function",
+    "name": "update_entry_file",
+    "description": "Rename a file kept on an entry, change its note, or remove it (remove=true).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "description": "The entry's ID."
+        },
+        "file": {
+          "type": "string",
+          "description": "The file's ID or name, as `get_knowledge_item` lists it."
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional new file name."
+        },
+        "note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Optional new note (\"\" clears it)."
+        },
+        "remove": {
+          "type": "boolean",
+          "description": "Remove the file from the entry."
+        }
+      },
+      "required": [
+        "item_id",
+        "file"
       ]
     }
   },
@@ -1200,7 +1259,7 @@
   {
     "type": "function",
     "name": "update_section",
-    "description": "Change a section (partial update). Use `summary` to write or refresh the section's Markdown write-up — for an options section: a short TL;DR comparison table, the recommendation, and what is still open — after options are added or change. Passing `columns` replaces the whole list (keep existing names to keep their values; a renamed column keeps its values when you pass its `key`, as shown in the section's columns).",
+    "description": "Change a section (partial update). Use `summary` to write or refresh the section's Markdown write-up — for an options section: a short TL;DR comparison table, the recommendation, and what is still open — after options are added or change. `columns` are merged into the existing ones by `key` (else name): a given column changes that one (pass its `key` to rename it, keeping its values), a new one is added, {\"name\": ..., \"remove\": true} drops one; others stay.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -1229,7 +1288,7 @@
               "type": "null"
             }
           ],
-          "description": "Optional full new list of columns (see `create_section`)."
+          "description": "Optional columns to change, add or remove (see `create_section`)."
         },
         "summary": {
           "anyOf": [
