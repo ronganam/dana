@@ -105,6 +105,8 @@ class PastRecordingsTest {
         assertEquals(now - 30 * day, PastRecordings.Range.MONTH.sinceMs(now))
         assertEquals(now - 90 * day, PastRecordings.Range.QUARTER.sinceMs(now))
         assertEquals(0L, PastRecordings.Range.ALL.sinceMs(now))
+        assertEquals(12_345L, PastRecordings.Range.SINCE.sinceMs(now, customSinceMs = 12_345L))
+        assertEquals(now - 7 * day, PastRecordings.Range.WEEK.sinceMs(now, customSinceMs = 12_345L))
         assertEquals(PastRecordings.Range.MONTH, PastRecordings.Range.of(null))
         assertEquals(PastRecordings.Range.ALL, PastRecordings.Range.of("ALL"))
     }

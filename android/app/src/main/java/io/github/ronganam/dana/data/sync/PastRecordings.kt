@@ -54,10 +54,16 @@ object PastRecordings {
 
     /** How far back a run goes, by the recording's last change; the user picks it in Settings. */
     enum class Range(val days: Int?, val label: String) {
-        WEEK(7, "Last 7 days"), MONTH(30, "Last 30 days"), QUARTER(90, "Last 3 months"), ALL(null, "Everything");
+        WEEK(7, "Last 7 days"), MONTH(30, "Last 30 days"), QUARTER(90, "Last 3 months"), ALL(null, "Everything"),
+        /** From a date the user picks ([customSinceMs]: that day's start). */
+        SINCE(null, "Since a date…");
 
-        /** The oldest last-change time this range takes at [nowMs] (0: no limit). */
-        fun sinceMs(nowMs: Long): Long = days?.let { nowMs - it * DAY_MS } ?: 0L
+        /** The oldest last-change time this range takes at [nowMs] (0: no limit; SINCE: [customSinceMs]). */
+        fun sinceMs(nowMs: Long, customSinceMs: Long = 0L): Long = when {
+            this == SINCE -> customSinceMs
+            days != null -> nowMs - days * DAY_MS
+            else -> 0L
+        }
 
         companion object {
             val DEFAULT = MONTH
@@ -120,13 +126,13 @@ object PastRecordings {
         WorkInfo.State.CANCELLED, null -> Backlog.Idle
     }
 
-    /** Start the backlog run over [range]; one already running or waiting is kept, never doubled. */
-    fun start(context: Context, range: Range) {
+    /** Start the backlog run over [range] ([customSinceMs] for SINCE); one already running or waiting is kept, never doubled. */
+    fun start(context: Context, range: Range, customSinceMs: Long = 0L) {
         val app = context.applicationContext
         val now = System.currentTimeMillis()
         val network = if (CallUploadSettings.wifiOnly(app)) NetworkType.UNMETERED else NetworkType.CONNECTED
         val request = OneTimeWorkRequestBuilder<PastRecordingsWorker>()
-            .setInputData(workDataOf(KEY_STARTED to now, KEY_SINCE to range.sinceMs(now)))
+            .setInputData(workDataOf(KEY_STARTED to now, KEY_SINCE to range.sinceMs(now, customSinceMs)))
             .setConstraints(Constraints.Builder().setRequiredNetworkType(network).build())
             .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 1, TimeUnit.MINUTES)
             .build()

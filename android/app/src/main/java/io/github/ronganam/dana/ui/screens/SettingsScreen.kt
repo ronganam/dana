@@ -459,11 +459,32 @@ private fun PastRecordingsRow(backlog: PastRecordings.Backlog) {
     }
     Text(status, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     var range by remember { mutableStateOf(CallUploadSettings.pastRange(context)) }
+    var sinceMs by remember { mutableLongStateOf(CallUploadSettings.pastSinceMs(context)) }
+    // "Since a date…": the system date picker, up to today; the run takes recordings from that day's start.
+    fun pickDate() {
+        val zone = java.time.ZoneId.systemDefault()
+        val shown = if (sinceMs > 0) java.time.Instant.ofEpochMilli(sinceMs).atZone(zone).toLocalDate()
+            else java.time.LocalDate.now().minusMonths(6)
+        android.app.DatePickerDialog(context, { _, y, m, d ->
+            sinceMs = java.time.LocalDate.of(y, m + 1, d).atStartOfDay(zone).toInstant().toEpochMilli()
+            range = PastRecordings.Range.SINCE
+            CallUploadSettings.setPastSinceMs(context, sinceMs)
+            CallUploadSettings.setPastRange(context, range)
+        }, shown.year, shown.monthValue - 1, shown.dayOfMonth).apply {
+            datePicker.maxDate = System.currentTimeMillis()
+        }.show()
+    }
     if (backlog !is PastRecordings.Backlog.Running) {
         Text("How far back", style = MaterialTheme.typography.titleSmall)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             PastRecordings.Range.entries.forEach { r ->
-                InkChip(r.label, selected = r == range, onClick = { range = r; CallUploadSettings.setPastRange(context, r) })
+                if (r == PastRecordings.Range.SINCE) {
+                    val label = if (sinceMs > 0) "Since " + java.time.format.DateTimeFormatter.ofPattern("d MMM yyyy")
+                        .format(java.time.Instant.ofEpochMilli(sinceMs).atZone(java.time.ZoneId.systemDefault())) else r.label
+                    InkChip(label, selected = r == range, onClick = { pickDate() })
+                } else {
+                    InkChip(r.label, selected = r == range, onClick = { range = r; CallUploadSettings.setPastRange(context, r) })
+                }
             }
         }
     }
@@ -474,7 +495,8 @@ private fun PastRecordingsRow(backlog: PastRecordings.Backlog) {
         ) { Text("Stop") }
     } else {
         OutlinedButton(
-            onClick = { PastRecordings.start(context, range) },
+            enabled = range != PastRecordings.Range.SINCE || sinceMs > 0,
+            onClick = { PastRecordings.start(context, range, sinceMs) },
             modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
         ) { Text("Upload past recordings") }
     }

@@ -36,6 +36,7 @@ object CallUploadSettings {
     private const val KEY_WIFI = "call_upload_wifi_only"
     private const val KEY_SKIP = "call_skip_contacts"
     private const val KEY_PAST_RANGE = "call_past_range"
+    private const val KEY_PAST_SINCE = "call_past_since_ms"
 
     private fun prefs(c: Context) = ServerConfig.prefs(c)
 
@@ -59,6 +60,10 @@ object CallUploadSettings {
     /** How far back "Upload past recordings" goes (the last choice). */
     fun pastRange(c: Context): PastRecordings.Range = PastRecordings.Range.of(prefs(c).getString(KEY_PAST_RANGE, null))
     fun setPastRange(c: Context, v: PastRecordings.Range) = prefs(c).edit { putString(KEY_PAST_RANGE, v.name) }
+
+    /** The date "Since a date…" last picked (the day's start, ms; 0: none yet). */
+    fun pastSinceMs(c: Context): Long = prefs(c).getLong(KEY_PAST_SINCE, 0L)
+    fun setPastSinceMs(c: Context, v: Long) = prefs(c).edit { putLong(KEY_PAST_SINCE, v) }
 
     fun wifiOnly(c: Context): Boolean = prefs(c).getBoolean(KEY_WIFI, false)
     fun setWifiOnly(c: Context, v: Boolean) = prefs(c).edit { putBoolean(KEY_WIFI, v) }
