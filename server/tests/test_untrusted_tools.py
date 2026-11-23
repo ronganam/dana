@@ -62,6 +62,8 @@ WORDS = re.compile(r"\b(messages?|e-?mails?|mail|notifications?|chats?|calls?|tr
 
 # Tools whose docstring uses one of WORDS but whose result carries no text other people wrote.
 ALLOWED = {
+    # Runs the user's own code; when the script read an untrusted tool its whole output comes back framed.
+    "run_code": "frames its output when the script read others' text",
     # Sending, replying, forwarding and deleting: they ask first (confirm) and return Dana's own words.
     "send_email": "a send; asks first", "reply_to_email": "a send; asks first",
     "send_whatsapp_message": "a send; asks first", "send_whatsapp_file": "a send; asks first",

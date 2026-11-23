@@ -81,7 +81,7 @@ Each feature is an addon you turn on per user. Before you turn one on, this says
 <!-- addons-table:start -->
 | Feature | What it does | Required | Optional | Region |
 |---|---|---|---|---|
-| Essentials | The time, asking you to pick, web search, the weather at Home | — | — | Any |
+| Essentials | The time, asking you to pick, web search, the weather at Home, Python in a sandbox | — | — | Any |
 | Tasks | Task lists, reminders and their triggers | — | Dana's phone app; the Phone addon | Any |
 | Shopping | Your shopping list, sorted by aisle and shared live | — | the Phone addon | Any |
 | Projects | Projects, decisions and saved notes, links and files | — | a transcription model: an OpenAI or Gemini key, or your own Whisper server | Any |

@@ -38,7 +38,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 
   | Addon | What | Doc |
   |---|---|---|
-  | essentials | time, selection, web search, `share_item`; everyone has it | `docs/access.md` |
+  | essentials | time, selection, web search, `share_item`, `run_code` (Python in a WASI sandbox calling the user's tools: `core/sandbox.py`); everyone has it | `docs/access.md`, `docs/sandbox.md` |
   | tasks | lists, tasks, links, trigger engine; sharing | `docs/tasks-and-triggers.md` |
   | shopping | one list per user, aisles, invitations, live stream + push; sharing | `docs/shopping.md` |
   | knowledge | projects (date, budget) with sections — decisions whose options are compared in columns with a summary, or notes — entries, files on entries (uploads, WhatsApp, transcripts), FTS search, link media; sharing; the web Projects panel (`addons/knowledge/web/`) | `docs/knowledge.md` |

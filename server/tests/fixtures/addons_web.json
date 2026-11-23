@@ -1,7 +1,7 @@
 {
  "catalog_admin": {
   "body": {
-   "dana_version": "10.3.0",
+   "dana_version": "10.4.0",
    "entries": [
     {
      "author": "Someone",
@@ -382,15 +382,16 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search, the weather at Home",
+     "description": "The time, asking you to pick, web search, the weather at Home, Python in a sandbox",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
      "features": [
-      "Get the current date, time, and day of the week.",
-      "Ask the user to choose one or more options from a predefined list.",
-      "Search the web for public information using DuckDuckGo.",
-      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+      "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
+      "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
+      "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
      ],
      "icon": "sparkles",
      "name": "essentials",
@@ -1755,15 +1756,16 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search, the weather at Home",
+     "description": "The time, asking you to pick, web search, the weather at Home, Python in a sandbox",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
      "features": [
-      "Get the current date, time, and day of the week.",
-      "Ask the user to choose one or more options from a predefined list.",
-      "Search the web for public information using DuckDuckGo.",
-      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+      "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
+      "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
+      "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
      ],
      "icon": "sparkles",
      "name": "essentials",
@@ -3002,15 +3004,16 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search, the weather at Home",
+     "description": "The time, asking you to pick, web search, the weather at Home, Python in a sandbox",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
      "features": [
-      "Get the current date, time, and day of the week.",
-      "Ask the user to choose one or more options from a predefined list.",
-      "Search the web for public information using DuckDuckGo.",
-      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+      "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
+      "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
+      "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
      ],
      "icon": "sparkles",
      "name": "essentials",
@@ -4262,15 +4265,16 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search, the weather at Home",
+     "description": "The time, asking you to pick, web search, the weather at Home, Python in a sandbox",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
      "features": [
-      "Get the current date, time, and day of the week.",
-      "Ask the user to choose one or more options from a predefined list.",
-      "Search the web for public information using DuckDuckGo.",
-      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+      "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
+      "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
+      "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
      ],
      "icon": "sparkles",
      "name": "essentials",
@@ -5512,15 +5516,16 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search, the weather at Home",
+     "description": "The time, asking you to pick, web search, the weather at Home, Python in a sandbox",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
      "features": [
-      "Get the current date, time, and day of the week.",
-      "Ask the user to choose one or more options from a predefined list.",
-      "Search the web for public information using DuckDuckGo.",
-      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+      "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
+      "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
+      "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
      ],
      "icon": "sparkles",
      "name": "essentials",
@@ -6762,15 +6767,16 @@
      "connect_url": null,
      "connected": true,
      "credentials": [],
-     "description": "The time, asking you to pick, web search, the weather at Home",
+     "description": "The time, asking you to pick, web search, the weather at Home, Python in a sandbox",
      "disconnect_warning": null,
      "everyone": true,
      "examples": [],
      "features": [
-      "Get the current date, time, and day of the week.",
-      "Ask the user to choose one or more options from a predefined list.",
-      "Search the web for public information using DuckDuckGo.",
-      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it."
+      "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
+      "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
+      "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
+      "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
      ],
      "icon": "sparkles",
      "name": "essentials",

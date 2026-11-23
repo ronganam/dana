@@ -7,7 +7,7 @@ from core.addons import Addon, PromptPart, Touches
 addon = Addon(
     "essentials", order=10, everyone=True, title="Essentials", icon="sparkles",
     touches=Touches(hosts=("DuckDuckGo and other public search engines", "api.open-meteo.com")),
-    description="The time, asking you to pick, web search, the weather at Home",
+    description="The time, asking you to pick, web search, the weather at Home, Python in a sandbox",
     prompt_parts=(
         PromptPart("tools", "web search", rank=40),
         PromptPart("action_examples", "set a timer", rank=20),

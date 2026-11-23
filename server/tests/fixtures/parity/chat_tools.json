@@ -71,6 +71,36 @@
   {
     "type": "function",
     "function": {
+      "name": "run_code",
+      "description": "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits. The script calls your tools as `tools.NAME(arg=...)` (or `call(\"NAME\", arg=...)`); each returns the tool's text. Reads and changes Dana can undo are allowed; tools that ask first or act outside Dana (sending, paying, deleting) raise ToolError: call those yourself. `/work` is your scratch folder, kept a day. Standard library only, no network, no input().",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "The Python code; print() what you need back."
+          },
+          "timeout": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds (default 30, max 120)."
+          }
+        },
+        "required": [
+          "code"
+        ]
+      }
+    }
+  },
+  {
+    "type": "function",
+    "function": {
       "name": "add_task",
       "description": "Add a task to the user's task list; a time, place, car or wake-up trigger makes it a reminder.",
       "parameters": {

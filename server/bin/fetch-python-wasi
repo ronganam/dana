@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+# Fetch the CPython WASI build that run_code runs in (docs/sandbox.md) into DEST
+# (default: server/.cache/python-wasi), checking its SHA-256. The image runs this at build
+# time (Dockerfile, PYTHON_WASI_DIR); a checkout runs it once so the sandbox tests run.
+set -euo pipefail
+VERSION=3.15.2
+URL="https://github.com/brettcannon/cpython-wasi-build/releases/download/v${VERSION}/python-${VERSION}-wasi_sdk-33.zip"
+SHA256=b8a63559c56760bbdc310dedb74fd69d10bcbafae26b705bea0ad353ad256888
+DEST="${1:-$(cd "$(dirname "$0")/.." && pwd)/.cache/python-wasi}"
+if [ -f "$DEST/python.wasm" ] && [ "$(cat "$DEST/.version" 2>/dev/null)" = "$VERSION" ]; then
+    exit 0
+fi
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+curl -fsSL --retry 3 -o "$tmp/python.zip" "$URL"
+echo "$SHA256  $tmp/python.zip" | sha256sum -c --quiet -
+rm -rf "$DEST" && mkdir -p "$DEST"
+python3 -m zipfile -e "$tmp/python.zip" "$DEST"
+echo "$VERSION" > "$DEST/.version"
+echo "Python $VERSION (WASI) in $DEST"

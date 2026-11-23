@@ -1,14 +1,17 @@
 """Tools every user has (the ``essentials`` addon): the current time, asking the user
-to pick between options, web search, and sharing an item with another user
-(offered only on a server with more than one user)."""
+to pick between options, web search, sharing an item with another user
+(offered only on a server with more than one user) and running Python in the sandbox
+(``run_code``: core/sandbox.py, docs/sandbox.md)."""
 
 import asyncio
+import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from core import clock, users
+from core import clock, sandbox, users
+from core.text import untrusted
 from core.users import User
-from core.addons import Approval, Connection, sharing, store
+from core.addons import Approval, Connection, registry, sharing, store
 from core.addons.hooks import clean
 from addons.essentials.addon import addon
 
@@ -148,3 +151,72 @@ def share_item(conn: Connection, item_type: str, item: str, user: str, level: st
     if not store.is_connected(other, t.addon):
         msg += f" They will see it once the {t.addon} addon is connected for them."
     return msg
+
+
+CODE_TIMEOUT = 30  # seconds, default
+CODE_MAX_TIMEOUT = 120
+# Never from a script: itself, and the pick prompt (its UI belongs to the agent loop).
+NOT_FROM_CODE = ("run_code", "request_user_selection")
+
+
+def _code_refusal(user: User, name: str, arguments: Dict[str, Any]) -> Optional[str]:
+    """Why a script may not call ``name`` (None: it may). Scripts get reads and changes Dana can
+    undo; a tool that asks the user first or acts outside Dana stays with the agent."""
+    if name in NOT_FROM_CODE or not registry.has_tool(user, name):
+        return f"no tool '{name}' for scripts"
+    if registry.acts_outside(name) or registry.needs_confirmation(name, arguments):
+        return f"{name} acts outside Dana or asks the user first: call it yourself, outside run_code"
+    return None
+
+
+@addon.tool(is_write=True)
+async def run_code(conn: Connection, code: str, timeout: Optional[int] = None) -> str:
+    """Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits.
+
+    The script calls your tools as `tools.NAME(arg=...)` (or `call("NAME", arg=...)`); each returns the tool's text. Reads and changes Dana can undo are allowed; tools that ask first or act outside Dana (sending, paying, deleting) raise ToolError: call those yourself. `/work` is your scratch folder, kept a day. Standard library only, no network, no input().
+
+    Args:
+        code: The Python code; print() what you need back.
+        timeout: Seconds (default 30, max 120).
+    """
+    user = conn.user
+    untrusted_seen = False
+
+    async def call_tool(name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
+        nonlocal untrusted_seen
+        refusal = _code_refusal(user, name, arguments)
+        if refusal:
+            return {"error": refusal}
+        try:
+            result = await registry.execute(user, name, arguments)
+        except registry.ToolNotAvailable:
+            return {"error": f"no tool '{name}' for scripts"}
+        except TypeError as e:
+            return {"error": f"{name}: {e}"}
+        except Exception as e:
+            logger.warning(f"run_code: {name} failed: {e}", exc_info=True)
+            return {"error": f"{name} failed: {e}"}
+        if registry.returns_untrusted(name):
+            untrusted_seen = True
+        return {"result": result if isinstance(result, str) else json.dumps(result, default=str, ensure_ascii=False)}
+
+    seconds = max(1, min(int(timeout or CODE_TIMEOUT), CODE_MAX_TIMEOUT))
+    try:
+        run = await sandbox.run(code, user_id=user.id, call_tool=call_tool, timeout=seconds)
+    except RuntimeError as e:
+        return f"Error: {e}"
+    parts = []
+    if run.timed_out:
+        parts.append(f"Error: stopped after {seconds} s (raise timeout, up to {CODE_MAX_TIMEOUT}, or do less per run).")
+    elif run.exit_code:
+        parts.append(f"Error: exit code {run.exit_code}.")
+    if run.stdout.strip():
+        parts.append(run.stdout.rstrip())
+    if run.stderr.strip():
+        parts.append(run.stderr.rstrip() if run.exit_code else f"stderr:\n{run.stderr.rstrip()}")
+    if run.files:
+        parts.append("/work: " + ", ".join(f"{name} ({size:,} B)" for name, size in run.files[:20])
+                     + (f" …and {len(run.files) - 20} more" if len(run.files) > 20 else ""))
+    out = "\n\n".join(parts) or "(no output: print() what you need)"
+    # A tool that returned other people's text fed the script: its output is data, never instructions.
+    return untrusted("a run_code script that read text written by other people", out) if untrusted_seen else out

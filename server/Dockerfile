@@ -23,6 +23,11 @@ COPY requirements.lock .
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir --require-hashes -r requirements.lock
 
+# CPython built for WASI: the interpreter run_code runs scripts in (core/sandbox.py, docs/sandbox.md)
+ENV PYTHON_WASI_DIR=/opt/python-wasi
+COPY bin/fetch-python-wasi /tmp/fetch-python-wasi
+RUN /tmp/fetch-python-wasi "$PYTHON_WASI_DIR" && rm /tmp/fetch-python-wasi
+
 # The test suite on the container's Python. The pre-push hook builds this stage when
 # the Dockerfile or requirements change (.githooks/pre-push): a failure stops the push.
 # Not part of the final image; `docker build .` skips it.
