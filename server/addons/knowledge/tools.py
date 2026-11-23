@@ -470,18 +470,18 @@ async def delete_project(conn: Connection, project_id: str) -> str:
 
 def _merged_fields(current: list, changes: list) -> list:
     """``current`` fields with ``changes`` applied by name: a known name is updated, a new one
-    added, one whose value is null removed."""
+    added, one given with "value": null removed (one without a value keeps it)."""
     out = [dict(f) for f in current if isinstance(f, dict)]
     for change in changes:
         name = clean_str(change.get("name")) if isinstance(change, dict) else ""
         if not name:
             continue
         at = next((i for i, f in enumerate(out) if clean_str(f.get("name")).casefold() == name.casefold()), None)
-        if change.get("value") is None:
+        if "value" in change and change["value"] is None:
             if at is not None:
                 out.pop(at)
         elif at is None:
-            out.append(change)
+            out.append({"value": None, **change})
         else:
             out[at] = {**out[at], **change, "name": out[at].get("name")}
     return out

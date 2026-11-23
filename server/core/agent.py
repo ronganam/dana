@@ -9,7 +9,7 @@ import litellm
 from core.runs import emit, add_undos
 from core.models import ModelProfile, resolve_profile
 from core import clock, llm, undo, usage, user_locale, user_profile, users
-from core.text import carries_untrusted, untrusted
+from core.text import carries_untrusted, framed_here, untrusted
 from core.users import User
 from core.addons import registry
 
@@ -56,8 +56,9 @@ def limit_tool_output(text: str, limit: int = MAX_TOOL_RESULT_CHARS) -> str:
 def for_model(tool_name: str, result: str) -> str:
     """A tool's result as the model reads it and history keeps it: the result of an
     ``untrusted_result`` tool framed as text other people wrote (``core.text.untrusted``), unless
-    the tool framed it itself; every other result as is."""
-    if not registry.returns_untrusted(tool_name) or carries_untrusted(result):
+    the tool framed it itself (a frame made here, not text that only looks like one); every other
+    result as is."""
+    if not registry.returns_untrusted(tool_name) or framed_here(result):
         return result
     return untrusted(f"what the {tool_name} tool returned", result)
 

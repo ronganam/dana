@@ -90,6 +90,10 @@ async def main() -> None:
           requests[-1][0] == "/apis/apps/v1/namespaces/apps/deployments" and f"…and {400 - tools.MAX_LINES} more" in out
           and len(out) < 12_000, out[-200:])
     n = len(requests)
+    out = await tools.run_kubectl(None, "logs deploy/web")
+    check("logs: only from a pod, saying how to find it, without a request",
+          out.startswith("Error: logs come from a pod") and len(requests) == n, out)
+    n = len(requests)
     for command in ("get secret db -o yaml", "describe secret db", "get secrets -o json"):
         out = await tools.run_kubectl(None, command)
         check(f"'{command}': refused before any request", out.startswith("Error: secret values") and len(requests) == n, out)

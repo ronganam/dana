@@ -467,10 +467,10 @@ async def sync_money(conn: Connection, account: Optional[str] = None) -> str:
             found = queries.find_account(user, account)
         except (ValueError, LookupError) as e:
             return f"Error: {e}"
-        if not found.get("source_id"):
+        source = store.get_source(user, found["source_id"]) if found.get("source_id") else None
+        if source is None:
             return "Error: that account's login was removed; add it again on the Money page."
-        source = store.get_source(user, found["source_id"])
-        sources = [source] if source else []
+        sources = [source]
     else:
         sources = store.list_sources(user)
     lines: List[str] = []

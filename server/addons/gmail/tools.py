@@ -225,8 +225,8 @@ async def read_email_attachment(conn: Connection, message_id: str, filename: str
     if not text:
         return f"{found['name']}: no text in it."
     cut = f"\n… (cut, {len(text):,} chars)" if len(text) > ATTACHMENT_MAX_CHARS else ""
-    return content.framed(conn.user, f"The attachment {found['name']} ({found['type']}), as read.",
-                          [text[:ATTACHMENT_MAX_CHARS] + cut])
+    return content.framed(conn.user, "An email attachment, as read.",
+                          [f"Attachment: {found['name']} ({found['type']})", text[:ATTACHMENT_MAX_CHARS] + cut])
 
 
 def _get_thread(conn: Connection, thread_id: str) -> List[Dict[str, Any]]:

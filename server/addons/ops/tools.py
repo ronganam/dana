@@ -166,6 +166,8 @@ async def run_kubectl(conn: Connection, command: str, namespace: Optional[str] =
     if kind is None:
         return f"Error: unknown resource '{words[1]}'. Known: {', '.join(sorted(RESOURCES))}."
     name = words[2] if len(words) > 2 else None
+    if verb == "logs" and kind != "pods":
+        return f"Error: logs come from a pod: 'get pods -l app=NAME' finds it, then 'logs POD'."
     if verb in ("describe", "logs") and not name:
         return f"Error: '{verb}' needs a name: {verb} {kind} NAME."
     if kind == "secrets" and (name or flags.get("output")):

@@ -321,6 +321,12 @@ async def main() -> None:
         check("update: a null value removes the field; an edit replaces its passage",
               [x["name"] for x in json.loads(row["fields"])] == ["מחיר כולל", "טלפון"]
               and row["body"] == "## חוזה\n- סכום: 12,500", (row["fields"], row["body"]))
+        await tool(ROBIN, "update_knowledge_item", item_id=ori, fields=[{"name": "טלפון", "type": "text"}])
+        with get_db_connection() as conn:
+            phone = [x for x in json.loads(conn.execute("SELECT fields FROM entries WHERE id = ?", (ori,)).fetchone()["fields"])
+                     if x["name"] == "טלפון"]
+        check("update: a field given without a value keeps its value", phone == [{"name": "טלפון", "type": "text",
+                                                                              "value": "052-0000000"}], phone)
         out = await tool(ROBIN, "update_knowledge_item", item_id=ori, title="x", body_edits=[{"old": "nope", "new": "x"}])
         with get_db_connection() as conn:
             title = conn.execute("SELECT title FROM entries WHERE id = ?", (ori,)).fetchone()["title"]
