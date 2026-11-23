@@ -5,6 +5,7 @@ Every function takes the user's :class:`~core.addons.Connection`
 (host and token from its credentials); nothing is shared between
 connections, caches included."""
 
+import asyncio
 import json
 import logging
 import re
@@ -131,6 +132,17 @@ async def fetch_all_states(conn: Connection) -> Dict[str, Dict[str, Any]]:
     return {s["entity_id"]: s for s in await fetch_states(conn)}
 
 
+async def fetch_state(conn: Connection, entity_id: str) -> Optional[Dict[str, Any]]:
+    """One entity's state object (``/api/states/{entity_id}``); None when it does not
+    exist or Home Assistant could not be asked (logged)."""
+    try:
+        r = await get(conn, f"/api/states/{addresses.segment(entity_id)}", timeout=10.0)
+    except (httpx.HTTPError, ValueError) as e:
+        logger.warning(f"[HA] state of {entity_id} failed: {type(e).__name__}: {e}")
+        return None
+    return r.json() if r.status_code == 200 else None
+
+
 # Several clients polling /api/ha/states share one upstream call per connection.
 STATES_TTL_SECONDS = 1.5
 _states_cache: Dict[Tuple[str, str, str], Tuple[float, List[Dict[str, Any]]]] = {}
@@ -199,6 +211,9 @@ async def authenticate(ws: Any, conn: Connection) -> None:
     store.reconnected(conn.user, ADDON)
 
 
+REGISTRY_TIMEOUT = 20.0
+
+
 async def fetch_registry(conn: Connection) -> Tuple[Set[str], Dict[str, Dict[str, Any]]]:
     """Return (exposed_ids, registry_map) via WebSocket.
 
@@ -208,8 +223,11 @@ async def fetch_registry(conn: Connection) -> Tuple[Set[str], Dict[str, Dict[str
     pipelined config/entity_registry/get calls (one per exposed entity)
     to get the full entry. All requests are sent before reading any
     responses, so this is a single batch round-trip regardless of count.
+
+    Raises:
+        TimeoutError: Home Assistant did not answer within :data:`REGISTRY_TIMEOUT`.
     """
-    async with websockets.connect(ws_uri(conn)) as ws:
+    async with asyncio.timeout(REGISTRY_TIMEOUT), websockets.connect(ws_uri(conn)) as ws:
         await authenticate(ws, conn)
 
         # Step 1: get exposed entity IDs

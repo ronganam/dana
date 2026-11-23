@@ -4,16 +4,15 @@ import sqlite3
 import logging
 import re
 import json
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Literal, Optional
 from core import undo as undo_registry, undoable
 from core.db import get_db_connection
-from core.text import escape_markdown
 from core.undoable import safe_record
 from core.addons import Connection
 from addons.phone import suggestions as phone_suggestions
 from addons.phone.calls import actions as suggestion_actions
 from addons.phone.calls.chat import suggestion_line
-from addons.phone.calls.labels import label_text
+from addons.phone.calls.labels import LABEL_IDS, label_text
 from addons.phone.addon import addon
 from core.users import User
 from addons.tasks import service as tasks_service
@@ -33,35 +32,41 @@ def _term_matches(text: str, term: str) -> bool:
     return bool(re.search(pattern, text, re.IGNORECASE))
 
 
-def _format_call_row(user: User, row) -> str:
-    """Format a single phone_calls row for display."""
-    c_id = row['id']
-    caller = escape_markdown(row['caller'])
-    receiver = escape_markdown(row['receiver'])
-    timestamp = escape_markdown(row['call_timestamp'])
-    title = escape_markdown(row['title'] or "Call Recording")
-    summary = escape_markdown(row['summary'] or "No summary available.")
-    dur = row['duration_seconds'] if 'duration_seconds' in row.keys() else 0
-    duration_str = ""
-    if dur:
-        minutes, seconds = divmod(int(dur), 60)
-        duration_str = f" ({minutes:02d}:{seconds:02d})"
-    labels = _labels_line(user, row)
+MAX_CALLS = 30
+SUMMARY_CHARS = 400
+TRANSCRIPT_PAGE = 8000
+_COLUMNS = "id, caller, receiver, call_timestamp, title, summary, duration_seconds, labels"
+_FIELDS = "(caller LIKE ? OR receiver LIKE ? OR transcript LIKE ? OR summary LIKE ? OR title LIKE ?)"
+# Common Hebrew stopwords: they add noise and rarely help match calls.
+_HE_STOPWORDS = frozenset({
+    "שלי", "שלך", "שלו", "שלה", "שלנו", "שלכם", "שלהן",
+    "אני", "אתה", "את", "אנחנו", "אתם", "אתן", "הוא", "היא", "הם", "הן",
+    "זה", "זאת", "זו", "אלה", "כך",
+    "על", "אל", "אבל", "או", "אם", "כי", "של", "לו", "לה", "להם", "להן",
+    "כל", "יש", "היה", "היתה", "היו", "כן", "לא", "מה", "מי", "איפה", "איך", "למה",
+    "עוד", "רק", "גם", "אז", "הרבה", "מאוד",
+})
 
-    return (
-        f"- **Call ID: {c_id}**\n"
-        f"  - **Title**: {title}\n"
-        f"  - **From**: {caller} | **To**: {receiver}\n"
-        f"  - **Date/Time**: {timestamp}{duration_str}\n"
-        + (f"  - **Labels**: {labels}\n" if labels else "")
-        + f"  - **Summary**: {summary}\n"
-    )
+
+def _duration(row) -> str:
+    dur = int(row["duration_seconds"] or 0)
+    return f" ({dur // 60:02d}:{dur % 60:02d})" if dur else ""
+
+
+def _format_call_row(user: User, row) -> str:
+    """One call in two lines: id, when, who, length, title and labels; then its summary (cut)."""
+    labels = _labels_line(user, row)
+    summary = (row["summary"] or "no summary").replace("\n", " ")
+    if len(summary) > SUMMARY_CHARS:
+        summary = summary[:SUMMARY_CHARS] + "… (get_call_transcript has all)"
+    return (f"- ID: {row['id']} · {row['call_timestamp']}{_duration(row)} · {row['caller']} → {row['receiver']} · "
+            f"{row['title'] or 'Call recording'}" + (f" · labels: {labels}" if labels else "") + f"\n  {summary}")
 
 
 def _labels_line(user: User, row) -> str:
     try:
-        ids = json.loads(row['labels']) if 'labels' in row.keys() and row['labels'] else []
-    except Exception:
+        ids = json.loads(row["labels"]) if row["labels"] else []
+    except (TypeError, ValueError):
         ids = []
     return ", ".join(label_text(user, i) for i in ids)
 
@@ -72,234 +77,104 @@ def _labels_line(user: User, row) -> str:
 
 @addon.tool(untrusted_result=True)
 async def list_recent_calls(conn: Connection, limit: int = 5, label: Optional[str] = None) -> str:
-    """List the most recent call recordings and voice memos with titles, labels, summaries, and durations.
-
-    Use this when the user asks about recent calls or voice memos in general,
-    or when you need to find calls from a specific person before searching deeper.
+    """The user's most recent call recordings and voice memos, newest first: id, time, who, length, title, labels and summary.
 
     Args:
-        limit: The max number of calls to retrieve. Defaults to 5.
-        label: Optional label id to filter by: family, partner, friends, work, wedding, home, purchases, travel, car, health, pets, admin, security, tech_help, logistics, automated.
+        limit: How many, 1-30 (default 5).
+        label: Only calls with this label: family, partner, friends, work, wedding, home, purchases, travel, car, health, pets, admin, security, tech_help, logistics, automated.
     """
+    label = (label or "").strip().lower() or None
+    if label and label not in LABEL_IDS:
+        return f"Error: unknown label '{label}'. Use one of: {', '.join(LABEL_IDS)}."
+    limit = max(1, min(int(limit or 5), MAX_CALLS))
     try:
         with get_db_connection() as db:
-            if label:
-                cursor = db.execute(
-                    """
-                    SELECT id, caller, receiver, call_timestamp, title, summary, duration_seconds, labels
-                    FROM phone_calls
-                    WHERE user_id = ? AND status != 'duplicate' AND labels LIKE ?
-                    ORDER BY call_timestamp DESC
-                    LIMIT ?
-                    """,
-                    (conn.user.id, f'%"{label.strip().lower()}"%', limit)
-                )
-            else:
-                cursor = db.execute(
-                    """
-                    SELECT id, caller, receiver, call_timestamp, title, summary, duration_seconds, labels
-                    FROM phone_calls
-                    WHERE user_id = ? AND status != 'duplicate'
-                    ORDER BY call_timestamp DESC
-                    LIMIT ?
-                    """,
-                    (conn.user.id, limit)
-                )
-            rows = cursor.fetchall()
-
-            if not rows:
-                return "No call recordings or voice memos found."
-
-            res = f"Found {len(rows)} recent calls/voice memos:\n\n"
-            for row in rows:
-                res += _format_call_row(conn.user, row) + "\n"
-            return res.strip()
-    except Exception as e:
+            rows = db.execute(
+                f"SELECT {_COLUMNS} FROM phone_calls WHERE user_id = ? AND status != 'duplicate'"
+                + (" AND labels LIKE ?" if label else "") + " ORDER BY call_timestamp DESC LIMIT ?",
+                (conn.user.id, *([f'%"{label}"%'] if label else []), limit)).fetchall()
+    except sqlite3.Error as e:
         logger.error(f"Error listing recent calls: {e}", exc_info=True)
-        return f"Error listing recent calls: {e}"
+        return "Error: the calls could not be read; try again."
+    if not rows:
+        return "No call recordings or voice memos found" + (f" with the label {label}." if label else ".")
+    return f"{len(rows)} most recent calls/voice memos:\n" + "\n".join(_format_call_row(conn.user, r) for r in rows)
 
 
 @addon.tool(untrusted_result=True)
 async def search_calls(conn: Connection, query: str) -> str:
-    """Search call recordings and voice memos by person name, topic, or both.
-
-    You can search for:
-    - A person's name (searches caller/receiver fields)
-    - A topic or keyword (searches transcripts, summaries, titles)
-    - A combination of person AND topic (e.g. "אמא דגים" finds calls
-      with 'אמא' in the contact name and 'דגים' in the transcript)
-
-    If the query contains multiple words each will be required — only calls
-    matching ALL terms (across any field) will be returned.
-
-    For broad searches like "recent calls with אמא", consider listing recent
-    calls first with list_recent_calls(limit=10) to get an overview, then
-    use get_call_transcript on the relevant call ID.
+    """Search the user's call recordings and voice memos by person, topic or both (names, transcripts, summaries, titles); best matches first, at most 30.
 
     Args:
-        query: The keyword(s) to find. Multiple words act as AND — all must match.
+        query: Words that must all match, in any field: a name ("אמא"), a topic ("דגים"), or both ("אמא דגים").
     """
-    if not query.strip():
-        return "Error: Search query cannot be empty."
-
-    # Common Hebrew stopwords to filter out — these add noise and rarely help match calls
-    _HE_STOPWORDS = frozenset({
-        "שלי", "שלך", "שלו", "שלה", "שלנו", "שלכם", "שלהן",
-        "אני", "אתה", "את", "אנחנו", "אתם", "אתן", "הוא", "היא", "הם", "הן",
-        "זה", "זאת", "זו", "אלה", "כך",
-        "על", "אל", "את", "אבל", "או", "אם", "כי", "של", "לו", "לה", "להם", "להן",
-        "כל", "יש", "היה", "היתה", "היו", "כן", "לא", "מה", "מי", "איפה", "איך", "למה",
-        "עוד", "רק", "גם", "אז", "הרבה", "מאוד",
-    })
-
     query_raw = query.strip()
-    # Split into individual non-empty tokens, ignore single-character noise and Hebrew stopwords
-    terms = [t for t in query_raw.split() if len(t) > 1 and t not in _HE_STOPWORDS]
-
+    if not query_raw:
+        return "Error: Search query cannot be empty."
+    terms = [t for t in query_raw.split() if len(t) > 1 and t not in _HE_STOPWORDS] or [query_raw]
     try:
         with get_db_connection() as db:
             rows: List[sqlite3.Row] = []
-
-            # ---- TIER 1: FTS5 full-text search ----
-            if terms:
-                fts_query = " AND ".join(f'"{t}"' for t in terms)
-                try:
-                    cursor = db.execute(
-                        """
-                        SELECT pc.id, pc.caller, pc.receiver, pc.call_timestamp,
-                               pc.title, pc.summary, pc.transcript, pc.duration_seconds, pc.labels
-                        FROM phone_calls_fts fts
-                        JOIN phone_calls pc ON pc.id = fts.id
-                        WHERE phone_calls_fts MATCH ? AND pc.user_id = ?
-                        ORDER BY rank
-                        LIMIT 30
-                        """,
-                        (fts_query, conn.user.id)
-                    )
-                    rows = cursor.fetchall()
-                except Exception as fts_err:
-                    logger.warning(f"FTS5 query failed ({fts_err}), falling back.")
-
-            # ---- TIER 2: multi-term LIKE fallback ----
-            if not rows:
-                if terms:
-                    conditions = []
-                    params: List[str] = []
-                    for term in terms:
-                        like = f"%{term}%"
-                        clause = "(caller LIKE ? OR receiver LIKE ? OR transcript LIKE ? OR summary LIKE ? OR title LIKE ?)"
-                        conditions.append(clause)
-                        params.extend([like] * 5)
-                    sql = f"""
-                        SELECT id, caller, receiver, call_timestamp, title, summary, transcript, duration_seconds, labels
-                        FROM phone_calls
-                        WHERE user_id = ? AND {' AND '.join(conditions)}
-                        ORDER BY call_timestamp DESC
-                        LIMIT 30
-                    """
-                    cursor = db.execute(sql, [conn.user.id, *params])
-                    rows = cursor.fetchall()
-                else:
-                    # Single-character query — fall back to old-style catch-all
-                    like = f"%{query_raw}%"
-                    cursor = db.execute(
-                        """
-                        SELECT id, caller, receiver, call_timestamp, title, summary, transcript, duration_seconds, labels
-                        FROM phone_calls
-                        WHERE user_id = ? AND (caller LIKE ? OR receiver LIKE ? OR transcript LIKE ? OR summary LIKE ?
-                                               OR title LIKE ?)
-                        ORDER BY call_timestamp DESC
-                        LIMIT 30
-                        """,
-                        (conn.user.id, like, like, like, like, like)
-                    )
-                    rows = cursor.fetchall()
-
-            # ---- Post-filter with word-boundary matching ----
-            if terms:
-                filtered = []
-                for row in rows:
-                    text = " ".join(str(row[c] or "") for c in
-                                    ("caller", "receiver", "title", "summary", "transcript"))
-                    if all(_term_matches(text, t) for t in terms):
-                        filtered.append(row)
-                if filtered:
-                    rows = filtered
-                # If filtering emptied the set, keep the original (loose) results
-            else:
-                # For single-char queries, use the raw results
-                pass
-
-            if not rows:
-                return f"No call recordings or voice memos match the query '{query_raw}'."
-
-            res = f"Found {len(rows)} matching calls/voice memos for '{query_raw}':\n\n"
-            for row in rows:
-                res += _format_call_row(conn.user, row) + "\n"
-            return res.strip()
-    except Exception as e:
+            try:  # full-text search first
+                rows = db.execute(
+                    "SELECT pc.id, pc.caller, pc.receiver, pc.call_timestamp, pc.title, pc.summary, "
+                    "pc.duration_seconds, pc.labels, pc.transcript "
+                    "FROM phone_calls_fts fts JOIN phone_calls pc ON pc.id = fts.id "
+                    "WHERE phone_calls_fts MATCH ? AND pc.user_id = ? AND pc.status != 'duplicate' "
+                    f"ORDER BY rank LIMIT {MAX_CALLS}",
+                    (" AND ".join('"' + t.replace('"', '""') + '"' for t in terms), conn.user.id)).fetchall()
+            except sqlite3.Error as fts_err:
+                logger.warning(f"FTS5 query failed ({fts_err}), falling back.")
+            if not rows:  # substrings: FTS misses words inside others (Hebrew prefixes like ה / ב / ל)
+                rows = db.execute(
+                    f"SELECT {_COLUMNS}, transcript FROM phone_calls WHERE user_id = ? AND status != 'duplicate' AND "
+                    + " AND ".join([_FIELDS] * len(terms)) + f" ORDER BY call_timestamp DESC LIMIT {MAX_CALLS}",
+                    [conn.user.id, *[f"%{t}%" for t in terms for _ in range(5)]]).fetchall()
+    except sqlite3.Error as e:
         logger.error(f"Error searching calls: {e}", exc_info=True)
-        return f"Error searching calls: {e}"
+        return "Error: the calls could not be searched; try again."
+    # Whole-word matches when there are any, else the loose substring matches.
+    text = lambda r: " ".join(str(r[c] or "") for c in ("caller", "receiver", "title", "summary", "transcript"))  # noqa: E731
+    rows = [r for r in rows if all(_term_matches(text(r), t) for t in terms)] or rows
+    if not rows:
+        return f"No call recordings or voice memos match '{query_raw}'."
+    return f"{len(rows)} calls/voice memos match '{query_raw}':\n" + "\n".join(_format_call_row(conn.user, r) for r in rows)
 
 
 @addon.tool(untrusted_result=True)
-async def get_call_transcript(conn: Connection, call_id: str) -> str:
-    """Retrieve the full transcript and summary of a specific call or voice memo by ID.
-
-    Use this after you have identified the relevant call via list_recent_calls or
-    search_calls. The output includes the full dialogue so you can answer specific
-    questions about what was said.
+async def get_call_transcript(conn: Connection, call_id: str, offset: int = 0) -> str:
+    """One call or voice memo in full: details, summary, key facts, pending suggestions, tasks from it and the transcript (a long one comes in pages).
 
     Args:
-        call_id: The unique ID of the call (e.g. UUID).
+        call_id: The call's id, from list_recent_calls or search_calls.
+        offset: Where in the transcript to start (a long transcript's result names the next offset).
     """
     if not call_id.strip():
         return "Error: Call ID cannot be empty."
-
     try:
         with get_db_connection() as db:
-            cursor = db.execute(
-                """
-                SELECT id, caller, receiver, call_timestamp, title, transcript, summary, duration_seconds,
-                       labels, analysis, direction
-                FROM phone_calls
-                WHERE id = ? AND user_id = ?
-                """,
-                (call_id.strip(), conn.user.id)
-            )
-            row = cursor.fetchone()
-
-            if not row:
-                return f"No call or voice memo found with ID '{call_id}'."
-
-            caller = escape_markdown(row['caller'])
-            receiver = escape_markdown(row['receiver'])
-            timestamp = escape_markdown(row['call_timestamp'])
-            title = escape_markdown(row['title'] or "Call Recording")
-            transcript = escape_markdown(row['transcript'] or "No transcript available.")
-            summary = escape_markdown(row['summary'] or "No summary available.")
-            dur = row['duration_seconds'] if 'duration_seconds' in row.keys() else 0
-            duration_str = ""
-            if dur:
-                minutes, seconds = divmod(int(dur), 60)
-                duration_str = f" ({minutes:02d}:{seconds:02d})"
-
-            res = (
-                f"### Call/Voice Memo Details (ID: {call_id})\n"
-                f"- **Title**: {title}\n"
-                f"- **From**: {caller}\n"
-                f"- **To**: {receiver}\n"
-                f"- **Date/Time**: {timestamp}{duration_str}\n"
-                + (f"- **Labels**: {_labels_line(conn.user, row)}\n" if _labels_line(conn.user, row) else "")
-                + (f"- **Direction**: {row['direction']}\n" if row['direction'] else "")
-                + f"\n#### Summary:\n{summary}\n\n"
-                + _call_extras(conn.user, row['id'], row['analysis'])
-                + f"#### Full Transcript:\n{transcript}"
-            )
-            return res
-    except Exception as e:
+            row = db.execute(
+                f"SELECT {_COLUMNS}, transcript, analysis, direction FROM phone_calls WHERE id = ? AND user_id = ?",
+                (call_id.strip(), conn.user.id)).fetchone()
+    except sqlite3.Error as e:
         logger.error(f"Error fetching call transcript: {e}", exc_info=True)
-        return f"Error fetching call transcript: {e}"
+        return "Error: the call could not be read; try again."
+    if not row:
+        return f"Error: no call or voice memo with ID '{call_id}'; find it with search_calls or list_recent_calls."
+    transcript = row["transcript"] or "No transcript available."
+    offset = max(0, int(offset or 0))
+    page = transcript[offset:offset + TRANSCRIPT_PAGE]
+    if offset + TRANSCRIPT_PAGE < len(transcript):
+        page += (f"\n[transcript characters {offset:,}–{offset + len(page):,} of {len(transcript):,}: "
+                 f"get_call_transcript with offset={offset + TRANSCRIPT_PAGE} for the rest]")
+    if offset:
+        return f"Call {row['id']}, transcript from character {offset:,}:\n{page}"
+    labels = _labels_line(conn.user, row)
+    return (f"Call {row['id']}: {row['title'] or 'Call recording'}\n"
+            f"From {row['caller']} to {row['receiver']}, {row['call_timestamp']}{_duration(row)}"
+            + (f", {row['direction']}" if row["direction"] else "") + (f"; labels: {labels}" if labels else "")
+            + f"\n\nSummary:\n{row['summary'] or 'No summary available.'}\n\n"
+            + _call_extras(conn.user, row["id"], row["analysis"]) + f"Transcript:\n{page}")
 
 
 def _call_extras(user: User, call_id: str, analysis_raw) -> str:
@@ -324,16 +199,15 @@ def _call_extras(user: User, call_id: str, analysis_raw) -> str:
 
 # Suggestions are written by the model from calls and notifications (others' words).
 @addon.tool(untrusted_result=True)
-async def list_call_suggestions(conn: Connection, status: str = "pending") -> str:
-    """List tasks, calendar events and security alerts suggested from the user's phone calls and phone notifications.
-
-    After each recorded call (and for notifications that ask the user to do something) the assistant
-    extracts action items as suggestions; nothing is created until the user (or you, on their explicit
-    request) accepts one.
+async def list_call_suggestions(conn: Connection,
+                                status: Literal["pending", "accepted", "dismissed", "all"] = "pending") -> str:
+    """Tasks, calendar events and security alerts suggested from the user's calls and phone notifications (newest 50), each with its id and source; nothing is created until one is accepted.
 
     Args:
-        status: 'pending' (default), 'accepted', 'dismissed' or 'all'.
+        status: pending (default), accepted, dismissed or all.
     """
+    if status not in ("pending", "accepted", "dismissed", "all"):
+        return f"Error: unknown status '{status}': use pending, accepted, dismissed or all."
     items = phone_suggestions.list_suggestions(conn.user, None if status == "all" else status, limit=50)
     if not items:
         return f"No {status} suggestions."
@@ -416,6 +290,7 @@ async def accept_call_suggestion(
         with undo_registry.collect() as inner:
             result = await suggestion_actions.accept_suggestion(conn.user, sid, overrides)
     except Exception as e:
+        logger.warning(f"accept_call_suggestion {sid} failed: {e}", exc_info=True)
         return f"Error: {e}"
     if s and not result.get("already") and result.get("status") in ("accepted", "dismissed"):
         _record_accept_undo(conn.user, s, result, [u["id"] for u in inner])

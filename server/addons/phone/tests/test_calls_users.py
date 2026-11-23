@@ -79,7 +79,7 @@ from core.addons.registry import ToolNotAvailable
 from addons.knowledge import projects as knowledge_projects
 from addons.people import briefs as people_briefs, store as people_store
 from addons.phone import popups, push, suggestions as phone_suggestions
-from addons.phone.calls import analysis, context as call_context, processing, retention
+from addons.phone.calls import analysis, context as call_context, processing, retention, tools as calls_tools
 from addons.phone.calls.store import RECORDINGS_DIR
 from addons.tasks import groups as task_groups, links as task_links, service as tasks_service
 from addons.tasks import titles as task_titles
@@ -417,6 +417,23 @@ async def test_calls_api(client: TestClient) -> None:
     check("list_recent_calls: Bob's only", b in out and a not in out and "ID: c1" not in out, out[:600])
     out, _ = await tool(BOB, "get_call_transcript", {"call_id": a})
     check("get_call_transcript: another user's call is not found", "טכנאי" not in out, out[:200])
+    check("get_call_transcript: not found is an error naming the tools that find calls",
+          out.startswith("Error: no call") and "search_calls" in out, out[:200])
+    out, _ = await tool(BOB, "list_recent_calls", {"label": "gardening"})
+    check("list_recent_calls: an unknown label is an error listing the labels",
+          out.startswith("Error: unknown label") and "family" in out, out)
+    kept = crow(b)["transcript"]
+    with get_db_connection() as c:
+        c.execute("UPDATE phone_calls SET transcript = ? WHERE id = ?", ("word " * 3000, b))
+    out, _ = await tool(BOB, "get_call_transcript", {"call_id": b})
+    nxt = calls_tools.TRANSCRIPT_PAGE
+    check("get_call_transcript: a long transcript comes in pages, naming the next offset",
+          f"offset={nxt}" in out and out.count("word") == nxt // 5 and len(out) < 12000, out[-200:])
+    out, _ = await tool(BOB, "get_call_transcript", {"call_id": b, "offset": nxt})
+    check("get_call_transcript: the next page is the rest of the transcript",
+          out.count("word") == 3000 - nxt // 5 and "offset=" not in out, out[:200])
+    with get_db_connection() as c:
+        c.execute("UPDATE phone_calls SET transcript = ? WHERE id = ?", (kept, b))
     with users.acting_as(BOB):
         bob_hits = [x["id"] for x in search.search(BOB, "offsite", 10) if x["kind"] == "call"]
         bob_miss = [x["id"] for x in search.search(BOB, "ladder", 10) if x["kind"] == "call"]

@@ -446,7 +446,8 @@ def find_account(user: User, term: str) -> Dict[str, Any]:
 
     found = [a for a in accounts if matches(a)]
     if not found:
-        raise NotFound(f"no account matches {term!r}")
+        known = ", ".join(store.account_label(a["company"], a["kind"], a["number"], a.get("label")) for a in accounts)
+        raise NotFound(f"no account matches {term!r}" + (f"; the accounts: {known}" if known else "; no accounts yet"))
     if len(found) > 1:
         names = ", ".join(store.account_label(a["company"], a["kind"], a["number"], a.get("label")) for a in found)
         raise ValueError(f"{term!r} matches several accounts: {names}")
