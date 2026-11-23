@@ -276,6 +276,12 @@ def test_convert_9_0():
           sorted(r[0] for r in wizard_rows) == sorted(r[0] for r in after["users"])
           and all(r[1] == "'{}'" and r[2] != "None" for r in wizard_rows), str(wizard_rows[:2]))
     expected["user_wizard"] = wizard_rows
+    # knowledge m0002: entries_fts made again with a files column (its shadow tables follow).
+    fts_rows = after.get("entries_fts", [])
+    check("9.0: every entry indexed again, the same values plus its files",
+          sorted(r[:-1] for r in fts_rows) == sorted(expected.get("entries_fts", [])), str(fts_rows[:2]))
+    for table in ("entries_fts", "entries_fts_content", "entries_fts_data", "entries_fts_docsize"):
+        expected[table] = after.get(table, [])
     changed = sorted(t for t in set(expected) | set(after) if expected.get(t) != after.get(t))
     check("9.0: every row kept with every value (FTS and sqlite_sequence included)", not changed, str(changed))
     check("9.0: the fixture's rows are there", after["users"] and after["tasks"] and after["phone_calls"])

@@ -17,7 +17,10 @@ project; the tools: create_section, save into a section by title with a
 decision, list_project_entries shows sections, columns and values,
 update_section writes the summary, get_knowledge_item lists files and
 transcripts, the undo of create_section; save_whatsapp_file keeps a WhatsApp
-file on an entry (and its undo removes it).
+file on an entry (and its undo removes it); search finds a word in a file's text, Hebrew prefix
+forms, falls back to any word and shows the snippet, section and decision; update_knowledge_item
+moves an entry to another project (undoable); update_entry_file renames (undoable) and removes
+(asks first); update_section merges columns; delete_section's Approve card.
 
 Run: bin/test test_knowledge_sections
 """
@@ -48,7 +51,7 @@ users.bootstrap()
 from core.auth import setup_auth
 from core.db import get_db_connection
 from core.addons import registry, sharing, store
-from addons.knowledge import api as knowledge_api, files, projects
+from addons.knowledge import api as knowledge_api, entries, files, projects, sections, tools
 from testfakes import FakeWAHA
 
 results: List[Tuple[str, bool]] = []
@@ -74,9 +77,9 @@ def auth(u) -> Dict[str, str]:
 UNDOS: List[str] = []  # the undo ids the last tool call registered
 
 
-async def tool(who, name: str, **args) -> str:
+async def tool(who, tool_name: str, **args) -> str:
     with users.acting_as(who), undo.collect() as recorded:
-        out = str(await registry.execute(who, name, args))
+        out = str(await registry.execute(who, tool_name, args))
     UNDOS[:] = [u["id"] for u in recorded]
     return out
 
@@ -343,6 +346,88 @@ async def main() -> None:
         check("delete project: its files leave the disk", r.status == 200
               and not (paths.KNOWLEDGE_FILES_DIR / stored2).exists())
         check("files: the size limit is the module's", files.MAX_BYTES >= 50 * 1024 * 1024)
+    await search_and_edits()
+
+
+async def search_and_edits() -> None:
+    """Search (file text, Hebrew prefixes, any-word fallback, snippets), moving an entry between
+    projects, renaming / removing a file, merging section columns."""
+    pid = new_id(await tool(ROBIN, "create_project", title="דירה"))
+    other = new_id(await tool(ROBIN, "create_project", title="Trip"))
+    sid = new_id(await tool(ROBIN, "create_section", project_id=pid, title="דירות", kind="options",
+                            columns=[{"name": "מחיר", "type": "money"}, {"name": "חדרים", "type": "number"}]))
+    eid = new_id(await tool(ROBIN, "save_knowledge_item", project_id=pid, title="Flat on Herzl", section=sid,
+                            body="Third floor, a balcony.", decision="shortlist"))
+    saved = files.add_file(ROBIN, eid, "lease.pdf", "application/pdf", b"%PDF",
+                           transcript="The landlord asks for a guarantee of two months rent.")
+    assert saved is not None
+    out = await tool(ROBIN, "search_knowledge", query="guarantee")
+    check("search: a word only in a file's text finds the entry",
+          f"[{eid}]" in out and "lease.pdf" in out and "**guarantee**" in out, out)
+    check("search: shows the section and the decision", "section דירות" in out and "shortlisted" in out, out)
+    await tool(ROBIN, "save_knowledge_item", project_id=pid, title="חוזה", body="נפגשנו עם המתווך בתל אביב")
+    out = await tool(ROBIN, "search_knowledge", query="באביב")
+    check("search: a Hebrew word also matches without its prefix letter (באביב → אביב)", "חוזה" in out, out)
+    out = await tool(ROBIN, "search_knowledge", query="מתוו")
+    check("search: a Hebrew word prefix also matches with a prefix letter (מתוו → המתווך)", "חוזה" in out, out)
+    out = await tool(ROBIN, "search_knowledge", query="balcony nonexistentword")
+    check("search: no entry has every word → any word", f"[{eid}]" in out, out)
+    found = entries.search_entries(ROBIN, "landlord")
+    check("search_entries: the snippet, the column and the file of the hit",
+          found and found[0]["matched"] == "files" and found[0]["matched_file"] == "lease.pdf"
+          and entries.HIT[0] in found[0]["snippet"] and found[0]["files"][0]["id"] == saved["id"], found)
+
+    # files: rename, re-note (undoable), remove (asks first)
+    out = await tool(ROBIN, "get_knowledge_item", item_id=eid)
+    check("get_knowledge_item: lists file ids", saved["id"] in out, out)
+    out = await tool(ROBIN, "update_entry_file", item_id=eid, file="lease.pdf", name="contract.pdf", note="signed")
+    row = files.file_row(ROBIN, eid, saved["id"]) or {}
+    check("update_entry_file: renames and re-notes by name", row.get("name") == "contract.pdf"
+          and row.get("note") == "signed", out)
+    check("search: a renamed file is found by its new name",
+          any(e["id"] == eid for e in entries.search_entries(ROBIN, "contract")))
+    await undo_last(ROBIN)
+    check("update_entry_file: undo puts the name back",
+          (files.file_row(ROBIN, eid, saved["id"]) or {}).get("name") == "lease.pdf")
+    check("update_entry_file: remove asks first, a rename does not",
+          registry.needs_confirmation("update_entry_file", {"remove": True})
+          and not registry.needs_confirmation("update_entry_file", {"name": "x"}))
+    out = await tool(ROBIN, "update_entry_file", item_id=eid, file=saved["id"], remove=True)
+    check("update_entry_file: removes by id", files.file_row(ROBIN, eid, saved["id"]) is None, out)
+    check("search: a removed file's text is no longer found",
+          not any(e["id"] == eid for e in entries.search_entries(ROBIN, "guarantee")))
+
+    # move between projects (section cleared), undo puts it back
+    out = await tool(ROBIN, "update_knowledge_item", item_id=eid, project="trip")
+    row = entries.entry_row(ROBIN, eid) or {}
+    check("update_knowledge_item: moves to another project by title, its section cleared",
+          row.get("project_id") == other and row.get("section_id") is None and "Trip" in out, out)
+    await undo_last(ROBIN)
+    row = entries.entry_row(ROBIN, eid) or {}
+    check("update_knowledge_item: undo of a move puts it back with its section",
+          row.get("project_id") == pid and row.get("section_id") == sid, row)
+    out = await tool(ROBIN, "update_knowledge_item", item_id=eid, project="nowhere")
+    check("update_knowledge_item: an unknown project is an error, nothing moves",
+          out.startswith("Error") and (entries.entry_row(ROBIN, eid) or {}).get("project_id") == pid, out)
+    out = await tool(CARL, "update_knowledge_item", item_id=eid, project=other)
+    check("update_knowledge_item: a stranger can't move it", (entries.entry_row(ROBIN, eid) or {}).get("project_id") == pid,
+          out)
+
+    # columns merge: rename by key, drop one, add one; the rest stay
+    sec = sections.get_section(ROBIN, sid) or {}
+    price = next(c_ for c_ in sec["columns"] if c_["name"] == "מחיר")
+    await tool(ROBIN, "update_knowledge_item", item_id=eid, fields=[{"name": "מחיר", "type": "money", "value": 5000}])
+    await tool(ROBIN, "update_section", section_id=sid, columns=[
+        {"key": price["key"], "name": "שכירות"}, {"name": "חדרים", "remove": True}, {"name": "קומה", "type": "number"}])
+    sec = sections.get_section(ROBIN, sid) or {}
+    check("update_section: columns merge (rename by key keeps type, remove drops, new added)",
+          [(c_["name"], c_["type"]) for c_ in sec["columns"]] == [("שכירות", "money"), ("קומה", "number")]
+          and sec["columns"][0]["key"] == price["key"], sec.get("columns"))
+    fields = (entries.get_entry(ROBIN, eid) or {}).get("fields") or []
+    check("update_section: the renamed column's value follows", fields == [{"name": "שכירות", "type": "money",
+                                                                          "value": 5000}], fields)
+    check("delete_section: the Approve card names the section",
+          "דירות" in tools._describe_delete_section(ROBIN, {"section_id": sid}).title)
 
 
 asyncio.run(main())

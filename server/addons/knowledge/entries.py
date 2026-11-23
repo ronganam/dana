@@ -13,6 +13,7 @@ Payloads never carry the owner columns; an entry seen through a share carries
 ``shared_by`` / ``access``.
 """
 
+import re
 import uuid
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -30,6 +31,13 @@ ENTRY_COLUMNS = ("kind", "title", "body", "fields", "status", "priority", "due_a
                  "decision")
 # Who last set the URL: an undo of a URL change puts it back with the URL.
 URL_SETTER = "url_set_by"
+# Hebrew letters that prefix a word (the, and, in, to, from, that, as): "בחתונה" also finds "חתונה".
+HEBREW_PREFIXES = "הובלמשכ"
+# The marks around a hit in a search snippet (search_entries).
+HIT = ("\x02", "\x03")
+# entries_fts columns (by index) a snippet may come from, in the order a hit is shown.
+SNIPPET_COLUMNS = ((3, "body"), (8, "files"), (4, "summary"), (5, "transcript"), (7, "fields"), (6, "tags"),
+                   (2, "title"))
 
 
 # --- Scope -----------------------------------------------------------------------------
@@ -176,27 +184,54 @@ def entry_previews(user: User, project_id: str, kind: Optional[str] = None, stat
     return [dict(r) for r in rows]
 
 
-def fts_match_query(query: str) -> str:
-    """Build a safe FTS5 MATCH expression: every word must appear, order-free."""
-    words = query.split()
-    terms = ['"' + word.replace('"', '""') + '"' for word in words if word]
-    return " AND ".join(terms)
+def fts_match_query(query: str, any_word: bool = False) -> str:
+    """A safe FTS5 MATCH expression for ``query``: every word (any one with
+    ``any_word``) as a word prefix, order-free; a Hebrew word also without
+    its leading prefix letter (:data:`HEBREW_PREFIXES`: "בתל" finds "תל") and
+    with one ("צלם" finds "הצלם")."""
+    groups = []
+    for word in re.findall(r"\w+", query):
+        forms = [word]
+        if "א" <= word[0] <= "ת":
+            if len(word) > 2 and word[0] in HEBREW_PREFIXES:
+                forms.append(word[1:])
+            forms += [p + word for p in HEBREW_PREFIXES]
+        terms = ['"' + w.replace('"', '""') + '"*' for w in forms]
+        groups.append(terms[0] if len(terms) == 1 else "(" + " OR ".join(terms) + ")")
+    return (" OR " if any_word else " AND ").join(groups)
+
+
+def _matched_file(snippet: str, files: List[Dict[str, Any]]) -> Tuple[str, Optional[str]]:
+    """The line of a ``files`` snippet that holds the hit, and the name of the file it is in."""
+    line = next((ln for ln in snippet.split("\n") if HIT[0] in ln), snippet)
+    plain = line.replace(HIT[0], "").replace(HIT[1], "").strip("…").strip()
+    for f in files:
+        if plain and plain in f"{f['name']} {f.get('note') or ''} {f.get('transcript') or ''}":
+            return line, f["name"]
+    return line, None
 
 
 def search_entries(user: User, query: str, project_id: Optional[str] = None, limit: int = 10) -> List[Dict[str, Any]]:
-    """Full-text search across the entries ``user`` can see, optionally scoped to one project."""
-    match = fts_match_query(query.strip())
-    if not match:
+    """Full-text search across the entries ``user`` can see (optionally one
+    project): every word, else any word. Each result is the entry plus
+    ``project_title``, ``section_title``, ``snippet`` (the text around the hit,
+    marked with :data:`HIT`), ``matched`` (the column it is in) and
+    ``matched_file`` (the file's name, when it is in a file's text)."""
+    words = len(re.findall(r"\w+", query))
+    if not words:
         return []
     where, vis_args = visible_sql(user)
+    snippets = ", ".join(f"snippet(entries_fts, {i}, '{HIT[0]}', '{HIT[1]}', '…', 16) AS s_{name}"
+                         for i, name in SNIPPET_COLUMNS)
     sql = f"""
-        SELECT e.*, p.title AS project_title, rank AS score
+        SELECT e.*, p.title AS project_title, s.title AS section_title, {snippets}
         FROM entries_fts
         JOIN entries e ON entries_fts.id = e.id
         JOIN projects p ON e.project_id = p.id
+        LEFT JOIN project_sections s ON s.id = e.section_id
         WHERE entries_fts MATCH ? AND {where}
     """
-    args: List[Any] = [match, *vis_args]
+    args: List[Any] = [*vis_args]
     if project_id:
         sql += " AND e.project_id = ?"
         args.append(project_id)
@@ -204,11 +239,22 @@ def search_entries(user: User, query: str, project_id: Optional[str] = None, lim
     args.append(limit)
 
     with get_db_connection() as conn:
-        rows = conn.execute(sql, args).fetchall()
+        rows = conn.execute(sql, [fts_match_query(query), *args]).fetchall()
+        if not rows and words > 1:
+            rows = conn.execute(sql, [fts_match_query(query, any_word=True), *args]).fetchall()
+    from addons.knowledge.files import files_of  # files imports this module
+    files = files_of([r["id"] for r in rows])
     results = []
     for row in rows:
-        entry = _public(user, row)
-        entry["project_title"] = row["project_title"]
+        raw = dict(row)
+        extra = {k: raw.pop(k) for k in list(raw) if k.startswith("s_") or k in ("project_title", "section_title")}
+        entry = _public(user, raw, files.get(raw["id"], []))
+        matched = next((name for _, name in SNIPPET_COLUMNS if HIT[0] in (extra[f"s_{name}"] or "")), "")
+        snippet, matched_file = (extra.get(f"s_{matched}") or "") if matched else "", None
+        if matched == "files":
+            snippet, matched_file = _matched_file(snippet, entry["files"])
+        entry.update(project_title=extra["project_title"], section_title=extra["section_title"],
+                     snippet=snippet, matched=matched, matched_file=matched_file)
         results.append(entry)
     return results
 
@@ -308,14 +354,17 @@ def update_entry(user: User, entry_id: str, *, kind: Optional[str] = None, title
                  body: Optional[str] = None, fields: Any = None, tags: Any = None, status: Optional[str] = None,
                  priority: Optional[str] = None, due_at: Optional[str] = None,
                  url: Optional[str] = None, section_id: Optional[str] = None,
-                 decision: Optional[str] = None) -> Optional[Dict[str, Any]]:
+                 decision: Optional[str] = None, project_id: Optional[str] = None) -> Optional[Dict[str, Any]]:
     """Partially update an entry ``user`` may change. `None` means 'leave
     unchanged' (pass "" to clear a value). A URL that differs from the stored
-    one records ``user`` as who set it (``url_set_by``). Returns the updated
-    entry, or None when they cannot see it.
+    one records ``user`` as who set it (``url_set_by``). Another ``project_id``
+    moves it there (it then belongs to that project's owner; its section is
+    ``section_id`` of that project, else none). Returns the updated entry, or
+    None when they cannot see it.
 
     Raises:
-        projects.ReadOnly: its project is shared with them read-only.
+        LookupError: they cannot see ``project_id``.
+        projects.ReadOnly: its project (or ``project_id``) is shared with them read-only.
         outbound.Refused: the new link is not one they may make the server fetch.
         WrongSection: ``section_id`` is not a section of the entry's project.
     """
@@ -323,7 +372,12 @@ def update_entry(user: User, entry_id: str, *, kind: Optional[str] = None, title
         current = writable_entry(user, entry_id)
     except LookupError:
         return None
-    section = _section_of(current.get("project_id"), section_id) if section_id is not None else None
+    moving = bool(project_id) and project_id != current.get("project_id")
+    new_owner = projects.writable_project(user, project_id) if moving else None
+    target = project_id if moving else current.get("project_id")
+    section = _section_of(target, section_id) if section_id is not None else None
+    if moving and section_id is None:
+        section_id = ""  # a section of the old project does not come along
     new_url = (clean_str(url) or None) if url is not None else current.get("url")
     url_changed = new_url != current.get("url")
     if url_changed:
@@ -351,6 +405,9 @@ def update_entry(user: User, entry_id: str, *, kind: Optional[str] = None, title
         sets.append("section_id = ?"); args.append(section)
     if decision is not None:
         sets.append("decision = ?"); args.append(norm_decision(decision))
+    if moving:
+        sets.append("project_id = ?"); args.append(project_id)
+        sets.append("user_id = ?"); args.append(new_owner)
     if url_changed:
         # Who set the link decides how freely it is downloaded (media.process_knowledge_media).
         sets.append("url_set_by = ?"); args.append(user.id)
