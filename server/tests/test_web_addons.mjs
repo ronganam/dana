@@ -283,6 +283,14 @@ check("catalog: the full-access warning, the entry with Install, the skipped ent
 check("catalog: an entry's icon when given", "icon" in weatherEntry && C.renderCatalogEntry({ ...weatherEntry, icon: "cloud-sun" }, {}).includes('data-lucide="cloud-sun"')
       && C.renderCatalogEntry({ ...weatherEntry, icon: "" }, {}).includes('data-lucide="package"'));
 check("catalog: an unreadable catalog says so with a retry", /Couldn't read the catalog[\s\S]*boom[\s\S]*data-catalog-retry/.test(C.renderCatalog({ catalogError: "boom" })));
+check("build your own: under the Catalog, the prompt naming the guide, its Copy button and the guide's link",
+      catHtml.includes("Build your own add-on") && catHtml.includes(C.esc(C.BUILD_PROMPT)) && C.BUILD_PROMPT.includes(C.BUILD_GUIDE)
+      && C.BUILD_GUIDE.endsWith("/build-an-addon.md") && catHtml.includes("data-copy-prompt") && catHtml.includes(`href="${C.BUILD_GUIDE}"`)
+      && catHtml.indexOf("data-git-field") < catHtml.indexOf("data-build"));
+check("build your own: also while the catalog loads or cannot be read",
+      C.renderCatalog({}).includes("data-build") && C.renderCatalog({ catalogError: "boom" }).includes("data-build"));
+check("build your own: Copied after copying", C.renderBuild(true).includes(">Copied<") && C.renderBuild(false).includes(">Copy<"));
+check("build your own: not for a member", !C.renderList({ items: F.list_member.body.addons, ui: {}, me: meMember, target: meMember.id, canManage: false }).includes("data-build"));
 check("catalog: a homepage that is not http(s) is not linked", !C.renderCatalogEntry({ ...weatherEntry, homepage: "javascript:alert(1)" }, {}).includes("javascript:"));
 check("install form: a full commit is required", C.installBody({ repo: "https://x/r.git", ref: "main" }).error
       && JSON.stringify(plain(C.installBody({ repo: " https://x/r.git ", path: "/addons/w/", ref: "A".repeat(40) }))) === JSON.stringify({ repo: "https://x/r.git", path: "addons/w", ref: "a".repeat(40) }));

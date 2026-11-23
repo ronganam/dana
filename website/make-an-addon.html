@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Make a Dana add-on</title>
-  <meta name="description" content="Build, check, test and publish an add-on for Dana, with a coding agent or by hand: one command writes it, one checks it, one tests it, one puts it in the catalog.">
+  <meta name="description" content="Build an add-on for Dana with a coding agent or by hand: one command writes it, one checks it, one tests it, one installs it on your Dana, one puts it in the catalog.">
   <meta name="theme-color" content="#2b2521">
   <link rel="icon" href="favicon.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -21,6 +21,7 @@
     .steps p { margin: 6px 0 0; font-size: 15px; }
     .steps code, .sub code, .facts code { font: 400 .92em/1 var(--mono); color: var(--ink); }
     .page-code pre { min-height: 0; }
+    #agent .agent { max-width: 72ch; margin-top: 24px; }
     .links { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 32px; }
   </style>
 </head>
@@ -41,7 +42,7 @@
     <section class="hero">
       <p class="eyebrow">Make an add-on</p>
       <h1>Teach Dana <em>something new</em>.</h1>
-      <p class="lede">An add-on is a folder of typed Python functions with docstrings. Dana turns them into tools it can call, cards on your Now screen and pages in the app. Four commands take one from an idea to the catalog, and a coding agent can run all four.</p>
+      <p class="lede">An add-on is a folder of typed Python functions with docstrings. Dana turns them into tools it can call, cards on your Now screen and pages in the app. A few commands take one from an idea to your own Dana and on to the catalog, and a coding agent can run them all with you.</p>
       <div class="cta">
         <a class="btn btn-primary" href="#loop">See the loop</a>
         <a class="btn btn-quiet" href="https://github.com/ronganam/dana/blob/master/server/docs/addon-reference.md">The reference</a>
@@ -53,42 +54,49 @@
         <p class="eyebrow">The loop</p>
         <h2 class="h-section">Edit, check, <em>test</em>, try.</h2>
         <ol class="steps">
-          <li><h3>Start it</h3><p><code>bin/dana addons new tides</code> writes a working add-on in its own git repository: a tool, a Now card, tests with made-up users and fakes for the model and the web, an <code>AGENTS.md</code> and the full reference.</p></li>
-          <li><h3>Check it</h3><p><code>bin/dana addons check tides</code> loads it and compares what the code does with what it declares: every host it calls, every setting it reads, every tool parameter the model will see. Each problem comes with its fix.</p></li>
-          <li><h3>Test it</h3><p><code>bin/dana addons test tides</code> runs its tests against Dana's own harness: a fresh database, two users who have it and one who doesn't, no network.</p></li>
-          <li><h3>Try it</h3><p><code>bin/dana addons dev tides</code> starts Dana on your machine with stub services and loads it, shows its log, its tools and the cards it makes, and reloads when you save.</p></li>
-          <li><h3>Publish it</h3><p><code>bin/dana addons publish tides</code> pushes it to GitHub, tags a release and opens a pull request to the catalog, pinned to the exact commit. Everyone running Dana can then install it from the Add-ons page.</p></li>
+          <li><h3>Start it</h3><p><code>bin/dana addons new tides</code> writes <code>./tides</code>, a working add-on in its own git repository: a tool, a Now card, tests with made-up users and fakes for the model and the web, an <code>AGENTS.md</code> and the full reference.</p></li>
+          <li><h3>Check it</h3><p><code>bin/dana addons check ./tides</code> loads it and compares what the code does with what it declares: every host it calls, every setting it reads, every tool parameter the model will see. Each problem comes with its fix.</p></li>
+          <li><h3>Test it</h3><p><code>bin/dana addons test ./tides</code> runs its tests against Dana's own harness: a fresh database, two users who have it and one who doesn't, no network.</p></li>
+          <li><h3>Try it</h3><p><code>bin/dana addons dev ./tides</code> starts Dana on your machine with stub services and loads it, shows its log, its tools and the cards it makes, and reloads when you save.</p></li>
+          <li><h3>Install it</h3><p><code>bin/dana addons install ./tides --server https://your-dana --restart</code> shows what it may touch, asks, copies it into your server's data folder and restarts the server. Turn it on in Settings → Addons and ask Dana about the tides.</p></li>
+          <li><h3>Publish it</h3><p><code>bin/dana addons publish ./tides</code> pushes it to GitHub, tags a release and opens a pull request to the catalog, pinned to the exact commit. Everyone running Dana can then install it from the Add-ons page.</p></li>
         </ol>
       </div>
       <div class="code page-code">
         <div class="code-tabs" aria-hidden="true"><button type="button" aria-selected="true">terminal</button></div>
-        <pre><code><span class="p">$</span> bin/dana addons new tides --dir ~/code
-<span class="o">Wrote the tides addon in ~/code/tides (a git repository)</span>
+        <pre><code><span class="p">$</span> bin/dana addons new tides
+<span class="o">Wrote the tides addon in ./tides (a git repository)</span>
 
-<span class="p">$</span> bin/dana addons check ~/code/tides
+<span class="p">$</span> bin/dana addons check ./tides
 <span class="o">error   tools.py:31  The code calls api.tides.example,</span>
 <span class="o">        which touches= does not list.</span>
 <span class="c">        fix: Add "api.tides.example" to</span>
 <span class="c">        touches=Touches(hosts=(...)) in addon.py</span>
 
-<span class="p">$</span> bin/dana addons check ~/code/tides
+<span class="p">$</span> bin/dana addons check ./tides
 <span class="o">OK: 0 error(s), 0 warning(s)</span>
 
-<span class="p">$</span> bin/dana addons test ~/code/tides
+<span class="p">$</span> bin/dana addons test ./tides
 <span class="o">PASS  tests/test_tides.py</span>
 
-<span class="p">$</span> bin/dana addons publish ~/code/tides
-<span class="o">Published tides 0.1.0: the catalog pull request is open.</span></code></pre>
+<span class="p">$</span> bin/dana addons install ./tides \
+    --server https://your-dana --restart</code></pre>
       </div>
     </section>
 
     <section id="agent">
       <p class="eyebrow">With a coding agent</p>
-      <h2 class="h-section">Give it the folder. <em>It knows the rest.</em></h2>
+      <h2 class="h-section">Paste one line. <em>It knows the rest.</em></h2>
+      <div class="agent">
+        <p class="agent-k">Let your coding agent do it</p>
+        <div class="agent-row"><span class="agent-l">Add-on</span><code>Read https://ronganam.github.io/dana/build-an-addon.md and help me build a Dana add-on.</code><button class="agent-copy" type="button" aria-label="Copy the add-on prompt">Copy</button></div>
+        <p class="agent-note">It asks what Dana should do, which service it uses and whether it acts for you, proposes the design and waits for your yes, then builds, tests and installs it on your Dana: <a href="build-an-addon.md">build-an-addon.md</a>.</p>
+      </div>
       <p class="sub">Every new add-on carries an <code>AGENTS.md</code>: what an add-on is, the loop above, and the rules. Next to it, <code>REFERENCE.md</code> lists every manifest field and every hook, each with an example taken from an add-on that Dana's own tests run. Point your coding agent at the folder and describe what you want. It edits, runs the check, fixes what the check says, and runs the tests until they pass.</p>
       <div class="links">
         <a class="btn btn-quiet" href="https://github.com/ronganam/dana/blob/master/server/cli/template/AGENTS.md.tmpl">The add-on's AGENTS.md</a>
         <a class="btn btn-quiet" href="https://github.com/ronganam/dana/tree/master/examples/addons/showcase">The showcase add-on</a>
+        <a class="btn btn-quiet" href="build-an-addon.md">The guide for agents</a>
         <a class="btn btn-quiet" href="llms.txt">llms.txt</a>
       </div>
     </section>
@@ -109,5 +117,6 @@
     <span class="brand"><span class="brand-mark" aria-hidden="true"></span>Dana</span>
     <span>Self-hosted personal assistant · MIT · <a href="index.html">Back to the home page</a></span>
   </footer>
+  <script src="copy.js"></script>
 </body>
 </html>

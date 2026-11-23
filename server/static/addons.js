@@ -31,6 +31,10 @@
  * server, and the Addons page offers it again ("Show the welcome again"). The suggestions stay listed under
  * Available either way.
  *
+ * Admins also see "Build your own add-on" under the Catalog: the one-line prompt for a coding agent (BUILD_PROMPT,
+ * copied by its button) and a link to the guide it reads (BUILD_GUIDE, website/build-an-addon.md), which ends by
+ * installing the add-on here (bin/dana addons install ./NAME --server <this Dana> --restart).
+ *
  * Installing from the catalog shows what the addon may touch before Install (the entry's touches; the server
  * checks them against the fetched code and answers 409 confirm_touches when it declares more, and the page
  * asks again with what it really touches). An update whose entry adds a touch asks again; one that adds
@@ -55,6 +59,8 @@
   const SOURCES = { official: "Official", site: "Site", image: "Image", installed: "Installed" };
   const FULL_ACCESS = "An addon runs inside Dana with the server's full access: it can read and change every user's data and reach your network. Install only addons whose code you trust.";
   const FULL_COMMIT = /^[0-9a-f]{40}$/i;
+  const BUILD_GUIDE = "https://ronganam.github.io/dana/build-an-addon.md";
+  const BUILD_PROMPT = `Read ${BUILD_GUIDE} and help me build a Dana add-on.`;
   const TELEGRAM_TYPES = new Set(["telegram_chat"]);
   const LIST_SETTINGS = new Set(["selected_calendars"]);
 
@@ -655,13 +661,26 @@
         <span class="itg-entry-actions">${action}${remove}</span></div>${status}</div>`;
   }
 
+  /** "Build your own add-on" (admins, under the Catalog): the prompt for a coding agent, its Copy button, the guide. */
+  function renderBuild(copied) {
+    return `<div class="itg-card itg-build" data-build>
+      <div class="itg-build-head"><span class="itg-icon"><i data-lucide="hammer"></i></span>
+        <span class="itg-row-text"><span class="itg-row-name">Build your own add-on</span>
+          <span class="itg-row-desc">Paste this into a coding agent on your computer (Claude Code, Codex, Cursor…). It asks what Dana should do, builds and tests the add-on with you, and installs it on this server.</span></span></div>
+      <div class="itg-build-prompt"><code dir="ltr" data-build-prompt>${esc(BUILD_PROMPT)}</code>
+        <button class="btn-secondary" data-copy-prompt>${copied ? "Copied" : "Copy"}</button></div>
+      <a class="itg-link" href="${esc(BUILD_GUIDE)}" target="_blank" rel="noopener noreferrer">Read the guide it follows</a>
+    </div>`;
+  }
+
   function renderCatalog(s) {
     const head = `<div class="itg-group-head"><span>Catalog</span><em>More addons for this server (admins)</em></div>`;
+    const build = renderBuild(s.promptCopied);
     if (s.catalogError) {
       return `<section class="itg-group" data-group="catalog">${head}<div class="itg-card itg-error"><strong>Couldn't read the catalog</strong><span>${esc(s.catalogError)}</span>
-        <button class="btn-secondary" data-catalog-retry><i data-lucide="refresh-cw"></i>Try again</button></div></section>`;
+        <button class="btn-secondary" data-catalog-retry><i data-lucide="refresh-cw"></i>Try again</button></div>${build}</section>`;
     }
-    if (!s.catalog) return `<section class="itg-group" data-group="catalog">${head}<div class="itg-skel dn-shimmer short"></div></section>`;
+    if (!s.catalog) return `<section class="itg-group" data-group="catalog">${head}<div class="itg-skel dn-shimmer short"></div>${build}</section>`;
     const c = s.catalog, ui = s.catalogUi || {};
     const entries = c.entries.length ? `<div class="itg-card itg-rows">${c.entries.map((e) => renderCatalogEntry(e, ui[e.name])).join("")}</div>`
       : `<div class="itg-card itg-empty"><i data-lucide="package"></i><span>The catalog lists no addons yet.</span></div>`;
@@ -678,7 +697,7 @@
           <label class="itg-field"><span class="itg-flabel">Commit</span><input class="settings-input" data-git-field="ref" type="text" spellcheck="false" autocomplete="off" dir="ltr" placeholder="the full 40-character commit hash" value="${esc(form.ref || "")}"></label>
           <div class="itg-actions"><button class="btn-secondary" data-git-install${s.gitBusy ? " disabled" : ""}>${s.gitBusy ? "Installing…" : "Install…"}</button></div>
           <div class="itg-status ${s.gitStatus ? esc(s.gitStatus.tone || "") : "hidden"}" role="status">${esc(s.gitStatus ? s.gitStatus.text : "")}</div>
-        </details></section>`;
+        </details>${build}</section>`;
   }
 
   /** Everything under the header: the list, or one addon's view. */
@@ -699,12 +718,12 @@
         <button class="${c.danger ? "btn-destructive-outline" : "btn-primary"}" data-confirm="yes">${esc(c.button || "OK")}</button></div></div>`;
   }
 
-  const core = { FULL_ACCESS, KEY_TEXT, esc, displayName, iconOf, safeUrl, fieldLabel, isService, needsSetup, accountText,
+  const core = { FULL_ACCESS, KEY_TEXT, BUILD_GUIDE, BUILD_PROMPT, esc, displayName, iconOf, safeUrl, fieldLabel, isService, needsSetup, accountText,
                  statusOf, reconnectText, reconnectAction, groupItems, connectFields, stepsFor, fieldModel, typedValue, buildChanges, path, errorText,
                  checkFailedText, testText, connectedText, disconnectText, welcomeModel, sourceLabel, serverActions,
                  catalogState, installBody, installConfirm, touchesConfirm, needLines, touchLines, renderHeader, renderRow,
                  renderWelcome, renderList, renderField, renderSteps, renderAdds, renderNeeds, renderExamples, renderDetail, renderBody, renderRestartBanner,
-                 renderCatalog, renderCatalogEntry, renderConfirm };
+                 renderCatalog, renderCatalogEntry, renderBuild, renderConfirm };
   (typeof window !== "undefined" ? window : globalThis).DanaAddonsCore = core;
   if (typeof document === "undefined") return;
 
@@ -713,7 +732,7 @@
   const icons = () => { try { window.lucide?.createIcons(); } catch (_) { /* ignore */ } };
   const S = { me: null, users: null, target: null, items: null, error: "", open: null, ui: {}, visible: false, confirm: null,
               canManage: false, restartNeeded: false, restarting: false, welcome: null,
-              catalog: null, catalogError: "", catalogUi: {}, gitForm: {}, gitBusy: false, gitStatus: null };
+              catalog: null, catalogError: "", catalogUi: {}, gitForm: {}, gitBusy: false, gitStatus: null, promptCopied: false };
   const drafts = {};  // addon -> {values, remove}: what was typed since the form was drawn (memory only)
   let seq = 0;
 
@@ -1043,6 +1062,24 @@
     return r.status === 200 ? r.body : null;
   }
 
+  /** Copy the build prompt; without the clipboard (plain http), select it for Ctrl+C. */
+  async function copyPrompt() {
+    try {
+      await navigator.clipboard.writeText(BUILD_PROMPT);
+      S.promptCopied = true;
+      render();
+      setTimeout(() => { S.promptCopied = false; if (S.visible && !S.open) render(); }, 2000);
+    } catch (_) {
+      const code = $("panel-addons").querySelector("[data-build-prompt]");
+      if (!code) return;
+      const range = document.createRange();
+      range.selectNodeContents(code);
+      const sel = getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+
   /** "Try asking Dana": the example goes into the chat box, ready to send. */
   function tryExample(text) {
     window.danaSwitchTab?.("chat");
@@ -1058,6 +1095,7 @@
       if ((n = t.closest("[data-retry]"))) load();
       else if (t.closest("[data-restart]")) askRestart();
       else if (t.closest("[data-catalog-retry]")) loadCatalog(true);
+      else if (t.closest("[data-copy-prompt]")) copyPrompt();
       else if (t.closest("[data-welcome-dismiss]")) setWelcome(true);
       else if (t.closest("[data-welcome-again]")) setWelcome(false);
       else if ((n = t.closest("[data-install]"))) {

@@ -424,13 +424,19 @@
       <section id="build" class="make">
         <p class="eyebrow reveal">Make it yours</p>
         <h2 class="h-section reveal">Your server. <em>Your add-ons.</em></h2>
-        <p class="sub reveal">Dana runs on one small server you own: a mini PC, a NAS or a homelab. Each feature is an add-on with its own tools and screens. The train add-on in the showreel lives in its own repository and installs from the catalog. You can write yours in an afternoon: an add-on is just typed Python functions with docstrings, and Dana takes it from there.</p>
+        <p class="sub reveal">Dana runs on one small server you own: a mini PC, a NAS or a homelab. Each feature is an add-on with its own tools and screens. Install more from the catalog, a git repository or a folder on your computer, like the showreel's trains. Write yours in an afternoon: typed Python functions with docstrings, and Dana takes it from there.</p>
         <ul class="facts reveal">
           <li><b>Any model</b> through LiteLLM. Claude is the default.</li>
           <li><b>Several users</b> on one server, each with their own accounts, data and tokens.</li>
           <li><b>Docker</b> and SQLite. Nothing to configure: open the setup link and paste one model key.</li>
           <li><b>MIT licensed.</b> Your data stays on your server.</li>
         </ul>
+        <div class="agent reveal">
+          <p class="agent-k">Let your coding agent do it</p>
+          <div class="agent-row"><span class="agent-l">Install</span><code>Read https://ronganam.github.io/dana/install.md and help me install Dana.</code><button class="agent-copy" type="button" aria-label="Copy the install prompt">Copy</button></div>
+          <div class="agent-row"><span class="agent-l">Add-on</span><code>Read https://ronganam.github.io/dana/build-an-addon.md and help me build a Dana add-on.</code><button class="agent-copy" type="button" aria-label="Copy the add-on prompt">Copy</button></div>
+          <p class="agent-note">Paste into Claude Code, Codex, Cursor…: it asks, then does the steps with you. <a href="llms.txt">llms.txt</a></p>
+        </div>
         <div class="code reveal">
           <div class="code-tabs" role="tablist" aria-label="Examples">
             <button role="tab" aria-selected="true" aria-controls="code-run" id="tab-run" type="button">terminal</button>
@@ -440,14 +446,13 @@
 <span class="p">$</span> curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
 <span class="p">$</span> docker compose up -d
 <span class="p">$</span> docker compose logs dana
-<span class="o">  Open http://127.0.0.1:8080/setup?code=… to create the first admin.</span>
-<span class="c"># the setup page asks for one model key, then pairs your phone</span>
-
-<span class="c"># add the trains from the catalog (or Settings → Add-ons)</span>
+<span class="o">  Open http://localhost:8080/setup?code=… to create the first admin.</span>
+<span class="c"># add the trains from the catalog (or Settings → Addons)</span>
 <span class="p">$</span> docker compose exec dana dana addons install israel_rail
 <span class="o">✓ israel_rail installed, pinned to a commit</span>
-<span class="c"># or write your own, in a checkout</span>
-<span class="p">$</span> bin/dana addons new my_thing</code></pre>
+<span class="c"># or write your own, then install it from its folder</span>
+<span class="p">$</span> bin/dana addons new my_thing
+<span class="p">$</span> bin/dana addons install ./my_thing --server https://dana.example --restart</code></pre>
           <pre id="code-addon" role="tabpanel" aria-labelledby="tab-addon" tabindex="0" hidden><code><span class="c"># israel_rail/tools.py (shortened)</span>
 <span class="k">@addon.tool</span>()
 <span class="k">async def</span> <span class="f">rail_trains</span>(conn, from_station: <span class="t">str</span> = <span class="s">""</span>,
@@ -504,5 +509,6 @@
   </footer>
 
   <script src="site.js"></script>
+  <script src="copy.js"></script>
 </body>
 </html>
