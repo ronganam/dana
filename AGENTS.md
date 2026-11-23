@@ -7,12 +7,13 @@
 | `server/` | aiohttp server: the ReAct agent over LiteLLM, addons (each owns its tools; `docs/addons.md`), REST/SSE/WebSocket APIs, the web UI (`static/` + addon `web/` panels), Telegram, background pipelines | `server/AGENTS.md`, `server/docs/` |
 | `android/` | Gradle project: `:app` (flavors `phone`, `kiosk`, `tv`), `:wear` (watch), `:watchface` (the Dana watch face), `:protocol` (phone↔watch Data Layer contract) | `android/AGENTS.md`, `android/docs/` |
 | `extensions/raycast-assistant/` | Raycast extension (macOS) | its `README.md` |
+| `extensions/omarchy/` | Omarchy (Linux desktop) shell plugin: the quick-ask overlay, the Now panel in the bar | its `README.md` |
 | `examples/addons/hello/` | The example addon, loaded as a site addon by `server/tests/test_addon_loading.py` | `server/docs/writing-an-addon.md` |
 | `examples/addons/showcase/` | An addon using every capability once; `server/docs/addon-reference.md` quotes it | `server/docs/writing-an-addon.md` ("The add-on kit") |
 | `website/` | The project's one-page site (static, no build) | its `README.md` |
 | `site.example/` | The template of a deployment's **site** folder: `site/` (gitignored, often a link to a private repository) holds one deployment's config, site addons, app defaults and notes | `docs/site.md` |
 | `.githooks/pre-push` | Pushing master runs the server tests, then deploys when `site/deploy.env` exists (`server/docs/operations.md`) | |
-| `.github/` | CI (`workflows/ci.yml`: server tests, Android unit tests / debug builds / lint, Raycast build & lint, Docker image builds; the website on GitHub Pages: `workflows/pages.yml`), releases (`workflows/release.yml`: the published server image `ghcr.io/ronganam/dana`, amd64 and arm64), Dependabot, issue and PR templates | |
+| `.github/` | CI (`workflows/ci.yml`: server tests, Android unit tests / debug builds / lint, Raycast build & lint, the Omarchy plugin's tests, Docker image builds; the website on GitHub Pages: `workflows/pages.yml`), releases (`workflows/release.yml`: the published server image `ghcr.io/ronganam/dana`, amd64 and arm64), Dependabot, issue and PR templates | |
 | `compose.yaml` | The quick start: runs the published image with no checkout (curl it, `docker compose up -d`, open the setup link from the logs); `server/compose.yaml` builds from source | `server/docs/operations.md` ("Running it") |
 
 **This deployment**: when `site/AGENTS.md` exists, read it first. It describes the deployment this checkout serves (production, secret store, devices, site addons). Change a deployment through its site (config, site addons), and Dana's code only in ways every deployment gets (`docs/site.md`). Never copy a site's details into the repository.

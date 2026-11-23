@@ -19,6 +19,7 @@ It is one person's daily driver, published as is: opinionated, built around one 
 | [`server/`](server/) | The server (Python 3.12+, tested on 3.14; aiohttp, SQLite): agent, addons, APIs, web UI, Telegram bot, background jobs |
 | [`android/`](android/) | The phone app, the wall-tablet kiosk and the TV home screen (flavors of one app), and the Wear OS watch app (Kotlin, Compose) |
 | [`extensions/raycast-assistant/`](extensions/raycast-assistant/) | A Raycast extension |
+| [`extensions/omarchy/`](extensions/omarchy/) | An Omarchy shell plugin: ask with Super+D, the Now queue in the bar |
 | [`examples/addons/`](examples/addons/) | A working example of an addon you write yourself |
 | [`website/`](website/) | The project's one-page site: open `website/index.html` |
 

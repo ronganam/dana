@@ -19,6 +19,7 @@ jobs:
       server: ${{ steps.filter.outputs.server }}
       android: ${{ steps.filter.outputs.android }}
       raycast: ${{ steps.filter.outputs.raycast }}
+      omarchy: ${{ steps.filter.outputs.omarchy }}
       docker: ${{ steps.filter.outputs.docker }}
     steps:
       - uses: actions/checkout@v4
@@ -36,6 +37,10 @@ jobs:
               - '.github/workflows/ci.yml'
             raycast:
               - 'extensions/raycast-assistant/**'
+              - '.github/workflows/ci.yml'
+            omarchy:
+              - 'extensions/omarchy/**'
+              - 'server/tests/fixtures/golden.sse'
               - '.github/workflows/ci.yml'
             docker:
               - 'server/Dockerfile'
@@ -114,6 +119,19 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npx eslint src/
+
+  omarchy:
+    needs: changes
+    if: needs.changes.outputs.omarchy == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      # The plugin's logic (lib/Dana.js) against the server's golden.sse; the
+      # QML needs Omarchy's shell and is checked on a desktop.
+      - run: node extensions/omarchy/tests/dana.test.js
 
   docker:
     needs: changes

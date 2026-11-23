@@ -25,7 +25,7 @@
     { id: "kind", label: "Type" },
   ];
   const SOURCE_NAMES = { app: "App / web", phone: "Phone", telegram: "Telegram", whatsapp: "WhatsApp", background: "Background",
-                         watch: "Watch", tablet: "Tablet", tv: "TV", mac: "Mac", web: "Web" };
+                         watch: "Watch", tablet: "Tablet", tv: "TV", mac: "Mac", desktop: "Desktop", web: "Web" };
   const PAGE = 30;
   const store = (k, v) => { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch (_) { return null; } };
 

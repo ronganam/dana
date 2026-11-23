@@ -350,6 +350,9 @@ async def test_thread(client):
     sent = fake.calls[-1]["messages"]
     check("thread: no ts/device/seq keys reach LiteLLM",
           not any(k in m for m in sent for k in ("ts", "device", "seq")))
+    check("thread: the Omarchy desktop is a known device, anything else is other",
+          thread.normalize_device("Desktop") == "desktop" and thread.normalize_device("toaster") == "other"
+          and thread.normalize_device("") == "")
 
     fake.load(answer("Second."))
     await send(client, "main", "and again", device="phone")

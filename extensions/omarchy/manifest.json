@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "id": "dana",
+  "name": "Dana",
+  "version": "1.0.0",
+  "author": "ronganam",
+  "license": "MIT",
+  "homepage": "https://github.com/ronganam/dana/tree/master/extensions/omarchy",
+  "description": "Your Dana assistant on the Omarchy desktop: ask from anywhere with Super+D, attach a part of the screen, approve what she asks inline, and see what needs you from the bar.",
+  "kinds": [
+    "service",
+    "overlay",
+    "bar-widget"
+  ],
+  "keepLoaded": true,
+  "entryPoints": {
+    "service": "Service.qml",
+    "overlay": "Ask.qml",
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Dana",
+    "description": "What needs you in Dana's Now queue, with its actions; right click to ask Dana. Polls the server every refreshSeconds (0 turns that off).",
+    "category": "Communication",
+    "aliases": ["assistant", "ai", "now"],
+    "allowMultiple": false,
+    "defaultSection": "right",
+    "defaults": {
+      "refreshSeconds": 120,
+      "notify": true
+    },
+    "schema": [
+      {
+        "key": "refreshSeconds",
+        "type": "number",
+        "label": "Check Now every (seconds, 0 = only when opened)",
+        "defaultValue": 120
+      },
+      {
+        "key": "notify",
+        "type": "boolean",
+        "label": "Notify when an answer arrives after the window is closed",
+        "defaultValue": true
+      }
+    ]
+  }
+}

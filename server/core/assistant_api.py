@@ -124,7 +124,7 @@ async def assistant_models_api(request: web.Request) -> web.Response:
 async def assistant_message_api(request: web.Request) -> web.StreamResponse:
     """POST /api/assistant/message {session_id, message, model?, images?, device?, screen?, device_screen?} → SSE
 
-    ``session_id: "main"`` is the shared thread; ``device`` (phone|watch|tablet|tv|mac|web)
+    ``session_id: "main"`` is the shared thread; ``device`` (phone|watch|tablet|tv|mac|desktop|web)
     is stored with the message there; ``screen: {kind, id}`` is the item on screen
     (this turn only); ``device_screen: {app, package, title, url, text}`` is the
     phone screen the user shared with this message (this turn only, untrusted).

@@ -275,6 +275,7 @@ object ThreadModel {
         "tablet" -> "tablet"
         "tv" -> "TV"
         "mac" -> "Mac"
+        "desktop" -> "desktop"
         "web" -> "web"
         else -> ""
     }

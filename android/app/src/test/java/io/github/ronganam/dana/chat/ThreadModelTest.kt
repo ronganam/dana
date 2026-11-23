@@ -90,6 +90,7 @@ class ThreadModelTest {
     fun separatorLabels() {
         assertEquals("13:32 · watch", ThreadModel.separatorLabel(at(2026, 11, 14, 13, 32), "watch", now, zone))
         assertEquals("Yesterday 08:19 · Mac", ThreadModel.separatorLabel(at(2026, 11, 13, 8, 19), "mac", now, zone))
+        assertEquals("Thu 21:04 · desktop", ThreadModel.separatorLabel(at(2026, 11, 12, 21, 4), "desktop", now, zone))
         assertEquals("Thu 21:04 · TV", ThreadModel.separatorLabel(at(2026, 11, 12, 21, 4), "tv", now, zone))
         assertEquals("3 Nov 10:00", ThreadModel.separatorLabel(at(2026, 11, 3, 10, 0), "telegram", now, zone))
         assertEquals("3 Nov 2025 10:00 · tablet", ThreadModel.separatorLabel(at(2025, 11, 3, 10, 0), "tablet", now, zone))

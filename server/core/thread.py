@@ -1,10 +1,11 @@
 """The one conversation with Dana that every device shares (session id ``main``).
 
-Phone, watch, tablet, TV, Mac and web all post to ``session_id: "main"`` with
-their ``device``. Every user has their own: the wire id is ``main`` for
-everyone and resolves to the user's thread (rows carry ``user_id``). It always
-exists (created on first use), cannot be deleted, and is not listed among the
-ordinary sessions; per-device sessions keep working as before.
+Phone, watch, tablet, TV, Mac, desktop (the Omarchy plugin) and web all post
+to ``session_id: "main"`` with their ``device``. Every user has their own: the
+wire id is ``main`` for everyone and resolves to the user's thread (rows carry
+``user_id``). It always exists (created on first use), cannot be deleted, and
+is not listed among the ordinary sessions; per-device sessions keep working as
+before.
 
 Storage: one row per message in ``thread_messages`` (the LiteLLM message JSON
 in ``message``; ``ts`` and ``device`` in their own columns, so they can never
@@ -38,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 THREAD_ID = "main"
 THREAD_TITLE = "Dana"
-DEVICES = ("phone", "watch", "tablet", "tv", "mac", "web")
+DEVICES = ("phone", "watch", "tablet", "tv", "mac", "desktop", "web")
 
 THREAD_GAP_MINUTES = float(os.getenv("THREAD_GAP_MINUTES", "20") or 20)
 THREAD_KEEP_MESSAGES = int(os.getenv("THREAD_KEEP_MESSAGES", "500") or 500)
