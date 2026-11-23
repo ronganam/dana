@@ -29,6 +29,7 @@
     <link rel="stylesheet" href="/static/household.css">
     <link rel="stylesheet" href="/static/zones.css">
     <link rel="stylesheet" href="/static/llm.css">
+    <link rel="stylesheet" href="/static/backups.css">
     <!-- Third-Party Libraries -->
     <!-- Vendored, exact versions (THIRD_PARTY.md): no script comes from a CDN -->
     <script src="/static/vendor/marked.min.js"></script>
@@ -59,6 +60,7 @@
     <script src="/static/demo.js" defer></script>
     <script src="/static/zones.js" defer></script>
     <script src="/static/llm.js" defer></script>
+    <script src="/static/backups.js" defer></script>
 </head>
 <body>
     <div class="app-container">
@@ -258,6 +260,11 @@
                     <div class="settings-card" id="llm-card">
                         <h2 style="font-size:18px;font-weight:600;color:var(--ink);">The model</h2>
                         <div id="llm-box"></div>
+                    </div>
+                    <!-- static/backups.js: backups of the whole server (admins): server/docs/backups.md -->
+                    <div class="settings-card hidden" id="backups-card">
+                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Backups</h2>
+                        <div id="backups-box"></div>
                     </div>
                     <div class="settings-card">
                         <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Dana</h2>

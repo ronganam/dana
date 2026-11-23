@@ -3,9 +3,11 @@ docs/writing-an-addon.md).
 
     bin/dana users …      users, tokens, Telegram ids, shares (cli/users.py)
     bin/dana addons …     the server's addons and a user's connections (cli/addons.py)
+    bin/dana backups …    make, list and restore backups (cli/backups.py)
 
 Commands that touch the database refuse one that is not migrated (start the
-server once first); ``addons new / install / remove`` and the addon kit (``addons check /
+server once first); ``backups restore`` replaces the database whatever its
+state; ``addons new / install / remove`` and the addon kit (``addons check /
 test / dev / reference / publish``, cli/kit/) work on folders only.
 """
 
@@ -16,6 +18,7 @@ from typing import Optional, Sequence, TextIO
 
 from core import db
 from cli import addons as addons_cli
+from cli import backups as backups_cli
 from cli import users as users_cli
 from cli.users import CliError
 
@@ -29,6 +32,8 @@ def build_parser() -> argparse.ArgumentParser:
     addons_cli.register(sub.add_parser("addons", help="the server's addons: list, new, check, test, dev, "
                                        "publish, install, remove, disable, enable; a user's: show, connect, update, "
                                        "disconnect").add_subparsers(
+        dest="command", required=True, metavar="command"))
+    backups_cli.register(sub.add_parser("backups", help="backups of the server: create, list, restore").add_subparsers(
         dest="command", required=True, metavar="command"))
     return parser
 

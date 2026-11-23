@@ -64,9 +64,9 @@ ENV PATH="/app/bin:${PATH}"
 ARG RELEASE=""
 RUN if [ -n "$RELEASE" ]; then echo "$RELEASE" > VERSION; fi
 
-# Ensure all files are owned by the non-root user; /app/db is where the data volume goes
-# (a new Docker volume takes this folder's owner)
-RUN mkdir -p /app/db && chown -R appuser:appgroup /app
+# Ensure all files are owned by the non-root user; /app/db is where the data volume goes and
+# /backups the backups' (a new Docker volume takes this folder's owner; docs/backups.md)
+RUN mkdir -p /app/db /backups && chown -R appuser:appgroup /app /backups
 
 # Switch to the non-root user
 USER appuser

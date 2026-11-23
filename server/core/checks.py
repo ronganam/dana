@@ -7,9 +7,11 @@ calls) and says whether the signal still arrives:
 - ``signals`` / ``wake`` / ``briefing``: core's own checks (a source of the
   wake, car and place signals: core/signals.py; confirmed wakes in
   ``wake_log``; today's briefing in ``briefings``);
-- ``budget`` / ``transcription``: core's server checks, for whoever may manage
-  the server (background work paused by the monthly budget, core/budget.py;
-  a transcription refused for want of a model, core/llm.py ``transcriber``);
+- ``budget`` / ``transcription`` / ``backups``: core's server checks, for
+  whoever may manage the server (background work paused by the monthly
+  budget, core/budget.py; a transcription refused for want of a model,
+  core/llm.py ``transcriber``; the last backup failed or the schedule is
+  overdue, core/backups.py);
 - every addon's ``@addon.selfcheck`` (phone's ``push``, ``notification_sync``,
   ``triage``, ``calls``; Home Assistant's ``location``, ``car``, ``ha_entities``,
   ``ha_watcher``; tasks' ``reminders``; calendar's ``calendar``; money's
@@ -34,7 +36,7 @@ import logging
 import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
-from core import briefing, budget, clock, llm, now_hidden, signals, undo, users, wake, wake_window
+from core import backups, briefing, budget, clock, llm, now_hidden, signals, undo, users, wake, wake_window
 from core.addons import helpers, registry
 from core.addons.helpers import parse_time
 from core.addons.hooks import Check, Hook
@@ -51,6 +53,7 @@ LABELS: Dict[str, str] = {
     "briefing": "Morning briefing",
     "budget": "Monthly budget",
     "transcription": "Transcription",
+    "backups": "Backups",
 }
 # A check about the server itself (``server=True``) is shown only to users who may see everyone.
 SERVER_CAPABILITY = "see_everyone"
@@ -62,6 +65,7 @@ APPLIES: Dict[str, Callable[[User], bool]] = {
     "briefing": lambda user: briefing.available(user),
     "budget": lambda user: user.level.allows("manage_server"),
     "transcription": lambda user: user.level.allows("manage_server"),
+    "backups": lambda user: user.level.allows("manage_server"),
 }
 
 
@@ -260,12 +264,41 @@ def _check_transcription(conn, now: datetime.datetime, user: Optional[User]) -> 
                        "and set WHISPER_URL.")
 
 
+def _check_backups(conn, now: datetime.datetime, user: Optional[User]) -> Dict[str, Any]:
+    if user is None or not APPLIES["backups"](user):
+        return _result("backups", True, "not connected", None)
+    s = backups.settings()
+    st = backups.state()
+    last, last_ok = st["last"] or {}, st["last_ok"] or {}
+    facts = [f"Destination: {s['destination']}"]
+    if last_ok:
+        facts.append(f"Last good backup: {last_ok.get('name')} ({ago(parse_time(last_ok.get('at')), now)})")
+    blocks = [{"type": "facts", "label": "Backups", "items": facts}]
+    if last and not last.get("ok"):
+        return _result("backups", False, "the last backup failed", parse_time(last.get("at")),
+                       title="The last backup failed",
+                       why=f"{last.get('error') or 'It failed.'} Check the destination in Settings → Backups, "
+                           "then back up now.", blocks=blocks)
+    due = backups.next_due(now)
+    if due is not None and due + backups.OVERDUE < now:
+        return _result("backups", False, "overdue", due, title="The scheduled backup did not run",
+                       why=f"It was due {ago(due, now)}; the server may be stuck. Back up now in Settings → Backups.",
+                       blocks=blocks)
+    if s["schedule"]["every"] == "off":
+        return _result("backups", True, "no schedule" + (f"; last {ago(parse_time(last_ok.get('at')), now)}"
+                                                          if last_ok else ""), parse_time(last_ok.get("at")))
+    if not last_ok:
+        return _result("backups", True, "none yet", None)
+    return _result("backups", True, f"last {ago(parse_time(last_ok.get('at')), now)}", parse_time(last_ok.get("at")))
+
+
 _CHECKS = {
     "signals": _check_signals,
     "wake": _check_wake,
     "briefing": _check_briefing,
     "budget": _check_budget,
     "transcription": _check_transcription,
+    "backups": _check_backups,
 }
 
 
