@@ -34,7 +34,7 @@ import io.github.ronganam.dana.R
  * Call-recording uploads.
  *
  * - [CallUploadStore] remembers which recordings were already handled, on
- *   disk, so a rescan or a service restart doesn't re-notify old calls.
+ *   disk, so the next scan of the recordings folder doesn't re-notify old calls.
  * - [CallUploadWorker] does the upload through WorkManager: it waits for a
  *   network, retries with backoff when the server is unreachable, and survives
  *   the app being killed.
@@ -90,31 +90,33 @@ object CallUploads {
         enqueue(context, meta.file, meta.contact, meta.timestamp, replace, meta.durationSeconds, meta.direction, meta.phoneNumber)
 
     /**
-     * Upload every recording still on the phone that is long enough and was
-     * never uploaded from here. The server recognises recordings it already
-     * has (same bytes / file name), so this is safe to run any time.
+     * Upload every recording in the recordings folder that is long enough
+     * and was never uploaded from here. The server recognises recordings it
+     * already has (same bytes / file name), so this is safe to run any time.
      */
     fun uploadPastRecordings(context: Context): Int {
-        val dir = File(RECORDINGS_DIR)
         val threshold = CallUploadSettings.thresholdSeconds(context)
         var queued = 0
-        dir.listFiles { f -> f.name.endsWith(".m4a") }.orEmpty().sortedBy { it.lastModified() }.forEach { file ->
-            val state = CallUploadStore.state(context, file.name)
+        RecordingsFolder.list(context).filter { FolderScan.isAudio(it.name, it.mime) }.sortedBy { it.modifiedMs }.forEach { doc ->
+            val state = CallUploadStore.state(context, doc.name)
             if (state == CallUploadStore.State.UPLOADED || state == CallUploadStore.State.QUEUED) return@forEach
-            val info = io.github.ronganam.dana.ui.viewmodels.CallsController.parseSamsungFilename(file.name) ?: return@forEach
-            if (CallUploadSettings.isSkipped(context, info.first)) return@forEach
-            val meta = RecordingInspector.inspect(context, file, info.first, info.second)
-            if (meta.durationSeconds < threshold) return@forEach
+            val file = RecordingsFolder.copy(context, doc) ?: return@forEach
+            val meta = RecordingInspector.inspect(context, file, doc.name, doc.modifiedMs)
+            if (CallUploadSettings.isSkipped(context, meta.contact) || meta.durationSeconds < threshold) {
+                if (state == null) RecordingsFolder.release(context, file)
+                return@forEach
+            }
             enqueue(context, meta)
             queued++
         }
         return queued
     }
 
-    const val RECORDINGS_DIR = "/storage/emulated/0/Recordings/Call"
-
-    /** Heads-up "short call — upload?" with Upload / Skip; tapping opens the short-call sheet. */
-    fun notifyShortCall(context: Context, meta: RecordingMeta) {
+    /**
+     * "Upload it?" with Upload / Skip; tapping opens the short-call sheet.
+     * [short]: under the auto-upload threshold; otherwise auto-upload is off.
+     */
+    fun notifyAsk(context: Context, meta: RecordingMeta, short: Boolean) {
         val name = meta.file.name
         val upload = PendingIntent.getBroadcast(
             context, name.hashCode() + 11,
@@ -134,7 +136,7 @@ object CallUploads {
         )
         notify(context, name, NotificationCompat.Builder(context, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.stat_sys_upload)
-            .setContentTitle("Short call with ${meta.contact} (${meta.durationSeconds}s)")
+            .setContentTitle(if (short) "Short call with ${meta.contact} (${meta.durationSeconds}s)" else "New call recording: ${meta.contact}")
             .setContentText("Upload it to Dana?")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setContentIntent(open)
@@ -231,6 +233,7 @@ class CallUploadWorker(appContext: Context, params: WorkerParameters) : Coroutin
             )
             if (result != null) {
                 CallUploadStore.mark(ctx, file.name, CallUploadStore.State.UPLOADED)
+                RecordingsFolder.release(ctx, file)
                 val callId = result.id.orEmpty()
                 val status = result.status.orEmpty()
                 if (callId.isNotEmpty()) {
@@ -328,6 +331,7 @@ class CallUploadReceiver : BroadcastReceiver() {
                     val meta = intent.readMeta() ?: return
                     cancelNotification(context, meta.file.name)
                     CallUploadStore.mark(context, meta.file.name, CallUploadStore.State.SKIPPED)
+                    RecordingsFolder.release(context, meta.file)
                 }
             }
         }
@@ -348,6 +352,7 @@ class CallUploadReceiver : BroadcastReceiver() {
 object CallUploadStore {
     private const val TAG = "CallUploadStore"
     private const val FILE_NAME = "call_uploads.json"
+    // The folder (tree URI) whose old recordings were recorded as seen.
     private const val KEY_SEEDED = "__seeded__"
     private val lock = Any()
 
@@ -360,17 +365,18 @@ object CallUploadStore {
         read(context).optJSONObject(fileName)?.optString("state")?.let { raw -> State.values().firstOrNull { it.name == raw } }
     }
 
-    fun isSeeded(context: Context): Boolean = synchronized(lock) { read(context).optBoolean(KEY_SEEDED, false) }
+    /** The first scan of [folder] already happened (a newly picked folder is seeded again). */
+    fun isSeeded(context: Context, folder: String): Boolean = synchronized(lock) { read(context).optString(KEY_SEEDED) == folder }
 
     /**
-     * First run: record the recordings already on the phone as seen, so the
-     * first rescan doesn't post a notification for every old call. Old calls
-     * can still be uploaded from the Calls screen.
+     * First scan of a folder: record the recordings already there as seen, so
+     * it doesn't post a notification for every old call. Old calls can still
+     * be uploaded from Settings ("Upload past recordings") or the Calls screen.
      */
-    fun seed(context: Context, existing: List<String>) = synchronized(lock) {
+    fun seed(context: Context, folder: String, existing: List<String>) = synchronized(lock) {
         val json = read(context)
         existing.forEach { if (!json.has(it)) json.put(it, entry(State.SEEN, null, null, null)) }
-        json.put(KEY_SEEDED, true)
+        json.put(KEY_SEEDED, folder)
         write(context, json)
     }
 

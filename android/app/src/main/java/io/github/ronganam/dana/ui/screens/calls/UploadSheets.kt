@@ -162,7 +162,7 @@ fun UploadOptionsSheet(
                         fontWeight = FontWeight.Medium
                     )
                     Text(
-                        text = "Choose a detected call recording",
+                        text = "From your recordings folder",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
@@ -343,6 +343,7 @@ fun RecordingSelectionSheet(
     isScanning: Boolean,
     onSelect: (PendingRecordingFile) -> Unit
 ) {
+    val context = LocalContext.current
     val handler = remember { Handler(Looper.getMainLooper()) }
     val mediaPlayer = remember { mutableStateOf<MediaPlayer?>(null) }
     val currentlyPlayingPath = remember { mutableStateOf<String?>(null) }
@@ -363,7 +364,8 @@ fun RecordingSelectionSheet(
         }
     }
 
-    fun playFile(path: String) {
+    fun playFile(uri: android.net.Uri) {
+        val path = uri.toString()
         if (currentlyPlayingPath.value == path && isPlaying.value) {
             mediaPlayer.value?.pause()
             isPlaying.value = false
@@ -385,7 +387,7 @@ fun RecordingSelectionSheet(
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .build()
                 )
-                setDataSource(path)
+                setDataSource(context, uri)
                 prepare()
                 start()
                 currentDuration.intValue = duration
@@ -452,6 +454,15 @@ fun RecordingSelectionSheet(
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
                     )
+                    if (!isScanning) {
+                        Text(
+                            text = "Recordings come from the folder your call recorder saves to: Settings → Call recordings → Recordings folder.",
+                            style = MaterialTheme.typography.bodySmall,
+                            textAlign = TextAlign.Center,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(horizontal = 24.dp, vertical = 6.dp)
+                        )
+                    }
                     if (isScanning) {
                         Spacer(Modifier.height(12.dp))
                         CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 2.dp)
@@ -467,7 +478,7 @@ fun RecordingSelectionSheet(
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 items(recordings) { recording ->
-                    val isThisPlaying = currentlyPlayingPath.value == recording.file.absolutePath
+                    val isThisPlaying = currentlyPlayingPath.value == recording.uri.toString()
 
                     Surface(
                         shape = RoundedCornerShape(8.dp),
@@ -481,7 +492,7 @@ fun RecordingSelectionSheet(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 IconButton(
-                                    onClick = { playFile(recording.file.absolutePath) },
+                                    onClick = { playFile(recording.uri) },
                                     modifier = Modifier
                                         .size(40.dp)
                                         .clip(CircleShape)

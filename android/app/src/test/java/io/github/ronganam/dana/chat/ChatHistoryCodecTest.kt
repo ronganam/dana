@@ -4,7 +4,6 @@ import io.github.ronganam.dana.data.chat.ChatHistoryCodec
 import io.github.ronganam.dana.data.models.ChatMessage
 import io.github.ronganam.dana.data.models.ToolCallEntry
 import io.github.ronganam.dana.data.network.ApiException
-import io.github.ronganam.dana.ui.viewmodels.CallsController
 import io.github.ronganam.dana.testing.ResourceTexts
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -61,13 +60,5 @@ class ChatHistoryCodecTest {
         assertTrue(ResourceTexts.reason(UnknownHostException("x")).contains("unreachable"))
         assertTrue(ResourceTexts.reason(ApiException(401, "no")).contains("API token"))
         assertEquals("server error (HTTP 500)", ResourceTexts.reason(ApiException(500, "boom")))
-    }
-
-    @Test
-    fun parsesSamsungRecordingNames() {
-        val parsed = CallsController.parseSamsungFilename("Call‎Dana Cohen‏_241031_093015.m4a")
-        assertEquals("Dana Cohen" to "2024-10-31T09:30:15", parsed)
-        assertNull(CallsController.parseSamsungFilename("Voice 001.m4a"))
-        assertNull(CallsController.parseSamsungFilename("CallBob_2410_0930.m4a"))
     }
 }

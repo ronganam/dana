@@ -41,8 +41,8 @@ class DanaNotificationListener : NotificationListenerService() {
         super.onListenerConnected()
         instance = this
         // Android rebinds the listener after an update or a kill even when
-        // nothing else of the app comes back: keep the call watcher alive too.
-        io.github.ronganam.dana.CallRecordingObserverService.ensureRunning(this)
+        // nothing else of the app comes back: make sure the recordings scan is scheduled.
+        io.github.ronganam.dana.data.sync.RecordingScans.schedule(this)
         // Signals that need a live process (this one is kept bound): unlocks, car mode.
         io.github.ronganam.dana.data.wake.UnlockWatcher.register(this)
         io.github.ronganam.dana.data.signals.PhoneSignals.watch(this)

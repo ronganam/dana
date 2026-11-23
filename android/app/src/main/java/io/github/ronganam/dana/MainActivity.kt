@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import io.github.ronganam.dana.data.sync.CallUploadSettings
+import io.github.ronganam.dana.data.sync.RecordingScans
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -69,7 +70,6 @@ class MainActivity : ComponentActivity() {
         // Call recordings are off until turned on in Settings (which asks for
         // these then); once on, ask again here for anything since revoked.
         if (CallUploadSettings.enabled(this)) {
-            permissionsToRequest.add(CallUploadSettings.storagePermission)
             // Call direction / number / name for auto-uploaded recordings.
             permissionsToRequest.add(android.Manifest.permission.READ_CALL_LOG)
         }
@@ -80,11 +80,8 @@ class MainActivity : ComponentActivity() {
             checkSelfPermission(it) != android.content.pm.PackageManager.PERMISSION_GRANTED
         }
 
-        if (ungranted.isNotEmpty()) {
-            permissionRequest.launch(ungranted.toTypedArray())
-        } else {
-            startCallObserverService()
-        }
+        if (ungranted.isNotEmpty()) permissionRequest.launch(ungranted.toTypedArray())
+        RecordingScans.schedule(this)
 
         io.github.ronganam.dana.ui.theme.ThemeSettings.load(applicationContext)
         setContent {
@@ -190,10 +187,6 @@ class MainActivity : ComponentActivity() {
         val vm = ViewModelProvider(this)[MainViewModel::class.java]
         try {
             when {
-                type.startsWith("audio/") && uri != null -> {
-                    vm.callsController.setSharedAudioUri(uri)
-                    vm.navigateTo("calls")
-                }
                 type.startsWith("image/") && uri != null -> {
                     val text = sharedText(intent)
                     // The read grant on a shared content:// URI ends with this
@@ -239,12 +232,6 @@ class MainActivity : ComponentActivity() {
         null
     }
 
-    private fun startCallObserverService() {
-        CallRecordingObserverService.start(this)
-    }
-
-    /** Notifications, call recordings and the caller card: the observer starts once answered, whatever the answer. */
-    private val permissionRequest = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-        startCallObserverService()
-    }
+    /** Notifications, the call log for call recordings, the caller card. */
+    private val permissionRequest = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {}
 }

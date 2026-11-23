@@ -10,10 +10,9 @@
     <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
     <!-- Coding-agent sessions as Android 16 Live Updates (push/AgentSessions.kt) -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
+    <!-- Call recordings: which call a recording is of. The recordings folder itself is read
+         through a Storage Access Framework grant the user gives (no storage permission). -->
     <uses-permission android:name="android.permission.READ_CALL_LOG" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <!-- In-app updates: lets the app hand the downloaded APK to the system installer -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <!-- WorkManager runs long call-recording uploads as a foreground job -->
@@ -44,12 +43,16 @@
     </queries>
 
     <application>
-        <!-- The launcher entry and share target (the activity itself is in main). -->
-        <activity android:name=".MainActivity" android:exported="true" tools:node="merge">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
+        <!-- Share audio to Dana: each file is uploaded as a call recording (which call, asked
+             on a small sheet) or kept as a transcribed note (share/ShareAudioActivity.kt). -->
+        <activity
+            android:name=".share.ShareAudioActivity"
+            android:exported="true"
+            android:label="@string/share_audio_label"
+            android:theme="@style/Theme.Dana.VoiceSession"
+            android:taskAffinity="io.github.ronganam.dana.share"
+            android:excludeFromRecents="true"
+            android:launchMode="standard">
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -59,6 +62,14 @@
                 <action android:name="android.intent.action.SEND_MULTIPLE" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="audio/*" />
+            </intent-filter>
+        </activity>
+
+        <!-- The launcher entry and share target (the activity itself is in main). -->
+        <activity android:name=".MainActivity" android:exported="true" tools:node="merge">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
             <!-- Share text, links and images from any app into a new chat -->
             <intent-filter>
@@ -199,15 +210,6 @@
                 android:resource="@xml/recognition_service" />
         </service>
 
-        <service
-            android:name=".CallRecordingObserverService"
-            android:enabled="true"
-            android:exported="false"
-            android:foregroundServiceType="specialUse">
-            <property
-                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-                android:value="Monitors the call recordings directory for new recordings and uploads them to Dana" />
-        </service>
 
         <service
             android:name=".data.wear.WearMessageListenerService"

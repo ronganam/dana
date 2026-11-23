@@ -28,7 +28,6 @@ class NotificationSyncWorker(appContext: Context, params: WorkerParameters) : Co
 
     override suspend fun doWork(): Result {
         val ctx = applicationContext
-        io.github.ronganam.dana.CallRecordingObserverService.ensureRunning(ctx)
         // Also a safety net for direct push: anything a lost ping didn't bring.
         io.github.ronganam.dana.push.PushSetup.ensureRegistered(ctx)
         io.github.ronganam.dana.push.PhoneEvents.catchUp(ctx)
