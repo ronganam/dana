@@ -8,7 +8,8 @@ How to iterate on Dana quickly without losing quality. It covers the inner loop,
 |---|---|---|
 | While editing | `bin/test --changed` (only the scripts touched by, or importing, what changed) or `bin/test <word>` | seconds |
 | Before a commit | `bin/test` (everything, side by side; prints only failures) | ~75 s (16 threads) |
-| On push to master | the pre-push hook runs `bin/test` (and the image's test stage when the Dockerfile or requirements change), then `bin/deploy` builds and deploys (when the site has a `deploy.env`), all on your machine | ~2.5 min + rollout |
+| On push to master | the pre-push hook runs `bin/test` (and the image's test stage when the Dockerfile or requirements change) on your machine; it deploys nothing | ~2.5 min |
+| A release | bump `VERSION` and the app versions, push the tag `v<version>` (the release workflow publishes the image), then `bin/deploy <version> --wait` (`docs/operations.md`, "Releasing", "Deploying") | ~15 min + rollout |
 
 - Don't run the suite "to see where we are" at the start of a task. The last commit passed the suite, so a failure you see is yours.
 - A script that fails once in parallel and passes alone is reported as **flaky**, not failed. Look at it when it happens often, but it doesn't block.
@@ -24,9 +25,9 @@ How to iterate on Dana quickly without losing quality. It covers the inner loop,
 
 ## Shipping small
 
-- Every push to master that changes the app deploys, as `<VERSION>-<commit>`, with no version bump (`docs/operations.md`). The pre-push test gate makes that safe. Several small pushes beat one big release: each is easier to verify, and a problem points at fewer changes. A push of only docs or tests deploys nothing.
+- Production runs published releases (`docs/operations.md`, "Releasing"). Pushes to master are tested, not deployed; release often: several small releases beat one big one, each is easier to verify, and a problem points at fewer changes.
 - New work can go live for one user first. An addon is used only by users who have it connected, so a new addon or a new tool can run for the admin for a few days before anyone else gets it (`bin/dana addons connect`).
-- After a deploy, verify with the self-checks (`/api/checks`) and the log, not by reading code (`docs/operations.md`).
+- After a deploy (`bin/deploy <version> --wait`), verify with the self-checks (`/api/checks`) and the log, not by reading code (`docs/operations.md`).
 
 ## Before a big change
 

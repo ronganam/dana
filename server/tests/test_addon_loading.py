@@ -1,4 +1,4 @@
-"""Addon loading (core/addons/loader.py): site addons after the official ones, ordered by needs then name, a broken one skipped without stopping the start, name clashes refused; the shipped example addon passes its own test.
+"""Addon loading (core/addons/loader.py): installed addons (the data dir's addons/, or DANA_ADDON_DIRS folders) after the official ones, ordered by needs then name, a broken one skipped without stopping the start, name clashes refused; the shipped example addon passes its own test.
 
 Run: bin/test test_addon_loading
 
@@ -49,14 +49,13 @@ def write_addon(folder: Path, name: str, manifest: str = "", tools_extra: str = 
         """))
 
 
-def run(script: str, addon_dirs: Optional[str], site: Optional[str] = None) -> subprocess.CompletedProcess:
-    """``script`` in a fresh interpreter; ``addon_dirs`` None leaves DANA_ADDON_DIRS unset (the site default)."""
-    env = dict(os.environ, DATABASE_PATH=testenv.scratch_path(f"p{len(addon_dirs or '')}{len(site or '')}.sqlite3"))
+def run(script: str, addon_dirs: Optional[str], database: Optional[str] = None) -> subprocess.CompletedProcess:
+    """``script`` in a fresh interpreter; ``addon_dirs`` None leaves DANA_ADDON_DIRS unset (the data dir's
+    addons/ is then the installed source); ``database``: the database path (its folder is the data dir)."""
+    env = dict(os.environ, DATABASE_PATH=database or testenv.scratch_path(f"p{len(addon_dirs or '')}.sqlite3"))
     env.pop("DANA_ADDON_DIRS", None)
     if addon_dirs is not None:
         env["DANA_ADDON_DIRS"] = addon_dirs
-    if site is not None:
-        env["DANA_SITE"] = site
     return subprocess.run([sys.executable, "-c", textwrap.dedent(script)], cwd=ROOT, env=env,
                           capture_output=True, text=True, timeout=120)
 
@@ -103,11 +102,11 @@ out = run("""
     print("RESULT", asyncio.run(registry.execute(admin, "zeta_echo", {"text": "hi"})))
 """, f"{one}{os.pathsep}{two}{os.pathsep}{base / 'missing'}")
 lines = lines_of(out)
-check("site addons: by needs then name, folders without addon.py skipped, a missing folder ignored",
+check("installed addons: by needs then name, folders without addon.py skipped, a missing folder ignored",
       lines.get("LOADED") == "['alpha', 'haspkg', 'zeta', 'beta']", out.stdout + out.stderr[-2000:])
-check("site addons: after the official addons; the addon order is the loaded order",
+check("installed addons: after the official addons; the addon order is the loaded order",
       lines.get("AFTER_OFFICIAL") == "True" and lines.get("ORDER_SAME") == "True", lines)
-check("failure isolation: a site addon that fails to import, names an unknown slot, needs a missing addon, "
+check("failure isolation: an installed addon that fails to import, names an unknown slot, needs a missing addon, "
       "declares a need of no known kind or credentials it does not say it stores, or has missing "
       "requirements.txt packages is skipped, the start goes on",
       lines.get("FAILED") == "['badneed', 'badslot', 'broken', 'missingpkg', 'needy', 'quietcreds']", lines.get("FAILED"))
@@ -117,9 +116,9 @@ check("failure isolation: each with its reason",
       and "nonexistent-dana-pkg-xyz" in why and "kind must be one of env, account, hardware, app, region, addon" in why
       and "stores_credentials=True" in why, why)
 check("failure isolation: a skipped addon leaves no tool behind", lines.get("BROKEN_TOOL") == "False")
-check("site addons: a tool only for a user who connected the addon",
+check("installed addons: a tool only for a user who connected the addon",
       lines.get("BEFORE") == "False" and lines.get("CONNECTED") == "True False", lines)
-check("site addons: the tool runs with the user's connection", lines.get("RESULT") == "zeta:Robin Levi:hi",
+check("installed addons: the tool runs with the user's connection", lines.get("RESULT") == "zeta:Robin Levi:hi",
       lines.get("RESULT"))
 
 clash = base / "clash"
@@ -134,20 +133,25 @@ out = run("import addons", f"{one}{os.pathsep}{again}")
 check("names: two with one name are refused", out.returncode != 0 and "clashes" in out.stderr, out.stderr[-500:])
 
 out = run("from core.addons import loader; print(loader.non_official())", "")
-check("site addons: none with DANA_ADDON_DIRS empty", out.stdout.strip() == "()", out.stdout + out.stderr[-500:])
+check("installed addons: none with DANA_ADDON_DIRS empty", out.stdout.strip() == "()", out.stdout + out.stderr[-500:])
 
-# --- the site folder: its addons/ is the default ------------------------------------------------
-site = base / "site"
-write_addon(site / "addons", "siteaddon")
-out = run("from core.addons import loader; print(loader.non_official())", None, str(site))
-check("site: DANA_SITE's addons/ load when DANA_ADDON_DIRS is unset", out.stdout.strip() == "('siteaddon',)",
+# --- the data dir's addons/ is the default -----------------------------------------------------
+data = base / "data"
+write_addon(data / "addons", "dataaddon")
+db_path = str(data / "db.sqlite3")
+out = run("from core.addons import loader; f = loader.folder('dataaddon'); "
+          "print(loader.non_official(), f.source.kind, f.source.label)", None, db_path)
+check("data dir: <data dir>/addons loads when DANA_ADDON_DIRS is unset, as the installed source",
+      out.stdout.strip() == "('dataaddon',) installed installed", out.stdout + out.stderr[-500:])
+out = run("from core.addons import loader; print(loader.non_official())", "", db_path)
+check("data dir: DANA_ADDON_DIRS='' turns installed addons off (what testenv does)", out.stdout.strip() == "()",
       out.stdout + out.stderr[-500:])
-out = run("from core.addons import loader; print(loader.non_official())", "", str(site))
-check("site: DANA_ADDON_DIRS='' turns site addons off (what testenv does)", out.stdout.strip() == "()",
+out = run("from core.addons import loader; f = loader.folder('zeta'); print(f.source.kind, f.source.label)", str(one))
+check("DANA_ADDON_DIRS: its folders replace the data dir's and count as installed",
+      out.stdout.strip() == "extra installed", out.stdout + out.stderr[-500:])
+out = run("from core import addon_dirs; print([s.kind for s in addon_dirs.sources()])", None, db_path)
+check("sources: official and installed only", out.stdout.strip() == "['official', 'installed']",
       out.stdout + out.stderr[-500:])
-out = run("from core import addon_dirs; print(addon_dirs.site_dir())", None)
-check("site: without DANA_SITE it is site/ at the repository root",
-      out.stdout.strip() == str(ROOT.parent / "site"), out.stdout + out.stderr[-500:])
 
 # --- the shipped example (examples/addons/hello) runs its own test --------------------------------
 EXAMPLE_TEST = ROOT.parent / "examples" / "addons" / "hello" / "tests" / "test_hello.py"
@@ -155,7 +159,8 @@ if EXAMPLE_TEST.is_file():
     env = dict(os.environ, PYTHONPATH=os.pathsep.join([str(ROOT), str(ROOT / "tests")]))
     proc = subprocess.run([sys.executable, str(EXAMPLE_TEST)], cwd=ROOT, env=env, capture_output=True, text=True,
                           timeout=300)
-    check("example: examples/addons/hello passes its own test (tool, job, event, Now card, route, migration)",
+    check("example: examples/addons/hello, installed from its folder, passes its own test "
+          "(tool, job, event, Now card, route, migration)",
           proc.returncode == 0, (proc.stdout + proc.stderr)[-2500:])
 else:  # the image's test stage builds from server/ alone
     print("[SKIP] example: no examples/ beside server/")

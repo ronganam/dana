@@ -7,8 +7,9 @@ docs/writing-an-addon.md).
 
 Commands that touch the database refuse one that is not migrated (start the
 server once first); ``backups restore`` replaces the database whatever its
-state; ``addons new / install / remove`` and the addon kit (``addons check /
-test / dev / reference / publish``, cli/kit/) work on folders only.
+state; ``addons new / install / remove / workers`` and the addon kit (``addons
+check / test / dev / reference / publish``, cli/kit/) work on folders only, or
+(``install --server``) on a running server through its API.
 """
 
 import argparse
@@ -30,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     users_cli.register(sub.add_parser("users", help="users, their tokens, Telegram ids and shares").add_subparsers(
         dest="command", required=True, metavar="command"))
     addons_cli.register(sub.add_parser("addons", help="the server's addons: list, new, check, test, dev, "
-                                       "publish, install, remove, disable, enable; a user's: show, connect, update, "
+                                       "publish, install, workers, remove, disable, enable; a user's: show, connect, update, "
                                        "disconnect").add_subparsers(
         dest="command", required=True, metavar="command"))
     backups_cli.register(sub.add_parser("backups", help="backups of the server: create, list, restore").add_subparsers(

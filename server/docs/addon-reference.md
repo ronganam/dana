@@ -257,12 +257,13 @@ docs/web-design.md, "Navigation").
 
 A sidecar process next to Dana: the port it listens on and the env
 variable that tells Dana its URL. `image`: the published image it runs
-(`ghcr.io/<owner>/<name>`, its repository building it; a tag of its own,
-else `bin/deploy` pins it to the installed commit), the way for an addon
-installed from the catalog; empty: `bin/deploy` builds the addon's
-`worker/` folder (a `Dockerfile`) as `<image>-<addon>`, the way for a
-site addon. `compose.yaml` runs it under a profile named after the addon
-(docs/operations.md, "Workers").
+(`ghcr.io/<owner>/<name>`, the addon's repository building it from its
+`worker/` folder; a tag of its own, else `bin/deploy` pins it to the
+commit the addon was installed at, so an addon installed from a folder
+names a tag); empty: nothing is published, the `worker/` folder (a
+`Dockerfile`) is built where it runs (`bin/dana addons dev`, your own
+compose file). `compose.yaml` runs it under a profile named after the
+addon (docs/operations.md, "Workers").
 
 | Field | Type | Default |
 |---|---|---|
@@ -1612,7 +1613,7 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
   },
   "Worker": {
    "type": "object",
-   "description": "A sidecar process next to Dana: the port it listens on and the env variable that tells Dana its URL. ``image``: the published image it runs (``ghcr.io/<owner>/<name>``, its repository building it; a tag of its own, else ``bin/deploy`` pins it to the installed commit), the way for an addon installed from the catalog; empty: ``bin/deploy`` builds the addon's ``worker/`` folder (a ``Dockerfile``) as ``<image>-<addon>``, the way for a site addon. ``compose.yaml`` runs it under a profile named after the addon (docs/operations.md, \"Workers\").",
+   "description": "A sidecar process next to Dana: the port it listens on and the env variable that tells Dana its URL. ``image``: the published image it runs (``ghcr.io/<owner>/<name>``, the addon's repository building it from its ``worker/`` folder; a tag of its own, else ``bin/deploy`` pins it to the commit the addon was installed at, so an addon installed from a folder names a tag); empty: nothing is published, the ``worker/`` folder (a ``Dockerfile``) is built where it runs (``bin/dana addons dev``, your own compose file). ``compose.yaml`` runs it under a profile named after the addon (docs/operations.md, \"Workers\").",
    "properties": {
     "port": {
      "type": "integer"

@@ -8,4 +8,4 @@ labels: enhancement
 
 **Why** (the situation where you'd use it)
 
-**How you'd build it** (optional: which part, an addon, a site addon…)
+**How you'd build it** (optional: which part, an official addon, an installed addon…)

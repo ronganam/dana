@@ -1,4 +1,4 @@
-"""Site addon isolation (core/addons/loader.py, core/server.py): a wrong declared name, a tool needing a missing addon, a BaseException at import, a repeated hook key, a failing migration, a failing or shadowing api.py each fail that addon alone (with what needs it), whatever it registered is gone, the others load.
+"""Installed addon isolation (core/addons/loader.py, core/server.py): a wrong declared name, a tool needing a missing addon, a BaseException at import, a repeated hook key, a failing migration, a failing or shadowing api.py each fail that addon alone (with what needs it), whatever it registered is gone, the others load.
 
 Run: bin/test test_addon_isolation
 
@@ -56,7 +56,7 @@ def echo_tool(name: str, flags: str = "") -> str:
 
 
 def run(case: str, script: str) -> Dict[str, str]:
-    """``script`` in a fresh interpreter with ``BASE/case`` as the only site folder; its ``KEY value`` lines."""
+    """``script`` in a fresh interpreter with ``BASE/case`` as the only addon folder (DANA_ADDON_DIRS); its ``KEY value`` lines."""
     env = dict(os.environ, DATABASE_PATH=testenv.scratch_path(f"{case}.sqlite3"), DANA_ADDON_DIRS=str(BASE / case))
     proc = subprocess.run([sys.executable, "-c", textwrap.dedent(script)], cwd=ROOT, env=env, capture_output=True,
                           text=True, timeout=180)
@@ -118,9 +118,9 @@ out = run("load", """
     print("OFFICIAL_ALL", all(n in loaded for n in ("tasks", "essentials", "knowledge")))
 """)
 failed = out.get("FAILED", "")
-check("load: the healthy site addon loads beside the broken ones", out.get("LOADED") == "['good']",
+check("load: the healthy installed addon loads beside the broken ones", out.get("LOADED") == "['good']",
       f"{out.get('LOADED')} {out['_err']}")
-check("load: every broken site addon is failed, the start goes on",
+check("load: every broken installed addon is failed, the start goes on",
       failed == "['basexc', 'dupcount', 'dupkey', 'dupllm', 'dupprefix', 'misnamed', 'needsbad', 'needtool', "
                 "'twoaddons']", failed)
 check("names: a declared name unlike the folder's fails it", "misnamed" in out.get("WHY_misnamed", "")
@@ -134,7 +134,7 @@ check("validation per addon: a tool needing a missing addon fails that addon onl
 check("validation per addon: an addon that needs it goes too, and neither leaves a tool",
       "needtool" in out.get("WHY_needsbad", "") and out.get("TOOLS_LEFT") == "[]" and out.get("GOOD_TOOL") == "True",
       f"{out.get('WHY_needsbad')} {out.get('TOOLS_LEFT')}")
-check("BaseException: a non-Exception raised at import is caught for a site addon",
+check("BaseException: a non-Exception raised at import is caught for a installed addon",
       "Weird" in out.get("WHY_basexc", ""), out.get("WHY_basexc"))
 check("keys: a check key, a briefing count and a card prefix another addon has fail the later addon",
       "reminders" in out.get("WHY_dupkey", "") and "tasks" in out.get("WHY_dupkey", "")
@@ -152,7 +152,7 @@ out = run("official", "import addons")
 check("official: a clash with an official addon still stops the start", out["_rc"] != "0" and "clashes" in out["_err"],
       out["_err"][-300:])
 
-# --- 3. Migrations: a failing site addon is unloaded with what needs it -----------------------------------------
+# --- 3. Migrations: a failing installed addon is unloaded with what needs it -----------------------------------------
 case = BASE / "migrate"
 addon(case, "mfine", {"addon.py": manifest("mfine"), "tools.py": echo_tool("mfine"),
                       "migrations/m0001_base.py": """\
@@ -177,7 +177,7 @@ out = run("migrate", """
     from core.addons import loader
     from core.addons.addon import find_tool
     result = loader.migrate()
-    print("APPLIED_SITE", [l for l in result if l.split(":")[0] in ("mfine", "mbroken", "mneeds")])
+    print("APPLIED_INSTALLED", [l for l in result if l.split(":")[0] in ("mfine", "mbroken", "mneeds")])
     print("RESULT_FAILED", sorted(result.failed))
     print("LOADED", sorted(n for n in loader.loaded() if not loader.folder(n).source.official))
     print("FAILED", sorted(loader.failed()))
@@ -186,8 +186,8 @@ out = run("migrate", """
     conn = db.get_db_connection()
     print("TABLES", sorted(r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE name LIKE 'm%_items'")))
 """)
-check("migrate: the healthy site addon's migration applies", out.get("APPLIED_SITE") == "['mfine:0001_base']",
-      f"{out.get('APPLIED_SITE')} {out['_err']}")
+check("migrate: the healthy installed addon's migration applies", out.get("APPLIED_INSTALLED") == "['mfine:0001_base']",
+      f"{out.get('APPLIED_INSTALLED')} {out['_err']}")
 check("migrate: the failing addon is rolled back and taken out with the addon that needs it",
       out.get("LOADED") == "['mfine']" and out.get("FAILED") == "['mbroken', 'mneeds']"
       and out.get("TABLES") == "['mfine_items']", f"{out.get('LOADED')} {out.get('FAILED')} {out.get('TABLES')}")
@@ -235,9 +235,9 @@ out = run("routes", """
                                 if p in paths))
     print("OWNER", app[server.ROUTE_OWNERS].get(next(r for r in app.router.resources() if r.canonical == "/api/rfine")))
 """)
-check("routes: a well-behaved site addon's routes are added and owned by it",
+check("routes: a well-behaved installed addon's routes are added and owned by it",
       out.get("RFINE") == "True" and out.get("OWNER") == "rfine", f"{out.get('RFINE')} {out['_err']}")
-check("routes: refused site addons are failed, the others stay",
+check("routes: refused installed addons are failed, the others stay",
       out.get("LOADED") == "['rfine']" and out.get("FAILED") == "['rboom', 'rdynamic', 'rhealth', 'rlater', 'rstatic']",
       f"{out.get('LOADED')} {out.get('FAILED')}")
 check("routes: a setup that raises is refused", "setup broke" in out.get("WHY_rboom", ""), out.get("WHY_rboom"))
@@ -247,7 +247,7 @@ check("routes: a route shadowing a core route is refused (none of that addon's r
 check("routes: a plain route a core dynamic route answers is refused",
       "shadow" in out.get("WHY_rdynamic", ""), out.get("WHY_rdynamic"))
 check("routes: /static/ is refused", "/static/" in out.get("WHY_rstatic", ""), out.get("WHY_rstatic"))
-check("routes: a route an earlier site addon has is refused", "/api/rfine" in out.get("WHY_rlater", ""),
+check("routes: a route an earlier installed addon has is refused", "/api/rfine" in out.get("WHY_rlater", ""),
       out.get("WHY_rlater"))
 
 if failures:

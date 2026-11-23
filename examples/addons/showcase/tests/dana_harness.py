@@ -10,7 +10,7 @@ holds ``server/``, or ``server/`` itself), the Dana a runner already put on the
 import path (``bin/dana addons test``, Dana's ``bin/test``), else a ``dana``
 checkout next to this addon's folder. :func:`start` cleans the environment (no
 real keys or ``.env`` reach a test), points the database at a temporary folder
-removed at exit, and loads this addon as a site addon under its own name.
+removed at exit, and loads this addon under its own name from a development folder (``DANA_ADDON_DIRS``).
 """
 
 import ast
@@ -74,7 +74,7 @@ os.chdir(SERVER)
 
 def start(test_name: str) -> str:
     """A clean environment and a temporary database for this test (a throwaway ``CREDENTIALS_KEY``),
-    with only this addon loaded as a site addon (``DANA_ADDON_DIRS``: a folder holding a link to it
+    with only this addon loaded beside the official ones (``DANA_ADDON_DIRS``: a folder holding a link to it
     under its own name, so neither its folder's name nor its neighbours matter).
     Returns the database path."""
     import testenv  # Dana's harness: server/tests/testenv.py

@@ -5,7 +5,7 @@ Notes about this site for you and for coding agents. The repository's `AGENTS.md
 ## Production
 
 - Where it runs (host / cluster, namespace), its URL:
-- How it deploys (`server/bin/deploy` with `deploy.env`, compose, …):
+- How it deploys (`server/bin/deploy <version>` with `deploy.env`: GitOps, compose, …):
 - Logs and the database:
 - Secrets live in:
 
@@ -16,4 +16,4 @@ Notes about this site for you and for coding agents. The repository's `AGENTS.md
 
 ## Addons
 
-- `addons/<name>`: what it is for.
+- `<name>` (where its folder or repository lives, how it is installed): what it is for.

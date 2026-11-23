@@ -21,10 +21,16 @@
     POST   /api/addons/{name}/enable     → <addon>
     GET    /api/addons/catalog[?fresh=1] → {origin, dana_version, entries: [<entry>], problems: [..], restart_needed}
     POST   /api/addons/install           {name} (a catalog entry) or {repo, ref, path?, name?}, + accept?: <touches>
-                                         → 201 {name, repo, path, commit, replaced, touches, restart_needed: true,
-                                           message}; 409 confirm_touches {name, touches, added, message}: it may
-                                           touch more than the replaced version plus ``accept`` (nothing written;
-                                           send it again with accept = touches once the admin agreed)
+                                         → 201 {name, kind, repo, path, commit, replaced, touches,
+                                           restart_needed: true, message}; 409 confirm_touches {name, touches,
+                                           added, message}: it may touch more than the replaced version plus
+                                           ``accept`` (nothing written; send it again with accept = touches
+                                           once the admin agreed)
+                                         or multipart/form-data: ``archive`` (a .tar.gz of the addon folder,
+                                           its files at the root or in one top folder; at most 20 MB, 2000
+                                           files, 50 MB unpacked) + ``accept`` (a JSON <touches>, optional)
+                                         → 201 {name, kind: "upload", replaced, touches, restart_needed: true,
+                                           message}; the same 409 confirm_touches; 413 too_large
     POST   /api/addons/{name}/remove     → {name, removed: true, restart_needed: true}
     POST   /api/server/restart           → 202 {restarting: true}: the process exits cleanly, the supervisor
                                            starts it again (core/lifecycle.py)
@@ -49,21 +55,23 @@ hardware / app / region / addon; an addon need's ``what`` is its name) and
 ``<welcome>`` = ``{show, dismissed, suggested: [addon name]}``: ``show``
 while the user has no optional addon on (beyond ``default_on`` / ``everyone``
 ones) and has not dismissed it; ``suggested`` are addons they can turn on
-now. An admin acting with ``?user=`` gets ``show: false``. ``source``: ``official`` / ``site`` / ``image`` /
+now. An admin acting with ``?user=`` gets ``show: false``. ``source``: ``official`` /
 ``installed``; ``state`` for this user: ``on`` (they have it), ``available``
 (they can turn it on), ``off`` (only an admin can: ``why_not``),
 ``disabled-on-server`` (an admin disabled it, or an addon it needs, for
-everyone) or ``failed`` (a site / installed addon that did not load: only
+everyone) or ``failed`` (an installed addon that did not load: only
 admins get its ``error``); ``web`` (empty unless it is on for the user) =
 its pages, ``[{id, panel, style, nav: {label, icon, order, primary} | null}]`` with
 the URLs of their files;
-``worker``: it has a sidecar. Admins also get ``installed`` (``{repo, path,
-commit}``) for an addon installed from git. ``<entry>`` = the catalog entry
+``worker``: it has a sidecar. Admins also get ``installed`` (``{kind, repo, path,
+commit, installed_at}``: ``kind`` catalog / git / upload, the git fields null for
+an upload) for an installed addon. ``<entry>`` = the catalog entry
 (core/addons/catalog.py; ``touches`` null when the entry does not say) plus
 ``official`` (its name is an official addon: not installable), ``present``
-(the source of an addon of that name already here, else null),
-``installed`` (``{commit, loaded, version, touches}`` for one in ``<data
-dir>/addons``: what the installed version declares), ``update_available``,
+(the source of an addon of that name already here: ``installed``, or ``upload``
+for one installed from an uploaded folder, which a catalog install does not
+replace; else null), ``installed`` (``{commit, loaded, version, touches}`` for
+one installed from git in ``<data dir>/addons``: what the installed version declares), ``update_available``,
 ``touches_added`` (an update whose entry declares touches the installed
 version did not: those, else null; the page asks again before such an
 update) and ``compatible`` (this Dana is at least ``min_dana``). ``restart_needed``: an addon was installed,
@@ -115,12 +123,14 @@ Loaded by core/server.py (``setup(app)``). The web page: static/addons.js.
 """
 
 import asyncio
+import json
 import logging
 import mimetypes
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
-from aiohttp import web
+from aiohttp import BodyPartReader, web
 
 from core import addon_dirs, cards, lifecycle, now_hidden, user_locale, users
 from core.access import CAPABILITIES
@@ -271,7 +281,7 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
         "title": addon.title,
         "description": addon.description,
         "version": addon.version,
-        "source": folder.source.label if folder is not None else addon_dirs.SITE,
+        "source": folder.source.label if folder is not None else addon_dirs.INSTALLED,
         "state": _state(user, addon, conn is not None, can_change),
         "needs": [n.to_json() for n in addon.needs],
         "touches": addon.touches.to_json(),
@@ -306,7 +316,9 @@ def addon_payload(user: User, addon: Addon, by: User) -> Dict[str, Any]:
         out["problem"] = {"field": problem[0], "message": problem[1]}
     if folder is not None and folder.source.kind == addon_dirs.INSTALLED and by.level.allows(MANAGE):
         info = addon_dirs.installed_info(folder.path) or {}
-        out["installed"] = {"repo": info.get("repo"), "path": info.get("path"), "commit": info.get("commit")}
+        out["installed"] = {"kind": install.source_kind(info) or None, "repo": info.get("repo"),
+                            "path": info.get("path"), "commit": info.get("commit"),
+                            "installed_at": info.get("installed_at")}
     return out
 
 
@@ -314,7 +326,7 @@ def failed_payload(failed: loader.Failed, by: User) -> Dict[str, Any]:
     """An addon that was found but did not load (its error only for an admin)."""
     out: Dict[str, Any] = {
         "name": failed.name, "title": failed.name.replace("_", " ").capitalize(), "description": "",
-        "version": "", "source": addon_dirs.SITE if failed.source == addon_dirs.EXTRA else failed.source,
+        "version": "", "source": addon_dirs.INSTALLED if failed.source == addon_dirs.EXTRA else failed.source,
         "state": FAILED, "needs": [], "touches": None, "everyone": False, "web": [], "worker": False, "connected": False,
         "requires": None, "can_change": False, "why_not": "It did not load", "credentials": [], "settings": [],
         "account": None, "check": False, "options": False, "connect_url": None, "connect_label": None,
@@ -334,7 +346,9 @@ def pending_changes() -> List[Dict[str, str]]:
         folder = found.get(name)
         if folder is None:
             out.append({"name": name, "change": "install"})
-        elif folder.source.kind == addon_dirs.INSTALLED and record.get("commit") != loader.loaded_commit(name):
+        elif folder.source.kind == addon_dirs.INSTALLED and (
+                record.get("commit") != loader.loaded_commit(name)
+                or record.get("installed_at") != loader.loaded_record(name).get("installed_at")):
             out.append({"name": name, "change": "update"})
     for name, folder in found.items():
         if folder.source.kind == addon_dirs.INSTALLED and not (folder.path / "addon.py").is_file():
@@ -640,11 +654,18 @@ async def enable_addon_api(request: web.Request) -> web.Response:
 
 
 def _present() -> Dict[str, str]:
-    """The source of every addon folder found at start or in ``<data dir>/addons`` now, by name."""
+    """The source of every addon folder found at start or in ``<data dir>/addons`` now, by name
+    (``upload`` for one installed from an uploaded folder: a catalog install does not replace it)."""
     out = {name: f.source.label for name, f in loader.folders().items()}
-    for name in install.installed(addon_dirs.installed_dir()):
-        out.setdefault(name, addon_dirs.INSTALLED)
+    for name, record in install.installed(addon_dirs.installed_dir()).items():
+        out[name] = install.UPLOAD if install.source_kind(record) == install.UPLOAD else out.get(name, addon_dirs.INSTALLED)
     return out
+
+
+def _git_installed() -> Dict[str, Dict[str, Any]]:
+    """The addons in ``<data dir>/addons`` installed from git (the catalog or a repository), by name, with their records."""
+    return {name: record for name, record in install.installed(addon_dirs.installed_dir()).items()
+            if install.source_kind(record) != install.UPLOAD}
 
 
 def catalog_entry_payload(entry: catalog.Entry, present: Mapping[str, str],
@@ -678,7 +699,7 @@ async def catalog_api(request: web.Request) -> web.Response:
         logger.warning(str(e))
         return web.json_response({"error": "catalog_unavailable", "message": str(e)}, status=502)
     present = _present()
-    installed = install.installed(addon_dirs.installed_dir())
+    installed = _git_installed()
     return web.json_response({"origin": cat.origin, "dana_version": catalog.dana_version(),
                               "entries": [catalog_entry_payload(e, present, installed) for e in cat.entries],
                               "problems": cat.problems, "notice": cat.notice, "restart_needed": bool(pending_changes())})
@@ -688,10 +709,89 @@ def _install_refused(message: str, status: int = 400, error: str = "install_refu
     return web.json_response({"error": error, "message": message}, status=status)
 
 
+class _TooLarge(Exception):
+    """The uploaded archive is over :data:`install.MAX_ARCHIVE_BYTES`."""
+
+
+async def _read_upload(request: web.Request, into: Path) -> Optional[str]:
+    """Stream the multipart ``archive`` part into the file ``into``; returns the ``accept``
+    part's text (None without one).
+
+    Raises:
+        _TooLarge: the archive is over the cap.
+        ValueError: no ``archive`` part.
+    """
+    reader = await request.multipart()
+    accept: Optional[str] = None
+    got = False
+    while True:
+        part = await reader.next()
+        if part is None:
+            break
+        if not isinstance(part, BodyPartReader):
+            continue
+        if part.name == "archive":
+            size = 0
+            with into.open("wb") as fh:
+                while True:
+                    chunk = await part.read_chunk(256 * 1024)
+                    if not chunk:
+                        break
+                    size += len(chunk)
+                    if size > install.MAX_ARCHIVE_BYTES:
+                        raise _TooLarge()
+                    fh.write(chunk)
+            got = True
+        elif part.name == "accept":
+            accept = (await part.text())[:65536]
+    if not got:
+        raise ValueError("no archive part")
+    return accept
+
+
+def _confirm_touches(e: install.ConfirmTouches) -> web.Response:
+    return web.json_response({"error": "confirm_touches", "name": e.name, "touches": e.touches.to_json(),
+                              "added": e.added.to_json(), "message": str(e)}, status=409)
+
+
+async def _upload_install(request: web.Request, caller: User) -> web.Response:
+    """POST /api/addons/install as multipart: the ``archive`` of an addon folder (+ ``accept``)."""
+    with tempfile.TemporaryDirectory(prefix="dana-upload-api-") as tmp:
+        archive = Path(tmp) / "addon.tar.gz"
+        try:
+            raw_accept = await _read_upload(request, archive)
+        except _TooLarge:
+            return _install_refused(f"The archive is larger than {install.MAX_ARCHIVE_BYTES // (1024 * 1024)} MB.",
+                                    413, "too_large")
+        except (ValueError, AssertionError) as e:
+            return _install_refused(f"Send the addon folder as a multipart part named archive (.tar.gz): {e}")
+        try:
+            accept = Touches.from_json(json.loads(raw_accept)) if raw_accept else None
+        except ValueError as e:
+            return _install_refused(f"accept: {e}")
+        try:
+            done = await asyncio.to_thread(install.install_archive, archive, addon_dirs.installed_dir(),
+                                           by=caller.id, accept=accept)
+        except install.ConfirmTouches as e:
+            return _confirm_touches(e)
+        except install.InstallError as e:
+            logger.info(f"Upload install refused for user {caller.id}: {e}")
+            return _install_refused(str(e))
+    logger.warning(f"Addon {done.name} {'updated' if done.replaced else 'installed'} from an uploaded folder "
+                   f"by user {caller.id}; a restart loads it")
+    return web.json_response({"name": done.name, "kind": done.kind, "replaced": done.replaced,
+                              "touches": done.touches.to_json(), "restart_needed": True,
+                              "message": f"{'Updated' if done.replaced else 'Installed'} {done.name} from the "
+                                         f"uploaded folder. Restart the server to load it."}, status=201)
+
+
 @requires(MANAGE)
 async def install_api(request: web.Request) -> web.Response:
-    """POST /api/addons/install: a catalog entry by ``name``, or any ``{repo, ref, path}`` (admins only)."""
+    """POST /api/addons/install: a catalog entry by ``name``, any ``{repo, ref, path}``, or an
+    uploaded folder (multipart ``archive``); admins only."""
     caller = request_user(request)
+    if request.content_type == "multipart/form-data":
+        return await _upload_install(request, caller)
     try:
         body = await request.json()
     except Exception:
@@ -699,6 +799,7 @@ async def install_api(request: web.Request) -> web.Response:
     if not isinstance(body, dict):
         return _install_refused("The body must be a JSON object: {name} or {repo, ref, path}.")
     name = body.get("name") if isinstance(body.get("name"), str) else None
+    kind = install.GIT
     if body.get("repo") is not None or body.get("ref") is not None:
         source = install.Source(str(body.get("repo") or ""), str(body.get("path") or ""), str(body.get("ref") or ""))
     elif name:
@@ -712,7 +813,7 @@ async def install_api(request: web.Request) -> web.Response:
         if not catalog.compatible(entry):
             return _install_refused(f"{name} needs Dana {entry.min_dana} or later; this server is "
                                     f"{catalog.dana_version()}.", 409, "incompatible")
-        source = entry.source
+        source, kind = entry.source, install.CATALOG
     else:
         return _install_refused("Give the name of a catalog entry, or repo and ref (and path).")
     try:
@@ -721,20 +822,20 @@ async def install_api(request: web.Request) -> web.Response:
         return _install_refused(f"accept: {e}")
     try:
         done = await asyncio.to_thread(install.install, source, addon_dirs.installed_dir(), name=name,
-                                       by=caller.id, accept=accept)
+                                       by=caller.id, accept=accept, kind=kind)
     except install.ConfirmTouches as e:
-        return web.json_response({"error": "confirm_touches", "name": e.name, "touches": e.touches.to_json(),
-                                  "added": e.added.to_json(), "message": str(e)}, status=409)
+        return _confirm_touches(e)
     except install.InstallError as e:
         logger.info(f"Install refused for user {caller.id}: {e}")
         return _install_refused(str(e))
-    logger.warning(f"Addon {done.name} {'updated' if done.replaced else 'installed'} from {done.source.repo} "
-                   f"at {done.source.ref} by user {caller.id}; a restart loads it")
-    return web.json_response({"name": done.name, "repo": done.source.repo, "path": done.source.path,
-                              "commit": done.source.ref, "replaced": done.replaced,
+    src = done.source or source
+    logger.warning(f"Addon {done.name} {'updated' if done.replaced else 'installed'} from {src.repo} "
+                   f"at {src.ref} by user {caller.id}; a restart loads it")
+    return web.json_response({"name": done.name, "kind": done.kind, "repo": src.repo, "path": src.path,
+                              "commit": src.ref, "replaced": done.replaced,
                               "touches": done.touches.to_json(), "restart_needed": True,
                               "message": f"{'Updated' if done.replaced else 'Installed'} {done.name} at "
-                                         f"{done.source.ref[:12]}. Restart the server to load it."}, status=201)
+                                         f"{src.ref[:12]}. Restart the server to load it."}, status=201)
 
 
 @requires(MANAGE)
@@ -743,7 +844,7 @@ async def remove_addon_api(request: web.Request) -> web.Response:
     name = request.match_info["name"]
     if name not in install.installed(addon_dirs.installed_dir()):
         if (addon_dirs.OFFICIAL_DIR / name).is_dir() or name in loader.folders():
-            return _install_refused(f"{name} was not installed from the catalog; it cannot be removed here.",
+            return _install_refused(f"{name} is not an installed addon; it cannot be removed here.",
                                     400, "not_installed")
         return web.json_response({"error": "unknown_addon", "addon": name}, status=404)
     try:

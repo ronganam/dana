@@ -30,7 +30,7 @@ Dana is an agent over a hosted language model (the provider is set by env, throu
 
 ### Addons run with the server's full access
 
-Official addons, your site's addons and addons installed from the catalog all run inside the server process, with its full access: every user's data, the credentials key, the network. Each addon declares what it **needs** and what it **touches** (the hosts it contacts, whether it acts for you outside Dana, whether it keeps credentials, which other addons' data it reads); the Addons page shows that before you turn one on, installing shows it before Install, and an update that declares more asks again. That is a **disclosure, not a sandbox**: nothing stops an addon's code from doing more than it declares. Install only addons whose code you trust; an installed addon is pinned to the git commit you saw ([`docs/addons.md`](docs/addons.md)).
+Official addons and installed addons (from the catalog, a git repository or a folder) all run inside the server process, with its full access: every user's data, the credentials key, the network. Each addon declares what it **needs** and what it **touches** (the hosts it contacts, whether it acts for you outside Dana, whether it keeps credentials, which other addons' data it reads); the Addons page shows that before you turn one on, installing shows it before Install, and an update that declares more asks again. That is a **disclosure, not a sandbox**: nothing stops an addon's code from doing more than it declares. Install only addons whose code you trust; an installed addon is pinned to the git commit you saw ([`docs/addons.md`](docs/addons.md)).
 
 ### Text written by other people
 

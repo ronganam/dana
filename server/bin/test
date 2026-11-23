@@ -10,10 +10,9 @@
     bin/test -v                  print the whole output of failed scripts, not the tail
     bin/test -j 4                at most 4 at a time (default: one per CPU, fewer when memory is short)
 
-Scripts live in tests/ (core), addons/<name>/tests/ (each addon), addons/<name>/worker/test/
-(an addon's worker's .mjs) and the tests/ and worker/test/
-folders of each site addon (the folders DANA_ADDON_DIRS names, else the site's addons/:
-docs/site.md). Each runs from this
+Scripts live in tests/ (core), addons/<name>/tests/ (each official addon) and
+addons/<name>/worker/test/ (an addon's worker's .mjs); an installed addon's own tests run
+with `bin/dana addons test PATH`. Each runs from this
 folder with it and tests/ on PYTHONPATH (so `import testenv` and the app's modules
 resolve); a script is named by its path from here (addons/tasks/tests/test_tasks_users.py).
 
@@ -65,21 +64,9 @@ def python() -> str:
     return str(venv) if venv.exists() else sys.executable
 
 
-def site_addon_dirs() -> list[Path]:
-    """The site addon folders, as the server finds them (core/addon_dirs.py: ``DANA_ADDON_DIRS``,
-    else ``$DANA_SITE/addons``, else ``site/addons`` at the repository root)."""
-    raw = os.environ.get("DANA_ADDON_DIRS")
-    if raw is None:
-        site = os.environ.get("DANA_SITE", "").strip()
-        raw = str((Path(site).expanduser() if site else ROOT.parent / "site") / "addons")
-    return [Path(d).expanduser().resolve() for d in raw.split(os.pathsep) if d.strip()]
-
-
 def script_paths() -> list[Path]:
-    """Every test script: core's, each official addon's and its worker's, each site addon's and its worker's."""
+    """Every test script: core's, each official addon's and its worker's."""
     found = [*ROOT.glob("tests/test_*"), *ROOT.glob("addons/*/tests/test_*"), *ROOT.glob("addons/*/worker/test/test_*")]
-    for folder in site_addon_dirs():
-        found += [*folder.glob("*/tests/test_*"), *folder.glob("*/worker/test/test_*")] if folder.is_dir() else []
     return [p for p in found if p.suffix in (".py", ".mjs") and p.is_file() and p.name not in NEVER]
 
 

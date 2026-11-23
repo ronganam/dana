@@ -264,8 +264,10 @@ check("server actions: admins turn an official addon off for everyone (no remove
 check("server actions: none for a member, none for essentials, remove for an installed one",
       C.serverActions(offShopping, false).length === 0 && C.serverActions(admin.essentials, true).length === 0
       && plain(C.serverActions({ ...admin.tasks, source: "installed" }, true)).map((a) => a.act).includes("remove"));
-check("failed: no connect, no server off, nothing to remove (a site addon)", !/data-act="(save|disable|remove)"/.test(C.renderDetail(admin.broken, {}, true)));
-check("source badge: none for official, the source for the others", C.sourceLabel(admin.tasks) === "" && C.sourceLabel(admin.broken) === "Site");
+check("failed: no connect, no server off; an installed one can be removed",
+      !/data-act="(save|disable)"/.test(C.renderDetail(admin.broken, {}, true))
+      && /data-act="remove"/.test(C.renderDetail(admin.broken, {}, true)));
+check("source badge: none for official, the source for the others", C.sourceLabel(admin.tasks) === "" && C.sourceLabel(admin.broken) === "Installed");
 
 const cat = F.catalog_admin.body, weatherEntry = cat.entries[0];
 check("catalog: members are refused", F.catalog_member.status === 403);
@@ -275,7 +277,7 @@ check("catalog: installed at another commit → Update; at its commit → Instal
       && C.catalogState({ ...weatherEntry, installed: { commit: weatherEntry.source.ref, loaded: false } }).label.includes("restart")
       && C.catalogState({ ...weatherEntry, installed: { commit: weatherEntry.source.ref, loaded: true } }).action === null);
 check("catalog: official names, other sources and too-new entries are not installable",
-      C.catalogState({ ...weatherEntry, official: true }).action === null && C.catalogState({ ...weatherEntry, present: "site" }).action === null
+      C.catalogState({ ...weatherEntry, official: true }).action === null && C.catalogState({ ...weatherEntry, present: "upload" }).action === null
       && C.catalogState({ ...weatherEntry, compatible: false }).label.includes(weatherEntry.min_dana));
 const catHtml = C.renderCatalog({ catalog: cat, catalogUi: {} });
 check("catalog: the full-access warning, the entry with Install, the skipped entries, the git form",

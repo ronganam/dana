@@ -2,7 +2,7 @@
 
 Run: bin/test test_web_shell
 
-Every page of every loaded addon (the official ones, plus a site addon
+Every page of every loaded addon (the official ones, plus a installed addon
 ``wx`` with two pages written to a temp folder) has its panel and style in
 its addon's ``web/`` folder, the panel registers with ``Dana.panel`` and
 every file its ``scripts`` names exists; page ids are unique and never a core
@@ -23,7 +23,7 @@ from typing import Callable
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
 testenv.isolate("web_shell_test")
-SITE = Path(testenv.scratch_dir()) / "site_addons"
+SITE = Path(testenv.scratch_dir()) / "dev_addons"
 (SITE / "wx" / "web").mkdir(parents=True)
 (SITE / "wx" / "addon.py").write_text(textwrap.dedent('''\
     from core.addons import Addon, Nav, Page
@@ -78,7 +78,7 @@ for name in loader.loaded():
 check("the official pages are all there, Tasks and Calls among them",
       {"shopping", "inbox", "calls", "tasks", "people", "projects", "money", "memory", "calendar"} <= set(pages), sorted(pages))
 check("the phone addon has two pages, Inbox and Calls", [p.id for p in get_addon("phone").web] == ["inbox", "calls"])
-check("a site addon's pages are found like an official one's", pages.get("wx") == "wx" and pages.get("wx-more") == "wx")
+check("a installed addon's pages are found like an official one's", pages.get("wx") == "wx" and pages.get("wx-more") == "wx")
 
 # --- A manifest that breaks the page rules is refused ---------------------------------------------
 def refused(make: Callable[[], object]) -> str:

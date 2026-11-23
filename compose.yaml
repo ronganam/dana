@@ -5,7 +5,10 @@
 #   docker compose logs dana       # open the setup link it prints, on this machine
 #
 # Settings: an optional .env next to this file (server/docs/configuration.md); none are needed to start.
-# Upgrading: docker compose pull && docker compose up -d. Building from source instead: server/compose.yaml.
+# Upgrading: docker compose pull && docker compose up -d. To stay on one release, DANA_VERSION=<version>
+# in .env (server/bin/deploy sets it: server/docs/operations.md, "Deploying"). From source: server/compose.yaml.
+# Add-ons beyond the official ones are installed into the data volume (Settings → Addons, or
+# `docker compose exec dana dana addons install NAME`) and survive upgrades.
 #
 # Transcription without an OpenAI or Gemini key (Claude does not hear audio): a local Whisper server,
 #   docker compose --profile whisper up -d
@@ -23,7 +26,7 @@ name: dana
 
 services:
   dana:
-    image: ghcr.io/ronganam/dana:latest
+    image: ghcr.io/ronganam/dana:${DANA_VERSION:-latest}
     env_file:
       - path: .env
         required: false

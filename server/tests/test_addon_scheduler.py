@@ -2,7 +2,7 @@
 
 Run: bin/test test_addon_scheduler
 
-One site addon (``sch``, through DANA_ADDON_DIRS) declares an every= job, a
+One installed addon (``sch``, through DANA_ADDON_DIRS) declares an every= job, a
 daily= job and a job that hangs. ``scheduler._now`` / ``scheduler._sleep`` are
 replaced by a fake clock: sleeping moves it on, and a test ends a job's loop
 by raising from the fake sleep once it has seen enough.

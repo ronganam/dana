@@ -4,7 +4,7 @@
     python -m cli.kit.probe <addon folder>      (from server/)
 
 The environment is cleaned like a test's (server/tests/testenv.py: no ``.env``, no real
-keys, a temporary database removed at exit); the addon is loaded as a site addon under
+keys, a temporary database removed at exit); the addon is loaded from a development folder (``DANA_ADDON_DIRS``) under
 the name its ``addon.py`` declares, next to the official ones, then the migrations run
 on the temporary database. Prints :data:`MARK` and ``{"name", "loaded", "error",
 "migration_error", "manifest", "tools", "hooks", "migrations"}``.

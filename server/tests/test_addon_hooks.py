@@ -2,7 +2,7 @@
 
 Run: bin/test test_addon_hooks
 
-Two site addons (through DANA_ADDON_DIRS): ``hk`` declares every keyed hook,
+Two installed addons (a DANA_ADDON_DIRS folder): ``hk`` declares every keyed hook,
 a briefing and a review section, and two confirm tools with describe=; ``hkx``
 needs ``hk`` and has a Now card hook, a channel and an event handler. Robin
 has both, Gal has only ``hkx`` (its need is missing), Maya has neither.

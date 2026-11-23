@@ -1,4 +1,4 @@
-# Operations: deploy, production, debugging
+# Operations: releasing, deploying, production, debugging
 
 ## Running it
 
@@ -10,7 +10,7 @@
   docker compose logs dana    # open the setup link it prints
   ```
 
-  The setup link creates the first admin in the browser and opens the first-run wizard (you, Home, the model and its key, your phone, add-ons, sample data); settings go in an optional `.env` next to `compose.yaml` (`docs/configuration.md`). Headless (no browser at hand): put `API_TOKEN` in that `.env` before the first start. Upgrade: `docker compose pull && docker compose up -d`. The administration CLI is `dana` on the image's PATH: `docker compose exec dana dana users list`, `docker compose exec dana dana addons install <name>` (into `<data dir>/addons`, in the volume, kept across upgrades; then `docker compose restart dana`). The image ships no add-on catalog: it reads the `dana-catalog` repository's `catalog.json` (`DANA_CATALOG_URL`; offline, set `DANA_CATALOG_FILE`). Phones, tablets and TVs find the server on the home network when something advertises `_dana._tcp` (`docs/devices.md`, "Finding the server on the home network": an Avahi example). The data lives in the `data` volume; the port is `127.0.0.1:8080` (reverse proxy or VPN to reach it from elsewhere, below).
+  The setup link creates the first admin in the browser and opens the first-run wizard (you, Home, the model and its key, your phone, add-ons, sample data); settings go in an optional `.env` next to `compose.yaml` (`docs/configuration.md`). Headless (no browser at hand): put `API_TOKEN` in that `.env` before the first start. Upgrade: `docker compose pull && docker compose up -d`. The administration CLI is `dana` on the image's PATH: `docker compose exec dana dana users list`, `docker compose exec dana dana addons install <name>` (into `<data dir>/addons`, in the volume, kept across upgrades; then `docker compose restart dana`), or from your own machine `bin/dana addons install <name | repo@commit | ./folder> --server <url> --restart` (`../../docs/addons.md`, "Installing an addon"). Pin a release with `DANA_VERSION=<version>` in the `.env` (the image tag; `bin/deploy` sets it: "Deploying"). The image ships no add-on catalog: it reads the `dana-catalog` repository's `catalog.json` (`DANA_CATALOG_URL`; offline, set `DANA_CATALOG_FILE`). Phones, tablets and TVs find the server on the home network when something advertises `_dana._tcp` (`docs/devices.md`, "Finding the server on the home network": an Avahi example). The data lives in the `data` volume; the port is `127.0.0.1:8080` (reverse proxy or VPN to reach it from elsewhere, below).
 - **Locally**: `python main.py` (README). The web UI and API on `:8080`, Telegram if `TELEGRAM_BOT_TOKEN` is set. It needs only an LLM key: a fresh database starts in setup mode and logs the setup link (`docs/devices.md`); `API_TOKEN` instead creates the first admin from env (headless), and `DANA_INSECURE_DEV=1` turns authentication off (`127.0.0.1` only).
 - **Docker Compose from source** (contributors): `docker compose up -d` in `server/` builds the image and keeps the data in the `data` volume (`compose.yaml`; an addon's worker runs under its profile, e.g. `docker compose --profile money_il up -d`: "Workers" below). The port is published on `127.0.0.1:8080` only: to reach Dana from other machines, put a reverse proxy with HTTPS in front of it (Caddy, Traefik, nginx) or change the mapping knowingly. The healthcheck polls `/api/health`.
 - **Data to back up**: the database directory (`DATABASE_PATH`'s folder: the database, `recordings/`, `media/`, `uploads/`…) including `credentials.key` when `CREDENTIALS_KEY` is not set (the generated key: without it the stored addon credentials are lost). Settings → Backups makes one archive of all of it on a schedule ("Backups" below).
@@ -29,45 +29,46 @@
   (`uv pip compile --upgrade` takes the newest versions; without it, versions already pinned stay.) Commit both files together; the pre-push hook then also runs the image's `test` stage.
 - No new runtime dependency without a reason in the commit; check its license against `../THIRD_PARTY.md` (e.g. `mutagen` is GPL-2.0-or-later).
 
-## Deploy
+## Releasing
 
-`git push origin master` tests and, when configured, deploys, all from your machine. The repository's `.githooks/pre-push` hook (once per clone: `git config core.hooksPath .githooks`), on a clean checkout of the pushed commit:
+Every deployment runs a published image, the maintainer's production included: `ghcr.io/ronganam/dana:<version>` (amd64 and arm64), built by `.github/workflows/release.yml` from a pushed tag. Nothing builds an image on your machine.
 
-1. runs `bin/test` when the push changes more than docs under `server/`, plus the Dockerfile's `test` stage (the suite on the exact image, Python 3.14) when it changes `server/Dockerfile` or `server/requirements.txt` / `requirements.lock`;
-2. when it changes what the images contain (`core/`, `addons/` with the addon workers, `static/`, `cli/`, `main.py`, `requirements.txt` / `requirements.lock`, `Dockerfile`, `VERSION`, `bin/dana`) and your site has a `deploy.env` (`site/deploy.env` at the repository root, or `$DANA_SITE/deploy.env`; `../docs/site.md`), runs `bin/deploy`.
+1. Merge to `master`. Pushing master runs the tests first: the repository's `.githooks/pre-push` hook (once per clone: `git config core.hooksPath .githooks`), on a clean checkout of the pushed commit, runs `bin/test` when the push changes more than docs under `server/` or `examples/`, plus the Dockerfile's `test` stage (the suite on the exact image, Python 3.14) when it changes `server/Dockerfile` or `server/requirements.txt` / `requirements.lock`. A failure stops the push; `git push --no-verify` skips it. Android changes are not tested by the hook. It deploys nothing.
+2. Bump the version: `server/VERSION` and the apps' `versionName` / `versionCode` (`android/app/build.gradle.kts`, `android/wear/build.gradle.kts`; `../../android/docs/release.md`), in one commit.
+3. Tag and push: `git tag v<version> && git push origin v<version>`. The release workflow checks the tag equals `server/VERSION` and the apps' `versionName`, publishes the server image as `:<version>` and `:latest`, and makes the GitHub Release with the signed APKs.
 
-A failure stops the push. `DANA_NO_DEPLOY=1 git push …` pushes without deploying; `git push --no-verify` skips tests and deploy. Android changes are not tested by the hook.
+`/api/health` reports the running image's `VERSION`, and the web release digest (`pages_api.web_release()`, the dashboard's and the service worker's `?v=`) follows it, so every release reaches cached clients.
 
-- **`bin/deploy [<commit>] [--wait]`** reads the site's `deploy.env` (`DANA_DEPLOY_CONFIG` names another file; the template is `site.example/deploy.env.example`): builds the `app` stage of that commit (default HEAD) from a clean checkout, with the site's addons as the `site_addons` build context (`site/addons/`, or the folders in `DANA_IMAGE_ADDONS`; the image's `/app/addons-site`; `docs/writing-an-addon.md`), as `$DANA_IMAGE:<release>` and `latest`, plus one image per addon worker (below), and pushes them. The release is `<VERSION>-<commit>`, plus `-a<hash>` of the site addons' files when there are any, so changing only a site addon and running `bin/deploy` again is a new release that rolls out. With `DANA_GITOPS_REPO` it writes the release into `DANA_GITOPS_VALUES` (every `tag:` line and every worker's `image:`) in that repository (from its own clone in `~/.cache/dana-deploy/gitops`) and pushes, for ArgoCD / Flux to roll the pod. It runs no tests. Use it to redeploy or roll back (`bin/deploy <older commit>`).
-- The release name is written into the image's `VERSION` file: `/api/health` reports it and the web release digest (`pages_api.web_release()`, the dashboard's and the service worker's `?v=`) follows it, so every deploy reaches cached clients. **No VERSION bump is needed to ship**; bump it to name a release.
-- `bin/deploy --wait` waits until a pod in `DANA_K8S_NAMESPACE` matching `DANA_K8S_SELECTOR` runs the release and is ready.
+## Deploying
+
+**`bin/deploy [<version>] [--wait]`** (default: `server/VERSION`) rolls out a published release. It reads the site's `deploy.env` (`site/deploy.env` at the repository root, or `$DANA_SITE/deploy.env`; `DANA_DEPLOY_CONFIG` names another file; the template is `site.example/deploy.env.example`; `../../docs/site.md`) and builds nothing:
+
+1. waits until `$DANA_IMAGE:<version>` exists (`docker manifest inspect`; `DANA_IMAGE` defaults to `ghcr.io/ronganam/dana`), saying so while the release workflow is still building it, up to `DANA_IMAGE_WAIT` seconds (default 1800);
+2. with `DANA_EXEC` (how to run `dana` where the server runs: `kubectl -n dana exec deploy/dana -c dana --`, or `docker compose exec -T dana`), asks `dana addons workers --json` for the installed addons' workers ("Workers" below);
+3. rolls it out: with `DANA_GITOPS_REPO`, writes `<version>` into every `tag:` line of `DANA_GITOPS_VALUES` and each worker's pinned image into its `image:` line, in that repository (from its own clone in `~/.cache/dana-deploy/gitops`), and pushes, for ArgoCD / Flux to roll the pod; `--wait` then waits until a pod in `DANA_K8S_NAMESPACE` matching `DANA_K8S_SELECTOR` runs that image and is ready. With `DANA_COMPOSE_DIR` (the folder of the repository root's `compose.yaml`), writes `DANA_VERSION=<version>` and each worker's `<ADDON>_WORKER_TAG` into its `.env`, then `docker compose pull` and `up -d`. With neither, it says the image is ready.
+
+Roll back with `bin/deploy <older version>` (within one schema: "Database schema" below). The whole release, in order: bump, tag, push the tag, then `bin/deploy <version> --wait`.
 
 ### Workers
 
-An addon that declares `worker=Worker(port, url_env, image)` (`core/addons/hooks.py`) has a sidecar. Its image is either **published** by the addon's own repository (`image="ghcr.io/…"`: a catalog addon, e.g. `money_il`'s bank worker, `ghcr.io/ronganam/dana-addon-money-il-worker`, Node + Chromium, built and pushed by that repository's workflow on every push to `main`, tagged with the commit and `latest`) or **built** here from the addon's `worker/` folder (`worker/Dockerfile`, self-contained: the app image leaves `addons/*/worker` out; a site addon's).
+An addon that declares `worker=Worker(port, url_env, image)` (`core/addons/hooks.py`) has a sidecar. Its image is **published** by the addon's own repository (`image="ghcr.io/…"`, built from its `worker/` folder: e.g. `money_il`'s bank worker, `ghcr.io/ronganam/dana-addon-money-il-worker`, Node + Chromium, built and pushed by that repository's workflow on every push to `main`, tagged with the commit and `latest`). No official addon has a worker; the app image leaves `addons/*/worker` out.
 
-- **`bin/deploy`**, for the commit's official addons and the site's addons (DANA_WORKERS in `deploy.env`: `all` (default), `none`, or addon names, space or comma separated):
-  - a published image is **pinned**, never built: to the tag or digest the manifest names when it names one, else to the commit the addon was installed at (`site/addons/<name>/.installed.json`, written by `bin/dana addons install`; `core/addon_dirs.py` `worker_image`). An addon whose image has no tag and that records no commit stops the deploy.
-  - a `worker/Dockerfile` is built as `$DANA_IMAGE-<addon>:<release>` (the same release as the app) and pushed.
-  - An addon installed at runtime into the data directory (the Addons page, `/api/addons/install`) is not in the image, so `bin/deploy` does not see it: set its worker image in the GitOps values by hand (its repository's commit tag), and again when you update the addon.
-- **GitOps values**: besides every `tag:` line, `bin/deploy` rewrites any `image: "<DANA_IMAGE>-<addon>:<old tag>"` to the new release and any `image: "<published image>:<old tag>"` (or `@<digest>`) to the pinned one, so name each worker's image in full under one key per addon; the convention is `workers.<addon>.image`:
+- **`bin/dana addons workers --json`**, run where the data lives, lists `[{name, image, tag}]` for every installed addon (`<data dir>/addons`) whose worker names an image, **pinned**: to the tag or digest (`tag` `@sha256:…`) the manifest names when it names one, else to the commit the addon was installed at (its `.installed.json`; `core/addon_dirs.py` `worker_image`). An addon installed from a folder records no commit, so its image needs a tag; one without either fails the command (and the deploy). A worker that names no image is not deployed by `bin/deploy` (run it yourself: `bin/dana addons dev` builds it locally).
+- **GitOps values**: `bin/deploy` rewrites any `image: "<published image>:<old tag>"` (or `@<digest>`) to the pinned one, so name each worker's image in full under one key per addon; the convention is `workers.<addon>.image`:
 
   ```yaml
   image:
-    repository: registry.example/dana
-    tag: "9.0.0-abc1234"
+    repository: ghcr.io/ronganam/dana
+    tag: "10.4.0"
   workers:
     money_il:
-      image: "ghcr.io/ronganam/dana-addon-money-il-worker:<commit>"   # published: pinned, not built
+      image: "ghcr.io/ronganam/dana-addon-money-il-worker:<commit>"   # pinned by bin/deploy
       port: 8090
-    my_addon:
-      image: "registry.example/dana-my_addon:9.0.0-abc1234"   # built by bin/deploy from worker/
-      port: 8091
   ```
 
   The chart (yours) runs it in the pod next to the app, sharing its network namespace and data volume, and the app reaches it at the addon's `url_env` (`MONEY_WORKER_URL`, default `http://127.0.0.1:8090`).
-- **Compose** (`compose.yaml`): each worker is a service under a profile named after its addon: `docker compose --profile money_il up -d` adds `money-il-worker`, run from its published image (`MONEY_IL_WORKER_TAG`, default `latest`; set it to the commit you installed). A built worker's service has a `build:` of its `worker/` folder.
-- Tests: a worker's own (`addons/<name>/worker/test/test_*.mjs`) run in `bin/test` with the rest; a catalog addon's run in its own repository.
+- **Compose** (`compose.yaml`): each worker is a service under a profile named after its addon: `docker compose --profile money_il up -d` adds `money-il-worker`, run from its published image (`MONEY_IL_WORKER_TAG`, default `latest`; `bin/deploy` sets it to the pinned tag).
+- Tests: a worker's own (`addons/<name>/worker/test/test_*.mjs`) run in `bin/test` with the rest; an installed addon's run in its own repository.
 
 ### Restarting
 
@@ -204,7 +205,7 @@ The web server listens on port 8080. Every path but the public ones (`docs/acces
 | `DELETE /api/addons/{kind}` | Disconnect |
 | `POST /api/addons/{kind}/test` | Does the service answer with these credentials: `{kind, checked, ok, reason}` (Home Assistant, WhatsApp, Calendar, cameras) |
 | `GET /api/addons/{kind}/options` | Candidates for the settings, read from the service (Home Assistant: people, car sensors and devices, phone sensors, weather) |
-| `GET /api/addons/catalog` · `POST /api/addons/install` · `POST /api/addons/{name}/remove` | `manage_server` only: the catalog / install a catalog entry (`{name}`) or a repository (`{repo, ref, path?}`), with `accept` (the touches the admin agreed to) → 201 `{name, commit, touches, restart_needed}`; 409 `confirm_touches {touches, added}` when it may touch more than the replaced version plus `accept` (nothing written; send it again with `accept` once agreed) / remove it (`../docs/addons.md`) |
+| `GET /api/addons/catalog` · `POST /api/addons/install` · `POST /api/addons/{name}/remove` | `manage_server` only: the catalog / install a catalog entry (`{name}`), a repository (`{repo, ref, path?}`) or an uploaded folder (`multipart/form-data`: `archive`, a `.tar.gz` of the addon folder, at most 20 MB, 2000 files, 50 MB unpacked; 413 `too_large`), with `accept` (the touches the admin agreed to; a JSON part for an upload) → 201 `{name, kind, commit?, touches, restart_needed}`; 409 `confirm_touches {touches, added}` when it may touch more than the replaced version plus `accept` (nothing written; send it again with `accept` once agreed) / remove it (`../../docs/addons.md`, "Installing an addon") |
 | `GET` / `PUT /api/sharing/{item_type}/{id}` | Who an item the caller owns is shared with / share it (`{user_id, level: read\|edit\|none}`); owner only (`docs/access.md` → Sharing) |
 | `GET /api/usage` · `GET /api/usage/events` | Usage and cost: totals, per day, breakdowns, individual calls (`docs/usage.md`) |
 | `GET /api/debug/sessions` | The caller's sessions with history length & pending status |

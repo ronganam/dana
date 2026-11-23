@@ -6,16 +6,14 @@ nothing of the app, so the database runner (core/db) and the loader
 Sources, in this order:
 
 - ``official``: ``server/addons/`` (ships with Dana);
-- ``site``: the deployment's site folder's ``addons/`` (``$DANA_SITE/addons``,
-  else ``site/addons`` at the repository root; docs/site.md);
-- ``image``: ``/app/addons-site`` in the container image (the site addons
-  ``bin/deploy`` builds in);
-- ``installed``: ``<data dir>/addons`` (addons installed from the catalog).
+- ``installed``: ``<data dir>/addons`` (every other addon: installed from the
+  catalog, a git repository or a folder; core/addons/install.py).
 
-``DANA_ADDON_DIRS`` (folders separated by ``os.pathsep``) replaces every source
-but the official one (``""``: official addons only, what the tests use).
-Folders that do not exist are skipped. An addon folder is a sub-folder with an
-``addon.py``.
+``DANA_ADDON_DIRS`` (folders separated by ``os.pathsep``), a development and
+test knob, replaces the installed source (``""``: official addons only, what
+the tests use; the add-on kit's harness points it at the addon under test).
+Its folders count as installed. Folders that do not exist are skipped. An
+addon folder is a sub-folder with an ``addon.py``.
 """
 
 import ast
@@ -29,13 +27,10 @@ from core.paths import ADDONS_DIR
 
 SERVER = Path(__file__).resolve().parent.parent
 OFFICIAL_DIR = SERVER / "addons"
-IMAGE_DIR = Path("/app/addons-site")
 
 OFFICIAL = "official"
-SITE = "site"
-IMAGE = "image"
 INSTALLED = "installed"
-# A folder named in DANA_ADDON_DIRS.
+# A folder named in DANA_ADDON_DIRS (tests, development).
 EXTRA = "extra"
 # The file an installed addon's folder keeps its origin in (core/addons/install.py).
 INSTALLED_FILE = ".installed.json"
@@ -53,9 +48,9 @@ class Source:
 
     @property
     def label(self) -> str:
-        """The source as people see it: official, site, image or installed (a
-        ``DANA_ADDON_DIRS`` folder counts as site: it replaces the site's)."""
-        return SITE if self.kind == EXTRA else self.kind
+        """The source as people see it: official or installed (a ``DANA_ADDON_DIRS``
+        folder counts as installed: it replaces the data dir's)."""
+        return INSTALLED if self.kind == EXTRA else self.kind
 
 
 # Touches(...)'s fields in order (core/addons/hooks.py), for a manifest read without running it.
@@ -173,12 +168,6 @@ def installed_dir() -> Path:
     return ADDONS_DIR
 
 
-def site_dir() -> Path:
-    """The deployment's site folder: ``DANA_SITE``, else ``site/`` at the repository root."""
-    raw = os.environ.get("DANA_SITE", "").strip()
-    return Path(raw).expanduser().resolve() if raw else SERVER.parent / "site"
-
-
 def sources() -> Tuple[Source, ...]:
     """The source folders that exist, official first."""
     raw = os.environ.get("DANA_ADDON_DIRS")
@@ -187,7 +176,7 @@ def sources() -> Tuple[Source, ...]:
         others = [Source(INSTALLED if p == ADDONS_DIR.resolve() else EXTRA, p)
                   for p in (Path(d).expanduser().resolve() for d in raw.split(os.pathsep) if d.strip())]
     else:
-        others = [Source(SITE, site_dir() / "addons"), Source(IMAGE, IMAGE_DIR), Source(INSTALLED, ADDONS_DIR)]
+        others = [Source(INSTALLED, ADDONS_DIR)]
     found: List[Source] = [Source(OFFICIAL, OFFICIAL_DIR)]
     for src in others:
         if src.path.is_dir() and all(s.path != src.path for s in found):

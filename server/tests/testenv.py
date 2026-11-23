@@ -49,7 +49,8 @@ ADDON_ENV = (
     "WAHA_URL", "WAHA_API_KEY", "WAHA_TOKEN", "WAHA_SESSION", "WHATSAPP_VOICE_TELEGRAM_CHAT_ID",
     "GOOGLE_REFRESH_TOKEN", "GOOGLE_CALENDAR_ID", "FRIGATE_URL",
 )
-IDENTITY_ENV = ("DANA_ADDON_DIRS", "DANA_SITE", "DANA_CATALOG_URL", "DANA_CATALOG_FILE", "CREDENTIALS_KEY", "API_TOKEN",
+IDENTITY_ENV = ("DANA_ADDON_DIRS", "DANA_URL", "DANA_TOKEN", "DANA_CATALOG_URL", "DANA_CATALOG_FILE",
+                "CREDENTIALS_KEY", "API_TOKEN",
                 "DANA_INSECURE_DEV", "WAHA_WEBHOOK_SECRET", "ALLOWED_TELEGRAM_USER_IDS", "TELEGRAM_CHAT_ID",
                 "OWNER_NAME", "OWNER_CONTEXT", "OWNER_PRONOUN", "OWNER_OTHER_NAMES", "OWNER_LANGUAGES",
                 "OWNER_CURRENCY", "DEFAULT_LANGUAGES", "CURRENCY", "DEFAULT_COUNTRY_CODE")
@@ -101,7 +102,7 @@ def isolate(name: str) -> str:
     for env in ADDON_ENV + IDENTITY_ENV + GIT_LOCATION_ENV:
         os.environ.pop(env, None)
     os.environ.update(OWNER_ENV)
-    os.environ["DANA_ADDON_DIRS"] = ""  # never your site's addons (a test that wants one sets it)
+    os.environ["DANA_ADDON_DIRS"] = ""  # never your installed addons (a test that wants one sets it)
     os.environ["APP_RELEASES_REPO"] = ""  # no app updates read from GitHub (test_app_updates fakes it)
     os.environ["OPEN_METEO_URL"] = "http://127.0.0.1:9/v1/forecast"  # no weather from Open-Meteo (test_signals fakes it)
     path = scratch_path(f"{name}.sqlite3")

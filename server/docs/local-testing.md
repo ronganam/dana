@@ -1,7 +1,7 @@
 # Local test environment
 
 A self-contained copy of the production setup on your machine: the real image
-built from the `Dockerfile` (as `bin/deploy` builds it), started from a Dana 9.0
+built from the `Dockerfile` (as the release workflow builds it), started from a Dana 9.0
 database (`tests/fixtures/db_9_0.sql`, its first admin named as the env file says)
 with an env file shaped like production's, so the first start is the real
 upgrade (snapshot, conversion to per-addon migrations, core's later
@@ -27,9 +27,10 @@ over the image's copy, `tests/local_env/compose.source.yaml`). `up` then builds 
 image only when it is missing, `restart` (about 8 s) picks up a Python change, and a
 static file change is live on the next browser reload. Rebuild with
 `bin/local-env.sh build` after changing `requirements.lock` or the `Dockerfile`.
-Without it, the environment runs exactly what `bin/deploy` would build.
-`DANA_LOCAL_ADDONS=NAME=PATH[:NAME=PATH…]` also mounts addon folders read-only as
-site addons (`/app/addons-site/NAME`, `.state/compose.addons.yaml`); `bin/dana addons
+Without it, the environment runs exactly what a release would publish.
+`DANA_LOCAL_ADDONS=NAME=PATH[:NAME=PATH…]` also mounts addon folders read-only in a
+development addons folder (`/app/addons-dev/NAME`, loaded beside the data dir's `addons/`
+through `DANA_ADDON_DIRS`; `.state/compose.addons.yaml`); `bin/dana addons
 dev PATH` sets both and prints what the addon produced (`writing-an-addon.md`, "The add-on kit").
 
 ```bash
@@ -67,7 +68,7 @@ DANA_LOCAL_PORT=18087 bin/local-env.sh down
 
 | Container | What |
 |---|---|
-| `app` | the image `dana-local/app:latest` (another environment's own, above; the repo's `Dockerfile`, built from the files git tracks or would add, like `bin/deploy`'s clean checkout), `python main.py`, data volume at `/app/db`, env from `tests/local_env/.state/app.env` |
+| `app` | the image `dana-local/app:latest` (another environment's own, above; the repo's `Dockerfile`, built from the files git tracks or would add, like a clean checkout), `python main.py`, data volume at `/app/db`, env from `tests/local_env/.state/app.env` |
 | `stubs` | `tests/local_env/stubs.py` (same image, the directory mounted read-only): every outside service, each on its own port, plus a control API |
 | `gateway` | `tests/local_env/gateway.py`: forwards `127.0.0.1:18080` to the app and `127.0.0.1:18090` to the stubs' control API (the environment's own ports) |
 

@@ -423,7 +423,7 @@ def test_addon_migrations_later():
                     raise RuntimeError("disk on fire")
             """})
         result = db.migrate(path)
-        check("failed migration of a site addon: recorded in .failed with the error, the start goes on",
+        check("failed migration of a installed addon: recorded in .failed with the error, the start goes on",
               result == [] and "disk on fire" in result.failed.get("notes_x", ""), f"{result} {result.failed}")
         check("failed migration: its changes are rolled back, not recorded",
               "notes_x_tags" not in tables(path) and ("notes_x", 3) not in db.applied_migrations(path))
@@ -481,7 +481,7 @@ def test_isolation_and_order():
         write_addon(root, "skipped", migration("base", "CREATE TABLE skipped_items (id INTEGER)"))
         result = db.migrate(path, skip={"skipped"})
         check("needs order: zzz (needed) before aaa", result == ["zzz:0001_base", "aaa:0001_base"], str(result))
-        check("isolation: a failing site addon rolls back all its migrations of this start, alone",
+        check("isolation: a failing installed addon rolls back all its migrations of this start, alone",
               "bad_items" not in tables(path) and "bad_more" not in tables(path)
               and not [a for a, _ in db.applied_migrations(path) if a == "bad"])
         check("isolation: its error is recorded", "broken on purpose" in result.failed.get("bad", ""), result.failed)

@@ -1,7 +1,7 @@
 {
  "catalog_admin": {
   "body": {
-   "dana_version": "10.1.0",
+   "dana_version": "10.3.0",
    "entries": [
     {
      "author": "Someone",
@@ -1714,7 +1714,7 @@
      "requires": null,
      "settings": [],
      "setup": [],
-     "source": "site",
+     "source": "installed",
      "state": "failed",
      "title": "Broken",
      "touches": null,
@@ -2969,7 +2969,7 @@
      "requires": null,
      "settings": [],
      "setup": [],
-     "source": "site",
+     "source": "installed",
      "state": "failed",
      "title": "Broken",
      "touches": null,
@@ -4229,7 +4229,7 @@
      "requires": null,
      "settings": [],
      "setup": [],
-     "source": "site",
+     "source": "installed",
      "state": "failed",
      "title": "Broken",
      "touches": null,
@@ -5475,7 +5475,7 @@
      "requires": null,
      "settings": [],
      "setup": [],
-     "source": "site",
+     "source": "installed",
      "state": "failed",
      "title": "Broken",
      "touches": null,
@@ -6725,7 +6725,7 @@
      "requires": null,
      "settings": [],
      "setup": [],
-     "source": "site",
+     "source": "installed",
      "state": "failed",
      "title": "Broken",
      "touches": null,
@@ -7963,7 +7963,7 @@
      "requires": null,
      "settings": [],
      "setup": [],
-     "source": "site",
+     "source": "installed",
      "state": "failed",
      "title": "Broken",
      "touches": null,

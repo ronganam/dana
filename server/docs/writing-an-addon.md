@@ -4,9 +4,9 @@ An addon is a folder with an `addon.py`; everything it adds to Dana is declared 
 
 ## Make one in five steps
 
-Commands run from `server/`. The addon goes in your site (`site/addons/`, or `$DANA_SITE/addons`; `../../docs/site.md`).
+Run the commands from the folder you keep your addons in; `bin/dana` is a Dana checkout's `server/bin/dana`. An addon lives in its own folder (its own git repository) and is installed on your Dana like any other: there is no other way in (`../../docs/addons.md`, "Where addons come from").
 
-**1. New.** `bin/dana addons new tides` writes `site/addons/tides/`:
+**1. New.** `bin/dana addons new tides` writes `./tides/`:
 
 ```
 tides/                its own git repository (one commit)
@@ -39,9 +39,9 @@ def tides_next(conn: Connection, place: str) -> str:
 
 The model sees the name, the docstring and the typed parameters; `conn` (the user's connection) is left out. Say when to use it in the manifest's `prompt_parts` (`PromptPart("guides", "For tide times, use tides_next.")`).
 
-**3. Test.** Change `tests/test_tides.py` to call your tool, then `bin/dana addons check site/addons/tides` and `bin/dana addons test site/addons/tides` (or `bin/test tides`). The scaffold's test already has the users every addon test needs: Robin and Gal have the addon (each with their own setting), Maya does not, and it checks that she is refused.
+**3. Test.** Change `tests/test_tides.py` to call your tool, then `bin/dana addons check ./tides` and `bin/dana addons test ./tides`; `bin/dana addons dev ./tides` runs it in the local test environment, reloaded on save. The scaffold's test already has the users every addon test needs: Robin and Gal have the addon (each with their own setting), Maya does not, and it checks that she is refused.
 
-**4. Turn it on.** Restart Dana (addons load at start). Turn it on in Settings → Addons, or `bin/dana addons connect <user> tides`. Ask Dana about the tides.
+**4. Install it on your Dana.** `DANA_TOKEN=<an admin's token> bin/dana addons install ./tides --server https://your-dana --restart` packs the folder (leaving out `.git/`, caches and what `.gitignore` names), uploads it, shows what it may touch and asks, then restarts the server so it loads (addons load at start). Turn it on in Settings → Addons, or `bin/dana addons connect <user> tides`. Ask Dana about the tides. Installing it again replaces the earlier upload. Once it lives in a git repository you can install a commit of it instead (`bin/dana addons install <repo>@<commit> --server …`; a private repository needs credentials the server's git can use), and `bin/dana addons publish` puts it in the catalog for everyone.
 
 **5. Page.** A page in the web app is a script in the addon's `web/` folder and a line in the manifest:
 
@@ -62,7 +62,7 @@ web=(Page("tides", panel="tides.js", style="tides.css", nav=Nav("Tides", icon="w
 })();
 ```
 
-and the route it reads in `api.py` ("Routes"). `bin/dana addons new tides --web` writes all three. Restart, and the page has a button in the navigation of every user who has the addon: among the places by its `order`, in the main bar when the user pins it (`Nav(..., primary=True)` puts it there by default, for a page most users open daily; `web-design.md`, "Navigation").
+and the route it reads in `api.py` ("Routes"). `bin/dana addons new tides --web` writes all three. Install it again (step 4), and the page has a button in the navigation of every user who has the addon: among the places by its `order`, in the main bar when the user pins it (`Nav(..., primary=True)` puts it there by default, for a page most users open daily; `web-design.md`, "Navigation").
 
 From here: [`examples/addons/hello/`](../../examples/addons/hello/) is the same shape grown by a table, a job, an event handler and a Now card; `addons/tasks/` uses most hooks. [`examples/addons/showcase/`](../../examples/addons/showcase/) uses every capability once; the [reference](addon-reference.md) quotes it. To share an addon, `bin/dana addons publish` ("The add-on kit").
 
@@ -72,11 +72,12 @@ Commands for building an addon outside Dana's tree (`server/cli/kit/`; each take
 
 | Command | What it does |
 |---|---|
-| `bin/dana addons new NAME [--dir PATH]` | writes the addon from `server/cli/template/` into its own git repository |
+| `bin/dana addons new NAME [--dir PATH]` | writes the addon from `server/cli/template/` into `./NAME` (or `PATH/NAME`), its own git repository |
 | `bin/dana addons check PATH [--json]` | the manifest against its JSON schema, imports (loaded in a clean process), migration names and order, a documented `Args:` line for every tool parameter, and what the code does against what it declares: hosts it calls (static scan of string literals in calls) against `touches.hosts`, environment values it reads against `needs` (`Need("env", …)`, a worker's `url_env`), imports of other addons against `needs` (`Need("addon", …)`). Each problem names the file and line and says the fix; exit 1 on an error |
 | `bin/dana addons test PATH [-v]` | runs the addon's `tests/test_*.py` and `test_*.mjs`, each in a clean process with `DANA_HOME` set to this checkout, Dana's `.env` values removed |
 | `bin/dana addons dev PATH [--once]` | checks it, starts the local test environment on your working tree with the addon mounted (`DANA_LOCAL_ADDONS`, `local-testing.md`), connects it for the first user and prints its log lines, tools, Now cards and day items; then watches the folder and, on a save, restarts the app and prints them again |
 | `bin/dana addons publish PATH [--catalog-repo OWNER/dana-catalog] [--dry-run]` | runs check and test, pushes the addon to `OWNER/dana-addon-NAME` with `gh` (created if missing), tags `v<version>` with a release, and opens a pull request to the catalog repository adding or replacing its entry pinned to that full commit; `--dry-run` prints every `git` / `gh` command and the entry instead |
+| `bin/dana addons install PATH --server URL [--restart] [--yes]` | packs the folder and installs it on the Dana at URL (an admin's token in `DANA_TOKEN`, else asked); `../../docs/addons.md`, "Installing an addon" |
 | `bin/dana addons reference [--check]` | writes [`addon-reference.md`](addon-reference.md) from the code (manifest fields, hooks with signatures and examples from the showcase, the manifest JSON schema); `test_addon_kit.py` fails when it is out of date |
 
 The scaffold's tests run without Dana's tree inside the addon: `tests/dana_harness.py` finds a Dana checkout from `DANA_HOME`, an importable Dana (when run by `bin/dana addons test` or `bin/test`), or a `dana` folder next to the addon, and says how to set `DANA_HOME` when none is found. `tests/fakes.py` has `three_users` (Robin and Gal with the addon, Maya without), `FakeLLM` (answers model calls, records each call's `purpose`) and `FakeHTTP` (a local server for the hosts the addon calls; point the addon's env override at its `url`).
@@ -93,14 +94,14 @@ tides/
   demo.py           @addon.demo: sample data for the demo household (docs/household.md)   imported when present
   api.py            setup(app): its HTTP routes          registered automatically
   web/              its pages: scripts, styles           served at /addons/<name>/web/<file>
-  worker/           a sidecar's Dockerfile and code      built by bin/deploy as <image>-<name>
+  worker/           a sidecar's Dockerfile and code      built and published by the addon's repository
   migrations/       m0001_baseline.py, m0002_…           its own tables
-  requirements.txt  extra Python packages                checked at load; installed into the image
-  tests/            test_*.py, test_*.mjs                run by bin/test
+  requirements.txt  extra Python packages                checked at load (an installed addon uses the image's)
+  tests/            test_*.py, test_*.mjs                run by bin/dana addons test (an official addon's by bin/test)
   README.md         what it does, settings, events       shown in the catalog
 ```
 
-The loader imports `addon.py`, then `tools.py`, `hooks.py`, `demo.py`, the modules named in `modules=(...)`, then `api.py`, as `addons.<name>.*`; another module of the addon imports the manifest as `from addons.tides.addon import addon`. Sources: `server/addons/` (official), the site's `addons/`, `/app/addons-site` in an image built by `bin/deploy`, `<data dir>/addons/` (installed); `DANA_ADDON_DIRS` (folders joined by `:`) replaces all but the official one. A non-official addon that fails to load is skipped with the reason (`loader.failed()`, the Addons page); the server runs without it.
+The loader imports `addon.py`, then `tools.py`, `hooks.py`, `demo.py`, the modules named in `modules=(...)`, then `api.py`, as `addons.<name>.*`; another module of the addon imports the manifest as `from addons.tides.addon import addon`. Sources: `server/addons/` (official) and `<data dir>/addons/` (installed: from the catalog, git or a folder); `DANA_ADDON_DIRS` (folders joined by `:`), for tests and development, replaces the installed one. A non-official addon that fails to load is skipped with the reason (`loader.failed()`, the Addons page); the server runs without it.
 
 ### The manifest
 
@@ -316,8 +317,8 @@ The key is unique across addons. Settings are text `Field`s (at most 8) a person
 
 ### Workers
 
-`worker=Worker(port=8091, url_env="TIDES_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained; the app image leaves it out); the addon reaches it at the URL in `url_env`. An addon published in its own repository (a catalog addon) builds its worker image there instead (a workflow pushing `ghcr.io/<owner>/<repo>-worker:<commit>`) and names it, `Worker(port, url_env, image="ghcr.io/<owner>/<repo>-worker")`: deployments then run that image at the installed commit and build nothing. `bin/dana addons new tides --worker` writes a small standard-library server and a tool that calls it. Deploying and running workers: `operations.md`, "Workers".
+`worker=Worker(port=8091, url_env="TIDES_WORKER_URL")` declares a sidecar built from the addon's `worker/` folder (its own `Dockerfile`, self-contained; the app image leaves it out); the addon reaches it at the URL in `url_env`. While you write it, `bin/dana addons dev` builds and runs it. To deploy it, the addon's repository publishes the image (a workflow pushing `ghcr.io/<owner>/<repo>-worker:<commit>`) and the manifest names it, `Worker(port, url_env, image="ghcr.io/<owner>/<repo>-worker")`: deployments run that image at the installed commit and build nothing (`bin/dana addons workers --json`, `bin/deploy`). An addon installed from a folder records no commit, so its manifest names a tag (`image="ghcr.io/<owner>/<repo>-worker:1.2"`). `bin/dana addons new tides --worker` writes a small standard-library server and a tool that calls it. Deploying and running workers: `operations.md`, "Workers".
 
 ### Testing
 
-`bin/test` runs `tests/test_*.py` and `test_*.mjs` of every official and site addon. A script starts with `import testenv; testenv.isolate("<name>")` (a clean environment and a temporary database; `DANA_ADDON_DIRS=""`), and a site addon's test sets `DANA_ADDON_DIRS` to the folder holding it before importing the app, as the scaffold's `dana_harness.start()` does. Cover two users with the addon and one without.
+`bin/test` runs `tests/test_*.py` and `test_*.mjs` of every official addon; `bin/dana addons test PATH` runs an installed addon's. A script starts with `import testenv; testenv.isolate("<name>")` (a clean environment and a temporary database; `DANA_ADDON_DIRS=""`), and an addon outside `server/addons/` sets `DANA_ADDON_DIRS` to a folder holding it before importing the app, as the scaffold's `dana_harness.start()` does (`examples/addons/hello`'s test installs it into the test's data dir instead, the way a server gets it). Cover two users with the addon and one without.

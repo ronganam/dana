@@ -1,32 +1,28 @@
 #!/usr/bin/env bash
-# Build and deploy one commit from this machine (docs/operations.md, "Deploy").
+# Deploy a published release of Dana (docs/operations.md, "Deploying").
 #
-#   bin/deploy            deploy HEAD
-#   bin/deploy <commit>   deploy another commit
-#   bin/deploy --wait     … and wait until the pod runs it
+#   bin/deploy                  deploy the version in server/VERSION
+#   bin/deploy <version>        deploy another version (e.g. 10.4.0)
+#   bin/deploy … --wait         … and wait until Dana runs it
 #
 # Reads your site's deploy.env: site/deploy.env at the repository root, or
 # $DANA_SITE/deploy.env (docs/site.md; DANA_DEPLOY_CONFIG names another file).
-# Builds the Dockerfile's `app` stage from a clean checkout of the commit, with the
-# site's addons (site/addons/, or the folders in DANA_IMAGE_ADDONS) copied into the
-# image's /app/addons-site, tagged "<VERSION>-<short commit>", plus "-a<addons hash>"
-# when there are site addons, so a change to one alone is a new release (the RELEASE build arg
-# writes the name into the image's VERSION: /api/health shows it). Addon workers (DANA_WORKERS:
-# all, none, or the addon names): one whose manifest names a published image
-# (Worker(image=...): an addon installed from the catalog) is pinned to that image's tag, else
-# to the commit it was installed at, and not built; a worker/Dockerfile otherwise (a site
-# addon's) is built as "$DANA_IMAGE-<addon>" with the same tag.
-# Pushes the images it built (and Dana's `latest`). With DANA_GITOPS_REPO set it then writes the
-# release into DANA_GITOPS_VALUES in that repo (every `tag:` line, every
-# `image: <DANA_IMAGE>-<addon>:<tag>` of a built worker and every `image: <published image>:<tag>`
-# of a pinned one) and pushes it, for a GitOps tool (ArgoCD, Flux) to roll the pod. That commit is made in a private clone (~/.cache/dana-deploy/gitops),
-# never in your own checkout.
-# It runs no tests: the pre-push hook runs them before it calls this.
-# DANA_DEPLOY_CHECKOUT=<dir>: build from that checkout of the commit (the hook's).
+# Builds nothing: the release workflow (.github/workflows/release.yml) publishes
+# "$DANA_IMAGE:<version>" (default ghcr.io/ronganam/dana) when the tag v<version> is pushed.
+# This waits for that image to exist (up to DANA_IMAGE_WAIT seconds), then rolls it out:
+#   - GitOps (DANA_GITOPS_REPO set): every `tag:` line of DANA_GITOPS_VALUES in that
+#     repository becomes "<version>", and each installed add-on's worker image
+#     (`image: <published image>:<tag>`) is pinned to what `dana addons workers --json`
+#     says where Dana runs ($DANA_EXEC, e.g. kubectl -n dana exec deploy/dana -c dana --);
+#     the commit is pushed for the GitOps tool (ArgoCD, Flux) to roll the pod. It is made in
+#     a private clone (~/.cache/dana-deploy/gitops), never in your own checkout.
+#   - Compose (DANA_COMPOSE_DIR set: the folder of the compose.yaml at the repository root):
+#     DANA_VERSION=<version> in its .env (the image tag), each worker's <ADDON>_WORKER_TAG
+#     likewise, then `docker compose pull` and `up -d`.
+#   - Neither: it only says the image is ready; roll it out yourself.
+# --wait (GitOps): until the pod runs that image and is ready.
 set -euo pipefail
 server="$(cd "$(dirname "$0")/.." && pwd)"
-cd "$server"
-prefix="$(git rev-parse --show-prefix)"          # "server/" in the monorepo
 
 site="${DANA_SITE:-$(dirname "$server")/site}"
 config="${DANA_DEPLOY_CONFIG:-$site/deploy.env}"
@@ -36,109 +32,70 @@ if [ ! -r "$config" ]; then
 fi
 # shellcheck disable=SC1090
 . "$config"
-: "${DANA_IMAGE:?deploy: set DANA_IMAGE in $config}"
-# Which addon workers to build: all (default), none, or addon names (space or comma separated).
-DANA_WORKERS="${DANA_WORKERS:-all}"
+DANA_IMAGE="${DANA_IMAGE:-ghcr.io/ronganam/dana}"
+DANA_IMAGE_WAIT="${DANA_IMAGE_WAIT:-1800}"
+DANA_EXEC="${DANA_EXEC:-}"
 DANA_GITOPS_REPO="${DANA_GITOPS_REPO:-}"
 DANA_GITOPS_BRANCH="${DANA_GITOPS_BRANCH:-main}"
 DANA_GITOPS_VALUES="${DANA_GITOPS_VALUES:-}"
-DANA_IMAGE_ADDONS="${DANA_IMAGE_ADDONS:-$site/addons}"
+DANA_COMPOSE_DIR="${DANA_COMPOSE_DIR:-}"
 DANA_K8S_NAMESPACE="${DANA_K8S_NAMESPACE:-dana}"
 DANA_K8S_SELECTOR="${DANA_K8S_SELECTOR:-app=dana}"
 GITOPS=${XDG_CACHE_HOME:-$HOME/.cache}/dana-deploy/gitops
 
 wait_pod=0
-ref=HEAD
+version=""
 for arg in "$@"; do
   case "$arg" in
     --wait) wait_pod=1 ;;
-    -h|--help) sed -n '2,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-    *) ref="$arg" ;;
+    -h|--help) sed -n '2,23p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -*) echo "deploy: unknown option $arg" >&2; exit 2 ;;
+    *) version="$arg" ;;
   esac
 done
+[ -n "$version" ] || version="$(tr -d '[:space:]' < "$server/VERSION")"
+version="${version#v}"
+if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]; then
+  echo "deploy: $version is not a version (e.g. 10.4.0)" >&2
+  exit 2
+fi
+image="$DANA_IMAGE:$version"
 
-sha="$(git rev-parse --verify "$ref^{commit}")"
-release="$(git show "$sha:${prefix}VERSION" | tr -d '[:space:]')-${sha:0:7}"
+# The release workflow may still be building it: wait, saying so.
+waited=0
+until docker manifest inspect "$image" >/dev/null 2>&1; do
+  if [ "$waited" -ge "$DANA_IMAGE_WAIT" ]; then
+    echo "deploy: $image does not exist after ${DANA_IMAGE_WAIT}s. Was the tag v$version pushed, and did the" \
+      "release workflow pass? (gh run list --workflow release.yml)" >&2
+    exit 1
+  fi
+  [ "$waited" = 0 ] && echo "deploy: waiting for $image (the release workflow publishes it from the tag v$version) …"
+  sleep 20
+  waited=$((waited + 20))
+done
+echo "deploy: $image is published"
 
-# The site's addons: <folder>/<name>/addon.py in each folder of DANA_IMAGE_ADDONS.
-site_addons=()
-IFS=: read -r -a addon_dirs <<< "$DANA_IMAGE_ADDONS"
-for dir in "${addon_dirs[@]}"; do
-  [ -n "$dir" ] || continue
-  dir="${dir/#\~/$HOME}"
-  [ -d "$dir" ] || { [ "$dir" = "$site/addons" ] && continue; echo "deploy: addon folder $dir is missing" >&2; exit 1; }
-  for addon in "$dir"/*/; do
-    if [ -f "$addon/addon.py" ]; then site_addons+=("${addon%/}"); fi
+# The installed add-ons' workers, asked where the data lives: "name image tag" lines
+# (tag "@sha256:…" for a digest).
+workers=()
+if [ -n "$DANA_EXEC" ]; then
+  # shellcheck disable=SC2086
+  listing="$($DANA_EXEC dana addons workers --json)" \
+    || { echo "deploy: '$DANA_EXEC dana addons workers --json' failed" >&2; exit 1; }
+  while IFS= read -r line; do
+    [ -n "$line" ] && workers+=("$line")
+  done < <(python3 -c 'import json, sys
+for w in json.load(sys.stdin):
+    print(w["name"], w["image"], w["tag"])' <<< "$listing")
+  for w in "${workers[@]}"; do
+    read -r name wimage tag <<< "$w"
+    echo "deploy: the $name worker runs $wimage $tag (published by the add-on's repository)"
   done
-done
-if [ "${#site_addons[@]}" -gt 0 ]; then
-  addons_hash="$(for addon in "${site_addons[@]}"; do
-      (cd "$addon/.." && find "$(basename "$addon")" -type f -not -path '*/__pycache__/*' -not -name '*.pyc' -print0 \
-        | sort -z | xargs -0 sha256sum)
-    done | sha256sum | cut -c1-7)"
-  release="$release-a$addons_hash"
-fi
-
-checkout="${DANA_DEPLOY_CHECKOUT:-}"
-if [ -z "$checkout" ]; then
-  checkout="$(mktemp -d "${TMPDIR:-/tmp}/dana-deploy-XXXXXX")"
-  trap 'git worktree remove --force "$checkout" >/dev/null 2>&1 || rm -rf "$checkout"' EXIT
-  git worktree add --detach -q "$checkout" "$sha"
-fi
-context="$checkout/$prefix"
-
-# The site's addons go into the image's /app/addons-site (the Dockerfile's site_addons build context).
-staging="$(mktemp -d "${TMPDIR:-/tmp}/dana-site-addons-XXXXXX")"
-trap 'rm -rf "$staging"; [ -n "${DANA_DEPLOY_CHECKOUT:-}" ] || git worktree remove --force "$checkout" >/dev/null 2>&1 || rm -rf "$checkout"' EXIT
-for addon in "${site_addons[@]}"; do
-  echo "deploy: with site addon $(basename "$addon")"
-  cp -r "$addon" "$staging/"
-  find "$staging/$(basename "$addon")" -name __pycache__ -prune -exec rm -rf {} +
-done
-
-# Addon workers (docs/operations.md, "Workers") of the commit's official addons and of the site addons
-# built in: a published image the manifest names is pinned (core/addon_dirs.py worker_image, read
-# without importing the addon); a worker/Dockerfile is built as its own image, "$DANA_IMAGE-<addon>".
-workers=()   # name=folder to build
-pinned=()    # name=image:tag
-if [ "$DANA_WORKERS" != "none" ]; then
-  for dir in "$context"addons/*/ "${site_addons[@]/%//}"; do
-    dir="${dir%/}"
-    [ -f "$dir/addon.py" ] || continue
-    name="$(basename "$dir")"
-    if [ "$DANA_WORKERS" != "all" ] && [[ " ${DANA_WORKERS//,/ } " != *" $name "* ]]; then continue; fi
-    image="$(PYTHONPATH="$context" python3 -c 'import sys
-from pathlib import Path
-from core import addon_dirs
-print(addon_dirs.worker_image(Path(sys.argv[1])) or "")' "$dir")" || { echo "deploy: cannot pin the $name worker" >&2; exit 1; }
-    if [ -n "$image" ]; then
-      pinned+=("$name=$image")
-    elif [ -f "$dir/worker/Dockerfile" ]; then
-      workers+=("$name=$dir/worker")
-    fi
-  done
-fi
-
-echo "deploy: building $release"
-docker build -q --target app --build-arg "RELEASE=$release" --build-context "site_addons=$staging" \
-  -t "$DANA_IMAGE:$release" -t "$DANA_IMAGE:latest" "$context" >/dev/null
-for worker in "${workers[@]}"; do
-  echo "deploy: building the ${worker%%=*} worker as $DANA_IMAGE-${worker%%=*}:$release"
-  docker build -q -t "$DANA_IMAGE-${worker%%=*}:$release" "${worker#*=}" >/dev/null
-done
-echo "deploy: pushing $DANA_IMAGE:$release"
-docker push -q "$DANA_IMAGE:$release" >/dev/null
-docker push -q "$DANA_IMAGE:latest" >/dev/null
-for worker in "${workers[@]}"; do
-  docker push -q "$DANA_IMAGE-${worker%%=*}:$release" >/dev/null
-done
-for worker in "${pinned[@]}"; do
-  echo "deploy: the ${worker%%=*} worker runs ${worker#*=} (published by the addon's repository, not built)"
-done
-
-if [ -z "$DANA_GITOPS_REPO" ]; then
-  echo "deploy: pushed $release (no DANA_GITOPS_REPO: roll it out yourself)"
 else
+  echo "deploy: no DANA_EXEC in $config: worker images are left as they are"
+fi
+
+if [ -n "$DANA_GITOPS_REPO" ]; then
   : "${DANA_GITOPS_VALUES:?deploy: set DANA_GITOPS_VALUES in $config}"
   app="$(basename "$(dirname "$DANA_GITOPS_VALUES")")"
   # Run from a git hook, git may export these for this repo; the GitOps repo is another one.
@@ -151,34 +108,48 @@ else
   for attempt in 1 2 3; do
     git -C "$GITOPS" fetch -q origin "$DANA_GITOPS_BRANCH"
     git -C "$GITOPS" checkout -q -B "$DANA_GITOPS_BRANCH" "origin/$DANA_GITOPS_BRANCH"
-    sed -i -E -e "s/^(\s*tag:\s*).*/\1\"$release\"/" "$GITOPS/$DANA_GITOPS_VALUES"
-    # Each worker's image (workers.<addon>.image: "<DANA_IMAGE>-<addon>:<tag>"; any key naming that image works).
-    for worker in "${workers[@]}"; do
-      sed -i -E -e "s#(image:\s*\"?$DANA_IMAGE-${worker%%=*}:)[^\"[:space:]]*#\1$release#" "$GITOPS/$DANA_GITOPS_VALUES"
-    done
-    # Each pinned worker's image (any key naming that repository: "<image>:<tag>" or "<image>@<digest>").
-    for worker in "${pinned[@]}"; do
-      image="${worker#*=}"
-      repo="${image%@*}"; [ "$repo" = "$image" ] && repo="${image%:*}"
-      sed -i -E -e "s#(image:\s*\"?)$repo[:@][^\"[:space:]]*#\1$image#" "$GITOPS/$DANA_GITOPS_VALUES"
+    sed -i -E -e "s/^(\s*tag:\s*).*/\1\"$version\"/" "$GITOPS/$DANA_GITOPS_VALUES"
+    # Each worker's image (any key naming that repository: "<image>:<tag>" or "<image>@<digest>").
+    for w in "${workers[@]}"; do
+      read -r name wimage tag <<< "$w"
+      ref="$wimage:$tag"; [ "${tag#@}" != "$tag" ] && ref="$wimage$tag"
+      sed -i -E -e "s#(image:\s*\"?)$wimage[:@][^\"[:space:]]*#\1$ref#" "$GITOPS/$DANA_GITOPS_VALUES"
     done
     if git -C "$GITOPS" diff --quiet -- "$DANA_GITOPS_VALUES"; then
-      echo "deploy: $DANA_GITOPS_VALUES already runs $release"
+      echo "deploy: $DANA_GITOPS_VALUES already runs $version"
       break
     fi
-    git -C "$GITOPS" commit -q -m "chore($app): deploy $release" -- "$DANA_GITOPS_VALUES"
+    git -C "$GITOPS" commit -q -m "chore($app): deploy $version" -- "$DANA_GITOPS_VALUES"
     if git -C "$GITOPS" push -q origin "$DANA_GITOPS_BRANCH"; then
-      echo "deploy: $DANA_GITOPS_VALUES set to $release; the GitOps tool rolls the pod"
+      echo "deploy: $DANA_GITOPS_VALUES set to $version; the GitOps tool rolls the pod"
       break
     fi
     [ "$attempt" = 3 ] && { echo "deploy: could not push the GitOps change" >&2; exit 1; }
   done
-fi
-
-if [ "$wait_pod" = 1 ]; then
-  echo "deploy: waiting for the pod to run $release …"
-  until kubectl -n "$DANA_K8S_NAMESPACE" get pod -l "$DANA_K8S_SELECTOR" \
-      -o jsonpath='{range .items[*]}{.spec.containers[0].image} {.status.containerStatuses[0].ready}{"\n"}{end}' \
-      | grep -q "$release true"; do sleep 10; done
-  echo "deploy: $release is running"
+  if [ "$wait_pod" = 1 ]; then
+    echo "deploy: waiting for the pod to run $image …"
+    until kubectl -n "$DANA_K8S_NAMESPACE" get pod -l "$DANA_K8S_SELECTOR" \
+        -o jsonpath='{range .items[*]}{.spec.containers[0].image} {.status.containerStatuses[0].ready}{"\n"}{end}' \
+        | grep -qF "$image true"; do sleep 10; done
+    echo "deploy: $version is running"
+  fi
+elif [ -n "$DANA_COMPOSE_DIR" ]; then
+  envfile="$DANA_COMPOSE_DIR/.env"
+  touch "$envfile"
+  set_env() {  # KEY VALUE: replace its line, or add one
+    if grep -qE "^$1=" "$envfile"; then sed -i -E "s#^$1=.*#$1=$2#" "$envfile"; else echo "$1=$2" >> "$envfile"; fi
+  }
+  set_env DANA_VERSION "$version"
+  for w in "${workers[@]}"; do
+    read -r name wimage tag <<< "$w"
+    if [ "${tag#@}" != "$tag" ]; then
+      echo "deploy: the $name worker is pinned by digest ($tag): set its image in the compose file yourself" >&2
+      continue
+    fi
+    set_env "$(tr '[:lower:]' '[:upper:]' <<< "$name")_WORKER_TAG" "$tag"
+  done
+  (cd "$DANA_COMPOSE_DIR" && docker compose pull -q && docker compose up -d)
+  echo "deploy: $DANA_COMPOSE_DIR runs $version"
+else
+  echo "deploy: $image is ready (no DANA_GITOPS_REPO or DANA_COMPOSE_DIR in $config: roll it out yourself)"
 fi

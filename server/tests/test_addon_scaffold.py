@@ -1,11 +1,11 @@
-"""bin/dana addons new: the addon and its kit, with --web and --worker, written into a site that bin/test then runs and passes; refused names; the example addon keeps the scaffold's shape.
+"""bin/dana addons new: the addon and its kit, with --web and --worker, written into the current folder, whose tests `bin/dana addons test` then runs and passes; refused names; the example addon keeps the scaffold's shape.
 
 Run: bin/test test_addon_scaffold
 
 End to end, as an author does it: ``bin/dana addons new`` (a subprocess, the
-real command line) writes into ``$DANA_SITE/addons`` of a temp site, then
-``bin/test <name>`` (a subprocess too) finds the new addons' tests there and
-they pass as written. ``examples/addons/hello`` has every code file the
+real command line) run in a temp folder writes ``./<name>`` there, then
+``bin/dana addons test <name>`` (a subprocess too) runs each new addon's tests
+and they pass as written. ``examples/addons/hello`` has every code file the
 scaffold writes with ``--web``, at the same path (the kit's files, AGENTS.md,
 REFERENCE.md and the tests' harness, are checked by ``test_addon_kit.py``).
 """
@@ -19,11 +19,10 @@ import testenv  # first: clean env, temp DB removed at exit, no .env (see testen
 testenv.isolate("addon_scaffold_test")
 
 SERVER = testenv.SERVER
-SITE = Path(testenv.scratch_dir()) / "site"
-ADDONS = SITE / "addons"
+ADDONS = Path(testenv.scratch_dir()) / "work"   # the author's folder: where `addons new` runs
+ADDONS.mkdir()
 EXAMPLE = SERVER.parent / "examples" / "addons" / "hello"
-ENV = {**os.environ, "DANA_SITE": str(SITE), "DANA_ENV_FILE": ""}
-ENV.pop("DANA_ADDON_DIRS", None)  # the site's addons/ is where bin/test looks
+ENV = {**os.environ, "DANA_ENV_FILE": ""}
 failures = 0
 
 
@@ -34,8 +33,8 @@ def check(name: str, cond: object, detail: object = "") -> None:
 
 
 def dana(*args: str) -> subprocess.CompletedProcess:
-    return subprocess.run([sys.executable, str(SERVER / "bin" / "dana"), *args], cwd=str(SERVER), env=ENV,
-                          capture_output=True, text=True, timeout=120)
+    return subprocess.run([sys.executable, str(SERVER / "bin" / "dana"), *args], cwd=str(ADDONS), env=ENV,
+                          capture_output=True, text=True, timeout=300)
 
 
 def files(folder: Path) -> list:
@@ -48,7 +47,7 @@ KIT = [".gitignore", "AGENTS.md", "README.md", "REFERENCE.md", "addon.py", "hook
 
 
 r = dana("addons", "new", "weather")
-check("new: the addon and its kit (manifest, tools, hooks, test, harness, guides) in the site's addons/",
+check("new: the addon and its kit (manifest, tools, hooks, test, harness, guides) in ./weather",
       r.returncode == 0 and files(ADDONS / "weather") == sorted(KIT + ["tests/test_weather.py", "tools.py"]),
       r.stdout + r.stderr)
 weather = (ADDONS / "weather" / "addon.py").read_text()
@@ -70,10 +69,10 @@ r = dana("addons", "new", "pager", "--web")
 check("new --web: no worker files", r.returncode == 0 and not (ADDONS / "pager" / "worker").exists()
       and "worker" not in (ADDONS / "pager" / "tools.py").read_text() and (ADDONS / "pager" / "web" / "pager.js").is_file())
 
-run = subprocess.run([sys.executable, str(SERVER / "bin" / "test"), "weather", "tide_chart", "pager"], cwd=str(SERVER),
-                     env=ENV, capture_output=True, text=True, timeout=300)
-check("bin/test finds the new addons' tests in the site and they pass as written",
-      run.returncode == 0 and "3 passed" in run.stdout and "0 failed" in run.stdout, run.stdout[-1500:] + run.stderr[-800:])
+for name in ("weather", "tide_chart", "pager"):
+    run = dana("addons", "test", name)
+    check(f"bin/dana addons test {name}: its tests pass as written",
+          run.returncode == 0 and "1 passed, 0 failed" in run.stdout, run.stdout[-1500:] + run.stderr[-800:])
 
 for name, why in (("weather", "already exists"), ("tasks", "official"), ("Bad-Name", "not a usable addon name"),
                   ("_hidden", "not a usable addon name"), ("settings", "not a usable addon name"),

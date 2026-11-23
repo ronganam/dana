@@ -41,7 +41,7 @@ import sys
 import traceback
 from dataclasses import dataclass
 from types import ModuleType
-from typing import Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Callable, Dict, List, Optional, Set, Tuple
 
 from core import addon_dirs, db, purposes
 from core.addon_dirs import AddonFolder
@@ -76,8 +76,8 @@ _folders: Dict[str, AddonFolder] = {}
 _apis: Dict[str, ModuleType] = {}
 # The addon names each folder's modules declared (normally just its own).
 _declared: Dict[str, Set[str]] = {}
-# The commit each installed (or site) addon was at when it loaded (its .installed.json).
-_commits: Dict[str, str] = {}
+# The install record (.installed.json) of each installed addon as it was when it loaded.
+_records: Dict[str, Dict[str, Any]] = {}
 
 
 def _package() -> ModuleType:
@@ -312,8 +312,8 @@ def _load() -> Tuple[str, ...]:
                             f"({_folders[f.name].path})")
         _folders[f.name] = f
         info = addon_dirs.installed_info(f.path) if not f.source.official else None
-        if info and isinstance(info.get("commit"), str):
-            _commits[f.name] = info["commit"]
+        if info:
+            _records[f.name] = info
     package = _package()
     for src in addon_dirs.sources():
         if not src.official and str(src.path) not in package.__path__:
@@ -417,10 +417,17 @@ def apis() -> Tuple[Tuple[str, ModuleType], ...]:
     return tuple((n, _apis[n]) for n in load() if n in _apis)
 
 
+def loaded_record(name: str) -> Dict[str, Any]:
+    """The install record (core/addons/install.py) of the copy of addon ``name`` this process loaded
+    (``{}``: official, or no record)."""
+    load()
+    return dict(_records.get(name) or {})
+
+
 def loaded_commit(name: str) -> Optional[str]:
     """The commit addon ``name`` was installed from when this process loaded it (None: not installed from git)."""
-    load()
-    return _commits.get(name)
+    commit = loaded_record(name).get("commit")
+    return commit if isinstance(commit, str) else None
 
 
 def folders() -> Dict[str, AddonFolder]:

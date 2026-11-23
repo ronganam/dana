@@ -4,9 +4,9 @@
 1. ``bin/dana addons check`` (errors are shown; the environment starts anyway, so the log
    says what breaks).
 2. ``bin/local-env.sh up`` with ``DANA_LOCAL_SOURCE=1`` (this checkout's code) and
-   ``DANA_LOCAL_ADDONS=<name>=<path>``: the addon folder mounted read-only as a site addon
-   (``/app/addons-site/<name>``). The first run builds the image (a few minutes); later
-   ones reuse it.
+   ``DANA_LOCAL_ADDONS=<name>=<path>``: the addon folder mounted read-only at
+   ``/app/addons-dev/<name>``, a development folder the server loads (``DANA_ADDON_DIRS``).
+   The first run builds the image (a few minutes); later ones reuse it.
 3. The addon is connected for the test admin (``bin/dana addons connect Robin <name>``),
    then its log lines, its tools and the Now cards and day items it makes are printed
    (:mod:`cli.kit.devshow`, inside the app container).

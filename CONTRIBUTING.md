@@ -43,7 +43,7 @@ cd android
 - A server payload change that a client reads updates that client (and its fixtures) in the same pull request.
 - User-facing text calls the assistant Dana.
 - No new dependency without a reason in the pull request.
-- Something only your own deployment needs belongs in your site (a site addon, a setting), not in Dana's code; a missing extension point is a welcome pull request ([`docs/site.md`](docs/site.md)).
+- Something only your own deployment needs belongs in an installed addon or a setting, not in Dana's code; a missing extension point is a welcome pull request ([`docs/site.md`](docs/site.md)).
 
 ## Pull requests
 

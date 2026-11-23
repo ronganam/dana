@@ -36,7 +36,7 @@ async def main():
     logger.info(f"Data directory: {DATA_DIR}")
     # The schema (core's, then each loaded addon's), then the data every part
     # relies on, before anything reads the database. A database older than
-    # Dana 9.0 stops the start here; a site addon whose migrations fail is
+    # Dana 9.0 stops the start here; an installed addon whose migrations fail is
     # taken out and the start goes on (core/addons/loader.py).
     try:
         applied = loader.migrate()

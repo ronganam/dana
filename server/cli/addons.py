@@ -1,10 +1,11 @@
 """``bin/dana addons …``: the server's addons (../docs/addons.md).
 
-    addons list                             every addon: source, version, state, fields; the failed ones
+    addons list                             every addon: source (official, or installed: catalog / git commit /
+                                            upload), version, state, fields; the failed ones
     addons table                            the official addons as a Markdown table: what each does, what it
                                             needs (required / optional) and where it works (the README's)
     addons new NAME [--web] [--worker] [--title T] [--dir DIR]
-                                            write a working addon from the template (default: site/addons/NAME),
+                                            write a working addon from the template (default: ./NAME),
                                             its own git repository: tools, a Now card, tests with the fakes they
                                             need, AGENTS.md, REFERENCE.md; --web adds a page, --worker a sidecar
     addons check PATH [--json]              what is wrong with an addon, each problem with its fix (cli/kit/check.py)
@@ -13,30 +14,37 @@
     addons reference [--check]              write docs/addon-reference.md from the code (--check: only compare)
     addons publish PATH [--repo R] [--catalog-repo R] [--owner O] [--dry-run]
                                             check, test, push to GitHub, release, open the catalog pull request
-    addons install NAME|REPO@COMMIT[:PATH] [--dir DIR | --data] [--yes]
-                                            fetch one commit of an addon (a catalog entry, or any git repository)
-                                            into the site's addons/ (default with a site), DIR, or the data
-                                            dir's addons/ (default without one: the container image);
-                                            asks first when it may touch more than the version it replaces
-                                            (--yes: agree without asking)
-    addons remove NAME [--dir DIR | --data] delete an addon folder there (its tables stay)
+    addons install NAME|REPO@COMMIT[:PATH]|./FOLDER [--server URL [--restart]] [--dir DIR] [--yes]
+                                            install an addon: a catalog entry, one commit of any git
+                                            repository, or a folder (packed and uploaded); on the running
+                                            server at URL (or $DANA_URL) through its API with an admin token
+                                            ($DANA_TOKEN, else asked), else into this machine's data dir
+                                            addons/ (or DIR); asks first when it may touch more than the
+                                            version it replaces (--yes: agree without asking)
+    addons workers [--json]                 the installed addons' workers: name, published image, pinned tag
+                                            (what bin/deploy pins)
+    addons remove NAME [--dir DIR]          delete an installed addon's folder (its tables stay)
     addons disable NAME / enable NAME       for everyone on this server (the running server sees it within 5 s)
 
-``install`` writes into the site's ``addons/`` by default when there is a site
-folder: what ``bin/deploy`` builds into the image. Without one (the container
-image: ``docker compose exec dana dana addons install NAME``) and with
-``--data`` it writes into ``<data dir>/addons`` like the Addons page does,
-which lives in the data volume and survives image updates (then restart the
-server). Either way the addon runs with the
-server's full access: install only code you trust. The per-user commands
-(``show``, ``connect``, ``update``, ``disconnect``) are in cli/users.py.
+Every addon that is not official is installed into ``<data dir>/addons``,
+which lives in the data volume and survives image updates; the server loads
+it at its next start (``--restart`` asks a remote server to restart). Without
+``--server`` the command writes into this machine's data dir, e.g. inside the
+container: ``docker compose exec dana dana addons install NAME``. Either way
+the addon runs with the server's full access: install only code you trust.
+The per-user commands (``show``, ``connect``, ``update``, ``disconnect``) are
+in cli/users.py.
 """
 
 from __future__ import annotations
 
 import argparse
+import getpass
 import json
+import os
 import re
+import sys
+import tempfile
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -48,6 +56,7 @@ from cli.kit import check as check_kit
 from cli.kit import dev as dev_kit
 from cli.kit import publish as publish_kit
 from cli.kit import reference, runner
+from cli import remote
 from cli.users import CliError, register_connections
 
 TEMPLATE = Path(__file__).resolve().parent / "template"
@@ -55,22 +64,27 @@ TEMPLATE = Path(__file__).resolve().parent / "template"
 SPEC = re.compile(r"^(?P<repo>.+)@(?P<ref>[0-9a-fA-F]{40})(?::(?P<path>.*))?$")
 
 
-def _site_addons() -> Path:
-    return addon_dirs.site_dir() / "addons"
-
-
-def default_root() -> Path:
-    """Where ``install`` / ``remove`` work without ``--dir`` / ``--data``: the
-    site's ``addons/`` when there is a site folder (a checkout that deploys
-    with ``bin/deploy``), else the data dir's (the container image, a plain
-    checkout: what the server loads at its next start, kept across image updates)."""
-    return _site_addons() if addon_dirs.site_dir().is_dir() else addon_dirs.installed_dir()
-
-
 def _root(args: argparse.Namespace) -> Path:
-    if getattr(args, "data", False):
-        return addon_dirs.installed_dir()
-    return Path(args.dir).expanduser().resolve() if getattr(args, "dir", None) else default_root()
+    """Where ``install`` / ``remove`` work on this machine: ``--dir``, else the data dir's ``addons/``."""
+    return Path(args.dir).expanduser().resolve() if getattr(args, "dir", None) else addon_dirs.installed_dir()
+
+
+def source_words(folder: addon_dirs.AddonFolder, info: dict[str, Any]) -> str:
+    """Where an addon came from, as ``list`` shows it: official, or installed from the catalog / git at a
+    commit / an uploaded folder (``info``: the install record of the copy loaded)."""
+    if folder.source.official:
+        return "official"
+    kind = install.source_kind(info)
+    commit = str(info.get("commit") or "")
+    if kind == install.UPLOAD:
+        when = str(info.get("installed_at") or "")
+        return f"installed: upload{' ' + when if when else ''}"
+    if kind == install.CATALOG:
+        return f"installed: catalog @ {commit[:12]}"
+    if commit:
+        repo = str(info.get("repo") or "")
+        return f"installed: git {repo + ' ' if repo else ''}@ {commit[:12]}"
+    return "installed"
 
 
 # --- list ----------------------------------------------------------------------------------------
@@ -78,11 +92,7 @@ def _root(args: argparse.Namespace) -> Path:
 def cmd_list(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     off = state.disabled()
     for k in all_addons():
-        folder = loader.folder(k.name)
-        where = folder.source.label
-        commit = loader.loaded_commit(k.name)
-        if commit:
-            where += f" @ {commit[:12]}"
+        where = source_words(loader.folder(k.name), loader.loaded_record(k.name))
         flags = [f"v{k.version}" if k.version else "", where,
                  "disabled on this server" if k.name in off else "",
                  "every user has it" if k.everyone else "",
@@ -196,7 +206,7 @@ def scaffold(name: str, root: Path, title: str = "", web: bool = False, worker: 
 
 
 def cmd_new(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
-    root = Path(args.dir).expanduser().resolve() if args.dir else _site_addons()
+    root = Path(args.dir).expanduser().resolve() if args.dir else Path.cwd()
     target = scaffold(args.name, root, args.title or "", web=args.web, worker=args.worker)
     files = sorted(str(p.relative_to(target)) for p in target.rglob("*") if p.is_file() and ".git" not in p.parts)
     try:
@@ -206,7 +216,7 @@ def cmd_new(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
     print(f"Wrote the {args.name} addon in {target}: {', '.join(files)}"
           f"{' (a git repository, first commit made)' if committed else ''}.\n"
           f"Next (AGENTS.md has the loop): bin/dana addons check {target}, bin/dana addons test {target}, "
-          f"bin/dana addons dev {target}.", file=out)
+          f"bin/dana addons dev {target}; then bin/dana addons install {target} --server <your Dana>.", file=out)
 
 
 # --- check / test / dev / reference / publish ---------------------------------------------------
@@ -245,6 +255,15 @@ def cmd_publish(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
 
 # --- install / remove ----------------------------------------------------------------------------
 
+def is_folder_spec(spec: str) -> bool:
+    """Whether ``spec`` names a folder (an existing one, or a path such as ``./tides``, ``../x``, ``/abs``,
+    ``~/x`` without an ``@``) rather than a catalog name or ``REPO@COMMIT[:PATH]``."""
+    spec = spec.strip()
+    if SPEC.match(spec):
+        return False
+    return Path(spec).expanduser().is_dir() or (spec.startswith((".", "~", "/")) and "@" not in spec)
+
+
 def parse_spec(spec: str) -> tuple[install.Source, str | None]:
     """``NAME`` (a catalog entry: its source and name) or ``REPO@COMMIT[:PATH]`` (no name).
 
@@ -255,7 +274,8 @@ def parse_spec(spec: str) -> tuple[install.Source, str | None]:
     if m:
         return install.Source(m["repo"], m["path"] or "", m["ref"].lower()), None
     if not spec.isidentifier():
-        raise CliError(f"{spec!r} is neither a catalog name nor REPO@COMMIT[:PATH] (a full 40-character commit).")
+        raise CliError(f"{spec!r} is neither a catalog name, REPO@COMMIT[:PATH] (a full 40-character commit) "
+                       "nor a folder (./NAME).")
     try:
         entry = catalog.load().get(spec)
     except catalog.CatalogError as e:
@@ -279,28 +299,182 @@ def touches_lines(touches: Touches) -> list[str]:
     return lines or ["touches nothing beyond Dana's own data"]
 
 
-def cmd_install(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
-    source, name = parse_spec(args.spec)
-    root = _root(args)
-    print(f"Installing from {source.repo} at {source.ref}{' (' + source.path + ')' if source.path else ''} "
-          f"into {root}. An addon runs with the server's full access: install only code you trust.", file=out)
+def _agree(name: str, touches: Touches, added: Touches, yes: bool, out: TextIO, stdin: TextIO) -> None:
+    """Show what the addon may touch and what is new; ask unless ``yes``.
+
+    Raises:
+        CliError: the answer was not yes.
+    """
+    print(f"{name} may touch:", *(f"  - {line}" for line in touches_lines(touches)), sep="\n", file=out)
+    print("New since the version you have (or you agreed to):",
+          *(f"  - {line}" for line in touches_lines(added)), sep="\n", file=out)
+    if not yes:
+        print("Install it? [y/N] ", end="", file=out, flush=True)
+        if stdin.readline().strip().lower() not in ("y", "yes"):
+            raise CliError("Not installed.")
+
+
+def _folder(spec: str) -> Path:
+    folder = Path(spec).expanduser().resolve()
+    if not folder.is_dir():
+        raise CliError(f"{folder} is not a folder.")
+    return folder
+
+
+def _pack(folder: Path, archive: Path, out: TextIO) -> None:
     try:
-        try:
-            done = install.install(source, root, name=name, by="cli")
-        except install.ConfirmTouches as e:
-            print(f"{e.name} may touch:", *(f"  - {line}" for line in touches_lines(e.touches)), sep="\n", file=out)
-            print("New since the version you have (or you agreed to):",
-                  *(f"  - {line}" for line in touches_lines(e.added)), sep="\n", file=out)
-            if not args.yes:
-                print("Install it? [y/N] ", end="", file=out, flush=True)
-                if stdin.readline().strip().lower() not in ("y", "yes"):
-                    raise CliError("Not installed.") from None
-            done = install.install(source, root, name=name, by="cli", accept=e.touches)
+        count = remote.pack_folder(folder, archive)
+    except remote.PackError as e:
+        raise CliError(str(e)) from e
+    print(f"Packed {count} file(s) of {folder} ({archive.stat().st_size // 1024 + 1} KB).", file=out)
+
+
+def _token(stdin: TextIO, out: TextIO) -> str:
+    """An admin's token: ``DANA_TOKEN``, else asked (hidden on a terminal)."""
+    token = os.environ.get("DANA_TOKEN", "").strip()
+    if token:
+        return token
+    if stdin is sys.stdin and sys.stdin.isatty():
+        token = getpass.getpass("An admin's token for the server (DANA_TOKEN): ")
+    else:
+        print("An admin's token for the server (DANA_TOKEN): ", end="", file=out, flush=True)
+        token = stdin.readline()
+    if not token.strip():
+        raise CliError("No token: set DANA_TOKEN to an admin's token.")
+    return token.strip()
+
+
+def _install_local(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
+    root = _root(args)
+    try:
+        if is_folder_spec(args.spec):
+            folder = _folder(args.spec)
+            print(f"Installing from the folder {folder} into {root}. An addon runs with the server's full access: "
+                  "install only code you trust.", file=out)
+            with tempfile.TemporaryDirectory(prefix="dana-pack-") as tmp:
+                archive = Path(tmp) / "addon.tar.gz"
+                _pack(folder, archive, out)
+                try:
+                    done = install.install_archive(archive, root, by="cli")
+                except install.ConfirmTouches as e:
+                    _agree(e.name, e.touches, e.added, args.yes, out, stdin)
+                    done = install.install_archive(archive, root, by="cli", accept=e.touches)
+        else:
+            source, name = parse_spec(args.spec)
+            kind = install.GIT if name is None else install.CATALOG
+            print(f"Installing from {source.repo} at {source.ref}{' (' + source.path + ')' if source.path else ''} "
+                  f"into {root}. An addon runs with the server's full access: install only code you trust.", file=out)
+            try:
+                done = install.install(source, root, name=name, by="cli", kind=kind)
+            except install.ConfirmTouches as e:
+                _agree(e.name, e.touches, e.added, args.yes, out, stdin)
+                done = install.install(source, root, name=name, by="cli", accept=e.touches, kind=kind)
     except install.InstallError as e:
         raise CliError(str(e)) from e
-    after = ("Restart the server to load it." if root == addon_dirs.installed_dir().resolve()
-             else "bin/deploy builds it into the image; a local server loads it at its next start.")
-    print(f"{'Updated' if done.replaced else 'Installed'} {done.name} in {done.folder}. {after}", file=out)
+    print(f"{'Updated' if done.replaced else 'Installed'} {done.name} in {done.folder}. "
+          "Restart the server to load it.", file=out)
+
+
+def _remote_answer(answer: remote.Answer) -> dict[str, Any]:
+    """The body of a successful install, or raise with the server's message."""
+    if answer.status == 201:
+        return answer.body
+    message = answer.body.get("message") or answer.body.get("error") or f"HTTP {answer.status}"
+    raise CliError(f"The server refused it ({answer.status}): {message}")
+
+
+def _install_remote(args: argparse.Namespace, url: str, out: TextIO, stdin: TextIO) -> None:
+    try:
+        server = remote.Server(url, _token(stdin, out))
+        if is_folder_spec(args.spec):
+            folder = _folder(args.spec)
+            print(f"Installing from the folder {folder} on {server.url}. An addon runs with the server's full "
+                  "access: install only code you trust.", file=out)
+            with tempfile.TemporaryDirectory(prefix="dana-pack-") as tmp:
+                archive = Path(tmp) / "addon.tar.gz"
+                _pack(folder, archive, out)
+                answer = server.install_archive(archive)
+                if answer.status == 409 and answer.body.get("error") == "confirm_touches":
+                    _agree(str(answer.body.get("name")), Touches.from_json(answer.body["touches"]),
+                           Touches.from_json(answer.body["added"]), args.yes, out, stdin)
+                    answer = server.install_archive(archive, accept=answer.body["touches"])
+        else:
+            m = SPEC.match(args.spec.strip())
+            if m:
+                body: dict[str, Any] = {"repo": m["repo"], "ref": m["ref"].lower(), "path": m["path"] or ""}
+            elif args.spec.isidentifier():
+                body = {"name": args.spec}
+            else:
+                raise CliError(f"{args.spec!r} is neither a catalog name, REPO@COMMIT[:PATH] nor a folder (./NAME).")
+            print(f"Installing {args.spec} on {server.url}. An addon runs with the server's full access: "
+                  "install only code you trust.", file=out)
+            answer = server.install_json(body)
+            if answer.status == 409 and answer.body.get("error") == "confirm_touches":
+                _agree(str(answer.body.get("name")), Touches.from_json(answer.body["touches"]),
+                       Touches.from_json(answer.body["added"]), args.yes, out, stdin)
+                answer = server.install_json({**body, "accept": answer.body["touches"]})
+        done = _remote_answer(answer)
+        print(done.get("message") or f"Installed {done.get('name')}. Restart the server to load it.", file=out)
+        if args.restart:
+            restarted = server.restart()
+            if restarted.status != 202:
+                raise CliError(f"The restart was refused ({restarted.status}): "
+                               f"{restarted.body.get('message') or restarted.body.get('error') or ''}")
+            print(f"{server.url} is restarting; it loads {done.get('name')} as it starts.", file=out)
+        else:
+            print("Restart it to load the addon (Addons page → Restart, or again with --restart).", file=out)
+    except remote.RemoteError as e:
+        raise CliError(str(e)) from e
+    except ValueError as e:  # a confirm_touches answer whose touches cannot be read
+        raise CliError(f"The server's answer could not be read: {e}") from e
+
+
+def cmd_install(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
+    url = (args.server or os.environ.get("DANA_URL", "")).strip()
+    if url and args.dir:
+        raise CliError("--dir installs on this machine; leave it out with --server (or DANA_URL).")
+    if not url and args.restart:
+        raise CliError("--restart restarts a server given with --server (or DANA_URL); restart a local one yourself.")
+    if url:
+        _install_remote(args, url, out, stdin)
+    else:
+        _install_local(args, out, stdin)
+
+
+def workers() -> list[dict[str, str]]:
+    """The workers of the installed addons (``<data dir>/addons``) that run a published image:
+    ``[{name, image, tag}]``, ``tag`` the pinned tag or digest (core/addon_dirs.py ``worker_image``).
+
+    Raises:
+        CliError: a worker image with no tag in an addon that records no commit.
+    """
+    found: list[dict[str, str]] = []
+    for name in install.installed(addon_dirs.installed_dir()):
+        try:
+            ref = addon_dirs.worker_image(addon_dirs.installed_dir() / name)
+        except ValueError as e:
+            raise CliError(str(e)) from e
+        if not ref:
+            continue
+        if "@" in ref:
+            image, tag = ref.split("@", 1)
+            tag = "@" + tag
+        else:
+            image, tag = ref.rsplit(":", 1)
+        found.append({"name": name, "image": image, "tag": tag})
+    return found
+
+
+def cmd_workers(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
+    found = workers()
+    if args.json:
+        out.write(json.dumps(found) + "\n")
+        return
+    for w in found:
+        sep = "" if w["tag"].startswith("@") else ":"
+        print(f"{w['name']}: {w['image']}{sep}{w['tag']}", file=out)
+    if not found:
+        print("No installed addon runs a published worker image.", file=out)
 
 
 def cmd_remove(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
@@ -308,8 +482,7 @@ def cmd_remove(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
         gone = install.remove(args.name, _root(args))
     except install.InstallError as e:
         raise CliError(str(e)) from e
-    print(f"Removed {gone} (its tables and rows stay in the database). Restart the server (or bin/deploy) "
-          "to unload it.", file=out)
+    print(f"Removed {gone} (its tables and rows stay in the database). Restart the server to unload it.", file=out)
 
 
 # --- disable / enable ----------------------------------------------------------------------------
@@ -340,10 +513,8 @@ def cmd_enable(args: argparse.Namespace, out: TextIO, stdin: TextIO) -> None:
 # --- Parser --------------------------------------------------------------------------------------
 
 def _where(p: argparse.ArgumentParser) -> None:
-    group = p.add_mutually_exclusive_group()
-    group.add_argument("--dir", help="the addons folder to use (default: the site's addons/ when there is a site, "
-                                     "else the data dir's)")
-    group.add_argument("--data", action="store_true", help="the data dir's addons/ (what the Addons page installs into)")
+    p.add_argument("--dir", help="the addons folder to use on this machine (default: the data dir's addons/, "
+                                 "what the server loads)")
 
 
 def register(sub: Any) -> None:
@@ -357,7 +528,7 @@ def register(sub: Any) -> None:
     p.add_argument("--title", help="its name for people (default: from the name)")
     p.add_argument("--web", action="store_true", help="also a page in the web app and the route it reads")
     p.add_argument("--worker", action="store_true", help="also a sidecar (worker/: a Dockerfile) and a tool calling it")
-    p.add_argument("--dir", help="the addons folder to write into (default: the site's addons/)")
+    p.add_argument("--dir", help="the folder to write it into (default: the current folder)")
     p.set_defaults(func=cmd_new, needs_db=False)
     p = sub.add_parser("check", help="what is wrong with an addon (manifest, imports, migrations, tool docstrings, "
                        "declared vs used), each problem with its fix")
@@ -386,11 +557,18 @@ def register(sub: Any) -> None:
     p.add_argument("--owner", help="your GitHub login (default: asked from gh)")
     p.add_argument("--dry-run", action="store_true", help="print every gh / git command instead of running it")
     p.set_defaults(func=cmd_publish, needs_db=False)
-    p = sub.add_parser("install", help="fetch one commit of an addon: a catalog NAME or REPO@COMMIT[:PATH]")
-    p.add_argument("spec", metavar="NAME|REPO@COMMIT[:PATH]")
+    p = sub.add_parser("install", help="install an addon: a catalog NAME, REPO@COMMIT[:PATH] or a ./FOLDER, "
+                       "on a running server (--server) or into this machine's data dir")
+    p.add_argument("spec", metavar="NAME|REPO@COMMIT[:PATH]|./FOLDER")
+    p.add_argument("--server", help="install on the Dana running at this URL, through its API (default: $DANA_URL; "
+                                    "an admin token from $DANA_TOKEN, else asked)")
+    p.add_argument("--restart", action="store_true", help="with --server: restart it afterwards, to load the addon")
     p.add_argument("--yes", action="store_true", help="agree to what it may touch without asking")
     _where(p)
     p.set_defaults(func=cmd_install, needs_db=False)
+    p = sub.add_parser("workers", help="the installed addons' workers: name, published image, pinned tag")
+    p.add_argument("--json", action="store_true", help="as JSON: [{name, image, tag}]")
+    p.set_defaults(func=cmd_workers, needs_db=False)
     p = sub.add_parser("remove", help="delete an addon folder (its tables stay)")
     p.add_argument("name")
     _where(p)

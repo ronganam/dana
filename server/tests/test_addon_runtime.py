@@ -2,7 +2,7 @@
 
 Run: bin/test test_addon_runtime
 
-One site addon written to a temp folder (``rt``, loaded through
+One installed addon written to a temp folder (``rt``, loaded through
 DANA_ADDON_DIRS) declares a job of each kind, a service, event handlers (one
 failing), a channel, prompt parts in three slots and an LLM job. Two users have
 it (one whose job raises), a third does not.
@@ -221,7 +221,7 @@ def test_purposes() -> None:
     except ValueError:
         taken = True
     check("purposes: a purpose of core cannot be taken by an addon", taken)
-    check("loader: rt loaded as a site addon", "rt" in loader.non_official())
+    check("loader: rt loaded as a installed addon", "rt" in loader.non_official())
 
 
 async def main() -> None:

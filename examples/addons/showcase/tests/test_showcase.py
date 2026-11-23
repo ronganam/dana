@@ -64,7 +64,7 @@ def age(plant_id: int, days: float) -> None:
 
 
 async def tools_and_manifest() -> None:
-    check("loaded as a site addon; its migration ran", "showcase" in loader.non_official()
+    check("loaded beside the official addons; its migration ran", "showcase" in loader.non_official()
           and "showcase:0001_baseline" in APPLIED, (loader.failed(), APPLIED))
     check("on_connect: each user who turned it on got a first plant (Basil); Maya nothing",
           [p["name"] for p in plants.plants(ROBIN)] == ["Basil"] and [p["name"] for p in plants.plants(GAL)] == ["Basil"]

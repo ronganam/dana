@@ -1,7 +1,3 @@
-# The site's own addons (docs/site.md): empty unless bin/deploy passes
-# --build-context site_addons=<folder>, which replaces this stage.
-FROM scratch AS site_addons
-
 # Use an official, lightweight Python base image
 FROM python:3.14-slim AS base
 
@@ -42,27 +38,21 @@ FROM base AS app
 COPY main.py .
 COPY VERSION .
 COPY core/ ./core/
-# An addon's worker/ (a sidecar) is its own image (bin/deploy), not part of this one.
+# An addon's worker/ (a sidecar) is its own image, not part of this one.
 COPY --exclude=*/worker addons/ ./addons/
 COPY static/ ./static/
-# Site addons (docs/writing-an-addon.md): the ones bin/deploy brings from your site; the loader reads
-# /app/addons-site when it exists (core/addon_dirs.py).
-COPY --from=site_addons --exclude=*/worker / ./addons-site/
-# Extra Python packages declared by official or site addons (addons/<name>/requirements.txt).
-RUN set -e; for req in addons/*/requirements.txt addons-site/*/requirements.txt; do \
+# Extra Python packages declared by official addons (addons/<name>/requirements.txt). Every other
+# addon is installed into the data volume (<data dir>/addons, docs/addons.md) and uses these.
+RUN set -e; for req in addons/*/requirements.txt; do \
         if [ -f "$req" ]; then pip install --no-cache-dir -r "$req"; fi; \
     done
 # The administration CLI (users, addons; docs/access.md, "Managing users"), on PATH:
-# docker compose exec dana dana users list, kubectl exec … dana addons install NAME (into the data volume)
+# docker compose exec dana dana users list, kubectl exec … dana addons workers --json
 COPY bin/dana ./bin/dana
 COPY cli/ ./cli/
 # The generated addon reference: bin/dana addons new copies it into each new addon as REFERENCE.md
 COPY docs/addon-reference.md ./docs/addon-reference.md
 ENV PATH="/app/bin:${PATH}"
-# The release name bin/deploy builds ("<VERSION>-<commit>"): /api/health reports it and the
-# dashboard's ?v= cache-buster uses it, so every deploy reaches cached clients.
-ARG RELEASE=""
-RUN if [ -n "$RELEASE" ]; then echo "$RELEASE" > VERSION; fi
 
 # Ensure all files are owned by the non-root user; /app/db is where the data volume goes and
 # /backups the backups' (a new Docker volume takes this folder's owner; docs/backups.md)

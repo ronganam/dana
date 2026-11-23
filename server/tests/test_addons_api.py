@@ -29,8 +29,8 @@ from cryptography.fernet import Fernet
 os.environ["CREDENTIALS_KEY"] = Fernet.generate_key().decode()  # a throwaway key for the fake credentials
 os.environ["GOOGLE_CLIENT_ID"] = "test-client"
 os.environ["GOOGLE_CLIENT_SECRET"] = "test-client-secret"
-# A site addon that fails to load (listed as failed), and a catalog with one valid and one invalid entry.
-_SITE = os.path.join(testenv.scratch_dir(), "site_addons")
+# An installed addon (a DANA_ADDON_DIRS folder) that fails to load (listed as failed), and a catalog with one valid and one invalid entry.
+_SITE = os.path.join(testenv.scratch_dir(), "dev_addons")
 os.makedirs(os.path.join(_SITE, "broken"))
 with open(os.path.join(_SITE, "broken", "addon.py"), "w", encoding="utf-8") as _f:
     _f.write("raise ImportError('a missing package')\n")
@@ -764,8 +764,8 @@ async def test_web_fixture(client: TestClient) -> None:
           and captured["enable"]["body"]["state"] == "on" and captured["install_refused"]["status"] == 400,
           {k: captured[k]["status"] for k in ("catalog_admin", "disable", "enable", "install_refused")})
     failed = next((i for i in captured["list_admin"]["body"]["addons"] if i["state"] == "failed"), {})
-    check("fixture: the failed site addon is listed, its error for the admin only",
-          failed.get("name") == "broken" and "a missing package" in failed.get("error", "")
+    check("fixture: the failed installed addon is listed (source installed), its error for the admin only",
+          failed.get("name") == "broken" and failed.get("source") == "installed" and "a missing package" in failed.get("error", "")
           and "error" not in next(i for i in captured["list_member"]["body"]["addons"] if i["name"] == "broken"), failed)
     conflict = next(i for i in captured["list_conflict"]["body"]["addons"] if i["name"] == "whatsapp")
     check("fixture: the conflict is in the admin's view of Carl",

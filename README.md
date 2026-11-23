@@ -102,9 +102,9 @@ Some parts need something without being an addon:
 
 ## Your own deployment
 
-Run Dana as upstream ships it and keep what is yours in a **site** folder beside it: deploy settings, your own addons, the apps' server address and TV setup, and notes for you and your coding agents. Start from `site.example/`. Updating is then `git pull`, and your deployment never drifts from Dana: [`docs/site.md`](docs/site.md).
+Run the published image as upstream ships it and keep your settings in a **site** folder beside the checkout: deploy settings, the apps' server address and TV setup, and notes for you and your coding agents. Start from `site.example/`. Updating is then a new release, and your deployment never drifts from Dana: [`docs/site.md`](docs/site.md).
 
-Addons: write your own with `server/bin/dana addons new <name>` (a working addon in `site/addons/<name>`), or install one from the catalog on the Addons page or with `bin/dana addons install`. Installed addons are pinned to a git commit and **run with the server's full access**: install only code you trust. [`docs/addons.md`](docs/addons.md).
+Addons: there is one way to extend Dana, installing an addon. Write your own with `server/bin/dana addons new <name>` (a working addon in `./<name>`) and install it with `bin/dana addons install ./<name> --server <your Dana>`, or install one from the catalog or a git repository on the Addons page. Installed addons live in the data volume and **run with the server's full access**: install only code you trust. [`docs/addons.md`](docs/addons.md).
 
 ## Build the apps
 
@@ -118,7 +118,7 @@ JDK 21 and the Android SDK are needed. Point the app at your server in its Setti
 ## Extend it
 
 - A new addon is a package in `server/addons/<name>/`: declare it in `addon.py`, write its tools as typed Python functions with docstrings (the schema is generated), and it shows up for users who connect it. The design: [`docs/addons.md`](docs/addons.md); the reference: [`server/docs/access.md`](server/docs/access.md) → Addon.
-- Something only your setup needs can stay out of the repository as a **site addon** in your site's `addons/`: the same code as an official addon ([`server/docs/writing-an-addon.md`](server/docs/writing-an-addon.md); working examples: [`examples/addons/hello/`](examples/addons/hello/), the smallest, and [`examples/addons/showcase/`](examples/addons/showcase/), every capability once).
+- Something only your setup needs can stay out of the repository as an addon in its own folder or repository, installed on your Dana (`bin/dana addons install ./<name> --server <url>`): the same code as an official addon ([`server/docs/writing-an-addon.md`](server/docs/writing-an-addon.md); working examples: [`examples/addons/hello/`](examples/addons/hello/), the smallest, and [`examples/addons/showcase/`](examples/addons/showcase/), every capability once).
 - **The add-on kit**, made to be driven by a coding agent: `bin/dana addons new <name>` writes an add-on in its own repository with an `AGENTS.md` guide and the generated reference ([`server/docs/addon-reference.md`](server/docs/addon-reference.md)); `check` says what is wrong and how to fix it, `test` runs its tests, `dev` runs it with sample data, and `publish` releases it and opens a pull request to the community catalog, [dana-catalog](https://github.com/ronganam/dana-catalog).
 - Every area has a doc: start from [`server/AGENTS.md`](server/AGENTS.md) and [`android/AGENTS.md`](android/AGENTS.md). They are written for people and coding agents alike.
 

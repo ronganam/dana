@@ -15,11 +15,17 @@ from pathlib import Path
 import testenv  # first: clean env, temp DB removed at exit, no .env (server/tests/testenv.py)
 testenv.isolate("hello_example")
 HERE = Path(__file__).resolve().parents[1]  # this addon's folder
-_HOLDER = Path(testenv.scratch_dir()) / "addons"  # holds only hello, not its neighbours in examples/addons
-_HOLDER.mkdir(exist_ok=True)
-(_HOLDER / "hello").symlink_to(HERE, target_is_directory=True)
-os.environ["DANA_ADDON_DIRS"] = str(_HOLDER)  # hello is a site addon
+os.environ.pop("DANA_ADDON_DIRS", None)  # the real sources: official, then <data dir>/addons
 os.environ["API_TOKEN"] = "hello-test-env-token"  # a test value: the first admin's token (a headless install)
+
+# Installed the way every addon is: the folder packed as for an upload, into the data dir's addons/.
+from cli import remote  # noqa: E402
+from core.addons import install  # noqa: E402
+from core.paths import ADDONS_DIR  # noqa: E402
+
+_ARCHIVE = Path(testenv.scratch_dir()) / "hello.tar.gz"
+remote.pack_folder(HERE, _ARCHIVE)
+INSTALLED = install.install_archive(_ARCHIVE, ADDONS_DIR, by="test", accept=install.manifest_touches(HERE / "addon.py"))
 
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
@@ -59,8 +65,9 @@ for u in (ROBIN, GAL, MAYA):
 
 
 async def main() -> None:
-    check("loaded as a site addon, after the official ones", loader.non_official() == ("hello",)
-          and loader.loaded()[-1] == "hello", loader.loaded())
+    check("installed from its folder into the data dir; loaded after the official ones",
+          INSTALLED.folder == ADDONS_DIR / "hello" and loader.non_official() == ("hello",)
+          and loader.loaded()[-1] == "hello" and loader.folder("hello").source.kind == "installed", loader.loaded())
     check("migration: its table was created", "hello:0001_baseline" in APPLIED, APPLIED)
 
     # Tool and setting.

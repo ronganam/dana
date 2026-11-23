@@ -2,7 +2,7 @@
 
 Run: bin/test test_addon_market
 
-A site addon ``mk`` (written to a temp folder) has a tool, a prompt part, a
+An addon ``mk`` in a development folder (``DANA_ADDON_DIRS``, beside the data dir's addons/) has a tool, a prompt part, a
 job, a service, an event handler, a notify channel, a Now card and action, a
 route and a ``web/`` folder; ``mkplus`` needs it; ``mkbroken`` fails to load.
 A local git repository (made here) holds addons at two commits; ``greeter``
@@ -29,7 +29,7 @@ import testenv  # first: clean env, temp DB removed at exit, no .env (see testen
 DB_PATH = testenv.isolate("addon_market_test")
 os.environ["API_TOKEN"] = "market-env-token"  # a test value: the first admin's token (a headless install)
 SCRATCH = Path(testenv.scratch_dir())
-SITE = SCRATCH / "site_addons"
+DEV = SCRATCH / "dev_addons"
 DATA_ADDONS = Path(DB_PATH).parent / "addons"   # core.paths.ADDONS_DIR for this database
 REPO = SCRATCH / "repo"
 CATALOG = SCRATCH / "catalog.json"
@@ -40,14 +40,14 @@ def write(path: Path, text: str) -> None:
     path.write_text(textwrap.dedent(text), encoding="utf-8")
 
 
-# --- The site addons -------------------------------------------------------------------------------
-write(SITE / "mk" / "addon.py", '''\
+# --- The development folder's addons -------------------------------------------------------------------------------
+write(DEV / "mk" / "addon.py", '''\
     from core.addons import Addon, Nav, Page, PromptPart
-    addon = Addon("mk", title="Market test", description="A site addon for the market test", version="1.2.3",
+    addon = Addon("mk", title="Market test", description="An addon for the market test", version="1.2.3",
                   prompt_parts=(PromptPart("guides", "Use mk_ping to ping."),),
                   web=(Page("mk", panel="panel.js", style="panel.css", nav=Nav("Market", icon="store", order=70)),))
     ''')
-write(SITE / "mk" / "tools.py", '''\
+write(DEV / "mk" / "tools.py", '''\
     from core.addons import Connection
     from addons.mk.addon import addon
 
@@ -56,7 +56,7 @@ write(SITE / "mk" / "tools.py", '''\
         """Ping."""
         return "pong"
     ''')
-write(SITE / "mk" / "hooks.py", '''\
+write(DEV / "mk" / "hooks.py", '''\
     import asyncio
     from core import cards
     from core.addons import Card, minutes
@@ -96,7 +96,7 @@ write(SITE / "mk" / "hooks.py", '''\
     async def act(user, ref, action, args, now):
         return cards.result("Done")
     ''')
-write(SITE / "mk" / "api.py", '''\
+write(DEV / "mk" / "api.py", '''\
     from aiohttp import web
     from core.auth import request_user
     from core.addons import store
@@ -108,17 +108,17 @@ write(SITE / "mk" / "api.py", '''\
     def setup(app):
         app.router.add_get("/api/mk", get_mk)
     ''')
-write(SITE / "mk" / "web" / "panel.js", "Dana.panel({mount() {}});\n")
-write(SITE / "mk" / "web" / "panel.css", ".mk { color: red; }\n")
-write(SITE / "mk" / "web" / ".hidden", "not served\n")
-write(SITE / "mk" / "web" / "sub" / "deep.js", "// deep\n")
+write(DEV / "mk" / "web" / "panel.js", "Dana.panel({mount() {}});\n")
+write(DEV / "mk" / "web" / "panel.css", ".mk { color: red; }\n")
+write(DEV / "mk" / "web" / ".hidden", "not served\n")
+write(DEV / "mk" / "web" / "sub" / "deep.js", "// deep\n")
 write(SCRATCH / "outside.txt", "OUTSIDE-SECRET\n")
-os.symlink(SCRATCH / "outside.txt", SITE / "mk" / "web" / "link.js")
-write(SITE / "mkplus" / "addon.py", '''\
+os.symlink(SCRATCH / "outside.txt", DEV / "mk" / "web" / "link.js")
+write(DEV / "mkplus" / "addon.py", '''\
     from core.addons import Addon, Need
     addon = Addon("mkplus", description="Needs mk", needs=(Need("addon", "mk", "Its data"),))
     ''')
-write(SITE / "mkbroken" / "addon.py", "raise RuntimeError('mkbroken is broken on purpose')\n")
+write(DEV / "mkbroken" / "addon.py", "raise RuntimeError('mkbroken is broken on purpose')\n")
 
 
 # --- The git repository with addons at two commits ----------------------------------------------------
@@ -142,7 +142,7 @@ git("init", "-q")
 write(REPO / "addons" / "greeter" / "addon.py", addon_py("greeter", "1.0.0"))
 write(REPO / "addons" / "fresh" / "addon.py", addon_py("fresh", "0.1.0"))
 write(REPO / "addons" / "tasks" / "addon.py", addon_py("tasks", "9.9.9"))          # an official name
-write(REPO / "addons" / "mk" / "addon.py", addon_py("mk", "9.9.9"))                # a site addon's name
+write(REPO / "addons" / "mk" / "addon.py", addon_py("mk", "9.9.9"))                # a DANA_ADDON_DIRS addon's name
 write(REPO / "addons" / "mismatch" / "addon.py", addon_py("mismatch", "1.0.0", declared="other"))
 write(REPO / "addons" / "noaddon" / "README.md", "no addon.py here\n")
 write(REPO / "addons" / "linky" / "addon.py", addon_py("linky", "1.0.0"))
@@ -178,7 +178,7 @@ CATALOG.write_text(json.dumps({"addons": [
     entry("badtouch", COMMIT1, touches={"hosts": "api.example.com"}),
 ]}), encoding="utf-8")
 os.environ["DANA_CATALOG_FILE"] = str(CATALOG)
-os.environ["DANA_ADDON_DIRS"] = f"{SITE}{os.pathsep}{DATA_ADDONS}"
+os.environ["DANA_ADDON_DIRS"] = f"{DEV}{os.pathsep}{DATA_ADDONS}"
 
 from core.addons import install  # noqa: E402  (folders only: nothing of the app is loaded yet)
 
@@ -242,8 +242,9 @@ async def test_list(c: TestClient) -> None:
     status, body = await call(c, "GET", "/api/addons", ADMIN_AUTH)
     items = by_name(body)
     mk, greeter, broken = items.get("mk", {}), items.get("greeter", {}), items.get("mkbroken", {})
-    check("list: loaded addons with their source (official, site, installed) and the failed one",
-          status == 200 and items["tasks"]["source"] == "official" and mk.get("source") == "site"
+    check("list: loaded addons with their source (official, installed: a DANA_ADDON_DIRS folder counts as "
+          "installed) and the failed one",
+          status == 200 and items["tasks"]["source"] == "official" and mk.get("source") == "installed"
           and greeter.get("source") == "installed" and broken.get("state") == "failed", list(items))
     check("list: mk's shape (title, version, state, needs, touches, web URLs and nav while on, no worker)",
           mk["title"] == "Market test" and mk["version"] == "1.2.3" and mk["state"] == "on" and mk["needs"] == []
@@ -264,7 +265,9 @@ async def test_list(c: TestClient) -> None:
     check("list: an addon that did not load has no touches", broken.get("touches", "missing") is None
           and broken.get("needs") == [], broken)
     check("list: the admin sees where an installed addon came from",
-          greeter["installed"] == {"repo": str(REPO), "path": "addons/greeter", "commit": COMMIT1}
+          {k: v for k, v in greeter["installed"].items() if k != "installed_at"}
+          == {"kind": "git", "repo": str(REPO), "path": "addons/greeter", "commit": COMMIT1}
+          and isinstance(greeter["installed"].get("installed_at"), str)
           and greeter["version"] == "1.0.0" and greeter["state"] == "available", greeter)
     check("list: the admin sees why an addon failed", "mkbroken is broken on purpose" in broken.get("error", ""), broken)
     check("list: nothing to restart for yet", body["restart_needed"] is False and body["pending"] == [], body.get("pending"))
@@ -502,7 +505,7 @@ async def test_install(c: TestClient) -> None:
           and not (DATA_ADDONS / "fresh").exists(), body)
     for name, want in (("tasks", 400), ("mk", 400), ("nope", 404)):
         status, body = await call(c, "POST", f"/api/addons/{name}/remove", ADMIN_AUTH)
-        check(f"remove: {name} → {want}", status == want and (name == "nope" or (SITE / name).is_dir()
+        check(f"remove: {name} → {want}", status == want and (name == "nope" or (DEV / name).is_dir()
                                                               or name == "tasks"), body)
     status, body = await call(c, "POST", "/api/addons/greeter/remove", ADMIN_AUTH)
     status, body = await call(c, "GET", "/api/addons", ADMIN_AUTH)
@@ -588,8 +591,12 @@ def test_cli() -> None:
     check("cli install: REPO@COMMIT:PATH into a folder, with the full-access warning", rc == 0
           and (target / "fresh" / ".installed.json").is_file() and "full access" in out, out + err)
     rc, out, err = run("addons", "install", "greeter", "--dir", str(target))
-    check("cli install: a catalog name", rc == 0 and json.loads((target / "greeter" / ".installed.json").read_text())
-          ["commit"] == COMMIT2, out + err)
+    record = json.loads((target / "greeter" / ".installed.json").read_text()) if rc == 0 else {}
+    check("cli install: a catalog name, recorded as from the catalog", rc == 0 and record["commit"] == COMMIT2
+          and record["source"] == {"kind": "catalog", "repo": str(REPO), "path": "addons/greeter", "commit": COMMIT2},
+          out + err)
+    check("cli install: REPO@COMMIT recorded as from git",
+          json.loads((target / "fresh" / ".installed.json").read_text())["source"]["kind"] == "git")
     rc, out, err = run("addons", "install", f"{REPO}@master:addons/fresh", "--dir", str(target))
     check("cli install: a branch is refused", rc == 1 and "neither a catalog name" in err, err)
     rc, out, err = run("addons", "install", f"{REPO}@{COMMIT1}:addons/tasks", "--dir", str(target))
@@ -603,7 +610,7 @@ def test_cli() -> None:
     check("cli install: --yes agrees to what it touches", rc == 0 and (target / "watcher" / "addon.py").is_file(),
           out + err)
     rc, out, err = run("addons", "table")
-    check("cli table: a Markdown table of the official addons (not site or installed ones)", rc == 0
+    check("cli table: a Markdown table of the official addons (not installed ones)", rc == 0
           and out.startswith("| Feature | What it does | Required | Optional | Region |") and "\n| Tasks |" in out
           and "Market test" not in out and "`GOOGLE_CLIENT_ID`" in out, out[:800])
     rc, out, err = run("addons", "remove", "fresh", "--dir", str(target))
@@ -613,8 +620,9 @@ def test_cli() -> None:
     check("cli disable: off for everyone, mkplus with it", rc == 0 and not state.is_enabled("mk")
           and "mkplus" in out, out + err)
     rc, out, err = run("addons", "list")
-    check("cli list: sources, the state, the failed addon", rc == 0 and "mk: A site addon for the market test (v1.2.3, site, "
-          "disabled on this server" in out and f"installed @ {COMMIT1[:12]}" in out and "mkbroken: FAILED" in out, out)
+    check("cli list: sources, the state, the failed addon", rc == 0 and "mk: An addon for the market test (v1.2.3, "
+          "installed, disabled on this server" in out and f"installed: git {REPO} @ {COMMIT1[:12]}" in out
+          and "tasks: " in out and "official" in out and "mkbroken: FAILED" in out, out[-600:])
     rc, out, err = run("addons", "enable", "mk")
     check("cli enable", rc == 0 and state.is_enabled("mk"))
     rc, out, err = run("addons", "disable", "essentials")
@@ -622,29 +630,20 @@ def test_cli() -> None:
 
 
 def test_cli_default_root() -> None:
-    """Without --dir / --data: the site's addons/ when there is a site folder, else the data dir's (the
-    container image, where `docker compose exec dana dana addons install NAME` runs)."""
+    """Without --dir: the data dir's addons/ (what the server loads at start; inside the container,
+    `docker compose exec dana dana addons install NAME`)."""
     from core import addon_dirs
     data = addon_dirs.installed_dir()
-    os.environ["DANA_SITE"] = str(SCRATCH / "no_site_here")
-    try:
-        rc, out, err = run("addons", "install", f"{REPO}@{COMMIT1}:addons/fresh")
-        check("cli install without a site: into the data dir's addons/, which the server loads at start",
-              rc == 0 and (data / "fresh" / ".installed.json").is_file() and "Restart the server" in out
-              and any(f.name == "fresh" and f.source.kind == addon_dirs.INSTALLED for f in addon_dirs.addon_folders()),
-              out + err)
-        rc, out, err = run("addons", "remove", "fresh")
-        check("cli remove without a site: from the data dir's addons/", rc == 0 and not (data / "fresh").exists(),
-              out + err)
-        site = SCRATCH / "a_site"
-        (site / "addons").mkdir(parents=True)
-        os.environ["DANA_SITE"] = str(site)
-        rc, out, err = run("addons", "install", f"{REPO}@{COMMIT1}:addons/fresh")
-        check("cli install with a site folder: into the site's addons/ (what bin/deploy builds in)",
-              rc == 0 and (site / "addons" / "fresh" / "addon.py").is_file() and not (data / "fresh").exists(),
-              out + err)
-    finally:
-        os.environ.pop("DANA_SITE", None)
+    rc, out, err = run("addons", "install", f"{REPO}@{COMMIT1}:addons/fresh")
+    check("cli install: into the data dir's addons/, which the server loads at start",
+          rc == 0 and (data / "fresh" / ".installed.json").is_file() and "Restart the server" in out
+          and any(f.name == "fresh" and f.source.kind == addon_dirs.INSTALLED for f in addon_dirs.addon_folders()),
+          out + err)
+    rc, out, err = run("addons", "workers", "--json")
+    check("cli workers: none of the installed addons runs a published image", rc == 0 and json.loads(out) == [],
+          out + err)
+    rc, out, err = run("addons", "remove", "fresh")
+    check("cli remove: from the data dir's addons/", rc == 0 and not (data / "fresh").exists(), out + err)
 
 
 def test_worker_image() -> None:
