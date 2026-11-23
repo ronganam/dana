@@ -2,6 +2,8 @@
 
 An addon is a folder with an `addon.py`; everything it adds to Dana is declared on the `addon` object there, as a field or with `@addon.<hook>`. Official addons and yours are written the same way. The design: [`../../docs/addons.md`](../../docs/addons.md).
 
+**With a coding agent**: paste `Read https://ronganam.github.io/dana/build-an-addon.md and help me build a Dana add-on.` into any coding agent. That guide ([`../../website/build-an-addon.md`](../../website/build-an-addon.md)) has it ask what the add-on should do, propose the design for your yes, then do the steps below with you.
+
 ## Make one in five steps
 
 Run the commands from the folder you keep your addons in; `bin/dana` is a Dana checkout's `server/bin/dana`. An addon lives in its own folder (its own git repository) and is installed on your Dana like any other: there is no other way in (`../../docs/addons.md`, "Where addons come from").

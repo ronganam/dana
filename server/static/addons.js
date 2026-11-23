@@ -56,7 +56,7 @@
     expired: { tone: "bad", text: "The Google sign-in took too long or was started elsewhere. Try again." },
     failed: { tone: "bad", text: "Google could not be connected. Try again; the server log says why." },
   };
-  const SOURCES = { official: "Official", site: "Site", image: "Image", installed: "Installed" };
+  const SOURCES = { official: "Official", installed: "Installed", upload: "Uploaded" };
   const FULL_ACCESS = "An addon runs inside Dana with the server's full access: it can read and change every user's data and reach your network. Install only addons whose code you trust.";
   const FULL_COMMIT = /^[0-9a-f]{40}$/i;
   const BUILD_GUIDE = "https://ronganam.github.io/dana/build-an-addon.md";
