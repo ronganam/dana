@@ -181,7 +181,8 @@ async def wait_ready(client, call_id, timeout=10):
 
 def upload_form(content: bytes, name="Call אמא_261108_114129.m4a", **fields):
     form = FormData()
-    for k, v in {"caller": "אמא", "receiver": "Me", "call_timestamp": "2026-11-08T11:41:29", **fields}.items():
+    an_hour_ago = (clock.now() - datetime.timedelta(hours=1)).replace(tzinfo=None).isoformat(timespec="seconds")
+    for k, v in {"caller": "אמא", "receiver": "Me", "call_timestamp": an_hour_ago, **fields}.items():
         form.add_field(k, str(v))
     form.add_field("audio", content, filename=name, content_type="audio/mp4")
     return form
@@ -220,6 +221,20 @@ async def main():
               and task_s["payload"]["triggers"].get("location") == {"location": "home", "event": "arrive"},
               task_s["payload"]["triggers"])
         check("task suggestion due date + group", task_s["payload"]["due_date"] == TOMORROW and task_s["payload"]["group"] == "Home")
+
+        # --- an old recording (a backlog of past calls): only what is still ahead
+        month_ago = (clock.now() - datetime.timedelta(days=30)).replace(tzinfo=None).isoformat(timespec="seconds")
+        r = await client.post("/api/calls/upload", data=upload_form(b"AUDIO-OLD", name="Call אמא_old.m4a",
+                                                                      call_timestamp=month_ago, duration_seconds=95))
+        old = await wait_ready(client, (await r.json())["id"])
+        old_titles = sorted(s["payload"]["title"] for s in old["suggestions"])
+        check("old call: only suggestions still ahead (the dated task and event, no undated 'Buy milk')",
+              old["status"] == "ready" and "Buy milk" not in old_titles
+              and old_titles == sorted(["למצוא טכנאי מזגנים", "תור לווטרינר"]), old_titles)
+        with get_db_connection() as conn:  # out of the way of the pending-suggestion checks below
+            conn.execute("DELETE FROM call_suggestions WHERE call_id = ?", (old["id"],))
+            conn.execute("DELETE FROM phone_calls WHERE id = ?", (old["id"],))
+            conn.commit()
         check("pending count on call", call["pending_suggestions"] == len(sugg))
 
         # --- duplicate upload returns the same call

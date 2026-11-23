@@ -51,15 +51,22 @@ _scheduled: set = set()
 _tasks: set = set()
 
 
-def recent_call(call: Dict[str, Any]) -> bool:
-    """A call that just happened (not a backfill or a recording recovered days later)."""
+# A recording older than this (a backlog of past calls, one recovered late) makes only suggestions
+# for what is still ahead (docs/calls.md, "Suggestions").
+CALL_SUGGESTIONS_MAX_AGE_DAYS = float(os.getenv("CALL_SUGGESTIONS_MAX_AGE_DAYS", "3"))
+
+
+def recent_call(call: Dict[str, Any], hours: Optional[float] = None) -> bool:
+    """A call that happened in the last ``hours`` (default: the pop-up window), not a backfill or a
+    recording recovered days later."""
     try:
         when = datetime.datetime.fromisoformat(str(call.get("call_timestamp") or call.get("when") or ""))
     except ValueError:
         return False
     now = clock.now()
     when = when.replace(tzinfo=now.tzinfo) if when.tzinfo is None else when
-    return now - when <= datetime.timedelta(hours=phone_popups.SUGGESTION_POPUP_MAX_AGE_HOURS)
+    limit = phone_popups.SUGGESTION_POPUP_MAX_AGE_HOURS if hours is None else hours
+    return now - when <= datetime.timedelta(hours=limit)
 
 
 def apply_analysis(user: User, call_id: str, analysis: Dict[str, Any], *, replace_text: bool = True,
@@ -163,7 +170,10 @@ async def _process(owner: User, call_id: str, custom_instructions: Optional[str]
 
     instructions = custom_instructions if custom_instructions is not None else (row["instructions"] or "")
     analysis = await analyze_transcript(owner, transcript, call, custom_instructions=instructions)
-    count = apply_analysis(owner, call_id, analysis)
+    # An old recording (a backlog, one recovered days later) keeps only suggestions still ahead of us:
+    # nothing on Now about what was already due back then.
+    count = apply_analysis(owner, call_id, analysis,
+                           only_future=not recent_call(call, CALL_SUGGESTIONS_MAX_AGE_DAYS * 24))
     logger.info(f"Call {call_id} analysed: labels={analysis['labels']} suggestions={count}")
     people_briefs.after_call(owner, call_id)
     if count and recent_call(call):

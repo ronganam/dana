@@ -131,6 +131,7 @@ Nothing: a server with no users and no `API_TOKEN` starts in **setup mode** and 
 | `THREAD_GAP_MINUTES` / `THREAD_KEEP_MESSAGES` | the shared thread (`session_id: "main"`): quiet gap after which the model's context starts fresh (20), messages kept for display (500) |
 | `SHORTCUTS` | `0` turns learned phrases off, both learning and use (default on) |
 | `UNDO_TTL_SECONDS` | how long an Undo stays usable, in memory (900) |
+| `CALL_SUGGESTIONS_MAX_AGE_DAYS` | A call recording older than this (days, default 3) makes only suggestions still ahead (`docs/calls.md`, "Old recordings") |
 | `SUGGESTION_POPUP_NOTIFICATIONS` | `1` = suggestions that come from notifications also open the phone's suggestions pop-up (default 0: they wait quietly in Now) |
 | `AGENT_SESSIONS_PUSH_INTERVAL` | seconds between pushes of a coding-agent session's activity to the phone, per user (default 15; status changes go at once; `docs/notifications.md` "Coding-agent sessions") |
 | `NOW_MAX_NOTIFICATIONS` / `NOW_MAX_SUGGESTIONS` / `NOW_MAX_REMINDERS` | cards per kind in Now (3 / 4 / 4; further call suggestions go to the quiet list) |
