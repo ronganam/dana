@@ -305,13 +305,13 @@ FIXTURE_SHOPPING = ["s1"] if S2_CLEARED else ["s1", "s2"]
 
 
 def later_migrations() -> List[str]:
-    """Every migration after a baseline in this tree (core's and each official addon's), as the log names them:
-    what the converted 9.0 database gets."""
+    """Every migration in this tree that is not a baseline (core's and each official addon's), as the log names
+    them: what the converted 9.0 database gets (an addon whose first migration is not a baseline gets it too)."""
     out = []
     for folder in [ROOT / "core" / "db" / "migrations", *sorted((ROOT / "addons").glob("*/migrations"))]:
         addon = "core" if folder.parent.name == "db" else folder.parent.name
         out += [f"{addon}:{f.stem[1:]}" for f in sorted(folder.glob("m[0-9][0-9][0-9][0-9]_*.py"))
-                if not f.stem.startswith("m0001_")]
+                if f.stem != "m0001_baseline"]
     return out
 
 
@@ -339,9 +339,9 @@ async def upgrade(c: Client) -> Dict[str, Any]:
     check("upgrade: the snapshot is the 9.0 database (3 tasks, old migrations up to 33)", out.split() == ["3", "33"], out)
     code, out = dexec("python", "-c", "import sqlite3; c=sqlite3.connect('/app/db/db.sqlite3');"
                       "print(*sorted(r[0] for r in c.execute('SELECT addon FROM schema_migrations')))")
-    check("upgrade: schema_migrations names core's and each official addon's baseline",
-          sorted(set(out.split())) == sorted(["core", "about", "contacts", "knowledge", "money", "people", "phone",
-                                              "shopping", "tasks", "whatsapp"]), out)
+    check("upgrade: schema_migrations names core, each official addon's baseline and homeassistant's clean-up",
+          sorted(set(out.split())) == sorted(["core", "about", "contacts", "homeassistant", "knowledge", "money",
+                                              "people", "phone", "shopping", "tasks", "whatsapp"]), out)
 
     health = await c.get("/api/health", token=None)
     version = (ROOT / "VERSION").read_text().strip()
