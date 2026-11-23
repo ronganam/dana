@@ -26,17 +26,32 @@ under the nav shows how far down you are):
   screen's look is the apps' (`server/static/app-now.js`, `android/DESIGN.md` "Now").
 - **Why Dana**: how it differs from a chat assistant, and undo-first safety.
 - **Everywhere**: phone, watch, wall tablet, TV, web, Telegram and desktops, in one row.
-- **Make it yours** and **What it costs**, side by side: running it, add-ons, and one real household's model spend
-  (a monthly total and the split by purpose, no other amounts).
+- **Make it yours** and **What it costs**, side by side: running it, add-ons (installed from the catalog, a git
+  repository or a folder), a **"Let your coding agent do it"** box with the two one-line prompts (install, build an
+  add-on) and a Copy button each (`copy.js`), the manual commands, and one real household's model spend (a monthly
+  total and the split by purpose, no other amounts).
 
-`make-an-addon.html` is a short page on building an addon with a coding agent (the scaffold, the loop, publishing),
-and `llms.txt` points agents at the add-on guide (`server/cli/template/AGENTS.md.tmpl`) and reference
-(`server/docs/addon-reference.md`) on GitHub.
+**Guides for coding agents**, plain Markdown served as is (the one-line prompts point at their URLs, e.g.
+`https://ronganam.github.io/dana/install.md`):
 
-Plain static files, no build step: `index.html`, `make-an-addon.html`, `llms.txt`, `style.css` (the apps' "Ember" design:
+- `install.md`: what to ask the person (where Dana runs, Docker, how it is reached, the model provider, who uses it,
+  which apps), then the quick start, the setup link, HTTPS access, pairing the apps, Telegram, backups, checks; and the
+  agent's rules (never print keys, never expose the server without auth, confirm destructive steps, stop on failure).
+- `build-an-addon.md`: the interview (what Dana should do and two example requests, the service and its key, read or
+  act, when, where it shows up, who, region), the design proposed back as the manifest, the checkout and scaffold
+  (`bin/dana addons new NAME` → `./NAME`), the check / test / dev loop, `bin/dana addons install ./NAME --server URL
+  --restart`, turning it on, trying the examples, publishing if wanted.
+- `llms.txt`: the two guides and the docs indexes on GitHub.
+
+The repository's Claude Code skills (`.claude/skills/dana-install`, `dana-addon`) and a new add-on's `AGENTS.md`
+point at these guides; change the guides, not them. `make-an-addon.html` is a short page on building an add-on (the
+scaffold, the loop, installing, publishing) with the add-on prompt.
+
+Plain static files, no build step: `index.html`, `make-an-addon.html`, `install.md`, `build-an-addon.md`, `llms.txt`,
+`copy.js`, `style.css` (the apps' "Ember" design:
 `../server/docs/web-design.md`), `site.js`, `favicon.png`. Open `index.html` in a browser, or serve the folder
 from any static host. `.github/workflows/pages.yml` publishes it to GitHub Pages on every push to master that
 changes it, once the repository is public and Pages is set to deploy from GitHub Actions.
 
 The people, places and amounts on the page are made up, except the cost section; keep it that way. Every claim on
-the page must be something the code does today: change the copy in the same commit as a feature it describes.
+the page and in the guides must be something the code does today: change the copy in the same commit as a feature it describes.

@@ -1,16 +1,27 @@
 # Dana
 
-> Dana is a self-hosted, open-source personal assistant for a household (a Python aiohttp server with an agent loop over LiteLLM, Android clients, a web app). Everything a user can turn on is an add-on: a folder with an `addon.py` manifest and typed Python functions that Dana offers to the model as tools, plus hooks for the Now screen, the briefing, search, web pages and background jobs.
+> Dana is a self-hosted, open-source personal assistant for a household: a Python server (an agent loop over LiteLLM, SQLite, Docker) with Android apps for the phone, watch, wall tablet and TV, a web app and Telegram. Everything a user can turn on is an add-on: its own folder and git repository with an `addon.py` manifest and typed Python functions that Dana offers to the model as tools, plus hooks for the Now screen, the briefing, jobs, events and web pages.
 
-## Making an add-on
+The two guides below are written for coding agents: each says what to ask the person, one question at a time, and then the steps.
 
-- [AGENTS.md of a new add-on](https://github.com/ronganam/dana/blob/master/server/cli/template/AGENTS.md.tmpl): what an add-on is, the loop (`bin/dana addons new`, `check`, `test`, `dev`, `publish`) and the rules (declare needs and touches, secrets only in credentials, made-up test data)
-- [REFERENCE.md](https://github.com/ronganam/dana/blob/master/server/docs/addon-reference.md): every manifest field, every hook with its signature and a tested example, what hooks return, and the manifest's JSON schema (generated from the code)
-- [The showcase add-on](https://github.com/ronganam/dana/tree/master/examples/addons/showcase): one add-on using every capability once, with its tests
-- [Writing an add-on](https://github.com/ronganam/dana/blob/master/server/docs/writing-an-addon.md): the guide (pages and their API, testing, workers)
+## Guides for agents
+
+- [Install Dana](https://ronganam.github.io/dana/install.md): ask where it runs, how it is reached, which model provider, who uses it and which apps; then the Docker quick start, the setup link, HTTPS access, pairing the apps, Telegram, backups and checks
+- [Build an add-on](https://ronganam.github.io/dana/build-an-addon.md): interview the person, propose the manifest, scaffold it with `bin/dana addons new`, the check / test / dev loop, install it on their Dana with `bin/dana addons install ./NAME --server URL --restart`, and publishing to the catalog
+
+## Docs
+
+- [Repository](https://github.com/ronganam/dana): the code, the README and the releases (server image `ghcr.io/ronganam/dana`, signed Android APKs)
+- [Repository map](https://github.com/ronganam/dana/blob/master/AGENTS.md): every part and its guide
+- [Server guide](https://github.com/ronganam/dana/blob/master/server/AGENTS.md): the server's docs index
+- [Android guide](https://github.com/ronganam/dana/blob/master/android/AGENTS.md): the apps' docs index
+- [Add-on reference](https://github.com/ronganam/dana/blob/master/server/docs/addon-reference.md): every manifest field, every hook with its signature and a tested example, the manifest's JSON schema (generated from the code)
+- [Writing an add-on](https://github.com/ronganam/dana/blob/master/server/docs/writing-an-addon.md): the guide (tools, jobs, events, pages, testing, workers)
 - [The add-on design](https://github.com/ronganam/dana/blob/master/docs/addons.md): where add-ons come from, needs and touches, the catalog, installing
 
 ## Optional
 
+- [A new add-on's AGENTS.md](https://github.com/ronganam/dana/blob/master/server/cli/template/AGENTS.md.tmpl): the loop and the rules every scaffolded add-on carries
+- [The showcase add-on](https://github.com/ronganam/dana/tree/master/examples/addons/showcase): one add-on using every capability once, with its tests
+- [Configuration](https://github.com/ronganam/dana/blob/master/server/docs/configuration.md): every environment variable
 - [The catalog](https://github.com/ronganam/dana-catalog): the add-ons anyone can install, and how to add one
-- [Repository map](https://github.com/ronganam/dana/blob/master/AGENTS.md)

@@ -20,12 +20,18 @@ It is one person's daily driver, published as is: opinionated, built around one 
 | [`android/`](android/) | The phone app, the wall-tablet kiosk and the TV home screen (flavors of one app), and the Wear OS watch app (Kotlin, Compose) |
 | [`extensions/raycast-assistant/`](extensions/raycast-assistant/) | A Raycast extension |
 | [`extensions/omarchy/`](extensions/omarchy/) | An Omarchy shell plugin: ask with Super+D, the Now queue in the bar |
-| [`examples/addons/`](examples/addons/) | A working example of an addon you write yourself |
-| [`website/`](website/) | The project's one-page site: open `website/index.html` |
+| [`examples/addons/`](examples/addons/) | Working examples of an add-on you write yourself |
+| [`website/`](website/) | The project's one-page site (open `website/index.html`) and the guides for coding agents: [`install.md`](website/install.md), [`build-an-addon.md`](website/build-an-addon.md) |
 
 ## Run the server
 
-An LLM key is the only thing you need, and the setup page asks for it (Claude by default; OpenAI, Gemini or a local model through Ollama also work). Three steps with Docker, no checkout:
+**Let your coding agent do it.** Paste this into Claude Code, Codex, Cursor or any coding agent; it asks you a few questions (where Dana runs, how you reach it, which model, which apps) and walks you through the rest:
+
+```text
+Read https://ronganam.github.io/dana/install.md and help me install Dana.
+```
+
+Or by hand. An LLM key is the only thing you need, and the setup page asks for it (Claude by default; OpenAI, Gemini or a local model through Ollama also work). Three steps with Docker, no checkout:
 
 ```bash
 curl -fsSLO https://raw.githubusercontent.com/ronganam/dana/master/compose.yaml
@@ -37,7 +43,7 @@ The setup link (one-time, on this machine) creates you as the admin, in that bro
 
 Headless (no browser at hand to open the link): also put `API_TOKEN` in `.env` (generate one: `openssl rand -hex 32`) before the first start, and sign in with it.
 
-Add-ons from the catalog install on the web (Settings → Addons) or with the `dana` command inside the container; either way they go into the `data` volume and survive upgrades:
+Add-ons from the catalog install on the web (Settings → Addons) or with the `dana` command inside the container; either way they go into the `data` volume, survive upgrades and are in every backup:
 
 ```bash
 docker compose exec dana dana addons install <name>   # from the catalog (or REPO@COMMIT[:PATH])
@@ -102,9 +108,9 @@ Some parts need something without being an addon:
 
 ## Your own deployment
 
-Run the published image as upstream ships it and keep your settings in a **site** folder beside the checkout: deploy settings, the apps' server address and TV setup, and notes for you and your coding agents. Start from `site.example/`. Updating is then a new release, and your deployment never drifts from Dana: [`docs/site.md`](docs/site.md).
+Run Dana as upstream ships it (the published image `ghcr.io/ronganam/dana:<version>`) and keep what is yours in a **site** folder beside a checkout: deploy settings, the apps' server address and TV setup, and notes for you and your coding agents. Start from `site.example/`. Updating is then a new release (`server/bin/deploy <version>`), and your deployment never drifts from Dana: [`docs/site.md`](docs/site.md).
 
-Addons: there is one way to extend Dana, installing an addon. Write your own with `server/bin/dana addons new <name>` (a working addon in `./<name>`) and install it with `bin/dana addons install ./<name> --server <your Dana>`, or install one from the catalog or a git repository on the Addons page. Installed addons live in the data volume and **run with the server's full access**: install only code you trust. [`docs/addons.md`](docs/addons.md).
+Everything else you add is an add-on, installed into the server's data folder: from the catalog (Settings → Addons, or `dana addons install <name>`), from a git repository at a full commit, or from a folder on your computer (`bin/dana addons install ./my_thing --server https://your-dana`). Installed add-ons **run with the server's full access**: install only code you trust. [`docs/addons.md`](docs/addons.md).
 
 ## Build the apps
 
@@ -117,9 +123,9 @@ JDK 21 and the Android SDK are needed. Point the app at your server in its Setti
 
 ## Extend it
 
-- A new addon is a package in `server/addons/<name>/`: declare it in `addon.py`, write its tools as typed Python functions with docstrings (the schema is generated), and it shows up for users who connect it. The design: [`docs/addons.md`](docs/addons.md); the reference: [`server/docs/access.md`](server/docs/access.md) → Addon.
-- Something only your setup needs can stay out of the repository as an addon in its own folder or repository, installed on your Dana (`bin/dana addons install ./<name> --server <url>`): the same code as an official addon ([`server/docs/writing-an-addon.md`](server/docs/writing-an-addon.md); working examples: [`examples/addons/hello/`](examples/addons/hello/), the smallest, and [`examples/addons/showcase/`](examples/addons/showcase/), every capability once).
-- **The add-on kit**, made to be driven by a coding agent: `bin/dana addons new <name>` writes an add-on in its own repository with an `AGENTS.md` guide and the generated reference ([`server/docs/addon-reference.md`](server/docs/addon-reference.md)); `check` says what is wrong and how to fix it, `test` runs its tests, `dev` runs it with sample data, and `publish` releases it and opens a pull request to the community catalog, [dana-catalog](https://github.com/ronganam/dana-catalog).
+- **Build an add-on with your coding agent**: paste `Read https://ronganam.github.io/dana/build-an-addon.md and help me build a Dana add-on.` It asks what Dana should do, which service it uses and whether it acts for you, proposes the design, builds and tests it, and installs it on your Dana ([`website/build-an-addon.md`](website/build-an-addon.md)).
+- An add-on is its own folder and git repository: an `addon.py` manifest and typed Python functions with docstrings (the schema is generated), shown to the users who turn it on. The design: [`docs/addons.md`](docs/addons.md); the guide: [`server/docs/writing-an-addon.md`](server/docs/writing-an-addon.md); working examples: [`examples/addons/hello/`](examples/addons/hello/), the smallest, and [`examples/addons/showcase/`](examples/addons/showcase/), every capability once.
+- **The add-on kit** (from a checkout's `server/`): `bin/dana addons new my_thing` writes `./my_thing` in its own repository with an `AGENTS.md` guide and the generated reference ([`server/docs/addon-reference.md`](server/docs/addon-reference.md)); `check` says what is wrong and how to fix it, `test` runs its tests, `dev` runs it in a local test environment, `install ./my_thing --server https://your-dana --restart` puts it on your Dana, and `publish` releases it and opens a pull request to the community catalog, [dana-catalog](https://github.com/ronganam/dana-catalog).
 - Every area has a doc: start from [`server/AGENTS.md`](server/AGENTS.md) and [`android/AGENTS.md`](android/AGENTS.md). They are written for people and coding agents alike.
 
 ## Contributing
