@@ -181,22 +181,23 @@
     const p = (t.priority || "medium").toLowerCase();
     const trig = C.triggersOf(t);
     const group = S.groups.find((g) => g.id === (t.group_id || t.groupId));
-    const tag = (text, style = "") => `<span class="badge-tag"${style}>${esc(text)}</span>`;
+    // One muted line: the group (a dot in its colour) and the triggers, in words.
+    const meta = [
+      group ? `<span class="task-meta-group"><i class="task-meta-dot" aria-hidden="true"></i>${esc(group.name)}</span>` : "",
+      trig.time ? esc(String(trig.time).replace("T", " ")) : "",
+      trig.location && typeof trig.location === "object" ? esc(`${trig.location.event === "leave" ? "Leaving" : "Arriving at"} ${trig.location.location || ""}`.trim()) : "",
+      trig.car ? esc(`Car (${trig.car})`) : "",
+      trig.wake ? "When I wake" : "",
+    ].filter(Boolean);
     return `
       <div class="task-card dn-row ${t.id === S.selected ? "active" : ""}" data-id="${esc(t.id)}"${group && group.color ? ` style="--hue:${esc(group.color)}"` : ""}>
         <div class="task-checkbox prio-${esc(p)} ${done ? "completed" : ""}" data-check="${esc(t.id)}">
           ${done ? `<i data-lucide="check" style="width:14px;height:14px;stroke-width:3;color:var(--on-primary);"></i>` : ""}
         </div>
         <div class="task-content">
-          <span class="task-title ${done ? "completed" : ""}">${esc(t.title)}</span>
-          ${t.description ? `<span class="task-desc">${esc(t.description)}</span>` : ""}
-          <div class="task-tags-row">
-            ${group ? tag(`${group.emoji || "📁"} ${group.name}`, ` style="background:${esc(group.color ? group.color + "22" : "rgb(var(--ink-rgb) / .1)")};color:${esc(group.color || "var(--ink)")};"`) : ""}
-            ${trig.time ? tag(`⏰ ${String(trig.time).replace("T", " ")}`) : ""}
-            ${trig.location && typeof trig.location === "object" ? tag(`📍 ${trig.location.location || ""} (${trig.location.event || "arrive"})`) : ""}
-            ${trig.car ? tag(`🚗 Car (${trig.car})`) : ""}
-            ${trig.wake ? tag("☀️ Wake Up") : ""}
-          </div>
+          <span class="task-title ${done ? "completed" : ""}" dir="auto">${esc(t.title)}</span>
+          ${t.description ? `<span class="task-desc" dir="auto">${esc(t.description)}</span>` : ""}
+          ${meta.length ? `<span class="task-meta">${meta.join('<span aria-hidden="true"> · </span>')}</span>` : ""}
         </div>
       </div>`;
   }

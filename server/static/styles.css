@@ -7,6 +7,31 @@
    turns it off. Never hardcode a colour in a screen: use these tokens.
    ========================================================================== */
 
+/* Self-hosted fonts (static/vendor/fonts; THIRD_PARTY.md): no font CDN at runtime. Instrument Serif and DM Mono
+   are Latin only: Hebrew and Arabic fall back to Inter / the system font. */
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url('/static/vendor/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 400 700; font-display: swap;
+  src: url('/static/vendor/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'DM Mono'; font-style: normal; font-weight: 300 500; font-display: swap;
+  src: url('/static/vendor/fonts/dm-mono-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Instrument Serif'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('/static/vendor/fonts/instrument-serif-regular.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Instrument Serif'; font-style: italic; font-weight: 400; font-display: swap;
+  src: url('/static/vendor/fonts/instrument-serif-italic.woff2') format('woff2');
+}
+
 /* --- 1. Design Tokens --- */
 :root {
   color-scheme: dark;
@@ -76,7 +101,7 @@
 
   /* Layout */
   --rail-width: 80px;
-  --topbar-height: 56px;
+  --topbar-height: 68px;
   --bottomnav-height: 62px;
 }
 
@@ -551,7 +576,8 @@ a {
   display: flex;
 }
 
-/* Top App Bar */
+/* Top App Bar: the place's header (server/docs/web-design.md, "Type"): a serif title, with the place's
+   kicker (.ibx-kicker, kit.css) as a mono eyebrow above it. */
 .top-bar {
   height: var(--topbar-height);
   display: flex;
@@ -565,20 +591,29 @@ a {
 }
 .top-bar-title-group {
   display: flex;
-  flex-direction: column;
+  flex-direction: column-reverse;
   align-items: center;
   text-align: center;
+  gap: 2px;
   flex: 1;
   min-width: 0;
 }
 .top-bar-title {
-  font-size: 17px;
-  font-weight: 600;
-  letter-spacing: -0.2px;
+  font-family: var(--font-serif);
+  font-size: 28px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
   color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .top-bar-subtitle {
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
   color: var(--mute);
   cursor: pointer;
   display: inline-flex;
@@ -787,107 +822,100 @@ a {
 }
 
 /* --- 4b. Screen: Now (static/app-now.js; server/docs/web-design.md, "Now") ---
-   The date in mono caps, the lede in the serif, the day strip, the needs-you rows (a 3 px start bar and a
-   dot in the kind's hue, set as --hue / --hue-text on the row), "Can wait", the notifications line. Rows are
-   hairline-separated on the canvas (the glow shows through); an open row sits on --canvas-soft. */
+   The showreel look: the mono date eyebrow, the serif lede, the day track (4 px hour segments, an ember
+   now-mark), then rows on the canvas: an 8 px dot in the kind's hue (--hue, set on the row), the title, one
+   muted line, the one visible primary as a quiet pill and the "⋯" menu. No boxes, no start bars; hairlines
+   between rows. With nothing waiting the header centres: "All clear." over a sage dot. */
 .now-scroll { flex: 1; overflow-y: auto; outline: none; }
 #panel-now [hidden] { display: none !important; }
-.now-inner { max-width: 760px; margin: 0 auto; padding: 28px 32px 72px; display: flex; flex-direction: column; gap: 28px; }
-.now-head { display: flex; flex-direction: column; gap: 6px; }
-.now-date-row { display: flex; align-items: center; gap: 10px; min-height: 32px; }
-.now-date, .now-section-h, .now-cell-label, .now-src, .now-block-label, .now-quiet-toggle, .now-stale, .now-day-time, .now-qsrc {
-  font-family: var(--font-mono); font-size: 11px; letter-spacing: .7px; text-transform: uppercase; font-weight: 400;
+.now-inner { max-width: 720px; margin: 0 auto; padding: 44px 32px 88px; display: flex; flex-direction: column; gap: 40px; }
+.now-head { display: flex; flex-direction: column; gap: 10px; }
+.now-date-row { display: flex; align-items: center; gap: 12px; min-height: 32px; }
+.now-date, .now-section-h, .now-block-label, .now-quiet-toggle, .now-stale, .now-day-time {
+  font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase; font-weight: 400;
 }
 .now-date { color: var(--mute); }
-.now-stale { color: var(--amber-text); text-transform: none; letter-spacing: 0; }
+.now-stale { color: var(--amber-text); text-transform: none; letter-spacing: 0; font-size: 11px; }
 .now-refresh { margin-inline-start: auto; width: 32px; height: 32px; color: var(--mute); }
-.now-refresh svg { width: 16px; height: 16px; }
+.now-refresh svg { width: 15px; height: 15px; }
 .now-lede {
-  font-family: var(--font-serif); font-weight: 400; font-size: 40px; line-height: 1.12; letter-spacing: -0.2px;
-  color: var(--ink); text-wrap: balance; max-width: 22em;
+  font-family: var(--font-serif); font-weight: 400; font-size: 52px; line-height: 1.06; letter-spacing: -0.01em;
+  color: var(--ink); text-wrap: balance; max-width: 15em;
 }
-.now-lede.script { font-family: var(--font-inter); font-weight: 500; font-size: 30px; line-height: 1.25; letter-spacing: -0.4px; }
+.now-lede.script { font-family: var(--font-inter); font-weight: 500; font-size: 34px; line-height: 1.25; letter-spacing: -0.02em; }
 .now-muted { color: var(--mute); font-size: 13px; }
-.now-section-h { color: var(--mute); display: flex; align-items: baseline; gap: 8px; margin-bottom: 10px; }
-.now-count { color: var(--accent-text); font-weight: 500; }
+.now-section-h { color: var(--mute); display: flex; align-items: baseline; gap: 6px; margin-bottom: 4px; }
+.now-count { color: var(--mute); }
 
-/* All clear: one hue mark and the italic serif line. */
-.now-clear { display: flex; flex-direction: column; gap: 10px; padding: 4px 0; }
-.now-mark { width: 18px; height: 3px; border-radius: var(--radius-xs); background: var(--sage); }
-.now-allclear { font-family: var(--font-serif); font-style: italic; font-size: 26px; line-height: 1.2; color: var(--body-strong); }
-.now-offline { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 40px; }
+/* The day track: one 4 px segment per hour of the waking day; past hours faint, busy ones sky, free ones a
+   wash; the 2 px ember now-mark between the past and the rest. */
+.now-track { display: flex; align-items: center; gap: 5px; margin-top: 14px; max-width: 520px; }
+.now-track i { flex: 1 1 0; max-width: 24px; height: 4px; border-radius: 2px; background: rgb(var(--ink-rgb) / .13); }
+.now-track i.past { background: var(--sky); opacity: .3; }
+.now-track i.busy { background: var(--sky); }
+.now-track .now-mark { flex: 0 0 2px; width: 2px; height: 18px; border-radius: 1px; background: var(--ember); margin-inline: 2px; }
 
-/* Day strip: Now, the hours with something, a narrow cell for a run of empty hours, At home, On waking. */
-.now-strip {
-  list-style: none; display: flex; gap: 0; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity;
-  border-top: 1px solid var(--hairline); border-bottom: 1px solid var(--hairline);
-  margin-inline: -4px; padding-inline: 4px;
-}
-.now-strip::-webkit-scrollbar { display: none; }
-.now-cell {
-  flex: 0 0 auto; min-width: 132px; max-width: 220px; padding: 10px 14px 12px; display: flex; flex-direction: column; gap: 6px;
-  border-inline-start: 1px solid var(--hairline); scroll-snap-align: start;
-}
-.now-cell:first-child { border-inline-start: 0; }
-.now-cell-label { color: var(--mute); }
-.now-cell.gap { min-width: 0; width: calc(28px + 10px * var(--hours, 1)); max-width: 120px; padding-inline: 10px; justify-content: flex-start; }
-.now-cell.gap .now-cell-label { font-size: 10px; opacity: .7; white-space: normal; line-height: 1.35; }
-.now-cell.nowcell { min-width: 84px; position: relative; border-inline-start: 0; }
-.now-cell.nowcell::after {
-  content: ""; position: absolute; top: 8px; bottom: 8px; inset-inline-end: -1px; width: 2px; border-radius: 2px; background: var(--accent);
-}
-.now-cell.nowcell .now-cell-label { color: var(--accent-text); }
-.now-cell-time { font-family: var(--font-serif); font-style: italic; font-size: 24px; line-height: 1; color: var(--ink); }
+/* The day's items: a quiet wrapped line of dot · time · title (past ones faint, the next one in ink). */
+.now-day-list { list-style: none; display: flex; flex-wrap: wrap; gap: 6px 26px; }
 .now-day-item {
-  display: grid; grid-template-columns: 8px auto 1fr; align-items: baseline; column-gap: 6px; text-align: start;
-  font-size: 13px; line-height: 1.35; color: var(--body); padding: 3px 6px; margin-inline: -6px; border-radius: var(--radius-md);
+  display: inline-flex; align-items: baseline; gap: 8px; text-align: start; font-size: 14px; line-height: 1.4; color: var(--body);
+  padding: 5px 0; border-radius: var(--radius-md); max-width: 100%;
 }
 button.now-day-item { cursor: pointer; transition: var(--t-state); }
-button.now-day-item:hover { background: rgb(var(--ink-rgb) / .06); }
-.now-day-item:not(:has(.now-day-time)) { grid-template-columns: 8px 1fr; }
-.now-day-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--hue); align-self: center; }
-.now-day-time { color: var(--mute); font-size: 10.5px; letter-spacing: .3px; }
-.now-day-title { min-width: 0; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+button.now-day-item:hover .now-day-title { color: var(--ink); text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 3px; }
+button.now-day-item:focus-visible { box-shadow: var(--focus-ring); }
+.now-day-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: var(--radius-full); background: var(--hue); align-self: center; }
+.now-day-time { color: var(--mute); letter-spacing: .08em; flex-shrink: 0; }
+.now-day-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .now-day-item.next { color: var(--ink); font-weight: 500; }
 .now-day-item.next .now-day-time { color: var(--accent-text); }
 .now-day-item.past { opacity: .45; }
 .now-cal-note { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: 12.5px; }
 .now-cal-note svg { width: 14px; height: 14px; }
 
-/* Needs you: a row per card. */
-.now-list { display: flex; flex-direction: column; border-top: 1px solid var(--hairline); }
+/* All clear: the header centres in the canvas, under a slightly warmer static glow. */
+.now-allclear { font-family: var(--font-serif); font-style: italic; font-weight: 400; font-size: 64px; line-height: 1.08; color: var(--ink); }
+.now-allclear::after { content: ""; display: block; width: 8px; height: 8px; margin: 18px auto 0; border-radius: var(--radius-full); background: var(--sage); }
+.now-tomorrow { margin-top: 14px; font-size: 13.5px; line-height: 1.5; color: var(--mute); max-width: 300px; text-wrap: balance; }
+.now-inner.clear { min-height: 100%; justify-content: center; }
+.now-inner.clear .now-head { align-items: center; text-align: center; gap: 12px; padding-block: 24px 8px; }
+.now-inner.clear { position: relative; }
+.now-inner.clear .now-date-row { justify-content: center; }
+.now-inner.clear .now-refresh { position: absolute; top: 20px; inset-inline-end: 20px; }
+.now-inner.clear .now-track { width: min(100%, 300px); margin-top: 10px; gap: 6px; }
+.now-inner.clear .now-day-list { justify-content: center; }
+.now-inner.clear .now-day .now-section-h { justify-content: center; }
+.now-inner.clear .now-quiet, .now-inner.clear .now-notifs { align-self: center; }
+#panel-now:has(.now-inner.clear) .now-scroll {
+  background: radial-gradient(90% 50% at 50% -6%, rgb(var(--ember-rgb) / var(--glow-a)) 0%, transparent 70%);
+}
+.now-offline { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding-top: 40px; }
+.now-offline .now-allclear { font-size: 34px; }
+.now-offline .now-allclear::after { display: none; }
+
+/* Needs you: one row per card. */
+.now-list { display: flex; flex-direction: column; }
 .now-card {
-  position: relative; padding: 16px 16px 14px 20px; border-bottom: 1px solid var(--hairline);
-  display: flex; flex-direction: column; gap: 4px; outline: none; transition: background-color var(--dur-fast) var(--ease-standard);
+  position: relative; display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; column-gap: 16px; align-items: start;
+  padding: 18px 0; outline: none; border-radius: var(--radius-md);
 }
-.now-card::before {
-  content: ""; position: absolute; inset-block: 14px; inset-inline-start: 0; width: 3px; border-radius: 2px; background: var(--hue);
-}
-.now-card.open { background: var(--canvas-soft); }
-.now-card:focus-visible { box-shadow: inset 0 0 0 2px rgb(var(--ember-rgb) / .45); }
-.now-src { display: flex; align-items: center; gap: 7px; color: var(--hue-text); min-width: 0; }
-.now-src-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
-.now-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: var(--radius-full); background: var(--hue); }
-.now-title { font-size: 16px; font-weight: 600; line-height: 1.35; color: var(--ink); overflow-wrap: anywhere; }
-.now-why { font-size: 13.5px; color: var(--mute); line-height: 1.45; }
-.now-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
-.now-btn { padding: 6px 14px; font-size: 13px; min-height: 34px; }
-.now-btn.quiet { background: transparent; border-color: transparent; color: var(--body); padding-inline: 10px; }
-.now-btn.quiet:hover { background: rgb(var(--ink-rgb) / .07); border-color: transparent; color: var(--ink); }
-.now-btn:disabled { opacity: .55; cursor: default; }
-.now-btn svg { width: 14px; height: 14px; }
-.now-more {
-  margin-inline-start: auto; display: inline-flex; align-items: center; gap: 4px; padding: 6px 8px; min-height: 34px;
-  font-size: 12.5px; color: var(--mute); border-radius: var(--radius-sm); transition: var(--t-state);
-}
-.now-more:hover { color: var(--ink); background: rgb(var(--ink-rgb) / .06); }
-.now-more svg { width: 14px; height: 14px; transition: transform var(--dur-fast) var(--ease-standard); }
-.now-more[aria-expanded="true"] svg { transform: rotate(180deg); }
+.now-card + .now-card { border-top: 1px solid var(--hairline); }
+.now-card:focus-visible { box-shadow: 0 0 0 2px rgb(var(--ember-rgb) / .45); }
+.now-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: var(--radius-full); background: var(--hue); }
+.now-card > .now-dot { margin-top: 8px; }
+.now-body { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.now-title { font-size: 16px; font-weight: 500; line-height: 1.4; color: var(--ink); overflow-wrap: anywhere; letter-spacing: -0.005em; }
+.now-meta { font-size: 13.5px; line-height: 1.45; color: var(--mute); overflow-wrap: anywhere; }
+.now-acts { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .now-err { color: var(--rose-text); font-size: 13px; margin-top: 6px; }
+/* User text keeps its own direction (dir="auto") but lines up with the row: a Hebrew title in an English UI
+   starts where the others start. */
+.now-body > [dir="auto"], .now-qtext > [dir="auto"], .now-day-title[dir="auto"] { text-align: left; }
+:root[dir="rtl"] .now-body > [dir="auto"], :root[dir="rtl"] .now-qtext > [dir="auto"], :root[dir="rtl"] .now-day-title[dir="auto"] { text-align: right; }
 .now-card.dn-completing { opacity: .55; }
 .now-card.dn-completing .now-title { text-decoration: line-through; text-decoration-color: var(--hue); }
 
-/* Blocks (folded behind More), each in the order the server sent. */
+/* Details (the blocks, folded behind the row's menu), each in the order the server sent. */
 .now-blocks { display: flex; flex-direction: column; gap: 14px; margin-top: 12px; }
 .now-block { border: 0; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .now-block-label { color: var(--mute); font-size: 10.5px; padding: 0; }
@@ -926,53 +954,98 @@ button.now-day-item:hover { background: rgb(var(--ink-rgb) / .06); }
 .now-check { display: flex; align-items: flex-start; gap: 10px; padding: 6px 0; font-size: 13.5px; color: var(--body-strong); cursor: pointer; }
 .now-check input { accent-color: var(--accent); width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; }
 
-/* Can wait: folded; compact rows with their actions. */
+/* Can wait: folded; compact rows, the same shape. */
 .now-quiet-head { display: flex; align-items: center; gap: 10px; }
 .now-quiet-toggle { display: inline-flex; align-items: center; gap: 6px; color: var(--mute); padding: 6px 4px; margin-inline-start: -4px; border-radius: var(--radius-sm); transition: var(--t-state); }
 .now-quiet-toggle:hover { color: var(--ink); }
 .now-quiet-toggle svg { width: 14px; height: 14px; transition: transform var(--dur-fast) var(--ease-standard); }
 .now-quiet.open .now-quiet-toggle svg { transform: rotate(90deg); }
 [dir="rtl"] .now-quiet-toggle svg { transform: scaleX(-1); }
-.now-quiet-n { color: var(--body-strong); }
+.now-quiet-n { color: var(--mute); }
 .now-quiet-head .ibx-link { margin-inline-start: auto; }
-.now-quiet-list { display: flex; flex-direction: column; margin-top: 6px; border-top: 1px solid var(--hairline); }
-.now-qrow { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--hairline); }
-.now-qtext { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
-.now-qtitle { font-size: 13.5px; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.now-qsrc { color: var(--mute); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.now-qacts { display: flex; gap: 4px; flex-shrink: 0; }
-.now-qacts .chip.quiet { background: transparent; border-color: transparent; }
+.now-quiet-list { display: flex; flex-direction: column; margin-top: 4px; }
+.now-qrow { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; column-gap: 16px; align-items: center; padding: 12px 0; }
+.now-qrow + .now-qrow { border-top: 1px solid var(--hairline); }
+.now-qtext { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.now-qtitle { font-size: 14.5px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-qsrc { color: var(--mute); font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* The notifications line. */
 .now-notifs {
-  align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 7px 12px; border-radius: var(--radius-full);
-  border: 1px solid var(--hairline); font-size: 13px; color: var(--body); transition: var(--t-state);
+  align-self: flex-start; display: inline-flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 13.5px; color: var(--mute);
+  border-radius: var(--radius-sm); transition: var(--t-state);
 }
-.now-notifs:hover:not(:disabled) { color: var(--ink); border-color: var(--hairline-strong); }
+.now-notifs:hover:not(:disabled) { color: var(--ink); }
+.now-notifs:focus-visible { box-shadow: var(--focus-ring); }
 .now-notifs:disabled { cursor: default; }
 .now-notifs:disabled svg { display: none; }
-.now-notifs svg { width: 14px; height: 14px; color: var(--mute); }
-.now-notifs-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--teal); }
+.now-notifs svg { width: 14px; height: 14px; }
+.now-notifs-dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--teal); }
 .now-notifs.loud .now-notifs-dot { background: var(--accent); }
 
 /* Loading */
 .now-skel { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
 .now-skel-line, .now-skel-card { border-radius: var(--radius-md); background: rgb(var(--ink-rgb) / .06); }
 .now-skel-line.short { width: 180px; height: 12px; }
-.now-skel-line.wide { width: 70%; height: 34px; }
-.now-skel-card { height: 92px; margin-top: 8px; }
+.now-skel-line.wide { width: 70%; height: 46px; }
+.now-skel-card { height: 64px; margin-top: 8px; }
 
 @media (max-width: 767px) {
-  .now-inner { padding: 20px 16px 40px; gap: 24px; }
-  .now-lede { font-size: 32px; }
-  .now-lede.script { font-size: 25px; }
-  .now-card { padding: 14px 12px 12px 16px; margin-inline: -4px; }
-  .now-cell { min-width: 120px; padding-inline: 12px; }
-  .now-strip { margin-inline: -16px; padding-inline: 16px; }
+  .now-inner { padding: 24px 16px 48px; gap: 32px; }
+  .now-lede { font-size: 40px; }
+  .now-lede.script { font-size: 27px; }
+  .now-allclear { font-size: 46px; }
+  /* The "⋯" stays at the row's end; the pill goes under the text. */
+  .now-card { column-gap: 12px; padding: 16px 0; }
+  .now-card > .now-acts { display: contents; }
+  .now-card .dn-overflow { grid-column: 3; grid-row: 1; margin-top: -2px; margin-inline-end: -6px; }
+  .now-card .dn-pill { grid-column: 2; grid-row: 2; justify-self: start; margin-top: 10px; }
+  .now-inner.clear .now-refresh { top: 12px; inset-inline-end: 8px; }
+  .now-track { gap: 3px; }
+  .now-inner.clear .now-track { gap: 4px; }
+  .now-day-list { flex-direction: column; gap: 0; }
   .ibx-toast.now-toast { bottom: calc(var(--bottomnav-height) + 16px); }
-  .now-qrow { flex-wrap: wrap; }
-  .now-qacts { width: 100%; padding-inline-start: 16px; }
 }
+
+/* Shared row pieces (server/docs/web-design.md, "Rows, not boxes"): the mono eyebrow, the one visible action as
+   a quiet pill (accent tint + accent text; .solid = an ember fill, for approvals only), the row's "⋯" button
+   that opens Dana.menu with every other action. */
+.dn-eyebrow { font-family: var(--font-mono); font-size: 10.5px; font-weight: 400; letter-spacing: .15em; text-transform: uppercase; color: var(--mute); }
+.dn-pill {
+  display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 15px; border-radius: var(--radius-full);
+  background: var(--accent-tint); color: var(--accent-text); font-size: 13px; font-weight: 500; white-space: nowrap; transition: var(--t-state);
+}
+.dn-pill:hover { background: rgb(var(--ember-rgb) / calc(var(--tint-a) + .08)); }
+.dn-pill:focus-visible, .dn-overflow:focus-visible { box-shadow: var(--focus-ring); }
+.dn-pill.solid { background: var(--accent); color: var(--on-accent); }
+.dn-pill.solid:hover { background: var(--accent-warm); }
+.dn-pill.small { height: 28px; padding: 0 12px; font-size: 12.5px; }
+.dn-overflow {
+  width: 32px; height: 32px; border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center;
+  color: var(--mute); transition: var(--t-state);
+}
+.dn-overflow:hover, .dn-overflow[aria-expanded="true"] { color: var(--ink); background: rgb(var(--ink-rgb) / .07); }
+.dn-overflow svg { width: 18px; height: 18px; }
+
+/* The overflow menu (Dana.menu in static/dana.js): a row's other actions under its "⋯" button. */
+.dn-menu {
+  position: fixed; z-index: 90; min-width: 210px; max-width: min(320px, calc(100vw - 16px)); padding: 5px;
+  background: var(--canvas-raised); border: 1px solid var(--hairline-strong); border-radius: 12px; box-shadow: var(--shadow);
+  display: flex; flex-direction: column;
+}
+.dn-menu.dn-menu-in { animation: dn-rise var(--dur-fast) var(--ease-decel); }
+.dn-menu-item {
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border-radius: 8px; text-align: start;
+  font-size: 13.5px; color: var(--body-strong); transition: var(--t-state);
+}
+.dn-menu-item:hover, .dn-menu-item:focus-visible, .dn-menu-item:focus { background: rgb(var(--ink-rgb) / .09); color: var(--ink); outline: none; box-shadow: none; }
+.dn-menu-item[aria-disabled="true"] { opacity: .5; cursor: default; }
+.dn-menu-item[aria-disabled="true"]:hover { background: none; color: var(--body-strong); }
+.dn-menu-item.danger { color: var(--rose-text); }
+.dn-menu-item svg { width: 15px; height: 15px; flex-shrink: 0; color: var(--mute); }
+.dn-menu-label { flex: 1; min-width: 0; }
+.dn-menu-hint { font-family: var(--font-mono); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--mute); }
+.dn-menu-sep { height: 1px; background: var(--hairline); margin: 4px 6px; }
 
 /* --- 5. Screen 1: Chat --- */
 .chat-layout {
@@ -1656,27 +1729,23 @@ button.now-day-item:hover { background: rgb(var(--ink-rgb) / .06); }
   gap: 16px;
 }
 
-/* Task Group Accordion */
-
+/* A row on the canvas (Tasks, Calendar): hairlines between rows, no box; the selected one on the accent tint. */
 .task-card {
-  background: var(--canvas-soft);
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-card);
-  padding: 12px 14px;
+  padding: 14px 10px;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
+  gap: 14px;
   cursor: pointer;
+  border-radius: var(--radius-card);
   transition: var(--t-state);
 }
-.task-card:hover {
-  border-color: var(--hairline-strong);
-  background: var(--canvas-raised);
+.task-card { position: relative; }
+.task-card + .task-card::before {
+  content: ""; position: absolute; top: 0; inset-inline: 10px; height: 1px; background: var(--hairline); pointer-events: none;
 }
-.task-card.active {
-  border-color: rgb(var(--ember-rgb) / 0.7);
-  background: var(--canvas-raised);
-}
+.task-card:hover { background: rgb(var(--ink-rgb) / 0.04); }
+.task-card.active { background: rgb(var(--ember-rgb) / 0.09); }
+.task-card:hover::before, .task-card:hover + .task-card::before, .task-card.active::before, .task-card.active + .task-card::before { opacity: 0; }
 
 .badge-tag {
   font-size: 11px;
@@ -2064,6 +2133,7 @@ button.now-day-item:hover { background: rgb(var(--ink-rgb) / .06); }
 }
 .profile-hint { font-size: 12px; color: var(--body); }
 .profile-hint.bad { color: var(--destructive); }
+.settings-card-title { font-family: var(--font-serif); font-size: 26px; font-weight: 400; line-height: 1.15; color: var(--ink); }
 .settings-card {
   width: 100%;
   max-width: 520px;
@@ -2620,7 +2690,7 @@ textarea.form-control {
 
 /* Press: a quick scale, everywhere something is tapped. */
 :is(.btn-primary, .btn-secondary, .btn-destructive-outline, .btn-ghost-danger, .chip, .icon-btn, .rail-btn, .bottom-nav-btn,
-  .nav-tile, .segmented-btn, .task-card, .now-more, .now-choice, .now-notifs, .now-quiet-toggle, button.now-day-item, .chat-sidebar-item, .settings-link-tile, .selection-option-row, .filter-nav-item, .ibx-link,
+  .nav-tile, .segmented-btn, .task-card, .dn-pill, .dn-overflow, .now-choice, .now-notifs, .now-quiet-toggle, button.now-day-item, .chat-sidebar-item, .settings-link-tile, .selection-option-row, .filter-nav-item, .ibx-link,
   .chat-bubble-act-btn, .project-tab, .knowledge-entry-card):active:not(:disabled) {
   transform: scale(0.97);
 }

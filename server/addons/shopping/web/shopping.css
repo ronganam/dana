@@ -7,7 +7,6 @@
 
 /* Header */
 .shp-top .top-bar-actions { gap: 6px; }
-#shp-sub { font-family: var(--font-inter); font-size: 12.5px; text-transform: none; letter-spacing: 0; color: var(--mute); font-weight: 400; }
 .shp-top .chip svg { width: 14px; height: 14px; }
 #shp-people:empty { display: none; }
 .shp-people { display: flex; align-items: center; padding-inline-end: 4px; }

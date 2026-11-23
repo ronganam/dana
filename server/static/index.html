@@ -15,10 +15,9 @@
     <link rel="apple-touch-icon" href="/static/icons/icon-192x192.png">
     <link rel="icon" type="image/png" href="/static/favicon.png">
     <link rel="manifest" href="/manifest.json">
-    <!-- Google Fonts: Inter (narrative), DM Mono (labels), Instrument Serif (headlines) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,400&family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Self-hosted fonts (styles.css): Inter (body), DM Mono (labels), Instrument Serif (titles) -->
+    <link rel="preload" href="/static/vendor/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
+    <link rel="preload" href="/static/vendor/fonts/instrument-serif-regular.woff2" as="font" type="font/woff2" crossorigin>
     <!-- Stylesheet -->
     <link rel="stylesheet" href="/static/styles.css">
     <link rel="stylesheet" href="/static/kit.css">
@@ -232,7 +231,7 @@
                 <div class="settings-container">
                     <!-- static/profile.js: the signed-in user's languages and currency -->
                     <div class="settings-card" id="profile-card">
-                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Profile</h2>
+                        <h2 class="settings-card-title">Profile</h2>
                         <div class="settings-input-group">
                             <label class="settings-label" for="profile-languages">Languages</label>
                             <input type="text" class="settings-input" id="profile-languages" autocomplete="off" spellcheck="false">
@@ -248,7 +247,7 @@
                     </div>
                     <!-- static/zones.js: the signed-in user's places (Home and the others) for location reminders -->
                     <div class="settings-card" id="zones-card">
-                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Zones</h2>
+                        <h2 class="settings-card-title">Zones</h2>
                         <span class="profile-hint">Places for reminders when you arrive or leave: Home and the others you go to.</span>
                         <div id="zones-list"></div>
                         <div class="zn-btns">
@@ -260,16 +259,16 @@
                     </div>
                     <!-- static/setup.js (the wizard) and static/llm.js (the model): server/docs/devices.md, configuration.md -->
                     <div class="settings-card" id="llm-card">
-                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">The model</h2>
+                        <h2 class="settings-card-title">The model</h2>
                         <div id="llm-box"></div>
                     </div>
                     <!-- static/backups.js: backups of the whole server (admins): server/docs/backups.md -->
                     <div class="settings-card hidden" id="backups-card">
-                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Backups</h2>
+                        <h2 class="settings-card-title">Backups</h2>
                         <div id="backups-box"></div>
                     </div>
                     <div class="settings-card">
-                        <h2 style="font-size:18px;font-weight:600;color:var(--ink);">Dana</h2>
+                        <h2 class="settings-card-title">Dana</h2>
                         
                         <div class="settings-input-group">
                             <span class="settings-label" id="settings-theme-label">Theme</span>

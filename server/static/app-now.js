@@ -1,12 +1,13 @@
 /* The web app — the Now screen (static/app.js says how the app's scripts fit together).
  *
  * The screen the app opens on: what's happening today and what needs a decision, from GET /api/now
- * (server/docs/now.md; a core composer, so the shell names it). The header (the date, the lede), the day
- * strip, the needs-you cards (a hue by kind, blocks folded behind More, the primary and the quiet actions,
- * acted on optimistically with Undo), "Can wait", the notifications line, All clear. Refreshed when it
+ * (server/docs/now.md; a core composer, so the shell names it). The header (the date, the lede, the day
+ * track and the day's items), the needs-you rows (a dot in the kind's hue, the title, one muted line, the one
+ * visible primary and every other action in the row's "⋯" menu, details folded, acted on optimistically with
+ * Undo), "Can wait", the notifications line, All clear (centred). Refreshed when it
  * opens, when the window comes back, and every minute while it is on screen (never in the background);
  * a refresh keeps the cards on screen as they are and only new ones rise in. Keyboard: j / k (or the
- * arrows on a card) between cards, Enter = its primary action, e = More.
+ * arrows on a card) between cards, Enter = its primary action (else its menu), e = details, m = the menu.
  * The pure part is DanaNow (static/app-now-core.js). server/docs/web-design.md, "Now".
  */
 
@@ -103,7 +104,8 @@ function nowFailedFirst() {
         <button type="button" class="btn-secondary" data-now-retry>Try again</button></div>`;
 }
 
-/** The screen's frame, drawn once; each refresh fills its parts. */
+/** The screen's frame, drawn once; each refresh fills its parts. With nothing waiting the header centres
+ *  (`.clear`): the date, the italic "All clear." over a sage dot, the track, the lede as a quiet line. */
 function nowFrame() {
     const root = nowEl("now-root");
     if (root.dataset.state === "ready") return root;
@@ -116,8 +118,10 @@ function nowFrame() {
                 <button type="button" class="icon-btn now-refresh" id="now-refresh" aria-label="Refresh" title="Refresh"><i data-lucide="rotate-cw" aria-hidden="true"></i></button>
             </div>
             <h1 class="now-lede" id="now-lede"></h1>
+            <p class="now-allclear" id="now-clear" hidden>All clear.</p>
+            <div class="now-track" id="now-track" aria-hidden="true"></div>
+            <p class="now-tomorrow" id="now-tomorrow" hidden></p>
         </header>
-        <div class="now-clear" id="now-clear" hidden><span class="now-mark" aria-hidden="true"></span><p class="now-allclear">All clear.</p></div>
         <section class="now-day" id="now-day" aria-label="Today" hidden></section>
         <section class="now-needs" id="now-needs" aria-labelledby="now-needs-h">
             <h2 class="now-section-h" id="now-needs-h">Needs you <span class="now-count" id="now-count"></span></h2>
@@ -152,6 +156,11 @@ function drawNow() {
         ledeEl.classList.toggle("script", C.isRtl(lede));   // the serif is Latin only: Hebrew / Arabic in Inter
         if (!first) window.Dana.motion.flash(ledeEl);
     }
+    // All clear: the lede (when the server wrote one) becomes the quiet line under the track.
+    const tomorrow = nowEl("now-tomorrow");
+    const serverLede = typeof d.lede === "string" ? d.lede.trim() : "";
+    tomorrow.textContent = serverLede;
+    tomorrow.setAttribute("dir", "auto");
     paintStale();
 
     const rec = C.reconcile(nowState.items, d.items || [], nowState.pending);
@@ -173,33 +182,36 @@ function paintStale() {
     if (nowState.failed) el.textContent = window.DanaNow.updatedAgo(nowState.lastOk, Date.now());
 }
 
-// ── The day strip ──────────────────────────────────────────────────────
+// ── The day: the track under the lede, the day's items ─────────────────
 
 function drawDay() {
     const C = window.DanaNow;
     const d = nowState.data;
-    const el = nowEl("now-day");
     const minutes = C.minutesNow(d.now, nowState.fetchedAt, Date.now());
+    const track = C.dayTrack(d.day, minutes);
+    const segs = track.hours.map(h => `<i class="${h.past ? "past" : h.busy ? "busy" : ""}"></i>`);
+    if (track.mark >= 0) segs.splice(track.mark, 0, `<b class="now-mark" title="${escapeHtml(track.now)}"></b>`);
+    nowEl("now-track").innerHTML = segs.join("");
+
+    const el = nowEl("now-day");
     const day = C.dayCells(d.day, minutes);
     el.hidden = !day.show && !day.calendarNote;
     if (el.hidden) { el.replaceChildren(); return; }
-    const item = (it) => {
+    const item = (it, cell) => {
         const page = it.ref ? panelOpening(it.ref.type) : null;
         const cls = `now-day-item${it.past ? " past" : ""}${it.next ? " next" : ""}`;
+        const when = it.time || (cell.type === "hour" ? "" : cell.label);
         const inner = `<span class="now-day-dot" style="--hue: var(--${it.hue})" aria-hidden="true"></span>`
-            + (it.time ? `<span class="now-day-time">${escapeHtml(it.time)}</span>` : "")
+            + (when ? `<span class="now-day-time">${escapeHtml(when)}</span>` : "")
             + `<span class="now-day-title"${nowRtl(it.title)}>${escapeHtml(it.title)}</span>`;
-        return page
-            ? `<button type="button" class="${cls}" data-day-page="${escapeHtml(page)}" data-day-arg="${escapeHtml(it.ref.id)}"${it.next ? ' aria-current="time"' : ""}>${inner}</button>`
-            : `<div class="${cls}"${it.next ? ' aria-current="time"' : ""}>${inner}</div>`;
+        const attrs = `${it.next ? ' aria-current="time"' : ""}`;
+        return `<li>${page
+            ? `<button type="button" class="${cls}" data-day-page="${escapeHtml(page)}" data-day-arg="${escapeHtml(it.ref.id)}"${attrs}>${inner}</button>`
+            : `<div class="${cls}"${attrs}>${inner}</div>`}</li>`;
     };
-    const cells = day.cells.map(c => c.type === "gap"
-        ? `<li class="now-cell gap" style="--hours: ${c.hours}"><span class="now-cell-label">${escapeHtml(c.label)}</span></li>`
-        : `<li class="now-cell ${c.type === "hour" ? "hour" : "slot"}"><span class="now-cell-label">${escapeHtml(c.label)}</span>${c.items.map(item).join("")}</li>`);
     el.innerHTML = (day.show
-        ? `<h2 class="now-section-h">Today</h2><ol class="now-strip" aria-label="Today's timeline">`
-            + `<li class="now-cell nowcell" aria-label="Now, ${escapeHtml(C.clock(minutes))}"><span class="now-cell-label">Now</span><span class="now-cell-time">${escapeHtml(C.clock(minutes))}</span></li>`
-            + cells.join("") + `</ol>`
+        ? `<h2 class="now-section-h">Today <span class="nav-sr-only">, now ${escapeHtml(C.clock(minutes))}</span></h2>`
+            + `<ul class="now-day-list">${day.cells.flatMap(c => c.items.map(it => item(it, c))).join("")}</ul>`
         : "")
         + (day.calendarNote ? `<p class="now-muted now-cal-note"><i data-lucide="calendar-x" aria-hidden="true"></i>Calendar couldn't be read</p>` : "");
 }
@@ -245,41 +257,67 @@ function blockHtml(b, item, bi) {
     }
 }
 
+/** The row's "⋯" menu: every action but the primary (a reply the web cannot send drawn disabled), then the
+ *  details when the card has blocks. */
+function cardMenu(item, holder, anchor) {
+    const C = window.DanaNow;
+    const id = item.id;
+    const items = [];
+    const acts = [...(item.primary && !C.canDo(item.primary) ? [[item.primary, "p"]] : []),
+                  ...(item.secondary || []).map((a, i) => [a, String(i)])];
+    for (const [a, which] of acts) {
+        if (!C.canDo(a)) items.push({ label: `${a.label || "Reply"} on phone`, hint: "Phone only", icon: "smartphone", disabled: true });
+        else items.push({ label: a.label || a.action, onSelect: () => nowAct(id, which) });
+    }
+    if (Array.isArray(item.blocks) && item.blocks.length && holder) {
+        if (items.length) items.push(null);
+        const open = nowState.expanded.has(id);
+        items.push({ label: open ? "Hide details" : "Show details", icon: open ? "chevron-up" : "chevron-down", onSelect: () => toggleCard(id) });
+    }
+    window.Dana.menu(anchor, items, { label: `More for ${item.title || "this"}` });
+}
+
+/** Whether a row has anything for its menu (other actions, a reply on phone, details). */
+const hasMenu = (item, withDetails) => Boolean((item.secondary || []).length
+    || (item.primary && !window.DanaNow.canDo(item.primary)) || (withDetails && Array.isArray(item.blocks) && item.blocks.length));
+
+/** The visible primary: a quiet pill (an ember fill for an approval), or nothing when the web cannot do it. */
+function primaryPill(item, small) {
+    const C = window.DanaNow;
+    if (!item.primary || !C.canDo(item.primary)) return "";
+    const label = C.primaryLabel(item, nowState.forms[item.id]);
+    return `<button type="button" class="dn-pill${item.kind === "approval" ? " solid" : ""}${small ? " small" : ""}" data-act="p">${escapeHtml(label)}</button>`;
+}
+
+const overflowBtn = (item, dom) => `<button type="button" class="dn-overflow" data-menu aria-haspopup="menu" aria-expanded="false"`
+    + ` aria-label="More for ${escapeHtml(item.title || "this")}"${dom ? ` aria-controls="${dom}-b"` : ""} title="More"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>`;
+
 function cardEl(item) {
     const C = window.DanaNow;
     const dom = cardDomId(item.id);
     const blocks = Array.isArray(item.blocks) ? item.blocks : [];
     const open = nowState.expanded.has(item.id);
-    const primary = item.primary;
     const el = document.createElement("article");
-    el.className = "now-card dn-row" + (open ? " open" : "");
+    el.className = "now-card dn-row" + (open ? " open" : "") + (blocks.length ? " has-details" : "");
     el.id = dom;
     el.dataset.id = item.id;
     el.tabIndex = -1;
     el.setAttribute("role", "region");
     el.setAttribute("aria-labelledby", `${dom}-t`);
     el.style.setProperty("--hue", `var(--${C.hueOf(item)})`);
-    el.style.setProperty("--hue-text", `var(--${C.hueOf(item)}-text)`);
-    const btn = (action, which, cls) => {
-        if (!C.canDo(action)) {
-            return `<button type="button" class="btn-secondary now-btn" disabled title="Reply from your phone" aria-label="${escapeHtml(action.label || "Reply")} — from your phone only">`
-                + `<i data-lucide="smartphone" aria-hidden="true"></i>${escapeHtml(action.label || "Reply")} on phone</button>`;
-        }
-        const label = which === "p" ? C.primaryLabel(item, nowState.forms[item.id]) : (action.label || action.action);
-        return `<button type="button" class="${cls}" data-act="${which}">${escapeHtml(label)}</button>`;
-    };
     const err = nowState.errors[item.id];
+    const source = item.source || "";
+    const meta = [source ? `<span class="now-src"${nowRtl(source)}>${nowSource(source)}</span>` : "",
+                  item.why ? `<span class="now-why"${nowRtl(item.why)}>${escapeHtml(item.why)}</span>` : ""].filter(Boolean);
     el.innerHTML = `
-        <div class="now-src"><span class="now-dot" aria-hidden="true"></span><span class="now-src-text"${nowRtl(item.source)}>${nowSource(item.source || item.kind || "")}</span></div>
-        <h3 class="now-title" id="${dom}-t"${nowRtl(item.title)}>${escapeHtml(item.title || "")}</h3>
-        ${item.why ? `<p class="now-why"${nowRtl(item.why)}>${escapeHtml(item.why)}</p>` : ""}
-        ${blocks.length ? `<div class="now-blocks" id="${dom}-b"${open ? "" : " hidden"}>${blocks.map((b, i) => blockHtml(b, item, i)).join("")}</div>` : ""}
-        <div class="now-acts">
-            ${primary ? btn(primary, "p", "btn-primary now-btn") : ""}
-            ${(item.secondary || []).map((a, i) => btn(a, String(i), "btn-secondary now-btn quiet")).join("")}
-            ${blocks.length ? `<button type="button" class="now-more" data-more aria-expanded="${open}" aria-controls="${dom}-b">${open ? "Less" : "More"}<i data-lucide="chevron-down" aria-hidden="true"></i></button>` : ""}
+        <span class="now-dot" aria-hidden="true"></span>
+        <div class="now-body">
+            <h3 class="now-title" id="${dom}-t"${nowRtl(item.title)}>${escapeHtml(item.title || "")}</h3>
+            ${meta.length ? `<p class="now-meta">${meta.join('<span class="now-sep" aria-hidden="true"> · </span>')}</p>` : ""}
+            ${blocks.length ? `<div class="now-blocks" id="${dom}-b"${open ? "" : " hidden"}>${blocks.map((b, i) => blockHtml(b, item, i)).join("")}</div>` : ""}
+            <p class="now-err" role="alert"${err ? "" : " hidden"}>${escapeHtml(err || "")}</p>
         </div>
-        <p class="now-err" role="alert"${err ? "" : " hidden"}>${escapeHtml(err || "")}</p>`;
+        <div class="now-acts">${primaryPill(item)}${hasMenu(item, true) ? overflowBtn(item, blocks.length ? dom : "") : ""}</div>`;
     return el;
 }
 
@@ -315,9 +353,13 @@ function drawCards(rec, first) {
 
 function paintNeedsCount() {
     const n = nowState.items.length;
-    window.Dana.motion.number(nowEl("now-count"), n ? String(n) : "");
+    window.Dana.motion.number(nowEl("now-count"), n ? `· ${n}` : "");
+    const clear = !n && Boolean(nowState.data);
     nowEl("now-needs").hidden = !n;
-    nowEl("now-clear").hidden = Boolean(n) || !nowState.data;
+    nowEl("now-clear").hidden = !clear;
+    nowEl("now-lede").hidden = clear;
+    nowEl("now-tomorrow").hidden = !clear || !nowEl("now-tomorrow").textContent;
+    nowEl("now-root").classList.toggle("clear", clear);
 }
 
 function redrawCard(id) {
@@ -325,7 +367,7 @@ function redrawCard(id) {
     const old = nowEl(cardDomId(id));
     if (!item || !old) return null;
     const focused = document.activeElement && old.contains(document.activeElement) ? document.activeElement : null;
-    const sel = focused ? (focused.dataset.act ? `[data-act="${focused.dataset.act}"]` : focused.hasAttribute("data-more") ? "[data-more]" : null) : null;
+    const sel = focused ? (focused.dataset.act ? `[data-act="${focused.dataset.act}"]` : focused.hasAttribute("data-menu") ? "[data-menu]" : null) : null;
     const fresh = cardEl(item);
     old.replaceWith(fresh);
     refreshIcons();
@@ -347,11 +389,6 @@ function toggleCard(id, open) {
             void blocks.offsetWidth;
             blocks.classList.add("dn-new");
         }
-    }
-    const more = el.querySelector("[data-more]");
-    if (more) {
-        more.setAttribute("aria-expanded", String(want));
-        more.firstChild.textContent = want ? "Less" : "More";
     }
 }
 
@@ -474,13 +511,11 @@ function drawQuiet() {
     nowEl("now-quiet").classList.toggle("open", nowState.quietOpen);
     list.hidden = !nowState.quietOpen;
     nowEl("now-quiet-all").hidden = !nowState.quietOpen || nowState.quiet.length < 2;
-    list.innerHTML = nowState.quiet.map(q => {
-        const btn = (a, which, cls) => C.canDo(a) ? `<button type="button" class="${cls}" data-act="${which}">${escapeHtml(a.label || a.action)}</button>` : "";
-        return `<div class="now-qrow" data-id="${escapeHtml(q.id)}" style="--hue: var(--${C.hueOf(q)})">`
+    list.innerHTML = nowState.quiet.map(q =>
+        `<div class="now-qrow" data-id="${escapeHtml(q.id)}" style="--hue: var(--${C.hueOf(q)})">`
             + `<span class="now-dot" aria-hidden="true"></span><div class="now-qtext"><span class="now-qtitle"${nowRtl(q.title)}>${escapeHtml(q.title || "")}</span>`
             + (q.source ? `<span class="now-qsrc"${nowRtl(q.source)}>${nowSource(q.source)}</span>` : "") + `</div>`
-            + `<div class="now-qacts">${q.primary ? btn(q.primary, "p", "chip") : ""}${(q.secondary || []).map((a, i) => btn(a, String(i), "chip quiet")).join("")}</div></div>`;
-    }).join("");
+            + `<div class="now-acts">${primaryPill(q, true)}${hasMenu(q, false) ? overflowBtn(q, "") : ""}</div></div>`).join("");
     paintQuietCount();
 }
 
@@ -494,6 +529,13 @@ function drawNotifs() {
     el.classList.toggle("loud", Number(n.needs_you) > 0);
     window.Dana.motion.number(nowEl("now-notifs-text"), text);
     if (page) el.dataset.page = page; else delete el.dataset.page;
+}
+
+/** Opens the menu of the row `holder` (a needs-you card or a Can wait row) under its "⋯" button. */
+function openRowMenu(holder, anchor) {
+    const id = holder.dataset.id;
+    const item = nowState.items.find(i => i.id === id) || nowState.quiet.find(i => i.id === id);
+    if (item) cardMenu(item, holder.classList.contains("now-card") ? holder : null, anchor);
 }
 
 // ── Events ─────────────────────────────────────────────────────────────
@@ -510,7 +552,8 @@ function drawNotifs() {
         const act = t.closest("[data-act]");
         const holder = t.closest("[data-id]");
         if (act && holder && !act.disabled) { nowAct(holder.dataset.id, act.dataset.act); return; }
-        if (t.closest("[data-more]") && holder) { toggleCard(holder.dataset.id); return; }
+        const menuBtn = t.closest("[data-menu]");
+        if (menuBtn && holder) { openRowMenu(holder, menuBtn); return; }
         const day = t.closest("[data-day-page]");
         if (day) { openScreen(day.dataset.dayPage, day.dataset.dayArg || null); return; }
         if (t.closest("#now-quiet-toggle")) { nowState.quietOpen = !nowState.quietOpen; drawQuiet(); refreshIcons(); return; }
@@ -539,7 +582,7 @@ function drawNotifs() {
     });
 })();
 
-// The keyboard: j / k between cards (the arrows too, on a card), Enter = the card's primary, e = More.
+// The keyboard: j / k between cards (the arrows too, on a card), Enter = the card's primary (else its menu), m = the menu, e = the details.
 document.addEventListener("keydown", (e) => {
     if (activeTab !== "now" || e.altKey || e.ctrlKey || e.metaKey) return;
     const t = e.target;
@@ -558,9 +601,11 @@ document.addEventListener("keydown", (e) => {
     }
     if (!current) return;
     if (e.key === "e") { e.preventDefault(); toggleCard(current.dataset.id); return; }
+    const menuBtn = current.querySelector("[data-menu]");
+    if (e.key === "m" && menuBtn) { e.preventDefault(); openRowMenu(current, menuBtn); return; }
     if (e.key === "Enter" && onCard) {
         e.preventDefault();
         const p = current.querySelector('[data-act="p"]:not(:disabled)');
-        if (p) p.click(); else toggleCard(current.dataset.id);
+        if (p) p.click(); else if (menuBtn) openRowMenu(current, menuBtn); else toggleCard(current.dataset.id);
     }
 });

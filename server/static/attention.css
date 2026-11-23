@@ -1,20 +1,23 @@
-/* Needs attention (static/attention.js). Tokens from styles.css: a rose start bar per row (alerts), the
-   Now screen's all-clear mark and serif line when nothing fails. */
+/* Needs attention (static/attention.js). Tokens from styles.css: rows on the canvas with a rose dot (grey when
+   the card is ignored), the fix as the quiet pill, the Now screen's italic "All clear." when nothing fails. */
 .att-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.att-row { position: relative; display: flex; gap: 12px; padding: 14px 4px 14px 14px; border-bottom: 1px solid var(--hairline); }
-.att-row:last-child { border-bottom: 0; }
-.att-row.focus { background: var(--canvas-soft); border-radius: var(--radius-card); }
+.att-row { display: grid; grid-template-columns: 8px minmax(0, 1fr); column-gap: 16px; padding: 16px 4px; }
+.att-row + .att-row { border-top: 1px solid var(--hairline); }
+.att-row.focus { background: rgb(var(--ink-rgb) / .04); border-radius: var(--radius-card); }
 .att-row.ignored .att-title { color: var(--body); }
-.att-bar { position: absolute; inset-block: 14px; inset-inline-start: 0; width: 3px; border-radius: var(--radius-xs); background: var(--rose); }
-.att-row.ignored .att-bar { background: var(--hairline-strong); }
-.att-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.att-meta { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .5px; text-transform: uppercase; color: var(--mute); }
-.att-title { margin: 0; font-size: 15px; font-weight: 500; color: var(--ink); }
-.att-why { margin: 0; font-size: 13.5px; color: var(--body); line-height: 1.45; }
-.att-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+.att-dot { width: 8px; height: 8px; margin-top: 23px; border-radius: var(--radius-full); background: var(--rose); }
+.att-row.ignored .att-dot { background: var(--hairline-strong); }
+.att-text { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.att-meta { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .15em; text-transform: uppercase; color: var(--mute); }
+.att-title { margin: 0; font-size: 16px; font-weight: 500; line-height: 1.4; color: var(--ink); }
+.att-why { margin: 0; font-size: 13.5px; color: var(--mute); line-height: 1.45; }
+.att-actions { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-top: 10px; }
 .att-actions button[disabled] { opacity: .55; cursor: default; }
+.att-quiet { height: 32px; padding: 0 12px; border-radius: var(--radius-full); font-size: 13px; color: var(--mute); transition: var(--t-state); }
+.att-quiet:hover { color: var(--ink); background: rgb(var(--ink-rgb) / .07); }
 .att-status { margin: 2px 0 0; font-size: 13px; }
 .att-status.ok { color: var(--sage-text); }
 .att-status.bad { color: var(--rose-text); }
-.att-clear { display: flex; flex-direction: column; gap: 10px; padding: 8px 0; }
-.att-muted { color: var(--mute); font-size: 13px; margin: 0; }
+.att-clear { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 16px; padding: 48px 0 8px; }
+.att-clear .now-allclear { font-size: 48px; }
+.att-muted { color: var(--mute); font-size: 13.5px; margin: 0; max-width: 380px; }

@@ -281,16 +281,19 @@
       : s.call ? `Call · ${s.call.contact || ""}` : "";
     const kind = s.kind === "event" ? "Event" : s.kind === "alert" ? "Alert" : "Task";
     const trigs = trigList(p);
-    return `<div class="ibx-sugg" data-sugg="${esc(s.id)}">
-      <div class="ibx-sugg-kicker" dir="auto">${esc(kind)}${src ? ` · from ${esc(src)}` : ""}</div>
-      <div class="ibx-sugg-title" dir="auto">${esc(p.title || "(untitled)")}</div>
-      ${trigs.length ? `<div class="ibx-trigs">${trigs.map((t) => `<span class="ibx-trig" dir="auto">${esc(t)}</span>`).join("")}</div>` : ""}
-      ${p.evidence ? `<div class="ibx-sugg-ev" dir="auto">“${esc(p.evidence)}”</div>` : ""}
-      <div class="ibx-btns">
-        <button class="btn-primary" data-act="sugg-accept"><i data-lucide="plus"></i>${s.kind === "event" ? "Add to calendar" : "Create task"}</button>
-        <button class="btn-secondary" data-act="sugg-edit"><i data-lucide="pencil"></i>Edit</button>
-        <button class="btn-secondary" data-act="sugg-ask"><i data-lucide="sparkles"></i>Ask Dana</button>
-        <button class="btn-ghost-danger" data-act="sugg-dismiss">Dismiss</button>
+    // A row (server/docs/web-design.md, "Rows, not boxes"): a dot, the title, one muted line, the one visible
+    // action and the rest (Edit, Ask Dana, Dismiss) in its "⋯" menu.
+    const meta = [`${kind}${src ? ` · from ${src}` : ""}`, ...trigs];
+    return `<div class="ibx-sugg" data-sugg="${esc(s.id)}" style="--hue: var(--${s.kind === "event" ? "sky" : "plum"})">
+      <span class="ibx-sugg-dot" aria-hidden="true"></span>
+      <div class="ibx-sugg-body">
+        <div class="ibx-sugg-title" dir="auto">${esc(p.title || "(untitled)")}</div>
+        <div class="ibx-sugg-meta">${meta.map((m) => `<bdi>${esc(m)}</bdi>`).join(" · ")}</div>
+        ${p.evidence ? `<div class="ibx-sugg-ev" dir="auto">“${esc(p.evidence)}”</div>` : ""}
+      </div>
+      <div class="ibx-sugg-acts">
+        <button type="button" class="dn-pill small" data-act="sugg-accept">${s.kind === "event" ? "Add to calendar" : "Create task"}</button>
+        <button type="button" class="dn-overflow" data-act="sugg-menu" aria-haspopup="menu" aria-expanded="false" aria-label="More for ${esc(p.title || "this suggestion")}" title="More"><i data-lucide="more-horizontal" aria-hidden="true"></i></button>
       </div>
     </div>`;
   }
@@ -428,7 +431,7 @@
 
       ${phoneHtml(n)}
 
-      ${sug.length ? `<div class="ibx-block"><div class="ibx-block-label">Dana suggests</div>${sug.map(suggHtml).join("").replaceAll('class="ibx-sugg"', 'class="ibx-sugg" style="margin:0 0 8px"')}</div>` : ""}
+      ${sug.length ? `<div class="ibx-block"><div class="ibx-block-label">Dana suggests</div>${sug.map(suggHtml).join("")}</div>` : ""}
 
       <div class="ibx-block"><div class="ibx-block-label">Notifications from ${esc(appName(n))}</div>
         <div class="ibx-seg">${RULES.map((r) => `<button class="chip${r.id === rule ? " active" : ""}" data-act="rule" data-rule="${r.id}">${esc(r.label)}</button>`).join("")}</div>
@@ -755,7 +758,7 @@
     if (act === "fold-sugg") { S.suggOpen = !S.suggOpen; store("ibx.suggOpen", S.suggOpen ? "1" : "0"); renderList({ keepScroll: true }); return; }
     if (act === "sugg-more") { S.suggAll = true; renderList({ keepScroll: true }); return; }
     if (act === "sugg-dismiss-all") { if (confirm(`Dismiss all ${S.suggestions.length} suggestions?`)) dismissSugg(S.suggestions.map((s) => s.id)); return; }
-    if (sugg && act) return suggAction(act, sugg);
+    if (sugg && act) return suggAction(act, sugg, t.closest("[data-act]"));
     if (act === "dismiss-bucket") { setStatus(S.items.map((n) => n.id), "dismissed"); return; }
     if (grp) {
       e.stopPropagation();
@@ -779,7 +782,15 @@
     open(id);
   }
 
-  function suggAction(act, id) {
+  function suggAction(act, id, btn) {
+    if (act === "sugg-menu") {
+      return A.menu(btn, [
+        { label: "Edit", icon: "pencil", onSelect: () => editSugg(id) },
+        { label: "Ask Dana", icon: "sparkles", onSelect: () => askDana("suggestion", id) },
+        null,
+        { label: "Dismiss", icon: "x", danger: true, onSelect: () => dismissSugg([id]) },
+      ], { label: "Suggestion actions" });
+    }
     if (act === "sugg-accept") return acceptSugg(id);
     if (act === "sugg-edit") return editSugg(id);
     if (act === "sugg-dismiss") return dismissSugg([id]);
@@ -792,7 +803,7 @@
     const n = current();
     const act = b.dataset.act;
     const sugg = b.closest("[data-sugg]")?.dataset.sugg;
-    if (sugg) return suggAction(act, sugg);
+    if (sugg) return suggAction(act, sugg, b);
     if (act === "close") { S.openId = null; renderList({ keepScroll: true }); renderDetail(); return; }
     if (!n) return;
     if (act === "dismiss") return setStatus([n.id], "dismissed");

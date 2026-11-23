@@ -1,5 +1,5 @@
 /**
- * The web Now screen's pure part (static/app-now-core.js, DanaNow): hues by kind (unknown kinds sky), the date line and the lede's fallback, the day strip's cells (gaps, past / next, refs, hidden when empty, the calendar note), the primary's label and body with choices / checks, what client actions open, acting optimistically and restoring, reconciling a refresh (only new cards are added), the notifications line, "Updated … ago", keyboard steps.
+ * The web Now screen's pure part (static/app-now-core.js, DanaNow): hues by kind (unknown kinds sky), the date line and the lede's fallback, the day's items (past / next, refs, hidden when empty, the calendar note), the day track (past hours, busy hours, the now-mark), the primary's label and body with choices / checks, what client actions open, acting optimistically and restoring, reconciling a refresh (only new cards are added), the notifications line, "Updated … ago", keyboard steps.
  *
  * Run: bin/test test_web_now
  */
@@ -63,18 +63,24 @@ const DAY = { calendar: true, slots: [
     slot("wake"),
 ] };
 const day = N.dayCells(DAY, 15 * 60 + 20);
-check("cells: the hours with items, one gap cell for the empty run between, At home; no trailing gap, no empty On waking",
-      eq(day.cells.map(c => c.type), ["hour", "gap", "hour", "home"]), plain(day.cells.map(c => c.type)));
-check("the gap says the hours it stands for", day.cells[1].label === "16:00–18:00" && day.cells[1].hours === 3);
+check("cells: the hours with items and At home; empty hours and an empty On waking left out",
+      eq(day.cells.map(c => c.type), ["hour", "hour", "home"]), plain(day.cells.map(c => c.type)));
 check("an item whose time has gone by on the user's clock is past", day.cells[0].items[0].past === true);
-check("the next one is the first timed item still to come", day.cells[2].items[0].next === true
+check("the next one is the first timed item still to come", day.cells[1].items[0].next === true
       && day.cells.flatMap(c => c.items).filter(i => i.next).length === 1);
 check("refs come from <type>_id fields; none without one",
-      eq(day.cells[2].items[0].ref, { type: "event", id: "e1" }) && day.cells[2].items[1].ref === null
-      && eq(day.cells[3].items[0].ref, { type: "task", id: "t2" }));
-check("items carry their hue", day.cells[0].items[0].hue === "amber" && day.cells[2].items[0].hue === "sky");
-const lead = N.dayCells({ slots: [slot("15"), slot("16", [{ title: "x", kind: "event", time: "16:00" }])] }, 14 * 60);
-check("a run of empty hours before the first item is a gap too (how far away it is)", eq(lead.cells.map(c => c.type), ["gap", "hour"]) && lead.cells[0].label === "15:00");
+      eq(day.cells[1].items[0].ref, { type: "event", id: "e1" }) && day.cells[1].items[1].ref === null
+      && eq(day.cells[2].items[0].ref, { type: "task", id: "t2" }));
+check("items carry their hue", day.cells[0].items[0].hue === "amber" && day.cells[1].items[0].hue === "sky");
+const track = N.dayTrack(DAY, 15 * 60 + 20);
+check("the track: one segment per hour 06–23", track.hours.length === 18 && track.hours[0].hour === 6 && track.hours[17].hour === 23);
+check("the track: hours begun are past, the mark after them, the time beside it",
+      track.hours.filter(h => h.past).map(h => h.hour).join() === "6,7,8,9,10,11,12,13,14,15" && track.mark === 10 && track.now === "15:20");
+check("the track: a later hour whose slot holds something is busy, free ones are not",
+      track.hours.filter(h => h.busy).map(h => h.hour).join() === "19");
+check("the track before 06:00: the mark at the start; late at night: all past",
+      N.dayTrack(DAY, 5 * 60).mark === 0 && N.dayTrack({ slots: [] }, 23 * 60 + 30).mark === 18);
+check("the track without a readable time: no mark", N.dayTrack(undefined, null).mark === -1 && N.dayTrack(undefined, null).hours.every(h => !h.past));
 const empty = N.dayCells({ calendar: true, slots: [slot("15"), slot("home"), slot("wake")] }, 900);
 check("nothing in any slot: the strip hides", empty.show === false && empty.cells.length === 0 && empty.calendarNote === false);
 check("the calendar couldn't be read: the note shows even with an empty day", N.dayCells({ calendar: false, slots: [] }, 900).calendarNote === true);

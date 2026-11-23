@@ -20,7 +20,7 @@
   width: 380px;
   height: 100%;
   border-right: 1px solid var(--hairline);
-  background: var(--canvas-soft);
+  background: transparent;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -66,24 +66,25 @@
 .task-group-section {
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
+/* A section's label: a mono eyebrow over the rows. */
 .task-group-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 8px 10px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--ink);
+  padding: 6px 6px 8px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--mute);
   cursor: pointer;
   user-select: none;
   border-radius: var(--radius-md);
-  background: rgb(var(--ink-rgb) / 0.03);
-  transition: background 0.15s;
+  transition: var(--t-state);
 }
 .task-group-header:hover {
-  background: rgb(var(--ink-rgb) / 0.08);
+  color: var(--ink);
 }
 .task-group-header .chevron {
   transition: transform 0.2s ease;
@@ -95,8 +96,6 @@
 .task-group-tasks {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  margin-top: 2px;
 }
 .task-group-tasks.hidden {
   display: none;
@@ -128,8 +127,9 @@
   gap: 3px;
 }
 .task-title {
-  font-size: 14.5px;
+  font-size: 15px;
   font-weight: 500;
+  line-height: 1.4;
   color: var(--ink);
 }
 .task-title.completed {
@@ -137,16 +137,16 @@
   color: var(--mute);
 }
 .task-desc {
-  font-size: 12.5px;
+  font-size: 13px;
   color: var(--body);
 }
-.task-tags-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-  margin-top: 4px;
+.task-meta {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--mute);
 }
+.task-meta-group { display: inline-flex; align-items: center; gap: 6px; }
+.task-meta-dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--hue, var(--mute)); flex-shrink: 0; }
 .task-detail-inline {
   display: flex;
   flex-direction: column;
@@ -266,8 +266,6 @@
   }
 }
 
-/* A reminder's group colour: a 3px bar at the row's start (the group chip carries its tint). */
-.task-card, .task-card.active, .task-card:hover { border-inline-start: 3px solid var(--hue, var(--hairline)); }
 
 /* Completing (Dana.motion.complete adds .dn-completing): the check fills with the group's hue and its mark
    draws in, the strike-through grows across the title; then the shell fades and collapses the row. */
