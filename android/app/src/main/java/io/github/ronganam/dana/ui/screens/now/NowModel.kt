@@ -56,7 +56,33 @@ sealed class NowVisual {
     data class Glyph(val glyph: NowGlyph) : NowVisual()
 }
 
+/**
+ * What leads a queue row: a notification item's app icon ([App]: its
+ * package, and the letter its fallback tile shows until the icon is there),
+ * every other kind its 8dp dot in [hue].
+ */
+sealed class RowLead {
+    data class App(val pkg: String, val letter: String) : RowLead()
+    data class Dot(val hue: Hue) : RowLead()
+}
+
 object NowModel {
+
+    /** A row's lead (see [RowLead]): the app icon for an item that carries its notification, else the kind's dot. */
+    fun rowLead(item: NowItem): RowLead {
+        val n = item.notification
+        val pkg = n?.packageName?.trim().orEmpty()
+        if (n == null || pkg.isEmpty()) return RowLead.Dot(hueOf(item))
+        val name = n.app?.trim()?.ifEmpty { null } ?: appNameOf(item.source) ?: pkg.substringAfterLast('.')
+        return RowLead.App(pkg, initial(name))
+    }
+
+    /** The first letter of [name] (a whole code point), upper-cased; "?" when blank. */
+    fun initial(name: String): String {
+        val t = name.trim()
+        if (t.isEmpty()) return "?"
+        return String(Character.toChars(t.codePointAt(0))).uppercase()
+    }
 
     /**
      * The leading tile of a queue row or a quieter suggestion. Anything that

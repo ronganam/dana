@@ -19,6 +19,8 @@ import io.github.ronganam.dana.ui.screens.now.NowGlyph
 import io.github.ronganam.dana.ui.screens.now.NowVisual
 import io.github.ronganam.dana.ui.screens.now.NowModel
 import io.github.ronganam.dana.ui.screens.now.PendingRemovals
+import io.github.ronganam.dana.ui.screens.now.RowLead
+import io.github.ronganam.dana.ui.theme.Hue
 import io.github.ronganam.dana.ui.shell.DaySlot
 import io.github.ronganam.dana.ui.viewmodels.AppRule
 import io.github.ronganam.dana.ui.viewmodels.OverviewMath
@@ -337,6 +339,40 @@ class NowModelTest {
         val s = isolatedParts("WHATSAPP · גל · 7 MIN AGO")
         assertEquals("\u2068WHATSAPP\u2069 \u200E·\u200E \u2068גל\u2069 \u200E·\u200E \u20687 MIN AGO\u2069", s)
         assertEquals("\u2068one\u2069", isolatedParts("one"))
+    }
+
+    @Test
+    fun aNotificationRowLeadsWithItsAppIconTheRestWithTheDot() {
+        // The notification's own package; the letter tile until the icon is there.
+        assertEquals(RowLead.App("com.whatsapp", "W"), NowModel.rowLead(notif))
+        // Other kinds keep their dot in the kind's hue.
+        assertEquals(RowLead.Dot(Hue.SAGE), NowModel.rowLead(sug))
+        assertEquals(RowLead.Dot(Hue.AMBER), NowModel.rowLead(task))
+        fun item(json: String) = NowApi.parse("""{"items":[$json]}""").items.single()
+        // A suggestion from a notification knows only the app's name: still a dot (no package for an icon).
+        assertEquals(
+            RowLead.Dot(Hue.PLUM),
+            NowModel.rowLead(item("""{"id":"sug:2","kind":"suggestion","source":"Slack · 2 h ago","title":"x","ref":{"type":"notification","id":"n"}}"""))
+        )
+        // No app name on the notification: the source's, else the package's last part; Hebrew letters stay whole.
+        assertEquals(
+            RowLead.App("com.example.bank", "B"),
+            NowModel.rowLead(item("""{"id":"n:1","kind":"notification","source":"Bank · now","title":"x","notification":{"id":"1","package":"com.example.bank"}}"""))
+        )
+        assertEquals(
+            RowLead.App("org.example.mail", "M"),
+            NowModel.rowLead(item("""{"id":"n:2","kind":"notification","title":"x","notification":{"id":"2","package":"org.example.mail"}}"""))
+        )
+        assertEquals(
+            RowLead.App("com.example.shop", "ש"),
+            NowModel.rowLead(item("""{"id":"n:3","kind":"notification","title":"x","notification":{"id":"3","package":"com.example.shop","app":"שופ"}}"""))
+        )
+        // A notification without a package has nothing to show: the dot.
+        assertEquals(
+            RowLead.Dot(Hue.TEAL),
+            NowModel.rowLead(item("""{"id":"n:4","kind":"notification","title":"x","notification":{"id":"4","package":""}}"""))
+        )
+        assertEquals("?", NowModel.initial("  "))
     }
 
     @Test

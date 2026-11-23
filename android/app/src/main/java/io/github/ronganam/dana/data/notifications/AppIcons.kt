@@ -8,6 +8,7 @@ import android.service.notification.StatusBarNotification
 import android.util.Log
 import android.util.LruCache
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.scale
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -20,11 +21,15 @@ import java.util.concurrent.Executors
  * loading the icon through that needs no visibility. The listener saves each
  * app's icon once (filesDir/app_icons/<package>.png, refreshed weekly) so the
  * Inbox can show it later, also for notifications no longer in the shade.
+ * Every saved icon is also sent to the server ([AppIconSync]) so the web can
+ * show it.
  */
 object AppIcons {
     private const val TAG = "AppIcons"
     private const val SIZE_PX = 108
     private const val REFRESH_MS = 7L * 24 * 3600 * 1000
+    /** The size the server gets ([uploadPng]). */
+    private const val UPLOAD_PX = 96
 
     private val memory = LruCache<String, Bitmap>(120)
     /** Packages with no icon anywhere (don't retry on every recomposition). */
@@ -50,6 +55,7 @@ object AppIcons {
                 save(f, bmp)
                 memory.put(pkg, bmp)
                 missing.remove(pkg)
+                AppIconSync.request(app)
             } catch (e: Exception) {
                 Log.w(TAG, "Couldn't save the icon of $pkg", e)
             }
@@ -71,10 +77,31 @@ object AppIcons {
             val bmp = context.packageManager.getApplicationIcon(pkg).toBitmap(SIZE_PX, SIZE_PX)
             save(f, bmp)
             memory.put(pkg, bmp)
+            AppIconSync.request(context)
             bmp
         } catch (e: Exception) {
             missing.add(pkg)
             null
+        }
+    }
+
+    /** The packages with a saved icon (file names are the packages; anything that isn't one is left out). */
+    fun savedPackages(context: Context): Set<String> =
+        dir(context).list().orEmpty()
+            .filter { it.endsWith(".png") }
+            .map { it.removeSuffix(".png") }
+            .filter { AppIconSyncPlan.validPackage(it) }
+            .toSet()
+
+    /** [pkg]'s saved icon as the server takes it: a [UPLOAD_PX] px PNG; null when none is saved. Call off the main thread. */
+    fun uploadPng(context: Context, pkg: String): ByteArray? {
+        val f = file(context, pkg)
+        if (!f.exists()) return null
+        val bmp = BitmapFactory.decodeFile(f.path) ?: return null
+        val scaled = bmp.scale(UPLOAD_PX, UPLOAD_PX)
+        return java.io.ByteArrayOutputStream().use { out ->
+            scaled.compress(Bitmap.CompressFormat.PNG, 100, out)
+            out.toByteArray()
         }
     }
 
