@@ -150,9 +150,7 @@ async def execute(user: Optional[User], name: str, arguments: Mapping[str, Any])
         return f"Error: {reason}"
     if inspect.iscoroutinefunction(tool.func):
         return await tool.func(conn, **arguments)
-    # A plain function (Google's client, SQLite) runs in a thread, with this context
-    # (the acting user, the undo collector), so it never blocks the event loop.
-    return await asyncio.to_thread(tool.func, conn, **arguments)
+    return tool.func(conn, **arguments)
 
 
 def prompt_section(user: Optional[User], name: str) -> str:
