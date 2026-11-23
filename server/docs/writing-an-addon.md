@@ -155,7 +155,7 @@ addon = Addon(
 
 ### Tools
 
-`@addon.tool(...)` on `def f(conn, ...)` or `async def`. A write runs at once and registers an undo (`is_write=True`, `core/undo.py`); `confirm=True` asks the user first, and `describe=` gives the Approve card's words:
+`@addon.tool(...)` on `def f(conn, ...)` (run in a thread, so blocking calls are fine) or `async def` (on the event loop: await, never block). A write runs at once and registers an undo (`is_write=True`, `core/undo.py`); `confirm=True` asks the user first, and `describe=` gives the Approve card's words:
 
 ```python
 def describe_delete(user: User, a: dict) -> Approval:
