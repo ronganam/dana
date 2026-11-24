@@ -13,7 +13,7 @@ means) and a section listing the user's accounts (:func:`accounts_section`).
 Tools: ``tools.py``."""
 
 from core.users import User
-from core.addons import Addon, Fix, PromptPart, LlmJob, Page, Nav, Need, Touches
+from core.addons import Addon, Field, Fix, PromptPart, LlmJob, Page, Nav, Need, Touches
 from addons.money import after_sync, classify, dashboard, savings, signals, sources, store
 from addons.money.config import ADDON
 
@@ -21,12 +21,15 @@ MONEY_GUIDE = (
     "Money (bank and cards):\n"
     "  1. Answer every question about spending, income, balances, card bills, subscriptions or a charge with the "
     "money tools: money_summary (totals by period, category, merchant, account; it gives the comparison too), "
-    "search_transactions (find charges), money_overview (balances, next card bills, everyday spending against a "
-    "typical month, sync state), money_forecast (the bank balance ahead and what is coming), money_insights (what "
-    "stands out in a month), recurring_charges (subscriptions, standing orders, yearly charges), investment_portfolio "
+    "search_transactions (find charges), money_overview (balances, next card bills, what is left until payday, "
+    "everyday spending against a typical month, sync state), money_flow (where a period's money went: fixed, yearly, "
+    "everyday, one-offs, set aside, left over), money_forecast (the bank balance ahead and what is coming), "
+    "can_i_afford (a purchase, once or in payments, against the forecast), money_insights (what "
+    "stands out in a month), recurring_charges (what {user} pays for: subscriptions, standing orders, yearly charges; "
+    "about= for one kind of bill or provider), investment_portfolio "
     "(the investment accounts: value, holdings, profit, activity; Dana can only read them, never trade), meal_card (the "
     "meal card from work: budget left, pace, past cycles). Pass a period name (today, yesterday, this_week, last_week, this_month, last_month, "
-    "last_30_days, this_year, last_year, YYYY-MM) or start/end dates; never add up amounts or work out dates "
+    "last_30_days, this_year, last_year, this_pay_cycle, last_pay_cycle, YYYY-MM) or start/end dates; never add up amounts or work out dates "
     "yourself.\n"
     "  2. Amounts are in {currency}. \"Spent\" means purchases, transfers to people and fees; card bills on the bank account "
     "and moves between {user}'s own accounts never count, and refunds reduce it; money set aside (investments, "
@@ -59,10 +62,14 @@ addon = Addon(
     title="Money", icon="wallet",
     needs=(Need("addon", "phone", "Sign-in codes from your SMS, and charges from card notifications before the bank shows them", optional=True),),
     touches=Touches(stores_credentials=True, reads=("phone",)),
+    settings=(Field("alerts", "Which money alerts reach your phone (or Telegram)", "all", label="Money alerts",
+                    help="all, off, or the ones to keep, comma separated: low_balance, unusual, salary, renewal, "
+                         "card_bill, move (this month's way to save)", placeholder="all"),),
     description="Your bank and card spending, balances and ways to save",
     features=("Spending, income and balances in chat and on the Money page",
-              "Subscriptions, card bills and your balance ahead",
-              "Ways to save and spending worth watching"),
+              "Where your money went, what is left until payday and what you pay for",
+              "Subscriptions, card bills, your balance ahead and \"can I afford it?\"",
+              "A few alerts worth acting on, and one way to save each month"),
     setup=("On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you "
            "download, into an account of yours.",
            "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins "

@@ -13,6 +13,8 @@ requests (docs/money.md, "API").
   ``GET /api/money/recurring``, ``GET /api/money/changes?since=``
 - The dashboards (dashboard.py): ``GET /api/money/cashflow?n=&end=``, ``GET /api/money/balance?days=``,
   ``GET /api/money/trends|insights?month=``, ``GET /api/money/merchants?period=|start=&end=``
+- Plan (plan.py): ``GET /api/money/flow?period=|start=&end=&by=``, ``GET /api/money/bills?about=``,
+  ``GET /api/money/afford?amount=&payments=&date=&on=&label=``
 - Investments (portfolio.py): ``GET /api/money/portfolio?days=&trades=``; meal cards (meals.py): ``GET /api/money/meals?months=``
 - Savings (savings.py): ``GET /api/money/savings``, ``GET|PATCH /api/money/savings/{key}``,
   ``POST /api/money/savings/{key}/check`` (keys contain ":"; clients URL-encode them)
@@ -26,6 +28,7 @@ ids answer 404, like missing ones. Credentials are accepted, never returned.
 """
 
 import asyncio
+import datetime
 import json
 import logging
 import re
@@ -37,7 +40,7 @@ from core import undo, users
 from core.auth import request_user
 from core.users import User
 from core.addons import crypto, store as connections
-from addons.money import (categories, config, dashboard, imports, insights, meals, otp, periods, portfolio, providers,
+from addons.money import (categories, config, dashboard, imports, insights, meals, otp, periods, plan, portfolio, providers,
                           queries, rules, savings, schedule, signals, sources, store)
 
 logger = logging.getLogger(__name__)
@@ -226,13 +229,15 @@ def _bad(field: str, message: str) -> web.HTTPBadRequest:
                               content_type="application/json")
 
 
-def _period_arg(request: web.Request, required: bool = True) -> Optional[periods.Period]:
-    """``?period=`` or ``?start=&end=`` (``end`` inclusive); None when neither is given and not ``required``."""
+def _period_arg(request: web.Request, user: User, required: bool = True) -> Optional[periods.Period]:
+    """``?period=`` (a name, ``YYYY-MM``, ``YYYY`` or a pay cycle: ``plan.resolve_period``) or ``?start=&end=``
+    (``end`` inclusive); None when neither is given and not ``required``."""
     q = request.query
     if not required and not q.get("period") and not q.get("start"):
         return None
     try:
-        return periods.resolve(q.get("period") or None, start=q.get("start") or None, end=q.get("end") or None)
+        return plan.resolve_period(user, q.get("period") or None, start=q.get("start") or None,
+                                   end=q.get("end") or None)
     except ValueError as e:
         raise _bad("period", str(e)) from None
 
@@ -259,7 +264,8 @@ async def get_overview(request: web.Request) -> web.Response:
     """GET /api/money/overview?month=YYYY-MM → the top of the page (``queries.overview``) + ``unusual`` and
     the dashboard tiles: ``everyday {total, typical, on_track}``, ``net``, ``set_aside``, ``fixed_monthly``
     (recurring charges + yearly ones a month), ``yearly_monthly``, ``forecast {soon_low, low_point,
-    next: [3 events]} | None`` (this month only)."""
+    next: [3 events]} | None`` (this month only), ``payday``: what is left until the next salary
+    (``plan.left_until_payday``; None for a past month or without a salary)."""
     user = _money_user(request)
     try:
         payload = queries.overview(user, request.query.get("month") or None)
@@ -267,7 +273,13 @@ async def get_overview(request: web.Request) -> web.Response:
         return _error(400, "invalid", field="month", message=str(e))
     p = payload["period"]
     payload["unusual"] = [u for u in insights.unusual(user, p["start"]) if u["transaction"]["purchase_date"] <= p["end"]]
-    payload.update(await asyncio.to_thread(dashboard.tiles, user, payload["month"]))
+
+    def numbers() -> Dict[str, Any]:
+        book = dashboard.load(user)
+        out = dashboard.tiles(user, payload["month"], book)
+        out["payday"] = plan.left_until_payday(book) if p["in_progress"] else None
+        return out
+    payload.update(await asyncio.to_thread(numbers))
     return web.json_response(payload)
 
 
@@ -305,7 +317,7 @@ async def get_trends(request: web.Request) -> web.Response:
 async def get_merchants(request: web.Request) -> web.Response:
     """GET /api/money/merchants?period=|start=&end=&limit= → the top merchants (``dashboard.merchants``)."""
     user = _money_user(request)
-    p = _period_arg(request)
+    p = _period_arg(request, user)
     limit = _number_arg(request, "limit")
     top = max(1, min(int(limit), 50)) if limit is not None else 15
     items = await asyncio.to_thread(lambda: dashboard.merchants(dashboard.load(user), p.start, p.end_exclusive, top))
@@ -341,7 +353,7 @@ async def get_meals(request: web.Request) -> web.Response:
 async def get_categories(request: web.Request) -> web.Response:
     """GET /api/money/categories?period=|start=&end= → groups with their categories + ``taxonomy``."""
     user = _money_user(request)
-    return web.json_response({**queries.category_tree(user, _period_arg(request)), "taxonomy": queries.taxonomy()})
+    return web.json_response({**queries.category_tree(user, _period_arg(request, user)), "taxonomy": queries.taxonomy()})
 
 
 async def get_months(request: web.Request) -> web.Response:
@@ -359,7 +371,7 @@ async def get_transactions(request: web.Request) -> web.Response:
     q = request.query
     limit = _number_arg(request, "limit")
     try:
-        payload = queries.search(user, query=q.get("q") or None, period=_period_arg(request, required=False),
+        payload = queries.search(user, query=q.get("q") or None, period=_period_arg(request, user, required=False),
                                  category=q.get("category") or None, account_id=q.get("account") or None,
                                  min_amount=_number_arg(request, "min"), max_amount=_number_arg(request, "max"),
                                  limit=int(limit) if limit is not None else 50, cursor=q.get("cursor") or None)
@@ -440,6 +452,76 @@ async def get_recurring(request: web.Request) -> web.Response:
     rec = insights.recurring(user)
     yearly = insights.yearly(user, rec=rec)
     return web.json_response({**rec, "yearly": yearly, "yearly_monthly": sum(y["monthly_cost"] for y in yearly)})
+
+
+async def get_flow(request: web.Request) -> web.Response:
+    """GET /api/money/flow?period=|start=&end=&by=kind|account → where the period's money went
+    (``plan.flow_chart``; default this month, ``by`` kind)."""
+    user = _money_user(request)
+    by = request.query.get("by") or "kind"
+    if by not in ("kind", "account"):
+        raise _bad("by", "by must be kind or account")
+
+    def build() -> Dict[str, Any]:
+        book = dashboard.load(user)
+        q = request.query
+        try:
+            p = plan.resolve_period(user, q.get("period") or None, start=q.get("start") or None,
+                                    end=q.get("end") or None, book=book)
+        except ValueError as e:
+            raise _bad("period", str(e)) from None
+        return plan.flow_chart(book, p, by, store.list_accounts(user))
+    return web.json_response(await asyncio.to_thread(build))
+
+
+async def get_bills(request: web.Request) -> web.Response:
+    """GET /api/money/bills?about= → what the user pays for (``plan.register``), each item with the savings
+    item that covers it (``saving``)."""
+    user = _money_user(request)
+    about = (request.query.get("about") or "").strip()[:80] or None
+
+    def build() -> Dict[str, Any]:
+        book = dashboard.load(user)
+        reg = plan.register(book, about)
+        try:
+            items = savings.overview(user, book=book)["items"]
+        except Exception as e:
+            logger.warning(f"Savings for the bills register of user {user.id} failed: {e}")
+            items = []
+        plan.link_savings(reg, items)
+        return reg
+    return web.json_response(await asyncio.to_thread(build))
+
+
+async def get_afford(request: web.Request) -> web.Response:
+    """GET /api/money/afford?amount=<agorot>&payments=1&date=YYYY-MM-DD&on=card|bank&label= → the forecast
+    with and without the purchase (``plan.afford``) · 409 ``no_balance`` without a bank balance."""
+    user = _money_user(request)
+    amount = _number_arg(request, "amount")
+    payments = _number_arg(request, "payments")
+    if amount is None or amount <= 0:
+        raise _bad("amount", "amount must be a positive number of agorot / cents")
+    if payments is not None and not 1 <= payments <= 36:
+        raise _bad("payments", "payments must be 1–36")
+    on = request.query.get("on") or "card"
+    if on not in ("card", "bank"):
+        raise _bad("on", "on must be card or bank")
+    when = None
+    if request.query.get("date"):
+        try:
+            when = datetime.date.fromisoformat(request.query["date"])
+        except ValueError:
+            raise _bad("date", "date must look like YYYY-MM-DD") from None
+    label = (request.query.get("label") or "").strip()[:60]
+
+    def build() -> Optional[Dict[str, Any]]:
+        book = dashboard.load(user)
+        return plan.afford(book, dashboard.labelled_accounts(user), int(amount),
+                           int(payments or 1), when, on, label)
+    result = await asyncio.to_thread(build)
+    if result is None:
+        return _error(409, "no_balance", message="no bank balance to forecast from")
+    return web.json_response(result)
 
 
 async def get_changes(request: web.Request) -> web.Response:
@@ -626,6 +708,9 @@ def setup(app: web.Application) -> None:
     app.router.add_get("/api/money/portfolio", get_portfolio)
     app.router.add_get("/api/money/meals", get_meals)
     app.router.add_get("/api/money/changes", get_changes)
+    app.router.add_get("/api/money/flow", get_flow)
+    app.router.add_get("/api/money/bills", get_bills)
+    app.router.add_get("/api/money/afford", get_afford)
     app.router.add_get("/api/money/savings", get_savings)
     app.router.add_get("/api/money/savings/{key}", get_saving)
     app.router.add_patch("/api/money/savings/{key}", patch_saving)

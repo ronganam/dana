@@ -3,7 +3,8 @@
 - at start: end what a previous process left mid-sync, then classify what is
   still missing;
 - every minute (after 15 s): start every due source of the user;
-- Now screen: unusual charges (``money:<id>``), ways to save (``money_save:<key>``),
+- every 30 minutes (after 2 min): send the money alerts that are due (``alerts.tick``);
+- Now screen: unusual charges (``money:<id>``), ways to save (``money_save:<key>``; this month's move first),
   and monthly target warnings/results (``money_target:<key>:<YYYY-MM>``);
 - weekly review: money spending & savings summary;
 - context chats for ``transaction`` and ``saving``;
@@ -19,12 +20,12 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Tuple
 
-from core import cards, now as now_screen, user_locale
+from core import cards, clock, now as now_screen, user_locale
 from core.addons import (BriefingContext, Card, Check, ContextRequest, Fix, NowContext, Section, WidgetContext, helpers,
                          minutes, store)
 from core.db import get_db_connection
 from core.users import User
-from addons.money import (classify, config, dashboard as money_dashboard, insights, otp, providers, queries,
+from addons.money import (alerts, classify, config, dashboard as money_dashboard, insights, otp, providers, queries,
                           savings, schedule, signals, store as money_store, sync)
 from addons.money.addon import addon
 
@@ -48,6 +49,11 @@ async def recover(user: User) -> None:
 @addon.job(every=minutes(schedule.INTERVAL_SECONDS / 60), delay=schedule.STARTUP_DELAY_SECONDS)
 async def start_due_syncs(user: User) -> List[str]:
     return schedule.tick_user(user)
+
+
+@addon.job(every=minutes(30), delay=120)
+async def send_alerts(user: User) -> List[str]:
+    return await alerts.tick(user, clock.now())
 
 
 @addon.on("phone.notification.ingested")
@@ -93,6 +99,7 @@ def savings_cards(user: User, now: datetime.datetime, hidden: Dict[str, Any]) ->
         logger.warning(f"Now savings cards for user {user.id} failed: {e}")
         return []
     sh = money_store.money_text
+    move = alerts.month_move(user, today)
     saves: List[Card] = []
     targets: List[Card] = []
     for i in items:
@@ -103,7 +110,8 @@ def savings_cards(user: User, now: datetime.datetime, hidden: Dict[str, Any]) ->
             left = (datetime.date.fromisoformat(until) - today).days if until else None
             fresh = (i["type"] == "bill" and i["status"] == "open"
                      and (today - datetime.date.fromisoformat(i["first_seen"])).days <= SAVINGS_NEW_DAYS)
-            if not ((left is not None and 0 <= left <= SAVINGS_DUE_DAYS) or fresh):
+            is_move = i["key"] == move and i["status"] == "open"
+            if not ((left is not None and 0 <= left <= SAVINGS_DUE_DAYS) or fresh or is_move):
                 continue
             item_id = f"money_save:{i['key']}"
             if item_id in hidden:
@@ -115,13 +123,18 @@ def savings_cards(user: User, now: datetime.datetime, hidden: Dict[str, Any]) ->
                 facts.append(i["steps"][0]["text"])
             why = (f"{i['timing']['label']} · in {left} day{'s' if left != 1 else ''}" if left is not None
                    and (i.get("timing") or {}).get("label") else i["summary"])
-            saves.append(Card(
-                id=item_id, kind="money", source="Money · Ways to save", title=i["title"], why=why,
+            card = Card(
+                id=item_id, kind="money", source="Money · This month's move" if is_move else "Money · Ways to save",
+                title=i["title"], why=why,
                 primary=cards.action("open", "Ask Dana", client=True),
                 secondary=[cards.action("dismiss", "Dismiss")], schedulable=False,
                 ref={"type": "saving", "id": i["key"]},
                 blocks=[{"type": "facts", "label": "Saving", "items": facts}],
-            ))
+            )
+            if is_move:
+                saves.insert(0, card)
+            else:
+                saves.append(card)
         t = i.get("target")
         if i["status"] != "watching" or not t:
             continue

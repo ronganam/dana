@@ -306,14 +306,14 @@ def get_transaction(user: User, txn_id: str) -> Optional[Dict[str, Any]]:
 def delete_all(user: User) -> List[Dict[str, Any]]:
     """Delete every money row of the user (sources, accounts, transactions,
     rules, aliases, phone signals, syncs, code requests, saving choices, price checks, meal card charges,
-    import mappings) and the
+    import mappings, sent alerts) and the
     Money section of their weekly reviews. Returns the removed sources (``{id, company}``)."""
     with db() as conn:
         removed = [{"id": r["id"], "company": r["company"]}
                    for r in conn.execute("SELECT id, company FROM money_sources WHERE user_id = ?", (user.id,))]
         for table in ("money_code_requests", "money_syncs", "money_signals", "money_transactions", "money_holdings",
                       "money_account_values", "money_trades", "money_meals", "money_accounts", "money_rules", "money_aliases",
-                      "money_savings", "money_market_checks", "money_import_maps", "money_sources"):
+                      "money_savings", "money_market_checks", "money_import_maps", "money_alerts", "money_sources"):
             conn.execute(f"DELETE FROM {table} WHERE user_id = ?", (user.id,))
         # The weekly reviews' Money sections go too (the rest of a review stays).
         conn.execute("UPDATE weekly_reviews SET data = json_remove(data, '$.money') WHERE user_id = ? "

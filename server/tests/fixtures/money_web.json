@@ -1,4 +1,70 @@
 {
+ "afford": {
+  "body": {
+   "after": {
+    "end_balance": 12140952,
+    "low": {
+     "balance": 1272566,
+     "date": "2026-12-20"
+    }
+   },
+   "amount": 600000,
+   "before": {
+    "end_balance": 12740952,
+    "low": {
+     "balance": 1322566,
+     "date": "2026-12-20"
+    }
+   },
+   "date": "2026-11-19",
+   "drop": 50000,
+   "end": "2027-11-19",
+   "floor": 200000,
+   "left_until_payday": {
+    "after": 594110,
+    "before": 644110
+   },
+   "on": "card",
+   "payment": 50000,
+   "payments": 12,
+   "verdict": "fine"
+  },
+  "request": "GET /api/money/afford?amount=600000&payments=12",
+  "status": 200
+ },
+ "afford_bank": {
+  "body": {
+   "after": {
+    "end_balance": 3497950,
+    "low": {
+     "balance": 531867,
+     "date": "2026-11-25"
+    }
+   },
+   "amount": 150000,
+   "before": {
+    "end_balance": 3647950,
+    "low": {
+     "balance": 681867,
+     "date": "2026-11-25"
+    }
+   },
+   "date": "2026-11-19",
+   "drop": 150000,
+   "end": "2027-02-16",
+   "floor": 200000,
+   "left_until_payday": {
+    "after": 494110,
+    "before": 644110
+   },
+   "on": "bank",
+   "payment": 150000,
+   "payments": 1,
+   "verdict": "fine"
+  },
+  "request": "GET /api/money/afford?amount=150000&on=bank&label=Sofa",
+  "status": 200
+ },
  "balance": {
   "body": {
    "forecast": {
@@ -7,7 +73,7 @@
     "end": "2027-02-16",
     "events": [
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": 17300,
       "date": "2026-11-20",
       "estimated": false,
@@ -15,7 +81,7 @@
       "label": "קצבת ילדים"
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": -450000,
       "date": "2026-11-20",
       "estimated": false,
@@ -23,7 +89,7 @@
       "label": "משכנתא לאומי"
      },
      {
-      "account_id": "fbf29a37be844f5593565558e49e29bf",
+      "account_id": "f589167b5bf54eaca03847f23e1cf5a3",
       "amount": -120000,
       "date": "2026-11-25",
       "estimated": false,
@@ -43,7 +109,7 @@
       ]
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": 1500000,
       "date": "2026-12-10",
       "estimated": false,
@@ -51,7 +117,7 @@
       "label": "משכורת נוגה תעשיות"
      },
      {
-      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+      "account_id": "6fd1470a340248889b51f94f088f507f",
       "amount": -386601,
       "date": "2026-12-10",
       "estimated": true,
@@ -82,7 +148,7 @@
       ]
      },
      {
-      "account_id": "fbf29a37be844f5593565558e49e29bf",
+      "account_id": "f589167b5bf54eaca03847f23e1cf5a3",
       "amount": -40000,
       "date": "2026-12-10",
       "estimated": false,
@@ -108,7 +174,7 @@
       ]
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": 17300,
       "date": "2026-12-20",
       "estimated": false,
@@ -116,7 +182,7 @@
       "label": "קצבת ילדים"
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": -450000,
       "date": "2026-12-20",
       "estimated": false,
@@ -124,7 +190,7 @@
       "label": "משכנתא לאומי"
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": 1500000,
       "date": "2027-01-10",
       "estimated": false,
@@ -132,7 +198,7 @@
       "label": "משכורת נוגה תעשיות"
      },
      {
-      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+      "account_id": "6fd1470a340248889b51f94f088f507f",
       "amount": -120958,
       "date": "2027-01-10",
       "estimated": true,
@@ -163,7 +229,7 @@
       ]
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": 17300,
       "date": "2027-01-20",
       "estimated": false,
@@ -171,7 +237,7 @@
       "label": "קצבת ילדים"
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": -450000,
       "date": "2027-01-20",
       "estimated": false,
@@ -179,7 +245,7 @@
       "label": "משכנתא לאומי"
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": 1500000,
       "date": "2027-02-10",
       "estimated": false,
@@ -187,7 +253,7 @@
       "label": "משכורת נוגה תעשיות"
      },
      {
-      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+      "account_id": "6fd1470a340248889b51f94f088f507f",
       "amount": -120958,
       "date": "2027-02-10",
       "estimated": true,
@@ -226,7 +292,7 @@
     },
     "plans": [
      {
-      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+      "account_id": "6fd1470a340248889b51f94f088f507f",
       "amount": 70900,
       "dates": [
        "2027-01-10",
@@ -240,7 +306,7 @@
       "total": 283600
      },
      {
-      "account_id": "fbf29a37be844f5593565558e49e29bf",
+      "account_id": "f589167b5bf54eaca03847f23e1cf5a3",
       "amount": 40000,
       "dates": [
        "2026-12-10"
@@ -1269,6 +1335,204 @@
    ]
   },
   "request": "GET /api/money/balance?days=90",
+  "status": 200
+ },
+ "bills": {
+  "body": {
+   "about": null,
+   "income_share": null,
+   "income_typical": 0,
+   "monthly": 479123,
+   "sections": [
+    {
+     "items": [
+      {
+       "account_kind": "bank",
+       "account_label": "Sample Bank ••••901",
+       "amount": 450000,
+       "cadence": "monthly",
+       "category": "housing",
+       "category_label": "Rent & mortgage",
+       "key": "משכנתא לאומי",
+       "last_date": "2026-10-20",
+       "merchant": "משכנתא לאומי",
+       "merchant_keys": [
+        "משכנתא לאומי"
+       ],
+       "monthly": 450000,
+       "next_date": "2026-11-20",
+       "payments": 1,
+       "price_change": null,
+       "saving": null,
+       "since": "2026-08-20",
+       "variable": false,
+       "yearly": 5400000
+      }
+     ],
+     "key": "home",
+     "label": "Home",
+     "monthly": 450000,
+     "yearly": 5400000
+    },
+    {
+     "items": [
+      {
+       "account_kind": "card",
+       "account_label": null,
+       "amount": 283600,
+       "cadence": "yearly",
+       "category": "insurance",
+       "category_label": "Insurance",
+       "key": "ביטוח רכב ישיר",
+       "last_date": "2026-11-16",
+       "merchant": "ביטוח רכב ישיר",
+       "merchant_keys": [
+        "ביטוח רכב ישיר"
+       ],
+       "monthly": 23633,
+       "next_date": "2027-11-16",
+       "payments": 4,
+       "price_change": null,
+       "saving": null,
+       "since": null,
+       "variable": false,
+       "yearly": 283600
+      }
+     ],
+     "key": "insurance",
+     "label": "Insurance",
+     "monthly": 23633,
+     "yearly": 283600
+    },
+    {
+     "items": [
+      {
+       "account_kind": "card",
+       "account_label": "Sample Card 8763",
+       "amount": 4990,
+       "cadence": "monthly",
+       "category": "subscriptions",
+       "category_label": "Subscriptions & software",
+       "key": "netflix com",
+       "last_date": "2026-11-03",
+       "merchant": "NETFLIX.COM",
+       "merchant_keys": [
+        "netflix com"
+       ],
+       "monthly": 4990,
+       "next_date": "2026-12-03",
+       "payments": 1,
+       "price_change": {
+        "from": 3990,
+        "since": "2026-11-03",
+        "to": 4990
+       },
+       "saving": null,
+       "since": "2026-08-03",
+       "variable": false,
+       "yearly": 59880
+      },
+      {
+       "account_kind": "card",
+       "account_label": "Sample Card 8763",
+       "amount": 6000,
+       "cadence": "yearly",
+       "category": "subscriptions",
+       "category_label": "Subscriptions & software",
+       "key": "namecheap",
+       "last_date": "2025-12-01",
+       "merchant": "NAMECHEAP",
+       "merchant_keys": [
+        "namecheap"
+       ],
+       "monthly": 500,
+       "next_date": "2026-12-01",
+       "payments": 1,
+       "price_change": null,
+       "saving": null,
+       "since": "2024-12-01",
+       "variable": false,
+       "yearly": 6000
+      }
+     ],
+     "key": "subscriptions",
+     "label": "Subscriptions",
+     "monthly": 5490,
+     "yearly": 65880
+    }
+   ],
+   "yearly": 5749480
+  },
+  "request": "GET /api/money/bills",
+  "status": 200
+ },
+ "bills_about": {
+  "body": {
+   "about": "subscriptions",
+   "income_share": null,
+   "income_typical": 0,
+   "monthly": 5490,
+   "sections": [
+    {
+     "items": [
+      {
+       "account_kind": "card",
+       "account_label": "Sample Card 8763",
+       "amount": 4990,
+       "cadence": "monthly",
+       "category": "subscriptions",
+       "category_label": "Subscriptions & software",
+       "key": "netflix com",
+       "last_date": "2026-11-03",
+       "merchant": "NETFLIX.COM",
+       "merchant_keys": [
+        "netflix com"
+       ],
+       "monthly": 4990,
+       "next_date": "2026-12-03",
+       "payments": 1,
+       "price_change": {
+        "from": 3990,
+        "since": "2026-11-03",
+        "to": 4990
+       },
+       "saving": null,
+       "since": "2026-08-03",
+       "variable": false,
+       "yearly": 59880
+      },
+      {
+       "account_kind": "card",
+       "account_label": "Sample Card 8763",
+       "amount": 6000,
+       "cadence": "yearly",
+       "category": "subscriptions",
+       "category_label": "Subscriptions & software",
+       "key": "namecheap",
+       "last_date": "2025-12-01",
+       "merchant": "NAMECHEAP",
+       "merchant_keys": [
+        "namecheap"
+       ],
+       "monthly": 500,
+       "next_date": "2026-12-01",
+       "payments": 1,
+       "price_change": null,
+       "saving": null,
+       "since": "2024-12-01",
+       "variable": false,
+       "yearly": 6000
+      }
+     ],
+     "key": "subscriptions",
+     "label": "Subscriptions",
+     "monthly": 5490,
+     "yearly": 65880
+    }
+   ],
+   "yearly": 65880
+  },
+  "request": "GET /api/money/bills?about=subscriptions",
   "status": 200
  },
  "cashflow": {
@@ -2318,7 +2582,7 @@
  "changes": {
   "body": {
    "changed": true,
-   "cursor": "aec8645e9b09da45"
+   "cursor": "9b536b107ed62e9e"
   },
   "request": "GET /api/money/changes",
   "status": 200
@@ -2326,17 +2590,17 @@
  "changes_after_patch": {
   "body": {
    "changed": false,
-   "cursor": "aec8645e9b09da45"
+   "cursor": "9b536b107ed62e9e"
   },
-  "request": "GET /api/money/changes?since=aec8645e9b09da45",
+  "request": "GET /api/money/changes?since=9b536b107ed62e9e",
   "status": 200
  },
  "changes_unchanged": {
   "body": {
    "changed": false,
-   "cursor": "aec8645e9b09da45"
+   "cursor": "9b536b107ed62e9e"
   },
-  "request": "GET /api/money/changes?since=aec8645e9b09da45",
+  "request": "GET /api/money/changes?since=9b536b107ed62e9e",
   "status": 200
  },
  "error_invalid": {
@@ -2360,8 +2624,209 @@
   "body": {
    "error": "not_found"
   },
-  "request": "GET /api/money/transactions/953ec7469d364e1f964b7090b02155b1",
+  "request": "GET /api/money/transactions/2e2baef9aa98437e8170a88a2b9900af",
   "status": 404
+ },
+ "flow": {
+  "body": {
+   "by": "kind",
+   "from_savings": 0,
+   "income": 1517300,
+   "left_over": 886310,
+   "middle": [
+    {
+     "amount": 453990,
+     "groups": [
+      {
+       "amount": 450000,
+       "key": "housing",
+       "label": "Housing"
+      },
+      {
+       "amount": 3990,
+       "key": "bills",
+       "label": "Bills"
+      }
+     ],
+     "key": "fixed",
+     "label": "Fixed"
+    },
+    {
+     "amount": 177000,
+     "groups": [
+      {
+       "amount": 155000,
+       "key": "food",
+       "label": "Food"
+      },
+      {
+       "amount": 22000,
+       "key": "health",
+       "label": "Health"
+      }
+     ],
+     "key": "everyday",
+     "label": "Everyday"
+    }
+   ],
+   "period": {
+    "end": "2026-10-31",
+    "in_progress": false,
+    "key": "last_month",
+    "label": "last month",
+    "start": "2026-10-01"
+   },
+   "set_aside": 0,
+   "sources": [
+    {
+     "amount": 1500000,
+     "key": "salary",
+     "label": "Salary"
+    },
+    {
+     "amount": 17300,
+     "key": "benefits",
+     "label": "Benefits"
+    }
+   ],
+   "spent": 630990
+  },
+  "request": "GET /api/money/flow?period=last_month",
+  "status": 200
+ },
+ "flow_accounts": {
+  "body": {
+   "by": "account",
+   "from_savings": 0,
+   "income": 1517300,
+   "left_over": 886310,
+   "middle": [
+    {
+     "amount": 450000,
+     "groups": [
+      {
+       "amount": 450000,
+       "key": "housing",
+       "label": "Housing"
+      }
+     ],
+     "key": "93f6b9b4ad224d94a6d79102c8009df8",
+     "label": "Sample Bank ••••901"
+    },
+    {
+     "amount": 180990,
+     "groups": [
+      {
+       "amount": 155000,
+       "key": "food",
+       "label": "Food"
+      },
+      {
+       "amount": 22000,
+       "key": "health",
+       "label": "Health"
+      },
+      {
+       "amount": 3990,
+       "key": "bills",
+       "label": "Bills"
+      }
+     ],
+     "key": "6fd1470a340248889b51f94f088f507f",
+     "label": "Sample Card 8763"
+    }
+   ],
+   "period": {
+    "end": "2026-10-31",
+    "in_progress": false,
+    "key": "2026-10",
+    "label": "October 2026",
+    "start": "2026-10-01"
+   },
+   "set_aside": 0,
+   "sources": [
+    {
+     "amount": 1500000,
+     "key": "salary",
+     "label": "Salary"
+    },
+    {
+     "amount": 17300,
+     "key": "benefits",
+     "label": "Benefits"
+    }
+   ],
+   "spent": 630990
+  },
+  "request": "GET /api/money/flow?period=2026-10&by=account",
+  "status": 200
+ },
+ "flow_cycle": {
+  "body": {
+   "by": "kind",
+   "from_savings": 0,
+   "income": 1500000,
+   "left_over": 1105100,
+   "middle": [
+    {
+     "amount": 70900,
+     "groups": [
+      {
+       "amount": 70900,
+       "key": "bills",
+       "label": "Bills"
+      }
+     ],
+     "key": "yearly",
+     "label": "Yearly"
+    },
+    {
+     "amount": 324000,
+     "groups": [
+      {
+       "amount": 150000,
+       "key": "health",
+       "label": "Health"
+      },
+      {
+       "amount": 131500,
+       "key": "food",
+       "label": "Food"
+      },
+      {
+       "amount": 40000,
+       "key": "transport",
+       "label": "Transport"
+      },
+      {
+       "amount": 2500,
+       "key": "uncategorized",
+       "label": "Uncategorized"
+      }
+     ],
+     "key": "everyday",
+     "label": "Everyday"
+    }
+   ],
+   "period": {
+    "end": "2026-11-18",
+    "in_progress": true,
+    "key": "this_pay_cycle",
+    "label": "this pay cycle (10 Nov – 9 Dec 2026)",
+    "start": "2026-11-10"
+   },
+   "set_aside": 0,
+   "sources": [
+    {
+     "amount": 1500000,
+     "key": "salary",
+     "label": "Salary"
+    }
+   ],
+   "spent": 394900
+  },
+  "request": "GET /api/money/flow?period=this_pay_cycle",
+  "status": 200
  },
  "insights": {
   "body": {
@@ -2444,7 +2909,7 @@
      "detail": "About 14× the usual ₪105.00 there.",
      "kind": "unusual",
      "link": {
-      "id": "b5f401843c9c49a7a6f7753f085f3230",
+      "id": "abaadb0b71384faa98e5dec2fdd8c935",
       "view": "transactions"
      },
      "title": "₪1,500.00 at סופר פארם",
@@ -2455,7 +2920,7 @@
      "detail": "Charged twice within 4 minutes.",
      "kind": "unusual",
      "link": {
-      "id": "1a9e0c7f5a194b71a4ce5f8f1a2d9c02",
+      "id": "a9dd9e01aa034ca99cbd260d0c69a48c",
       "view": "transactions"
      },
      "title": "₪200.00 at פז דלק",
@@ -3089,7 +3554,7 @@
     {
      "name": "Sample Card",
      "reason": "bank worker not reachable",
-     "source_id": "8f57f091e3584f7cbb217a7dc6356666",
+     "source_id": "555d757762b74db4a567dc4e03dd0d50",
      "state": "failing"
     }
    ],
@@ -3099,17 +3564,17 @@
      "balance_at": "2026-11-18T05:01:00+00:00",
      "company": "samplebank",
      "company_name": "Sample Bank",
-     "id": "f8475d67ef6f491691d848122d135700",
+     "id": "93f6b9b4ad224d94a6d79102c8009df8",
      "label": "Sample Bank ••••901",
      "number": "••••901"
     }
    ],
    "cards": [
     {
-     "billed_from_account_id": "f8475d67ef6f491691d848122d135700",
+     "billed_from_account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "company": "samplecard",
      "company_name": "Sample Card",
-     "id": "fbf29a37be844f5593565558e49e29bf",
+     "id": "f589167b5bf54eaca03847f23e1cf5a3",
      "label": "Shared card",
      "next_charge": 120000,
      "next_charge_date": "2026-11-25",
@@ -3119,7 +3584,7 @@
      "billed_from_account_id": null,
      "company": "samplecard",
      "company_name": "Sample Card",
-     "id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "id": "6fd1470a340248889b51f94f088f507f",
      "label": "Sample Card 8763",
      "next_charge": 345081,
      "next_charge_date": "2026-12-10",
@@ -3143,7 +3608,7 @@
     },
     "next": [
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": 17300,
       "date": "2026-11-20",
       "estimated": false,
@@ -3151,7 +3616,7 @@
       "label": "קצבת ילדים"
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": -450000,
       "date": "2026-11-20",
       "estimated": false,
@@ -3159,7 +3624,7 @@
       "label": "משכנתא לאומי"
      },
      {
-      "account_id": "fbf29a37be844f5593565558e49e29bf",
+      "account_id": "f589167b5bf54eaca03847f23e1cf5a3",
       "amount": -120000,
       "date": "2026-11-25",
       "estimated": false,
@@ -3179,7 +3644,7 @@
       ]
      },
      {
-      "account_id": "f8475d67ef6f491691d848122d135700",
+      "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
       "amount": 1500000,
       "date": "2026-12-10",
       "estimated": false,
@@ -3205,6 +3670,53 @@
    "month": "2026-11",
    "net": 1022316,
    "one_off": 0,
+   "payday": {
+    "cycle": {
+     "end": "2026-12-09",
+     "start": "2026-11-10"
+    },
+    "days_left": 22,
+    "due": [
+     {
+      "amount": 450000,
+      "date": "2026-11-20",
+      "kind": "fixed",
+      "label": "משכנתא לאומי"
+     },
+     {
+      "amount": 6000,
+      "date": "2026-12-01",
+      "kind": "yearly",
+      "label": "NAMECHEAP"
+     },
+     {
+      "amount": 4990,
+      "date": "2026-12-03",
+      "kind": "fixed",
+      "label": "NETFLIX.COM"
+     }
+    ],
+    "due_total": 460990,
+    "everyday": 324000,
+    "fixed": 0,
+    "income": 1500000,
+    "late": false,
+    "left": 644110,
+    "one_off": 0,
+    "payday": "2026-12-10",
+    "per_day": 29277,
+    "salary": {
+     "amount": 1500000,
+     "merchant": "משכורת נוגה תעשיות"
+    },
+    "set_aside": 0,
+    "status": "ok",
+    "usual": {
+     "ahead": 31984,
+     "rate": 44250
+    },
+    "yearly": 70900
+   },
    "period": {
     "end": "2026-11-18",
     "in_progress": true,
@@ -3218,7 +3730,7 @@
     {
      "company": "samplebank",
      "company_name": "Sample Bank",
-     "id": "3d9505076e1346129c00b1ad404df48c",
+     "id": "26e4373c7a134d43a8d703114a487985",
      "label": null,
      "last_ok_at": "2026-11-18T05:01:00+00:00",
      "last_sync_at": "2026-11-18T05:01:00+00:00",
@@ -3230,7 +3742,7 @@
     {
      "company": "samplecard",
      "company_name": "Sample Card",
-     "id": "8f57f091e3584f7cbb217a7dc6356666",
+     "id": "555d757762b74db4a567dc4e03dd0d50",
      "label": null,
      "last_ok_at": "2026-11-17T17:00:00+00:00",
      "last_sync_at": "2026-11-17T17:00:00+00:00",
@@ -3267,7 +3779,7 @@
      "text": "₪1,500.00 at סופר פארם, about 14× the usual ₪105.00 there",
      "title": "₪1,500.00 at סופר פארם",
      "transaction": {
-      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+      "account_id": "6fd1470a340248889b51f94f088f507f",
       "account_kind": "card",
       "account_label": "Sample Card 8763",
       "amount": -150000,
@@ -3280,7 +3792,7 @@
       "flow": "purchase",
       "group": "health",
       "group_label": "Health",
-      "id": "b5f401843c9c49a7a6f7753f085f3230",
+      "id": "abaadb0b71384faa98e5dec2fdd8c935",
       "memo": null,
       "merchant": "סופר פארם",
       "merchant_key": "סופר פארם",
@@ -3294,12 +3806,12 @@
      "why": "about 14× the usual ₪105.00 there"
     },
     {
-     "duplicate_of": "2a8687a1bc6f4b3493c595f3fc355262",
+     "duplicate_of": "c4c95bdf36594ba3944d89c5cf9de951",
      "reason": "duplicate",
      "text": "₪200.00 at פז דלק, charged twice within 4 minutes",
      "title": "₪200.00 at פז דלק",
      "transaction": {
-      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+      "account_id": "6fd1470a340248889b51f94f088f507f",
       "account_kind": "card",
       "account_label": "Sample Card 8763",
       "amount": -20000,
@@ -3312,7 +3824,7 @@
       "flow": "purchase",
       "group": "transport",
       "group_label": "Transport",
-      "id": "1a9e0c7f5a194b71a4ce5f8f1a2d9c02",
+      "id": "a9dd9e01aa034ca99cbd260d0c69a48c",
       "memo": null,
       "merchant": "פז דלק",
       "merchant_key": "פז דלק",
@@ -3329,7 +3841,7 @@
      "text": "₪2,836.00 at ביטוח רכב ישיר, the first charge from them",
      "title": "₪2,836.00 at ביטוח רכב ישיר",
      "transaction": {
-      "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+      "account_id": "6fd1470a340248889b51f94f088f507f",
       "account_kind": "card",
       "account_label": "Sample Card 8763",
       "amount": -70900,
@@ -3348,7 +3860,7 @@
       "flow": "purchase",
       "group": "bills",
       "group_label": "Bills",
-      "id": "625c7a3126064d6380e309133047907f",
+      "id": "591d5314fcc7434fba42e91904964074",
       "memo": null,
       "merchant": "ביטוח רכב ישיר",
       "merchant_key": "ביטוח רכב ישיר",
@@ -3372,7 +3884,7 @@
     {
      "name": "Sample Card",
      "reason": "bank worker not reachable",
-     "source_id": "8f57f091e3584f7cbb217a7dc6356666",
+     "source_id": "555d757762b74db4a567dc4e03dd0d50",
      "state": "failing"
     }
    ],
@@ -3382,17 +3894,17 @@
      "balance_at": "2026-11-18T05:01:00+00:00",
      "company": "samplebank",
      "company_name": "Sample Bank",
-     "id": "f8475d67ef6f491691d848122d135700",
+     "id": "93f6b9b4ad224d94a6d79102c8009df8",
      "label": "Sample Bank ••••901",
      "number": "••••901"
     }
    ],
    "cards": [
     {
-     "billed_from_account_id": "f8475d67ef6f491691d848122d135700",
+     "billed_from_account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "company": "samplecard",
      "company_name": "Sample Card",
-     "id": "fbf29a37be844f5593565558e49e29bf",
+     "id": "f589167b5bf54eaca03847f23e1cf5a3",
      "label": "Shared card",
      "next_charge": 120000,
      "next_charge_date": "2026-11-25",
@@ -3402,7 +3914,7 @@
      "billed_from_account_id": null,
      "company": "samplecard",
      "company_name": "Sample Card",
-     "id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "id": "6fd1470a340248889b51f94f088f507f",
      "label": "Sample Card 8763",
      "next_charge": 345081,
      "next_charge_date": "2026-12-10",
@@ -3428,6 +3940,7 @@
    "month": "2026-10",
    "net": 886310,
    "one_off": 0,
+   "payday": null,
    "period": {
     "end": "2026-10-31",
     "in_progress": false,
@@ -3441,7 +3954,7 @@
     {
      "company": "samplebank",
      "company_name": "Sample Bank",
-     "id": "3d9505076e1346129c00b1ad404df48c",
+     "id": "26e4373c7a134d43a8d703114a487985",
      "label": null,
      "last_ok_at": "2026-11-18T05:01:00+00:00",
      "last_sync_at": "2026-11-18T05:01:00+00:00",
@@ -3453,7 +3966,7 @@
     {
      "company": "samplecard",
      "company_name": "Sample Card",
-     "id": "8f57f091e3584f7cbb217a7dc6356666",
+     "id": "555d757762b74db4a567dc4e03dd0d50",
      "label": null,
      "last_ok_at": "2026-11-17T17:00:00+00:00",
      "last_sync_at": "2026-11-17T17:00:00+00:00",
@@ -3626,7 +4139,7 @@
   "body": {
    "changed": 1,
    "transaction": {
-    "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+    "account_id": "6fd1470a340248889b51f94f088f507f",
     "account_kind": "card",
     "account_label": "Sample Card 8763",
     "amount": -2500,
@@ -3646,7 +4159,7 @@
     "foreign": null,
     "group": "food",
     "group_label": "Food",
-    "id": "0c9f33797ca54a68bd0eb60beacdf378",
+    "id": "9ce965de547046449561ad08f4f521ba",
     "installment": null,
     "kind": "everyday",
     "meal_cycle": null,
@@ -3666,12 +4179,12 @@
     "source": "notification",
     "spending": true,
     "status": "provisional",
-    "updated_at": "2026-11-22T16:29:33+00:00",
+    "updated_at": "2026-11-24T23:39:08+00:00",
     "yearly": null
    },
-   "undo_id": "8949b312212c"
+   "undo_id": "8fc4289fa288"
   },
-  "request": "PATCH /api/money/transactions/0c9f33797ca54a68bd0eb60beacdf378",
+  "request": "PATCH /api/money/transactions/9ce965de547046449561ad08f4f521ba",
   "request_body": {
    "category": "restaurants",
    "for_merchant": true
@@ -3682,7 +4195,7 @@
   "body": {
    "changed": 0,
    "transaction": {
-    "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+    "account_id": "6fd1470a340248889b51f94f088f507f",
     "account_kind": "card",
     "account_label": "Sample Card 8763",
     "amount": -1594,
@@ -3707,7 +4220,7 @@
     },
     "group": "family",
     "group_label": "Family",
-    "id": "fd8760a6bd3e489a87e49f6395312305",
+    "id": "a2f9a160328f45bcb49009c6406a6f49",
     "installment": null,
     "kind": null,
     "meal_cycle": null,
@@ -3727,12 +4240,12 @@
     "source": "scrape",
     "spending": false,
     "status": "completed",
-    "updated_at": "2026-11-22T16:29:33+00:00",
+    "updated_at": "2026-11-24T23:39:08+00:00",
     "yearly": null
    },
-   "undo_id": "df63a3883e69"
+   "undo_id": "5fe4b6452fe0"
   },
-  "request": "PATCH /api/money/transactions/fd8760a6bd3e489a87e49f6395312305",
+  "request": "PATCH /api/money/transactions/a2f9a160328f45bcb49009c6406a6f49",
   "request_body": {
    "flow": "investment"
   },
@@ -3742,7 +4255,7 @@
   "body": {
    "changed": 0,
    "transaction": {
-    "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+    "account_id": "6fd1470a340248889b51f94f088f507f",
     "account_kind": "card",
     "account_label": "Sample Card 8763",
     "amount": -2500,
@@ -3762,7 +4275,7 @@
     "foreign": null,
     "group": null,
     "group_label": null,
-    "id": "0c9f33797ca54a68bd0eb60beacdf378",
+    "id": "9ce965de547046449561ad08f4f521ba",
     "installment": null,
     "kind": "everyday",
     "meal_cycle": null,
@@ -3782,12 +4295,12 @@
     "source": "notification",
     "spending": true,
     "status": "provisional",
-    "updated_at": "2026-11-22T16:29:33+00:00",
+    "updated_at": "2026-11-24T23:39:08+00:00",
     "yearly": null
    },
-   "undo_id": "006da487dac2"
+   "undo_id": "4eb0ac24a443"
   },
-  "request": "PATCH /api/money/transactions/0c9f33797ca54a68bd0eb60beacdf378",
+  "request": "PATCH /api/money/transactions/9ce965de547046449561ad08f4f521ba",
   "request_body": {
    "note": "with Noa"
   },
@@ -3797,7 +4310,7 @@
   "body": {
    "changed": 1,
    "transaction": {
-    "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+    "account_id": "6fd1470a340248889b51f94f088f507f",
     "account_kind": "card",
     "account_label": "Sample Card 8763",
     "amount": -1594,
@@ -3822,7 +4335,7 @@
     },
     "group": "family",
     "group_label": "Family",
-    "id": "fd8760a6bd3e489a87e49f6395312305",
+    "id": "a2f9a160328f45bcb49009c6406a6f49",
     "installment": null,
     "kind": "one_off",
     "meal_cycle": null,
@@ -3842,12 +4355,12 @@
     "source": "scrape",
     "spending": true,
     "status": "completed",
-    "updated_at": "2026-11-22T16:29:33+00:00",
+    "updated_at": "2026-11-24T23:39:08+00:00",
     "yearly": null
    },
-   "undo_id": "a22431d786ee"
+   "undo_id": "b2a2fbdc73be"
   },
-  "request": "PATCH /api/money/transactions/fd8760a6bd3e489a87e49f6395312305",
+  "request": "PATCH /api/money/transactions/a2f9a160328f45bcb49009c6406a6f49",
   "request_body": {
    "one_off": true
   },
@@ -3857,7 +4370,7 @@
   "body": {
    "income": [
     {
-     "account_id": "f8475d67ef6f491691d848122d135700",
+     "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "account_kind": "bank",
      "account_label": "Sample Bank ••••901",
      "amount": 1500000,
@@ -3880,7 +4393,7 @@
      "variable": false
     },
     {
-     "account_id": "f8475d67ef6f491691d848122d135700",
+     "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "account_kind": "bank",
      "account_label": "Sample Bank ••••901",
      "amount": 17300,
@@ -3905,7 +4418,7 @@
    ],
    "items": [
     {
-     "account_id": "f8475d67ef6f491691d848122d135700",
+     "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "account_kind": "bank",
      "account_label": "Sample Bank ••••901",
      "amount": 450000,
@@ -3928,7 +4441,7 @@
      "variable": false
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": 4990,
@@ -3955,7 +4468,7 @@
      "variable": false
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": 6000,
@@ -3981,7 +4494,7 @@
    "monthly_total": 455490,
    "yearly": [
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "amount": 283600,
      "category": "insurance",
@@ -3995,7 +4508,7 @@
      "next_date": "2027-11-16",
      "payments": 4,
      "row_ids": [
-      "625c7a3126064d6380e309133047907f"
+      "591d5314fcc7434fba42e91904964074"
      ]
     }
    ],
@@ -4006,7 +4519,7 @@
  },
  "transaction_foreign": {
   "body": {
-   "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+   "account_id": "6fd1470a340248889b51f94f088f507f",
    "account_kind": "card",
    "account_label": "Sample Card 8763",
    "amount": -1594,
@@ -4031,7 +4544,7 @@
    },
    "group": "family",
    "group_label": "Family",
-   "id": "fd8760a6bd3e489a87e49f6395312305",
+   "id": "a2f9a160328f45bcb49009c6406a6f49",
    "installment": null,
    "kind": "everyday",
    "meal_cycle": null,
@@ -4054,12 +4567,12 @@
    "updated_at": "2026-11-01T00:00:00+00:00",
    "yearly": null
   },
-  "request": "GET /api/money/transactions/fd8760a6bd3e489a87e49f6395312305",
+  "request": "GET /api/money/transactions/a2f9a160328f45bcb49009c6406a6f49",
   "status": 200
  },
  "transaction_installment": {
   "body": {
-   "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+   "account_id": "6fd1470a340248889b51f94f088f507f",
    "account_kind": "card",
    "account_label": "Sample Card 8763",
    "amount": -70900,
@@ -4081,7 +4594,7 @@
    "foreign": null,
    "group": "bills",
    "group_label": "Bills",
-   "id": "625c7a3126064d6380e309133047907f",
+   "id": "591d5314fcc7434fba42e91904964074",
    "installment": {
     "number": 1,
     "purchase_amount": -283600,
@@ -4108,12 +4621,12 @@
    "updated_at": "2026-11-01T00:00:00+00:00",
    "yearly": null
   },
-  "request": "GET /api/money/transactions/625c7a3126064d6380e309133047907f",
+  "request": "GET /api/money/transactions/591d5314fcc7434fba42e91904964074",
   "status": 200
  },
  "transaction_provisional": {
   "body": {
-   "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+   "account_id": "6fd1470a340248889b51f94f088f507f",
    "account_kind": "card",
    "account_label": "Sample Card 8763",
    "amount": -2500,
@@ -4133,7 +4646,7 @@
    "foreign": null,
    "group": null,
    "group_label": null,
-   "id": "0c9f33797ca54a68bd0eb60beacdf378",
+   "id": "9ce965de547046449561ad08f4f521ba",
    "installment": null,
    "kind": "everyday",
    "meal_cycle": null,
@@ -4156,15 +4669,15 @@
    "updated_at": "2026-11-01T00:00:00+00:00",
    "yearly": null
   },
-  "request": "GET /api/money/transactions/0c9f33797ca54a68bd0eb60beacdf378",
+  "request": "GET /api/money/transactions/9ce965de547046449561ad08f4f521ba",
   "status": 200
  },
  "transactions": {
   "body": {
-   "next_cursor": "WyIyMDI2LTExLTEwIiwgIiIsICIzYWFjNzEzNmRhOGU0NjA4OWVmOTQ2ODE5YmVhMWVkYyJd",
+   "next_cursor": "WyIyMDI2LTExLTEwIiwgIiIsICI4YzQ3ZjExMDI1ODk0OWM2YTE0NTNlOGZmMmIzMjk5ZiJd",
    "transactions": [
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -2500,
@@ -4181,7 +4694,7 @@
      "flow": "purchase",
      "group": null,
      "group_label": null,
-     "id": "0c9f33797ca54a68bd0eb60beacdf378",
+     "id": "9ce965de547046449561ad08f4f521ba",
      "kind": "everyday",
      "memo": null,
      "merchant": "קפה קפה",
@@ -4193,7 +4706,7 @@
      "status": "provisional"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -150000,
@@ -4206,7 +4719,7 @@
      "flow": "purchase",
      "group": "health",
      "group_label": "Health",
-     "id": "b5f401843c9c49a7a6f7753f085f3230",
+     "id": "abaadb0b71384faa98e5dec2fdd8c935",
      "kind": "everyday",
      "memo": null,
      "merchant": "סופר פארם",
@@ -4218,7 +4731,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -20000,
@@ -4231,7 +4744,7 @@
      "flow": "purchase",
      "group": "transport",
      "group_label": "Transport",
-     "id": "1a9e0c7f5a194b71a4ce5f8f1a2d9c02",
+     "id": "a9dd9e01aa034ca99cbd260d0c69a48c",
      "kind": "everyday",
      "memo": null,
      "merchant": "פז דלק",
@@ -4243,7 +4756,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -20000,
@@ -4256,7 +4769,7 @@
      "flow": "purchase",
      "group": "transport",
      "group_label": "Transport",
-     "id": "2a8687a1bc6f4b3493c595f3fc355262",
+     "id": "c4c95bdf36594ba3944d89c5cf9de951",
      "kind": "everyday",
      "memo": null,
      "merchant": "פז דלק",
@@ -4268,7 +4781,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -4500,
@@ -4285,7 +4798,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "4d1f72c77d6e46bfa1f6ed4c857fee64",
+     "id": "2ba5714ea095475e8d2ff227450f0cc9",
      "kind": "everyday",
      "memo": null,
      "merchant": "WOLT",
@@ -4297,7 +4810,7 @@
      "status": "pending"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -70900,
@@ -4316,7 +4829,7 @@
      "flow": "purchase",
      "group": "bills",
      "group_label": "Bills",
-     "id": "625c7a3126064d6380e309133047907f",
+     "id": "591d5314fcc7434fba42e91904964074",
      "kind": "yearly",
      "memo": null,
      "merchant": "ביטוח רכב ישיר",
@@ -4328,7 +4841,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -9900,
@@ -4345,7 +4858,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "5b222365de7d47ae8fa0300a080c5ce1",
+     "id": "4a2049ca737b4be59822d76a5b5c1650",
      "kind": null,
      "memo": null,
      "merchant": "WOLT",
@@ -4357,7 +4870,7 @@
      "status": "unmatched"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": 5000,
@@ -4370,7 +4883,7 @@
      "flow": "refund",
      "group": "food",
      "group_label": "Food",
-     "id": "9b2237aeb5ca4258b0052419c5163738",
+     "id": "f322e1c02c8f4e6a963226e1924793b7",
      "kind": "everyday",
      "memo": null,
      "merchant": "שופרסל דיל",
@@ -4382,7 +4895,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -82000,
@@ -4395,7 +4908,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "d692fbdbd9f24325b09ab3e0e40e387a",
+     "id": "740041942c6a4f2f9a7f8463b5dcfdad",
      "kind": "everyday",
      "memo": null,
      "merchant": "מסעדת הדג",
@@ -4407,7 +4920,7 @@
      "status": "completed"
     },
     {
-     "account_id": "f8475d67ef6f491691d848122d135700",
+     "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "account_kind": "bank",
      "account_label": "Sample Bank ••••901",
      "amount": -30000,
@@ -4420,7 +4933,7 @@
      "flow": "other",
      "group": null,
      "group_label": null,
-     "id": "7b1ea26efdea437b8ac895cf4e758a24",
+     "id": "49c3f04a8ee44301b8605264c4685b77",
      "kind": null,
      "memo": null,
      "merchant": "משיכת מזומן",
@@ -4432,7 +4945,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -50000,
@@ -4445,7 +4958,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "e80f8c0485624676b0734e3732138e84",
+     "id": "8c3869d50a63444c8cfcb01346367163",
      "kind": "everyday",
      "memo": null,
      "merchant": "שופרסל דיל",
@@ -4457,7 +4970,7 @@
      "status": "completed"
     },
     {
-     "account_id": "f8475d67ef6f491691d848122d135700",
+     "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "account_kind": "bank",
      "account_label": "Sample Bank ••••901",
      "amount": 1500000,
@@ -4470,7 +4983,7 @@
      "flow": "income",
      "group": "income",
      "group_label": "Income",
-     "id": "3aac7136da8e46089ef946819bea1edc",
+     "id": "8c47f110258949c6a1453e8ff2b3299f",
      "kind": null,
      "memo": null,
      "merchant": "משכורת נוגה תעשיות",
@@ -4491,7 +5004,7 @@
    "next_cursor": null,
    "transactions": [
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -82000,
@@ -4504,7 +5017,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "d692fbdbd9f24325b09ab3e0e40e387a",
+     "id": "740041942c6a4f2f9a7f8463b5dcfdad",
      "kind": "everyday",
      "memo": null,
      "merchant": "מסעדת הדג",
@@ -4516,7 +5029,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -50000,
@@ -4529,7 +5042,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "e80f8c0485624676b0734e3732138e84",
+     "id": "8c3869d50a63444c8cfcb01346367163",
      "kind": "everyday",
      "memo": null,
      "merchant": "שופרסל דיל",
@@ -4541,7 +5054,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -32000,
@@ -4554,7 +5067,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "6a40750656bd4fa399815c222f191a6a",
+     "id": "632f044d87a9459c9fdf5f806013065e",
      "kind": "everyday",
      "memo": null,
      "merchant": "רמי לוי - יבנה",
@@ -4566,7 +5079,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -20000,
@@ -4579,7 +5092,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "faa9340511d6467d8da5d3b51a0d658d",
+     "id": "1940736e0e134023ab3b9d1a8d612b79",
      "kind": "everyday",
      "memo": null,
      "merchant": "מסעדת הדג",
@@ -4592,7 +5105,7 @@
     }
    ]
   },
-  "request": "GET /api/money/transactions?period=last_30_days&category=food&account=8b46f2c359c046bda5ca34a3a63daec2&min=100",
+  "request": "GET /api/money/transactions?period=last_30_days&category=food&account=6fd1470a340248889b51f94f088f507f&min=100",
   "status": 200
  },
  "transactions_next": {
@@ -4600,7 +5113,7 @@
    "next_cursor": null,
    "transactions": [
     {
-     "account_id": "fbf29a37be844f5593565558e49e29bf",
+     "account_id": "f589167b5bf54eaca03847f23e1cf5a3",
      "account_kind": "card",
      "account_label": "Shared card",
      "amount": -6000,
@@ -4613,7 +5126,7 @@
      "flow": "purchase",
      "group": null,
      "group_label": null,
-     "id": "c580553db1984e149894c244a8efed5e",
+     "id": "6e41e5dcd1ea4f1eabd4d491136df536",
      "kind": "everyday",
      "memo": null,
      "merchant": "חנות כלבו",
@@ -4625,7 +5138,7 @@
      "status": "completed"
     },
     {
-     "account_id": "fbf29a37be844f5593565558e49e29bf",
+     "account_id": "f589167b5bf54eaca03847f23e1cf5a3",
      "account_kind": "card",
      "account_label": "Shared card",
      "amount": -12000,
@@ -4638,7 +5151,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "8e9c15368f0f486db6ea6828837eade6",
+     "id": "d9b9233dc3b34312990b973a2b81f736",
      "kind": "everyday",
      "memo": null,
      "merchant": "קפה לנדוור",
@@ -4650,7 +5163,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -1594,
@@ -4669,7 +5182,7 @@
      "flow": "purchase",
      "group": "family",
      "group_label": "Family",
-     "id": "fd8760a6bd3e489a87e49f6395312305",
+     "id": "a2f9a160328f45bcb49009c6406a6f49",
      "kind": "everyday",
      "memo": null,
      "merchant": "ONLINE COURSE CO",
@@ -4681,7 +5194,7 @@
      "status": "completed"
     },
     {
-     "account_id": "f8475d67ef6f491691d848122d135700",
+     "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "account_kind": "bank",
      "account_label": "Sample Bank ••••901",
      "amount": -25000,
@@ -4694,7 +5207,7 @@
      "flow": "transfer_out",
      "group": "people",
      "group_label": "People",
-     "id": "c16b0f886e374e36b0b6e39e3d62c2f1",
+     "id": "3e70472c548e4065b79900c9d2ef6308",
      "kind": "everyday",
      "memo": "עבור כרטיסים להופעה",
      "merchant": "העברה לדני כהן",
@@ -4706,7 +5219,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -32000,
@@ -4719,7 +5232,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "6a40750656bd4fa399815c222f191a6a",
+     "id": "632f044d87a9459c9fdf5f806013065e",
      "kind": "everyday",
      "memo": null,
      "merchant": "רמי לוי - יבנה",
@@ -4731,7 +5244,7 @@
      "status": "completed"
     },
     {
-     "account_id": "f8475d67ef6f491691d848122d135700",
+     "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "account_kind": "bank",
      "account_label": "Sample Bank ••••901",
      "amount": -100000,
@@ -4744,7 +5257,7 @@
      "flow": "own_transfer",
      "group": null,
      "group_label": null,
-     "id": "f3a816296b174ea98ed2d9fde0a89775",
+     "id": "addc8d3a18834f60b1369985469afd8a",
      "kind": null,
      "memo": null,
      "merchant": "העברה לחיסכון",
@@ -4756,7 +5269,7 @@
      "status": "completed"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -4990,
@@ -4769,7 +5282,7 @@
      "flow": "purchase",
      "group": "bills",
      "group_label": "Bills",
-     "id": "cd1c41c30c2547c39730ab36a4bfe448",
+     "id": "9592ddfd9ce54ff09a8864d22ccc1ebd",
      "kind": "fixed",
      "memo": null,
      "merchant": "NETFLIX.COM",
@@ -4781,7 +5294,7 @@
      "status": "completed"
     },
     {
-     "account_id": "f8475d67ef6f491691d848122d135700",
+     "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "account_kind": "bank",
      "account_label": "Sample Bank ••••901",
      "amount": -345000,
@@ -4794,7 +5307,7 @@
      "flow": "card_bill",
      "group": null,
      "group_label": null,
-     "id": "91fdaedd32ce4518ab04f4e2bfac5ee9",
+     "id": "42a3be92a3a7444f9f9926d6fcb754c4",
      "kind": null,
      "memo": null,
      "merchant": "כאל",
@@ -4806,7 +5319,7 @@
      "status": "completed"
     },
     {
-     "account_id": "f8475d67ef6f491691d848122d135700",
+     "account_id": "93f6b9b4ad224d94a6d79102c8009df8",
      "account_kind": "bank",
      "account_label": "Sample Bank ••••901",
      "amount": -1200,
@@ -4819,7 +5332,7 @@
      "flow": "fee",
      "group": "finance",
      "group_label": "Finance",
-     "id": "e61321c64c314af1b55287096d1386e1",
+     "id": "0bf4aa58f28841f79445231d2c6454e4",
      "kind": "everyday",
      "memo": null,
      "merchant": "עמלת פעולה",
@@ -4832,7 +5345,7 @@
     }
    ]
   },
-  "request": "GET /api/money/transactions?period=this_month&limit=12&cursor=WyIyMDI2LTExLTEwIiwgIiIsICIzYWFjNzEzNmRhOGU0NjA4OWVmOTQ2ODE5YmVhMWVkYyJd",
+  "request": "GET /api/money/transactions?period=this_month&limit=12&cursor=WyIyMDI2LTExLTEwIiwgIiIsICI4YzQ3ZjExMDI1ODk0OWM2YTE0NTNlOGZmMmIzMjk5ZiJd",
   "status": 200
  },
  "transactions_search": {
@@ -4840,7 +5353,7 @@
    "next_cursor": null,
    "transactions": [
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -4500,
@@ -4857,7 +5370,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "4d1f72c77d6e46bfa1f6ed4c857fee64",
+     "id": "2ba5714ea095475e8d2ff227450f0cc9",
      "kind": "everyday",
      "memo": null,
      "merchant": "WOLT",
@@ -4869,7 +5382,7 @@
      "status": "pending"
     },
     {
-     "account_id": "8b46f2c359c046bda5ca34a3a63daec2",
+     "account_id": "6fd1470a340248889b51f94f088f507f",
      "account_kind": "card",
      "account_label": "Sample Card 8763",
      "amount": -9900,
@@ -4886,7 +5399,7 @@
      "flow": "purchase",
      "group": "food",
      "group_label": "Food",
-     "id": "5b222365de7d47ae8fa0300a080c5ce1",
+     "id": "4a2049ca737b4be59822d76a5b5c1650",
      "kind": null,
      "memo": null,
      "merchant": "WOLT",
@@ -5827,7 +6340,7 @@
    "label": "Set קפה קפה and its merchant to Restaurants & cafés",
    "ok": true
   },
-  "request": "POST /api/undo/8949b312212c",
+  "request": "POST /api/undo/8fc4289fa288",
   "status": 200
  },
  "undo_flow": {
@@ -5835,7 +6348,7 @@
    "label": "Counted ONLINE COURSE CO as money set aside",
    "ok": true
   },
-  "request": "POST /api/undo/df63a3883e69",
+  "request": "POST /api/undo/5fe4b6452fe0",
   "status": 200
  },
  "undo_one_off": {
@@ -5843,7 +6356,7 @@
    "label": "Marked ONLINE COURSE CO a one-off",
    "ok": true
   },
-  "request": "POST /api/undo/a22431d786ee",
+  "request": "POST /api/undo/b2a2fbdc73be",
   "status": 200
  }
 }

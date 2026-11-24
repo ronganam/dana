@@ -735,6 +735,13 @@ async def test_web_fixture(client: TestClient) -> None:
     await grab("merchants", "GET", "/api/money/merchants?period=last_30_days")
     await grab("insights", "GET", "/api/money/insights")
     await grab("insights_past", "GET", "/api/money/insights?month=2026-10")
+    await grab("flow", "GET", "/api/money/flow?period=last_month")
+    await grab("flow_cycle", "GET", "/api/money/flow?period=this_pay_cycle")
+    await grab("flow_accounts", "GET", "/api/money/flow?period=2026-10&by=account")
+    await grab("bills", "GET", "/api/money/bills")
+    await grab("bills_about", "GET", "/api/money/bills?about=subscriptions")
+    await grab("afford", "GET", "/api/money/afford?amount=600000&payments=12")
+    await grab("afford_bank", "GET", "/api/money/afford?amount=150000&on=bank&label=Sofa")
     ch = await grab("changes", "GET", "/api/money/changes")
     await grab("changes_unchanged", "GET", f"/api/money/changes?since={ch['cursor']}")
     patched = await grab("patch_category", "PATCH", f"/api/money/transactions/{T['coffee']}",
@@ -762,7 +769,9 @@ async def test_web_fixture(client: TestClient) -> None:
                   + captured["transactions"]["body"]["transactions"])
           and any(i["price_change"] for i in captured["recurring"]["body"]["items"])
           and captured["overview"]["body"]["unusual"] and captured["overview"]["body"]["forecast"]
-          and captured["overview"]["body"]["attention"] and captured["overview"]["body"]["uncategorized"])
+          and captured["overview"]["body"]["attention"] and captured["overview"]["body"]["uncategorized"]
+          and captured["overview"]["body"]["payday"] and captured["flow"]["body"]["middle"]
+          and captured["bills"]["body"]["sections"])
     text = json.dumps(captured, indent=1, ensure_ascii=False, sort_keys=True)
     if os.getenv("WRITE_WEB_FIXTURE"):
         with open(WEB_FIXTURE, "w", encoding="utf-8") as f:

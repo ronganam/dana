@@ -388,8 +388,12 @@ def _main_card(book: Book, cards: Sequence[Dict[str, Any]], as_of: datetime.date
 
 
 def project(book: Book, accounts: Sequence[Dict[str, Any]], balance: int, as_of: datetime.date,
-            days: int = FORECAST_DAYS) -> Dict[str, Any]:
+            days: int = FORECAST_DAYS, extra: Sequence[Dict[str, Any]] = ()) -> Dict[str, Any]:
     """The forecast from ``balance`` at the end of ``as_of`` (pure: :func:`forecast` and the backtests).
+
+    ``extra``: purchases that have not happened (``plan.afford``): ``{date, amount (positive agorot),
+    payments, on: card | bank, label}``, split into monthly payments from ``date``; on the card they join the
+    main card's bills as ``installments``, on the bank they are debits (``kind`` "planned").
 
     Returns ``{as_of, end, balance, series: [{date, balance, low, high}], events: [{date, kind
     (income | fixed | yearly | card_bill), label, amount (signed agorot), estimated, parts?,
@@ -461,8 +465,9 @@ def project(book: Book, accounts: Sequence[Dict[str, Any]], balance: int, as_of:
                     b["items"].append({"label": item["merchant"], "amount": item["amount"], "kind": "fixed"})
     # Yearly charges (and recurring ones that come once a year), on their dates.
     upcoming = []
-    extra = [{**i, "payments": 1} for i in book.charges if i["cadence"] == "yearly" and i["merchant_key"] not in yearly_keys]
-    for y in list(book.yearly) + extra:
+    once_a_year = [{**i, "payments": 1} for i in book.charges
+                   if i["cadence"] == "yearly" and i["merchant_key"] not in yearly_keys]
+    for y in list(book.yearly) + once_a_year:
         d = _date(y["next_date"])
         late = datetime.timedelta(days=LATE_DAYS["yearly"])
         if d < as_of - late:
@@ -491,6 +496,21 @@ def project(book: Book, accounts: Sequence[Dict[str, Any]], balance: int, as_of:
                 if when <= end:
                     bank_events[bank_day(when)].append({"kind": "yearly", "label": y["merchant"], "amount": -part,
                                               "estimated": True})
+    # Purchases that have not happened ("can I afford it?").
+    for p in extra:
+        n = max(1, int(p.get("payments") or 1))
+        each = p["amount"] // n
+        for i in range(n):
+            part = each + (p["amount"] - each * n if i == 0 else 0)
+            when = periods.add_months(p["date"], i)
+            if p.get("on") == "card" and main is not None:
+                b = bill(main["id"], bill_date(when, billing[main["id"]]))
+                if b is not None:
+                    b["parts"]["installments"] += part
+                    b["items"].append({"label": p.get("label") or "Planned", "amount": part, "kind": "planned"})
+            elif when <= end:
+                bank_events[bank_day(when)].append({"kind": "planned", "label": p.get("label") or "Planned",
+                                                    "amount": -part, "estimated": False})
     # Everyday card spending, day by day from as_of, into the main card's bills.
     if main is not None and typical_rate:
         per_day = 12 / 365.25
@@ -553,11 +573,16 @@ def project(book: Book, accounts: Sequence[Dict[str, Any]], balance: int, as_of:
             "left_out_total": -sum(r["amount"] for r in one_offs)}
 
 
+def labelled_accounts(user: User) -> List[Dict[str, Any]]:
+    """The user's accounts, each ``label`` the name the page shows (what :func:`project` expects)."""
+    return [{**a, "label": store.account_label(a["company"], a["kind"], a["number"], a.get("label"))}
+            for a in store.list_accounts(user)]
+
+
 def forecast(user: User, days: int = FORECAST_DAYS, book: Optional[Book] = None) -> Optional[Dict[str, Any]]:
     """The user's forecast from their banks' last balance (:func:`project`); None without one."""
     book = book or load(user)
-    accounts = [{**a, "label": store.account_label(a["company"], a["kind"], a["number"], a.get("label"))}
-                for a in store.list_accounts(user)]
+    accounts = labelled_accounts(user)
     now = balance_at(book, accounts)
     if now is None:
         return None

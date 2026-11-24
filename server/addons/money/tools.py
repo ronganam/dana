@@ -1,7 +1,7 @@
 """Dana's money tools (docs/money.md, "Agent tools"): thin wrappers over
 :mod:`.queries`, :mod:`.insights` and :mod:`.dashboard` that answer in short text with amounts as
-``€1,234.50`` in the user's currency (``store.money_text``). Periods are resolved here (``periods.resolve``), never by the
-model. Read-only except ``categorize_transaction`` (runs at once with Undo:
+``€1,234.50`` in the user's currency (``store.money_text``). Periods are resolved here (``plan.resolve_period``: ``periods.resolve`` and the pay cycles), never by
+the model. Read-only except ``categorize_transaction`` (runs at once with Undo:
 ``rules.set_category`` registers it), ``update_saving`` (``savings.update``,
 with Undo) and ``sync_money`` (starts a sync, rate limited by
 ``schedule.sync_now``). ``search_transactions`` returns text written by others
@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Literal, Optional
 from core import clock
 from core.users import User
 from core.addons import Connection
-from addons.money import (categories, dashboard, insights, meals, periods, portfolio, queries, rules, savings,
+from addons.money import (categories, dashboard, insights, meals, periods, plan, portfolio, queries, rules, savings,
                                 schedule, store)
 from addons.money.addon import addon
 from addons.money.periods import Period
@@ -29,8 +29,8 @@ MAX_ROWS = 30
 money_text = store.money_text
 
 
-def _period(period: Optional[str], start: Optional[str], end: Optional[str]) -> Period:
-    return periods.resolve(period or None, start=start or None, end=end or None)
+def _period(user: User, period: Optional[str], start: Optional[str], end: Optional[str]) -> Period:
+    return plan.resolve_period(user, period or None, start=start or None, end=end or None)
 
 
 def _span(p: Dict[str, Any]) -> str:
@@ -69,7 +69,7 @@ async def money_summary(conn: Connection, period: str = "this_month", start: Opt
     """How much the user spent (or earned) in a period, optionally for one category, merchant or account, with a breakdown and the same span of the period before ("at this point last month").
 
     Args:
-        period: today, yesterday, this_week, last_week, this_month, last_month, last_30_days, this_year, last_year, or a month YYYY-MM. Ignored when start is given.
+        period: today, yesterday, this_week, last_week, this_month, last_month, last_30_days, this_year, last_year, this_pay_cycle, last_pay_cycle (salary to salary), or a month YYYY-MM. Ignored when start is given.
         start: First day (YYYY-MM-DD) of a custom range.
         end: Last day (YYYY-MM-DD, inclusive) of a custom range; default today.
         category: A group (food, housing, transport, bills, health, shopping, leisure, family, people, finance, other, income), a category (groceries, restaurants, delivery, fuel, subscriptions, …), or "uncategorized".
@@ -80,7 +80,7 @@ async def money_summary(conn: Connection, period: str = "this_month", start: Opt
     """
     user = conn.user
     try:
-        p = _period(period, start, end)
+        p = _period(user, period, start, end)
         account_id = _account_id(user, account)
         if group_by is None and not merchant:
             if category:
@@ -157,7 +157,7 @@ async def search_transactions(conn: Connection, query: Optional[str] = None, per
     """
     user = conn.user
     try:
-        p = _period(period, start, end) if (period or start) else None
+        p = _period(user, period, start, end) if (period or start) else None
         found = queries.search(user, query=query, period=p, category=category, account_id=_account_id(user, account),
                                min_amount=min_amount, max_amount=max_amount, limit=MAX_ROWS, cursor=cursor or None)
     except (ValueError, LookupError) as e:
@@ -174,12 +174,30 @@ async def search_transactions(conn: Connection, query: Optional[str] = None, per
             + "\n".join(_row_line(t) for t in rows) + more)
 
 
+def _payday_text(pay: Dict[str, Any]) -> str:
+    """What is left until payday in one line."""
+    head = (f"Left for everyday spending until payday ({_day(pay['payday'])}, {pay['days_left']} "
+            f"day{'s' if pay['days_left'] != 1 else ''}): {money_text(pay['left'])}")
+    if pay["status"] == "over":
+        head = f"Over by {money_text(-pay['left'])} this pay cycle with {pay['days_left']} days to payday ({_day(pay['payday'])})"
+    else:
+        head += f", about {money_text(pay['per_day'])} a day"
+        head += ("; that covers the usual pace" if pay["status"] == "ok"
+                 else f"; the usual pace would need {money_text(pay['usual']['ahead'])}")
+    late = " The salary is late." if pay["late"] else ""
+    return (f"{head}. This cycle: salary and income {money_text(pay['income'])}, fixed {money_text(pay['fixed'])} "
+            f"and yearly {money_text(pay['yearly'])} paid, {money_text(pay['due_total'])} still due before payday, "
+            f"set aside {money_text(pay['set_aside'])}, everyday {money_text(pay['everyday'])} so far"
+            + (f"; one-offs {money_text(pay['one_off'])} (not counted)" if pay["one_off"] else "") + f".{late}")
+
+
 @addon.tool(untrusted_result=True)
 async def money_overview(conn: Connection) -> str:
-    """The user's money right now: spent and earned this month (with the same point last month), everyday spending against a typical month, the net so far, bank balances, each card's next bill and date, the lowest bank balance coming up (one-offs left out), fixed costs a month, the last sync and anything that needs attention."""
+    """The user's money right now: spent and earned this month (with the same point last month), what is left for everyday spending until payday, everyday spending against a typical month, the net so far, bank balances, each card's next bill and date, the lowest bank balance coming up (one-offs left out), fixed costs a month, the last sync and anything that needs attention."""
     user = conn.user
     o = queries.overview(user)
-    tiles = dashboard.tiles(user)
+    book = dashboard.load(user)
+    tiles = dashboard.tiles(user, book=book)
     lines = [f"Money in {periods.month_label(datetime.date.fromisoformat(o['period']['start']))}, so far:"]
     spent = f"- Spent {money_text(o['spent']['total'])}"
     if o["spent"]["compare"]:
@@ -191,6 +209,9 @@ async def money_overview(conn: Connection) -> str:
         lines.append(f"- Everyday spending (no fixed costs or one-offs): {money_text(e['total'])} so far"
                      + (f", on track for {money_text(e['on_track'])}" if e["on_track"] is not None else "")
                      + f"; a typical month {money_text(e['typical'])}.")
+    pay = plan.left_until_payday(book)
+    if pay:
+        lines.append("- " + _payday_text(pay))
     # An account the bank reports without a balance, or an old card with no bill coming, says nothing.
     for b in o["banks"]:
         if b["balance"] is not None:
@@ -228,8 +249,14 @@ async def money_overview(conn: Connection) -> str:
 
 
 @addon.tool(untrusted_result=True)
-async def recurring_charges(conn: Connection) -> str:
-    """The user's subscriptions and standing orders (weekly, monthly, every-2-months or yearly charges at a similar amount), with their monthly cost, price changes and next expected date; charges that come once a year (insurance renewals, the car licence); and regular income."""
+async def recurring_charges(conn: Connection, about: Optional[str] = None) -> str:
+    """What the user pays for: subscriptions and standing orders (weekly, monthly, every-2-months or yearly charges at a similar amount) with their cost, price changes and next expected date; charges that come once a year (insurance renewals, the car licence); and regular income. With about, only those bills, a month and a year each ("what do I pay for insurance?", "how much is Partner?").
+
+    Args:
+        about: A category or group (insurance, phone_internet, utilities, subscriptions, car, housing…, in either language) or part of a provider's name. Default: everything.
+    """
+    if about and about.strip():
+        return _register_text(plan.register(dashboard.load(conn.user), about))
     rec = insights.recurring(conn.user)
     if not rec["items"] and not rec["income"] and not insights.yearly(conn.user, rec=rec):
         return "No recurring charges found yet (they show after three months of the same charge)."
@@ -258,6 +285,92 @@ async def recurring_charges(conn: Connection) -> str:
     if rec["income"]:
         lines.append("Regular income:")
         lines.extend(line(i) for i in rec["income"])
+    return "\n".join(lines)
+
+
+def _register_text(reg: Dict[str, Any]) -> str:
+    if not reg["sections"]:
+        return (f"No recurring or yearly charges match '{reg['about']}'. A one-time payment would show in "
+                f"search_transactions.")
+    lines = [f"Bills for '{reg['about']}': {money_text(reg['monthly'])} a month, {money_text(reg['yearly'])} a year."]
+    for sec in reg["sections"]:
+        lines.append(f"{sec['label']}: {money_text(sec['monthly'])} a month, {money_text(sec['yearly'])} a year.")
+        for i in sec["items"]:
+            if i["cadence"] == "yearly":
+                price = f"{money_text(i['amount'])} a year" + (f" in {i['payments']} payments" if i["payments"] > 1 else "")
+            else:
+                price = f"{'about ' if i['variable'] else ''}{money_text(i['amount'])} {insights.cadence_text(i['cadence'])}"
+                if i["cadence"] != "monthly":
+                    price += f" ({money_text(i['monthly'])} a month)"
+            change = i["price_change"]
+            if change:
+                price += f", was {money_text(change['from'])} until {_day(change['since'])}"
+            lines.append(f"- {i['merchant']} · {price} · {money_text(i['yearly'])} a year · {i['category_label']}"
+                         f" · last {_day(i['last_date'])}, next ~{_day(i['next_date'])}")
+    return "\n".join(lines)
+
+
+@addon.tool(untrusted_result=True)
+async def money_flow(conn: Connection, period: str = "last_month", start: Optional[str] = None,
+                     end: Optional[str] = None) -> str:
+    """Where a period's money went: income by source, then spending split into fixed costs, yearly charges, everyday spending and one-offs (each by group), money set aside, and what was left over or taken from savings. Use it for "where did my money go last month?", "what did this pay cycle look like?".
+
+    Args:
+        period: As in money_summary (last_month by default; this_pay_cycle / last_pay_cycle run salary to salary).
+        start: First day (YYYY-MM-DD) of a custom range.
+        end: Last day (YYYY-MM-DD, inclusive) of a custom range; default today.
+    """
+    user = conn.user
+    book = dashboard.load(user)
+    try:
+        p = plan.resolve_period(user, period or None, start=start or None, end=end or None, book=book)
+    except ValueError as e:
+        return f"Error: {e}"
+    f = plan.flow_chart(book, p, "kind")
+    label, span = f["period"]["label"], _span(f["period"])
+    when = label if label == span or span in label else f"{label} ({span})"
+    lines = [f"{when[:1].upper()}{when[1:]}: income {money_text(f['income'])}"
+             + (" (" + ", ".join(f"{s['label']} {money_text(s['amount'])}" for s in f["sources"]) + ")" if f["sources"] else "")
+             + f"; spent {money_text(f['spent'])}; set aside {money_text(f['set_aside'])}; "
+             + (f"left over {money_text(f['left_over'])}." if f["left_over"] or not f["from_savings"]
+                else f"{money_text(f['from_savings'])} more than came in (from savings).")]
+    for m in f["middle"]:
+        share = f" ({round(m['amount'] / f['income'] * 100)}% of income)" if f["income"] else ""
+        lines.append(f"- {m['label']} {money_text(m['amount'])}{share}: "
+                     + ", ".join(f"{g['label']} {money_text(g['amount'])}" for g in m["groups"][:MAX_BREAKDOWN]) + ".")
+    return "\n".join(lines)
+
+
+@addon.tool(untrusted_result=True)
+async def can_i_afford(conn: Connection, amount: float, payments: int = 1, date: Optional[str] = None,
+                       on: Literal["card", "bank"] = "card") -> str:
+    """Whether a purchase fits: the bank balance forecast with and without it (once or in monthly payments), the lowest balance after it, and what is left until payday. Use it for "can I afford a 6,000 sofa in 12 payments?".
+
+    Args:
+        amount: The price in the user's currency (e.g. 6000).
+        payments: Monthly payments, 1 to 36 (1 = paid at once).
+        date: When it would be bought (YYYY-MM-DD); default today.
+        on: card (the main card's bills) or bank (straight from the bank account).
+    """
+    user = conn.user
+    try:
+        when = datetime.date.fromisoformat(date) if date else None
+        a = plan.afford(dashboard.load(user), dashboard.labelled_accounts(user), int(round(float(amount) * 100)),
+                        int(payments or 1), when, on)
+    except (ValueError, TypeError) as e:
+        return f"Error: {e}"
+    if a is None:
+        return "No bank balance yet: the answer starts from the bank account's balance (add the bank on the Money page)."
+    low = a["after"]["low"]
+    word = {"fine": "Fits", "tight": "Tight", "short": "Doesn't fit"}[a["verdict"]]
+    how = (f"in {a['payments']} payments of {money_text(a['payment'])}" if a["payments"] > 1 else "at once")
+    lines = [f"{word}: {money_text(a['amount'])} {how} on the {a['on']} from {_day(a['date'])}. The lowest bank "
+             f"balance after it would be {money_text(low['balance'])} on {_day(low['date'])} (without it "
+             f"{money_text(a['before']['low']['balance'])}); Dana warns below {money_text(a['floor'])}."]
+    if a["left_until_payday"]:
+        lp = a["left_until_payday"]
+        lines.append(f"Left for everyday spending until payday: {money_text(lp['before'])} → {money_text(lp['after'])}.")
+    lines.append("The forecast leaves other one-offs out and assumes the usual everyday spending.")
     return "\n".join(lines)
 
 

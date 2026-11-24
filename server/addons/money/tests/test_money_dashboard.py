@@ -21,7 +21,15 @@ spending at its rate, one-offs never projected, the band, the low points);
 trends (typical medians, on track, movers from everyday spending only); merchants;
 insights; everyday pace; the API for two users and one without (403
 ``not_connected``), 400 on a bad month; PATCH flow / one_off / yearly with
-one Undo.
+one Undo. Plan (plan.py): the salary and its pay cycles (the Saturday payday
+in August, the cycle in progress and the ones before, ``this_pay_cycle`` /
+``last_pay_cycle`` in the API and tools); the Flow chart (its kinds equal the
+cash flow month's, by account, a month that took from savings); what is left
+until payday (income − fixed, yearly and what is still due − everyday so far;
+one-offs reported); "can I afford it?" (bank and card in payments, the drop,
+the verdicts, no balance → 409); what the user pays for (sections, a price
+change, ``about``, the savings link). Alerts (alerts.py): each kind, the
+setting, quiet hours, sent once.
 """
 
 import asyncio
@@ -59,7 +67,7 @@ from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 from core import actions_api, clock  # noqa: E402
 from core.auth import setup_auth  # noqa: E402
 from core.addons import store as connections  # noqa: E402
-from addons.money import api as money_api, dashboard, ingest, insights, queries, store  # noqa: E402
+from addons.money import alerts, api as money_api, dashboard, ingest, insights, plan, queries, store, tools  # noqa: E402
 
 results: List[Tuple[str, bool]] = []
 
@@ -514,11 +522,234 @@ async def test_marks(client: TestClient) -> None:
     check("marks: another user's transaction → 404; no money → 403", (s, s2) == (404, 403), (s, s2))
 
 
+# --- Plan: pay cycles, Flow, left until payday, afford, bills ------------------------------------
+
+def test_plan() -> None:
+    pay = plan.salary(BOOK)
+    check("plan: the salary (the 1st; 2 Aug when the 1st was a Saturday)",
+          pay is not None and pay["category"] == "salary" and pay["dates"][-4:] == ["2026-08-02", "2026-09-01",
+                                                                                   "2026-10-01", "2026-11-01"]
+          and pay["next_date"] == "2026-12-01", pay and pay["dates"][-4:])
+    cur = plan.cycle_period(BOOK, 0)
+    last = plan.cycle_period(BOOK, 1)
+    aug = plan.cycle_period(BOOK, 3)
+    check("plan: this pay cycle so far, compared with the same days of the last one and all of it",
+          cur.start == D(2026, 11, 1) and cur.end_exclusive == D(2026, 11, 19) and cur.in_progress
+          and cur.label == "this pay cycle (1–30 Nov 2026)"
+          and [(c.start, c.end_exclusive) for c in cur.compare_to] == [(D(2026, 10, 1), D(2026, 10, 19)),
+                                                                       (D(2026, 10, 1), D(2026, 11, 1))], cur)
+    check("plan: past cycles run payday to payday (2 Aug – 31 Aug)",
+          (last.start, last.end_exclusive, last.in_progress) == (D(2026, 10, 1), D(2026, 11, 1), False)
+          and (aug.start, aug.end_exclusive) == (D(2026, 8, 2), D(2026, 9, 1)), (last, aug))
+    check("plan: resolve_period — pay cycles by name, the rest as periods.resolve; none without a salary",
+          plan.resolve_period(ROBIN, "last pay cycle", book=BOOK) == last
+          and plan.resolve_period(ROBIN, "2026-10").key == "2026-10", None)
+    try:
+        plan.resolve_period(BOB, "this_pay_cycle")
+        no_salary = False
+    except ValueError:
+        no_salary = True
+    check("plan: Bob has no salary → a pay cycle is an error in words", no_salary)
+
+    # The Flow chart: its kinds are the cash flow month's.
+    oct_cf = next(m for m in dashboard.cashflow(BOOK, 12)["months"] if m["month"] == "2026-10")
+    f = plan.flow_chart(BOOK, last)
+    mid = {m["key"]: m["amount"] for m in f["middle"]}
+    check("flow: income, the kinds and money set aside equal the month's cash flow; left over = the net",
+          f["income"] == oct_cf["income"] and mid.get("fixed") == oct_cf["fixed"] and mid.get("everyday") == oct_cf["everyday"]
+          and mid.get("one_off") == oct_cf["one_off"] and f["spent"] == oct_cf["spent"]
+          and f["left_over"] == oct_cf["net"] and f["from_savings"] == 0
+          and [s["key"] for s in f["sources"]] == ["salary"], (f, oct_cf))
+    check("flow: each kind's groups add up to it (fixed = housing + bills)",
+          all(m["amount"] == sum(g["amount"] for g in m["groups"]) for m in f["middle"])
+          and {g["key"] for g in f["middle"][0]["groups"]} == {"housing", "bills"}, f["middle"][0])
+    apr = plan.flow_chart(BOOK, plan.resolve_period(ROBIN, "2026-04"))
+    check("flow: April's investment is set aside and took money from savings",
+          apr["set_aside"] == 4_000_000 and apr["left_over"] == 0
+          and apr["from_savings"] == apr["spent"] + apr["set_aside"] - apr["income"] > 0, apr)
+    acc = plan.flow_chart(BOOK, last, "account", store.list_accounts(ROBIN))
+    check("flow: by account — the bank and the card, adding up to the same spending",
+          sorted(m["key"] for m in acc["middle"]) == sorted([BANK, CARD]) and acc["spent"] == f["spent"]
+          and all(m["label"] for m in acc["middle"]), [m["label"] for m in acc["middle"]])
+
+    # Left until payday.
+    left = plan.left_until_payday(BOOK)
+    expected = left["income"] - left["fixed"] - left["yearly"] - left["set_aside"] - left["due_total"] - left["everyday"]
+    check("payday: the cycle, payday Tue 1 Dec, 13 days left, the November salary and fixed costs so far",
+          left["cycle"] == {"start": "2026-11-01", "end": "2026-11-30"} and left["payday"] == "2026-12-01"
+          and left["days_left"] == 13 and not left["late"] and left["income"] == SALARY[-1]
+          and left["fixed"] == 749_000 + 4_990 and left["everyday"] == EVERYDAY["2026-11"], left)
+    check("payday: electricity (two days late) is still due; left = income − fixed − yearly − due − everyday; a day",
+          [e["label"] for e in left["due"]] == ["חברת החשמל לישראל"] and left["left"] == expected
+          and left["per_day"] == left["left"] // 13
+          and left["status"] == ("ok" if left["left"] >= left["usual"]["ahead"] else "tight"), left)
+    check("payday: none without a salary", plan.left_until_payday(dashboard.load(BOB)) is None)
+
+    # Can I afford it?
+    accounts = dashboard.labelled_accounts(ROBIN)
+    bank = plan.afford(BOOK, accounts, 600_000, 1, on="bank", label="Sofa")
+    card = plan.afford(BOOK, accounts, 600_000, 12)
+    check("afford: at once from the bank — the balance drops by all of it",
+          bank["drop"] == 600_000 and bank["after"]["end_balance"] == bank["before"]["end_balance"] - 600_000
+          and bank["payment"] == 600_000 and bank["left_until_payday"] == {"before": left["left"],
+                                                                         "after": left["left"] - 600_000}, bank)
+    check("afford: in 12 card payments — 50 a month on the bills, all of it by the end, the cycle loses one payment",
+          card["payment"] == 50_000 and card["after"]["end_balance"] == card["before"]["end_balance"] - 600_000
+          and 0 < card["drop"] < 600_000 and card["left_until_payday"]["after"] == left["left"] - 50_000, card)
+    huge = plan.afford(BOOK, accounts, 100_000_000, 1, on="bank")
+    check("afford: verdicts — fine above the floor, short below zero",
+          bank["verdict"] in ("fine", "tight") and huge["verdict"] == "short" and huge["after"]["low"]["balance"] < 0,
+          (bank["verdict"], huge["verdict"]))
+    try:
+        plan.afford(BOOK, accounts, 0)
+        refused = False
+    except ValueError:
+        refused = True
+    check("afford: nothing to buy is refused; Bob (no bank balance) → None",
+          refused and plan.afford(dashboard.load(BOB), dashboard.labelled_accounts(BOB), 1_000) is None)
+
+    # What I pay for.
+    reg = plan.register(BOOK)
+    secs = {s["key"]: s for s in reg["sections"]}
+    netflix = next(i for i in secs["subscriptions"]["items"] if i["merchant"] == "NETFLIX.COM")
+    home_ins = next(i for i in secs["insurance"]["items"] if "הראל" in i["merchant"])
+    check("bills: sections by cost a year (home first: the mortgage), each adding up its items",
+          reg["sections"][0]["key"] == "home" and {"home", "insurance", "subscriptions", "car"} <= set(secs)
+          and all(s["yearly"] == sum(i["yearly"] for i in s["items"]) for s in reg["sections"])
+          and reg["monthly"] == sum(s["monthly"] for s in reg["sections"]), list(secs))
+    check("bills: Netflix with its price change; the home insurance yearly in 3 payments; a share of income",
+          (netflix["amount"], netflix["monthly"], netflix["yearly"]) == (4_990, 4_990, 59_880)
+          and netflix["price_change"]["from"] == 3_990 and (home_ins["yearly"], home_ins["payments"]) == (120_000, 3)
+          and reg["income_share"] == round(reg["monthly"] / reg["income_typical"], 3), (netflix, home_ins))
+    ins = plan.register(BOOK, "insurance")
+    by_name = plan.register(BOOK, "netflix")
+    check("bills: about a category (either language) or a provider's name",
+          [s["key"] for s in ins["sections"]] == ["insurance"] and len(ins["sections"][0]["items"]) == 2
+          and plan.register(BOOK, "ביטוח")["yearly"] == ins["yearly"]
+          and [i["merchant"] for s in by_name["sections"] for i in s["items"]] == ["NETFLIX.COM"], ins["sections"])
+    plan.link_savings(reg, [{"active": True, "scope": {"merchant_keys": netflix["merchant_keys"]}, "key": "bill:n",
+                             "title": "Netflix went up", "status": "open"},
+                            {"active": False, "scope": {"merchant_keys": home_ins["merchant_keys"]}, "key": "x",
+                             "title": "old", "status": "open"}])
+    check("bills: the savings item covering a bill is linked (an inactive one is not)",
+          netflix["saving"] == {"key": "bill:n", "title": "Netflix went up", "status": "open"}
+          and home_ins["saving"] is None)
+
+
+# --- Alerts ---------------------------------------------------------------------------------------
+
+async def test_alerts() -> None:
+    fc = {"series": [{"date": "2026-11-18", "balance": 900_000}, {"date": "2026-11-19", "balance": 600_000},
+                     {"date": "2026-11-25", "balance": 150_000}],
+          "events": [{"date": "2026-11-25", "kind": "fixed", "label": "פועלים-משכנתא", "amount": -450_000},
+                     {"date": "2026-11-22", "kind": "card_bill", "label": "Card 8763", "account_id": CARD,
+                      "amount": -2_000_000}]}
+    unusual = [{"transaction": {"id": "t1"}, "title": "₪1,500.00 at Shop", "why": "about 14× the usual ₪105.00 there"}]
+    items = [{"group": "save", "status": "dismissed", "active": True, "saving": {"low": 1, "high": 2}, "title": "No",
+              "key": "a", "steps": []},
+             {"group": "save", "status": "open", "active": True, "saving": {"low": 10_000, "high": 30_000},
+              "title": "Cut the phone bill", "key": "bill:phone", "steps": [{"text": "Call them"}]}]
+    got = {a.kind: a for a in alerts.candidates(BOOK, TODAY, forecast=fc, unusual=unusual, saving_items=items)}
+    check("alerts: low balance (with what is due that day), a big card bill, an unusual charge, this month's move",
+          set(got) == {"low_balance", "card_bill", "unusual", "move"}
+          and got["low_balance"].key == "low_balance:2026-11-25" and "פועלים-משכנתא" in got["low_balance"].text
+          and got["card_bill"].key == f"card_bill:{CARD}:2026-11-22" and got["unusual"].key == "unusual:t1"
+          and got["move"].key == "move:2026-11" and got["move"].data == {"saving": "bill:phone"}
+          and "Call them" in got["move"].text, {k: (a.key, a.text) for k, a in got.items()})
+    late = alerts.candidates(dashboard.load(ROBIN, D(2026, 12, 4)), D(2026, 12, 4), forecast=None, unusual=[],
+                             saving_items=[])
+    soon = alerts.candidates(dashboard.load(ROBIN, D(2026, 12, 20)), D(2026, 12, 20), forecast=None, unusual=[],
+                             saving_items=[])
+    check("alerts: the salary two days late on 3 Dec+; the car insurance renewing within 14 days",
+          [a.key for a in late if a.kind == "salary"] == ["salary:2026-12-01"]
+          and any(a.kind == "renewal" and a.key.endswith(":2026-12-28") for a in soon)
+          and not any(a.kind == "salary" for a in alerts.candidates(BOOK, TODAY, forecast=None, unusual=[],
+                                                                     saving_items=[])),
+          ([a.key for a in late], [a.key for a in soon]))
+
+    sent: List[Tuple[str, str]] = []
+
+    async def push(user, title, text, tag="", channel="messages"):
+        sent.append((title, tag))
+        return True
+    noon = NOW.replace(hour=12)
+    fake = [alerts.Alert(f"unusual:{n}", "unusual", f"T{n}", "x") for n in range(5)]
+    with patch.object(alerts.notify, "push_notify", push), patch.object(alerts, "candidates", lambda *a, **k: fake):
+        first = (await alerts.tick(ROBIN, noon))
+        second = (await alerts.tick(ROBIN, noon))
+        night = (await alerts.tick(ROBIN, NOW.replace(hour=23)))
+        connections.update(ROBIN, "money", settings={"alerts": "move, renewal"})
+        kept = alerts.enabled(ROBIN)
+        filtered = (await alerts.tick(ROBIN, noon))
+        connections.update(ROBIN, "money", settings={"alerts": "off"})
+        off = (await alerts.tick(ROBIN, noon))
+        connections.update(ROBIN, "money", settings={"alerts": "all"})
+    with store.db() as conn:
+        rows = conn.execute("SELECT key, delivered FROM money_alerts WHERE user_id = ? ORDER BY key", (ROBIN.id,)).fetchall()
+    check("alerts: at most 3 a run, then the rest; never twice; quiet at night; the setting keeps some or none",
+          first == ["unusual:0", "unusual:1", "unusual:2"] and second == ["unusual:3", "unusual:4"] and night == []
+          and kept == {"move", "renewal"} and filtered == [] and off == [] and len(sent) == 5
+          and [(r["key"], r["delivered"]) for r in rows] == [(f"unusual:{n}", 1) for n in range(5)],
+          (first, second, night, kept, filtered, off))
+    with store.db() as conn:
+        conn.execute("INSERT INTO money_alerts (user_id, key, kind, sent_at, data) VALUES (?, ?, 'move', ?, ?)",
+                     (ROBIN.id, "move:2026-11", STAMP, json.dumps({"saving": "bill:phone"})))
+    check("alerts: this month's move is remembered for the Now card", alerts.month_move(ROBIN, TODAY) == "bill:phone"
+          and alerts.month_move(ROBIN, D(2026, 12, 2)) is None)
+
+
+async def test_plan_api(client: TestClient) -> None:
+    s, ov = await call(client, "GET", "/api/money/overview", ROBIN)
+    s2, past = await call(client, "GET", "/api/money/overview?month=2026-10", ROBIN)
+    check("plan api: the overview has what is left until payday (the month in progress only)",
+          s == 200 and ov["payday"]["payday"] == "2026-12-01" and s2 == 200 and past["payday"] is None, ov.get("payday"))
+    s, f = await call(client, "GET", "/api/money/flow?period=last_pay_cycle", ROBIN)
+    s2, fa = await call(client, "GET", "/api/money/flow?period=2026-10&by=account", ROBIN)
+    s3, cyc = await call(client, "GET", "/api/money/categories?period=last_pay_cycle", ROBIN)
+    check("plan api: flow by pay cycle and by account; other routes take pay cycles too",
+          (s, s2, s3) == (200, 200, 200) and f["period"]["key"] == "last_pay_cycle" and fa["by"] == "account"
+          and cyc["period"]["start"] == "2026-10-01", (s, s2, s3))
+    bad = [(await call(client, "GET", p, who))[0] for p, who in (
+        ("/api/money/flow?by=day", ROBIN), ("/api/money/flow?period=this_pay_cycle", BOB),
+        ("/api/money/afford?amount=0", ROBIN), ("/api/money/afford?amount=100&payments=40", ROBIN),
+        ("/api/money/afford?amount=100&on=cash", ROBIN), ("/api/money/afford?amount=100&date=soon", ROBIN))]
+    check("plan api: a bad by, a pay cycle without a salary, a bad amount / payments / on / date → 400",
+          bad == [400] * 6, bad)
+    s, a = await call(client, "GET", "/api/money/afford?amount=600000&payments=12", ROBIN)
+    s2, _ = await call(client, "GET", "/api/money/afford?amount=1000", BOB)
+    s3, b = await call(client, "GET", "/api/money/bills?about=insurance", ROBIN)
+    check("plan api: afford (Bob without a balance → 409 no_balance); bills about insurance with savings links",
+          s == 200 and a["payment"] == 50_000 and s2 == 409 and s3 == 200
+          and [x["key"] for x in b["sections"]] == ["insurance"] and all("saving" in i for i in b["sections"][0]["items"]),
+          (s, s2, s3))
+    statuses = [(await call(client, "GET", p, CARL))[0] for p in ("/api/money/flow", "/api/money/bills",
+                                                                  "/api/money/afford?amount=1")]
+    check("plan api: no money → 403", statuses == [403, 403, 403], statuses)
+
+
+async def test_plan_tools() -> None:
+    conn = connections.get(ROBIN, "money")
+    flow = await tools.money_flow(conn, "last_pay_cycle")
+    afford = await tools.can_i_afford(conn, 6000, 12)
+    bills = await tools.recurring_charges(conn, "insurance")
+    over = await tools.money_overview(conn)
+    summ = await tools.money_summary(conn, "this_pay_cycle")
+    bob = await tools.money_flow(connections.get(BOB, "money"), "this_pay_cycle")
+    check("tools: money_flow, can_i_afford, recurring_charges(about=), the overview's payday line, pay cycles",
+          flow.startswith("Last pay cycle (1–31 Oct 2026): income") and "Fixed" in flow
+          and afford.startswith(("Fits", "Tight")) and "12 payments of ₪500.00" in afford
+          and bills.startswith("Bills for 'insurance'") and "Left for everyday spending until payday" in over
+          and "this pay cycle" in summ and bob.startswith("Error: no pay cycle"), (flow, afford, bills, summ, bob))
+
+
 async def main() -> None:
     test_kinds_and_detection()
     test_cashflow_and_balance()
     test_forecast()
     test_trends_and_insights()
+    test_plan()
+    await test_alerts()
+    await test_plan_tools()
     app = web.Application()
     setup_auth(app)
     money_api.setup(app)
@@ -526,6 +757,7 @@ async def main() -> None:
     async with TestClient(TestServer(app)) as client:
         await test_api(client)
         await test_marks(client)
+        await test_plan_api(client)
 
 
 if __name__ == "__main__":
