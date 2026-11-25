@@ -194,6 +194,8 @@ object PhoneEvents {
             }
             // The laptop's coding-agent sessions (the whole list each time): live notifications.
             "agent_sessions" -> AgentSessions.show(context, d)
+            // Live activities (every add-on's, the whole list each time): Live Updates.
+            "live" -> LiveActivities.show(context, d)
             else -> Log.w(TAG, "Unknown event type $type (newer server?)")
         }
     }

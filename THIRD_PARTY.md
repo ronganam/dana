@@ -9,6 +9,7 @@ Dana's own code is under the [MIT license](LICENSE). These files in the reposito
 | `android/watchface/src/main/res/font/wfs_bebasneue_*.ttf` | [Bebas Neue](https://github.com/dharmatype/Bebas-Neue) | SIL Open Font License 1.1 |
 | `android/*/src/main/res/font/instrument_serif_*.ttf`, `server/static/vendor/fonts/instrument-serif-*.woff2` | [Instrument Serif](https://github.com/Instrument/instrument-serif) | SIL Open Font License 1.1 |
 | `server/static/vendor/lucide.min.js` | [Lucide](https://github.com/lucide-icons/lucide) icons, v0.460.0 | ISC |
+| `android/app/src/main/res/drawable/ic_live_*.xml` | [Lucide](https://github.com/lucide-icons/lucide) icons (v0.460.0), converted to Android vector drawables | ISC |
 | `server/static/vendor/marked.min.js` | [marked](https://github.com/markedjs/marked) Markdown parser, v12.0.2 | MIT |
 | `server/static/vendor/qrcode.js` | [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) QR code generator by Kazuhiko Arase, v1.4.4 | MIT |
 | `server/static/vendor/purify.min.js` | [DOMPurify](https://github.com/cure53/DOMPurify) HTML sanitizer, v3.4.18 | MPL-2.0 or Apache License 2.0 |

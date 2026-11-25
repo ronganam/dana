@@ -23,6 +23,11 @@
     <string name="channel_sessions_live_description">Claude Code and Codex sessions while they run</string>
     <string name="channel_sessions_alert">Coding sessions (finished / needs you)</string>
     <string name="channel_sessions_alert_description">A coding session finished, failed or is waiting for you</string>
+    <string name="channel_group_live">Live</string>
+    <string name="channel_live">%1$s · live</string>
+    <string name="channel_live_description">Kept current while it lasts; silent</string>
+    <string name="channel_live_alert">%1$s · alerts</string>
+    <string name="channel_live_alert_description">A change worth a sound (a delay, a finish)</string>
     <string name="channel_briefing">Morning briefing</string>
     <string name="channel_people">Before you meet someone</string>
     <string name="channel_review">Weekly review</string>
