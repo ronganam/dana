@@ -10,6 +10,7 @@ Generated from Dana's code by `bin/dana addons reference` (`server/cli/kit/refer
 - [Functions on the manifest](#functions-on-the-manifest)
 - [Hooks](#hooks)
 - [What hooks get and return](#what-hooks-get-and-return)
+- [Live activities](#live-activities)
 - [More examples](#more-examples)
 - [The manifest as JSON](#the-manifest-as-json)
 
@@ -109,7 +110,7 @@ addon = Addon(
     llm_jobs={"showcase_poem": LlmJob("fast", "Plant poems")},
     web=(Page("plants", panel="plants.js", style="plants.css", nav=Nav("Plants", icon="sprout", order=85)),),
     worker=Worker(port=8092, url_env="SHOWCASE_WORKER_URL"),
-    modules=("now",),                    # more modules the loader imports (tools.py and hooks.py go without saying)
+    modules=("now", "watering"),         # more modules the loader imports (tools.py and hooks.py go without saying)
     on_connect=welcome,
     test=check_connection,
     options=setting_options,
@@ -369,7 +370,7 @@ Called with the user right after `update` changed the stored credentials (anothe
 
 ## Hooks
 
-Declared with a decorator on the `addon` object, in any module the loader imports. Composer hooks (`now_cards`, `day_items`, `review`, `search`, `selfcheck`, `context*`) are plain functions; jobs, services, handlers, channels and the action hooks are `async`; `briefing`, `provide` and `widget` may be either. Keys (a card prefix, a section, a check, a widget) are unique across addons; a provider key may be declared by several, ranked.
+Declared with a decorator on the `addon` object, in any module the loader imports. Composer hooks (`now_cards`, `day_items`, `review`, `search`, `selfcheck`, `context*`) are plain functions; jobs, services, handlers, channels, the action hooks and the live hooks are `async`; `briefing`, `provide` and `widget` may be either. Keys (a card prefix, a section, a check, a widget) are unique across addons; a provider key may be declared by several, ranked.
 
 ### `@addon.tool(name=None, *, is_write=False, confirm=False, acts_outside=False, needs=(), available=None, untrusted_result=False, describe=None, shortcut=False, shortcut_prep=False, shortcut_describe=None)`
 
@@ -850,6 +851,77 @@ From [`examples/addons/showcase/web/widget.js`](https://github.com/ronganam/dana
 })();
 ```
 
+### `@addon.live_refresh(*, every=60)`
+
+`async def f(user, current: live.Current) -> live.HookResult`: keeps
+this addon's running live activities current (`from core import live`,
+server/docs/live.md). Dana calls it for each of them, as their user and
+only while the addon is active for them, when it is due: at the
+activity's `refresh_at` when it set one later than the last call, else
+`every` seconds (at least 5) after the last call or the start. An
+`Activity` updates it (one that changes nothing on the wire is
+dropped), `live.END` ends it, None leaves it as it is. A failure is
+logged and never ends it. One per addon.
+
+From [`examples/addons/showcase/watering.py`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/watering.py):
+
+```python
+@addon.tool(is_write=True)
+async def showcase_water_now(conn: Connection, plant_id: int, minutes: int = 2) -> str:
+    """Start watering a plant now: a timer on the user's phone until it is done.
+
+    Args:
+        plant_id: The plant's id, from showcase_plants.
+        minutes: How long the watering takes.
+    """
+    p = store.plant(conn.user, plant_id)
+    if p is None:
+        return "Error: no such plant."
+    done = clock.now() + datetime.timedelta(minutes=max(1, min(minutes, 30)))
+    await live.start(conn.user, addon, f"water:{plant_id}", live.Activity(
+        title=f"Watering {p['name']}", icon="droplets", tone="good", countdown=live.Countdown(done, "Done in"),
+        actions=(live.Action("watered", "Watered"), live.Action("stop", "Stop", kind="stop")),
+        open="/plants", refresh_at=done, ends_at=done + datetime.timedelta(minutes=10)))
+    return f"Watering {p['name']} until {done:%H:%M}."
+
+
+def _plant_id(current: live.Current) -> int:
+    return int(current.key.split(":", 1)[1])
+
+
+@addon.live_refresh(every=60)
+async def watering_done(user: User, current: live.Current) -> live.HookResult:
+    """Due at the activity's refresh_at (the end of the countdown): the plant counts as watered, it ends."""
+    countdown = current.activity.countdown
+    if countdown is not None and clock.now() >= countdown.to:
+        store.water(user, _plant_id(current), clock.now())
+        return live.END
+    return None                                  # unchanged
+
+
+@addon.live_action
+async def watering_action(user: User, current: live.Current, action: str, choice: str) -> live.HookResult:
+    """"Watered" ends it early (watered now); after "stop" (Dana already ended it) nothing is left to clean up."""
+    if action == "watered":
+        store.water(user, _plant_id(current), clock.now())
+        return live.END
+    return None
+```
+
+### `@addon.live_action`
+
+`async def f(user, current: live.Current, action, choice) -> live.HookResult`:
+a person acted on one of this addon's live activities (the
+`/api/live/{id}` routes: act, select, stop). `live.HookResult` is a
+`live.Activity` (update it), `live.END` (end it) or None (leave it).
+`action` is a `server` `Action`'s id (`choice`:
+the choice it was pressed on), `"select"` once Dana stored a new
+selection (`choice`: its key), or `"stop"` once Dana ended the
+activity (clean up your own rows; the return value is ignored). A
+failure is logged. One per addon; only for users who have the addon active.
+
+Example: under `@addon.live_refresh`.
+
 ## What hooks get and return
 
 From `core.addons` (`core/addons/hooks.py`); `to_json()` gives the payload clients read.
@@ -1016,6 +1088,137 @@ and the moment `now` (aware, the user's zone).
 | `settings` | dict of str → any | required |
 | `size` | str | required |
 | `now` | datetime | required |
+
+## Live activities
+
+From `core.live` (`from core import live`; server/docs/live.md): `await live.start(user, addon, key, Activity(...))`, `live.update(...)`, `live.end(user, addon, key, Final(...))`, `live.get`, `live.active`. Dana validates them (`live.LiveError`), drops updates that change nothing, batches the pushes and expires them. Tones: `neutral`, `good`, `warn`, `bad`, `muted`. Icons: `train-front`, `tram-front`, `bus`, `car`, `bike`, `footprints`, `plane`, `ship`, `timer`, `clock`, `bot`, `terminal`, `package`, `truck`, `chef-hat`, `utensils`, `shopping-cart`, `dumbbell`, `sprout`, `droplets`, `flame`, `bell`, `map-pin`, `house`, `sparkles`, `zap`.
+
+### live.Activity
+
+What a live activity shows (server/docs/live.md, "The activity").
+
+`countdown` and `since` (a timer counting up) exclude each other;
+`chip` (up to 7 characters) replaces the default status-bar chip text;
+`selected` is a choice key ("" = the first); `open` an https URL or a
+Dana path ("/israel_rail"); `alert` a key: an update alerts only the
+first time each non-empty value is seen; `ends_at`: it expires by
+itself; `refresh_at`: when the addon's `live_refresh` should run next.
+
+| Field | Type | Default |
+|---|---|---|
+| `title` | str | required |
+| `text` | str | `''` |
+| `context` | str | `''` |
+| `icon` | str | `''` |
+| `tone` | str | `'neutral'` |
+| `countdown` | Countdown or None | `None` |
+| `since` | datetime or None | `None` |
+| `chip` | str | `''` |
+| `progress` | Progress or None | `None` |
+| `actions` | list of Action | `()` |
+| `choices` | list of Choice | `()` |
+| `selected` | str | `''` |
+| `open` | str | `''` |
+| `alert` | str | `''` |
+| `ends_at` | datetime or None | `None` |
+| `refresh_at` | datetime or None | `None` |
+
+### live.Countdown
+
+A timer counting down to `to` (aware), with an optional short `label` ("Departs").
+
+| Field | Type | Default |
+|---|---|---|
+| `to` | datetime | required |
+| `label` | str | `''` |
+
+### live.Progress
+
+A progress bar: its `segments` (the total is the sum of their lengths,
+100 without any), `points` on it, the `value` reached, `tracker` (an
+ICONS name riding the bar at `value`), `indeterminate` (no value
+known), `styled_by_progress` (False: every segment drawn filled, the
+colours carry the meaning).
+
+| Field | Type | Default |
+|---|---|---|
+| `segments` | list of Seg | `()` |
+| `points` | list of Point | `()` |
+| `value` | int | `0` |
+| `tracker` | str | `''` |
+| `indeterminate` | bool | `False` |
+| `styled_by_progress` | bool | `True` |
+
+### live.Seg
+
+A segment of a progress bar: `length` (at least 1) units drawn in `tone`.
+
+| Field | Type | Default |
+|---|---|---|
+| `length` | int | required |
+| `tone` | str | `'neutral'` |
+
+### live.Point
+
+A marker on a progress bar at unit `at` (0 to the bar's total).
+
+| Field | Type | Default |
+|---|---|---|
+| `at` | int | required |
+| `tone` | str | `'neutral'` |
+
+### live.Action
+
+A button: `kind` `server` (calls the addon's `live_action` with
+`id`), `next` / `prev` (the next / previous choice, handled by the
+client), `stop` (ends the activity).
+
+| Field | Type | Default |
+|---|---|---|
+| `id` | str | required |
+| `label` | str | required |
+| `kind` | str | `'server'` |
+
+### live.Choice
+
+An alternative the user can switch to (a later train): its display
+fields override the activity's while it is selected (its own choices and
+actions are ignored).
+
+| Field | Type | Default |
+|---|---|---|
+| `key` | str | required |
+| `activity` | Activity | required |
+
+### live.Final
+
+What an ended activity leaves behind for a few minutes ("Arrived").
+
+| Field | Type | Default |
+|---|---|---|
+| `title` | str | required |
+| `text` | str | `''` |
+| `tone` | str | `'neutral'` |
+| `open` | str | `''` |
+
+### live.Current
+
+A stored live activity, as hooks get it: `id` is `<addon>:<key>`,
+`selected` the choice the user is on, `rev` its change count;
+`ended_at` / `final` only for an ended one kept for its final.
+
+| Field | Type | Default |
+|---|---|---|
+| `id` | str | required |
+| `addon` | str | required |
+| `key` | str | required |
+| `activity` | Activity | required |
+| `selected` | str | required |
+| `rev` | int | required |
+| `started_at` | datetime | required |
+| `updated_at` | datetime | required |
+| `ended_at` | datetime or None | `None` |
+| `final` | Final or None | `None` |
 
 ## More examples
 

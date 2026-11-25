@@ -98,7 +98,7 @@ addon = Addon(
     llm_jobs={"showcase_poem": LlmJob("fast", "Plant poems")},
     web=(Page("plants", panel="plants.js", style="plants.css", nav=Nav("Plants", icon="sprout", order=85)),),
     worker=Worker(port=8092, url_env="SHOWCASE_WORKER_URL"),
-    modules=("now",),                    # more modules the loader imports (tools.py and hooks.py go without saying)
+    modules=("now", "watering"),         # more modules the loader imports (tools.py and hooks.py go without saying)
     on_connect=welcome,
     test=check_connection,
     options=setting_options,

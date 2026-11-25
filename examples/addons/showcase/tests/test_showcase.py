@@ -1,4 +1,4 @@
-"""The showcase example addon: every capability once (tools, approval, undo, blocked, settings rule, connection test, options, prompt, model, HTTP service, worker, job, service, event, channel, Now card and action, day item, briefing, review, search, self-check, context, provider, route, page, dashboard widget, migration), for the users who have it only.
+"""The showcase example addon: every capability once (tools, approval, undo, blocked, settings rule, connection test, options, prompt, model, HTTP service, worker, job, service, event, channel, Now card and action, day item, briefing, review, search, self-check, context, provider, route, page, dashboard widget, live activity, migration), for the users who have it only.
 
 Run from server/: bin/dana addons test ../examples/addons/showcase (``tests/test_addon_kit.py``
 runs it in Dana's suite). Robin (the first admin) and Gal turn it on, Maya does not.
@@ -10,6 +10,7 @@ import os
 import socket
 import subprocess
 import sys
+from unittest.mock import patch
 
 import dana_harness  # first: finds Dana (DANA_HOME), a clean environment and a temporary database
 dana_harness.start("showcase_test")
@@ -18,7 +19,7 @@ os.environ["API_TOKEN"] = "showcase-test-env-token"  # a test value: with it set
 from aiohttp import web  # noqa: E402
 from aiohttp.test_utils import TestClient, TestServer  # noqa: E402
 
-from core import clock, db, events, users  # noqa: E402
+from core import clock, db, events, live, users  # noqa: E402
 
 APPLIED = db.migrate()
 users.bootstrap()
@@ -271,11 +272,35 @@ async def web_parts() -> None:
         check("route: a user without the addon is refused (403 not_connected)", s3 == 403)
 
 
+async def live_activity() -> None:
+    basil = next(p for p in plants.plants(GAL) if p["name"] == "Basil")
+    age(basil["id"], 5)
+    started = await registry.execute(GAL, "showcase_water_now", {"plant_id": basil["id"], "minutes": 2})
+    current = live.get(GAL, get_addon("showcase"), f"water:{basil['id']}")
+    wire = live.to_json(current) if current else {}
+    check("live: 'water now' starts a watering timer for the caller only (countdown, droplets, two buttons)",
+          started.startswith("Watering Basil") and wire.get("icon") == "droplets"
+          and wire.get("countdown", {}).get("label") == "Done in" and [a["kind"] for a in wire.get("actions", [])]
+          == ["server", "stop"] and live.active(ROBIN) == [] and live.active(MAYA) == [], wire)
+    later = current.activity.countdown.to + datetime.timedelta(seconds=1)
+    with patch.object(clock, "now", lambda: later):
+        await live.tick()
+    watered = plants.plant(GAL, basil["id"])["last_watered"]
+    check("live_refresh: once the countdown is over the plant is watered and the activity ended",
+          live.active(GAL) == [] and watered and datetime.datetime.fromisoformat(watered) >= later
+          - datetime.timedelta(seconds=1), watered)
+    await registry.execute(GAL, "showcase_water_now", {"plant_id": basil["id"]})
+    ended = await live.act(GAL, f"showcase:water:{basil['id']}", "watered")
+    check("live_action: 'Watered' ends it early", ended is None and live.active(GAL) == [])
+    await live.drain()
+
+
 async def main() -> None:
     await tools_and_manifest()
     await outside()
     await background()
     await composers()
+    await live_activity()
     await web_parts()
 
 

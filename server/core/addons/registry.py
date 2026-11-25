@@ -14,8 +14,9 @@ for a user come only from the addons the user has *active*
 (:func:`active_addons`: connected, enabled on the server, and every addon the
 addon ``depends`` on connected too); those asked without a user (``None``:
 the server's own view, e.g. its self-checks) from every addon enabled on the
-server. Composers look hooks up only through :func:`hooks` and
-:func:`hook_for`; providers (``@addon.provide``) through :func:`providers`,
+server. Composers look hooks up only through :func:`hooks`,
+:func:`hook_for` and :func:`addon_hook` (an addon's own one, for live
+activities); providers (``@addon.provide``) through :func:`providers`,
 :func:`provider` and :func:`answer`, ranked: several addons may provide one
 key. The scheduler checks jobs and services itself.
 """
@@ -308,6 +309,13 @@ def hook_for(kind: str, key: str, user: Optional[User]) -> Optional[Hook]:
     if owner.addon not in active_addons(user):
         raise store.NotConnected(user, owner.addon)
     return owner
+
+
+def addon_hook(kind: str, addon: str, user: User) -> Optional[Hook]:
+    """The hook of ``kind`` that addon ``addon`` declares once (``live_refresh``,
+    ``live_action``: core/live.py) when the addon is active for ``user``; None
+    when it is not, or declares none."""
+    return next((h for h in hooks(kind, user) if h.addon == addon), None)
 
 
 def providers(key: str, user: Optional[User]) -> List[Hook]:

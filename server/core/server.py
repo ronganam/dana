@@ -5,7 +5,7 @@ Every route lives in the module that owns it, each registering its routes
 with ``setup(app)``: core's own (:data:`ROUTE_MODULES`, in this order), then
 every loaded addon's ``api.py`` in the addon order (core/addons/loader.py).
 Background work: core's own loops (usage, the briefing fallback, meeting
-cards, the weekly review, the wake watch, app updates from GitHub Releases, the backup schedule) and the addons' jobs and services
+cards, the weekly review, the wake watch, app updates from GitHub Releases, the backup schedule, live activities) and the addons' jobs and services
 (core/addons/scheduler.py). Nothing here imports an addon.
 
 Every route an addon's ``setup(app)`` adds is remembered as that addon's:
@@ -32,7 +32,8 @@ from aiohttp import web
 from aiohttp.web_urldispatcher import AbstractResource, DynamicResource, PlainResource, StaticResource
 
 from core import (actions_api, addons_api, app_updates, assistant_api, backups, backups_api, briefing, briefing_api,
-                  dashboard_api, debug_api, demo_api, devices_api, events, household_api, llm_api, now_api, pages_api, profile_api,
+                  dashboard_api, debug_api, demo_api, devices_api, events, household_api, live, live_api, llm_api, now_api,
+                  pages_api, profile_api,
                   sessions_api, setup_api, sharing_api, signals_api, usage, usage_api, wake, weekly_review, wizard_api,
                   zones_api)
 from core.addons import loader, scheduler, state
@@ -47,7 +48,7 @@ ROUTE_MODULES = (
     pages_api, assistant_api, app_updates, debug_api, sessions_api, briefing_api, actions_api, now_api,
     usage_api, sharing_api, addons_api, profile_api, devices_api, setup_api, household_api, demo_api, zones_api, wizard_api, llm_api,
     dashboard_api,
-    signals_api, backups_api,
+    signals_api, backups_api, live_api,
 )
 
 
@@ -215,11 +216,13 @@ def _start_core_background(app: web.Application) -> None:
     (calendar + phone), the 10:00 briefing fallback (users who get a
     briefing), the weekly review, and the wake fallback (the phone's screen
     history, in case no unlock signal arrives); and, server-wide, the Android
-    app updates read from GitHub Releases (core/app_updates.py) and the backup
-    schedule (core/backups.py)."""
+    app updates read from GitHub Releases (core/app_updates.py), the backup
+    schedule (core/backups.py) and the live activities' expiry, refreshes and
+    trailing pushes (core/live.py)."""
     app["meeting_cards_task"] = asyncio.create_task(briefing.meeting_cards_loop())
     app["briefing_fallback_task"] = asyncio.create_task(briefing.fallback_loop())
     app["weekly_review_task"] = asyncio.create_task(weekly_review.schedule_loop())
     app["wake_watch_task"] = asyncio.create_task(wake.wake_watch_loop())
     app["app_releases_task"] = asyncio.create_task(app_updates.releases_loop())
     app["backups_task"] = asyncio.create_task(backups.schedule_loop())
+    app["live_task"] = asyncio.create_task(live.run_loop())

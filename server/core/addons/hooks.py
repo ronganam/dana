@@ -284,7 +284,7 @@ class Hook:
     """A hook declared with ``@addon.<kind>`` (``now_cards``, ``day_items``,
     ``now_action``, ``briefing``, ``review``, ``review_action``, ``search``,
     ``selfcheck``, ``context``, ``context_card``, ``context_block``,
-    ``provide``, ``widget``, ``fix``): ``key`` names what it is for when the hook has one (the card
+    ``provide``, ``widget``, ``fix``, ``live_refresh``, ``live_action``): ``key`` names what it is for when the hook has one (the card
     prefix it acts on, the section key, the item type, the context kind, the
     check (``selfcheck``, ``fix``), provider or widget key; unique across addons), ``options`` its decorator's
     other values."""
