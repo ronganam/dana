@@ -5,7 +5,7 @@ and direct push to the phone (docs/calls.md, docs/notifications.md).
   ``POST /api/suggestions/{id}/accept``, ``POST /api/suggestions/{id}/dismiss``
 - ``POST /api/phone/register``, ``GET /api/phone/events``, ``GET /api/phone/devices``, ``POST /api/phone/test``
 - ``/api/phone/app-icons*``: the phone's app icons (``app_icons.py``)
-- ``POST /api/agent-sessions/hook``, ``GET /api/agent-sessions``, ``DELETE /api/agent-sessions/{id}``
+- ``POST /api/agent-sessions/hook``: coding-agent hook events, shown as live activities (``agent_sessions.py``)
 - ``POST /api/signals``: the phone's signals (addons/phone/signals.py; ``GET
   /api/signals``, the overview, is core's: core/signals_api.py)
 
@@ -189,15 +189,15 @@ async def phone_test_api(request: web.Request) -> web.Response:
     return web.json_response({"delivered": ok}, status=200 if ok else 502)
 
 
-_hook_pushes: Set[asyncio.Task] = set()
+_hook_syncs: Set[asyncio.Task] = set()
 
 
 async def agent_session_hook_api(request: web.Request) -> web.Response:
     """POST /api/agent-sessions/hook?agent=claude|codex&host=&open_url=&thread=&parent_thread=&title=
     — one coding-agent hook event as the agent gave it (JSON); the T3 Code
     thread it runs in, its root thread when it is a delegated child, and the
-    thread's title. Answers at once; the push to the phone goes out in the
-    background."""
+    thread's title. Answers at once; the session's live activity follows in
+    the background (``agent_sessions.sync``)."""
     user = phone_user(request)
     try:
         event = await request.json()
@@ -214,24 +214,10 @@ async def agent_session_hook_api(request: web.Request) -> web.Response:
     except ValueError as e:
         return web.json_response({"error": str(e)}, status=400)
     if change:
-        task = asyncio.create_task(agent_sessions.schedule(user, change))
-        _hook_pushes.add(task)
-        task.add_done_callback(_hook_pushes.discard)
+        task = asyncio.create_task(agent_sessions.sync(user))
+        _hook_syncs.add(task)
+        task.add_done_callback(_hook_syncs.discard)
     return web.json_response({"ok": True, "change": change})
-
-
-async def agent_sessions_api(request: web.Request) -> web.Response:
-    """GET /api/agent-sessions — the caller's sessions as the phone shows them."""
-    return web.json_response({"sessions": agent_sessions.snapshot(phone_user(request))})
-
-
-async def agent_session_delete_api(request: web.Request) -> web.Response:
-    """DELETE /api/agent-sessions/{id} — hide one of the caller's sessions (pushes the new list)."""
-    user = phone_user(request)
-    if not agent_sessions.remove(user, request.match_info["id"]):
-        return web.json_response({"error": "not_found"}, status=404)
-    await agent_sessions.push_now(user)
-    return web.json_response({"ok": True})
 
 
 def setup(app: web.Application) -> None:
@@ -250,6 +236,4 @@ def setup(app: web.Application) -> None:
     app.router.add_post("/api/suggestions/{id}/accept", accept_suggestion_api)
     app.router.add_post("/api/suggestions/{id}/dismiss", dismiss_suggestion_api)
     app.router.add_post("/api/agent-sessions/hook", agent_session_hook_api)
-    app.router.add_get("/api/agent-sessions", agent_sessions_api)
-    app.router.add_delete("/api/agent-sessions/{id}", agent_session_delete_api)
     notifications_api.setup(app)

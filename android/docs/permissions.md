@@ -25,7 +25,7 @@ P = phone, K = kiosk, T = TV, W = watch.
 | `VIBRATE` | P K W | Reminder and urgent alerts (`ReminderActivity`, `NotificationAlertActivity`), haptics; the watch's reminder alarm. |
 | `WAKE_LOCK` | P (*library*) K T W | WorkManager / Firebase (phone); `WakeWordService` keeps the CPU while listening (kiosk, TV); the watch's alarm. |
 | `USE_FULL_SCREEN_INTENT` | P W | Reminders ring as a full-screen alarm over the lock screen (`ReminderActivity`, `WearReminderActivity`). On Android 14+ this is a special access the user may have to allow (Settings → Apps → Special app access → Full screen intents). |
-| `POST_PROMOTED_NOTIFICATIONS` | P | Live Updates (Android 16): Live activities, every add-on's (`push/LiveActivities.kt`), and the coding-agent session status (`push/AgentSessions.kt`). |
+| `POST_PROMOTED_NOTIFICATIONS` | P | Live Updates (Android 16): Live activities, every add-on's (`push/LiveActivities.kt`), the coding-agent sessions among them. |
 | `READ_CALL_LOG` | P | Which call a recording is of, with its number and direction (`RecordingInspector`, `CallMatcher`), and the recent calls the share sheet offers (`ShareAudioActivity`). Asked once a recordings folder is picked, from Settings → Call recordings, or on the share sheet. |
 | `READ_PHONE_STATE` | P | The caller card: notice the phone ringing (`CallerCardReceiver`); the same broadcast schedules a scan of the recordings folder when a call ends. Asked at first launch. |
 | `BLUETOOTH_CONNECT` (Android 12+) / `BLUETOOTH` (≤ 11, `maxSdkVersion=30`) | P | Signals → car: list the paired devices for "This is my car" and receive the car's `ACL_CONNECTED` / `ACL_DISCONNECTED` (`CarSignals`, `CarBluetoothReceiver`). Asked on Android 12+ only when the user picks the car ("Nearby devices"). |

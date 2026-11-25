@@ -8,6 +8,8 @@
 - every 30 seconds: re-nudge unseen alerts;
 - the ``push`` channel of ``core.notify.send``: a message's ``kind`` and
   ``data`` as a push event to the user's phone (addons/phone/push.py);
+- ``live_action``: Hide on a coding-agent session's live activity forgets it
+  (addons/phone/agent_sessions.py);
 - context chats for ``suggestion``, ``call`` and ``notification``, plus the
   ``call`` context block for tasks linked to a call;
 - global search over the user's calls and active notifications;
@@ -26,12 +28,12 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from core import cards, clock, devices, users
+from core import cards, clock, devices, live, users
 from core.addons import BriefingContext, Check, ContextRequest, Fix, Hit, Section, helpers, hours, minutes
 from core.db import get_db_connection
 from core.notify import Message
 from core.users import User
-from addons.phone import now_cards as _now_cards, push, signals as phone_signals, suggestions as phone_suggestions  # noqa: F401
+from addons.phone import agent_sessions, now_cards as _now_cards, push, signals as phone_signals, suggestions as phone_suggestions  # noqa: F401
 from addons.phone.addon import addon
 from addons.phone.calls import (actions as suggestion_actions, chat as phone_chat,
                                 processing as calls_processing, retention as calls_retention)
@@ -122,6 +124,15 @@ async def push_channel(user: User, message: Message) -> bool:
         return await push.notify(user, str(d.get("title") or ""), str(d.get("text") or ""),
                                  tag=str(d.get("tag") or ""), channel=str(d.get("channel") or "messages"))
     return await push.send(user, message.kind, dict(message.data), replace=message.replace)
+
+
+@addon.live_action
+async def live_action(user: User, current: live.Current, action: str, choice: str) -> live.HookResult:
+    """The phone add-on's live activities are the coding-agent sessions: Hide
+    (live's ``stop``) forgets the session and its subagents."""
+    if action == "stop":
+        agent_sessions.forget(user, current.key)
+    return None
 
 
 # --- Briefing & weekly review ---------------------------------------------------------------

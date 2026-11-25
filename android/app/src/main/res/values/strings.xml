@@ -19,10 +19,6 @@
     <string name="channel_reminders_quiet_description">Kept while the reminder screen is showing (the screen rings itself)</string>
     <string name="channel_snoozed">Snoozed notifications</string>
     <string name="channel_snoozed_description">A notification you snoozed in Dana is back</string>
-    <string name="channel_sessions_live">Coding sessions (live)</string>
-    <string name="channel_sessions_live_description">Claude Code and Codex sessions while they run</string>
-    <string name="channel_sessions_alert">Coding sessions (finished / needs you)</string>
-    <string name="channel_sessions_alert_description">A coding session finished, failed or is waiting for you</string>
     <string name="channel_group_live">Live</string>
     <string name="channel_live">%1$s · live</string>
     <string name="channel_live_description">Kept current while it lasts; silent</string>

@@ -1,9 +1,12 @@
 package io.github.ronganam.dana.push
 
+import android.app.NotificationManager
 import android.content.Context
+import androidx.core.content.edit
 import android.content.pm.PackageManager
 import android.util.Log
 import io.github.ronganam.dana.BuildConfig
+import io.github.ronganam.dana.data.network.ServerConfig
 import com.google.firebase.FirebaseApp
 import com.google.firebase.FirebaseOptions
 import com.google.firebase.messaging.FirebaseMessaging
@@ -38,6 +41,7 @@ object PushSetup {
     /** Main process, app start: set up the transport, (re)register, catch up. */
     fun init(context: Context) {
         val app = context.applicationContext
+        dropAgentSessionLeftovers(app)
         if (transport == PushTransport.FCM) {
             try {
                 if (FirebaseApp.getApps(app).isEmpty()) {
@@ -54,6 +58,14 @@ object PushSetup {
             }
         }
         ensureRegistered(app, force = true)
+    }
+
+    /** Coding-agent sessions arrive as live activities now: drop their old channels and shown state (no-ops once gone). */
+    private fun dropAgentSessionLeftovers(app: Context) {
+        app.getSystemService(NotificationManager::class.java)?.run {
+            listOf("agent_sessions_live", "agent_sessions_alert").filter { getNotificationChannel(it) != null }.forEach(::deleteNotificationChannel)
+        }
+        ServerConfig.prefs(app).run { if (contains("agent_sessions_shown")) edit { remove("agent_sessions_shown") } }
     }
 
     /** Register unless already done (also called from the notification sync and Settings → Push). */

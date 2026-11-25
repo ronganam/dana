@@ -134,7 +134,6 @@ Nothing: a server with no users and no `API_TOKEN` starts in **setup mode** and 
 | `UNDO_TTL_SECONDS` | how long an Undo stays usable, in memory (900) |
 | `CALL_SUGGESTIONS_MAX_AGE_DAYS` | A call recording older than this (days, default 3) makes only suggestions still ahead (`docs/calls.md`, "Old recordings") |
 | `SUGGESTION_POPUP_NOTIFICATIONS` | `1` = suggestions that come from notifications also open the phone's suggestions pop-up (default 0: they wait quietly in Now) |
-| `AGENT_SESSIONS_PUSH_INTERVAL` | seconds between pushes of a coding-agent session's activity to the phone, per user (default 15; status changes go at once; `docs/notifications.md` "Coding-agent sessions") |
 | `NOW_MAX_NOTIFICATIONS` / `NOW_MAX_SUGGESTIONS` / `NOW_MAX_REMINDERS` | cards per kind in Now (3 / 4 / 4; further call suggestions go to the quiet list) |
 | `NOW_QUIET_CONFIDENCE` / `NOW_REMINDER_MAX_HOURS` / `NOW_CALENDAR_WAIT_SECONDS` | call suggestions below this confidence go to the quiet list (0.7); how long a fired, unhandled reminder stays in Now (48); longest wait for the calendar on a cold cache (1.5) |
 | `CHECK_PUSH_FETCH_HOURS` / `CHECK_NOTIFICATION_SYNC_HOURS` / `CHECK_WAKE_DAYS` / `CHECK_CALLS_DAYS` | self-check: how long each signal may stay quiet before its check fails (24 h, 12 h, 3, 7 days) |

@@ -99,9 +99,6 @@ class DevicesApi(private val http: ApiClient) {
     suspend fun putAppIcon(pkg: String, png: ByteArray): Int =
         http.sendForCode(http.request("/api/phone/app-icons/${enc(pkg)}") { put(png.toRequestBody(PNG)) })
 
-    /** Forget one of the user's coding-agent sessions (the live notification's Hide). */
-    suspend fun hideAgentSession(id: String): Boolean = http.send(http.request("/api/agent-sessions/${enc(id)}") { delete() })
-
     private companion object {
         val PNG = "image/png".toMediaType()
     }

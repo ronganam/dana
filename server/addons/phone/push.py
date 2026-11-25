@@ -41,8 +41,6 @@ Event types (``data`` fields) — handled by the app's ``PhoneEvents``:
 - ``shopping``: list_id, version (silent: a shopping list the user is on changed;
   the widget / watch read it again; at most one per user per 10 seconds,
   addons/shopping/events.py)
-- ``agent_sessions``: sessions (list; the user's coding-agent sessions, the
-  whole state each time, so it replaces earlier ones; agent_sessions.py)
 - ``live``: activities (list; the user's live activities, the whole state each
   time, so it replaces earlier ones: ``GET /api/live``'s object, core/live.py,
   sent by core through the ``push`` channel; docs/live.md)
@@ -89,7 +87,6 @@ TTL = {
     "context_card": 20 * 60,
     "weekly_review": 3 * 24 * 3600,
     "shopping": 10 * 60,
-    "agent_sessions": 30 * 60,
     "live": 6 * 3600,
     "zones_changed": KEEP_EVENTS_DAYS * 24 * 3600,
 }

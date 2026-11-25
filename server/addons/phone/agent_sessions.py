@@ -12,18 +12,24 @@ turns it into one state per session (row in ``agent_sessions``):
     done      it stopped (``summary``: the start of its last message)
     failed    the turn ended on an API error
 
-and pushes the whole list (:func:`snapshot`) to the phone as one
-``agent_sessions`` event that replaces the earlier ones, so a lost ping or a
-phone that was offline still ends up with the right state. A change of status
-is pushed at once; changes of activity at most every ``PUSH_INTERVAL``
-seconds per user (the last one always arrives, a moment later). ``rev`` rises
-with every status change, so the phone alerts once per change.
+and keeps one live activity per listed session on the user's phone
+(:func:`sync`, core/live.py: owner the phone add-on, key the session id, or a
+hash of it when it doesn't fit the key charset): :func:`activity_of` says
+what it shows (the title, "Needs you · " while waiting, what it does now, plan
+steps or subagents as a segmented bar, a timer since the prompt, a Hide
+button, the session's ``open_url``), :func:`final_of` what a finished one
+leaves (its summary and the subagents' results). ``rev`` rises with every
+status change and the waiting activity's ``alert`` is ``waiting:<rev>``, so
+each new wait alerts once. Live batches and replaces the pushes; a running
+one silent for ``STALE_AFTER`` seconds (the laptop slept, the agent was
+killed) expires by its ``ends_at``. Hide is live's stop: the phone add-on's
+``live_action`` (hooks.py) calls :func:`forget`.
 
-Finished sessions stay in the list ``DONE_KEEP`` seconds (a phone that comes
-online later still hears it finished); running ones that went silent for
-``STALE_AFTER`` seconds (the laptop slept, the agent was killed) and ended
-ones (``SessionEnd``) are left out. Everything is the user's own: a session
-id is only looked up under the caller's user id.
+Finished sessions stay in the list ``DONE_KEEP`` seconds (a subagent's
+late event still finds its group); silent running ones and ended ones
+(``SessionEnd``) are left out, and their activities end without a final.
+Everything is the user's own: a session id is only looked up under the
+caller's user id.
 
 Subagents are rows of their own with a ``parent`` and show inside their
 parent's entry (``subagents``), never as sessions of their own: one of Claude
@@ -40,25 +46,30 @@ pruned as one. A subagent whose parent isn't listed shows on its own.
 
 import asyncio
 import datetime
+import hashlib
 import logging
 import os
-import time
 from typing import Any, Dict, List, Optional, Tuple
 
+from core import live
 from core.db import get_db_connection
 from core.users import User
-from addons.phone import push
+from addons.phone.addon import addon
 
 logger = logging.getLogger(__name__)
 
 AGENTS = ("claude", "codex")
+AGENT_NAMES = {"claude": "Claude Code", "codex": "Codex"}
 STATUSES = ("running", "waiting", "done", "failed")
-PUSH_INTERVAL = float(os.getenv("AGENT_SESSIONS_PUSH_INTERVAL", "15"))
+FINISHED = ("done", "failed")
 DONE_KEEP = 15 * 60
 STALE_AFTER = 60 * 60
 GRACE = 90
 TEXT_MAX = 120
 SUMMARY_MAX = 300
+# More plan steps / subagents than this are not drawn one segment each.
+MAX_SEGMENTS = 40
+_SUB_TONES = {"done": "good", "running": "neutral", "waiting": "warn", "failed": "bad"}
 
 # Tools that mean the agent is waiting for the user.
 _ASKING = {"AskUserQuestion": "Asking you a question", "ExitPlanMode": "Plan ready for review",
@@ -66,10 +77,8 @@ _ASKING = {"AskUserQuestion": "Asking you a question", "ExitPlanMode": "Plan rea
 _PATH_VERBS = {"Edit": "Editing", "MultiEdit": "Editing", "Write": "Writing", "NotebookEdit": "Editing",
                "Read": "Reading"}
 
-# Per user: when the last push went out and the trailing push waiting to go.
-_last_push: Dict[str, float] = {}
-_pending: Dict[str, asyncio.Task] = {}
-# Per user: the push that goes out when a finished subagent's grace ends.
+# Per user: one sync at a time, and the sync that runs when a finished subagent's grace ends.
+_locks: Dict[str, asyncio.Lock] = {}
 _grace: Dict[str, asyncio.Task] = {}
 LIVE = ("running", "waiting")
 _FIELDS = ("id", "agent", "host", "project", "title", "status", "activity", "summary", "steps_done", "steps_total",
@@ -157,8 +166,8 @@ def record(user: User, agent: str, host: str, event: Dict[str, Any], open_url: s
     event has none). ``thread``: the T3 Code thread it runs in;
     ``parent_thread``: its root thread when it is a delegated child;
     ``title``: the thread's title (used over the prompt). Returns ``"status"``
-    when the status changed (push now), ``"activity"`` when only what it shows
-    changed (push soon), None when nothing the phone shows changed."""
+    when the status changed, ``"activity"`` when only what it shows changed,
+    None when nothing the phone shows changed (no :func:`sync` needed)."""
     if agent not in AGENTS:
         raise ValueError(f"agent must be one of {', '.join(AGENTS)}")
     session_id = str(event.get("session_id") or "").strip()[:100]
@@ -257,7 +266,7 @@ def record(user: User, agent: str, host: str, event: Dict[str, Any], open_url: s
             _bump(conn, user, row["parent"])
         conn.commit()
     if status_changed and row["parent"] and row["status"] in ("done", "failed"):
-        _grace_push(user)
+        _grace_sync(user)
     if status_changed:
         return "status"
     after = {k: row[k] for k in before}
@@ -351,13 +360,83 @@ def snapshot(user: User) -> List[Dict[str, Any]]:
     return out
 
 
-def remove(user: User, sid: str) -> bool:
-    """Forget one of the user's sessions and its subagents (the phone's Hide).
-    False: no such session of theirs."""
+def _key(sid: str) -> str:
+    """The live activity key of a listed session: its id when it fits the key
+    charset, else a stable hash of it (a subagent shown on its own has a ``/``)."""
+    if live.KEY.match(sid):
+        return sid
+    return "s-" + hashlib.sha256(sid.encode("utf-8")).hexdigest()[:40]
+
+
+def _when(iso: str) -> datetime.datetime:
+    return datetime.datetime.fromisoformat(iso)
+
+
+def _title(entry: Dict[str, Any]) -> str:
+    return entry["title"] or entry["project"] or AGENT_NAMES[entry["agent"]]
+
+
+def _progress(entry: Dict[str, Any], waiting: bool) -> Optional[live.Progress]:
+    """Plan steps (one segment each), else subagents (one each, finished
+    first, coloured by status), else indeterminate while it runs."""
+    done, total = int(entry["steps_done"]), int(entry["steps_total"])
+    subs = entry["subagents"]
+    if total:
+        tone = "warn" if waiting else "neutral"
+        if total > MAX_SEGMENTS:  # too many to draw one each: a plain bar
+            return live.Progress(segments=(live.Seg(100, tone),), value=min(100, done * 100 // total))
+        return live.Progress(segments=(live.Seg(1, tone),) * total, value=min(done, total))
+    if subs:
+        ordered = sorted(subs, key=lambda s: s["status"] not in FINISHED)[:MAX_SEGMENTS]
+        return live.Progress(segments=tuple(live.Seg(1, _SUB_TONES.get(s["status"], "neutral")) for s in ordered),
+                             value=sum(1 for s in ordered if s["status"] in FINISHED))
+    return None if waiting else live.Progress(indeterminate=True)
+
+
+def activity_of(entry: Dict[str, Any]) -> live.Activity:
+    """The live activity of a listed running / waiting session (an entry of :func:`snapshot`)."""
+    waiting = entry["status"] == "waiting"
+    done, total = int(entry["steps_done"]), int(entry["steps_total"])
+    subs = entry["subagents"]
+    finished = sum(1 for s in subs if s["status"] in FINISHED)
+    parts = [entry["activity"]]
+    if total:
+        parts.append(f"step {done}/{total}")
+    if subs:
+        parts.append(f"{finished}/{len(subs)} subagent{'' if len(subs) == 1 else 's'} done")
+    chip = "Waiting" if waiting else f"{done}/{total}" if total else f"{finished}/{len(subs)}" if subs else ""
+    heard = max(_when(r["updated_at"]) for r in [entry, *subs]).replace(second=0, microsecond=0)
+    return live.Activity(
+        title=_line(f"Needs you · {_title(entry)}" if waiting else _title(entry), live.MAX_TITLE),
+        text=_line(" · ".join(p for p in parts if p), live.MAX_TEXT),
+        context=_line(" · ".join(p for p in (AGENT_NAMES[entry["agent"]], entry["project"]) if p), live.MAX_CONTEXT),
+        icon="bot", tone="warn" if waiting else "neutral", since=_when(entry["started_at"]),
+        chip=chip if len(chip) <= live.MAX_CHIP else "", progress=_progress(entry, waiting),
+        actions=(live.Action("stop", "Hide", kind="stop"),), open=entry["open_url"],
+        alert=f"waiting:{entry['rev']}" if waiting else "",
+        ends_at=heard + datetime.timedelta(seconds=STALE_AFTER))
+
+
+def final_of(entry: Dict[str, Any]) -> live.Final:
+    """What a finished session leaves on the phone: its summary and its subagents' results."""
+    failed = entry["status"] == "failed"
+    lines = [entry["summary"]] + [f"{'✗' if s['status'] == 'failed' else '✓'} {s['title']}: {s['summary'] or s['status']}"
+                                  for s in entry["subagents"]]
+    text = "\n".join(_line(x, live.MAX_TEXT) for x in lines if x)
+    return live.Final(title=_line(f"{'Failed' if failed else 'Done'} · {_title(entry)}", live.MAX_TITLE),
+                      text=text if len(text) <= live.MAX_TEXT else text[:live.MAX_TEXT - 1].rstrip() + "…",
+                      tone="bad" if failed else "good", open=entry["open_url"])
+
+
+def forget(user: User, key: str) -> bool:
+    """Forget the user's session whose live activity is ``key``, with its
+    subagents (the phone's Hide). False: no such session of theirs."""
     with get_db_connection() as conn:
-        row = _get(conn, user, sid)
+        rows = conn.execute("SELECT id, thread, parent FROM agent_sessions WHERE user_id = ?", (user.id,)).fetchall()
+        row = next((r for r in rows if _key(r["id"]) == key), None)
         if row is None:
             return False
+        sid = row["id"]
         conn.execute("DELETE FROM agent_sessions WHERE user_id = ? AND (id = ? OR id LIKE ?)",
                      (user.id, sid, sid + "/%"))
         if row["thread"] and not row["parent"]:
@@ -366,25 +445,43 @@ def remove(user: User, sid: str) -> bool:
     return True
 
 
-async def push_now(user: User) -> bool:
-    """Send the whole list to the user's phone (replacing the earlier list)."""
-    _last_push[user.id] = time.monotonic()
-    return await push.send(user, "agent_sessions", {"sessions": snapshot(user)}, replace=True)
+async def sync(user: User) -> None:
+    """Make the user's live activities match :func:`snapshot`: each running /
+    waiting session is started or updated, one that finished is ended with its
+    final (only while its activity runs, so once), and the phone add-on's
+    activities of sessions no longer listed end without one. Live batches the
+    pushes (a start, an end and each new wait go at once)."""
+    async with _locks.setdefault(user.id, asyncio.Lock()):
+        keys = set()
+        for entry in snapshot(user):
+            key = _key(entry["id"])
+            keys.add(key)
+            running = live.get(user, addon, key) is not None
+            if entry["status"] in LIVE:
+                if running:
+                    await live.update(user, addon, key, activity_of(entry))
+                else:
+                    await live.start(user, addon, key, activity_of(entry))
+            elif running:
+                await live.end(user, addon, key, final_of(entry))
+        for c in live.active(user):
+            if c.addon == addon.name and c.key not in keys:
+                await live.end(user, addon, c.key)
 
 
-async def _push_later(user: User, delay: float, tasks: Optional[Dict[str, asyncio.Task]] = None) -> None:
+async def _sync_later(user: User, delay: float) -> None:
     try:
         await asyncio.sleep(delay)
-        (_pending if tasks is None else tasks).pop(user.id, None)
-        await push_now(user)
+        _grace.pop(user.id, None)
+        await sync(user)
     except asyncio.CancelledError:
         pass
     except Exception:
-        logger.exception(f"Agent sessions: push for user {user.id} failed")
+        logger.exception(f"Agent sessions: sync for user {user.id} failed")
 
 
-def _grace_push(user: User) -> None:
-    """Push again when a finished subagent's grace ends (the group may be done by then)."""
+def _grace_sync(user: User) -> None:
+    """Sync again when a finished subagent's grace ends (the group may be done by then)."""
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
@@ -392,19 +489,4 @@ def _grace_push(user: User) -> None:
     task = _grace.pop(user.id, None)
     if task:
         task.cancel()
-    _grace[user.id] = loop.create_task(_push_later(user, GRACE + 1, _grace))
-
-
-async def schedule(user: User, change: Optional[str]) -> None:
-    """Push after a :func:`record`: at once for a status change, otherwise at
-    most every ``PUSH_INTERVAL`` seconds (a trailing push carries the latest)."""
-    if not change:
-        return
-    waited = time.monotonic() - _last_push.get(user.id, 0.0)
-    if change == "status" or waited >= PUSH_INTERVAL:
-        task = _pending.pop(user.id, None)
-        if task:
-            task.cancel()
-        await push_now(user)
-    elif user.id not in _pending:
-        _pending[user.id] = asyncio.create_task(_push_later(user, PUSH_INTERVAL - waited))
+    _grace[user.id] = loop.create_task(_sync_later(user, GRACE + 1))
