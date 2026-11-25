@@ -21,7 +21,7 @@ from typing import Set
 from aiohttp import web
 
 from core.addons import store
-from core.auth import request_device
+from core.auth import request_device, request_token_id
 from core.addons.store import NotConnected
 from addons.phone.access import phone_user
 from addons.phone.calls import api as calls_api
@@ -138,13 +138,23 @@ async def phone_register_api(request: web.Request) -> web.Response:
 async def phone_events_api(request: web.Request) -> web.Response:
     """GET /api/phone/events?after=<seq> — the caller's events the device hasn't
     handled yet (``registered``: whether the request's device is still
-    registered for push; absent from a token of no device)."""
+    registered for push; absent from a token of no device). ``device``: whether
+    the request was made with a paired device's own token; false (an old token
+    issued by hand) tells the app to pair again, and the fetch is recorded in
+    the user's ``token_fetch`` mark (the token's id, never the token) for the
+    ``push`` self-check."""
     user = phone_user(request)
     try:
         after = int(request.query.get("after", "0"))
     except ValueError:
         return web.json_response({"error": "after must be a number"}, status=400)
-    return web.json_response(phone_push.events_after(user, after, request_device(request)))
+    device = request_device(request)
+    res = phone_push.events_after(user, after, device)
+    res["device"] = device is not None
+    token_id = request_token_id(request)
+    if device is None and token_id:
+        phone_config.mark(phone_config.TOKEN_FETCH, user.id, True, token_id)
+    return web.json_response(res)
 
 
 async def post_signals_api(request: web.Request) -> web.Response:

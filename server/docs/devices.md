@@ -36,7 +36,24 @@ migration.
 change and at most every 10 s) gives the device, which is set as `request["device"]` (read it with
 `core.auth.request_device(request)`; None for a token of no device, `API_TOKEN`, or a request without
 credentials in local development) and touched. A browser signed in with a pairing code has its cookie made
-from its device token, so cookie requests carry the device too.
+from its device token, so cookie requests carry the device too. The stored token's id (never the token) is
+`request["token_id"]` (`core.auth.request_token_id`; None for `API_TOKEN`, local development or a demo view).
+
+## Tokens without a device
+
+A token issued by hand (`bin/dana users tokens issue`) belongs to no device: a script's, or an app set up
+before devices had their own tokens (a deployment upgraded from then keeps such phones, TVs and tablets
+signed in; its moved phone rows have `token_id` NULL). Requests made with it work, but Dana can't
+tell which device they come from: the phone's push registration (`POST /api/phone/register`) is refused,
+per-device features (a tablet's or TV's dashboard) can't find it, and the phone's events feed answers
+`"device": false` and marks the fetch, so the `push` self-check says "This phone signs in with an old token"
+(`docs/notifications.md`) and the app asks to pair again (`../android/docs/phone.md`, "Pairing").
+
+`GET /api/devices` lists them as `unpaired_tokens` (`devices.unpaired_tokens`) and the Devices page shows
+them as **Signed in without pairing**, with a hint: pair the device, then revoke its token. There is no
+reliable marker of what a token is for (a browser that signed in at `/login` with a token, not a code, uses
+that token too), so every token of no device is listed with its label. `DELETE /api/devices/tokens/{id}`
+revokes one (its user, or `manage_users`; a device's token, someone else's or an unknown id: 404).
 
 ## Pairing
 
@@ -123,9 +140,10 @@ that types its code.
 | `GET /api/devices/pairings/{id}` | the one who started it | → `{id, status: pending \| paired \| expired, expires_at, device?}` |
 | `DELETE /api/devices/pairings/{id}` | the one who started it | → `{ok}` (404 when none waits) |
 | `POST /api/pair` | public, rate-limited | `{code, kind, name?}` → `{token, device, user: {id, name}, server: {version}}`; 403 `invalid_code`, 409 `wrong_kind` `{expected}`, 400 `invalid` (kind), 429 |
-| `GET /api/devices` | signed in | → `{devices: [device + current]}` (theirs); `?user=<id>` / `?user=all` with `manage_users` (each with `user_name`) |
+| `GET /api/devices` | signed in | → `{devices: [device + current], unpaired_tokens: [{id, user_id, label, created_at, last_used_at, current}]}` (theirs; `unpaired_tokens`: tokens of no device, never the token or its hash); `?user=<id>` / `?user=all` with `manage_users` (each with `user_name`) |
 | `PATCH /api/devices/{id}` | its user, or `manage_users` | `{name?, room?, role?}` → `{device}` |
 | `DELETE /api/devices/{id}` | its user, or `manage_users` | → `{ok}`; its token stops working at once |
+| `DELETE /api/devices/tokens/{id}` | its user, or `manage_users` | → `{ok}`; a token of no device stops working at once (404 for a device's token: remove the device) |
 
 A device in an answer: `{id, user_id, name, kind, room, role, paired, created_at, last_seen_at}` (never a
 token or token id). Someone else's device answers 404 like an unknown one. A field that is not valid: 400
@@ -153,7 +171,9 @@ a device" asks the kind (and for a tablet or TV, who it is for and the room), th
 vendored qrcode-generator, `static/vendor/qrcode.js`, drawn by `DanaDevicesCore.qrSvg`, which the Household
 screen's invites reuse; dark on white in both themes) and the code in two groups
 of four with a five-minute countdown, polls every 2 s and says when the device has paired (or that the code
-expired, with "New code"). A browser gets no QR: it types the code on `/login`.
+expired, with "New code"). A browser gets no QR: it types the code on `/login`. Below the devices,
+**Signed in without pairing** lists the user's tokens of no device (label, made, last used; "This browser"
+for the one in use) with Revoke and the hint to pair the device first (Tokens without a device, above).
 
 ## Setup mode
 

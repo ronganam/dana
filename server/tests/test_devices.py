@@ -10,6 +10,7 @@ logs, and the phone addon's phone_devices rows moved onto core devices by its mi
 """
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -221,6 +222,7 @@ async def pair(client: TestClient, code: str, kind: str, name: str = "", ip: str
 
 async def test_pairing(client: TestClient, S: Dict[str, Any]) -> None:
     gal, maya = S["gal"], S["maya"]
+    client.session.cookie_jar.clear()  # the login test signed this client in
     status, p = await start(client, S["gal_token"], {"kind": "phone"},
                             **{"X-Forwarded-Proto": "https", "X-Forwarded-Host": "dana.example.test"})
     code = p.get("code", "")
@@ -456,6 +458,55 @@ async def test_login_with_code(client: TestClient, S: Dict[str, Any]) -> None:
     check("login: a token still signs in", r.status == 302 and r.cookies.get(SESSION_COOKIE) is not None)
 
 
+async def test_unpaired_tokens(client: TestClient, S: Dict[str, Any]) -> None:
+    gal, maya = S["gal"], S["maya"]
+    client.session.cookie_jar.clear()  # the login test signed this client in
+    old_phone, gal_old = users.issue_token(gal.id, "Gal's old phone")
+    maya_raw, maya_old = users.issue_token(maya.user.id, "Maya's tablet")
+    SECRETS.extend([old_phone, maya_raw])
+    await client.get("/api/whoami", headers=bearer(old_phone))
+
+    r = await client.get("/api/devices", headers=bearer(S["gal_token"]))
+    g = await r.json()
+    toks = {t["id"]: t for t in g.get("unpaired_tokens", [])}
+    check("tokens: the list adds the caller's tokens of no device (label, made, last used), not a device's",
+          gal_old.id in toks and toks[gal_old.id]["label"] == "Gal's old phone" and toks[gal_old.id]["last_used_at"]
+          and maya_old.id not in toks and maya.token not in json.dumps(g)
+          and not ({d.token_id for d in devices.list_for(gal.id)} & set(toks)), g)
+    check("tokens: never the token or its hash; `current` marks the one making the request",
+          all(set(t) == {"id", "user_id", "label", "created_at", "last_used_at", "current"} for t in toks.values())
+          and old_phone not in json.dumps(g) and sum(t["current"] for t in toks.values()) == 1
+          and not toks[gal_old.id]["current"], g)
+    r = await client.get("/api/devices", headers=bearer(maya.token))
+    m = await r.json()
+    check("tokens isolation: Maya sees only hers",
+          {t["user_id"] for t in m["unpaired_tokens"]} == {maya.user.id} and maya_old.id in {t["id"] for t in m["unpaired_tokens"]}, m)
+    r = await client.get("/api/devices?user=all", headers=bearer(S["admin_token"]))
+    everyone = {t["id"]: t for t in (await r.json())["unpaired_tokens"]}
+    check("tokens: an admin's ?user=all lists everyone's, with whose they are",
+          {gal_old.id, maya_old.id} <= set(everyone) and everyone[maya_old.id]["user_name"] == maya.user.name, everyone)
+
+    r = await client.delete(f"/api/devices/tokens/{maya_old.id}", headers=bearer(S["gal_token"]))
+    r2 = await client.delete("/api/devices/tokens/nosuchtoken", headers=bearer(S["gal_token"]))
+    still = await client.get("/api/whoami", headers=bearer(maya_raw))
+    check("revoke token isolation: another user's token id answers 404 like a missing one, and keeps working",
+          r.status == 404 and r2.status == 404 and await r.json() == await r2.json() and still.status == 200)
+    phone_tok, phone_dev = devices.create(gal, "phone", "Gal's new phone")
+    SECRETS.append(phone_tok)
+    r = await client.delete(f"/api/devices/tokens/{phone_dev.token_id}", headers=bearer(S["gal_token"]))
+    check("revoke token: a device's token → 404 (it goes with its device)",
+          r.status == 404 and devices.get(phone_dev.id) is not None)
+    r = await client.delete(f"/api/devices/tokens/{gal_old.id}", headers=bearer(S["gal_token"]))
+    r2 = await client.get("/api/whoami", headers=bearer(old_phone))
+    r3 = await client.get("/api/devices", headers=bearer(S["gal_token"]))
+    check("revoke token: one's own → it stops working at once and leaves the list",
+          r.status == 200 and r2.status == 401
+          and gal_old.id not in {t["id"] for t in (await r3.json())["unpaired_tokens"]}, (r.status, r2.status))
+    r = await client.delete(f"/api/devices/tokens/{maya_old.id}", headers=bearer(S["admin_token"]))
+    r2 = await client.get("/api/whoami", headers=bearer(maya_raw))
+    check("revoke token: an admin (manage_users) revokes another user's", r.status == 200 and r2.status == 401)
+
+
 # --- 4. The phone addon's devices moved onto core devices ----------------------------------------
 
 def test_phone_migration() -> None:
@@ -527,6 +578,7 @@ async def main() -> None:
         await test_limits(client, S)
         await test_devices(client, S)
         await test_login_with_code(client, S)
+        await test_unpaired_tokens(client, S)
     test_phone_migration()
     leaked = [s for s in SECRETS if s and any(s in line or s.lower() in line for line in LOG.lines)]
     check("logs: no pairing code, setup code or token in any log line", SECRETS and not leaked,

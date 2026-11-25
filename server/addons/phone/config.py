@@ -18,6 +18,8 @@ from core.addons import store
 logger = logging.getLogger(__name__)
 
 ADDON = "phone"
+# The mark of a user's events fetched with a token of no device (detail: the token's id): the push self-check.
+TOKEN_FETCH = "token_fetch"
 
 
 def phone_users() -> List[User]:

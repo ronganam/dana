@@ -26,9 +26,18 @@ data class MeAnswer(
 @Serializable
 data class PhoneEvent(val seq: Long = 0, val type: String = "", val data: JsonObject = JsonObject(emptyMap()))
 
-/** A page of `GET /api/phone/events`; [registered] false = the server forgot this phone. */
+/**
+ * A page of `GET /api/phone/events`; [registered] false = the server forgot this phone; [device] false = the
+ * request's token belongs to no device (issued by hand before pairing): pair again (`PairAgain`). Older servers
+ * send neither: both read as true.
+ */
 @Serializable
-data class PhoneEventsPage(val events: LenientList<PhoneEvent> = emptyList(), val latest: Long = 0, val registered: Boolean = true)
+data class PhoneEventsPage(
+    val events: LenientList<PhoneEvent> = emptyList(),
+    val latest: Long = 0,
+    val registered: Boolean = true,
+    val device: Boolean = true
+)
 
 @Serializable
 private data class Registered(val latestSeq: Long = 0)

@@ -425,6 +425,65 @@ async def test_push(client: TestClient) -> None:
     await client.post("/api/phone/register", headers=auth(BOB), json={"transport": "fcm", "token": "tok-b"})
 
 
+def token_fetch_mark(user_id: str) -> Dict[str, Any]:
+    with get_db_connection() as conn:
+        return dict(conn.execute("SELECT last_ok_at, detail FROM system_marks WHERE key = ?",
+                                 (phone_config.mark_key(phone_config.TOKEN_FETCH, user_id),)).fetchone() or {})
+
+
+def backdate_fetch(user_id: str, hours: float) -> None:
+    at = (datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=hours)).isoformat(timespec="seconds")
+    with get_db_connection() as conn:
+        conn.execute("UPDATE phone_push SET last_fetch_at = ?, updated_at = ? WHERE user_id = ?", (at, at, user_id))
+        conn.commit()
+
+
+def push_check(user) -> Dict[str, Any]:
+    with users.acting_as(user):
+        return {c["key"]: c for c in checks.compute(user=user)}["push"]
+
+
+async def test_old_token(client: TestClient) -> None:
+    """A phone set up before pairing signs in with a token issued by hand (no device): the events feed says so,
+    the fetch is marked, the push self-check asks to pair it again; per user."""
+    raw, old = users.issue_token(BOB.id, "Bob's old phone")
+    phone_config.mark("push", BOB.id, True, "reminder: 1/1 device(s)")  # push works (test_push left a failure)
+    r = await client.get("/api/phone/events?after=0", headers={"Authorization": f"Bearer {raw}"})
+    plain = await r.json()
+    r = await client.get("/api/phone/events?after=0", headers=auth(ADMIN))
+    paired = await r.json()
+    check("old token: the feed answers device false (and no registered) to a token of no device, true to a device",
+          r.status == 200 and plain.get("device") is False and "registered" not in plain
+          and paired.get("device") is True and paired.get("registered") is True, (plain, paired))
+    mark = token_fetch_mark(BOB.id)
+    check("old token: the fetch is marked for that user only, with the token's id (never the token)",
+          mark.get("detail") == old.id and mark.get("last_ok_at") and raw not in json.dumps(mark)
+          and not token_fetch_mark(ADMIN.id), mark)
+
+    backdate_fetch(BOB.id, 72)  # the migrated device's last fetch is old; push still works through the token
+    c = push_check(BOB)
+    check("old token: the push check fails with pair-again wording, not 'hasn't checked in'",
+          not c["ok"] and c["title"] == "This phone signs in with an old token"
+          and "Pair it again" in c["why"] and "Firebase" in c["why"] and "checked in" not in c["title"], c)
+    facts = [i for b in c["blocks"] for i in b.get("items", [])]
+    check("old token: the facts show the token's label and last use; the fix opens Devices",
+          any(f.startswith("Bob's old phone · last used") for f in facts)
+          and (c.get("fix") or {}).get("screen") == "devices", (facts, c.get("fix")))
+    check("old token isolation: the first admin's push check is unaffected", push_check(ADMIN)["ok"], push_check(ADMIN))
+
+    await client.get("/api/phone/events?after=0", headers=auth(BOB))
+    c = push_check(BOB)
+    check("old token: a newer fetch by the paired device clears it", c["ok"], c)
+
+    await client.get("/api/phone/events?after=0", headers={"Authorization": f"Bearer {raw}"})
+    backdate_fetch(BOB.id, 1)
+    check("old token: fetching with it again brings it back",
+          push_check(BOB)["title"] == "This phone signs in with an old token")
+    users.revoke_token(old.id)
+    c = push_check(BOB)
+    check("old token: once the token is revoked the check no longer names it", c["ok"], c)
+
+
 # --- 3. Notifications -----------------------------------------------------------------------------
 
 IDS: Dict[str, Dict[str, str]] = {}
@@ -822,6 +881,7 @@ async def main() -> None:
     app = build_app()
     async with TestClient(TestServer(app)) as client:
         await test_push(client)
+        await test_old_token(client)
         await test_notifications(client)
     await test_loops()
     await test_callers()

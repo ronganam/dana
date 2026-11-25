@@ -318,6 +318,41 @@ def remove(device: Device) -> None:
     logger.info(f"Device {device.id} ({device.kind}) of user {device.user_id} removed")
 
 
+# --- Tokens of no device ----------------------------------------------------------------
+
+_UNPAIRED = ("SELECT t.id, t.user_id, t.label, t.created_at, t.last_used_at FROM user_tokens t "
+             "WHERE NOT EXISTS (SELECT 1 FROM devices d WHERE d.token_id = t.id AND d.user_id = t.user_id)")
+
+
+def _token(row: sqlite3.Row) -> users.Token:
+    return users.Token(id=row["id"], user_id=row["user_id"], label=row["label"], created_at=row["created_at"],
+                       last_used_at=row["last_used_at"])
+
+
+def unpaired_tokens(user_id: Optional[str]) -> List[users.Token]:
+    """The stored tokens that belong to no device (issued by hand with
+    ``bin/dana users tokens issue``: a script, or an app set up before
+    pairing), most recently used first: ``user_id``'s, or everyone's for
+    None (only for ``manage_users``). Never the token or its hash."""
+    order = " ORDER BY COALESCE(t.last_used_at, t.created_at) DESC, t.created_at DESC"
+    with get_db_connection() as conn:
+        if user_id is None:
+            # scoped: everyone's tokens of no device, only for manage_users (core/devices_api.py)
+            rows = conn.execute(_UNPAIRED + order).fetchall()
+        else:
+            rows = conn.execute(_UNPAIRED + " AND t.user_id = ?" + order, (user_id,)).fetchall()
+    return [_token(r) for r in rows]
+
+
+def unpaired_token(token_id: str) -> Optional[users.Token]:
+    """A stored token of no device by id, whoever's (callers check whose it
+    is); None for an unknown id or a device's token (revoked with its device)."""
+    with get_db_connection() as conn:
+        # scoped: by id; every caller checks the owner (devices_api.py)
+        row = conn.execute(_UNPAIRED + " AND t.id = ?", (token_id,)).fetchone()
+    return _token(row) if row else None
+
+
 def _changed() -> None:
     invalidate()
     users.invalidate()

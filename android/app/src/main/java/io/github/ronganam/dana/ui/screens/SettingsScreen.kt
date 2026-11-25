@@ -4,6 +4,8 @@ import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.data.network.ServerConfig
 import io.github.ronganam.dana.data.pairing.DevicePairing
 import io.github.ronganam.dana.data.pairing.PairedDevice
+import io.github.ronganam.dana.push.PairAgain
+import androidx.compose.ui.res.stringResource
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
@@ -804,9 +806,22 @@ private fun PairedServerCard(viewModel: MainViewModel) {
     val config = viewModel.serverConfig
     val context = LocalContext.current
     val device = remember(config) { DevicePairing.device(context) }
+    // Signed in with a token of no device (set up before pairing): the events feed said so (PairAgain).
+    val pairAgain = remember(config) { PairAgain.needed(context) }
     var confirmUnpair by remember { mutableStateOf(false) }
     GlassCard(modifier = Modifier.fillMaxWidth()) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (pairAgain) {
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(stringResource(R.string.pair_again_title), style = MaterialTheme.typography.titleMedium,
+                        color = MaterialTheme.colorScheme.error)
+                    Text(stringResource(R.string.pair_again_text), style = MaterialTheme.typography.bodyMedium)
+                }
+                Button(
+                    onClick = { viewModel.pairingController.pairAgain() },
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                ) { Text("Pair again") }
+            }
             Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 Text(config.url, style = MaterialTheme.typography.titleSmall)
                 Text(
@@ -816,7 +831,7 @@ private fun PairedServerCard(viewModel: MainViewModel) {
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
+                if (!pairAgain) OutlinedButton(
                     onClick = { viewModel.pairingController.pairAgain() },
                     modifier = Modifier.weight(1f).heightIn(min = 48.dp)
                 ) { Text("Pair again") }

@@ -24,6 +24,9 @@ An authenticated request carries its :class:`core.users.User` in
 ``request["user"]`` (handlers read it with :func:`request_user`) and its
 :class:`core.devices.Device` in ``request["device"]`` (None for a token of no
 device: :func:`request_device`); the device's ``last_seen_at`` is refreshed.
+The id of the stored token it was made with is in ``request["token_id"]``
+(:func:`request_token_id`; None for ``API_TOKEN``, local development or a
+demo view).
 An admin viewing the demo household (core/demo.py) has the demo user as
 ``request["user"]`` and themselves as ``request["viewer"]``
 (:func:`viewed_demo_user`).
@@ -139,6 +142,12 @@ def request_device(request: web.Request) -> Optional[Device]:
     return request.get("device")
 
 
+def request_token_id(request: web.Request) -> Optional[str]:
+    """The id of the stored token an authenticated request was made with
+    (never the token), or None (``API_TOKEN``, local development, a demo view)."""
+    return request.get("token_id")
+
+
 def requires(capability: str) -> Callable[[Handler], Handler]:
     """Wrap a handler so only users whose access level has ``capability``
     (core/access.py) reach it; anyone else gets 403
@@ -197,12 +206,14 @@ async def _as(identity: Identity, request: web.Request, handler: Handler) -> web
         device = None
     if device is not None:
         devices.touch(device)
+    token_id = identity.token_id
     viewed = viewed_demo_user(request, user)
     if viewed is not None:
         request["viewer"] = user
-        user, device = viewed, None
+        user, device, token_id = viewed, None, None
     request["user"] = user
     request["device"] = device
+    request["token_id"] = token_id
     with users.acting_as(user):
         return await handler(request)
 

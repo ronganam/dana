@@ -33,6 +33,7 @@ object DevicePairing {
     fun store(context: Context, serverUrl: String, paired: PairOutcome.Paired): ServerConfig {
         val config = ServerConfig.save(context, serverUrl, paired.token)
         remember(context, paired.device)
+        io.github.ronganam.dana.push.PairAgain.clear(context)
         return config
     }
 

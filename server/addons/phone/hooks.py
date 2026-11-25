@@ -26,7 +26,7 @@ import logging
 import os
 from typing import Any, Dict, List, Optional
 
-from core import cards, clock
+from core import cards, clock, devices, users
 from core.addons import BriefingContext, Check, ContextRequest, Fix, Hit, Section, helpers, hours, minutes
 from core.db import get_db_connection
 from core.notify import Message
@@ -35,7 +35,7 @@ from addons.phone import now_cards as _now_cards, push, signals as phone_signals
 from addons.phone.addon import addon
 from addons.phone.calls import (actions as suggestion_actions, chat as phone_chat,
                                 processing as calls_processing, retention as calls_retention)
-from addons.phone.config import mark_key
+from addons.phone.config import TOKEN_FETCH, mark_key
 from addons.phone.notifications import (digest, escalation, format as notif_format, judges,
                                         processing as notification_processing, retention as notification_retention,
                                         store as notification_store, summary as notification_summary)
@@ -306,6 +306,21 @@ def _ago_or_never(dt: Optional[datetime.datetime], now: datetime.datetime) -> st
     return helpers.ago(dt, now) if dt else "never"
 
 
+def _old_token_fetch(conn, user: User):
+    """``(when, label, last used)`` of the user's newest events fetch made with
+    a token of no device (the ``token_fetch`` mark, api.py), or None: no such
+    fetch, or the token is gone (revoked) or is now a device's."""
+    m = conn.execute("SELECT last_ok_at, detail FROM system_marks WHERE key = ?",
+                     (mark_key(TOKEN_FETCH, user.id),)).fetchone()
+    at = helpers.parse_time(m["last_ok_at"]) if m else None
+    if not at or not m["detail"]:
+        return None
+    tok = next((t for t in users.list_tokens(user.id) if t.id == m["detail"]), None)
+    if tok is None or devices.by_token_id(tok.id) is not None:
+        return None
+    return at, tok.label, helpers.parse_time(tok.last_used_at)
+
+
 @addon.selfcheck("push", "Push to the phone")
 def check_push(user: User, now: datetime.datetime) -> Check:
     with get_db_connection() as conn:
@@ -315,6 +330,7 @@ def check_push(user: User, now: datetime.datetime) -> Check:
             "JOIN devices d ON d.id = p.device_id WHERE p.user_id = ?", (user.id,)).fetchall()]
         m = dict(conn.execute("SELECT * FROM system_marks WHERE key = ?",
                               (mark_key("push", user.id),)).fetchone() or {})
+        old_token = _old_token_fetch(conn, user)
     last_ok, last_fail = helpers.parse_time(m.get("last_ok_at")), helpers.parse_time(m.get("last_fail_at"))
     fetch = _latest(*(helpers.parse_time(d.get("last_fetch_at")) for d in devs))
     seen = _latest(fetch, *(helpers.parse_time(d.get("updated_at")) for d in devs))
@@ -334,6 +350,15 @@ def check_push(user: User, now: datetime.datetime) -> Check:
         return Check(False, "FCM key missing on the server", None, title="Push isn't configured",
                      why=why + " A phone is registered for FCM but the server has no FCM_SERVICE_ACCOUNT_JSON.",
                      blocks=blocks)
+    if old_token and not (fetch and fetch >= old_token[0]):
+        at, label, last_used = old_token
+        return Check(False, "Fetches with a token of no device", at, title="This phone signs in with an old token",
+                     why="It still gets push, but Dana can't tell which phone it is, and push will stop if Firebase "
+                     "changes the phone's address. Pair it again: Devices → Pair a device, then in the app "
+                     "Settings → Server → Pair again.",
+                     blocks=[{"type": "facts", "label": "Token", "items": [
+                         f"{label or 'Unnamed token'} · last used {_ago_or_never(last_used or at, now)}"]}] + blocks,
+                     fix=Fix.screen("devices", "Open Devices"))
     if not devs:
         return Check(False, "No phone registered", last_ok, title="No phone registered for push",
                      why=why + " Open the paired Dana app once so it registers again "

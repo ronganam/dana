@@ -127,6 +127,8 @@ object PhoneEvents {
                     return
                 }
                 val latest = res.latest
+                // Signed in with a token of no device (set up before pairing): ask to pair again.
+                PairAgain.note(context, res.device)
                 // The server no longer knows this phone (token dropped, DB restored):
                 // register again, otherwise pings would silently stop.
                 if (!res.registered) {
