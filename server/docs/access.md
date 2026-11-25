@@ -895,7 +895,7 @@ Sessions and the `main` thread (the wire id stays `main`), runs, pending
 approvals, undo entries, learned phrases, usage rows, About-you facts and the
 learner, people, tasks, shopping lists, projects, calls, notifications and
 rules, phone devices and events, zones, the first-run wizard's progress,
-briefings, weekly reviews, Now, self-checks of that user's addons. Another user's ids answer 404.
+briefings, weekly reviews, Now, live activities (`docs/live.md`: rows keyed by user, add-on and key; hooks run only for add-ons active for that user), tokens of no device (listed and revoked on the Devices page by their owner or a `manage_users` admin), self-checks of that user's addons. Another user's ids answer 404.
 
 In detail: sessions and `main`, runs, pending approvals, undo entries,
 learned phrases, usage rows and the Now screen's approval cards (see "The
