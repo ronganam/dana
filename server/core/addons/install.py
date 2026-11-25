@@ -35,7 +35,10 @@ update that adds nothing goes ahead without asking. A manifest whose
 
 Refused besides: a ref that is not a full 40-character commit hash, a path
 leaving the repository, a folder without ``addon.py`` or whose manifest names
-another addon. :func:`remove` deletes the folder (the addon's tables and rows
+another addon, and a version older than the database: one whose
+``migrations/`` lack a migration this server's database already applied for
+that addon (a newer version ran here; installing the older one would stop it
+from loading). :func:`remove` deletes the folder (the addon's tables and rows
 stay).
 """
 
@@ -53,7 +56,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Dict, Iterable, List, Optional
 
-from core import addon_dirs
+from core import addon_dirs, db
 from core.addons.hooks import Touches
 
 FULL_COMMIT = re.compile(r"^[0-9a-f]{40}$")
@@ -246,6 +249,27 @@ def installed_touches(folder: Path) -> Touches:
         return Touches()
 
 
+_MIGRATION_FILE = re.compile(r"^m(\d{4})_\w+\.py$")
+
+
+def _check_not_older(name: str, folder: Path) -> None:
+    """Refuse ``folder`` when this server's database applied migrations of
+    ``name`` that the folder does not have (an older version than the one that
+    ran here)."""
+    try:
+        applied = {v for a, v in db.applied_migrations() if a == name}
+    except Exception:
+        return  # no database here (a fresh --dir install): nothing to compare
+    has = set()
+    if (folder / "migrations").is_dir():
+        has = {int(m.group(1)) for f in (folder / "migrations").iterdir() if (m := _MIGRATION_FILE.match(f.name))}
+    missing = sorted(applied - has)
+    if missing:
+        raise InstallError(f"This version of {name} is older than the one that already ran on this server: the "
+                           f"database has its migration {', '.join(map(str, missing))}, which this version does not "
+                           f"have, so it would not load. Install the same version or a newer one.")
+
+
 def _place(folder: Path, root: Path, kind: str, source: Optional[Source], *, name: Optional[str],
            by: str, accept: Optional[Touches]) -> Installed:
     """Check the addon ``folder`` and copy it to ``root/<its name>`` with its record (the lock held)."""
@@ -270,6 +294,7 @@ def _place(folder: Path, root: Path, kind: str, source: Optional[Source], *, nam
         if kind != UPLOAD and was == UPLOAD:
             raise InstallError(f"{declared} is installed from an uploaded folder here; a git install does not "
                                f"replace it. Remove it first to install it from git.")
+    _check_not_older(declared, folder)
     touches = manifest_touches(folder / "addon.py")
     added = touches.added_since(installed_touches(target) if target.is_dir() else Touches())
     if accept is not None:

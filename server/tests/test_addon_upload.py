@@ -1,4 +1,4 @@
-"""Installing an addon from a folder (core/addons/install.py install_archive, POST /api/addons/install as multipart, cli/remote.py): the archive checks, the touches agreement, replacing an upload, never over a git install (nor the other way), the CLI's packing excludes, `bin/dana addons install ./FOLDER` on this machine and on a running server (--server, DANA_URL, DANA_TOKEN, --restart), and `bin/dana addons workers --json`.
+"""Installing an addon from a folder (core/addons/install.py install_archive, POST /api/addons/install as multipart, cli/remote.py): the archive checks, the touches agreement, replacing an upload, never over a git install (nor the other way), the CLI's packing excludes, a version older than the database refused, `bin/dana addons install ./FOLDER` on this machine and on a running server (--server, DANA_URL, DANA_TOKEN, --restart), and `bin/dana addons workers --json`.
 
 Run: bin/test test_addon_upload
 
@@ -397,6 +397,28 @@ def test_cli_local() -> None:
     check("cli workers: one line each", rc == 0 and f"gitone: ghcr.io/example/gitone-worker:{COMMIT}" in out, out)
 
 
+def test_older_than_database() -> None:
+    """A version without a migration the database already applied for that addon is refused, nothing written."""
+    folder = FOLDERS / "olderone"
+    write(folder / "addon.py", manifest("olderone"))
+    write(folder / "migrations" / "__init__.py", "")
+    write(folder / "migrations" / "m0001_baseline.py", "VERSION = 1\nNAME = 'baseline'\ndef up(conn):\n    pass\n")
+    conn = db.get_db_connection(DB_PATH)
+    conn.executemany("INSERT INTO schema_migrations (addon, version, name, applied_at) VALUES ('olderone', ?, ?, '2026-01-01')",
+                     [(1, "baseline"), (2, "newer")])
+    conn.commit()
+    conn.close()
+    try:
+        install.install_archive(pack(folder, "olderone"), DATA_ADDONS, by="test")
+        check("older than the database: refused", False)
+    except install.InstallError as e:
+        check("older than the database: refused, naming the migration", "older" in str(e) and "2" in str(e), str(e))
+    check("older than the database: nothing written", not (DATA_ADDONS / "olderone").exists())
+    write(folder / "migrations" / "m0002_newer.py", "VERSION = 2\nNAME = 'newer'\ndef up(conn):\n    pass\n")
+    install.install_archive(pack(folder, "olderone"), DATA_ADDONS, by="test")
+    check("the same version as the database: installed", (DATA_ADDONS / "olderone" / "addon.py").is_file())
+
+
 async def main() -> None:
     test_pack()
     app = web.Application()
@@ -406,6 +428,7 @@ async def main() -> None:
         await test_api(c)
         await test_cli_remote(str(c.make_url("")).rstrip("/"))
     test_cli_local()
+    test_older_than_database()
 
 
 asyncio.run(main())
