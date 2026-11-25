@@ -15,6 +15,8 @@
  *   app-chat.js      the Chat screen and its chats sidebar
  *   app-now-core.js  the Now screen's pure part: DanaNow (tested by test_web_now.mjs)
  *   app-now.js       the Now screen, the one the app opens on
+ *   app-live-core.js live activities' pure part: DanaLive (tested by test_web_live.mjs)
+ *   app-live.js      the Live strip at the top of Now
  *   app-voice.js     the orb, voice messages, realtime calls
  *   app-settings.js, app-debug.js   one screen each
  *   app.js           this file, last

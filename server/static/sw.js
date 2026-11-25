@@ -37,6 +37,8 @@ const SHELL = [
   "/static/app-debug.js",
   "/static/app-now-core.js",
   "/static/app-now.js",
+  "/static/app-live-core.js",
+  "/static/app-live.js",
   "/static/app.js",
   "/static/review.js",
   "/static/usage.js",

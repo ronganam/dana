@@ -394,3 +394,190 @@ function errorKind(status) {
   if (status === 0) return "unreachable"
   return "http"
 }
+
+// ---------------------------------------------------------------- Live
+
+// Live activities (server/docs/live.md): GET /api/live. An icon is a Lucide
+// name; the bar draws the Material Design glyph of the Nerd Font it uses
+// for its other icons. Anything unknown is a pulse.
+var LIVE_GLYPHS = {
+  "train-front": 0xF052C, "tram-front": 0xF052D, "bus": 0xF00E7, "car": 0xF010B, "bike": 0xF00A3,
+  "footprints": 0xF0583, "plane": 0xF001D, "ship": 0xF0213, "timer": 0xF051B, "clock": 0xF0150,
+  "bot": 0xF06A9, "terminal": 0xF018D, "package": 0xF03D6, "truck": 0xF053D, "chef-hat": 0xF0B7C,
+  "utensils": 0xF04A3, "shopping-cart": 0xF0110, "dumbbell": 0xF01E6, "sprout": 0xF0E66,
+  "droplets": 0xF058C, "flame": 0xF0238, "bell": 0xF009A, "map-pin": 0xF034E, "house": 0xF02DC,
+  "sparkles": 0xF0674, "zap": 0xF0241
+}
+var LIVE_GLYPH_DEFAULT = 0xF0430
+var LIVE_TONES = ["neutral", "good", "warn", "bad", "muted"]
+var MAX_LIVE = 10
+
+function liveGlyph(icon) {
+  var code = Object.prototype.hasOwnProperty.call(LIVE_GLYPHS, icon) ? LIVE_GLYPHS[icon] : LIVE_GLYPH_DEFAULT
+  return String.fromCodePoint(code)
+}
+
+function liveTime(value) {
+  var t = Date.parse(String(value || ""))
+  return isFinite(t) ? t : 0
+}
+
+// The display fields an activity and each of its choices may carry.
+function liveFields(raw) {
+  var out = {}
+  if (typeof raw.title === "string") out.title = oneLine(raw.title, 120)
+  if (typeof raw.text === "string") out.text = oneLine(raw.text, 240)
+  if (typeof raw.context === "string") out.context = oneLine(raw.context, 120)
+  if (typeof raw.icon === "string") out.icon = raw.icon
+  if (typeof raw.tone === "string") out.tone = LIVE_TONES.indexOf(raw.tone) >= 0 ? raw.tone : "neutral"
+  if (raw.countdown && typeof raw.countdown === "object" && liveTime(raw.countdown.to))
+    out.countdown = { to: liveTime(raw.countdown.to), label: oneLine(raw.countdown.label, 24) }
+  if (raw.since && liveTime(raw.since)) out.since = liveTime(raw.since)
+  if (typeof raw.chip === "string") out.chip = oneLine(raw.chip, 7)
+  if (typeof raw.open === "string") out.open = raw.open
+  return out
+}
+
+function liveActivity(raw) {
+  if (!raw || typeof raw !== "object") return null
+  var id = String(raw.id || "")
+  if (!/^[A-Za-z0-9_.-]{1,64}:[A-Za-z0-9][A-Za-z0-9_.:@-]{0,99}$/.test(id)) return null
+  var a = liveFields(raw)
+  a.id = id
+  a.source = oneLine(raw.source, 80)
+  a.title = a.title || ""
+  a.tone = a.tone || "neutral"
+  a.actions = Array.isArray(raw.actions) ? raw.actions.filter(function(x) {
+    return x && typeof x.id === "string" && x.id.length > 0 && x.id.length <= 40 && ["server", "next", "prev", "stop"].indexOf(x.kind) >= 0
+  }).slice(0, 3).map(function(x) { return { id: x.id, label: oneLine(x.label || x.id, 40), kind: x.kind } }) : []
+  a.choices = Array.isArray(raw.choices) ? raw.choices.filter(function(c) { return c && typeof c.key === "string" && c.key })
+    .slice(0, 8).map(function(c) { var f = liveFields(c); f.key = c.key; return f }) : []
+  a.selected = typeof raw.selected === "string" ? raw.selected : ""
+  a.ended = raw.ended === true
+  var f = raw.final && typeof raw.final === "object" ? raw.final : null
+  a.final = f ? { title: oneLine(f.title, 120), text: oneLine(f.text, 240), tone: LIVE_TONES.indexOf(f.tone) >= 0 ? f.tone : "muted",
+                  open: typeof f.open === "string" ? f.open : "" } : null
+  return a
+}
+
+function parseLive(text) {
+  var data
+  try { data = typeof text === "string" ? JSON.parse(text) : text } catch (e) { return null }
+  if (!data || typeof data !== "object" || !Array.isArray(data.activities)) return null
+  return data.activities.map(liveActivity).filter(function(x) { return !!x }).slice(0, MAX_LIVE)
+}
+
+function liveChoiceIndex(a, key) {
+  if (!a || !a.choices.length) return -1
+  var keys = [key, a.selected]
+  for (var k = 0; k < keys.length; k++) {
+    if (!keys[k]) continue
+    for (var i = 0; i < a.choices.length; i++) if (a.choices[i].key === keys[k]) return i
+  }
+  return 0
+}
+
+// The next (+1) or previous (-1) choice's key, or "" at either end.
+function liveStep(a, key, dir) {
+  var i = liveChoiceIndex(a, key)
+  var j = i + (dir < 0 ? -1 : 1)
+  return i >= 0 && j >= 0 && j < a.choices.length ? a.choices[j].key : ""
+}
+
+// What is shown: the activity overridden by the shown choice (a field the
+// choice leaves out keeps the activity's); an ended one shows its final.
+function liveView(a, key) {
+  if (!a) return null
+  if (a.ended) {
+    var f = a.final || { title: "", text: "", tone: "muted", open: "" }
+    return { ended: true, title: f.title || a.title, text: f.text, context: "", icon: a.icon || "", tone: f.tone,
+             countdown: null, since: 0, chip: "", open: f.open, key: "", index: -1, count: 0 }
+  }
+  var v = { ended: false, title: a.title, text: a.text || "", context: a.context || "", icon: a.icon || "", tone: a.tone,
+            countdown: a.countdown || null, since: a.since || 0, chip: a.chip || "", open: a.open || "" }
+  var i = liveChoiceIndex(a, key)
+  var c = i >= 0 ? a.choices[i] : null
+  if (c) {
+    for (var k in c) if (k !== "key") v[k] = c[k]
+    if (c.countdown && !c.since) v.since = 0
+    if (c.since && !c.countdown) v.countdown = null
+  }
+  v.key = c ? c.key : ""
+  v.index = i
+  v.count = a.choices.length
+  return v
+}
+
+// "7:42" under an hour, "1 h 05" under a day, then "2 d 3 h".
+function liveDuration(seconds) {
+  var s = Math.max(0, Math.floor(Number(seconds) || 0))
+  function pad(n) { return n < 10 ? "0" + n : String(n) }
+  if (s < 3600) return Math.floor(s / 60) + ":" + pad(s % 60)
+  if (s < 86400) return Math.floor(s / 3600) + " h " + pad(Math.floor((s % 3600) / 60))
+  var d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600)
+  return h ? d + " d " + h + " h" : d + " d"
+}
+
+// The timer at `nowMs`: { label: "Departs in", value: "7:42", past } for a
+// countdown (the label alone and "now" once it passed), { label: "Elapsed",
+// value } for `since`; null without one.
+function liveTimer(v, nowMs) {
+  if (!v) return null
+  if (v.countdown) {
+    var left = Math.ceil((v.countdown.to - nowMs) / 1000)
+    if (left <= 0) return { label: v.countdown.label, value: "now", past: true }
+    return { label: v.countdown.label ? v.countdown.label + " in" : "In", value: liveDuration(left), past: false }
+  }
+  if (v.since) return { label: "Elapsed", value: liveDuration((nowMs - v.since) / 1000), past: false }
+  return null
+}
+
+// The one the bar shows: of the running ones, the soonest countdown still
+// ahead, else the newest with a count-up, else the newest; null when none.
+function soonestLive(list, picks, nowMs) {
+  var best = null, bestTo = 0, counting = null, first = null
+  var items = Array.isArray(list) ? list : []
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].ended) continue
+    var v = liveView(items[i], picks ? picks[items[i].id] : "")
+    if (!first) first = items[i]
+    if (v.countdown && v.countdown.to > nowMs) {
+      if (!best || v.countdown.to < bestTo) { best = items[i]; bestTo = v.countdown.to }
+    } else if (v.since && !counting) counting = items[i]
+  }
+  return best || counting || first
+}
+
+// The bar's text beside the glyph: the timer, else the chip.
+function liveBarText(a, key, nowMs) {
+  var v = liveView(a, key)
+  if (!v) return ""
+  var t = liveTimer(v, nowMs)
+  return t ? t.value : v.chip
+}
+
+// The list after a reply ({activity: <wire> | null}): replaced, removed when null, added in front.
+function liveApply(list, id, raw) {
+  var items = Array.isArray(list) ? list.slice() : []
+  var a = raw ? liveActivity(raw) : null
+  for (var i = 0; i < items.length; i++) {
+    if (items[i].id !== id) continue
+    if (a) items[i] = a
+    else items.splice(i, 1)
+    return items
+  }
+  if (a) items.unshift(a)
+  return items
+}
+
+function livePath(id, tail) {
+  return "/api/live/" + encodeURIComponent(id).replace(/%3A/gi, ":").replace(/%40/g, "@") + (tail || "")
+}
+
+// Where a click goes: a Dana path as that screen of the web app ("/rail" →
+// <server>/#rail), or an https link.
+function liveOpenUrl(base, open) {
+  var s = String(open || "")
+  if (/^\/[A-Za-z0-9_-]+(\/[^\s]*)?$/.test(s)) return base ? base + "/#" + s.slice(1) : ""
+  return /^https:\/\/[^\s]+$/i.test(s) ? s : ""
+}

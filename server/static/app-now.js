@@ -7,7 +7,8 @@
  * visible primary and every other action in the row's "⋯" menu, details folded, acted on optimistically with
  * Undo), "Can wait", the notifications line, All clear (centred). Refreshed when it
  * opens, when the window comes back, and every minute while it is on screen (never in the background);
- * a refresh keeps the cards on screen as they are and only new ones rise in. Keyboard: j / k (or the
+ * a refresh keeps the cards on screen as they are and only new ones rise in. The Live strip on top is
+ * static/app-live.js. Keyboard: j / k (or the
  * arrows on a card) between cards, Enter = its primary action (else its menu), e = details, m = the menu.
  * The pure part is DanaNow (static/app-now-core.js). server/docs/web-design.md, "Now".
  */
@@ -58,6 +59,7 @@ async function nowRequest(method, path, body) {
 function showNow() {
     nowSkeleton();
     refreshNow();
+    liveShow();
     clearInterval(nowState.timer);
     nowState.timer = setInterval(() => { if (activeTab === "now" && !document.hidden) refreshNow(); }, NOW_REFRESH_MS);
 }
@@ -65,6 +67,7 @@ function showNow() {
 function hideNow() {
     clearInterval(nowState.timer);
     nowState.timer = null;
+    liveHide();
 }
 
 window.addEventListener("focus", () => { if (activeTab === "now") refreshNow(); });
@@ -114,6 +117,7 @@ function nowFrame() {
     if (root.dataset.state === "ready") return root;
     root.dataset.state = "ready";
     root.innerHTML = `
+        <section class="now-live" id="now-live" aria-labelledby="now-live-h" hidden></section>
         <header class="now-head">
             <div class="now-date-row">
                 <span class="now-date" id="now-date"></span>
@@ -148,7 +152,7 @@ function drawNow() {
     const d = nowState.data;
     const first = !nowState.drawn;
     const root = nowFrame();
-    if (first) window.Dana.motion.arrive(root);
+    if (first) { window.Dana.motion.arrive(root); liveDraw(); }   // the Live strip (static/app-live.js)
 
     nowEl("now-date").textContent = C.dateLine(d.now);
     const lede = C.ledeLine(d);

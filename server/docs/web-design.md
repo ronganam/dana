@@ -142,6 +142,16 @@ blocks, so an addon's own cards (any `kind`) need nothing here.
 - **All clear** (no cards): the header centres in the canvas under a slightly warmer static ember glow: the date
   eyebrow, the italic serif "All clear." with an 8 px sage dot under it, the track, and the server's lede (when
   there is one) as a quiet muted line under it.
+- **Live** (`static/app-live.js`, `static/app-live-core.js`; `docs/live.md`, "Clients"): above the header, when
+  the user has live activities, "LIVE" (after a small sage dot) and one compact card each, the one place Now uses
+  cards (something running right now, not a decision): the soft canvas, a hairline, 14 px corners; a 36 px icon tile
+  on the tone's tint, the title (Inter 15 / 500), the text, the context in 12 px mute, the chip as a mono pill in the
+  tone; the timer at the end as a mono eyebrow over a 22 px DM Mono value with tabular digits; the bar under the text
+  (4 px segments in the tones, faint ahead of the value, 8 px points, the tracker icon in a 22 px ring); then Earlier /
+  Next as outlined buttons with "1/2" between, a server action as the pill and Stop quiet at the end. The tones are
+  the `--tone-*` tokens (neutral sky, good sage, warn amber, bad rose, muted the mute ink). An ended one is
+  transparent with a dashed hairline, "DONE" and a ×. Only new cards rise in; a timer changes its text and nothing
+  else moves.
 - **The day's items**: under the header, "TODAY" and one quiet wrapped line per item (`day.slots`, empty hours
   left out): a dot in its hue (reminders amber, events and the rest sky), the time in mono (or "AT HOME" /
   "ON WAKING"), the title; past ones faint, the next one in ink with its time in the accent. An item with a
@@ -186,7 +196,8 @@ blocks, so an addon's own cards (any `kind`) need nothing here.
 The pure part (hues, the date line and the lede's fallback, the day track, the day's items, the primary's label and
 body, what a client action opens, removing / restoring a card, reconciling a refresh, the notifications
 line, "Updated … ago", keyboard steps) is `DanaNow` in `static/app-now-core.js`, tested by
-`tests/test_web_now.mjs`.
+`tests/test_web_now.mjs`; the Live strip's (the shown choice, next / previous, the timer, the bar's geometry, where a
+tap goes, the card's HTML) is `DanaLive` in `static/app-live-core.js`, tested by `tests/test_web_live.mjs`.
 
 ## Needs attention (`static/attention.js`, `static/attention.css`)
 

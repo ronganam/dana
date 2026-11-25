@@ -167,6 +167,13 @@
   --prio-high: var(--rose);
   --prio-medium: var(--amber);
   --prio-low: var(--sky);
+
+  /* Live activities' tones (docs/live.md): neutral sky, good sage, warn amber, bad rose, muted the mute ink */
+  --tone-neutral: var(--sky);  --tone-neutral-tint: var(--sky-tint);  --tone-neutral-text: var(--sky-text);
+  --tone-good: var(--sage);    --tone-good-tint: var(--sage-tint);    --tone-good-text: var(--sage-text);
+  --tone-warn: var(--amber);   --tone-warn-tint: var(--amber-tint);   --tone-warn-text: var(--amber-text);
+  --tone-bad: var(--rose);     --tone-bad-tint: var(--rose-tint);     --tone-bad-text: var(--rose-text);
+  --tone-muted: var(--mute);   --tone-muted-tint: rgb(var(--ink-rgb) / .08); --tone-muted-text: var(--mute);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -993,6 +1000,97 @@ button.now-day-item:focus-visible { box-shadow: var(--focus-ring); }
 .now-notifs-dot { width: 8px; height: 8px; border-radius: var(--radius-full); background: var(--teal); }
 .now-notifs.loud .now-notifs-dot { background: var(--accent); }
 
+/* Live: the user's live activities on top of Now (static/app-live.js; docs/live.md). The one place Now uses
+   cards: each is something running right now, so it sits on the soft canvas with a hairline, compact. The
+   icon tile, the chip, the bar and the timer take the activity's tone (--lv*, from the --tone-* tokens). */
+.now-live { display: flex; flex-direction: column; gap: 8px; }
+.lv-h { align-items: center; }
+.lv-h-dot { width: 6px; height: 6px; border-radius: var(--radius-full); background: var(--sage); }
+.lv-list { display: flex; flex-direction: column; gap: 10px; }
+.lv-tone-neutral { --lv: var(--tone-neutral); --lv-tint: var(--tone-neutral-tint); --lv-text: var(--tone-neutral-text); }
+.lv-tone-good { --lv: var(--tone-good); --lv-tint: var(--tone-good-tint); --lv-text: var(--tone-good-text); }
+.lv-tone-warn { --lv: var(--tone-warn); --lv-tint: var(--tone-warn-tint); --lv-text: var(--tone-warn-text); }
+.lv-tone-bad { --lv: var(--tone-bad); --lv-tint: var(--tone-bad-tint); --lv-text: var(--tone-bad-text); }
+.lv-tone-muted { --lv: var(--tone-muted); --lv-tint: var(--tone-muted-tint); --lv-text: var(--tone-muted-text); }
+.lv-card {
+  position: relative; display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; column-gap: 14px; row-gap: 12px;
+  align-items: start; padding: 14px 16px; border-radius: 14px; background: var(--canvas-soft);
+  border: 1px solid var(--hairline); outline: none; transition: var(--t-state);
+}
+.lv-card.can-open { cursor: pointer; }
+.lv-card.can-open:hover { border-color: var(--hairline-strong); }
+.lv-card:focus-visible { box-shadow: var(--focus-ring); }
+.lv-icon {
+  grid-row: 1; width: 36px; height: 36px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center;
+  background: var(--lv-tint); color: var(--lv);
+}
+.lv-icon svg { width: 18px; height: 18px; }
+.lv-main { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.lv-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.lv-title { min-width: 0; font-size: 15px; font-weight: 500; line-height: 1.35; color: var(--ink); letter-spacing: -0.005em; overflow-wrap: anywhere; }
+.lv-open { color: inherit; font: inherit; text-align: start; text-decoration: none; border-radius: var(--radius-sm); }
+.lv-open:hover { text-decoration: underline; text-decoration-color: var(--hairline-strong); text-underline-offset: 3px; }
+.lv-open:focus-visible { box-shadow: var(--focus-ring); outline: none; }
+.lv-chip {
+  flex-shrink: 0; padding: 1px 7px; border-radius: var(--radius-full); background: var(--lv-tint); color: var(--lv-text);
+  font-family: var(--font-mono); font-size: 11px; line-height: 1.5; font-variant-numeric: tabular-nums;
+}
+.lv-text { font-size: 13.5px; line-height: 1.4; color: var(--body); overflow-wrap: anywhere; }
+.lv-context { font-size: 12px; line-height: 1.4; color: var(--mute); overflow-wrap: anywhere; }
+.lv-main > [dir="auto"], .lv-title[dir="auto"] { text-align: left; }
+:root[dir="rtl"] .lv-main > [dir="auto"], :root[dir="rtl"] .lv-title[dir="auto"] { text-align: right; }
+/* The timer: a mono eyebrow over the time; tabular digits, so a ticking second never shifts it. */
+.lv-timer { grid-column: 3; grid-row: 1; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: end; min-width: 64px; }
+.lv-timer-label { font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--mute); white-space: nowrap; }
+.lv-timer-value { font-family: var(--font-mono); font-size: 22px; line-height: 1.1; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; white-space: nowrap; }
+.lv-timer.past .lv-timer-value { color: var(--lv-text); }
+/* The bar: segments in their tones (faint where not reached yet), points, the tracker riding the value. */
+.lv-bar { grid-column: 2 / -1; position: relative; height: 18px; display: flex; align-items: center; margin-inline-end: 9px; }
+.lv-track { display: flex; gap: 2px; width: 100%; height: 4px; }
+.lv-seg { position: relative; flex: 1 1 0; min-width: 2px; height: 100%; border-radius: 2px; overflow: hidden; background: rgb(var(--ink-rgb) / .1); }
+.lv-seg:not(.lv-tone-muted) { background: color-mix(in srgb, var(--lv, var(--mute)) 28%, transparent); }
+.lv-seg i { position: absolute; inset-block: 0; inset-inline-start: 0; background: var(--lv, var(--mute)); border-radius: inherit; }
+.lv-bar.indeterminate .lv-seg { background: rgb(var(--ink-rgb) / .1); }
+.lv-point {
+  position: absolute; top: 50%; width: 8px; height: 8px; margin-inline-start: -4px; transform: translateY(-50%);
+  border-radius: var(--radius-full); background: var(--canvas-soft); border: 2px solid var(--lv);
+}
+.lv-point.reached { background: var(--lv); }
+.lv-tracker {
+  position: absolute; top: 50%; width: 22px; height: 22px; margin-inline-start: -11px; transform: translateY(-50%);
+  border-radius: var(--radius-full); display: inline-flex; align-items: center; justify-content: center;
+  background: var(--canvas-soft); color: var(--ink); border: 1.5px solid var(--hairline-strong);
+  transition: inset-inline-start var(--dur-slow) var(--ease-standard);
+}
+.lv-tracker svg { width: 13px; height: 13px; }
+.lv-tracker.dot { width: 10px; height: 10px; margin-inline-start: -5px; background: var(--ink); border: 2px solid var(--canvas-soft); }
+/* The actions: Earlier / Next as quiet outlined buttons with the position between, a server action as the
+   pill, Stop quiet at the end. */
+.lv-acts { grid-column: 2 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lv-act, .lv-stop {
+  display: inline-flex; align-items: center; gap: 4px; height: 30px; padding: 0 12px; border-radius: var(--radius-full);
+  font-size: 12.5px; font-weight: 500; color: var(--body-strong); border: 1px solid var(--hairline-strong); transition: var(--t-state);
+  white-space: nowrap;
+}
+.lv-act svg, .lv-stop svg { width: 14px; height: 14px; }
+.lv-act.prev { padding-inline-start: 8px; }
+.lv-act.next { padding-inline-end: 8px; }
+.lv-act:hover:not(:disabled) { color: var(--ink); background: rgb(var(--ink-rgb) / .06); }
+.lv-act:disabled { opacity: .4; cursor: default; }
+.lv-act:focus-visible, .lv-stop:focus-visible { box-shadow: var(--focus-ring); }
+.lv-pos { font-family: var(--font-mono); font-size: 11px; color: var(--mute); padding: 0 4px; font-variant-numeric: tabular-nums; }
+.lv-stop { margin-inline-start: auto; border-color: transparent; color: var(--mute); padding: 0 10px 0 8px; }
+.lv-stop:hover { color: var(--rose-text); background: var(--rose-tint); }
+.lv-stop.icon { width: 30px; padding: 0; justify-content: center; }
+[dir="rtl"] .lv-act svg { transform: scaleX(-1); }
+/* Ended, kept for its final: muted, the "Done" eyebrow, the × to dismiss it. */
+.lv-card.ended { background: transparent; border-style: dashed; }
+.lv-card.ended .lv-title { color: var(--body-strong); }
+.lv-card.ended .lv-icon { opacity: .8; }
+.lv-card.ended .lv-acts { grid-column: 3; grid-row: 1; align-self: center; }
+.lv-done { flex-shrink: 0; font-family: var(--font-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--lv-text); }
+.lv-card.dn-completing { opacity: .5; }
+
 /* Loading */
 .now-skel { display: flex; flex-direction: column; gap: 14px; padding-top: 6px; }
 .now-skel-line, .now-skel-card { border-radius: var(--radius-md); background: rgb(var(--ink-rgb) / .06); }
@@ -1014,6 +1112,13 @@ button.now-day-item:focus-visible { box-shadow: var(--focus-ring); }
   .now-track { gap: 3px; }
   .now-inner.clear .now-track { gap: 4px; }
   .now-day-list { flex-direction: column; gap: 0; }
+  .lv-card { grid-template-columns: 32px minmax(0, 1fr) auto; column-gap: 12px; padding: 12px 12px 12px 12px; border-radius: 12px; }
+  .lv-icon { width: 32px; height: 32px; border-radius: 9px; }
+  .lv-icon svg { width: 16px; height: 16px; }
+  .lv-timer-value { font-size: 19px; }
+  .lv-timer { min-width: 0; }
+  .lv-bar, .lv-acts { grid-column: 1 / -1; }
+  .lv-act, .lv-stop { height: 34px; }
   .ibx-toast.now-toast { bottom: calc(var(--bottomnav-height) + 16px); }
 }
 
