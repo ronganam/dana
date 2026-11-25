@@ -7,10 +7,13 @@ import "lib/Dana.js" as Dana
 
 // Dana in the bar: one glyph. A number beside it when Now has cards that need
 // a decision; the glyph pulses while Dana works on something you asked here
-// and turns the bar's alert colour when she is waiting for your OK.
+// and turns the bar's alert colour when she is waiting for your OK. While a
+// live activity runs (server/docs/live.md), the soonest one takes the glyph's
+// place with its own icon and its countdown ("7:42"), ticking every second.
 //
-// Click: the Now panel (the cards, each with its actions). Right click: the
-// quick-ask overlay (also Super+D). Middle click: refresh.
+// Click: the Now panel (live activities with Earlier / Next / their actions /
+// Stop, then the cards, each with its actions). Right click: the quick-ask
+// overlay (also Super+D). Middle click: refresh.
 //
 // The service is a singleton shared with the overlay; the shell hands plugin
 // settings to this widget, so the widget pushes them across.
@@ -62,6 +65,27 @@ Panel {
   onRowCountChanged: cursor = Math.max(0, Math.min(cursor, rowCount - 1))
   onOpenedChanged: if (opened) { cursor = 0; if (svc) svc.refreshNow() }
 
+  // ---------- live activities ----------
+  property double clock: Date.now()
+  Timer {
+    interval: 1000
+    repeat: true
+    running: !!root.svc && root.svc.liveRunning
+    triggeredOnStart: true
+    onTriggered: root.clock = Date.now()
+  }
+  readonly property var liveList: root.ready ? root.svc.activities : []
+  readonly property var liveTop: root.ready ? Dana.soonestLive(root.svc.activities, root.svc.livePicks, root.clock) : null
+  readonly property var liveTopView: liveTop ? Dana.liveView(liveTop, root.svc.livePicks[liveTop.id]) : null
+  readonly property string liveText: liveTop ? Dana.liveBarText(liveTop, root.svc.livePicks[liveTop.id], root.clock) : ""
+  readonly property string countText: root.ready && root.items.length > 0 ? Commons.I18n.formatNumber(root.items.length, 0) : ""
+
+  function toneColor(tone) {
+    if (tone === "bad") return Commons.Color.urgent
+    if (tone === "muted") return root.fg
+    return root.accent
+  }
+
   readonly property color fg: Commons.Color.popups.text
   readonly property color accent: Commons.Color.accent
   readonly property int smallRadius: Math.min(4, Style.cornerRadius)
@@ -106,12 +130,13 @@ Panel {
     id: button
     anchors.fill: parent
     bar: root.bar
-    text: String.fromCodePoint(0xF0AE2)
+    text: root.liveTopView ? Dana.liveGlyph(root.liveTopView.icon) : String.fromCodePoint(0xF0AE2)
     active: !!root.svc && root.svc.pending !== null
     opacity: !root.ready ? 0.45 : 1
-    labelText: root.ready && root.items.length > 0 && !vertical ? Commons.I18n.formatNumber(root.items.length, 0) : ""
-    slotSize: Style.bar.iconSlot * (labelText !== "" ? 1.7 : 1)
-    tooltipText: ""
+    // "7:42" for the live activity, the Now count after it ("7:42 · 2").
+    labelText: vertical ? "" : [root.liveText, root.countText].filter(function(s) { return s !== "" }).join(" · ")
+    slotSize: Style.bar.iconSlot * (labelText === "" ? 1 : labelText.length <= 2 ? 1.7 : 1 + labelText.length * 0.3)
+    tooltipText: root.liveTopView ? root.liveTopView.title : ""
     onPressed: function(b) {
       if (b === Qt.RightButton) root.ask({})
       else if (b === Qt.MiddleButton) { if (root.svc) root.svc.refreshNow() }
@@ -161,7 +186,9 @@ Panel {
       onActivateRequested: root.activateCursor()
       onDeleteRequested: root.secondary("dismiss")
       onTextKey: function(t) {
-        if (t === "s") root.secondary("snooze")
+        if (t === "n" && root.liveTop) root.svc.liveSelect(root.liveTop, 1)
+        else if (t === "p" && root.liveTop) root.svc.liveSelect(root.liveTop, -1)
+        else if (t === "s") root.secondary("snooze")
         else if (t === "a") root.ask({})
         else if (t === "u") root.svc.undo()
         else if (t === "r") root.svc.refreshNow()
@@ -202,6 +229,155 @@ Panel {
           text: !root.svc ? "" : root.svc.setupProblem === "url" ? strings.t("setup.badUrl").arg(root.svc.envPath)
             : root.svc.setupProblem === "token" ? strings.t("setup.badToken").arg(root.svc.envPath)
             : strings.t("setup.body").arg(root.svc.envPath)
+        }
+
+        // ---------- live activities: what is running now ----------
+        PlainText {
+          visible: root.liveList.length > 0
+          text: strings.t("panel.live").toUpperCase()
+          font.pixelSize: Style.font.caption
+          font.bold: true
+          font.letterSpacing: 1.2
+          opacity: 0.6
+        }
+
+        Column {
+          width: parent.width
+          spacing: Style.space(4)
+          visible: root.liveList.length > 0
+
+          Repeater {
+            model: root.liveList
+            delegate: Rectangle {
+              id: liveRow
+              required property var modelData
+              readonly property var view: Dana.liveView(modelData, root.svc ? root.svc.livePicks[modelData.id] : "")
+              readonly property var timer: Dana.liveTimer(view, root.clock)
+              readonly property bool busy: !!root.svc && !!root.svc.liveBusy[modelData.id]
+              readonly property bool isTop: !!root.liveTop && root.liveTop.id === modelData.id   // n / p act on it
+              readonly property bool canOpen: Dana.liveOpenUrl(root.svc ? root.svc.url : "", view.open) !== ""
+              width: column.width
+              height: liveColumn.implicitHeight + Style.space(16)
+              radius: root.smallRadius
+              color: liveMouse.containsMouse && canOpen ? Style.hoverFill : "transparent"
+              border.width: Style.hoverBorderWidth
+              border.color: Style.hoverBorderColor
+              opacity: view.ended ? 0.6 : 1
+
+              // A click on the card opens what it is about (its screen on the web, or its link).
+              MouseArea {
+                id: liveMouse
+                anchors.fill: parent
+                hoverEnabled: true
+                cursorShape: liveRow.canOpen ? Qt.PointingHandCursor : Qt.ArrowCursor
+                onClicked: if (liveRow.canOpen) { root.close(); root.svc.liveOpen(liveRow.modelData) }
+              }
+
+              Column {
+                id: liveColumn
+                x: Style.space(10)
+                y: Style.space(8)
+                width: parent.width - Style.space(20)
+                spacing: Style.space(4)
+
+                Item {
+                  width: parent.width
+                  height: Math.max(liveTitle.implicitHeight, liveTimerCol.implicitHeight, liveGlyphText.implicitHeight)
+
+                  PlainText {
+                    id: liveGlyphText
+                    anchors.left: parent.left
+                    anchors.top: parent.top
+                    text: Dana.liveGlyph(liveRow.view.icon)
+                    color: root.toneColor(liveRow.view.tone)
+                    font.pixelSize: Style.font.title
+                  }
+                  PlainText {
+                    id: liveTitle
+                    anchors.left: liveGlyphText.right
+                    anchors.leftMargin: Style.space(8)
+                    anchors.right: liveTimerCol.left
+                    anchors.rightMargin: Style.space(8)
+                    text: liveRow.view.title + (liveRow.view.chip ? "  " + liveRow.view.chip : "")
+                    wrapMode: Text.Wrap
+                    maximumLineCount: 2
+                    elide: Text.ElideRight
+                    font.bold: true
+                  }
+                  Column {
+                    id: liveTimerCol
+                    anchors.right: parent.right
+                    anchors.top: parent.top
+                    PlainText {
+                      anchors.right: parent.right
+                      text: liveRow.view.ended ? strings.t("live.done").toUpperCase() : liveRow.timer ? liveRow.timer.label.toUpperCase() : ""
+                      visible: text !== ""
+                      font.pixelSize: Style.font.caption
+                      font.letterSpacing: 1.2
+                      opacity: 0.6
+                    }
+                    PlainText {
+                      anchors.right: parent.right
+                      visible: !!liveRow.timer
+                      text: liveRow.timer ? liveRow.timer.value : ""
+                      color: liveRow.timer && liveRow.timer.past ? root.toneColor(liveRow.view.tone) : root.fg
+                      font.pixelSize: Style.font.title
+                      font.bold: true
+                    }
+                  }
+                }
+                PlainText {
+                  width: parent.width
+                  visible: text !== ""
+                  text: liveRow.view.text
+                  elide: Text.ElideRight
+                  font.pixelSize: Style.font.bodySmall
+                  opacity: 0.8
+                }
+                PlainText {
+                  width: parent.width
+                  visible: text !== ""
+                  text: liveRow.view.context
+                  elide: Text.ElideRight
+                  font.pixelSize: Style.font.bodySmall
+                  opacity: 0.6
+                }
+
+                // Earlier / Next switch the shown choice; a server action goes to the add-on; Stop ends it.
+                Flow {
+                  width: parent.width
+                  spacing: Style.space(6)
+                  topPadding: Style.space(4)
+                  visible: liveRow.view.ended || liveRow.modelData.actions.length > 0
+
+                  Repeater {
+                    model: liveRow.view.ended ? [] : liveRow.modelData.actions
+                    delegate: Button {
+                      required property var modelData
+                      readonly property int dir: modelData.kind === "next" ? 1 : modelData.kind === "prev" ? -1 : 0
+                      bordered: true
+                      selected: modelData.kind === "server"
+                      enabled: !liveRow.busy && (dir === 0 || Dana.liveStep(liveRow.modelData, liveRow.view.key, dir) !== "")
+                      opacity: enabled ? 1 : 0.4
+                      text: modelData.label + (liveRow.isTop && dir > 0 ? "  n" : liveRow.isTop && dir < 0 ? "  p" : "")
+                      onClicked: {
+                        if (dir !== 0) root.svc.liveSelect(liveRow.modelData, dir)
+                        else if (modelData.kind === "stop") root.svc.liveStop(liveRow.modelData)
+                        else root.svc.liveAct(liveRow.modelData, modelData.id)
+                      }
+                    }
+                  }
+                  Button {
+                    visible: liveRow.view.ended
+                    bordered: true
+                    enabled: !liveRow.busy
+                    text: strings.t("live.dismiss")
+                    onClicked: root.svc.liveStop(liveRow.modelData)
+                  }
+                }
+              }
+            }
+          }
         }
 
         // ---------- the conversation, when it needs a look ----------

@@ -10,7 +10,7 @@ where it was, and it follows the theme, the corners and the language the way Oma
 |---|---|
 | **Super+D** | Ask. A card opens in the upper middle of the screen; type and press Enter, and the answer streams in under the question. **Esc** closes it and Dana keeps going: the answer, or her question back, arrives as a notification, and clicking it brings the card back. |
 | **Super+Alt+D** | Ask about the screen. Pick a region (as with Omarchy's OCR capture); the card opens with that screenshot attached. A screenshot already on the clipboard pastes in with Ctrl+V. |
-| **The bar** | ✦ shows how many cards in Dana's **Now** queue need a decision (a dot on a vertical bar). It pulses while she works on something you asked here and takes the bar's alert colour while she waits for your OK. Click: the Now panel. Right click: ask. Middle click: refresh. |
+| **The bar** | ✦ shows how many cards in Dana's **Now** queue need a decision (a dot on a vertical bar). It pulses while she works on something you asked here and takes the bar's alert colour while she waits for your OK. While a **live activity** runs (a watched train, a coding session, a timer), the soonest one takes the glyph's place: its icon and its countdown, ticking (`󰔬 7:42`, then the Now count: `󰔬 7:42 · 2`). Click: the Now panel. Right click: ask. Middle click: refresh. |
 
 ![The Now panel: what needs you, with the current card's actions](assets/now-panel.png)
 
@@ -26,6 +26,11 @@ where it was, and it follows the theme, the corners and the language the way Oma
   it as declined). Choices are picked with **1–9**.
 - **Calm by default.** Nothing pops up on its own except the answer to something you asked and then closed. Now cards
   never notify (the phone already does); the bar only counts them.
+- **Live activities** (the server's `docs/live.md`): what an add-on keeps running for you, also on the phone's
+  status bar. The panel lists them on top, each with its icon, title, timer ("Departs in 7:42", "Elapsed 28:14"), text
+  and context, and its buttons: **Earlier** / **Next** switch to the previous / next option at once (**p** / **n** for
+  the one on the bar), an add-on's own action, **Stop**. Clicking one opens what it is about: its screen in Dana's web
+  app, or its link. One that ended with a summary stays a while, dimmed, with **Dismiss**.
 - **Now from the keyboard.** In the panel, **j / k** (or a click) pick a card and show its actions, **Enter** does its main action, **x** dismisses,
   **s** snoozes, **u** undoes the last action, **a** asks Dana, **o** opens the web app. An approval card opens its
   conversation in the card; a phone notification to reply to opens on the web.
@@ -74,7 +79,7 @@ On the bar widget (Omarchy's bar settings, or `omarchy bar set dana <key> <value
 
 | Key | Default | |
 |---|---|---|
-| `refreshSeconds` | `120` | How often to check Now in the background; `0` checks only when the panel opens. |
+| `refreshSeconds` | `120` | How often to check Now (and live activities) in the background; `0` checks only when the panel opens. A running live activity is checked every 20 s regardless. |
 | `notify` | `true` | Notify when an answer arrives after the card was closed. |
 
 Other ways in: `omarchy-shell shell toggle dana` (the card), `omarchy-shell shell summon dana '{"capture":"region"}'`,
@@ -83,7 +88,8 @@ Other ways in: `omarchy-shell shell toggle dana` (the card), `omarchy-shell shel
 ## What it sends where
 
 Only to `DANA_URL`, with the bearer token: the messages you send (and a screenshot when you attach one), answers to
-Dana's questions, Now actions, and `GET /api/now` every `refreshSeconds`. Screenshots are taken with `slurp` and
+Dana's questions, Now and live activity actions, `GET /api/now` and `GET /api/live` every `refreshSeconds`, and
+`GET /api/live` every 20 s while a live activity is running (its countdown ticks locally in between). Screenshots are taken with `slurp` and
 `grim` into `$XDG_RUNTIME_DIR/dana-omarchy/` (memory, private to you, gone at logout). Everything the server sends back
 is shown as plain text, except answers, which are Markdown with HTML and images removed; links open only when they are
 http(s).
@@ -96,9 +102,10 @@ Service.qml       the one long-lived owner: config, the thread, the run being fo
 Ask.qml           the overlay window and its lifecycle (summon payloads)
 AskCard.qml       the card itself: conversation, approval / choice, input, keys
 BarWidget.qml     the bar glyph and the Now panel
-lib/Dana.js       pure logic: env file, SSE reader, run reducer, thread turns, Markdown sanitizer, Now parsing
+lib/Dana.js       pure logic: env file, SSE reader, run reducer, thread turns, Markdown sanitizer, Now parsing,
+                  live activities (the shown choice, timers, the soonest, glyphs)
 i18n/en.json      every visible string (Omarchy falls back to English for a missing language)
-tests/            node tests for lib/Dana.js, replaying the server's golden.sse
+tests/            node tests for lib/Dana.js, replaying the server's golden.sse and reading its live_web.json
 install.sh        install / update / bind keys
 ```
 

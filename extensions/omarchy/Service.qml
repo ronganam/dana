@@ -12,8 +12,9 @@ import "lib/Dana.js" as Dana
 // its answer arrives as a notification.
 //
 // Network: requests go only to the https origin in ~/.config/dana/omarchy.env
-// with its bearer token. In the background, GET /api/now every
-// `refreshSeconds` (bar widget setting; 0 turns it off). Nothing else polls.
+// with its bearer token. In the background, GET /api/now and GET /api/live
+// every `refreshSeconds` (bar widget setting; 0 turns it off), and GET
+// /api/live every 20 s while a live activity is running. Nothing else polls.
 Item {
   id: root
   visible: false
@@ -80,6 +81,8 @@ Item {
     root.live = null
     root.pending = null
     root.now = null
+    root.activities = []
+    root.livePicks = ({})
     root.threadLoaded = false
     root.errorKind = ""
     root.nowErrorKind = ""
@@ -118,6 +121,13 @@ Item {
   property string toastUndo: ""
   property bool toastError: false
   readonly property int needsYou: now ? now.items.length : 0
+
+  // ---------- Live activities (server/docs/live.md) ----------
+  property var activities: []       // Dana.parseLive shape, newest-updated first
+  property var livePicks: ({})      // id → the choice picked here while its select request runs
+  property var liveBusy: ({})       // id → true while a request about it runs
+  property bool liveLoading: false
+  readonly property bool liveRunning: activities.some(function(a) { return !a.ended })
 
   // ---------- HTTP ----------
   // Qt's XMLHttpRequest has no timeout: JSON requests are tracked and
@@ -504,6 +514,7 @@ Item {
   }
 
   function refreshNow() {
+    refreshLive()
     if (!root.ready || root.nowLoading) return
     root.nowLoading = true
     request("GET", "/api/now", null, function(data) {
@@ -515,6 +526,101 @@ Item {
       root.nowLoading = false
       root.nowErrorKind = kind
     })
+  }
+
+  // ---------- Live ----------
+  Timer {
+    interval: 20000
+    repeat: true
+    running: root.ready && root.liveRunning
+    onTriggered: root.refreshLive()
+  }
+
+  function refreshLive() {
+    if (!root.ready || root.liveLoading) return
+    root.liveLoading = true
+    request("GET", "/api/live", null, function(data) {
+      root.liveLoading = false
+      var parsed = Dana.parseLive(data)
+      if (parsed) root.activities = parsed
+    }, function(kind) {
+      root.liveLoading = false     // keep what is shown (a server before live activities answers 404)
+    })
+  }
+
+  function setPick(id, key) {
+    var picks = {}
+    for (var k in root.livePicks) if (k !== id) picks[k] = root.livePicks[k]
+    if (key) picks[id] = key
+    root.livePicks = picks
+  }
+
+  function setBusy(id, on) {
+    var busy = {}
+    for (var k in root.liveBusy) if (k !== id) busy[k] = root.liveBusy[k]
+    if (on) busy[id] = true
+    root.liveBusy = busy
+  }
+
+  function liveReply(id, data) {
+    root.activities = Dana.liveApply(root.activities, id, data ? data.activity : null)
+  }
+
+  function liveFailed(kind, data) {
+    root.toast(Dana.oneLine(data && (data.message || data.error), 160) || strings.t("error." + kind), "", true)
+    root.refreshLive()
+  }
+
+  // Next / Earlier: shown at once, then stored on the server.
+  function liveSelect(a, dir) {
+    if (!a) return
+    var key = Dana.liveStep(a, root.livePicks[a.id], dir)
+    if (!key) return
+    setPick(a.id, key)
+    request("POST", Dana.livePath(a.id, "/select"), { choice: key }, function(data) {
+      if (root.livePicks[a.id] !== key) return
+      root.liveReply(a.id, data)
+      root.setPick(a.id, "")
+    }, function(kind, data) {
+      if (root.livePicks[a.id] !== key) return
+      root.setPick(a.id, "")
+      root.liveFailed(kind, data)
+    })
+  }
+
+  function liveAct(a, actionId) {
+    if (!a || root.liveBusy[a.id]) return
+    var body = { action: actionId }
+    var key = Dana.liveView(a, root.livePicks[a.id]).key
+    if (key) body.choice = key
+    setBusy(a.id, true)
+    request("POST", Dana.livePath(a.id, "/act"), body, function(data) {
+      root.setBusy(a.id, false)
+      root.liveReply(a.id, data)
+    }, function(kind, data) {
+      root.setBusy(a.id, false)
+      root.liveFailed(kind, data)
+    })
+  }
+
+  // Stop (or dismiss an ended one kept for its final).
+  function liveStop(a) {
+    if (!a || root.liveBusy[a.id]) return
+    setBusy(a.id, true)
+    request("DELETE", Dana.livePath(a.id), null, function() {
+      root.setBusy(a.id, false)
+      root.liveReply(a.id, null)
+    }, function(kind, data) {
+      root.setBusy(a.id, false)
+      if (kind === "notFound") root.liveReply(a.id, null)
+      else root.liveFailed(kind, data)
+    })
+  }
+
+  function liveOpen(a) {
+    if (!a) return
+    var target = Dana.liveOpenUrl(root.url, Dana.liveView(a, root.livePicks[a.id]).open)
+    Qt.openUrlExternally(target || root.url + "/")
   }
 
   function act(item, action) {

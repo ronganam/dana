@@ -1,6 +1,6 @@
 // Run: node extensions/omarchy/tests/dana.test.js
 // Loads lib/Dana.js the way QML does (a .pragma library script) and checks it
-// against the server's shared fixtures (server/tests/fixtures/golden.sse), so
+// against the server's shared fixtures (server/tests/fixtures/golden.sse, live_web.json), so
 // a payload change that breaks the plugin fails here as it does for Android.
 const fs = require("fs")
 const path = require("path")
@@ -10,7 +10,9 @@ const root = path.join(__dirname, "..")
 const src = fs.readFileSync(path.join(root, "lib", "Dana.js"), "utf8").replace(/^\.pragma library\s*$/m, "")
 const names = ["cleanText", "oneLine", "expandHome", "parseEnv", "baseUrl", "token", "readFrames", "humanTool",
   "argLines", "newRun", "applyEvent", "messageSeq", "turnsFromState", "pendingFromState", "safeMarkdown",
-  "safeLink", "summary", "parseNow", "approvalSession", "secondaryOf", "errorKind", "THREAD", "DEVICE"]
+  "safeLink", "summary", "parseNow", "approvalSession", "secondaryOf", "errorKind", "THREAD", "DEVICE",
+  "parseLive", "liveActivity", "liveView", "liveStep", "liveDuration", "liveTimer", "soonestLive", "liveBarText",
+  "liveApply", "livePath", "liveOpenUrl", "liveGlyph"]
 const D = new Function(src + "\nreturn {" + names.join(",") + "}")()
 const fixture = (name) => fs.readFileSync(path.join(root, "..", "..", "server", "tests", "fixtures", name), "utf8")
 
@@ -168,6 +170,90 @@ test("Now: items validated and bounded, approval session, secondary verbs", () =
   assert.deepStrictEqual(D.secondaryOf(now.items[1], "snooze").args, { minutes: 60 })
   assert.strictEqual(D.secondaryOf(now.items[1], "ignore"), null)
   assert.strictEqual(D.parseNow("not json"), null)
+})
+
+test("live: the server's live_web.json parses, bad entries out", () => {
+  const list = D.parseLive(fixture("live_web.json"))
+  assert.deepStrictEqual(list.map((a) => a.id), ["rail:watch-12", "phone:agent-claude-abc"])
+  const [rail, agent] = list
+  assert.strictEqual(rail.countdown.to, Date.parse("2026-11-25T17:46:00+02:00"))
+  assert.deepStrictEqual(rail.actions.map((a) => a.kind), ["prev", "next", "stop"])
+  assert.deepStrictEqual(rail.choices.map((c) => c.key), ["404", "406"])
+  assert.strictEqual(agent.ended, true)
+  assert.strictEqual(agent.final.title, "Done · Fix the parser")
+  assert.strictEqual(D.parseLive({ activities: [null, { id: "bad id" }, { id: "a:b", title: "<b>x</b>\u0007" }] }).length, 1)
+  assert.strictEqual(D.parseLive({ activities: [{ id: "a:b", title: "<b>x</b>\u0007" }] })[0].title, "<b>x</b>") // PlainText
+  assert.strictEqual(D.parseLive("not json"), null)
+  assert.strictEqual(D.parseLive({}), null)
+})
+
+test("live: the shown choice overrides the activity; next / earlier stop at the ends", () => {
+  const [rail, agent] = D.parseLive(fixture("live_web.json"))
+  const first = D.liveView(rail, "")
+  assert.strictEqual(first.key, "404")
+  assert.strictEqual(first.title, "Departs 17:46 (+4)")
+  assert.strictEqual(first.context, "Central → Harbour · Train 404")
+  const second = D.liveView(rail, "406")
+  assert.strictEqual(second.title, "Departs 17:52")
+  assert.strictEqual(second.tone, "good")
+  assert.strictEqual(second.context, first.context)          // a field the choice leaves out stays
+  assert.strictEqual(second.index, 1)
+  assert.strictEqual(D.liveStep(rail, "", 1), "406")
+  assert.strictEqual(D.liveStep(rail, "", -1), "")
+  assert.strictEqual(D.liveStep(rail, "406", 1), "")
+  assert.strictEqual(D.liveStep(rail, "406", -1), "404")
+  assert.strictEqual(D.liveStep(agent, "", 1), "")
+  const done = D.liveView(agent, "")
+  assert.strictEqual(done.ended, true)
+  assert.strictEqual(done.text, "All 42 tests pass")
+  assert.strictEqual(done.countdown, null)
+})
+
+test("live: timers count down and up", () => {
+  const [rail] = D.parseLive(fixture("live_web.json"))
+  const at = (iso) => Date.parse(iso)
+  assert.deepStrictEqual(D.liveTimer(D.liveView(rail, ""), at("2026-11-25T17:38:18+02:00")), { label: "Departs in", value: "7:42", past: false })
+  assert.deepStrictEqual(D.liveTimer(D.liveView(rail, ""), at("2026-11-25T17:47:00+02:00")), { label: "Departs", value: "now", past: true })
+  assert.strictEqual(D.liveTimer(D.liveView(rail, ""), at("2026-11-25T16:41:00+02:00")).value, "1 h 05")
+  const since = { since: at("2026-11-25T17:01:00+02:00") }
+  assert.deepStrictEqual(D.liveTimer(since, at("2026-11-25T17:29:14+02:00")), { label: "Elapsed", value: "28:14", past: false })
+  assert.deepStrictEqual([0, 462, 3900, 90000].map(D.liveDuration), ["0:00", "7:42", "1 h 05", "1 d 1 h"])
+  assert.strictEqual(D.liveTimer({ title: "x" }, 0), null)
+})
+
+test("live: the bar shows the soonest running one, its glyph and countdown", () => {
+  const list = D.parseLive(fixture("live_web.json"))
+  const at = Date.parse("2026-11-25T17:38:18+02:00")
+  const later = D.liveActivity({ id: "w:1", title: "Water", tone: "good", icon: "droplets", countdown: { to: "2026-11-25T18:30:00+02:00" } })
+  const timerless = D.liveActivity({ id: "w:2", title: "Cooking", tone: "neutral", chip: "3/7" })
+  assert.strictEqual(D.soonestLive([later, ...list], {}, at).id, "rail:watch-12")
+  // The user's pick shows the later train's countdown.
+  assert.strictEqual(D.liveBarText(list[0], "406", at), "13:42")
+  assert.strictEqual(D.liveBarText(list[0], "", at), "7:42")
+  assert.strictEqual(D.soonestLive([timerless, later], {}, at).id, "w:1")
+  assert.strictEqual(D.soonestLive([timerless], {}, at).id, "w:2")
+  assert.strictEqual(D.liveBarText(timerless, "", at), "3/7")      // no timer: the chip
+  assert.strictEqual(D.soonestLive([list[1]], {}, at), null)        // an ended one never takes the bar
+  assert.strictEqual(D.soonestLive([], {}, at), null)
+  assert.strictEqual(D.liveGlyph("train-front"), String.fromCodePoint(0xF052C))
+  assert.strictEqual(D.liveGlyph("droplets"), String.fromCodePoint(0xF058C))
+  assert.strictEqual(D.liveGlyph("nope"), String.fromCodePoint(0xF0430))
+})
+
+test("live: replies, paths, where a click goes", () => {
+  const list = D.parseLive(fixture("live_web.json"))
+  const raw = JSON.parse(fixture("live_web.json")).activities[0]
+  const replaced = D.liveApply(list, "rail:watch-12", { ...raw, selected: "406" })
+  assert.strictEqual(replaced.length, 2)
+  assert.strictEqual(replaced[0].selected, "406")
+  assert.deepStrictEqual(D.liveApply(list, "rail:watch-12", null).map((a) => a.id), ["phone:agent-claude-abc"])
+  assert.strictEqual(D.liveApply([], "rail:watch-12", raw)[0].id, "rail:watch-12")
+  assert.strictEqual(D.livePath("rail:watch-12", "/select"), "/api/live/rail:watch-12/select")
+  assert.strictEqual(D.livePath("phone:agent@x y"), "/api/live/phone:agent@x%20y")
+  assert.strictEqual(D.liveOpenUrl("https://dana.example.com", "/rail"), "https://dana.example.com/#rail")
+  assert.strictEqual(D.liveOpenUrl("https://dana.example.com", "https://example.com/t"), "https://example.com/t")
+  assert.strictEqual(D.liveOpenUrl("https://dana.example.com", "javascript:alert(1)"), "")
+  assert.strictEqual(D.liveOpenUrl("https://dana.example.com", "//evil.example"), "")
 })
 
 test("http status kinds", () => {

@@ -70,6 +70,10 @@
   "panel.ask": "Ask Dana",
   "panel.notifications": { "one": "%1 notification", "other": "%1 notifications" },
 
+  "panel.live": "Live",
+  "live.done": "Done",
+  "live.dismiss": "Dismiss",
+
   "now.done": "Done",
   "now.undone": "Undone",
   "now.undoFailed": "Couldn't undo that."

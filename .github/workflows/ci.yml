@@ -41,6 +41,7 @@ jobs:
             omarchy:
               - 'extensions/omarchy/**'
               - 'server/tests/fixtures/golden.sse'
+              - 'server/tests/fixtures/live_web.json'
               - '.github/workflows/ci.yml'
             docker:
               - 'server/Dockerfile'
@@ -130,7 +131,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      # The plugin's logic (lib/Dana.js) against the server's golden.sse; the
+      # The plugin's logic (lib/Dana.js) against the server's golden.sse and live_web.json; the
       # QML needs Omarchy's shell and is checked on a desktop.
       - run: node extensions/omarchy/tests/dana.test.js
 

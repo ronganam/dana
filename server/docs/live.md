@@ -1,8 +1,8 @@
 # Live activities
 
-A **live activity** is something ongoing that an add-on describes in plain terms (a watched train, a coding-agent session, a watering timer) and Dana keeps current on the user's clients: the phone shows it as an Android 16 Live Update (a promoted ongoing notification with a status-bar chip, Samsung's Now Bar), later the web Now screen and the Omarchy bar. Add-ons never touch Android fields: they say what to show, Dana validates, stores, batches and delivers it.
+A **live activity** is something ongoing that an add-on describes in plain terms (a watched train, a coding-agent session, a watering timer) and Dana keeps current on the user's clients: the phone shows it as an Android 16 Live Update (a promoted ongoing notification with a status-bar chip, Samsung's Now Bar), the web shows it in the Live strip on top of Now, and the Omarchy bar shows the soonest one with its countdown. Add-ons never touch Android fields: they say what to show, Dana validates, stores, batches and delivers it.
 
-Code: `core/live.py` (the API, validation, storage, pushes, the loop), `core/live_api.py` (the routes), core migration `m0011_live` (`live_activities`). Tests: `tests/test_live.py`; the wire contract is `tests/fixtures/live_web.json` (generated from `to_json`, read by the Android contract tests).
+Code: `core/live.py` (the API, validation, storage, pushes, the loop), `core/live_api.py` (the routes), core migration `m0011_live` (`live_activities`). Tests: `tests/test_live.py`; the wire contract is `tests/fixtures/live_web.json` (generated from `to_json`, read by the Android contract tests, `tests/test_web_live.mjs` and the Omarchy plugin's tests).
 
 ## For add-on authors
 
@@ -91,3 +91,9 @@ Each activity: `id`, `addon`, `source` (the add-on's title), `rev` (one more for
 - `alert`: alert only when it is non-empty and differs from the last alert shown for that id.
 
 `tests/fixtures/live_web.json` is a train-like activity with every field and an ended one with a final.
+
+### Clients
+
+- **Phone** (`android/docs/notifications.md`): an Android 16 Live Update per activity, from the `live` push.
+- **Web** (`static/app-live.js`, its pure part `static/app-live-core.js`, `tests/test_web_live.mjs`; `docs/web-design.md`, "Now"): the **Live** strip on top of Now, one compact card per activity: the Lucide icon on its tone's tint, the title, text and context, the chip, the timer ticking every second in the browser ("Departs in 7:42", "1 h 05", "Elapsed 28:14"; `aria-live="off"` with the absolute time for screen readers), the bar (segments in their tones, faint until reached when styled by progress, the points, the tracker icon at the value) and the actions (Earlier / Next switch the shown choice at once, then `select`; a server action is the pill, `act`; Stop, `DELETE`). A tap on the card follows `open` (a `/path` is that screen in the shell, https a new tab). An ended one with a final shows muted with "Done" and a × until it leaves the list. `GET /api/live` when Now opens, every 20 s while Now is on screen and the tab visible, and when the window comes back (the push is for the phone only); hidden when there is none.
+- **Omarchy** (`extensions/omarchy/README.md`): the bar's glyph becomes the soonest running activity's icon with its countdown (else its count-up, else its chip); the Now panel lists them with Earlier / Next / the server actions / Stop. It polls `GET /api/live` with Now, and every 20 s while one is running.
