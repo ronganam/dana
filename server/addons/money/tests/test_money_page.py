@@ -527,6 +527,11 @@ def test_insights_pure() -> None:
           len(found) == 1 and found[0]["cadence"] == "monthly" and found[0]["amount"] == 4_490
           and found[0]["price_change"] == {"from": 3_990, "to": 4_490, "since": "2026-10-02"}
           and found[0]["next_date"] == "2026-12-02" and found[0]["monthly_cost"] == 4_490, found)
+    joined = [row("2026-08-15", -6_200, "cellco", category="phone_internet")] + \
+             [row(d, -11_900, "cellco", category="phone_internet") for d in ("2026-09-15", "2026-10-15", "2026-11-15")]
+    j = insights.detect_recurring(joined, today)
+    check("recurring: a lower first charge is a part month (joined mid-cycle), not a price change",
+          [(i["amount"], i["price_change"]) for i in j] == [(11_900, None)], j)
     weekly = [row((today - datetime.timedelta(days=7 * k)).isoformat(), -2_000, "gym") for k in range(5)]
     w = insights.detect_recurring(weekly, today)
     check("recurring: weekly (5 weeks) with its monthly cost", [(i["cadence"], i["monthly_cost"]) for i in w]

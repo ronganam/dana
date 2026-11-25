@@ -3,7 +3,7 @@
 - :func:`recurring`: subscriptions, standing orders and regular income — the
   same merchant key at a regular interval (monthly in ≥ 3 distinct months,
   weekly in ≥ 4 weeks, yearly in ≥ 2 years) with similar amounts (one price
-  change allowed, and flagged), still active. Card installments are payments
+  change allowed, and flagged, except a lone lower first charge: a part month), still active. Card installments are payments
   of one purchase, never a subscription.
 - :func:`yearly`: charges that come once a year — an insurance renewal, the
   car licence, an annual subscription (:data:`YEARLY_CATEGORIES`, at least
@@ -157,7 +157,9 @@ def _series(items: List[Dict[str, Any]], key: str, money_out: bool,
     typical = int(statistics.median(amounts[-VARIABLE_TYPICAL_OF:] if variable else
                                     [amounts[i] for i in runs[-1]][-VARIABLE_TYPICAL_OF:]))
     change = None
-    if len(runs) == 2:
+    # A lone lower first charge is a part month (joined mid-cycle), not an old price.
+    prorated = len(runs[0]) == 1 and amounts[0] < typical
+    if len(runs) == 2 and not prorated:
         change = {"from": int(statistics.median(amounts[i] for i in runs[0])), "to": typical,
                   "since": items[runs[1][0]]["purchase_date"]}
     last = items[-1]
