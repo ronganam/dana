@@ -22,8 +22,8 @@ android {
         applicationId = "io.github.ronganam.dana"
         minSdk = 30
         targetSdk = 34
-        versionCode = 66
-        versionName = "10.6.1"
+        versionCode = 67
+        versionName = "10.6.2"
     }
 
     signingConfigs {
