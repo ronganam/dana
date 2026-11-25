@@ -1,0 +1,106 @@
+{
+  "activities": [
+    {
+      "id": "rail:watch-12",
+      "addon": "rail",
+      "source": "Rail",
+      "rev": 4,
+      "updated_at": "2026-11-25T17:30:02+02:00",
+      "started_at": "2026-11-25T17:05:00+02:00",
+      "title": "Departs 17:46 (+4)",
+      "text": "Platform 3 · Arrives 18:35",
+      "context": "Central → Harbour · Train 404",
+      "icon": "train-front",
+      "tone": "warn",
+      "countdown": {
+        "to": "2026-11-25T17:46:00+02:00",
+        "label": "Departs"
+      },
+      "progress": {
+        "segments": [
+          {
+            "length": 4,
+            "tone": "warn"
+          },
+          {
+            "length": 6,
+            "tone": "warn"
+          }
+        ],
+        "points": [
+          {
+            "at": 4,
+            "tone": "neutral"
+          }
+        ],
+        "value": 0,
+        "tracker": "train-front",
+        "indeterminate": false,
+        "styled_by_progress": true
+      },
+      "actions": [
+        {
+          "id": "prev",
+          "label": "Earlier",
+          "kind": "prev"
+        },
+        {
+          "id": "next",
+          "label": "Next train",
+          "kind": "next"
+        },
+        {
+          "id": "stop",
+          "label": "Stop",
+          "kind": "stop"
+        }
+      ],
+      "choices": [
+        {
+          "key": "404",
+          "title": "Departs 17:46 (+4)",
+          "text": "Platform 3 · Arrives 18:35",
+          "tone": "warn",
+          "countdown": {
+            "to": "2026-11-25T17:46:00+02:00",
+            "label": "Departs"
+          }
+        },
+        {
+          "key": "406",
+          "title": "Departs 17:52",
+          "text": "Platform 1 · Arrives 18:41",
+          "tone": "good",
+          "countdown": {
+            "to": "2026-11-25T17:52:00+02:00",
+            "label": "Departs"
+          }
+        }
+      ],
+      "selected": "404",
+      "open": "/rail",
+      "alert": "delay:4",
+      "ends_at": "2026-11-25T18:40:00+02:00"
+    },
+    {
+      "id": "phone:agent-claude-abc",
+      "addon": "phone",
+      "source": "Phone",
+      "rev": 9,
+      "updated_at": "2026-11-25T17:29:00+02:00",
+      "started_at": "2026-11-25T17:01:00+02:00",
+      "title": "Fix the parser",
+      "text": "Running the tests",
+      "icon": "bot",
+      "tone": "neutral",
+      "since": "2026-11-25T17:01:00+02:00",
+      "chip": "3/7",
+      "ended": true,
+      "final": {
+        "title": "Done · Fix the parser",
+        "text": "All 42 tests pass",
+        "tone": "good"
+      }
+    }
+  ]
+}

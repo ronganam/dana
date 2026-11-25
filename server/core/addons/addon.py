@@ -129,6 +129,8 @@ ICON = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 WIDGET_KEY = re.compile(r"^[a-z][a-z0-9_]{0,39}$")
 WIDGET_SCRIPT = re.compile(r"^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\.js$")
 MAX_WIDGET_SETTINGS = 8
+# The shortest interval of @addon.live_refresh (core/live.py ticks every 5 seconds).
+MIN_LIVE_EVERY = 5
 
 
 def _https_url(owner: str, url: str) -> None:
@@ -338,8 +340,8 @@ class Addon:
             sends it to the Money page, where each bank login is fixed.
 
     Hooks are declared with the decorators below (``@addon.job``,
-    ``@addon.on``, ``@addon.now_cards``…); docs/writing-an-addon.md has an
-    example of each.
+    ``@addon.on``, ``@addon.now_cards``, ``@addon.live_refresh``…);
+    docs/writing-an-addon.md has an example of each.
     """
 
     def __init__(self, name: str, *, title: str = "", description: str = "", version: str = "",
@@ -778,6 +780,44 @@ class Addon:
             raise ValueError(f"{self.name}: @addon.provide source {source!r} must be lower case letters, digits, _")
         _short(self.name, "a provider label", label, MAX_LABEL)
         return self._hook("provide", key, rank=int(rank), source=source or self.name, label=label or self.title)
+
+
+    # --- Live activities (core/live.py, docs/live.md) -----------------------------
+
+    def _once(self, kind: str) -> None:
+        if any(h.kind == kind for h in self.hooks):
+            raise ValueError(f"{self.name}: @addon.{kind} is declared twice (one per addon)")
+
+    def live_refresh(self, *, every: int = 60) -> Callable[[F], F]:
+        """``async def f(user, current: live.Current) -> live.HookResult``: keeps
+        this addon's running live activities current (``from core import live``,
+        server/docs/live.md). Dana calls it for each of them, as their user and
+        only while the addon is active for them, when it is due: at the
+        activity's ``refresh_at`` when it set one later than the last call, else
+        ``every`` seconds (at least 5) after the last call or the start. An
+        ``Activity`` updates it (one that changes nothing on the wire is
+        dropped), ``live.END`` ends it, None leaves it as it is. A failure is
+        logged and never ends it. One per addon."""
+        if isinstance(every, bool) or not isinstance(every, (int, float)) or every < MIN_LIVE_EVERY:
+            raise ValueError(f"{self.name}: @addon.live_refresh(every=) is seconds, at least {MIN_LIVE_EVERY}")
+
+        def decorator(func: F) -> F:
+            self._once("live_refresh")
+            return self._hook("live_refresh", every=every)(func)
+        return decorator
+
+    def live_action(self, func: F) -> F:
+        """``async def f(user, current: live.Current, action, choice) -> live.HookResult``:
+        a person acted on one of this addon's live activities (the
+        ``/api/live/{id}`` routes: act, select, stop). ``live.HookResult`` is a
+        ``live.Activity`` (update it), ``live.END`` (end it) or None (leave it).
+        ``action`` is a ``server`` :class:`~core.live.Action`'s id (``choice``:
+        the choice it was pressed on), ``"select"`` once Dana stored a new
+        selection (``choice``: its key), or ``"stop"`` once Dana ended the
+        activity (clean up your own rows; the return value is ignored). A
+        failure is logged. One per addon; only for users who have the addon active."""
+        self._once("live_action")
+        return self._hook("live_action")(func)
 
 
 def _require_async(addon: str, what: str, func: Callable[..., Any]) -> None:

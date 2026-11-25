@@ -20,6 +20,7 @@ import typing
 from pathlib import Path
 from typing import Any, Dict, List, Sequence, Tuple
 
+from core import live
 from core.addons import hooks as hook_types
 from core.addons.addon import Addon
 from cli.kit import schema
@@ -54,6 +55,8 @@ HOOKS: Tuple[Tuple[str, Sequence[str], str], ...] = (
     ("context_block", (), "context"),
     ("provide", ("provide",), ""),
     ("widget", ("widget", "widget_web"), ""),
+    ("live_refresh", ("live",), ""),
+    ("live_action", (), "live_refresh"),
 )
 # Manifest fields that take a function, and the example of each.
 CALLBACKS: Tuple[Tuple[str, str], ...] = (
@@ -65,6 +68,9 @@ RESULT_TYPES = (hook_types.Card, hook_types.DayItem, hook_types.NowContext, hook
                 hook_types.Section, hook_types.Hit, hook_types.Check, hook_types.Fix, hook_types.ContextRequest,
                 hook_types.Approval,
                 hook_types.WidgetContext)
+# What a live activity is made of (core/live.py).
+LIVE_TYPES = (live.Activity, live.Countdown, live.Progress, live.Seg, live.Point, live.Action, live.Choice, live.Final,
+              live.Current)
 # More examples: (heading, showcase keys, words before them).
 MORE = (
     ("Settings and credentials", ("manifest",), "Declared on the manifest (`settings=`, `credentials=`); a tool reads "
@@ -202,7 +208,8 @@ def render() -> str:
         "## Contents\n",
         "- [The folder](#the-folder)\n- [The manifest](#the-manifest)\n- [Manifest values](#manifest-values)\n"
         "- [Functions on the manifest](#functions-on-the-manifest)\n- [Hooks](#hooks)\n"
-        "- [What hooks get and return](#what-hooks-get-and-return)\n- [More examples](#more-examples)\n"
+        "- [What hooks get and return](#what-hooks-get-and-return)\n- [Live activities](#live-activities)\n"
+        "- [More examples](#more-examples)\n"
         "- [The manifest as JSON](#the-manifest-as-json)\n",
         "## The folder\n",
         "```\n<name>/\n  addon.py          addon = Addon(\"<name>\", ...): the manifest (required)\n"
@@ -241,7 +248,8 @@ def render() -> str:
     out.append("## Hooks\n")
     out.append("Declared with a decorator on the `addon` object, in any module the loader imports. Composer "
                "hooks (`now_cards`, `day_items`, `review`, `search`, `selfcheck`, `context*`) are plain functions; "
-               "jobs, services, handlers, channels and the action hooks are `async`; `briefing`, `provide` and "
+               "jobs, services, handlers, channels, the action hooks and the live hooks are `async`; `briefing`, "
+               "`provide` and "
                "`widget` may be either. Keys (a card prefix, a section, a check, a widget) are unique across "
                "addons; a provider key may be declared by several, ranked.\n")
     for name, keys, see in HOOKS:
@@ -255,6 +263,16 @@ def render() -> str:
     out.append("From `core.addons` (`core/addons/hooks.py`); `to_json()` gives the payload clients read.\n")
     for cls in RESULT_TYPES:
         out.append(f"### {cls.__name__}\n")
+        out.append(md(inspect.cleandoc(cls.__doc__ or "")) + "\n")
+        out.append(fields_table(cls))
+    out.append("## Live activities\n")
+    out.append("From `core.live` (`from core import live`; server/docs/live.md): `await live.start(user, addon, key, "
+               "Activity(...))`, `live.update(...)`, `live.end(user, addon, key, Final(...))`, `live.get`, "
+               "`live.active`. Dana validates them (`live.LiveError`), drops updates that change nothing, batches "
+               f"the pushes and expires them. Tones: {', '.join(f'`{t}`' for t in live.TONES)}. Icons: "
+               f"{', '.join(f'`{i}`' for i in live.ICONS)}.\n")
+    for cls in LIVE_TYPES:
+        out.append(f"### live.{cls.__name__}\n")
         out.append(md(inspect.cleandoc(cls.__doc__ or "")) + "\n")
         out.append(fields_table(cls))
     out.append("## More examples\n")

@@ -113,14 +113,15 @@ async def zones_changed(user: User, data: Dict[str, Any]) -> None:
 
 @addon.channel("push")
 async def push_channel(user: User, message: Message) -> bool:
-    """A message with a ``kind`` goes to ``user``'s phone as that push event."""
+    """A message with a ``kind`` goes to ``user``'s phone as that push event
+    (``replace``: earlier events of the kind are superseded, e.g. core's ``live``)."""
     if not message.kind:
         return False
     if message.kind == "notify":
         d = message.data
         return await push.notify(user, str(d.get("title") or ""), str(d.get("text") or ""),
                                  tag=str(d.get("tag") or ""), channel=str(d.get("channel") or "messages"))
-    return await push.send(user, message.kind, dict(message.data))
+    return await push.send(user, message.kind, dict(message.data), replace=message.replace)
 
 
 # --- Briefing & weekly review ---------------------------------------------------------------

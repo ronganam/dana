@@ -241,6 +241,26 @@ async def refetch(user: User, action: str) -> str:
 
 `core_cards` is `from core import cards as core_cards`. Composer hooks are plain functions (they run in a worker thread); jobs, services, handlers, channels and the action hooks are `async`. Keys (a card prefix, a section, a check) are unique across addons. `core.addons.helpers` has shared time and search helpers (`parse_time`, `ago`, `when_phrase`, `match_score`, `like_pattern`…).
 
+### Live activities
+
+Something ongoing (a tide coming in, a delivery, a timer) can be a live activity: Dana shows it on the user's phone as an ongoing notification with a status-bar chip and keeps it current. Say what it shows; Dana validates it, drops updates that change nothing, batches the pushes and ends it at `ends_at` (`docs/live.md`; the showcase's "water now" in the reference):
+
+```python
+from core import live
+
+await live.start(user, addon, "tide-7", live.Activity(title="High tide 14:20", icon="ship",
+                 countdown=live.Countdown(high, "High tide"), refresh_at=high, ends_at=high + timedelta(hours=1)))
+
+@addon.live_refresh(every=300)                         # also at the activity's refresh_at
+async def refresh(user, current: live.Current) -> live.HookResult:
+    return live.END if clock.now() >= current.activity.countdown.to else None   # or a new live.Activity
+
+@addon.live_action                                    # a "server" Action's id, "select" or "stop"
+async def act(user, current: live.Current, action: str, choice: str) -> live.HookResult: ...
+```
+
+Tests end-to-end without the phone: `await live.tick()` runs the loop once (expiry, due refreshes, pushes) with `core.clock.now` patched; `live.to_json(live.get(user, addon, key))` is what clients get.
+
 ### Data
 
 ```python

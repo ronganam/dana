@@ -40,11 +40,15 @@ class Message:
     ``parse_mode`` "Markdown" for Telegram's legacy Markdown, values escaped
     with ``core.text.escape_markdown``); ``kind`` and ``data`` are the
     structured event a device gets (the phone's push: ``kind`` "reminder",
-    ``data`` its payload). A channel skips a message without what it needs."""
+    ``data`` its payload); ``replace``: ``data`` is the whole state of its
+    ``kind``, so a device catching up needs only the newest (the phone's push
+    drops the user's earlier events of the kind). A channel skips a message
+    without what it needs."""
     text: str = ""
     parse_mode: Optional[str] = None
     kind: str = ""
     data: Dict[str, Any] = field(default_factory=dict)
+    replace: bool = False
 
 
 class TelegramChannel(Protocol):
