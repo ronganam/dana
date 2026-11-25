@@ -264,7 +264,7 @@
   }
 
   /** What makes a card's HTML change (its timer ticks on its own). */
-  const signature = (a, key, busy) => `${a.rev}|${a.ended ? 1 : 0}|${key || ""}|${busy ? [...busy].join(",") : ""}`;
+  const signature = (a, key, busy) => `${a.rev}|${a.started_at || ""}|${a.ended ? 1 : 0}|${key || ""}|${busy ? [...busy].join(",") : ""}`;
 
   globalThis.DanaLive = {
     TONES, DISPLAY, toneOf, choiceIndex, stepChoice, view, duration, clockOf, timer, progress, openTarget,

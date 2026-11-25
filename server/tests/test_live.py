@@ -22,7 +22,7 @@ testenv.isolate("live_test")
 os.environ["TIMEZONE"] = "Asia/Jerusalem"  # the wire's offsets are the server zone's
 
 ROOT = Path(testenv.scratch_path("addon_dirs"))
-for name in ("rail", "plain"):
+for name in ("rail", "plain", "slow"):
     (ROOT / name).mkdir(parents=True)
 (ROOT / "rail" / "addon.py").write_text("from core.addons import Addon\naddon = Addon('rail', title='Rail', "
                                         "description='Live test')\n")
@@ -54,6 +54,20 @@ for name in ("rail", "plain"):
             return replace(current.activity, title="Later, as asked")
         return None
     '''))
+(ROOT / "slow" / "addon.py").write_text("from core.addons import Addon\naddon = Addon('slow', description='Hangs')\n")
+(ROOT / "slow" / "hooks.py").write_text(textwrap.dedent('''\
+    import asyncio
+    from addons.slow.addon import addon
+
+    CALLS = []
+    RELEASE = asyncio.Event()
+
+    @addon.live_refresh(every=5)
+    async def refresh(user, current):
+        CALLS.append(current.key)
+        await RELEASE.wait()
+        return None
+    '''))
 os.environ["DANA_ADDON_DIRS"] = str(ROOT)
 
 from aiohttp import web  # noqa: E402
@@ -69,6 +83,7 @@ from core.live import Action, Activity, Choice, Countdown, Current, Final, Point
 db.migrate()
 users.bootstrap()
 from addons.rail import hooks as rail  # noqa: E402
+from addons.slow import hooks as slow  # noqa: E402
 
 FIXTURE = testenv.FIXTURES / "live_web.json"
 TZ = zoneinfo.ZoneInfo("Asia/Jerusalem")
@@ -87,10 +102,12 @@ MAYA = users.create("Maya")
 for u in (ROBIN, GAL, MAYA):
     store.connect(u, "rail")
 store.connect(ROBIN, "plain")
+store.connect(ROBIN, "slow")
 for u in (ROBIN, GAL):  # Maya has no phone addon
     store.connect(u, "phone")
 RAIL: Addon = get_addon("rail")
 PLAIN: Addon = get_addon("plain")
+SLOW: Addon = get_addon("slow")
 AUTH = {u.id: {"Authorization": f"Bearer {users.issue_token(u.id, 'test')[0]}"} for u in (ROBIN, GAL, MAYA)}
 
 # The fake clock: clock.now() reads it; tests move it.
@@ -404,6 +421,24 @@ async def test_end_stop_expiry() -> None:
     await live.drain()
     check("end without a final: the push no longer lists it", len(SENT) == n + 1
           and "plain:quick" not in [a["id"] for a in SENT[-1][1]["activities"]])
+    check("end without a final: no longer running, not stoppable", live.get(ROBIN, PLAIN, "quick") is None
+          and live.find(ROBIN, "plain:quick") is None and not await live.stop(ROBIN, "plain:quick"))
+    again = await live.start(ROBIN, PLAIN, "quick", Activity(title="Quick again"))
+    check("start again after an end without a final: rev carries on (1, ended 2, now 3), started_at new",
+          again.rev == 3 and live.to_json(again)["rev"] == 3 and again.started_at == CLOCK["t"], again.rev)
+    await live.end(ROBIN, PLAIN, "quick")
+    at(hours=23)
+    await live.tick()
+    with get_db_connection() as conn:
+        kept = conn.execute("SELECT rev FROM live_activities WHERE user_id = ? AND addon = 'plain' AND key = 'quick'",
+                            (ROBIN.id,)).fetchone()
+    check("a gone row keeps its rev (hidden) for a day", kept is not None and kept["rev"] == 4, kept)
+    at(hours=2)
+    await live.tick()
+    with get_db_connection() as conn:
+        kept = conn.execute("SELECT rev FROM live_activities WHERE user_id = ? AND addon = 'plain' AND key = 'quick'",
+                            (ROBIN.id,)).fetchone()
+    check("then it is deleted", kept is None)
 
     now = at(seconds=30)
     await live.start(ROBIN, PLAIN, "brief", Activity(title="Brief", ends_at=now + datetime.timedelta(seconds=30)))
@@ -437,8 +472,14 @@ async def test_end_stop_expiry() -> None:
           and live.get(ROBIN, PLAIN, "nohook") is None)
     await live.start(ROBIN, RAIL, "kept", Activity(title="Kept"))
     await live.end(ROBIN, RAIL, "kept", Final("Done"))
+    await live.drain()
+    n = len(SENT)
     check("stop on an ended one kept for its final: dismissed", await live.stop(ROBIN, "rail:kept")
           and not any(a["id"] == "rail:kept" for a in live.payload(ROBIN)["activities"]))
+    await live.drain()
+    check("dismissing a final: pushed at once, so the other clients drop it", len(SENT) == n + 1
+          and "rail:kept" not in [a["id"] for a in SENT[-1][1]["activities"]], len(SENT) - n)
+    check("dismissing a final: again → False", not await live.stop(ROBIN, "rail:kept"))
 
 
 async def test_actions() -> None:
@@ -484,10 +525,12 @@ async def test_refresh_loop() -> None:
     rail.CALLS.clear()
     at(seconds=5)
     out = await live.tick()
+    await live.drain()
     check("refresh: nothing due yet → no call", rail.CALLS == [] and out["refreshed"] == 0, rail.CALLS)
     at(seconds=6)
     rail.NEXT[(ROBIN.id, "soon")] = Activity(title="Refreshed")
     out = await live.tick()
+    await live.drain()
     check("refresh: an activity's refresh_at makes it due then; only it is called; its Activity updates it",
           rail.CALLS == [("refresh", ROBIN.id, "soon")] and out["refreshed"] == 1
           and live.get(ROBIN, RAIL, "soon").activity.title == "Refreshed", rail.CALLS)
@@ -495,6 +538,7 @@ async def test_refresh_loop() -> None:
     at(seconds=50)  # 61 s after the start
     rail.NEXT[(GAL.id, "gals")] = live.END
     out = await live.tick()
+    await live.drain()
     called = sorted(c[1:] for c in rail.CALLS)
     check("refresh: every=60 after the start, each as its own user; never for an addon without the hook",
           called == sorted([(ROBIN.id, "every"), (GAL.id, "gals")]) and out["refreshed"] == 2, called)
@@ -503,26 +547,78 @@ async def test_refresh_loop() -> None:
     at(seconds=10)  # 60 s after "soon" was refreshed
     rail.NEXT[(ROBIN.id, "soon")] = "boom"
     await live.tick()
+    await live.drain()
     check("refresh: a failing hook is logged and never ends the activity",
           rail.CALLS == [("refresh", ROBIN.id, "soon")] and live.get(ROBIN, RAIL, "soon") is not None, rail.CALLS)
     rail.CALLS.clear()
     at(seconds=5)
     await live.tick()
+    await live.drain()
     check("refresh: a failed one is not called again until it is due", rail.CALLS == [], rail.CALLS)
     store.disconnect(ROBIN, "rail")
     at(minutes=2)
     await live.tick()
+    await live.drain()
     check("refresh: not called while the addon is not active for the user", rail.CALLS == [], rail.CALLS)
     store.connect(ROBIN, "rail")
     rail.CALLS.clear()
     at(minutes=2)
     rail.NEXT[(ROBIN.id, "every")] = None
     await live.tick()
+    await live.drain()
     check("refresh: None leaves it as it is", live.get(ROBIN, RAIL, "every").rev == 1
           and ("refresh", ROBIN.id, "every") in rail.CALLS)
     for key in ("every", "soon"):
         await live.end(ROBIN, RAIL, key)
     await live.end(ROBIN, PLAIN, "plain")
+
+
+async def test_slow_refresh() -> None:
+    """A hanging live_refresh of one addon holds up nothing else: not the loop,
+    another activity's refresh, expiry or a trailing push; and it is never
+    started twice for its activity."""
+    now = at(minutes=5)
+    for c in list(live.active(ROBIN)):
+        await live.end(ROBIN, get_addon(c.addon), c.key)
+    await live.drain()
+    rail.CALLS.clear()
+    slow.CALLS.clear()
+    await live.start(ROBIN, SLOW, "hang", Activity(title="Hangs"))
+    await live.start(ROBIN, RAIL, "quick", Activity(title="Quick", refresh_at=now + datetime.timedelta(seconds=10)))
+    await live.start(ROBIN, PLAIN, "short", Activity(title="Short", ends_at=now + datetime.timedelta(seconds=10)))
+    await live.drain()
+    at(seconds=6)
+    out = await asyncio.wait_for(live.tick(), timeout=2)
+    for _ in range(5):
+        await asyncio.sleep(0)
+    check("slow: its refresh starts in the background; tick does not wait for it",
+          out["refreshed"] == 1 and slow.CALLS == ["hang"] and len(live._inflight) == 1, (out, slow.CALLS))
+    at(seconds=5)
+    rail.NEXT[(ROBIN.id, "quick")] = Activity(title="Quick, refreshed")
+    await live.update(ROBIN, PLAIN, "short", Activity(title="Short, changed", ends_at=now + datetime.timedelta(seconds=10)))
+    await asyncio.wait_for(asyncio.gather(*list(live._tasks)), timeout=2)  # not drain: the slow one still hangs
+    n = len(SENT)
+    out = await asyncio.wait_for(live.tick(), timeout=2)
+    others = [t for k, t in live._inflight.items() if k[1] != "slow"]
+    await asyncio.wait_for(asyncio.gather(*others), timeout=2)
+    check("slow: another addon's refresh runs and applies meanwhile; the hanging one is not started again",
+          out["refreshed"] == 1 and rail.CALLS == [("refresh", ROBIN.id, "quick")]
+          and live.get(ROBIN, RAIL, "quick").activity.title == "Quick, refreshed" and slow.CALLS == ["hang"],
+          (out, rail.CALLS, slow.CALLS))
+    check("slow: expiry still runs", out["expired"] == 1 and live.get(ROBIN, PLAIN, "short") is None, out)
+    at(seconds=11)
+    out = await asyncio.wait_for(live.tick(), timeout=2)
+    await asyncio.wait_for(asyncio.gather(*list(live._tasks)), timeout=2)
+    check("slow: pushes still go (the expiry's at once, the refresh's trailing one later)",
+          len(SENT) == n + 2 and out["pushed"] == 1
+          and "Quick, refreshed" in [a["title"] for a in SENT[-1][1]["activities"]]
+          and slow.CALLS == ["hang"], (out, len(SENT) - n))
+    slow.RELEASE.set()
+    await asyncio.wait_for(live.drain(), timeout=2)
+    check("slow: once it answers it is done; drain waits for it", live._inflight == {} and slow.CALLS == ["hang"])
+    await live.end(ROBIN, SLOW, "hang")
+    await live.end(ROBIN, RAIL, "quick")
+    await live.drain()
 
 
 def build_app() -> web.Application:
@@ -544,7 +640,7 @@ async def test_api() -> None:
     for u in (ROBIN, GAL, MAYA):
         for c in live.active(u):
             await live.end(u, get_addon(c.addon), c.key)
-    await live.start(ROBIN, RAIL, "watch-12", replace(train(), actions=train().actions + ()))
+    robins = await live.start(ROBIN, RAIL, "watch-12", replace(train(), actions=train().actions + ()))
     await live.start(GAL, RAIL, "watch-12", replace(train(), title="Gal's train"))
     await live.start(MAYA, RAIL, "maya", Activity(title="Maya's", actions=(Action("later", "Later"),)))
     await live.drain()
@@ -581,7 +677,7 @@ async def test_api() -> None:
         r = await c.post("/api/live/rail:watch-12/select", headers=AUTH[ROBIN.id], json={"choice": "406"})
         body = await r.json()
         check("select: the activity in the reply, its selection stored",
-              r.status == 200 and body["activity"]["selected"] == "406" and body["activity"]["rev"] == 2
+              r.status == 200 and body["activity"]["selected"] == "406" and body["activity"]["rev"] == robins.rev + 1
               and live.find(ROBIN, "rail:watch-12").selected == "406"
               and live.find(GAL, "rail:watch-12").selected == "404", body)
         r = await c.post("/api/live/rail:watch-12/act", headers=AUTH[ROBIN.id], json={"action": "prev"})
@@ -617,6 +713,7 @@ async def main() -> None:
     await test_end_stop_expiry()
     await test_actions()
     await test_refresh_loop()
+    await test_slow_refresh()
     await test_api()
 
 

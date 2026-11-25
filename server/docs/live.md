@@ -31,7 +31,7 @@ async def refresh(user, current: live.Current) -> live.HookResult: ...
 async def act(user, current: live.Current, action: str, choice: str) -> live.HookResult: ...
 ```
 
-A hook returns an `Activity` (update it), `live.END` (end it) or None (leave it). `live_refresh` is called per running activity of the add-on when it is due: at the activity's `refresh_at` when it set one later than the last call, else `every` seconds after the last call (or the start). `live_action` gets a `server` action's id (with the choice it was pressed on), `"select"` after Dana stored a new selection (with its key), or `"stop"` after Dana ended the activity (clean your own rows; the answer is ignored). Both run as the activity's user, only while the add-on is active for them; a failing or slow (60 s) one is logged and never ends the activity.
+A hook returns an `Activity` (update it), `live.END` (end it) or None (leave it). `live_refresh` is called per running activity of the add-on when it is due: at the activity's `refresh_at` when it set one later than the last call, else `every` seconds after the last call (or the start). `live_action` gets a `server` action's id (with the choice it was pressed on), `"select"` after Dana stored a new selection (with its key), or `"stop"` after Dana ended the activity (clean your own rows; the answer is ignored). Both run as the activity's user, only while the add-on is active for them; a failing or slow (30 s) one is logged and never ends the activity. Each due `live_refresh` runs as a background task of its own, never two at once for one activity, so a slow one holds up nothing else (other add-ons' refreshes, expiry, pushes).
 
 ### The activity
 
@@ -61,7 +61,8 @@ Times are aware datetimes (`core.clock.now()` based). Anything else, or more tha
 - **Expiry**: an activity whose `ends_at` passed is ended (quietly: no `live_action`).
 - **Selection**: the user's choice is stored on the activity and survives updates whose choices still have that key; otherwise it falls back to the activity's `selected`, else the first choice.
 - **Stop**: the user's Stop (or a `stop` action, or dismissing the notification) ends it, then `live_action` gets `"stop"`.
-- **Finals**: an activity ended with a `Final` stays listed (ended) for 10 minutes so the phone can show the final; one ended without is gone at once.
+- **Finals**: an activity ended with a `Final` stays listed (ended) for 10 minutes so the phone can show the final; one ended without is gone from the list at once. Dismissing a final is pushed at once so the other clients drop it too.
+- **`rev` always rises**: an ended activity's row stays, hidden, for a day (`GONE_KEEP`), so a `start` under the same key carries on its `rev` rather than starting at 1 again.
 
 ## For client authors
 
@@ -72,7 +73,7 @@ Times are aware datetimes (`core.clock.now()` based). Anything else, or more tha
 | `GET /api/live` | `{"activities": [<wire>, …]}`, newest-updated first |
 | `POST /api/live/{id}/act {"action": "<id>", "choice": "<key>"?}` | `{"activity": <wire> \| null}` (null: it ended); 400 `unknown_action`, 400 `unknown_choice` |
 | `POST /api/live/{id}/select {"choice": "<key>"}` | `{"activity": <wire> \| null}`; 400 `unknown_choice` |
-| `DELETE /api/live/{id}` | `{"ok": true}`: stops it (an ended one kept for its final is dismissed) |
+| `DELETE /api/live/{id}` | `{"ok": true}`: stops it (an ended one kept for its final is dismissed, pushed at once) |
 
 `{id}` is `<addon>:<key>`. Another user's id answers 404 `not_found` like a missing one; a body that is not a JSON object answers 400 `invalid`. Redraw from the reply at once; the push follows for the user's other devices.
 
@@ -88,12 +89,13 @@ Each activity: `id`, `addon`, `source` (the add-on's title), `rev` (one more for
 - times are ISO 8601 with the offset of the server's zone, to the second;
 - `selected` is always a key of `choices` when there are any (the first when the add-on gave none);
 - a choice carries only display fields (`title`, `text`, `context`, `icon`, `tone`, `countdown`, `since`, `chip`, `progress`, `open`); show the top-level fields overridden by the selected choice's (a field the choice leaves out keeps the top-level one);
-- `alert`: alert only when it is non-empty and differs from the last alert shown for that id.
+- `alert`: alert only when it is non-empty and differs from the last alert shown for that id;
+- `rev` only rises for an id, across a stop and a new start under the same key too (within a day); `started_at` changes with each start.
 
 `tests/fixtures/live_web.json` is a train-like activity with every field and an ended one with a final.
 
 ### Clients
 
 - **Phone** (`android/docs/notifications.md`): an Android 16 Live Update per activity, from the `live` push.
-- **Web** (`static/app-live.js`, its pure part `static/app-live-core.js`, `tests/test_web_live.mjs`; `docs/web-design.md`, "Now"): the **Live** strip on top of Now, one compact card per activity: the Lucide icon on its tone's tint, the title, text and context, the chip, the timer ticking every second in the browser ("Departs in 7:42", "1 h 05", "Elapsed 28:14"; `aria-live="off"` with the absolute time for screen readers), the bar (segments in their tones, faint until reached when styled by progress, the points, the tracker icon at the value) and the actions (Earlier / Next switch the shown choice at once, then `select`; a server action is the pill, `act`; Stop, `DELETE`). A tap on the card follows `open` (a `/path` is that screen in the shell, https a new tab). An ended one with a final shows muted with "Done" and a × until it leaves the list. `GET /api/live` when Now opens, every 20 s while Now is on screen and the tab visible, and when the window comes back (the push is for the phone only); hidden when there is none.
+- **Web** (`static/app-live.js`, its pure part `static/app-live-core.js`, `tests/test_web_live.mjs`; `docs/web-design.md`, "Now"): the **Live** strip on top of Now, one compact card per activity: the Lucide icon on its tone's tint, the title, text and context, the chip, the timer ticking every second in the browser ("Departs in 7:42", "1 h 05", "Elapsed 28:14"; `aria-live="off"` with the absolute time for screen readers), the bar (segments in their tones, faint until reached when styled by progress, the points, the tracker icon at the value) and the actions (Earlier / Next switch the shown choice at once, then `select`; a server action is the pill, `act`; Stop, `DELETE`). A tap on the card follows `open` (a `/path` is that screen in the shell, https a new tab). An ended one with a final shows muted with "Done" and a × until it leaves the list. A card is redrawn when its `rev`, `started_at`, the shown choice or a pending action changes (`signature`). `GET /api/live` when Now opens, every 20 s while Now is on screen and the tab visible, and when the window comes back (the push is for the phone only); hidden when there is none.
 - **Omarchy** (`extensions/omarchy/README.md`): the bar's glyph becomes the soonest running activity's icon with its countdown (else its count-up, else its chip); the Now panel lists them with Earlier / Next / the server actions / Stop. It polls `GET /api/live` with Now, and every 20 s while one is running.

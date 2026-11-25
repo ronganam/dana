@@ -182,4 +182,44 @@ class LiveActivitiesTest {
         assertNull(list[0].progress)
         assertEquals(emptyList<LiveActivity>(), LiveApi.parse("not json"))
     }
+
+    // dismissIsTimeout(): the delete intent at ends_at is Android's timeout, not the user's Stop
+
+    @Test
+    fun dismissNearOrPastEndsAtIsTheTimeout() {
+        val now = 1_000_000L
+        assertTrue(LiveActivities.dismissIsTimeout(now - 5_000, now))
+        assertTrue(LiveActivities.dismissIsTimeout(now, now))
+        assertTrue(LiveActivities.dismissIsTimeout(now + 10_000, now))
+    }
+
+    @Test
+    fun dismissLongBeforeEndsAtOrWithoutOneIsTheUser() {
+        val now = 1_000_000L
+        assertFalse(LiveActivities.dismissIsTimeout(now + 10_001, now))
+        assertFalse(LiveActivities.dismissIsTimeout(now + 3_600_000, now))
+        assertFalse(LiveActivities.dismissIsTimeout(null, now))
+    }
+
+    // intentUri(): every PendingIntent its own data
+
+    @Test
+    fun intentUriEncodesEachPart() {
+        assertEquals("dana-live://rail%3Awatch-12/next/next", LiveActivities.intentUri("rail:watch-12", "next", "next"))
+        assertEquals("dana-live://a%2Fb%20c/server/go%2Fnow", LiveActivities.intentUri("a/b c", "server", "go/now"))
+        assertEquals("dana-live://x%3Ay/dismiss/", LiveActivities.intentUri("x:y", LiveActivities.KIND_DISMISS, ""))
+    }
+
+    @Test
+    fun intentUrisNeverCollide() {
+        val uris = listOf(
+            LiveActivities.intentUri("a:b", "server", "c"),
+            LiveActivities.intentUri("a:b/server", "c", ""),
+            LiveActivities.intentUri("a:b", "server/c", ""),
+            LiveActivities.intentUri("a:b", "open", ""),
+            LiveActivities.intentUri("a:c", "open", ""),
+            LiveActivities.intentUri("a:b", "dismiss", ""),
+        )
+        assertEquals(uris.size, uris.toSet().size)
+    }
 }

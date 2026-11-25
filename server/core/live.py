@@ -21,12 +21,19 @@ one push per user every :data:`LIVE_PUSH_INTERVAL` seconds; a start, an end,
 a new non-empty ``alert`` or a selection change go at once, and a trailing
 push carries the latest of the rest.
 
+An ended activity keeps its row: with a final, listed (ended) for
+:data:`FINAL_KEEP`; without one (or once its final went or was dismissed)
+as a hidden *gone* row (``ended_at`` set, ``final`` NULL) for
+:data:`GONE_KEEP`, so that starting the same key again carries on its
+``rev`` (clients comparing revs see the change) instead of starting at 1.
+
 One loop (:func:`run_loop`, started with the server) ticks every
-:data:`TICK_SECONDS`: it ends activities whose ``ends_at`` passed, deletes
-ended rows kept for their final after :data:`FINAL_KEEP`, calls each addon's
-``@addon.live_refresh`` for its due activities (as their user, only while
-the addon is active for them; a failure is logged and never ends one) and
-sends the trailing pushes. People act through core/live_api.py (:func:`act`,
+:data:`TICK_SECONDS`: it ends activities whose ``ends_at`` passed, drops
+finals after :data:`FINAL_KEEP` and gone rows after :data:`GONE_KEEP`,
+starts each addon's ``@addon.live_refresh`` for its due activities as a
+background task (as their user, only while the addon is active for them;
+never two at once for one activity; a failure is logged and never ends one;
+a slow one never holds up the loop) and sends the trailing pushes. People act through core/live_api.py (:func:`act`,
 :func:`select`, :func:`stop`), which calls the addon's ``@addon.live_action``.
 """
 
@@ -59,7 +66,9 @@ RESERVED_ACTIONS = ("select", "stop")
 LIVE_PUSH_INTERVAL = 10.0
 TICK_SECONDS = 5.0
 FINAL_KEEP = datetime.timedelta(minutes=10)
-HOOK_TIMEOUT = 60.0
+# How long an ended activity's hidden row keeps its rev for a start with the same key.
+GONE_KEEP = datetime.timedelta(days=1)
+HOOK_TIMEOUT = 30.0
 MAX_STATE_BYTES = 16 * 1024
 MAX_TITLE, MAX_TEXT, MAX_CONTEXT, MAX_LABEL, MAX_CHIP, MAX_ALERT = 120, 240, 120, 24, 7, 80
 MAX_ACTIONS, MAX_CHOICES = 3, 8
@@ -529,9 +538,10 @@ def active(user: User) -> List[Current]:
 
 def listed(user: User) -> List[Current]:
     """What ``user``'s clients get: the running activities and the ended ones
-    kept for their final, newest-updated first."""
+    kept for their final, newest-updated first (never the gone rows)."""
     with get_db_connection() as conn:
-        rows = conn.execute("SELECT * FROM live_activities WHERE user_id = ? ORDER BY updated_at DESC",
+        rows = conn.execute("SELECT * FROM live_activities WHERE user_id = ? "
+                            "AND (ended_at IS NULL OR final IS NOT NULL) ORDER BY updated_at DESC",
                             (user.id,)).fetchall()
     return [_current(r) for r in rows]
 
@@ -543,7 +553,8 @@ def payload(user: User) -> Dict[str, Any]:
 
 async def start(user: User, addon: Addon, key: str, activity: Activity) -> Current:
     """Start ``addon``'s live activity ``key`` for ``user`` (replacing one with
-    the same key), pushed at once.
+    the same key), pushed at once. Its ``rev`` carries on from the last one
+    under that key (running, ended or gone), so it always rises.
 
     Raises:
         LiveError: an activity or key Dana refuses.
@@ -616,14 +627,11 @@ async def _end(user: User, addon: str, key: str, final: Optional[Final]) -> bool
     if final is not None:
         _check_final(final)
     now = _db_time(clock.now())
-    with get_db_connection() as conn:
-        if final is None:
-            cur = conn.execute("DELETE FROM live_activities WHERE user_id = ? AND addon = ? AND key = ? "
-                               "AND ended_at IS NULL", (user.id, addon, key))
-        else:
-            cur = conn.execute("UPDATE live_activities SET ended_at = ?, final = ?, rev = rev + 1, updated_at = ?, "
-                               "refresh_at = NULL WHERE user_id = ? AND addon = ? AND key = ? AND ended_at IS NULL",
-                               (now, json.dumps(_final_dict(final), ensure_ascii=False), now, user.id, addon, key))
+    with get_db_connection() as conn:  # without a final the row stays hidden (gone), keeping its rev
+        cur = conn.execute("UPDATE live_activities SET ended_at = ?, final = ?, rev = rev + 1, updated_at = ?, "
+                           "refresh_at = NULL WHERE user_id = ? AND addon = ? AND key = ? AND ended_at IS NULL",
+                           (now, json.dumps(_final_dict(final), ensure_ascii=False) if final is not None else None,
+                            now, user.id, addon, key))
         conn.commit()
     if not cur.rowcount:
         return False
@@ -753,17 +761,20 @@ async def act(user: User, live_id: str, action: str, choice: Optional[str] = Non
 async def stop(user: User, live_id: str) -> bool:
     """The user stopped ``live_id``: it ends (pushed at once), then the
     addon's ``live_action`` gets ``"stop"`` to clean up. An ended one kept for
-    its final is dismissed. False when ``user`` has no such activity."""
+    its final is dismissed (pushed at once, so the other clients drop it).
+    False when ``user`` has no such activity."""
     addon, key = _split(live_id)
     row = _row(user, addon, key, running=False) if addon and key else None
-    if row is None:
+    if row is None or (row["ended_at"] is not None and row["final"] is None):
         return False
     c = _current(row)
     if c.ended_at is not None:
         with get_db_connection() as conn:
-            conn.execute("DELETE FROM live_activities WHERE user_id = ? AND addon = ? AND key = ?",
-                         (user.id, addon, key))
+            conn.execute("UPDATE live_activities SET final = NULL, rev = rev + 1, updated_at = ? WHERE user_id = ? "
+                         "AND addon = ? AND key = ? AND final IS NOT NULL",
+                         (_db_time(clock.now()), user.id, addon, key))
             conn.commit()
+        _queue_push(user, urgent=True)
         return True
     await _end(user, addon, key, None)
     await _call(user, "live_action", c, "stop", c.selected)
@@ -802,9 +813,9 @@ async def _push(user: User) -> None:
 
 
 async def drain() -> None:
-    """Wait for the pushes under way (tests)."""
-    while _tasks:
-        await asyncio.gather(*list(_tasks), return_exceptions=True)
+    """Wait for the pushes and the refreshes under way, and the pushes they queue (tests)."""
+    while _tasks or _inflight:
+        await asyncio.gather(*list(_tasks), *list(_inflight.values()), return_exceptions=True)
 
 
 def _flush() -> int:
@@ -833,59 +844,82 @@ async def _expire(now: datetime.datetime) -> int:
 
 
 def _purge(now: datetime.datetime) -> int:
+    """Finals older than FINAL_KEEP leave the list (their rows stay, gone); gone
+    rows older than GONE_KEEP are deleted. How many finals left."""
     with get_db_connection() as conn:
-        # scoped: server-wide retention of ended activities kept for their final (FINAL_KEEP)
-        cur = conn.execute("DELETE FROM live_activities WHERE ended_at IS NOT NULL AND ended_at <= ?",
-                           (_db_time(now - FINAL_KEEP),))
+        # scoped: server-wide retention of ended activities (FINAL_KEEP listed, GONE_KEEP for their rev)
+        cur = conn.execute("UPDATE live_activities SET final = NULL WHERE ended_at IS NOT NULL "
+                           "AND final IS NOT NULL AND ended_at <= ?", (_db_time(now - FINAL_KEEP),))
+        # scoped: server-wide retention of the gone rows kept for their rev (GONE_KEEP)
+        conn.execute("DELETE FROM live_activities WHERE ended_at IS NOT NULL AND final IS NULL AND ended_at <= ?",
+                     (_db_time(now - GONE_KEEP),))
         conn.commit()
     return cur.rowcount
 
 
-async def _refresh(user: User, c: Current, now: datetime.datetime) -> bool:
-    """One due ``live_refresh``: marked first (a slow or failing one is not
-    called again at once), then its answer applied. Whether it ran."""
-    with get_db_connection() as conn:
-        conn.execute("UPDATE live_activities SET refreshed_at = ?, refresh_at = ? WHERE user_id = ? AND addon = ? "
-                     "AND key = ? AND ended_at IS NULL",
-                     (_db_time(now), _next_refresh(c.addon, c.activity, now), user.id, c.addon, c.key))
-        conn.commit()
-    ran, result = await _call(user, "live_refresh", c)
-    if ran:
-        await _apply(user, c, result, "live_refresh")
-    return ran
+# The refreshes under way, by (user id, addon, key): never two at once for one activity.
+_inflight: Dict[Tuple[str, str, str], "asyncio.Task[None]"] = {}
 
 
-async def _refresh_due(now: datetime.datetime) -> int:
+async def _refresh(user: User, c: Current) -> None:
+    """One due ``live_refresh``, in a task of its own: its answer applied."""
+    try:
+        ran, result = await _call(user, "live_refresh", c)
+        if ran:
+            await _apply(user, c, result, "live_refresh")
+    except asyncio.CancelledError:
+        raise
+    except Exception:
+        logger.exception(f"A live refresh of {c.addon} failed for user {user.id} ({c.key})")
+
+
+def _refresh_due(now: datetime.datetime) -> int:
+    """Start the due ``live_refresh`` calls as background tasks, each marked
+    first (a slow or failing one is not called again at once) and skipped
+    while the last one for that activity is still running. How many started."""
     with get_db_connection() as conn:
         # scoped: the server-wide refresh pass; each row's hook runs as its own user below
         rows = conn.execute("SELECT * FROM live_activities WHERE ended_at IS NULL AND refresh_at IS NOT NULL "
                             "AND refresh_at <= ? ORDER BY refresh_at", (_db_time(now),)).fetchall()
-    calls = []
+    started = 0
+    loop = asyncio.get_running_loop()
     for r in rows:
+        k = (r["user_id"], r["addon"], r["key"])
         user = users.get(r["user_id"])
-        if user is not None:
-            calls.append(_refresh(user, _current(r), now))
-    done = await asyncio.gather(*calls, return_exceptions=True)
-    for d in done:
-        if isinstance(d, BaseException):
-            logger.error(f"A live refresh failed: {d!r}")
-    return sum(1 for d in done if d is True)
+        if k in _inflight or user is None:
+            continue
+        c = _current(r)
+        with get_db_connection() as conn:
+            conn.execute("UPDATE live_activities SET refreshed_at = ?, refresh_at = ? WHERE user_id = ? "
+                         "AND addon = ? AND key = ? AND ended_at IS NULL",
+                         (_db_time(now), _next_refresh(c.addon, c.activity, now), user.id, c.addon, c.key))
+            conn.commit()
+        task = loop.create_task(_refresh(user, c), name=f"live-refresh-{c.addon}-{user.id}")
+        _inflight[k] = task
+        task.add_done_callback(lambda t, k=k: _inflight.pop(k) if _inflight.get(k) is t else None)
+        started += 1
+    return started
 
 
 async def tick() -> Dict[str, int]:
-    """One pass of the loop: expire, purge, refresh what is due, trailing pushes."""
+    """One pass of the loop: expire, purge, start the due refreshes (not
+    awaited: :func:`drain` waits for them), trailing pushes."""
     now = clock.now()
-    return {"expired": await _expire(now), "purged": _purge(now), "refreshed": await _refresh_due(now),
+    return {"expired": await _expire(now), "purged": _purge(now), "refreshed": _refresh_due(now),
             "pushed": _flush()}
 
 
 async def run_loop() -> None:
     """Tick every :data:`TICK_SECONDS` for as long as the server runs (core/server.py)."""
-    while True:
-        try:
-            await tick()
-        except asyncio.CancelledError:
-            raise
-        except Exception:
-            logger.exception("Live activities: a pass failed; the loop goes on")
-        await asyncio.sleep(TICK_SECONDS)
+    try:
+        while True:
+            try:
+                await tick()
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("Live activities: a pass failed; the loop goes on")
+            await asyncio.sleep(TICK_SECONDS)
+    finally:  # the server is stopping: the refreshes under way stop with it
+        for task in list(_inflight.values()):
+            task.cancel()

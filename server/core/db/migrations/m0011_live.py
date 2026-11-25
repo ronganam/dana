@@ -5,7 +5,9 @@ activity as JSON (what the addon gave), ``selected`` the choice the user is on,
 pushed. ``refreshed_at`` is when the addon's ``live_refresh`` last ran (or the
 start), ``refresh_at`` when it is due next (NULL: never), ``ends_at`` when the
 activity expires by itself. An ended activity with a ``final`` keeps its row
-(``ended_at`` set) for a few minutes; one without is deleted at once. Times
+(``ended_at`` set) listed for a few minutes; one without (or past its final)
+stays hidden (``final`` NULL) for a day so a new start under the same key
+carries on its ``rev`` (core/live.py), then is deleted. Times
 are UTC ISO 8601 with microseconds, so they compare as text. Removing the user
 removes their rows (``ON DELETE CASCADE``)."""
 

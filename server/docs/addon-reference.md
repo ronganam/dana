@@ -860,8 +860,10 @@ only while the addon is active for them, when it is due: at the
 activity's `refresh_at` when it set one later than the last call, else
 `every` seconds (at least 5) after the last call or the start. An
 `Activity` updates it (one that changes nothing on the wire is
-dropped), `live.END` ends it, None leaves it as it is. A failure is
-logged and never ends it. One per addon.
+dropped), `live.END` ends it, None leaves it as it is. A failure (or
+a call over 30 s) is logged and never ends it; each call runs on its
+own, never two at once for one activity, so a slow one holds up no
+other. One per addon.
 
 From [`examples/addons/showcase/watering.py`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/watering.py):
 

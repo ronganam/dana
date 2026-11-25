@@ -285,6 +285,7 @@ async def live_activity() -> None:
     later = current.activity.countdown.to + datetime.timedelta(seconds=1)
     with patch.object(clock, "now", lambda: later):
         await live.tick()
+        await live.drain()  # the refresh runs in the background
     watered = plants.plant(GAL, basil["id"])["last_watered"]
     check("live_refresh: once the countdown is over the plant is watered and the activity ended",
           live.active(GAL) == [] and watered and datetime.datetime.fromisoformat(watered) >= later

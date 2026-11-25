@@ -148,9 +148,10 @@ check("the ended card: muted class, Done, the final's text, a labelled dismiss, 
       doneHtml.includes("lv-card lv-tone-good ended") && doneHtml.includes(">Done<") && doneHtml.includes("All 42 tests pass")
       && doneHtml.includes('aria-label="Dismiss Done · Fix the parser"') && !doneHtml.includes("lv-timer") && !doneHtml.includes("lv-bar"));
 check("the chip shows on a running one", L.cardHtml({ ...agent, ended: false, final: undefined }, { now }).includes('<span class="lv-chip">3/7</span>'));
-check("the signature changes with the rev, the pick and busy actions, not the clock",
+check("the signature changes with the rev, the start, the pick and busy actions, not the clock",
       L.signature(rail, "", null) === L.signature(rail, "", null) && L.signature(rail, "406", null) !== L.signature(rail, "", null)
-      && L.signature({ ...rail, rev: 5 }, "", null) !== L.signature(rail, "", null) && L.signature(rail, "", new Set(["x"])) !== L.signature(rail, "", null));
+      && L.signature({ ...rail, rev: 5 }, "", null) !== L.signature(rail, "", null) && L.signature(rail, "", new Set(["x"])) !== L.signature(rail, "", null)
+      && L.signature({ ...rail, started_at: "2026-11-25T18:00:00+02:00" }, "", null) !== L.signature(rail, "", null));
 
 // --- The shell wiring ------------------------------------------------------------------------------
 const index = fs.readFileSync(path.join(SERVER, "static/index.html"), "utf8");

@@ -52,7 +52,11 @@ import java.io.IOException
  * Buttons go to [LiveActivityReceiver]: `next` / `prev` switch the choice
  * here at once (from the cached payload) and tell the server after (kept
  * and sent again with the next push while offline), `server` actions are
- * answered with the new activity, `stop` and swiping it away end it.
+ * answered with the new activity, `stop` and swiping it away end it. The
+ * delete intent also fires when Android times one out at its `ends_at`
+ * (`setTimeoutAfter`): that one is only forgotten here ([dismissIsTimeout]),
+ * the server ends it itself. Every intent carries its own data URI
+ * ([intentUri]) so no two ever match one another, whatever their request codes.
  */
 object LiveActivities {
     private const val TAG = "LiveActivities"
@@ -65,8 +69,11 @@ object LiveActivities {
     const val EXTRA_ID = "live_id"
     const val EXTRA_ACTION = "live_action"
     const val EXTRA_KIND = "live_kind"
-    /** [EXTRA_KIND] of the delete intent (the user swiped it away). */
+    /** [EXTRA_KIND] of the delete intent (the user swiped it away, or Android timed it out). */
     const val KIND_DISMISS = "dismiss"
+    /** A delete intent this close to (or past) the activity's `ends_at` is its timeout, not the user. */
+    const val TIMEOUT_SLACK_MS = 10_000L
+    private const val URI_SCHEME = "dana-live"
 
     /** The cache, prefs and the shade change together. */
     private val lock = Any()
@@ -198,6 +205,19 @@ object LiveActivities {
         else -> Open.Home
     }
 
+    /**
+     * Whether a delete intent for an activity ending at [endsAtMs] is Android's
+     * `setTimeoutAfter` expiry (it passed, or is within [TIMEOUT_SLACK_MS]) rather
+     * than the user swiping it away. Nothing to end on the server then.
+     */
+    fun dismissIsTimeout(endsAtMs: Long?, nowMs: Long): Boolean = endsAtMs != null && endsAtMs - nowMs <= TIMEOUT_SLACK_MS
+
+    /** The data URI that makes a PendingIntent of activity [id] unique: `dana-live://<id>/<kind>/<action>`, each part URL-encoded. */
+    fun intentUri(id: String, kind: String, action: String): String =
+        "$URI_SCHEME://${enc(id)}/${enc(kind)}/${enc(action)}"
+
+    private fun enc(part: String): String = java.net.URLEncoder.encode(part, Charsets.UTF_8.name()).replace("+", "%20")
+
     /** Make the shade match the pushed list (`data.activities`), then send selections made offline. */
     suspend fun show(context: Context, data: JsonObject) {
         val pending = loadPending(context)
@@ -272,6 +292,17 @@ object LiveActivities {
         }
     }
 
+    /** The delete intent: Android's timeout at `ends_at` is only forgotten here; the user's swipe stops it. */
+    internal suspend fun dismissed(context: Context, id: String) {
+        val a = cached(context, id)
+        if (a != null && dismissIsTimeout(a.endsAtMs, System.currentTimeMillis())) {
+            replace(context, id, null)
+            dropPending(context, id, null)
+        } else {
+            stop(context, id)
+        }
+    }
+
     /** `stop` (cancelled first) or swiped away: end it here and on the server. */
     internal suspend fun stop(context: Context, id: String) {
         replace(context, id, null)
@@ -336,12 +367,14 @@ object LiveActivities {
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra(EXTRA_OPEN_SCREEN, target.route)
             Open.Home -> Intent(context, MainActivity::class.java)
         }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        if (intent.data == null) intent.data = intentUri(id, "open", "").toUri()  // a web tap's data is its page
         return PendingIntent.getActivity(context, "$id/open".hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
     }
 
     private fun broadcast(context: Context, id: String, action: String, kind: String): PendingIntent {
         val intent = Intent(context, LiveActivityReceiver::class.java).setAction(ACTION)
+            .setData(intentUri(id, kind, action).toUri())
             .putExtra(EXTRA_ID, id).putExtra(EXTRA_ACTION, action).putExtra(EXTRA_KIND, kind)
         return PendingIntent.getBroadcast(context, "$id/$kind/$action".hashCode(), intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
@@ -467,7 +500,8 @@ class LiveActivityReceiver : BroadcastReceiver() {
                 when (kind) {
                     "next" -> LiveActivities.step(context, id, 1)
                     "prev" -> LiveActivities.step(context, id, -1)
-                    "stop", LiveActivities.KIND_DISMISS -> LiveActivities.stop(context, id)
+                    "stop" -> LiveActivities.stop(context, id)
+                    LiveActivities.KIND_DISMISS -> LiveActivities.dismissed(context, id)
                     else -> LiveActivities.act(context, id, action)
                 }
             } catch (e: Exception) {
