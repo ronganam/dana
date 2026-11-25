@@ -1,7 +1,7 @@
 {
  "catalog_admin": {
   "body": {
-   "dana_version": "10.4.0",
+   "dana_version": "10.5.0",
    "entries": [
     {
      "author": "Someone",
@@ -1537,8 +1537,9 @@
      ],
      "features": [
       "Spending, income and balances in chat and on the Money page",
-      "Subscriptions, card bills and your balance ahead",
-      "Ways to save and spending worth watching"
+      "Where your money went, what is left until payday and what you pay for",
+      "Subscriptions, card bills, your balance ahead and \"can I afford it?\"",
+      "A few alerts worth acting on, and one way to save each month"
      ],
      "icon": "wallet",
      "name": "money",
@@ -1555,7 +1556,22 @@
       "Money"
      ],
      "requires": null,
-     "settings": [],
+     "settings": [
+      {
+       "can_change": true,
+       "default": "all",
+       "description": "Which money alerts reach your phone (or Telegram)",
+       "help": "all, off, or the ones to keep, comma separated: low_balance, unusual, salary, renewal, card_bill, move (this month's way to save)",
+       "label": "Money alerts",
+       "name": "alerts",
+       "placeholder": "all",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": "all",
+       "why_not": null
+      }
+     ],
      "setup": [
       "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
       "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
@@ -2840,8 +2856,9 @@
      ],
      "features": [
       "Spending, income and balances in chat and on the Money page",
-      "Subscriptions, card bills and your balance ahead",
-      "Ways to save and spending worth watching"
+      "Where your money went, what is left until payday and what you pay for",
+      "Subscriptions, card bills, your balance ahead and \"can I afford it?\"",
+      "A few alerts worth acting on, and one way to save each month"
      ],
      "icon": "wallet",
      "name": "money",
@@ -2858,7 +2875,22 @@
       "Money"
      ],
      "requires": null,
-     "settings": [],
+     "settings": [
+      {
+       "can_change": true,
+       "default": "all",
+       "description": "Which money alerts reach your phone (or Telegram)",
+       "help": "all, off, or the ones to keep, comma separated: low_balance, unusual, salary, renewal, card_bill, move (this month's way to save)",
+       "label": "Money alerts",
+       "name": "alerts",
+       "placeholder": "all",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": "all",
+       "why_not": null
+      }
+     ],
      "setup": [
       "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
       "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
@@ -4101,8 +4133,9 @@
      ],
      "features": [
       "Spending, income and balances in chat and on the Money page",
-      "Subscriptions, card bills and your balance ahead",
-      "Ways to save and spending worth watching"
+      "Where your money went, what is left until payday and what you pay for",
+      "Subscriptions, card bills, your balance ahead and \"can I afford it?\"",
+      "A few alerts worth acting on, and one way to save each month"
      ],
      "icon": "wallet",
      "name": "money",
@@ -4119,7 +4152,22 @@
       "Money"
      ],
      "requires": null,
-     "settings": [],
+     "settings": [
+      {
+       "can_change": true,
+       "default": "all",
+       "description": "Which money alerts reach your phone (or Telegram)",
+       "help": "all, off, or the ones to keep, comma separated: low_balance, unusual, salary, renewal, card_bill, move (this month's way to save)",
+       "label": "Money alerts",
+       "name": "alerts",
+       "placeholder": "all",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": "all",
+       "why_not": null
+      }
+     ],
      "setup": [
       "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
       "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
@@ -5349,8 +5397,9 @@
      ],
      "features": [
       "Spending, income and balances in chat and on the Money page",
-      "Subscriptions, card bills and your balance ahead",
-      "Ways to save and spending worth watching"
+      "Where your money went, what is left until payday and what you pay for",
+      "Subscriptions, card bills, your balance ahead and \"can I afford it?\"",
+      "A few alerts worth acting on, and one way to save each month"
      ],
      "icon": "wallet",
      "name": "money",
@@ -5367,7 +5416,22 @@
       "Money"
      ],
      "requires": null,
-     "settings": [],
+     "settings": [
+      {
+       "can_change": true,
+       "default": "all",
+       "description": "Which money alerts reach your phone (or Telegram)",
+       "help": "all, off, or the ones to keep, comma separated: low_balance, unusual, salary, renewal, card_bill, move (this month's way to save)",
+       "label": "Money alerts",
+       "name": "alerts",
+       "placeholder": "all",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": "all",
+       "why_not": null
+      }
+     ],
      "setup": [
       "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
       "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
@@ -6600,8 +6664,9 @@
      ],
      "features": [
       "Spending, income and balances in chat and on the Money page",
-      "Subscriptions, card bills and your balance ahead",
-      "Ways to save and spending worth watching"
+      "Where your money went, what is left until payday and what you pay for",
+      "Subscriptions, card bills, your balance ahead and \"can I afford it?\"",
+      "A few alerts worth acting on, and one way to save each month"
      ],
      "icon": "wallet",
      "name": "money",
@@ -6618,7 +6683,22 @@
       "Money"
      ],
      "requires": null,
-     "settings": [],
+     "settings": [
+      {
+       "can_change": true,
+       "default": "all",
+       "description": "Which money alerts reach your phone (or Telegram)",
+       "help": "all, off, or the ones to keep, comma separated: low_balance, unusual, salary, renewal, card_bill, move (this month's way to save)",
+       "label": "Money alerts",
+       "name": "alerts",
+       "placeholder": "all",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": "all",
+       "why_not": null
+      }
+     ],
      "setup": [
       "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
       "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."
@@ -7839,8 +7919,9 @@
      ],
      "features": [
       "Spending, income and balances in chat and on the Money page",
-      "Subscriptions, card bills and your balance ahead",
-      "Ways to save and spending worth watching"
+      "Where your money went, what is left until payday and what you pay for",
+      "Subscriptions, card bills, your balance ahead and \"can I afford it?\"",
+      "A few alerts worth acting on, and one way to save each month"
      ],
      "icon": "wallet",
      "name": "money",
@@ -7857,7 +7938,22 @@
       "Money"
      ],
      "requires": null,
-     "settings": [],
+     "settings": [
+      {
+       "can_change": true,
+       "default": "all",
+       "description": "Which money alerts reach your phone (or Telegram)",
+       "help": "all, off, or the ones to keep, comma separated: low_balance, unusual, salary, renewal, card_bill, move (this month's way to save)",
+       "label": "Money alerts",
+       "name": "alerts",
+       "placeholder": "all",
+       "rule": null,
+       "type": "text",
+       "url": null,
+       "value": "all",
+       "why_not": null
+      }
+     ],
      "setup": [
       "On the Money page, import a statement file (CSV, OFX or QIF) your bank or card company lets you download, into an account of yours.",
       "Or install a provider addon for your banks from the catalog (an admin), turn it on, and add your logins on the Money page: they then sync by themselves."

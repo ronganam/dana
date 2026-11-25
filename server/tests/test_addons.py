@@ -108,12 +108,13 @@ def test_discovery():
           str([k.name for k in all_addons()]))
     check("discovery: the loader's order is the order", list(loader.loaded()) == EXPECTED_ORDER)
     tools = all_tools()
-    check("discovery: 103 tools", len(tools) == 103, str(len(tools)))
+    check("discovery: 105 tools", len(tools) == 105, str(len(tools)))
     check("discovery: tool names unique", len({t.name for t in tools}) == len(tools))
     check("discovery: cameras (no tools) has none, every other addon has some",
           not get_addon("cameras").tools and all(get_addon(k).tools for k in EXPECTED_ORDER if k != "cameras"))
     check("discovery: money tools", [t.name for t in get_addon("money").tools]
-          == ["money_summary", "search_transactions", "money_overview", "recurring_charges", "money_forecast",
+          == ["money_summary", "search_transactions", "money_overview", "recurring_charges", "money_flow", "can_i_afford",
+              "money_forecast",
               "money_insights", "meal_card", "investment_portfolio", "categorize_transaction", "sync_money", "saving_opportunities",
               "update_saving"], [t.name for t in get_addon("money").tools])
     check("discovery: core tools", [t.name for t in get_addon("essentials").tools]

@@ -1,21 +1,24 @@
 /* Money — bank and card transactions, investment accounts (docs/money.md "Money tab"), the money addon's
- * page. The pure part is money-core.js; the Overview / Spending / Cash flow / Save / Investments views are
- * drawn by money-dash.js (DanaMoneyDash); both load first (Dana.panel `scripts`).
+ * page. The pure part is money-core.js; the Overview / Where it went / Plan / Save / Investments / Meal card
+ * views are drawn by money-dash.js (DanaMoneyDash); both load first (Dana.panel `scripts`).
  *
- * Views: Overview · Spending · Cash flow · Save · Investments (only with an investment account) ·
- * Transactions; the header's month switcher hides on Save and Investments (not tied to a month). Each view
- * loads what it shows (cached per URL; a change elsewhere refetches the view on screen and marks the rest
- * stale):
- *   GET    /api/money/overview?month=           tiles, banners, sources' states (every view)
+ * Views: Overview · Where it went · Plan · Save · Investments (only with an investment account) · Meal card
+ * (only with a meal card) · Transactions; the header's month switcher hides on Plan, Save, Investments and
+ * Meal card (not tied to a month). Each view loads what it shows (cached per URL; a change elsewhere
+ * refetches the view on screen and marks the rest stale):
+ *   GET    /api/money/overview?month=           tiles (left until payday), banners, sources' states (every view)
  *   GET    /api/money/categories?period=        the category taxonomy (the picker, labels)
  *   GET    /api/money/insights?month=           Overview: insight cards
  *   GET    /api/money/pace?month=               Overview: everyday pace
- *   GET    /api/money/balance?days=90|180|365   Overview: coming up · Cash flow: bank balance, plans
- *   GET    /api/money/cashflow?n=12&end=        Overview: typical net · Cash flow: in / out
- *   GET    /api/money/trends?month=             Spending: where it went, movers, big purchases, Everyday bars
- *   GET    /api/money/months?n=12               Spending: the Everything bars
- *   GET    /api/money/merchants?period=YYYY-MM  Spending: top merchants
- *   GET    /api/money/recurring                 Cash flow: fixed costs and regular income
+ *   GET    /api/money/balance?days=90|180|365   Overview: coming up · Plan: bank balance, installment plans
+ *   GET    /api/money/cashflow?n=12&end=        Overview: typical net · Where it went: month by month
+ *   GET    /api/money/flow?period=&by=          Where it went: the Flow chart (the month, a pay cycle, a year; by kind / account)
+ *   GET    /api/money/trends?month=             Where it went: by group, movers, big purchases, Everyday bars
+ *   GET    /api/money/months?n=12               Where it went: the Everything bars
+ *   GET    /api/money/merchants?period=YYYY-MM  Where it went: top merchants
+ *   GET    /api/money/bills                     Plan: what you pay for (each item's way to save)
+ *   GET    /api/money/afford?amount=&payments=&date=&on=&label=   Plan: "Can I afford it?" (when asked) · 409 no_balance
+ *   GET    /api/money/recurring                 Plan: regular income
  *   GET    /api/money/portfolio?days=365        Investments: value, history, allocation, holdings, activity
  *   GET    /api/money/savings                   Save: totals, ways to save, spending to watch
  *   GET    /api/money/savings/{key}             one item: polled every 3 s (up to 90 s) while its price check runs
@@ -36,7 +39,8 @@
  *   POST   /api/chat/context {kind: "transaction", id}   "Ask Dana"
  *
  * Registered with Dana.panel (static/dana.js): the shell shows it only to a user with `money` on. The page's
- * state (view, month, filters, the accounts view) lives in the hash: #money/spending?month=2026-10&category=food.
+ * state (view, month, filters, the accounts view) lives in the hash: #money/spending?month=2026-10&category=food
+ * (an old #money/cashflow opens Plan).
  * Login details go only into the add / update request bodies: never the URL, the console or storage.
  */
 (() => {
@@ -68,13 +72,19 @@
     // flight, a price check's last answer in words, the running polls, collapsed sections.
     saveOpen: null, saveTarget: null, saveDraft: {}, saveTargetError: "", saveBusy: {}, checkNote: {}, savePolls: {}, pollGaveUp: new Set(), saveKeys: false,
     saveCollapsed: new Set(),
+    // Where it went: the Flow's period ("month" = the page's month, or a period name) and split, the kind or
+    // account highlighted. Overview: the payday breakdown open. Plan: collapsed bill sections, the afford form
+    // (what is typed, the request in flight, its answer or error).
+    flowPeriod: "month", flowBy: "kind", flowHi: null, paydayOpen: false, billsCollapsed: new Set(),
+    afford: { amount: "", payments: "1", date: "", on: "card", label: "", busy: false, result: null, resultLabel: "", error: "", query: "" },
+    errs: {},            // name → {url, text}: the last fetch of that URL failed (the view says so instead of a skeleton)
     cursor: null, fastUntil: 0,
     sheet: null,
     codeDrafts: {}, codeBusy: {}, codeError: {}, codeSent: {},
     syncBusy: {},
     importAccts: null,   // GET /api/money/import/accounts
   };
-  let txSeq = 0, detailSeq = 0, importSeq = 0;
+  let txSeq = 0, detailSeq = 0, importSeq = 0, affordSeq = 0;
   const fetchSeq = {};
   let pollTimer = null, tickTimer = null, searchTimer = null, toastTimer = null;
 
@@ -152,6 +162,8 @@
     balance: () => `/api/money/balance?days=${S.horizon}`,
     cashflow: () => `/api/money/cashflow?n=12&end=${S.month}`,
     trends: () => `/api/money/trends?month=${S.month}`,
+    flow: () => `/api/money/flow?${C.flowQuery(S.flowPeriod, S.month, S.flowBy)}`,
+    bills: () => "/api/money/bills",
     months: () => `/api/money/months?n=12&end=${S.month}`,
     merchants: () => `/api/money/merchants?period=${S.month}&limit=12`,
     recurring: () => "/api/money/recurring",
@@ -160,8 +172,8 @@
     savings: () => "/api/money/savings",
   };
   const VIEW_NEEDS = {
-    overview: ["insights", "pace", "cashflow"], spending: ["trends", "months", "merchants"],
-    cashflow: ["cashflow", "balance", "recurring"], save: ["savings"], investments: ["portfolio"], meals: ["meals"], transactions: [],
+    overview: ["insights", "pace", "cashflow"], spending: ["flow", "trends", "months", "merchants", "cashflow"],
+    plan: ["bills", "balance", "recurring"], save: ["savings"], investments: ["portfolio"], meals: ["meals"], transactions: [],
   };
   function wanted() {
     const names = ["overview", "sources", "categories", ...VIEW_NEEDS[S.tab]];
@@ -172,6 +184,11 @@
     const e = S.d[name];
     return e && e.url === URLS[name]() ? e.body : null;
   }
+  /** The error in words when the last fetch of `name`'s current URL failed (not while a newer one runs). */
+  function failed(name) {
+    const e = S.errs[name];
+    return e && e.url === URLS[name]() && !got(name) ? e.text : "";
+  }
   let D = null;          // the dashboard views (money-dash.js), made in start
 
   async function fetchOne(name) {
@@ -181,10 +198,11 @@
     if (fetchSeq[name] !== mine) return null;  // a newer fetch of it is on its way
     if (r.status === 200) {
       S.d[name] = { url, body: r.body };
+      delete S.errs[name];
       S.stale.delete(name);
       if (name === "sources") S.sources = r.body.sources;
       if (name === "categories") S.taxonomy = r.body.taxonomy;
-    }
+    } else if (!(r.status === 403 && r.body && r.body.error === "not_connected")) S.errs[name] = { url, text: C.errorText(r.status, r.body) };
     return r;
   }
 
@@ -268,6 +286,7 @@
     if (S.tab === "transactions") loadTxns({ keep: true });
     else S.txDirty = true;
     if (S.openId) loadDetail(S.openId);
+    if (S.afford.query && S.afford.result) runAfford(S.afford.query, S.afford.resultLabel, true);
   }
 
   // ---------- live ----------
@@ -315,6 +334,7 @@
     if (S.sheet && S.sheet.type === "detail") S.sheet = null;
     S.openId = null; S.detail = null;
     S.expanded.clear(); S.openBills.clear();
+    S.flowPeriod = "month"; S.flowHi = null; S.paydayOpen = false;
     S.txns = []; S.next = null; S.txLoaded = false; S.txDirty = true;
     syncHash();
     render();
@@ -329,7 +349,8 @@
   }
   /** One of the views (C.TABS). `anchor`: an element id to scroll to once it is drawn. */
   function setTab(tab, { anchor = null } = {}) {
-    if (!C.TABS.includes(tab)) return;
+    tab = C.tabOf(tab);
+    if (!tab) return;
     const same = tab === S.tab;
     S.tab = tab;
     syncHash();
@@ -356,11 +377,40 @@
     renderView();
     loadPage();
   }
+  /** The Flow chart's period (C.flowPeriods' key) or split (kind | account): a new chart, skeleton first. */
+  function setFlow(patch) {
+    const next = { period: S.flowPeriod, by: S.flowBy, ...patch };
+    if (next.period === S.flowPeriod && next.by === S.flowBy) return;
+    S.flowPeriod = next.period; S.flowBy = next.by; S.flowHi = null;
+    renderView();
+    loadPage();
+  }
+  /** "Can I afford it?": the form's answer (GET afford), its words drawn by money-dash.js. `quiet`: a refetch
+   *  after a change elsewhere, which keeps the last answer on screen meanwhile. */
+  async function runAfford(query, label, quiet = false) {
+    const mine = ++affordSeq;
+    Object.assign(S.afford, { busy: !quiet, error: quiet ? S.afford.error : "", query });
+    if (!quiet) renderPlan();
+    const r = await request("GET", `/api/money/afford?${query}`);
+    if (mine !== affordSeq) return;
+    S.afford.busy = false;
+    if (r.status === 200) Object.assign(S.afford, { result: r.body, resultLabel: label, error: "" });
+    else Object.assign(S.afford, { result: null, error: C.affordError(r.status, r.body) });
+    renderPlan();
+  }
+  /** Plan redrawn keeping what is typed in the form. */
+  function renderPlan() { if (S.tab === "plan" && S.view === "page") { keepFocus(() => renderView()); } }
+  /** A bill's "Ways to save": that item opened in the Save view. */
+  function openSaving(key) {
+    S.saveOpen = key;
+    setTab("save");
+    setTimeout(() => { S.saveKeys = true; focusSaving(key); }, 80);
+  }
   /** An insight's link: a view, with a category to focus Spending on or a transaction to open. */
   function followLink(view, category, id) {
     if (category) S.f = C.cleanFilters({ ...S.f, category, all: false });
     if (id) { openTxn(id); return; }
-    setTab(view || "overview");
+    setTab(C.tabOf(view) || "overview");
   }
   /** A transaction from a dashboard view: the Transactions view's pane on a wide screen, a sheet in place on a narrow one. */
   function openTxn(id) {
@@ -416,7 +466,7 @@
             `<button role="tab" data-tab-go="${t}" id="mny-tab-${t}" aria-controls="mny-view-${t}">${esc(C.TAB_LABELS[t])}</button>`).join("")}</nav>
           <div class="mny-view" id="mny-view-overview" role="tabpanel" aria-labelledby="mny-tab-overview"></div>
           <div class="mny-view" id="mny-view-spending" role="tabpanel" aria-labelledby="mny-tab-spending"></div>
-          <div class="mny-view" id="mny-view-cashflow" role="tabpanel" aria-labelledby="mny-tab-cashflow"></div>
+          <div class="mny-view" id="mny-view-plan" role="tabpanel" aria-labelledby="mny-tab-plan"></div>
           <div class="mny-view" id="mny-view-save" role="tabpanel" aria-labelledby="mny-tab-save"></div>
           <div class="mny-view" id="mny-view-investments" role="tabpanel" aria-labelledby="mny-tab-investments"></div>
           <div class="mny-view" id="mny-view-meals" role="tabpanel" aria-labelledby="mny-tab-meals"></div>
@@ -493,7 +543,7 @@
     const el = $(`mny-view-${S.tab}`);
     if (S.tab === "overview") D.overview(el);
     else if (S.tab === "spending") D.spending(el);
-    else if (S.tab === "cashflow") D.cashflow(el);
+    else if (S.tab === "plan") keepFocus(() => D.plan(el));
     else if (S.tab === "investments") D.investments(el);
     else if (S.tab === "meals") D.meals(el);
     else if (S.tab === "save") { keepFocus(() => D.save(el)); watchChecks(); }
@@ -1468,7 +1518,12 @@
     if ((n = t.closest("[data-tab-go]"))) { setTab(n.dataset.tabGo); return; }
     if ((n = t.closest("[data-go]"))) { setTab(n.dataset.go, { anchor: n.dataset.anchor || null }); return; }
     if ((n = t.closest("[data-link-view]"))) { followLink(n.dataset.linkView, n.dataset.linkCategory || "", n.dataset.linkId || ""); return; }
-    if ((n = t.closest("[data-focus]"))) { setFilter({ category: n.dataset.focus, all: false }); return; }
+    if ((n = t.closest("[data-focus]"))) {
+      const flowNode = n.closest("[data-fl-node]") ? n.dataset.flNode : null;
+      setFilter({ category: n.dataset.focus, all: false });
+      if (flowNode != null) document.querySelector(`#mny-fl-wrap [data-fl-node="${flowNode}"]`)?.focus({ preventScroll: true });
+      return;
+    }
     if ((n = t.closest("[data-expand]"))) {
       const k = n.dataset.expand;
       if (S.expanded.has(k)) S.expanded.delete(k); else S.expanded.add(k);
@@ -1482,6 +1537,35 @@
       return;
     }
     if ((n = t.closest("[data-horizon]"))) { setHorizon(Number(n.dataset.horizon)); return; }
+    if ((n = t.closest("[data-payday-toggle]"))) {
+      S.paydayOpen = !S.paydayOpen;
+      renderView();
+      document.querySelector("#mny-view-overview [data-payday-toggle]")?.focus({ preventScroll: true });
+      return;
+    }
+    if ((n = t.closest("[data-flow-period]"))) { setFlow({ period: n.dataset.flowPeriod }); return; }
+    if ((n = t.closest("[data-flow-by]"))) { setFlow({ by: n.dataset.flowBy }); return; }
+    if ((n = t.closest("[data-flow-hi]"))) {
+      const k = n.dataset.flowHi;
+      S.flowHi = S.flowHi === k ? null : k;
+      D.drawFlow(); icons();
+      document.querySelector(`#mny-fl-wrap [data-flow-hi="${CSS.escape(k)}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    if ((n = t.closest("[data-bills-section]"))) {
+      const k = n.dataset.billsSection;
+      if (S.billsCollapsed.has(k)) S.billsCollapsed.delete(k); else S.billsCollapsed.add(k);
+      renderView();
+      document.querySelector(`#mny-view-plan [data-bills-section="${CSS.escape(k)}"]`)?.focus({ preventScroll: true });
+      return;
+    }
+    if ((n = t.closest("[data-save-open]"))) { openSaving(n.dataset.saveOpen); return; }
+    if ((n = t.closest("[data-afford-on]"))) {
+      S.afford.on = n.dataset.affordOn;
+      renderPlan();
+      document.querySelector(`#mny-view-plan [data-afford-on="${n.dataset.affordOn}"]`)?.focus({ preventScroll: true });
+      return;
+    }
     if ((n = t.closest("[data-inv-range]"))) { S.invDays = Number(n.dataset.invRange); renderView(); return; }
     if ((n = t.closest("[data-spend-mode]"))) { S.spendMode = n.dataset.spendMode; renderView(); return; }
     if ((n = t.closest("[data-month-bar]"))) { setMonth(n.dataset.monthBar); return; }
@@ -1600,6 +1684,7 @@
     if (t.dataset.codeInput) { S.codeDrafts[t.dataset.codeInput] = t.value; return; }
     if (t.dataset.importField === "newLabel" && S.sheet && S.sheet.type === "import") { S.sheet.newLabel = t.value; return; }
     if (t.dataset.saveDraft) { S.saveDraft[t.dataset.saveDraft] = t.value; return; }
+    if (t.dataset.affordField) { S.afford[t.dataset.affordField] = t.value; return; }
     if (t.dataset.noteFor) {
       S.noteDraft[t.dataset.noteFor] = t.value;
       const tx = currentTxn();
@@ -1618,6 +1703,14 @@
       if (target == null) { S.saveTargetError = "Type the most to spend a month in whole shekels, for example 650."; renderView(); return; }
       S.saveTargetError = "";
       patchSaving(key, { target });
+      return;
+    }
+    if (form.dataset.affordForm !== undefined) {
+      ev.preventDefault();
+      ["amount", "payments", "date", "label"].forEach((k) => { if (form.elements[k]) S.afford[k] = form.elements[k].value; });
+      const q = C.affordQuery(S.afford, today());
+      if (q.error) { Object.assign(S.afford, { error: q.error, result: null }); renderPlan(); return; }
+      runAfford(q.query, S.afford.label.trim());
       return;
     }
     if (form.dataset.form === "amount") {
@@ -1645,9 +1738,18 @@
         else { const key = S.saveOpen; S.saveOpen = null; renderView(); focusSaving(key); }
         return;
       }
+      if (S.tab === "overview" && S.view === "page" && S.paydayOpen) {
+        ev.preventDefault();
+        S.paydayOpen = false;
+        renderView();
+        document.querySelector("#mny-view-overview [data-payday-toggle]")?.focus({ preventScroll: true });
+        return;
+      }
       if (S.openId) { ev.preventDefault(); closeDetail(); }
       return;
     }
+    const flowNode = ev.target.closest?.("#mny-fl-wrap [data-fl-node][role=button]");
+    if (flowNode && (ev.key === "Enter" || ev.key === " ")) { ev.preventDefault(); onClick({ target: flowNode, detail: 0 }); return; }
     if (ev.target.dataset && ev.target.dataset.noteFor && ev.key === "Enter" && (ev.ctrlKey || ev.metaKey)) { ev.preventDefault(); saveNote(); return; }
     if (typing || ev.ctrlKey || ev.metaKey || ev.altKey || S.sheet) return;
     if (ev.key === "/") { ev.preventDefault(); if (S.tab !== "transactions") setTab("transactions"); setTimeout(() => $("mny-q")?.focus(), 0); return; }
@@ -1739,7 +1841,7 @@
       A = api;
       C = window.DanaMoneyCore;
       C.setCurrency(api.me && api.me.currency, navigator.language);   // amounts in the user's currency
-      D = window.DanaMoneyDash({ S, C, got, esc, icon, icons, today, isCurrent, seriesCls, acctOf, catLabel });
+      D = window.DanaMoneyDash({ S, C, got, failed, esc, icon, icons, today, isCurrent, seriesCls, acctOf, catLabel });
       S.month = C.monthOf();
       S.f = { ...C.EMPTY_FILTERS };
       // Opened at #money/…: the view, month and filters it names (the shell opens the page).

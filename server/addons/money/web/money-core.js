@@ -38,11 +38,13 @@
   const EMPTY_FILTERS = Object.freeze({ q: "", category: "", account: "", min: "", max: "", all: false });
   // The page's views, in the header's order; the first is the default (no path in the hash).
   // Investments shows only for a user with an investment account, Meal card only with a meal card
-  // (visibleTabs). Save, Investments and Meal card are not tied to a month: the header's month switcher
-  // hides on them (usesMonth).
-  const TABS = ["overview", "spending", "cashflow", "save", "investments", "meals", "transactions"];
-  const TAB_LABELS = { overview: "Overview", spending: "Spending", cashflow: "Cash flow", save: "Save", investments: "Investments", meals: "Meal card", transactions: "Transactions" };
-  const MONTHLESS_TABS = ["save", "investments", "meals"];
+  // (visibleTabs). Plan, Save, Investments and Meal card are not tied to a month: the header's month
+  // switcher hides on them (usesMonth). "spending" is labelled "Where it went"; an old view name still
+  // opens its successor (TAB_ALIASES: the Cash flow view became Plan; links from the server name it).
+  const TABS = ["overview", "spending", "plan", "save", "investments", "meals", "transactions"];
+  const TAB_LABELS = { overview: "Overview", spending: "Where it went", plan: "Plan", save: "Save", investments: "Investments", meals: "Meal card", transactions: "Transactions" };
+  const TAB_ALIASES = { cashflow: "plan" };
+  const MONTHLESS_TABS = ["plan", "save", "investments", "meals"];
   // Tabs shown only when the user has that kind of account (visibleTabs' `has`).
   const OPTIONAL_TABS = ["investments", "meals"];
   // An account's kind (sources, the account picker, the add-a-login list): its icon and word.
@@ -515,8 +517,10 @@
 
   /** The tabs to show: Investments only with an investment account, Meal card only with a meal card
    *  (`has`: {investments, meals}), either also when it is the view asked for. */
+  /** A view name (the hash's path, an insight's or a saving's link) → the view that shows it, or null. */
+  const tabOf = (view) => (TABS.includes(view) ? view : TAB_ALIASES[view] || null);
   const visibleTabs = (has, current) => TABS.filter((t) => !OPTIONAL_TABS.includes(t) || (has && has[t]) || current === t);
-  /** Whether a view follows the header's month switcher (Save and Investments don't, so it hides there). */
+  /** Whether a view follows the header's month switcher (Plan, Save, Investments and Meal card don't, so it hides there). */
   const usesMonth = (tab) => !MONTHLESS_TABS.includes(tab);
   const kindIcon = (kind) => (ACCOUNT_KINDS[kind] || ACCOUNT_KINDS.card).icon;
   const kindWord = (kind) => (ACCOUNT_KINDS[kind] || ACCOUNT_KINDS.card).word;
@@ -855,7 +859,8 @@
       const f = cleanFilters({ q: link.q || "", category: link.category || "", all: true });
       return { tab: "transactions", f, label: f.q || f.category ? "See these charges" : "Open Transactions" };
     }
-    return TABS.includes(link.view) ? { tab: link.view, f: null, label: `Open ${TAB_LABELS[link.view]}` } : null;
+    const tab = tabOf(link.view);
+    return tab ? { tab, f: null, label: `Open ${TAB_LABELS[tab]}` } : null;
   }
   /** The evidence sparkline (series [{date, amount}], oldest first) in a W × H box: a line over a soft
    *  area from zero, x by date; {W, H, line, area, last: {x, y}, range: "10 Oct 2025 – 10 Nov"}; null under 2 points. */
@@ -1111,7 +1116,7 @@
     return qs([["period", c.all ? "" : month], ["q", c.q], ["category", c.category], ["account", c.account],
                ["min", c.min], ["max", c.max], ["limit", extra.limit || ""], ["cursor", extra.cursor || ""]]);
   }
-  /** The page's state as a hash: "#money", "#money/cashflow?month=2026-10", "#money/transactions?category=food&q=wolt&all=1",
+  /** The page's state as a hash: "#money", "#money/spending?month=2026-10", "#money/transactions?category=food&q=wolt&all=1",
    *  "#money?view=accounts" (the view in the path unless it is the Overview; the month only when it
    *  is not the current one; the filters whatever the view, so a category chosen on Spending stays). */
   function stateToHash(state, currentMonth) {
@@ -1135,7 +1140,7 @@
     return {
       month: isMonth(params.month) ? params.month : null,
       view: params.view === "accounts" ? "sources" : "page",
-      tab: TABS.includes(m[1]) ? m[1] : TABS[0],
+      tab: tabOf(m[1]) || TABS[0],
       f: cleanFilters({ q: params.q, category: params.category, account: params.account, min: params.min, max: params.max, all: params.all === "1" }),
     };
   }
@@ -1365,6 +1370,240 @@
   /** The toast after PATCH {flow}. */
   const flowText = (body) => `${isolate(((body && body.transaction) || {}).merchant)} now counts as ${flowLabel(((body && body.transaction) || {}).flow)}`;
 
+  // ---------- left until payday (overview.payday), the Flow chart (GET flow), bills (GET bills), afford ----------
+
+  /** The "Left until payday" tile from overview.payday (plan.left_until_payday): {value, tone, sub, status
+   *  {tone: good | warn | bad, text}, late, cycle}; null without one (no salary found, or a past month). */
+  function paydayTile(p, today) {
+    if (!p) return null;
+    const day = shortDate(p.payday, today);
+    const sub = p.left > 0 && p.per_day > 0 ? `≈ ${whole(p.per_day)} a day · payday ${day}`
+      : `payday ${day} · ${plural(p.days_left || 0, "day")} to go`;
+    const status = p.status === "over" ? { tone: "bad", text: `Over by ${whole(Math.abs(p.left))}` }
+      : p.status === "tight" ? { tone: "warn", text: `Tight: your usual pace needs ${whole((p.usual && p.usual.ahead) || 0)}` }
+      : { tone: "good", text: "On track" };
+    return { value: p.left, tone: p.left < 0 ? "neg" : "", sub, status, late: p.late ? "Salary is late" : "",
+             cycle: p.cycle ? `${shortDate(p.cycle.start, today)} – ${shortDate(p.cycle.end, today)}` : "" };
+  }
+  /** What "Left until payday" is made of: {lines: [{key, label, amount (signed: money in +, out −), items?}],
+   *  left, oneOff (one-offs this cycle: reported, not counted), more (due items the list leaves out), cycle,
+   *  salary}. The lines add up to `left`; an empty one is left out (income and everyday always shown). */
+  function paydayBreakdown(p, today) {
+    if (!p) return null;
+    const due = (p.due || []).map((e) => ({ date: e.date, day: shortDate(e.date, today), label: e.label, amount: -Math.abs(e.amount), kind: e.kind }));
+    const listed = due.reduce((a, e) => a - e.amount, 0);
+    const lines = [
+      { key: "income", label: "Income this pay cycle", amount: p.income || 0 },
+      { key: "fixed", label: "Fixed costs so far", amount: -(p.fixed || 0) },
+      { key: "yearly", label: "Yearly charges so far", amount: -(p.yearly || 0) },
+      { key: "due", label: "Still due before payday", amount: -(p.due_total || 0), items: due },
+      { key: "set_aside", label: "Set aside", amount: -(p.set_aside || 0) },
+      { key: "everyday", label: "Everyday spending so far", amount: -(p.everyday || 0) },
+    ].filter((l) => l.amount || l.key === "income" || l.key === "everyday");
+    return {
+      lines, left: p.left,
+      oneOff: p.one_off ? `One-offs this pay cycle: ${whole(p.one_off)}, not counted here (they are often paid from savings)` : "",
+      more: (p.due_total || 0) > listed ? `and ${whole((p.due_total || 0) - listed)} more` : "",
+      cycle: p.cycle ? `Pay cycle ${shortDate(p.cycle.start, today)} – ${shortDate(p.cycle.end, today)}` : "",
+      salary: p.salary ? `Salary ${money(p.salary.amount, { cents: false })} from ${isolate(p.salary.merchant)}` : "",
+    };
+  }
+
+  /** The Flow chart's period choices: the page's month (key "month"), the pay cycles (only with a payday),
+   *  this and last year: [{key, label}]. */
+  function flowPeriods(month, currentMonth, hasPayday) {
+    const out = [{ key: "month", label: month === currentMonth ? "This month" : monthLabel(month, { short: true }) }];
+    if (hasPayday) out.push({ key: "this_pay_cycle", label: "This pay cycle" }, { key: "last_pay_cycle", label: "Last pay cycle" });
+    out.push({ key: "this_year", label: "This year" }, { key: "last_year", label: "Last year" });
+    return out;
+  }
+  /** GET /api/money/flow's query for a period choice and the page's month. */
+  const flowQuery = (key, month, by) => qs([["period", key === "month" || !key ? month : key], ["by", by === "account" ? "account" : "kind"]]);
+  /** "42% of income" ("" without income). */
+  function flowShare(amount, income) {
+    if (!(income > 0)) return "";
+    const p = (amount / income) * 100;
+    return `${pctText(p, { sign: "none", digits: p < 1 ? 1 : 0 })} of income`;
+  }
+  /** The Flow's one line: "In ₪15,173 · spent ₪6,310 · set aside ₪500 · left over ₪8,863" (or "₪1,200 from savings"). */
+  function flowSummary(f) {
+    if (!f) return "";
+    return [`In ${whole(f.income || 0)}`, `spent ${whole(f.spent || 0)}`, f.set_aside ? `set aside ${whole(f.set_aside)}` : "",
+            f.from_savings ? `${whole(f.from_savings)} from savings` : `left over ${whole(f.left_over || 0)}`].filter(Boolean).join(" · ");
+  }
+  const clip = (s, n) => { const t = String(s ?? ""); return t.length > n ? t.slice(0, Math.max(1, n - 1)) + "…" : t; };
+  /** Labels' vertical centres pushed apart to at least `gap` and kept within [lo, hi] (as far as they fit). */
+  function spreadLabels(ys, gap, lo, hi) {
+    const order = ys.map((y, i) => [y, i]).sort((a, b) => a[0] - b[0]);
+    const out = ys.slice();
+    let prev = -Infinity;
+    order.forEach(([y, i]) => { out[i] = Math.max(y, prev + gap, lo); prev = out[i]; });
+    let next = Infinity;
+    order.slice().reverse().forEach(([, i]) => { out[i] = Math.min(out[i], next - gap, hi); next = out[i]; });
+    return out;
+  }
+  // The middle nodes' colour slots: a kind its cash flow series, an account its rank, set aside and left over their own.
+  const FLOW_KIND_SLOTS = { fixed: "cf-fixed", yearly: "cf-yearly", everyday: "cf-everyday", one_off: "cf-one_off" };
+  /** The Flow chart (GET /api/money/flow) as a Sankey: income sources (column 0) → Income, with From savings
+   *  under it when the period spent more than came in (1) → the kinds or accounts, Set aside and Left over
+   *  (2) → each one's groups (3; a group under two kinds is two nodes, so every node has one way in). Income
+   *  pays the middle nodes in order; what it doesn't cover comes from savings. `narrow` drops column 3 (the
+   *  page lists the groups under the chart). Every node is as tall as its amount on one scale; each link is a
+   *  ribbon as thick as its amount; the chart grows taller so every label gets `labelHeight`.
+   *  → {W, H, k, cols, income, nodes: [{i, col, type, key, label, amount, text, share, parent?, slot, x, y, w, h,
+   *  tag: {x, y, anchor, name (clipped), amount}}], links: [{from, to, value, mid, group, text, share, d}]}; null
+   *  with nothing to show. */
+  function flowGeometry(f, size = {}) {
+    if (!f) return null;
+    const narrow = Boolean(size.narrow);
+    const W = size.width || 720;
+    const L = size.left ?? (narrow ? 88 : 132), R = size.right ?? (narrow ? 96 : 144), T = size.top ?? 6, B = size.bottom ?? 6;
+    const NW = size.nodeWidth ?? (narrow ? 10 : 12), GAP = size.gap ?? 10, LH = size.labelHeight ?? 31;
+    const nameLen = size.nameLength ?? (narrow ? 12 : 18);
+    const income = Math.max(0, f.income || 0);
+    const nodes = [], links = [];
+    const add = (n) => { n.i = nodes.length; n.text = money(n.amount, { cents: false }); n.share = flowShare(n.amount, income); nodes.push(n); return n; };
+    const sources = (f.sources || []).filter((s) => s.amount > 0).map((s) => add({ col: 0, type: "source", key: s.key, label: s.label, amount: s.amount, slot: "cf-income" }));
+    const hub = income > 0 ? add({ col: 1, type: "income", key: "income", label: "Income", amount: income, slot: "cf-income" }) : null;
+    const sav = f.from_savings > 0 ? add({ col: 1, type: "savings", key: "from_savings", label: "From savings", amount: f.from_savings, slot: "fl-savings" }) : null;
+    const mids = (f.middle || []).filter((m) => m.amount > 0).map((m, n) => add({ col: 2, type: "middle", key: m.key, label: m.label, amount: m.amount,
+      slot: f.by === "account" ? `inv-a${n % 8}` : FLOW_KIND_SLOTS[m.key] || "g-other", groups: m.groups || [] }));
+    const aside = f.set_aside > 0 ? add({ col: 2, type: "aside", key: "set_aside", label: "Set aside", amount: f.set_aside, slot: "cf-set_aside" }) : null;
+    const left = f.left_over > 0 ? add({ col: 2, type: "left", key: "left_over", label: "Left over", amount: f.left_over, slot: "fl-left" }) : null;
+    if (!nodes.length) return null;
+    const link = (a, b, value, mid = null, group = null) => { if (value > 0) links.push({ from: a.i, to: b.i, value, mid, group }); };
+    if (hub) sources.forEach((s) => link(s, hub, s.amount));
+    let fromIncome = income;
+    [...mids, aside].filter(Boolean).forEach((m) => {
+      const a = hub ? Math.min(fromIncome, m.amount) : 0;
+      if (a > 0) link(hub, m, a, m.key);
+      fromIncome -= a;
+      if (sav && m.amount - a > 0) link(sav, m, m.amount - a, m.key);
+    });
+    if (left && hub) link(hub, left, left.amount, "left_over");
+    if (!narrow) mids.forEach((m) => m.groups.filter((g) => g.amount > 0).forEach((g) => {
+      const n = add({ col: 3, type: "group", key: g.key, label: g.label, amount: g.amount, parent: m.key, slot: `g-${seriesOf(g.key === "uncategorized" ? null : g.key)}` });
+      link(m, n, g.amount, m.key, g.key);
+    }));
+    mids.forEach((m) => { delete m.groups; });
+    const used = [0, 1, 2, 3].filter((c) => nodes.some((n) => n.col === c));
+    const cols = used.map((c) => nodes.filter((n) => n.col === c));
+    const most = Math.max(...cols.map((c) => c.length));
+    const H = Math.max(size.height || (narrow ? 240 : 280), most * LH + T + B);
+    const avail = H - T - B;
+    const total = (c) => c.reduce((a, n) => a + n.amount, 0);
+    const k = Math.min(...cols.map((c) => (avail - GAP * (c.length - 1)) / total(c)));
+    const last = cols.length - 1;
+    const colX = (ci) => r1(L + (cols.length > 1 ? (ci / last) * (W - L - R - NW) : 0));
+    const stack = (c, ci, y) => c.forEach((n) => { n.x = colX(ci); n.w = NW; n.h = r1(Math.max(1, n.amount * k)); n.y = r1(y); n.out = 0; n.in = 0; y += n.amount * k + GAP; });
+    const heightOf = (c) => total(c) * k + GAP * (c.length - 1);
+    cols.forEach((c, ci) => stack(c, ci, T + (avail - heightOf(c)) / 2));
+    // The sources line up with Income (From savings hangs under it).
+    if (hub && cols[0][0].col === 0) stack(cols[0], 0, Math.min(Math.max(T, hub.y + hub.h / 2 - heightOf(cols[0]) / 2), H - B - heightOf(cols[0])));
+    cols.forEach((c, ci) => {
+      const anchor = ci === 0 && cols.length > 1 ? "end" : "start";
+      const lx = anchor === "end" ? r1(c[0].x - 6) : r1(c[0].x + NW + 6);
+      const ys = spreadLabels(c.map((n) => n.y + n.h / 2), LH, T + LH / 2 - 4, H - B - LH / 2 + 4);
+      c.forEach((n, j) => { n.tag = { x: lx, y: r1(ys[j]), anchor, name: clip(n.label, nameLen), amount: n.text }; });
+    });
+    links.forEach((l) => {
+      const a = nodes[l.from], b = nodes[l.to];
+      const h = l.value * k;
+      const y0 = a.y + a.out, y1 = b.y + b.in;
+      a.out += h; b.in += h;
+      const x0 = a.x + NW, x1 = b.x, xm = r1((x0 + x1) / 2);
+      l.h = r1(h); l.y0 = r1(y0); l.y1 = r1(y1);
+      l.d = `M${x0},${r1(y0)} C${xm},${r1(y0)} ${xm},${r1(y1)} ${x1},${r1(y1)} L${x1},${r1(y1 + h)} C${xm},${r1(y1 + h)} ${xm},${r1(y0 + h)} ${x0},${r1(y0 + h)} Z`;
+      l.text = money(l.value, { cents: false }); l.share = flowShare(l.value, income);
+    });
+    nodes.forEach((n) => { delete n.out; delete n.in; });
+    return { W, H, T, B, k, cols: cols.length, income, narrow, nodes, links };
+  }
+  /** The groups under each kind or account (the narrow chart lists them under itself): [{key, label, amount,
+   *  slot, groups: [{key, label, amount, slot, share}]}]. */
+  function flowGroups(f) {
+    if (!f) return [];
+    return (f.middle || []).filter((m) => m.amount > 0).map((m, n) => ({
+      key: m.key, label: m.label, amount: m.amount, slot: f.by === "account" ? `inv-a${n % 8}` : FLOW_KIND_SLOTS[m.key] || "g-other",
+      groups: (m.groups || []).filter((g) => g.amount > 0).map((g) => ({ key: g.key, label: g.label, amount: g.amount,
+        slot: `g-${seriesOf(g.key === "uncategorized" ? null : g.key)}`, share: flowShare(g.amount, f.income) })),
+    }));
+  }
+
+  const BILL_EVERY = { weekly: "a week", monthly: "a month", bimonthly: "every 2 months", yearly: "a year" };
+  /** What the bills register says for one item (GET /api/money/bills): {words: "₪117.30 every 2 months ·
+   *  ≈ ₪58.65 a month" | "₪1,775 a year in 4 payments · renews 3 Mar", next: "next 3 Dec" ("" for a yearly
+   *  one: its renewal is in the words), price: "₪39.90 → ₪49.90 since Nov" | "", up (the price went up),
+   *  variable, account}. */
+  function billText(item, today) {
+    const c = item.cadence || "monthly";
+    const amount = `${money(Math.abs(item.amount || 0), { sign: "none", cents: "auto" })} ${BILL_EVERY[c] || ""}`.trim();
+    if (c === "yearly") {
+      const pay = item.payments > 1 ? ` in ${item.payments} payments` : "";
+      return { words: [amount + pay, item.next_date ? `renews ${shortDate(item.next_date, today)}` : ""].filter(Boolean).join(" · "), next: "",
+               price: priceChangeText(item.price_change, today), up: Boolean(item.price_change && item.price_change.to > item.price_change.from),
+               variable: Boolean(item.variable), account: item.account_label || (item.account_kind ? kindWord(item.account_kind) : "") };
+    }
+    const monthly = c !== "monthly" && item.monthly ? `≈ ${money(item.monthly, { sign: "none", cents: "auto" })} a month` : "";
+    return { words: [amount, monthly].filter(Boolean).join(" · "), next: item.next_date ? `next ${shortDate(item.next_date, today)}` : "",
+             price: priceChangeText(item.price_change, today), up: Boolean(item.price_change && item.price_change.to > item.price_change.from),
+             variable: Boolean(item.variable), account: item.account_label || (item.account_kind ? kindWord(item.account_kind) : "") };
+  }
+  /** The register's header: {monthly, yearly, share: "32% of a typical month's income" | ""}. */
+  function billsHeader(b) {
+    const x = b || {};
+    return { monthly: x.monthly || 0, yearly: x.yearly || 0,
+             share: x.income_share != null ? `${pctText(x.income_share * 100, { sign: "none", digits: 0 })} of a typical month's income` : "" };
+  }
+
+  /** Whole units typed for an amount ("1500", "₪1,500", "1,500 €") → hundredths; null unless a whole number
+   *  from 1 to `max` units. */
+  function wholeAgorot(text, max = 10000000) {
+    const s = String(text ?? "").replace(/[,\s]/g, "").replace(/^\p{Sc}|\p{Sc}$/u, "");
+    if (!/^\d{1,9}$/.test(s)) return null;
+    const n = Number(s);
+    return n >= 1 && n <= max ? n * 100 : null;
+  }
+  /** "Can I afford it?" — the form → GET /api/money/afford's query: {query, error}. Only what differs from the
+   *  server's defaults is sent (one payment, today, on the card, no label); the amount goes in hundredths. */
+  function affordQuery(form, today) {
+    const f = form || {};
+    const amount = wholeAgorot(f.amount);
+    if (amount == null) return { query: "", error: "Type the amount as a whole number, for example 1500." };
+    const p = String(f.payments ?? "").trim() === "" ? 1 : Number(f.payments);
+    if (!Number.isInteger(p) || p < 1 || p > 36) return { query: "", error: "Payments: a whole number from 1 to 36." };
+    const date = String(f.date || "").trim();
+    if (date && !isDay(date)) return { query: "", error: "Choose the date it would be paid." };
+    const on = f.on === "bank" ? "bank" : "card";
+    return { error: "", query: qs([["amount", amount], ["payments", p > 1 ? p : ""], ["date", date && date !== today ? date : ""],
+                                   ["on", on === "bank" ? "bank" : ""], ["label", String(f.label || "").trim().slice(0, 60)]]) };
+  }
+  /** GET /api/money/afford's answer in words: {tone: good | warn | bad, verdict, drop, payments, payday, end}. */
+  function affordText(r, today) {
+    if (!r) return null;
+    const low = (r.after && r.after.low) || {};
+    const at = `${whole(low.balance || 0)} on ${shortDate(low.date, today)}`;
+    const verdict = r.verdict === "short" ? { tone: "bad", text: `Short — your balance would go below zero, to ${at}` }
+      : r.verdict === "tight" ? { tone: "warn", text: `Tight — your balance goes down to ${at}` }
+      : { tone: "good", text: `Fine — your lowest balance after it would be ${at}` };
+    const where = r.on === "bank" ? "from the bank" : "on the card";
+    const before = r.before && r.before.low;
+    const lp = r.left_until_payday;
+    return {
+      ...verdict,
+      drop: r.drop > 0 ? `${whole(r.drop)} lower than without it${before ? ` (${whole(before.balance)} on ${shortDate(before.date, today)})` : ""}` : "Your lowest balance stays where it is",
+      payments: r.payments > 1 ? `${r.payments} payments of ${money(r.payment, { cents: "auto" })} ${where}, from ${shortDate(r.date, today)}`
+        : `${money(r.amount, { cents: "auto" })} ${where} on ${shortDate(r.date, today)}`,
+      payday: lp ? `Left until payday: ${whole(lp.before)} → ${whole(lp.after)}` : "",
+      end: r.end ? `Forecast to ${shortDate(r.end, today)}; one-offs left out` : "",
+    };
+  }
+  /** An afford error in words (409 no_balance: no bank balance to forecast from). */
+  function affordError(status, body) {
+    if (status === 409 && body && body.error === "no_balance") return "Dana needs a bank balance to answer this. Add a bank account, or import a bank statement.";
+    return errorText(status, body);
+  }
+
   // ---------- statement files ----------
 
   // The CSV columns a mapping names, in the order the import sheet asks for them (required first).
@@ -1458,6 +1697,8 @@
     sourceStatus, busy, headerStatus, cadenceLabel, perText, cadenceAmount,
     planText, priceChangeText,
     isolateHebrew, netTile, everydayTile, balanceTile, fixedTile, vsTypical, cardBillParts, upcoming, cashflowTotalsText, forecastNote,
+    tabOf, paydayTile, paydayBreakdown, flowPeriods, flowQuery, flowShare, flowSummary, spreadLabels, flowGeometry, flowGroups,
+    billText, billsHeader, wholeAgorot, affordQuery, affordText, affordError,
     kindBadge, flowLabel, flowChoices, markState, kindText, markText, flowText,
     IMPORT_ROLES, importSummary, importResultText, setMapping, mappingProblem,
     undoText, errorText,

@@ -1,23 +1,26 @@
-/* Money — the dashboard views of the Money tab: Overview, Spending, Cash flow, Save, Investments and Meal card (docs/money.md "Money tab").
+/* Money — the dashboard views of the Money tab: Overview, Where it went, Plan, Save, Investments and Meal card (docs/money.md "Money tab").
  *
- * window.DanaMoneyDash(ctx) → {overview(el), spending(el), cashflow(el), save(el), investments(el), meals(el), redraw()}: money.js (the
+ * window.DanaMoneyDash(ctx) → {overview(el), spending(el), plan(el), save(el), investments(el), meals(el), redraw()}: money.js (the
  * controller: state, loading, events, the Transactions view, sheets) makes one with its state and helpers
  * and calls a view's function to fill its container; redraw() re-measures the charts on screen (resize).
  * Rendering only: no network and no state of its own — clicks land on data attributes that money.js
  * handles (data-go, data-link-*, data-focus, data-bill, data-horizon, data-spend-mode, data-oneoff-no,
- * data-txn-go, data-merchant, data-month-bar, data-inv-range, and the Save view's data-save-*). Geometry, words and money formatting are DanaMoneyCore's
- * (money-core.js, tested by test_web_money.mjs). Loaded before money.js.
+ * data-txn-go, data-merchant, data-month-bar, data-inv-range, data-payday-toggle, data-flow-period, data-flow-by,
+ * data-flow-hi, data-bills-section, data-save-open, data-afford-*, and the Save view's data-save-*). Geometry, words
+ * and money formatting are DanaMoneyCore's (money-core.js, tested by test_web_money.mjs). Loaded before money.js.
  *
- *   Overview      overview?month (tiles, forecast), insights?month, balance?days= (coming up),
- *                 pace?month (everyday pace), cashflow?end= (the typical net)
- *   Spending      trends?month (where it went, movers, big purchases, the Everyday bars),
- *                 months?n=12 (the Everything bars), merchants?period=YYYY-MM
- *   Cash flow     cashflow?n=12&end=, balance?days=90|180|365, recurring, overview (fixed costs total)
- *   Save          savings (the tiles, ways to save and spending to watch in sections, each card's
- *                 evidence, math, questions, price check offers, subscription lines, steps, script,
- *                 target progress, outcome and the actions of its status); not tied to the month
- *   Investments   portfolio?days=365 (tiles, the value over 1 month / 3 months / 1 year, allocation,
- *                 holdings, activity); read-only: Dana never trades
+ *   Overview       overview?month (tiles: left until payday, forecast), insights?month, balance?days= (coming up),
+ *                  pace?month (everyday pace), cashflow?end= (the typical net, for the Net tile without a payday)
+ *   Where it went  flow?period=&by= (the Flow chart, a Sankey in SVG), trends?month (where it went, movers, big
+ *                  purchases, the Everyday bars), months?n=12 (the Everything bars), merchants?period=YYYY-MM,
+ *                  cashflow?n=12&end= (month by month, in and out)
+ *   Plan           bills (what you pay for), afford (on demand: the form's answer, kept by money.js),
+ *                  balance?days=90|180|365 (bank balance, installment plans), recurring (regular income); not tied to the month
+ *   Save           savings (the tiles, ways to save and spending to watch in sections, each card's
+ *                  evidence, math, questions, price check offers, subscription lines, steps, script,
+ *                  target progress, outcome and the actions of its status); not tied to the month
+ *   Investments    portfolio?days=365 (tiles, the value over 1 month / 3 months / 1 year, allocation,
+ *                  holdings, activity); read-only: Dana never trades
  */
 (() => {
   "use strict";
@@ -39,7 +42,7 @@
   const EFFORT_ICONS = { call: "phone", app: "smartphone", online: "globe", compare: "scale", review: "list-checks" };
 
   window.DanaMoneyDash = (ctx) => {
-    const { S, C, got, esc, icon, icons, today, isCurrent, seriesCls, acctOf, catLabel } = ctx;
+    const { S, C, got, failed, esc, icon, icons, today, isCurrent, seriesCls, acctOf, catLabel } = ctx;
     let svSeq = 0;
     const $ = (id) => document.getElementById(id);
     const amt = (v, o, cls) => C.moneyHtml(v, o, cls);
@@ -76,7 +79,7 @@
       }
       const inProgress = Boolean(ov.period && ov.period.in_progress);
       const fc = inProgress ? ov.forecast : null;
-      el.innerHTML = `<div class="mny-tiles">${tilesHtml(ov, inProgress, fc)}</div>
+      el.innerHTML = `<div class="mny-tiles">${tilesHtml(ov, inProgress, fc)}</div>${paydayHtml(ov, inProgress)}
         <div class="mny-ov-grid${fc ? "" : " no-up"}">
           <section class="mny-card mny-insights" aria-label="Insights">${insightsHtml(ov)}</section>
           ${fc ? `<section class="mny-card mny-up" aria-label="Coming up">${upcomingHtml()}</section>` : ""}
@@ -88,12 +91,22 @@
 
     function tilesHtml(ov, inProgress, fc) {
       const out = [];
-      const net = C.netTile(ov, got("cashflow"));
-      out.push(`<button class="mny-tile dn-row" data-go="cashflow">
-        <span class="mny-tl">${esc(net.label)}</span>
-        <span class="mny-tv ${net.value < 0 ? "neg" : "in"}">${amt(net.value, { sign: "plus" })}</span>
-        <span class="mny-ts strong">${esc(net.rate)}${net.typical ? ` · ${esc(net.typical)}` : ""}</span>
-        <span class="mny-ts">${esc(net.sub)}</span></button>`);
+      const pd = inProgress ? C.paydayTile(ov.payday, today()) : null;
+      if (pd) {
+        const open = Boolean(S.paydayOpen);
+        out.push(`<button class="mny-tile dn-row mny-pd-tile" data-payday-toggle aria-expanded="${open}" aria-controls="mny-payday" title="${open ? "Hide" : "Show"} what it is made of">
+          <span class="mny-tl">Left until payday${icon(open ? "chevron-up" : "chevron-down", "mny-pd-chev")}</span>
+          <span class="mny-tv ${pd.tone}">${amt(pd.value, { cents: false })}</span>
+          <span class="mny-ts strong">${esc(pd.sub)}</span>
+          <span class="mny-pd-chips"><span class="mny-pd-chip tone-${pd.status.tone}">${esc(pd.status.text)}</span>${pd.late ? `<span class="mny-pd-chip tone-warn">${icon("clock")}${esc(pd.late)}</span>` : ""}</span></button>`);
+      } else {
+        const net = C.netTile(ov, got("cashflow"));
+        out.push(`<button class="mny-tile dn-row" data-go="spending" data-anchor="mny-flow">
+          <span class="mny-tl">${esc(net.label)}</span>
+          <span class="mny-tv ${net.value < 0 ? "neg" : "in"}">${amt(net.value, { sign: "plus" })}</span>
+          <span class="mny-ts strong">${esc(net.rate)}${net.typical ? ` · ${esc(net.typical)}` : ""}</span>
+          <span class="mny-ts">${esc(net.sub)}</span></button>`);
+      }
       const ev = C.everydayTile(ov.everyday, inProgress);
       out.push(`<button class="mny-tile dn-row" data-go="spending">
         <span class="mny-tl">Everyday spending</span>
@@ -102,7 +115,7 @@
         <span class="mny-ts">${esc(ev.typical || (inProgress ? "so far this month" : "in all"))}</span></button>`);
       const bt = C.balanceTile(fc, today());
       if (bt) {
-        out.push(`<button class="mny-tile dn-row" data-go="cashflow" data-anchor="mny-bal">
+        out.push(`<button class="mny-tile dn-row" data-go="plan" data-anchor="mny-bal">
           <span class="mny-tl">Balance ahead</span>
           <span class="mny-tv${bt.value < 0 ? " neg" : ""}">${amt(bt.value)}</span>
           ${bt.low ? `<span class="mny-ts strong${bt.tone === "bad" ? " bad" : ""}">${esc(bt.low)}</span>` : ""}
@@ -114,12 +127,29 @@
           <span class="mny-ts">${ov.set_aside ? `Set aside ${C.moneyText(ov.set_aside, { cents: false, sign: "none" })}` : "left out of everyday spending"}</span></button>`);
       }
       const fx = C.fixedTile(ov);
-      out.push(`<button class="mny-tile dn-row" data-go="cashflow" data-anchor="mny-fixed">
+      out.push(`<button class="mny-tile dn-row" data-go="plan" data-anchor="mny-bills">
         <span class="mny-tl">Fixed costs</span>
         <span class="mny-tv">${amt(fx.value, { sign: "none" })}<em>/ month</em></span>
         ${fx.share ? `<span class="mny-ts strong">${esc(fx.share)}</span>` : ""}
         <span class="mny-ts">${esc(fx.yearly || "recurring and yearly charges")}</span></button>`);
       return out.join("");
+    }
+
+    /** What "Left until payday" is made of, under the tiles while its tile is open. */
+    function paydayHtml(ov, inProgress) {
+      if (!S.paydayOpen || !inProgress || !ov.payday) return "";
+      const b = C.paydayBreakdown(ov.payday, today());
+      const lines = b.lines.map((l) => `<div class="mny-pd-line"><span>${esc(l.label)}</span>${amt(l.amount, { sign: l.amount > 0 ? "plus" : "minus", cents: false })}</div>
+        ${l.items && l.items.length ? `<div class="mny-pd-items">${l.items.map((e) => `<span class="mny-pop-item"><span class="mny-pd-item-t"><span class="mny-pd-day">${esc(e.day)}</span><bdi dir="auto">${esc(e.label)}</bdi></span>
+          ${amt(e.amount, { sign: "none", cents: false })}</span>`).join("")}${b.more ? `<span class="mny-pop-item"><span>${esc(b.more)}</span></span>` : ""}</div>` : ""}`).join("");
+      return `<section class="mny-card mny-pd" id="mny-payday" aria-label="Left until payday">
+        <div class="mny-card-head"><span>Left until payday</span><span class="mny-head-hint">${esc(b.cycle)}</span></div>
+        ${b.salary ? `<div class="mny-head-sub">${esc(b.salary)}</div>` : ""}
+        <div class="mny-pd-lines">${lines}
+          <div class="mny-pd-line total"><span>Left until payday</span>${amt(b.left, { cents: false })}</div></div>
+        ${b.oneOff ? `<div class="mny-chart-note">${esc(b.oneOff)}</div>` : ""}
+        <div class="mny-chart-note">Fixed and yearly charges count whether paid already or still due before payday; everyday spending counts what you spent so far.</div>
+      </section>`;
     }
 
     function insightsHtml(ov) {
@@ -306,21 +336,110 @@
       const chip = focus ? `<div class="mny-focus">${icon("filter")}<span>Showing <strong>${esc(catLabel(focus))}</strong></span>
           <button class="mny-link" data-act="focus-tx">See its transactions</button>
           <button class="icon-btn mny-focus-x" data-focus="" aria-label="Show every category">${icon("x")}</button></div>` : "";
-      el.innerHTML = `${chip}<div class="mny-cols">
+      el.innerHTML = `${chip}<section class="mny-card mny-flow" id="mny-flow" aria-label="Flow">${flowHtml()}</section>
+        <div class="mny-cols">
         <div class="mny-col">
-          <section class="mny-card mny-where o1" aria-label="Where it went">${whereHtml(t)}</section>
+          <section class="mny-card mny-where o1" aria-label="By group">${whereHtml(t)}</section>
           <section class="mny-card mny-months o3" aria-label="12 months">${monthsHtml()}</section>
         </div>
         <div class="mny-col">
           <section class="mny-card mny-movers o2" aria-label="Movers">${moversHtml(t)}</section>
           <section class="mny-card mny-merchants o4" aria-label="Top merchants">${merchantsHtml()}</section>
           <section class="mny-card mny-big o5" id="mny-big" aria-label="Big purchases">${bigHtml(t)}</section>
-        </div></div>`;
+        </div></div>
+        <section class="mny-card mny-cf" id="mny-mbm" aria-label="Month by month">${cfHtml()}</section>`;
+      drawFlow();
       drawMonths();
+      drawCf();
     }
 
+    // ---- the Flow chart (Where it went's top) ----
+
+    function flowHtml() {
+      const ov = got("overview");
+      const periods = C.flowPeriods(S.month, C.monthOf(), Boolean(ov && ov.payday));
+      const per = `<span class="mny-seg mny-fl-periods" role="radiogroup" aria-label="Flow period">${periods.map((p) =>
+        `<button role="radio" aria-checked="${S.flowPeriod === p.key}" class="${S.flowPeriod === p.key ? "on" : ""}" data-flow-period="${esc(p.key)}">${esc(p.label)}</button>`).join("")}</span>`;
+      const by = `<span class="mny-seg" role="radiogroup" aria-label="Split the spending">${[["kind", "By kind"], ["account", "By account"]].map(([k, l]) =>
+        `<button role="radio" aria-checked="${S.flowBy === k}" class="${S.flowBy === k ? "on" : ""}" data-flow-by="${k}">${l}</button>`).join("")}</span>`;
+      const f = got("flow"), err = failed("flow");
+      const head = `<div class="mny-card-head"><span>Flow</span>${by}</div><div class="mny-fl-tools">${per}</div>`;
+      if (err) return `${head}<div class="mny-empty">${esc(err)}</div>`;
+      if (!f) return `${head}<div class="mny-chart-skel dn-shimmer"></div>`;
+      const label = (f.period && f.period.label) || "";
+      if (!f.income && !f.spent && !f.set_aside) return `${head}<div class="mny-empty">Nothing came in or went out in ${esc(label)}${f.period && f.period.in_progress ? " yet" : ""}.</div>`;
+      return head + `<div class="mny-head-sub mny-fl-sum"><span class="mny-fl-period">${esc(label.charAt(0).toUpperCase() + label.slice(1))}${f.period && f.period.in_progress ? " so far" : ""}</span><span>${esc(C.flowSummary(f))}</span></div>
+        <div class="mny-chart-wrap mny-fl-wrap" id="mny-fl-wrap"></div><div class="mny-fl-groups" id="mny-fl-groups"></div>
+        <div class="mny-chart-note">Everything spent, one-offs too. Income pays for each part in turn; what it doesn't cover came from savings. Click a ${S.flowBy === "account" ? "card or account" : "kind"} to highlight its money, a group to focus the page on it.</div>`;
+    }
+
+    function drawFlow() {
+      const wrap = $("mny-fl-wrap");
+      const f = got("flow");
+      if (!wrap || !f) return;
+      const w = width(wrap, 720);
+      const narrow = w < 620;
+      const g = C.flowGeometry(f, { width: w, narrow });
+      const list = $("mny-fl-groups");
+      if (!g) { wrap.innerHTML = ""; if (list) list.innerHTML = ""; return; }
+      const fg = focusGroup(), hi = S.flowHi;
+      const fgMids = new Set(fg ? (f.middle || []).filter((m) => (m.groups || []).some((x) => x.key === fg)).map((m) => m.key) : []);
+      const linkState = (l) => {
+        if (hi) return l.mid == null ? "" : l.mid === hi ? " on" : " dim";
+        if (fg) return l.mid == null ? "" : (l.group ? l.group === fg : fgMids.has(l.mid)) ? " on" : " dim";
+        return "";
+      };
+      const nodeState = (n) => {
+        if (hi) return n.type === "middle" ? (n.key === hi ? " on" : " dim") : n.type === "group" ? (n.parent === hi ? "" : " dim") : (n.type === "aside" || n.type === "left") ? " dim" : "";
+        if (fg) return n.type === "group" ? (n.key === fg ? " on" : " dim") : n.type === "middle" ? (fgMids.has(n.key) ? "" : " dim") : (n.type === "aside" || n.type === "left") ? " dim" : "";
+        return "";
+      };
+      const links = g.links.map((l, i) => `<path class="mny-fl-link ${esc(g.nodes[l.to].slot)}${linkState(l)}" d="${l.d}" data-fl-link="${i}"/>`).join("");
+      const nodes = g.nodes.map((n) => {
+        const aria = `${n.label}: ${n.text}${n.share ? `, ${n.share}` : ""}${n.type === "group" ? ` (${(g.nodes.find((x) => x.type === "middle" && x.key === n.parent) || {}).label || ""})` : ""}`;
+        const act = n.type === "group" ? ` role="button" data-focus="${esc(fg === n.key ? "" : n.key)}" aria-pressed="${fg === n.key}"`
+          : n.type === "middle" ? ` role="button" data-flow-hi="${esc(n.key)}" aria-pressed="${hi === n.key}"` : ` role="img"`;
+        const t = n.tag;
+        return `<g class="mny-fl-node ${esc(n.slot)}${nodeState(n)}${n.type === "group" || n.type === "middle" ? " act" : ""}" data-fl-node="${n.i}" tabindex="0"${act} aria-label="${esc(aria)}">
+          <rect x="${n.x}" y="${n.y}" width="${n.w}" height="${n.h}" rx="2"/>
+          <text class="mny-fl-name" x="${t.x}" y="${t.y - 2}" text-anchor="${t.anchor}">${esc(t.name)}</text>
+          <text class="mny-fl-amt" x="${t.x}" y="${t.y + 11}" text-anchor="${t.anchor}">${esc(t.amount)}</text></g>`;
+      }).join("");
+      wrap.innerHTML = `<svg viewBox="0 0 ${g.W} ${g.H}" height="${g.H}" role="group" aria-label="Where the money went: ${esc(C.flowSummary(f))}">${links}${nodes}</svg><div class="mny-tip hidden"></div>`;
+      const svg = wrap.querySelector("svg"), tip = wrap.querySelector(".mny-tip");
+      const show = (el) => {
+        let x, y, html;
+        if (el.dataset.flNode != null) {
+          const n = g.nodes[+el.dataset.flNode];
+          const parent = n.type === "group" ? g.nodes.find((m) => m.type === "middle" && m.key === n.parent) : null;
+          x = n.x + n.w / 2; y = n.y;
+          html = `<strong><bdi dir="auto">${esc(n.label)}</bdi>${parent ? ` <span class="mny-muted">· ${esc(parent.label)}</span>` : ""}</strong><span>${amt(n.amount, { sign: "none", cents: false })}</span>${n.share ? `<span class="mny-muted">${esc(n.share)}</span>` : ""}`;
+        } else {
+          const l = g.links[+el.dataset.flLink], a = g.nodes[l.from], b = g.nodes[l.to];
+          x = (a.x + a.w + b.x) / 2; y = Math.min(l.y0, l.y1);
+          html = `<strong><bdi dir="auto">${esc(a.label)}</bdi> → <bdi dir="auto">${esc(b.label)}</bdi></strong><span>${amt(l.value, { sign: "none", cents: false })}</span>${l.share ? `<span class="mny-muted">${esc(l.share)}</span>` : ""}`;
+        }
+        tip.innerHTML = html;
+        placeTip(tip, svg, g, x);
+        tip.style.top = `${(y / g.H) * svg.getBoundingClientRect().height - 6}px`;
+      };
+      const hide = () => { tip.classList.add("hidden"); tip.style.top = ""; };
+      svg.addEventListener("pointermove", (ev) => { const el = ev.target.closest("[data-fl-node], [data-fl-link]"); if (el) show(el); else hide(); });
+      svg.addEventListener("pointerleave", hide);
+      svg.addEventListener("focusin", (ev) => { const el = ev.target.closest("[data-fl-node]"); if (el) show(el); });
+      svg.addEventListener("focusout", hide);
+      // A narrow chart stops at the kinds: their groups are listed under it.
+      if (list) {
+        list.innerHTML = narrow ? C.flowGroups(f).filter((m) => m.groups.length).map((m) => `<div class="mny-fl-gsec${hi && hi !== m.key ? " dim" : ""}">
+            <div class="mny-fl-gh"><span class="mny-sw ${esc(m.slot)}"></span><span class="t">${esc(m.label)}</span>${whole(m.amount, { sign: "none" })}</div>
+            ${m.groups.map((x) => `<button class="mny-fl-g${fg === x.key ? " on" : ""}${fg && fg !== x.key ? " dim" : ""}" data-focus="${esc(fg === x.key ? "" : x.key)}" aria-pressed="${fg === x.key}">
+              <span class="mny-sw ${esc(x.slot)}"></span><span class="t">${esc(x.label)}</span><span class="mny-muted">${esc(x.share)}</span>${whole(x.amount, { sign: "none" })}</button>`).join("")}</div>`).join("") : "";
+      }
+    }
+
+
     function whereHtml(t) {
-      const head = (num = "") => `<div class="mny-card-head"><span>Where it went</span>${num}</div>`;
+      const head = (num = "") => `<div class="mny-card-head"><span>By group</span>${num}</div>`;
       if (!t) return head() + rowsSkel(6);
       const live = (x) => x.total > 0 || x.on_track > 0 || x.typical > 0;
       const groups = (t.groups || []).filter(live);
@@ -452,21 +571,115 @@
         </div>`).join("")}</div>`;
     }
 
-    // ================================ Cash flow ================================
+    // ================================ Plan ================================
 
-    function cashflow(el) {
-      el.innerHTML = `<section class="mny-card mny-cf" aria-label="Money in and out">${cfHtml()}</section>
-        <div class="mny-cols cf">
-          <div class="mny-col"><section class="mny-card mny-bal" id="mny-bal" aria-label="Bank balance">${balHtml()}</section></div>
-          <div class="mny-col"><section class="mny-card mny-fixed" id="mny-fixed" aria-label="Fixed costs">${fixedHtml()}</section></div>
+    function plan(el) {
+      el.innerHTML = `<div class="mny-cols plan">
+          <div class="mny-col"><section class="mny-card mny-bills o1" id="mny-bills" aria-label="What you pay for">${billsHtml()}</section></div>
+          <div class="mny-col">
+            <section class="mny-card mny-afford o2" id="mny-afford" aria-label="Can I afford it?">${affordHtml()}</section>
+            <section class="mny-card mny-bal o3" id="mny-bal" aria-label="Bank balance">${balHtml()}</section>
+            <section class="mny-card mny-plans o4" id="mny-plans" aria-label="Installment plans and income">${plansHtml()}</section>
+          </div>
         </div>`;
-      drawCf();
       drawBal();
     }
 
+    function billsHtml() {
+      const b = got("bills"), err = failed("bills");
+      const hd = b ? C.billsHeader(b) : null;
+      const head = `<div class="mny-card-head"><span>What you pay for</span>${hd ? `<span class="mny-head-num">${amt(hd.monthly, { sign: "none", cents: false })}<em>/ month</em></span>` : ""}</div>`;
+      if (err) return `${head}<div class="mny-empty">${esc(err)}</div>`;
+      if (!b) return head + rowsSkel(6);
+      if (!(b.sections || []).length) return `${head}<div class="mny-empty">No regular charges found yet. A subscription or a standing order shows up after three regular charges, a yearly one after its second renewal.</div>`;
+      const sub = `<div class="mny-head-sub">${whole(hd.yearly, { sign: "none" })} a year${hd.share ? ` · ${esc(hd.share)}` : ""} · recurring and yearly charges</div>`;
+      const day = today();
+      const item = (x) => {
+        const t = C.billText(x, day);
+        const meta = [t.words, t.next, t.account].filter(Boolean).join(" · ");
+        return `<div class="mny-bl-row">
+          <button class="mny-sub" data-merchant="${esc(x.merchant)}" title="See every charge">
+            <span class="mny-sub-main"><bdi dir="auto" class="mny-sub-name">${esc(x.merchant)}</bdi>
+              <span class="mny-sub-meta" dir="ltr">${heb(meta)}</span>
+              ${t.price || t.variable ? `<span class="mny-bl-chips">${t.price ? `<span class="mny-flag ${t.up ? "up" : "down"}">${icon(t.up ? "arrow-up-right" : "arrow-down-right")}${esc(t.price)}</span>` : ""}${t.variable ? `<span class="mny-flag var" title="The amount changes from charge to charge: this is the typical one">varies</span>` : ""}</span>` : ""}</span>
+            <span class="mny-sub-amt"><span>${amt(x.monthly, { sign: "none", cents: "auto" })}<em>/ month</em></span>
+              <span class="mny-sub-mo">${C.moneyText(x.yearly, { sign: "none", cents: false })} a year</span></span></button>
+          ${x.saving ? `<button class="mny-link mny-bl-save" data-save-open="${esc(x.saving.key)}">${icon("piggy-bank")}<span dir="ltr">Ways to save: ${heb(x.saving.title)}</span></button>` : ""}
+        </div>`;
+      };
+      return head + sub + `<div class="mny-bl-secs">${b.sections.map((sec) => {
+        const shut = S.billsCollapsed.has(sec.key);
+        const id = `mny-bl-${esc(sec.key)}`;
+        return `<div class="mny-bl-sec">
+          <button class="mny-bl-head" data-bills-section="${esc(sec.key)}" aria-expanded="${!shut}"${shut ? "" : ` aria-controls="${id}"`}>
+            ${icon(shut ? "chevron-right" : "chevron-down")}<span class="mny-bl-label">${esc(sec.label)}</span><span class="mny-sv-count">${sec.items.length}</span>
+            <span class="mny-bl-sum">${whole(sec.monthly, { sign: "none" })}<em>/ month</em> · ${whole(sec.yearly, { sign: "none" })}<em>/ year</em></span></button>
+          ${shut ? "" : `<div class="mny-subs-list" id="${id}">${sec.items.map(item).join("")}</div>`}</div>`;
+      }).join("")}</div>`;
+    }
+
+    function affordHtml() {
+      const a = S.afford;
+      const head = `<div class="mny-card-head"><span>Can I afford it?</span></div>`;
+      const on = a.on === "bank" ? "bank" : "card";
+      const form = `<form class="mny-af-form" data-afford-form novalidate>
+          <label class="mny-af-f"><span>Amount (${esc(C.currencySymbol())})</span>
+            <input class="form-control" name="amount" inputmode="numeric" autocomplete="off" placeholder="1500" data-keep="af-amount" data-afford-field="amount" value="${esc(a.amount)}"></label>
+          <label class="mny-af-f"><span>Payments</span>
+            <input class="form-control" name="payments" type="number" min="1" max="36" step="1" inputmode="numeric" data-keep="af-payments" data-afford-field="payments" value="${esc(a.payments)}"></label>
+          <label class="mny-af-f"><span>Date</span>
+            <input class="form-control" name="date" type="date" data-keep="af-date" data-afford-field="date" value="${esc(a.date || today())}"></label>
+          <label class="mny-af-f"><span>What is it? <span class="mny-muted">optional</span></span>
+            <input class="form-control" name="label" maxlength="60" autocomplete="off" placeholder="A new sofa" data-keep="af-label" data-afford-field="label" value="${esc(a.label)}"></label>
+          <div class="mny-af-f paid"><span id="mny-af-on-l">Paid</span>
+            <span class="mny-seg" role="radiogroup" aria-labelledby="mny-af-on-l">${[["card", "On the card"], ["bank", "From the bank"]].map(([k, l]) =>
+              `<button type="button" role="radio" aria-checked="${on === k}" class="${on === k ? "on" : ""}" data-afford-on="${k}">${l}</button>`).join("")}</span></div>
+          <button class="btn-primary mny-af-go" type="submit"${a.busy ? " disabled" : ""}>${a.busy ? `<span class="mny-spin"></span><span>Checking…</span>` : `${icon("scale")}<span>Check</span>`}</button>
+        </form>`;
+      let out = "";
+      if (a.error) out = `<div class="mny-af-err" role="alert">${icon("circle-alert")}<span>${esc(a.error)}</span></div>`;
+      else if (a.result) {
+        const t = C.affordText(a.result, today());
+        const ic = t.tone === "good" ? "circle-check" : t.tone === "warn" ? "circle-alert" : "octagon-alert";
+        out = `<div class="mny-af-verdict tone-${t.tone}">${icon(ic)}<span>${a.resultLabel ? `<span class="mny-af-what" dir="auto">${esc(a.resultLabel)}</span>` : ""}<strong>${esc(t.text)}</strong></span></div>
+          <ul class="mny-af-lines"><li>${esc(t.payments)}</li><li>${esc(t.drop)}</li>${t.payday ? `<li>${esc(t.payday)}</li>` : ""}</ul>
+          ${t.end ? `<div class="mny-chart-note">${esc(t.end)}</div>` : ""}`;
+      }
+      return head + form + `<div class="mny-af-out" aria-live="polite">${out}</div>`;
+    }
+
+    function plansHtml() {
+      const r = got("recurring"), b = got("balance");
+      const head = `<div class="mny-card-head"><span>Installments and income</span></div>`;
+      if (!r || !b) return head + rowsSkel(3);
+      const plans = (b.forecast && b.forecast.plans) || [];
+      const income = r.income || [];
+      const pRow = (p) => {
+        const pt = C.planText(p, today());
+        return `<button class="mny-sub" data-merchant="${esc(p.merchant)}" title="See every charge">
+          <span class="mny-sub-main"><bdi dir="auto" class="mny-sub-name">${esc(p.merchant)}</bdi>
+            <span class="mny-sub-meta">${esc([pt.left, pt.next, C.accountName(acctOf(p.account_id))].filter(Boolean).join(" · "))}</span></span>
+          <span class="mny-sub-amt"><span>${amt(p.left, { sign: "none" })}<em>to go</em></span>
+            <span class="mny-sub-mo">${esc(C.money(p.amount, { sign: "none" }))} a payment</span></span></button>`;
+      };
+      const iRow = (x) => {
+        const ca = C.cadenceAmount(x);
+        const meta = [C.cadenceLabel(x.cadence), x.next_date ? `next ${C.shortDate(x.next_date, today())}` : "", C.accountName(acctOf(x.account_id)) || x.account_label].filter(Boolean).join(" · ");
+        return `<button class="mny-sub" data-merchant="${esc(x.merchant)}" title="See every payment">
+          <span class="mny-sub-main"><bdi dir="auto" class="mny-sub-name">${esc(x.merchant)}</bdi><span class="mny-sub-meta">${esc(meta)}</span></span>
+          <span class="mny-sub-amt in"><span><bdi dir="ltr" class="mny-amt">+${esc(ca.amount)}</bdi><em>${esc(ca.per)}</em></span>
+            ${ca.monthly ? `<span class="mny-sub-mo">${esc(ca.monthly)}</span>` : ""}</span></button>`;
+      };
+      const section = (label, rows, empty) => `<div class="mny-sub-label">${label}</div>${rows.length ? `<div class="mny-subs-list">${rows.join("")}</div>` : `<div class="mny-empty slim">${empty}</div>`}`;
+      return head + section("Installment plans", plans.map(pRow), "No installment plan running.")
+        + section("Regular income", income.map(iRow), "No regular income found yet. It shows up after three regular payments.");
+    }
+
+    // ---- month by month (Where it went) and the bank balance (Plan) ----
+
     function cfHtml() {
       const cf = got("cashflow");
-      const head = `<div class="mny-card-head"><span>Money in and out</span><span class="mny-head-hint">12 months to ${esc(C.monthLabel(S.month, { short: true }))}</span></div>`;
+      const head = `<div class="mny-card-head"><span>Month by month</span><span class="mny-head-hint">in and out, 12 months to ${esc(C.monthLabel(S.month, { short: true }))}</span></div>`;
       if (!cf) return head + `<div class="mny-chart-skel dn-shimmer"></div>`;
       if (!cf.months.some((m) => m.income || m.spent || m.set_aside)) return `${head}<div class="mny-empty">Nothing in or out in these 12 months yet.</div>`;
       return head + `<div class="mny-chart-wrap" id="mny-cf-wrap"></div><div class="mny-legend wrap" id="mny-cf-legend"></div>
@@ -548,53 +761,6 @@
           ${low}${crossHtml(g)}
         </svg><div class="mny-tip hidden"></div>`;
       hoverPoints(wrap, g);
-    }
-
-    function fixedHtml() {
-      const ov = got("overview");
-      const r = got("recurring");
-      const b = got("balance");
-      const total = ov ? `<span class="mny-head-num">${amt(ov.fixed_monthly || 0, { sign: "none" })}<em>/ month</em></span>` : "";
-      const head = `<div class="mny-card-head"><span>Fixed costs</span>${total}</div>`;
-      if (!r) return head + rowsSkel(5);
-      const meta = (x, extra = []) => [C.cadenceLabel(x.cadence), x.next_date ? `next ${C.shortDate(x.next_date, today())}` : "", ...extra,
-                                       C.accountName(acctOf(x.account_id)) || x.account_label].filter(Boolean).join(" · ");
-      const item = (x) => {
-        const ca = C.cadenceAmount(x);
-        const up = x.price_change && x.price_change.to > x.price_change.from;
-        return `<button class="mny-sub" data-merchant="${esc(x.merchant)}" title="See every charge">
-          <span class="mny-sub-main"><bdi dir="auto" class="mny-sub-name">${esc(x.merchant)}</bdi>
-            <span class="mny-sub-meta">${esc(meta(x))}</span>
-            ${x.price_change ? `<span class="mny-flag ${up ? "up" : "down"}">${icon(up ? "arrow-up-right" : "arrow-down-right")}${esc(C.priceChangeText(x.price_change, today()))}</span>` : ""}</span>
-          <span class="mny-sub-amt${x.direction === "in" ? " in" : ""}"><span><bdi dir="ltr" class="mny-amt">${x.direction === "in" ? "+" : ""}${esc(ca.amount)}</bdi><em>${esc(ca.per)}</em></span>
-            ${ca.monthly ? `<span class="mny-sub-mo">${esc(ca.monthly)}</span>` : ""}</span></button>`;
-      };
-      const items = (r.items || []).filter((x) => x.direction !== "in");
-      const keys = new Set(items.map((x) => x.merchant_key));
-      const yearly = (r.yearly || []).filter((y) => !keys.has(y.merchant_key));
-      const plans = (b && b.forecast && b.forecast.plans) || [];
-      const yRow = (y) => {
-        const ca = C.cadenceAmount({ ...y, cadence: "yearly" });
-        const m = [y.next_date ? `next ${C.shortDate(y.next_date, today())}` : "", y.payments > 1 ? `in ${y.payments} payments` : "", y.category_label].filter(Boolean).join(" · ");
-        return `<button class="mny-sub" data-merchant="${esc(y.merchant)}" title="See every charge">
-          <span class="mny-sub-main"><bdi dir="auto" class="mny-sub-name">${esc(y.merchant)}</bdi><span class="mny-sub-meta">${esc(m)}</span></span>
-          <span class="mny-sub-amt"><span><bdi dir="ltr" class="mny-amt">${esc(ca.amount)}</bdi><em>${esc(ca.per)}</em></span>
-            ${ca.monthly ? `<span class="mny-sub-mo">${esc(ca.monthly)}</span>` : ""}</span></button>`;
-      };
-      const pRow = (p) => {
-        const pt = C.planText(p, today());
-        return `<button class="mny-sub" data-merchant="${esc(p.merchant)}" title="See every charge">
-          <span class="mny-sub-main"><bdi dir="auto" class="mny-sub-name">${esc(p.merchant)}</bdi>
-            <span class="mny-sub-meta">${esc([pt.left, pt.next, C.accountName(acctOf(p.account_id))].filter(Boolean).join(" · "))}</span></span>
-          <span class="mny-sub-amt"><span>${amt(p.left, { sign: "none" })}<em>to go</em></span>
-            <span class="mny-sub-mo">${esc(C.money(p.amount, { sign: "none" }))} a payment</span></span></button>`;
-      };
-      const section = (label, rows, empty) => `<div class="mny-sub-label">${label}</div>${rows.length ? `<div class="mny-subs-list">${rows.join("")}</div>` : `<div class="mny-empty slim">${empty}</div>`}`;
-      return head
-        + section("Recurring", items.map(item), "No subscriptions or standing orders found yet. They show up after three regular charges.")
-        + (yearly.length ? section("Yearly charges", yearly.map(yRow), "") : "")
-        + (plans.length ? section("Installment plans", plans.map(pRow), "") : "")
-        + ((r.income || []).length ? section("Regular income", r.income.map(item), "") : "");
     }
 
     // ================================ Investments ================================
@@ -998,12 +1164,12 @@
 
     function redraw() {
       if (S.tab === "overview") { drawPace(); drawUpSpark(); }
-      else if (S.tab === "spending") drawMonths();
-      else if (S.tab === "cashflow") { drawCf(); drawBal(); }
+      else if (S.tab === "spending") { drawFlow(); drawMonths(); drawCf(); }
+      else if (S.tab === "plan") drawBal();
       else if (S.tab === "investments") drawInv();
       icons();
     }
 
-    return { overview, spending, cashflow, save, investments, meals, redraw };
+    return { overview, spending, plan, save, investments, meals, redraw, drawFlow };
   };
 })();

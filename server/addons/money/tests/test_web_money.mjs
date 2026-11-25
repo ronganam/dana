@@ -17,7 +17,10 @@
  * (the money_il addon's test_money_il_meals.py: tiles, pace, cycle bars, the tab); the Save view from tests/fixtures/money_savings_web.json
  * (`WRITE_WEB_FIXTURE=1 bin/test test_money_savings`): the tab and its hash, sections (the user's choices always
  * listed), tiles, chips, the actions of each status and their PATCH bodies, the toasts, price check states and
- * offer rows, check answers, outcomes, target progress, subscription lines, links and the sparkline.
+ * offer rows, check answers, outcomes, target progress, subscription lines, links and the sparkline; Plan's
+ * payloads (money_web.json): left until payday and its breakdown, the Flow chart's periods, query and Sankey
+ * geometry (every node's links add up to it, narrow without groups, from savings), the bills register's words
+ * and "Can I afford it?" (the form → the query, the verdict in words); an old #money/cashflow opens Plan.
  *
  * Run: bin/test test_web_money [path-to-fixture]
  */
@@ -320,15 +323,18 @@ check("hash: the page's state round-trips", h.startsWith("#money?month=2026-10&v
       { month: "2026-10", view: "sources", tab: "overview", f: { q: "קפה", category: "food", account: "a1", min: "100", max: "", all: true } }));
 check("hash: the current month, the Overview and no filters is just #money", C.stateToHash({ month: "2026-11", view: "page", tab: "overview", f: {} }, "2026-11") === "#money"
       && same(C.stateFromHash("#money"), { month: null, view: "page", tab: "overview", f: plain(C.EMPTY_FILTERS) }));
-check("hash: the view is the path — #money/cashflow?month=2026-10, #money/spending?category=food — and round-trips",
-      C.stateToHash({ month: "2026-10", view: "page", tab: "cashflow", f: {} }, "2026-11") === "#money/cashflow?month=2026-10"
+check("hash: the view is the path — #money/plan?month=2026-10, #money/spending?category=food — and round-trips; an old #money/cashflow opens Plan",
+      C.stateToHash({ month: "2026-10", view: "page", tab: "plan", f: {} }, "2026-11") === "#money/plan?month=2026-10"
+      && C.stateFromHash("#money/cashflow?month=2026-10").tab === "plan" && C.stateFromHash("#money/cashflow").month === null
+      && C.tabOf("cashflow") === "plan" && C.tabOf("spending") === "spending" && C.tabOf("nope") === null
       && C.stateToHash({ month: "2026-11", view: "page", tab: "spending", f: { category: "food" } }, "2026-11") === "#money/spending?category=food"
       && same(C.stateFromHash("#money/transactions?q=wolt&all=1"), { month: null, view: "page", tab: "transactions", f: { ...plain(C.EMPTY_FILTERS), q: "wolt", all: true } })
       && C.TABS.every((t) => C.stateFromHash(C.stateToHash({ month: "2026-09", view: "page", tab: t, f: {} }, "2026-11")).tab === t));
 check("hash: another tab's hash is not ours; a bad month, amount or view is dropped", C.stateFromHash("#inbox") === null && C.stateFromHash("#moneyx") === null
       && C.stateFromHash("#money?month=2026-13&min=abc").month === null && C.stateFromHash("#money?month=2026-13&min=abc").f.min === ""
       && C.stateFromHash("#money/nope?month=2026-10").tab === "overview" && C.stateFromHash("#money/nope?month=2026-10").month === "2026-10"
-      && same(C.TABS, ["overview", "spending", "cashflow", "save", "investments", "meals", "transactions"]) && C.TAB_LABELS.cashflow === "Cash flow");
+      && same(C.TABS, ["overview", "spending", "plan", "save", "investments", "meals", "transactions"])
+      && C.TAB_LABELS.spending === "Where it went" && C.TAB_LABELS.plan === "Plan" && C.TAB_LABELS.cashflow === undefined);
 const chips = C.filterChips({ q: "wolt", category: "food", account: ov.cards[1].id, min: "100", max: "500" },
                             { categoryLabel: (k) => C.categoryLabel(taxonomy, k), accountLabel: (id) => C.accountName({ ...ov.cards.find((a) => a.id === id), kind: "card" }) });
 check("chips: the active filters in words", same(chips.map((c) => [c.key, c.label]), [["q", "“wolt”"], ["category", "Food"], ["account", "Sample Card ••8763"], ["amount", "₪100 – ₪500"]]));
@@ -398,15 +404,145 @@ check("errors: the server's message, not connected, too soon, offline", C.errorT
       && C.errorText(409, { error: "needs_attention", reason: "Sample Card wants a new password" }) === "Sample Card wants a new password" && /Can't reach Dana/.test(C.errorText(0, null))
       && /4 to 8 digits/.test(C.errorText(400, { error: "bad_code" })) && C.errorText(500, null) === "Something went wrong (HTTP 500).");
 
+// ---------- Left until payday, the Flow chart, bills, can I afford it (plan.py's payloads) ----------
+const pd = ov.payday;
+const pdt = plain(C.paydayTile(pd, "2026-11-18"));
+check("payday: the tile — what is left, a day until payday, on track; a past month has none",
+      pdt.value === 644110 && pdt.sub === "≈ ₪293 a day · payday 10 Dec" && same(pdt.status, { tone: "good", text: "On track" })
+      && pdt.late === "" && pdt.cycle === "10 Nov – 9 Dec" && pdt.tone === "" && past.payday === null && C.paydayTile(past.payday) === null, JSON.stringify(pdt));
+const tight = plain(C.paydayTile({ ...pd, left: 20000, per_day: 909, status: "tight", late: true }, "2026-11-18"));
+const over = plain(C.paydayTile({ ...pd, left: -45000, per_day: 0, status: "over" }, "2026-11-18"));
+check("payday: tight says what the usual pace needs, over by how much (and no per day), a late salary says so",
+      same(tight.status, { tone: "warn", text: "Tight: your usual pace needs ₪320" }) && tight.late === "Salary is late"
+      && same(over.status, { tone: "bad", text: "Over by ₪450" }) && over.tone === "neg" && over.sub === "payday 10 Dec · 22 days to go", JSON.stringify([tight, over]));
+const pdb = plain(C.paydayBreakdown(pd, "2026-11-18"));
+check("payday: the breakdown adds up to what is left; still due lists each charge with its day; empty lines left out",
+      pdb.lines.reduce((a, l) => a + l.amount, 0) === pd.left && pdb.left === 644110
+      && same(pdb.lines.map((l) => l.key), ["income", "yearly", "due", "everyday"])
+      && same(pdb.lines.find((l) => l.key === "due").items.map((e) => [e.day, e.amount]), [["20 Nov", -450000], ["1 Dec", -6000], ["3 Dec", -4990]])
+      && pdb.more === "" && pdb.oneOff === "" && pdb.cycle === "Pay cycle 10 Nov – 9 Dec" && pdb.salary.startsWith("Salary ₪15,000 from ⁨"), JSON.stringify(pdb));
+const pdb2 = plain(C.paydayBreakdown({ ...pd, due: pd.due.slice(0, 1), one_off: 250000, fixed: 10000, left: pd.left - 10000 }, "2026-11-18"));
+check("payday: one-offs are reported, not counted; charges the list leaves out are named as a sum",
+      pdb2.oneOff.startsWith("One-offs this pay cycle: ₪2,500, not counted") && pdb2.more === "and ₪110 more"
+      && pdb2.lines.reduce((a, l) => a + l.amount, 0) === pdb2.left, JSON.stringify(pdb2));
+
+check("flow: the period choices — the page's month, the pay cycles only with a payday, this and last year",
+      same(plain(C.flowPeriods("2026-11", "2026-11", true)).map((p) => p.key), ["month", "this_pay_cycle", "last_pay_cycle", "this_year", "last_year"])
+      && C.flowPeriods("2026-11", "2026-11", true)[0].label === "This month"
+      && same(plain(C.flowPeriods("2026-10", "2026-11", false)).map((p) => p.label), ["Oct 2026", "This year", "Last year"]));
+check("flow: the query — the page's month or a period name, by kind or account (as the fixture asked)",
+      same(params("GET /api/money/flow?" + C.flowQuery("month", "2026-10", "account")), params(F.flow_accounts.request))
+      && same(params("GET /api/money/flow?" + C.flowQuery("this_pay_cycle", "2026-11", "kind")), { ...params(F.flow_cycle.request), by: "kind" })
+      && C.flowQuery("last_year", "2026-11", "nope") === "period=last_year&by=kind");
+check("flow: the summary line and shares of income", C.flowSummary(body("flow")) === "In ₪15,173 · spent ₪6,310 · left over ₪8,863"
+      && C.flowSummary({ income: 100000, spent: 120000, set_aside: 30000, from_savings: 50000, left_over: 0 }) === "In ₪1,000 · spent ₪1,200 · set aside ₪300 · ₪500 from savings"
+      && C.flowShare(453990, 1517300) === "30% of income" && C.flowShare(3990, 1517300) === "0.3% of income" && C.flowShare(100, 0) === "");
+const LH = 31;
+/** Every node's links in and out add up to it; labels in a column at least a label apart; inside the chart. */
+function flowSound(g, f) {
+  const inn = {}, out = {};
+  g.links.forEach((l) => { out[l.from] = (out[l.from] || 0) + l.value; inn[l.to] = (inn[l.to] || 0) + l.value; });
+  const bad = [];
+  g.nodes.forEach((n) => {
+    if (n.type !== "source" && n.type !== "savings" && !(n.type === "income" && !g.nodes.some((x) => x.type === "source")) && inn[n.i] !== n.amount) bad.push(`in ${n.key}`);
+    if (["source", "income", "savings"].includes(n.type) && out[n.i] !== n.amount) bad.push(`out ${n.key}`);
+    if (n.type === "middle" && !g.narrow && out[n.i] !== n.amount) bad.push(`out ${n.key}`);
+    if (n.y < g.T - 0.1 || n.y + n.h > g.H - g.B + 0.2) bad.push(`outside ${n.key}`);
+  });
+  for (let c = 0; c < 4; c++) {
+    const ys = g.nodes.filter((n) => n.col === c).map((n) => n.tag.y).sort((a, b) => a - b);
+    ys.forEach((y, i) => { if (i && y - ys[i - 1] < LH - 0.2) bad.push(`labels col ${c}`); });
+    const xs = new Set(g.nodes.filter((n) => n.col === c).map((n) => n.x));
+    if (xs.size > 1) bad.push(`x col ${c}`);
+  }
+  if (g.links.some((l) => g.nodes[l.from].x >= g.nodes[l.to].x)) bad.push("backwards");
+  return bad;
+}
+const flg = C.flowGeometry(body("flow"), { width: 900 });
+const flgN = (key, type) => flg.nodes.find((n) => n.key === key && (!type || n.type === type));
+check("flow: the Sankey — sources → Income → kinds and left over → groups, every node's links adding up to it",
+      flowSound(flg, body("flow")).length === 0 && flg.cols === 4
+      && same(flg.nodes.filter((n) => n.col === 2).map((n) => n.key), ["fixed", "everyday", "left_over"])
+      && same(flg.nodes.filter((n) => n.col === 3).map((n) => `${n.parent}:${n.key}`), ["fixed:housing", "fixed:bills", "everyday:food", "everyday:health"])
+      && flgN("income").amount === 1517300 && flgN("left_over").amount === 886310 && flgN("food").share === "10% of income"
+      && flgN("fixed").slot === "cf-fixed" && flgN("food").slot === "g-food" && flgN("left_over").slot === "fl-left", JSON.stringify(flowSound(flg)));
+check("flow: one scale — a node as tall as its amount; a link a ribbon from its source's right edge to its target's left",
+      Math.abs(flgN("income").h - 1517300 * flg.k) < 0.11 && Math.abs(flgN("salary").h - 1500000 * flg.k) < 0.11
+      && flg.links.every((l) => /^M[\d.]+,[\d.]+ C.* L.* C.* Z$/.test(l.d) && l.text.startsWith("₪"))
+      && flgN("bills").h === 1 && flgN("salary").tag.anchor === "end" && flgN("food").tag.anchor === "start" && flgN("food").tag.amount === "₪1,550");
+const fgc = C.flowGeometry(body("flow_cycle"), { width: 900 }), fga = C.flowGeometry(body("flow_accounts"), { width: 900 });
+check("flow: a pay cycle and by account read the same way (accounts take the rank colours)", flowSound(fgc).length === 0 && flowSound(fga).length === 0
+      && fga.nodes.filter((n) => n.type === "middle").map((n) => n.slot).join() === "inv-a0,inv-a1"
+      && fga.nodes.find((n) => n.type === "middle").label === "Sample Bank ••••901", JSON.stringify([flowSound(fgc), flowSound(fga)]));
+const narrowG = C.flowGeometry(body("flow"), { width: 343, narrow: true });
+check("flow: narrow — no group column (the page lists them under the chart), still sound and inside the width",
+      narrowG.cols === 3 && !narrowG.nodes.some((n) => n.type === "group") && flowSound(narrowG).length === 0
+      && Math.max(...narrowG.nodes.map((n) => n.x + n.w)) <= 343 - 90 && narrowG.nodes.every((n) => n.tag.name.length <= 12)
+      && same(plain(C.flowGroups(body("flow"))).map((m) => [m.key, m.slot, m.groups.map((x) => x.key).join()]), [["fixed", "cf-fixed", "housing,bills"], ["everyday", "cf-everyday", "food,health"]]));
+const savF = { by: "kind", income: 100000, spent: 120000, set_aside: 30000, left_over: 0, from_savings: 50000, sources: [{ key: "salary", label: "Salary", amount: 100000 }],
+               middle: [{ key: "everyday", label: "Everyday", amount: 80000, groups: [{ key: "food", label: "Food", amount: 80000 }] },
+                        { key: "one_off", label: "One-offs", amount: 40000, groups: [{ key: "shopping", label: "Shopping", amount: 25000 }, { key: "food", label: "Food", amount: 15000 }] }] };
+const sg = C.flowGeometry(savF, { width: 900 });
+const sgLinks = (from) => sg.links.filter((l) => sg.nodes[l.from].key === from).map((l) => `${sg.nodes[l.to].key}:${l.value}`).join();
+check("flow: spending more than came in — From savings under Income pays what income doesn't; a group under two kinds is two nodes",
+      flowSound(sg).length === 0 && sgLinks("income") === "everyday:80000,one_off:20000" && sgLinks("from_savings") === "one_off:20000,set_aside:30000"
+      && sg.nodes.filter((n) => n.key === "food").length === 2 && sg.nodes.find((n) => n.key === "from_savings").col === 1
+      && !sg.nodes.some((n) => n.key === "left_over") && C.flowGeometry({ by: "kind", income: 0, spent: 0, set_aside: 0, left_over: 0, from_savings: 0, sources: [], middle: [] }) === null,
+      JSON.stringify(flowSound(sg)));
+const many = { ...savF, from_savings: 0, set_aside: 0, income: 500000, left_over: 380000,
+               middle: [{ key: "everyday", label: "Everyday", amount: 120000, groups: Array.from({ length: 14 }, (_, i) => ({ key: `g${i}`, label: `Group ${i}`, amount: i ? 5000 : 55000 })) }] };
+const manyG = C.flowGeometry({ ...many, sources: [{ key: "salary", label: "Salary", amount: 500000 }] }, { width: 900 });
+check("flow: many small groups — the chart grows so every label has its own line", flowSound(manyG).length === 0 && manyG.H >= 14 * LH && manyG.H > 280, JSON.stringify(flowSound(manyG)));
+check("flow: labels pushed apart, kept in range", same(plain(C.spreadLabels([10, 12, 13, 100], 10, 0, 200)), [10, 20, 30, 100])
+      && same(plain(C.spreadLabels([95, 96], 10, 0, 100)), [90, 100]));
+
+const bitems = body("bills").sections.flatMap((x) => x.items);
+const bi = (m) => plain(C.billText(bitems.find((x) => x.merchant === m) || body("bills_about").sections[0].items.find((x) => x.merchant === m), "2026-11-18"));
+check("bills: each item in its cadence's words, a yearly one with its payments and renewal, the price change, the account",
+      same(bi("משכנתא לאומי"), { words: "₪4,500 a month", next: "next 20 Nov", price: "", up: false, variable: false, account: "Sample Bank ••••901" })
+      && bi("ביטוח רכב ישיר").words === "₪2,836 a year in 4 payments · renews 16 Nov 2027" && bi("ביטוח רכב ישיר").next === "" && bi("ביטוח רכב ישיר").account === "Card"
+      && same(bi("NETFLIX.COM"), { words: "₪49.90 a month", next: "next 3 Dec", price: "₪39.90 → ₪49.90 since Nov", up: true, variable: false, account: "Sample Card 8763" })
+      && bi("NAMECHEAP").words === "₪60 a year · renews 1 Dec", JSON.stringify([bi("ביטוח רכב ישיר"), bi("NAMECHEAP")]));
+check("bills: a bimonthly or weekly charge is never shown as a month's; one that varies says so",
+      plain(C.billText({ cadence: "bimonthly", amount: 11730, monthly: 5865, next_date: "2026-12-03", variable: true }, "2026-11-18")).words === "₪117.30 every 2 months · ≈ ₪58.65 a month"
+      && C.billText({ cadence: "bimonthly", amount: 11730, monthly: 5865, variable: true }).variable === true
+      && C.billText({ cadence: "weekly", amount: 5000, monthly: 21740 }).words === "₪50 a week · ≈ ₪217.40 a month");
+check("bills: the header — a month, a year, the share of a typical month's income when there is one; the sections add up",
+      same(plain(C.billsHeader(body("bills"))), { monthly: 479123, yearly: 5749480, share: "" })
+      && C.billsHeader({ monthly: 481500, yearly: 5778000, income_share: 0.321 }).share === "32% of a typical month's income"
+      && body("bills").sections.reduce((a, x) => a + x.monthly, 0) === body("bills").monthly
+      && body("bills").sections.every((x) => x.items.reduce((a, i) => a + i.monthly, 0) === x.monthly && x.items.every((i) => "saving" in i)));
+
+check("afford: the form → the query, only what differs from the defaults, the amount in hundredths (as the fixture asked)",
+      same(params("GET /api/money/afford?" + C.affordQuery({ amount: "6000", payments: "12", date: "2026-11-18", on: "card" }, "2026-11-18").query), params(F.afford.request))
+      && same(params("GET /api/money/afford?" + C.affordQuery({ amount: "₪1,500", payments: "1", on: "bank", label: " Sofa " }, "2026-11-18").query), params(F.afford_bank.request))
+      && C.affordQuery({ amount: "900", payments: "", date: "2026-12-01" }, "2026-11-18").query === "amount=90000&date=2026-12-01");
+check("afford: a bad amount, payments or date is said, nothing sent",
+      C.affordQuery({ amount: "" }).error.startsWith("Type the amount") && C.affordQuery({ amount: "12.5" }).query === ""
+      && C.affordQuery({ amount: "100", payments: "37" }).error === "Payments: a whole number from 1 to 36." && C.affordQuery({ amount: "100", payments: "0" }).query === ""
+      && C.affordQuery({ amount: "100", date: "tomorrow" }).error !== "" && C.wholeAgorot("1,500 €") === 150000 && C.wholeAgorot("0") === null);
+const at1 = plain(C.affordText(body("afford"), "2026-11-18")), at2 = plain(C.affordText(body("afford_bank"), "2026-11-18"));
+check("afford: the verdict in words, the drop, each payment, left until payday before → after",
+      at1.tone === "good" && at1.text === "Fine — your lowest balance after it would be ₪12,726 on 20 Dec" && at1.drop === "₪500 lower than without it (₪13,226 on 20 Dec)"
+      && at1.payments === "12 payments of ₪500 on the card, from 19 Nov" && at1.payday === "Left until payday: ₪6,441 → ₪5,941"
+      && at2.payments === "₪1,500 from the bank on 19 Nov" && at2.payday === "Left until payday: ₪6,441 → ₪4,941" && at1.end === "Forecast to 19 Nov 2027; one-offs left out",
+      JSON.stringify([at1, at2]));
+const atT = plain(C.affordText({ ...body("afford"), verdict: "tight", after: { ...body("afford").after, low: { balance: 120000, date: "2026-12-20" } }, left_until_payday: null }, "2026-11-18"));
+const atS = plain(C.affordText({ ...body("afford"), verdict: "short", drop: 0, after: { ...body("afford").after, low: { balance: -35000, date: "2027-01-10" } } }, "2026-11-18"));
+check("afford: tight and short, and why Dana can't answer without a bank balance",
+      atT.tone === "warn" && atT.text === "Tight — your balance goes down to ₪1,200 on 20 Dec" && atT.payday === ""
+      && atS.tone === "bad" && atS.text === `Short — your balance would go below zero, to ${M}₪350 on 10 Jan 2027` && atS.drop === "Your lowest balance stays where it is"
+      && C.affordError(409, { error: "no_balance" }).startsWith("Dana needs a bank balance to answer this") && C.affordError(400, { message: "amount must be positive" }) === "amount must be positive");
+
 // ---------- Investments (tests/fixtures/money_portfolio_web.json) ----------
 const PF = JSON.parse(fs.readFileSync(path.join(SERVER, "tests", "fixtures", "money_portfolio_web.json"), "utf8"));
 const pf = PF.portfolio.body;
 const pov = PF.overview.body;
 const PNOW = Date.parse("2026-11-18T12:00:00Z");
 check("investments: the tab only with an investment account (or when asked for in the hash)",
-      same(C.visibleTabs({}, "overview"), ["overview", "spending", "cashflow", "save", "transactions"])
-      && same(C.visibleTabs({}, "investments"), ["overview", "spending", "cashflow", "save", "investments", "transactions"])
-      && same(C.visibleTabs({ investments: pov.investments.length > 0 }, "overview"), ["overview", "spending", "cashflow", "save", "investments", "transactions"])
+      same(C.visibleTabs({}, "overview"), ["overview", "spending", "plan", "save", "transactions"])
+      && same(C.visibleTabs({}, "investments"), ["overview", "spending", "plan", "save", "investments", "transactions"])
+      && same(C.visibleTabs({ investments: pov.investments.length > 0 }, "overview"), ["overview", "spending", "plan", "save", "investments", "transactions"])
       && C.stateToHash({ month: "2026-11", view: "page", tab: "investments", f: {} }, "2026-11") === "#money/investments"
       && C.stateFromHash("#money/investments").tab === "investments" && C.TAB_LABELS.investments === "Investments");
 check("investments: kinds' icons and words; the account's name ends in its last three digits",
@@ -487,10 +623,10 @@ const parts = plain(C.saveSections(sv.items, DAY));
 const secs = (g) => Object.fromEntries(parts.find((p) => p.group === g).sections.map((s) => [s.key, s.items.map((i) => i.key)]));
 const order = (keys) => keys.every((k, i) => i === 0 || sv.items.findIndex((x) => x.key === keys[i - 1]) < sv.items.findIndex((x) => x.key === k));
 
-check("save: the tab sits between Cash flow and Investments, #money/save, not tied to the month (nor Investments)",
-      C.TABS.indexOf("save") === C.TABS.indexOf("cashflow") + 1 && C.TABS.indexOf("investments") === C.TABS.indexOf("save") + 1 && C.TAB_LABELS.save === "Save"
+check("save: the tab sits between Plan and Investments, #money/save, not tied to the month (nor Plan, Investments)",
+      C.TABS.indexOf("save") === C.TABS.indexOf("plan") + 1 && C.TABS.indexOf("investments") === C.TABS.indexOf("save") + 1 && C.TAB_LABELS.save === "Save"
       && C.stateToHash({ month: "2026-11", view: "page", tab: "save", f: {} }, "2026-11") === "#money/save" && C.stateFromHash("#money/save").tab === "save"
-      && !C.usesMonth("save") && !C.usesMonth("investments") && ["overview", "spending", "cashflow", "transactions"].every(C.usesMonth));
+      && !C.usesMonth("save") && !C.usesMonth("investments") && !C.usesMonth("plan") && ["overview", "spending", "transactions"].every(C.usesMonth));
 
 // ---- Meal card (tests/fixtures/money_meals_web.json, from the money_il addon's test_money_il_meals.py) ----
 const ML = JSON.parse(fs.readFileSync(path.join(SERVER, "tests", "fixtures", "money_meals_web.json"), "utf8"));
@@ -498,9 +634,9 @@ const ml = ML.meals.body;
 const mcur = ml.accounts[0].current;
 const MDAY = mcur.start;  // the fixture's cycle holds the day it was written; any day of that year reads the same
 check("meals: the tab only with a meal card (or when asked for), after Investments, not tied to the month",
-      same(C.visibleTabs({ meals: ML.overview_meals.body.length > 0 }, "overview"), ["overview", "spending", "cashflow", "save", "meals", "transactions"])
+      same(C.visibleTabs({ meals: ML.overview_meals.body.length > 0 }, "overview"), ["overview", "spending", "plan", "save", "meals", "transactions"])
       && same(C.visibleTabs({ investments: true, meals: true }, "overview"), C.TABS.slice())
-      && same(C.visibleTabs({}, "meals"), ["overview", "spending", "cashflow", "save", "meals", "transactions"])
+      && same(C.visibleTabs({}, "meals"), ["overview", "spending", "plan", "save", "meals", "transactions"])
       && C.TABS.indexOf("meals") === C.TABS.indexOf("investments") + 1 && C.TAB_LABELS.meals === "Meal card" && !C.usesMonth("meals")
       && C.stateFromHash("#money/meals").tab === "meals" && C.kindIcon("meal") === "utensils" && C.kindWord("meal") === "Meal card");
 const mt = plain(C.mealTiles(ml, MDAY));
@@ -646,7 +782,8 @@ check("save: subscription lines — the charge at its cadence, a year, the next 
 check("save: evidence links — the merchant or category over all time in Transactions, or the named view",
       same(plain(C.savingLink(svi(BILL).evidence.link)), { tab: "transactions", f: { ...plain(C.EMPTY_FILTERS), q: "סלולר הצפון", all: true }, label: "See these charges" })
       && plain(C.savingLink(svi("subscriptions").evidence.link)).f.category === "subscriptions"
-      && same(plain(C.savingLink(svi(CASH).evidence.link)), { tab: "investments", f: null, label: "Open Investments" }) && C.savingLink(svi("cushion").evidence.link).tab === "cashflow"
+      && same(plain(C.savingLink(svi(CASH).evidence.link)), { tab: "investments", f: null, label: "Open Investments" }) && C.savingLink(svi("cushion").evidence.link).tab === "plan"
+      && C.savingLink(svi("cushion").evidence.link).label === "Open Plan"
       && C.savingLink(svi(FX).evidence.link).label === "Open Transactions" && C.savingLink({ view: "nowhere" }) === null && C.savingLink(null) === null);
 const spk = plain(C.seriesSpark(svi(BILL).evidence.series, { width: 180, height: 44 }, DAY));
 check("save: the evidence sparkline — every point by date, from zero, the dates it covers; under 2 points none",

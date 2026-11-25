@@ -549,7 +549,7 @@ def _cushion(ctx: Context) -> List[Dict[str, Any]]:
         saving=saving, at_stake=saving["high"] if saving else None, effort=make_effort(10, "app"),
         evidence=make_evidence([f"Lowest balance in the last {CUSHION_DAYS} days: {sh(floor)} on {day_text(low_point['date'])}",
                             f"A month of fixed costs is about {sh(fixed)}"],
-                           [{"date": p["date"], "amount": p["balance"]} for p in history], {"view": "cashflow"}),
+                           [{"date": p["date"], "amount": p["balance"]} for p in history], {"view": "plan"}),
         math_lines=[f"{sh(floor)} − {sh(fixed)} (a month of fixed costs) = {sh(idle_fixed)}",
                     f"{sh(floor)} − {sh(CUSHION_BUFFER)} = {sh(idle_buffer)}",
                     f"× {percent(y)} a year (the {ctx.bank} rate {percent(ctx.rate['rate'])} minus fees)"],

@@ -500,7 +500,7 @@
    "title": "סלולר הצפון went up ₪40 a month",
    "type": "bill"
   },
-  "undo_id": "97942a4ac748"
+  "undo_id": "8e2cf88f32e5"
  },
  "savings": {
   "as_of": "2026-11-18",
@@ -650,7 +650,7 @@
       "A month of fixed costs is about ₪6,087.40"
      ],
      "link": {
-      "view": "cashflow"
+      "view": "plan"
      },
      "series": [
       {
@@ -1082,7 +1082,7 @@
     },
     "first_seen": "2026-11-18",
     "group": "save",
-    "key": "cash:8911a0cc896a48868cbc3996a2169815",
+    "key": "cash:1908fbe484304564a8cbe624d08c6cae",
     "market": null,
     "math": [
      "₪25,000.00 × (4.25% − 0.3%) = ₪987.50 a year",
@@ -1552,7 +1552,7 @@
     },
     "first_seen": "2026-11-18",
     "group": "save",
-    "key": "fx:f92b676f49294e4c9b755d0cc4ccf36d",
+    "key": "fx:796ff5e7b445437b8fe9b5d331e90722",
     "market": {
      "checked_at": "2026-11-18T07:01:00+00:00",
      "error": null,
@@ -2313,11 +2313,11 @@
        "date": "2026-09-14"
       },
       {
-       "amount": 9500,
+       "amount": 15000,
        "date": "2026-09-15"
       },
       {
-       "amount": 15000,
+       "amount": 9500,
        "date": "2026-09-15"
       },
       {
@@ -2339,7 +2339,7 @@
     "key": "spree:חנות הצפון אונליין:2026-09-14",
     "market": null,
     "math": [
-     "₪120.00 + ₪95.00 + ₪150.00 + ₪80.00 + ₪60.00 + ₪110.00 = ₪615.00"
+     "₪120.00 + ₪150.00 + ₪95.00 + ₪80.00 + ₪60.00 + ₪110.00 = ₪615.00"
     ],
     "new": true,
     "outcome": null,

@@ -845,7 +845,7 @@ def insights_for(book: Book, month: Optional[str] = None, fc: Optional[Dict[str,
             title = (f"Lowest balance in the next {soon['days']} days: {sh(soon['balance'])} on "
                      f"{periods.short_date(_date(soon['date']), False)}")
         out.append({"kind": "low_point", "tone": tone, "title": title, "detail": detail,
-                    "amount": soon["balance"], "link": {"view": "cashflow"}})
+                    "amount": soon["balance"], "link": {"view": "plan"}})
     if not t["in_progress"] and this["income"] > 0:
         typical_net = cf["typical"]["net"]
         tone = "good" if this["net"] > 0 else "bad"
@@ -859,7 +859,7 @@ def insights_for(book: Book, month: Optional[str] = None, fc: Optional[Dict[str,
                        else f". A typical month spends {sh(-typical_net)} more than it earns")
         out.append({"kind": "net", "tone": tone,
                     "title": (f"Saved {sh(this['net'])}" if this["net"] >= 0 else f"Spent {sh(-this['net'])} more than earned"),
-                    "detail": detail + ".", "amount": this["net"], "link": {"view": "cashflow"}})
+                    "detail": detail + ".", "amount": this["net"], "link": {"view": "spending"}})
     for m in t["movers"][:3]:
         if m["direction"] == "new":
             title, tone = f"{m['label']}: {sh(m['value'])}, usually nothing", "info"
@@ -883,21 +883,21 @@ def insights_for(book: Book, month: Optional[str] = None, fc: Optional[Dict[str,
                         "title": f"{item['merchant']} {'up' if up else 'down'} to {sh(ch['to'])}",
                         "detail": f"Was {sh(ch['from'])} {insights.cadence_text(item['cadence'])}: "
                                   f"{sh(abs(per_year))} a year {'more' if up else 'less'}.",
-                        "amount": ch["to"] - ch["from"], "link": {"view": "cashflow"}})
+                        "amount": ch["to"] - ch["from"], "link": {"view": "plan"}})
     soon = (book.today + datetime.timedelta(days=45)).isoformat()
     for y in book.yearly if t["in_progress"] else ():
         if book.today.isoformat() < y["next_date"] <= soon:
             out.append({"kind": "yearly_soon", "tone": "info",
                         "title": f"{y['merchant']} {sh(y['amount'])} around {periods.short_date(_date(y['next_date']), False)}",
                         "detail": f"Once a year (last on {periods.short_date(_date(y['last_date']))}); it is in the forecast.",
-                        "amount": y["amount"], "link": {"view": "cashflow"}})
+                        "amount": y["amount"], "link": {"view": "plan"}})
     if fc and t["in_progress"] and fc["plans"]:
         left = sum(p["left"] for p in fc["plans"])
         names = ", ".join(p["merchant"] for p in fc["plans"][:3])
         if left:
             out.append({"kind": "installments", "tone": "info",
                         "title": f"{sh(left)} left on installment plans",
-                        "detail": f"{len(fc['plans'])} running: {names}.", "amount": left, "link": {"view": "cashflow"}})
+                        "detail": f"{len(fc['plans'])} running: {names}.", "amount": left, "link": {"view": "plan"}})
     if t["one_offs"]:
         big = t["one_offs"][0]
         rest = len(t["one_offs"]) - 1
@@ -916,7 +916,7 @@ def insights_for(book: Book, month: Optional[str] = None, fc: Optional[Dict[str,
     if set_aside > 0:
         out.append({"kind": "set_aside", "tone": "good", "title": f"Set aside {sh(set_aside)} in {first.year}",
                     "detail": "Investments and savings; not counted as spending.", "amount": set_aside,
-                    "link": {"view": "cashflow"}})
+                    "link": {"view": "spending"}})
     return out
 
 
