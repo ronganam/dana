@@ -350,7 +350,7 @@ private fun SavingBody(money: MoneyController, it: SavingItem, day: String?) {
 private fun viewOf(view: String): MoneyView? = when (view) {
     "overview" -> MoneyView.OVERVIEW
     "spending" -> MoneyView.SPENDING
-    "cashflow" -> MoneyView.CASHFLOW
+    "cashflow", "plan" -> MoneyView.CASHFLOW
     "save" -> MoneyView.SAVE
     "investments" -> MoneyView.INVESTMENTS
     "meals" -> MoneyView.MEALS

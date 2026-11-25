@@ -371,7 +371,7 @@ object MoneySave {
     }
 
     private val VIEW_LABELS = mapOf(
-        "overview" to "Overview", "spending" to "Spending", "cashflow" to "Cash flow", "save" to "Save",
+        "overview" to "Overview", "spending" to "Spending", "cashflow" to "Cash flow", "plan" to "Cash flow", "save" to "Save",
         "investments" to "Investments", "meals" to "Meal card", "transactions" to "Transactions"
     )
 

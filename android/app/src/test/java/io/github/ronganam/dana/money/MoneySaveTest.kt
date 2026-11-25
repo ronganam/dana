@@ -229,7 +229,7 @@ class MoneySaveTest {
         MoneySave.link(svi(bill).evidence.link)!!.let { assertEquals(listOf("transactions", "סלולר הצפון", "See these charges"), listOf(it.view, it.q, it.label)) }
         assertEquals("subscriptions", MoneySave.link(svi("subscriptions").evidence.link)!!.category)
         assertEquals("investments" to "Open Investments", MoneySave.link(svi(cash).evidence.link)!!.let { it.view to it.label })
-        assertEquals("cashflow", MoneySave.link(svi("cushion").evidence.link)!!.view)
+        assertEquals("plan", MoneySave.link(svi("cushion").evidence.link)!!.view)
         assertEquals("Open Transactions", MoneySave.link(svi(fx).evidence.link)!!.label)
         assertNull(MoneySave.link(EvidenceLink("nowhere", null, null)))
         assertNull(MoneySave.link(null))

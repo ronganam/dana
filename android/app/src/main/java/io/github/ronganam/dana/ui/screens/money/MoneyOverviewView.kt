@@ -124,7 +124,7 @@ internal fun follow(money: MoneyController, link: io.github.ronganam.dana.data.m
     if (link.category != null) money.setFilter(money.filter.value.copy(category = link.category, allTime = false))
     val view = when (link.view) {
         "spending" -> MoneyView.SPENDING
-        "cashflow" -> MoneyView.CASHFLOW
+        "cashflow", "plan" -> MoneyView.CASHFLOW
         "save" -> MoneyView.SAVE
         "investments" -> MoneyView.INVESTMENTS
         "meals" -> MoneyView.MEALS
