@@ -64,8 +64,8 @@ android {
         applicationId = "io.github.ronganam.dana"
         minSdk = 26
         targetSdk = 36
-        versionCode = 64
-        versionName = "10.5.0"
+        versionCode = 65
+        versionName = "10.6.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // LAN resolvers the TV asks when the system DNS has no answer (comma-separated).
         buildConfigField("String", "LAN_DNS_SERVERS", quoted(siteValue("LAN_DNS_SERVERS")))
