@@ -8,9 +8,13 @@
     DELETE /api/devices/pairings/{id} → {ok}: the code stops working
     POST   /api/pair {code, name?, kind}   (public, rate-limited per client)
            → {token, device, user: {id, name}, server: {version}}
-    GET    /api/devices[?user=<id>|all] → {devices: [{…, current, user_name?}]}
+    GET    /api/devices[?user=<id>|all] → {devices: [{…, current, user_name?}],
+           unpaired_tokens: [{id, user_id, label, created_at, last_used_at, current, user_name?}]}
+           ``unpaired_tokens``: the same users' tokens of no device ("Signed in
+           without pairing": issued by hand; never the token or its hash)
     PATCH  /api/devices/{id} {name?, room?, role?} → {device}
     DELETE /api/devices/{id} → {ok}: its token stops working at once
+    DELETE /api/devices/tokens/{id} → {ok}: a token of no device stops working at once
 
 A user sees and changes only their own devices; ``?user=`` / ``all`` and
 another user's device need ``manage_users`` (someone else's device answers
@@ -26,7 +30,7 @@ from urllib.parse import urlencode
 from aiohttp import web
 
 from core import devices, public_url, ratelimit, users
-from core.auth import request_device, request_user
+from core.auth import request_device, request_token_id, request_user
 from core.devices import Device, PairingError
 from core.pages_api import server_version
 from core.users import User
@@ -165,20 +169,49 @@ async def pair_api(request: web.Request) -> web.Response:
                               "server": {"version": server_version()}})
 
 
+def _token_payload(token: users.Token, current_token: Optional[str], with_user: bool = False) -> Dict[str, Any]:
+    out = {"id": token.id, "user_id": token.user_id, "label": token.label, "created_at": token.created_at,
+           "last_used_at": token.last_used_at, "current": current_token is not None and current_token == token.id}
+    if with_user:
+        owner = users.get(token.user_id)
+        out["user_name"] = owner.name if owner else ""
+    return out
+
+
+def _listing(request: web.Request, user_id: Optional[str], with_user: bool) -> web.Response:
+    current, current_token = request_device(request), request_token_id(request)
+    found = devices.list_all() if user_id is None else devices.list_for(user_id)
+    return web.json_response({
+        "devices": [_device_payload(d, current, with_user) for d in found],
+        "unpaired_tokens": [_token_payload(t, current_token, with_user) for t in devices.unpaired_tokens(user_id)]})
+
+
 async def list_devices_api(request: web.Request) -> web.Response:
     """GET /api/devices[?user=<id>|all]"""
     caller = request_user(request)
-    current = request_device(request)
     wanted = (request.query.get("user") or "").strip()
     if not wanted or wanted == caller.id:
-        return web.json_response({"devices": [_device_payload(d, current) for d in devices.list_for(caller.id)]})
+        return _listing(request, caller.id, False)
     if not caller.level.allows("manage_users"):
         return _forbidden("manage_users")
     if wanted == "all":
-        return web.json_response({"devices": [_device_payload(d, current, True) for d in devices.list_all()]})
+        return _listing(request, None, True)
     if users.get(wanted) is None:
         return web.json_response({"error": "user_not_found"}, status=404)
-    return web.json_response({"devices": [_device_payload(d, current, True) for d in devices.list_for(wanted)]})
+    return _listing(request, wanted, True)
+
+
+async def revoke_token_api(request: web.Request) -> web.Response:
+    """DELETE /api/devices/tokens/{id} — a token of no device: the caller's
+    own, or anyone's with ``manage_users`` (someone else's, a device's or an
+    unknown id: 404)."""
+    caller = request_user(request)
+    token = devices.unpaired_token(request.match_info["id"])
+    if token is None or not (token.user_id == caller.id or caller.level.allows("manage_users")):
+        return _not_found()
+    users.revoke_token(token.id)
+    logger.info(f"Token {token.id} of user {token.user_id} (no device) revoked by user {caller.id}")
+    return web.json_response({"ok": True})
 
 
 async def update_device_api(request: web.Request) -> web.Response:
@@ -216,4 +249,5 @@ def setup(app: web.Application) -> None:
     app.router.add_post("/api/pair", pair_api)
     app.router.add_get("/api/devices", list_devices_api)
     app.router.add_patch("/api/devices/{id}", update_device_api)
+    app.router.add_delete("/api/devices/tokens/{id}", revoke_token_api)
     app.router.add_delete("/api/devices/{id}", delete_device_api)

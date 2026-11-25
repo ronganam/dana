@@ -28,6 +28,10 @@
 .dev-end { justify-content: flex-end; }
 .dev-danger { background: var(--rose); color: var(--on-accent); }
 
+/* Tokens of no device ("Signed in without pairing"). */
+.dev-tokens { margin-top: 18px; display: flex; flex-direction: column; gap: 8px; }
+.dev-tokens-title { margin: 0; font-size: 14px; color: var(--ink); font-weight: 500; }
+
 .dev-kinds { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .dev-kind { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border-radius: var(--radius-card);
   border: 1px solid var(--hairline); background: var(--canvas); color: var(--body-strong); font-size: 12.5px; cursor: pointer; }

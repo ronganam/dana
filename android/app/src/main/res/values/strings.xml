@@ -29,6 +29,8 @@
     <string name="channel_messages">Messages from Dana</string>
     <string name="channel_important">Important (from Dana)</string>
     <string name="channel_digest">Notification digest</string>
+    <string name="pair_again_title">Pair this phone again</string>
+    <string name="pair_again_text">This phone signs in with an old token, so Dana can\'t tell which phone it is and push will stop if its address changes. On Dana\'s Devices page choose Pair a device, then here Settings → Server → Pair again.</string>
 
     <!-- Toasts -->
     <string name="toast_couldnt_open_app">Couldn\'t open %1$s</string>

@@ -1,5 +1,5 @@
 /**
- * The web Devices page's pure part (static/devices.js, DanaDevicesCore): kinds and their icons, the line under a device (kind, room / role, last seen, this device, not paired), times ago, the code shown in two groups, the pairing countdown, the pairing request body (a role and room only for a tablet or a TV), the QR code's SVG.
+ * The web Devices page's pure part (static/devices.js, DanaDevicesCore): kinds and their icons, the line under a device (kind, room / role, last seen, this device, not paired), times ago, the code shown in two groups, the line under a token of no device, the pairing countdown, the pairing request body (a role and room only for a tablet or a TV), the QR code's SVG.
  *
  * Run: bin/test test_web_devices
  */
@@ -50,6 +50,12 @@ check("meta: a room and a different role both show",
 check("meta: a device moved from push registrations, not paired",
       C.metaLine({ ...phone, paired: false }, now) === "Phone · not paired: pair it again");
 
+const tok = { id: "t1", label: "old phone", created_at: "2026-11-19T12:00:00Z", last_used_at: "2026-11-22T09:00:00Z", current: false };
+check("token meta: made and last used (a token of no device)",
+      C.tokenMetaLine(tok, now) === "made 3 days ago · last used 3 h ago", C.tokenMetaLine(tok, now));
+check("token meta: never used; used by this browser",
+      C.tokenMetaLine({ ...tok, last_used_at: null }, now) === "made 3 days ago · last used never"
+      && C.tokenMetaLine({ ...tok, current: true }, now) === "made 3 days ago · used here");
 check("code: shown in two groups of four", C.showCode("ABCDEFGH") === "ABCD EFGH");
 check("countdown: m:ss left, 0:00 once past",
       C.countdown("2026-11-22T12:04:59Z", now) === "4:59" && C.countdown("2026-11-22T11:00:00Z", now) === "0:00");
