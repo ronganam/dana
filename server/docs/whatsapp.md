@@ -154,13 +154,28 @@ Docs/knowledge.md → Sections, decisions and files.
   seam; phone push is not per user yet, so only a user with the `phone` addon
   gets it) and to Telegram (`core.notify.whatsapp_voice(user, chat_id, …)`,
   the chat of their `voice_telegram_chat_id` setting; none set: logged, not
-  sent). Groups, outgoing and non-voice messages are ignored; redelivered
-  message ids are deduped in memory per connection. Transcription needs a
+  sent). Groups, outgoing and non-voice messages are not transcribed (only
+  announced, below); redelivered message ids are deduped in memory per
+  connection. Transcription needs a
   model that hears audio (docs/configuration.md, "Transcription": an OpenAI or
   Gemini key, or a local Whisper server); without one the voice note is
   logged and skipped, the admins' `transcription` self-check says why, and a
   voice note read through the tools reads "not transcribed: the server needs
   a transcription model".
+- **Events for watches** (`event_types.py`, `Addon(events=)`): every new
+  `message` event routed to a connection — 1:1 or group, incoming or the
+  user's own from another device — is emitted once as
+  `whatsapp.message.received` for that connection's user, before the voice
+  filters: `{message_id, chat (the contact, or the group's name), sender
+  (display name; "Me" for the user's own), is_group, from_me, text (the body
+  or a caption; empty for a voice note), has_media, media_type (voice |
+  audio | image | video | sticker | document, or empty)}`. Names come from
+  the connection's chat-id map (`client.get_chat_id_to_name_map`, cached 5
+  min). Redeliveries are deduped by message id per connection (the same set
+  as the voice notes', in memory). Watches usually want `from_me eq false`.
+  The data is other people's text: the watches engine frames it
+  (`core.text.untrusted`), nothing in the addon puts it in a prompt. No
+  history: Dana keeps no copy of messages (dry runs see none).
 - The Telegram copy carries a `✨ Summarize` inline button (`wa_sum:<hash>` →
   `TelegramBot.handle_whatsapp_summary_callback`), which summarizes the
   transcript on demand with the model (`core/voice.summarize_text`) and edits
@@ -171,6 +186,8 @@ Docs/knowledge.md → Sections, decisions and files.
   the adapter logs, per user with WhatsApp, where their transcripts go
   (`report_whatsapp_voice_chats`; a missing / malformed setting is a warning).
 - Tests: `bin/test test_waha_voice` (the pipeline, all network calls mocked),
+  `bin/test test_whatsapp_events` (`whatsapp.message.received`: shapes, groups,
+  from_me, media, dedupe, two users),
   `bin/test test_whatsapp_users` (two fake WAHA instances: tools, caches,
   contacts, images, reading with ids and file names, forwarding, accounts,
   routing, Summarize per user), `bin/test

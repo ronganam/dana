@@ -3,7 +3,8 @@
 - self-check: ``calendar``;
 - morning briefing: ``events`` (today's events);
 - providers: ``events_today`` (Now screen cache) and ``events_between`` (meeting cards, weekly review);
-- the dashboard's Calendar widget (``calendar``: today and tomorrow; drawn by ``web/widget.js``).
+- the dashboard's Calendar widget (``calendar``: today and tomorrow; drawn by ``web/widget.js``);
+- jobs: ``starting`` (``calendar.event.starting`` before each event: event_types.py) and its daily prune.
 """
 
 import asyncio
@@ -15,7 +16,7 @@ from core import clock
 from core.addons import BriefingContext, Check, Section, WidgetContext, helpers, store
 from core.db import get_db_connection
 from core.users import User
-from addons.calendar import config, events as calendar_events, today as calendar_today
+from addons.calendar import config, event_types, events as calendar_events, today as calendar_today
 from addons.calendar.addon import addon
 
 logger = logging.getLogger(__name__)
@@ -29,6 +30,18 @@ def _hhmm(iso: Optional[str]) -> str:
         return dt.strftime("%H:%M")
     except (TypeError, ValueError):
         return ""
+
+
+@addon.job(every=datetime.timedelta(minutes=1), timeout=50.0)
+async def starting(user: User) -> int:
+    """Announce the user's events that start in the next few minutes (``calendar.event.starting``)."""
+    return await event_types.announce_starting(user)
+
+
+@addon.job(daily="03:50")
+async def prune_starting(user: User) -> int:
+    """Forget announced event starts older than 30 days."""
+    return event_types.prune(user)
 
 
 @addon.selfcheck("calendar", "Calendar")

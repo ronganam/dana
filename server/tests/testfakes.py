@@ -105,13 +105,15 @@ class FakeHA:
 
 class FakeWAHA:
     """One WAHA instance: its API key, its sessions (name → ``me``), contacts,
-    chats and messages; it records every request as (method, path, key, session)."""
+    chats (``groups``: more chats, group id → name) and messages; it records
+    every request as (method, path, key, session)."""
 
     def __init__(self, name: str, key: str, sessions: Dict[str, Dict[str, str]], contact: Tuple[str, str],
-                 chat_name: str) -> None:
+                 chat_name: str, groups: Optional[Dict[str, str]] = None) -> None:
         self.name, self.key, self.sessions = name, key, sessions
         self.contact_id, self.contact_name = contact
         self.chat_name = chat_name
+        self.groups = dict(groups or {})
         self.requests: List[Tuple[str, str, str, str]] = []
         self.sent: List[Dict[str, Any]] = []
         self.forwarded: List[Dict[str, Any]] = []
@@ -191,7 +193,8 @@ class FakeWAHA:
         return await self._auth(request) or web.json_response([{
             "id": self.contact_id, "name": self.chat_name,
             "lastMessage": {"body": f"hello from {self.name}", "fromMe": False, "ack": 3, "timestamp": 1792271419,
-                            "_data": {"pushName": self.contact_name}}}])
+                            "_data": {"pushName": self.contact_name}}}]
+            + [{"id": gid, "name": gname} for gid, gname in self.groups.items()])
 
     async def messages(self, request):
         """A text, an image and a PDF with a caption (listed by name only:

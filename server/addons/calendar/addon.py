@@ -3,6 +3,7 @@
 from core.addons import Field, Addon, PromptPart, Page, Nav, Need, Touches
 from addons.calendar import client
 from addons.calendar.config import DEFAULT_CALENDAR, ADDON, SELECTED
+from addons.calendar.event_types import CALENDAR_EVENTS
 from addons.google_account import oauth
 
 SCOPES = ("https://www.googleapis.com/auth/calendar",)
@@ -29,6 +30,7 @@ addon = Addon(
     setup=oauth.SETUP,
     examples=("What's on my calendar tomorrow?", "Move my dentist appointment to Thursday at 10"),
     test=client.check,
+    events=CALENDAR_EVENTS,
     connect_url=oauth.CONNECT_PATH,
     prompt_parts=(
         PromptPart("tools", "calendar management", rank=10),

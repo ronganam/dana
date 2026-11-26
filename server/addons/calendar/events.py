@@ -16,10 +16,11 @@ logger = logging.getLogger(__name__)
 
 
 def list_events(conn: Connection, time_min: datetime.datetime, time_max: datetime.datetime,
-                limit: int = 50) -> List[Dict[str, Any]]:
+                limit: int = 50, details: bool = False) -> List[Dict[str, Any]]:
     """Events from the connection's selected calendars as plain dicts (blocking — call via asyncio.to_thread).
 
-    Each: id, title, start / end (ISO; a date for all-day), all_day, location, attendees (names or emails), calendar_id.
+    Each: id, title, start / end (ISO; a date for all-day), all_day, location, attendees (names or emails), calendar_id;
+    with ``details`` also its description (Google's text, may hold HTML; "" when none).
     Cancelled events and ones the user declined are left out.
 
     Raises:
@@ -41,13 +42,16 @@ def list_events(conn: Connection, time_min: datetime.datetime, time_max: datetim
             if me and me.get("responseStatus") == "declined":
                 continue
             start, end = ev.get("start", {}), ev.get("end", {})
-            out.append({
+            item = {
                 "id": ev.get("id"), "title": ev.get("summary") or "(No title)",
                 "start": start.get("dateTime") or start.get("date"), "end": end.get("dateTime") or end.get("date"),
                 "all_day": "dateTime" not in start, "location": ev.get("location") or "",
                 "attendees": [a.get("displayName") or a.get("email", "") for a in ev.get("attendees", []) if not a.get("self")],
                 "calendar_id": cid,
-            })
+            }
+            if details:
+                item["description"] = ev.get("description") or ""
+            out.append(item)
     out.sort(key=lambda e: e["start"] or "")
     return out
 

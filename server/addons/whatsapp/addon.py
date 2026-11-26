@@ -3,6 +3,7 @@
 from core.addons import ADDRESS, NAME, TELEGRAM_CHAT, Field, Addon, PromptPart, LlmJob, Need, Touches
 from addons.whatsapp import accounts, client
 from addons.whatsapp.config import ADDON, VOICE_CHAT
+from addons.whatsapp.event_types import WHATSAPP_EVENTS
 
 # No owner-specific defaults here: the address, key and session are set on the
 # Addons page or with bin/dana. The account (the session's own
@@ -46,6 +47,7 @@ addon = Addon(
     on_credentials_change=accounts.on_credentials_change,
     validate=accounts.validate,
     blocked=accounts.blocked,
+    events=WHATSAPP_EVENTS,
     test=client.check,
     prompt_parts=(
         PromptPart("tools", "WhatsApp messaging", rank=50),

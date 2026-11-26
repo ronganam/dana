@@ -6,12 +6,13 @@ WAHA pushes WhatsApp events to us via a global webhook (``WHATSAPP_HOOK_URL`` /
 
 Each event is routed to the connection(s) whose WhatsApp account it names
 (:mod:`addons.whatsapp.accounts`) and processed as that connection's
-user. We only act on **voice messages**: incoming 1:1 audio notes are
+user. Every new message (redeliveries deduped per connection) is announced
+as ``whatsapp.message.received`` (:mod:`addons.whatsapp.event_types`, for
+watches). Beyond that we only act on **voice messages**: incoming 1:1 audio notes are
 downloaded from the user's WAHA, transcribed (``core/llm.transcribe``, usage
 theirs) and delivered to the phone (:func:`_notify_phone`) and to the
 Telegram chat of the user's ``voice_telegram_chat_id`` setting, where the
 transcript carries a "✨ Summarize" button handled by core/telegram_bot.py.
-Everything else is ignored.
 """
 
 import logging
@@ -22,7 +23,7 @@ import httpx
 
 from core import llm, notify, users
 from core.addons import Connection
-from addons.whatsapp import accounts
+from addons.whatsapp import accounts, event_types
 from addons.whatsapp.client import (api_url, config, download_media_bytes, get_chat_id_to_name_map,
                                           get_message_sender_name, session_status, signature)
 from addons.whatsapp.config import voice_chat_id
@@ -30,10 +31,10 @@ from addons.whatsapp.config import voice_chat_id
 logger = logging.getLogger(__name__)
 
 # Bounded set of recently handled message ids per connection so WAHA webhook
-# redeliveries (network timeouts, retry policy) don't transcribe + notify the
-# same voice note twice. Single-process deployment, so in-memory is enough.
+# redeliveries (network timeouts, retry policy) don't announce a message, or
+# transcribe + notify a voice note, twice. Single-process deployment, so in-memory is enough.
 _SEEN_MESSAGE_IDS: "Dict[Any, OrderedDict[str, None]]" = {}
-_SEEN_MESSAGE_IDS_MAX = 500
+_SEEN_MESSAGE_IDS_MAX = 2000
 
 # Direct-chat JIDs. Groups (@g.us), broadcasts and newsletters are ignored.
 # Contacts increasingly arrive as @lid (Linked ID) rather than @c.us.
@@ -145,7 +146,8 @@ async def handle_webhook(data: Dict[str, Any]) -> None:
 async def process_event(conn: Connection, data: Dict[str, Any]) -> None:
     """Handle one WAHA event for ``conn`` (whose WhatsApp it is), as its user.
 
-    Only incoming 1:1 voice messages are acted on: download -> transcribe ->
+    Every new message is announced (``whatsapp.message.received``); only
+    incoming 1:1 voice messages are acted on: download -> transcribe ->
     notify. Never raises; errors are logged so the webhook always stays healthy.
     """
     with users.acting_as(conn.user):
@@ -167,6 +169,20 @@ async def _process(conn: Connection, data: Dict[str, Any]) -> None:
         if not message_id:
             return
 
+        if _mark_seen(conn, message_id):
+            logger.info(f"Ignoring duplicate WhatsApp message {message_id} (webhook redelivery)")
+            return
+
+        try:
+            mapping = await get_chat_id_to_name_map(conn)
+        except Exception as e:
+            logger.warning(f"Could not resolve WhatsApp contact names: {e}")
+            mapping = {}
+        try:
+            event_types.announce_message(conn.user, payload, mapping)
+        except Exception as e:
+            logger.error(f"Announcing WhatsApp message {message_id} failed: {e}", exc_info=True)
+
         if payload.get("fromMe"):
             logger.debug(f"Ignoring outgoing WhatsApp message {message_id}")
             return
@@ -179,10 +195,6 @@ async def _process(conn: Connection, data: Dict[str, Any]) -> None:
         mimetype = _voice_mimetype(payload)
         if not mimetype:
             logger.debug(f"Ignoring non-voice WhatsApp message {message_id}")
-            return
-
-        if _mark_seen(conn, message_id):
-            logger.info(f"Ignoring duplicate WhatsApp voice message {message_id} (webhook redelivery)")
             return
 
         logger.info(f"Processing WhatsApp voice message {message_id} from '{sender_jid}' ({mimetype}) "
@@ -207,11 +219,6 @@ async def _process(conn: Connection, data: Dict[str, Any]) -> None:
             return
         logger.info(f"Transcribed WhatsApp voice message {message_id}: {transcript[:100]!r}")
 
-        try:
-            mapping = await get_chat_id_to_name_map(conn)
-        except Exception as e:
-            logger.warning(f"Could not resolve WhatsApp contact names: {e}")
-            mapping = {}
         sender = get_message_sender_name(payload, mapping) or "Unknown"
 
         await _notify_phone(conn, sender, transcript, message_id)
