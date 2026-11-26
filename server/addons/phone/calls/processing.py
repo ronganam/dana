@@ -9,7 +9,9 @@ Flow for an upload (``POST /api/calls/upload``, addons/phone/calls/upload.py):
    transcribe (``core.llm``, audio inline) → ``analysis.analyze_transcript``
    (one structured model call, with the owner's own context) →
    :func:`apply_analysis` (stores it and turns action items into the owner's
-   ``call_suggestions``) → people linking and the pop-up to the owner's phone.
+   ``call_suggestions``) → people linking and the pop-up to the owner's phone;
+   the first analysis of a call is emitted as ``phone.call.ended``
+   (addons/phone/event_types.py).
 3. Clients poll ``GET /api/calls/{id}`` until ``status`` is ``ready``/``failed``
    and show the pending suggestions (welcome area, Debrief screen).
 
@@ -33,6 +35,7 @@ from core import budget, clock, llm, users
 from core.db import get_db_connection
 from core.users import User
 from addons.people import briefs as people_briefs
+from addons.phone import event_types
 from addons.phone import popups as phone_popups
 from addons.phone.calls import store as calls_store
 from addons.phone.calls.analysis import analyze_transcript
@@ -175,6 +178,8 @@ async def _process(owner: User, call_id: str, custom_instructions: Optional[str]
     count = apply_analysis(owner, call_id, analysis,
                            only_future=not recent_call(call, CALL_SUGGESTIONS_MAX_AGE_DAYS * 24))
     logger.info(f"Call {call_id} analysed: labels={analysis['labels']} suggestions={count}")
+    if not row["analysis"]:
+        event_types.announce_call(owner, call_id)
     people_briefs.after_call(owner, call_id)
     if count and recent_call(call):
         await phone_popups.announce_suggestions(owner, "call", call_id, f"From the call with {call['contact']}")

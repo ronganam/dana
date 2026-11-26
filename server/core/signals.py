@@ -21,7 +21,7 @@ Event signals (``wake``, ``car``, ``location``, ``sleep``) go through
 source is recent for that user (still recorded), so two sources never both
 fire a reminder. An accepted ``car`` / ``location`` event is
 emitted as ``core.signal.car`` (``action``: enter | leave, ``source``,
-``late``) / ``core.signal.location`` (``action``: arrive | leave, ``target``:
+``late``) / ``core.signal.location`` (``action``: arrive | leave, ``zone`` and ``target``:
 the zone's name, ``source``, ``late``); ``late`` marks an event that happened
 more than :data:`LATE_MINUTES` before it arrived (the tasks addon records the
 transition but sends no reminder). The wake flow (core/wake.py) delivers
@@ -176,6 +176,7 @@ def deliver(user: User, signal: str, source: str, *, at: Optional[datetime.datet
         data: Dict[str, Any] = {"action": action, "source": source, "late": late}
         if signal == "location":
             data["target"] = target
+            data["zone"] = target
         events.emit(f"core.signal.{signal}", user, **data)
     return True
 

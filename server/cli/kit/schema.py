@@ -15,10 +15,10 @@ import typing
 from typing import Any, Dict, List, Optional, Tuple
 
 from core.addons.addon import FIELD_TYPES, ICON, Addon, Field, PromptPart
-from core.addons.hooks import ADDON_NAME, NEED_KINDS, LlmJob, Nav, Need, Page, Touches, Worker
+from core.addons.hooks import ADDON_NAME, NEED_KINDS, EventType, LlmJob, Nav, Need, Page, Touches, Worker
 
 # The manifest's dataclasses, in the order the reference lists them.
-MANIFEST_TYPES: Tuple[type, ...] = (Need, Touches, Field, PromptPart, LlmJob, Page, Nav, Worker)
+MANIFEST_TYPES: Tuple[type, ...] = (Need, Touches, Field, PromptPart, LlmJob, Page, Nav, Worker, EventType)
 # Values a field can only take (beyond its type).
 ENUMS: Dict[Tuple[str, str], Tuple[str, ...]] = {("Need", "kind"): NEED_KINDS, ("Field", "type"): FIELD_TYPES,
                                                  ("LlmJob", "profile"): ("fast", "balanced", "deep")}

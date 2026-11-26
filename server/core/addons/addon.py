@@ -26,8 +26,8 @@ from typing import (Any, Awaitable, Callable, Collection, Dict, List, Mapping, O
 
 from core.access import CAPABILITIES
 from core.users import User
-from core.addons.hooks import (ADDON as ADDON_NEED, CONNECT, WIDGET_SIZES, Channel, Fix, Handler, Hook, Job, LlmJob,
-                               Need, Page, Service, Touches, Worker)
+from core.addons.hooks import (ADDON as ADDON_NEED, CONNECT, EVENT_NAME, WIDGET_SIZES, Channel, EventType, Fix,
+                               Handler, Hook, Job, LlmJob, Need, Page, Service, Touches, Worker)
 from core.addons.schema import generate_schema
 
 logger = logging.getLogger(__name__)
@@ -59,8 +59,6 @@ SettingsRule = Callable[[User, Mapping[str, Any], Mapping[str, Any], Mapping[str
 # The Approve card of one call of a tool: (the user, the call's arguments) → a
 # core.addons.hooks.Approval (typed Any here).
 DescribeRule = Callable[[User, Dict[str, Any]], Any]
-# Event names: <addon>.<thing>.<what happened> (core: core.<thing>.<what>).
-EVENT_NAME = re.compile(r"^[a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+$")
 DAILY = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 # Composer hooks: their functions are plain (not async): composers call them in
 # a worker thread, next to their own database reads. ``FLEX_HOOKS`` accept either
@@ -275,6 +273,10 @@ class Addon:
             :class:`~core.addons.hooks.Page` (files served from its ``web/``;
             page ids unique across addons).
         worker: Its sidecar (:class:`~core.addons.hooks.Worker`): a published image, or built from its ``worker/``.
+        events: The events it emits (:class:`~core.addons.hooks.EventType`),
+            for the event catalog (:func:`core.addons.registry.event_types`):
+            each named ``<this addon>.<thing>.<what happened>``, once. Emitting
+            does not need a declaration; declaring makes the event watchable.
         modules: More modules of its folder the loader imports after
             ``addon.py`` and ``tools.py`` (dotted, relative: ``"calls.tools"``):
             where its other tools and hooks are declared. ``hooks.py`` is
@@ -349,8 +351,8 @@ class Addon:
                  credentials: Sequence[Field] = (), settings: Sequence[Field] = (),
                  default_on: bool = False, everyone: bool = False, requires: Optional[str] = None,
                  prompt_parts: Sequence[PromptPart] = (), llm_jobs: Optional[Mapping[str, Union[str, LlmJob]]] = None,
-                 web: Sequence[Page] = (), worker: Optional[Worker] = None, modules: Sequence[str] = (),
-                 order: Optional[int] = None,
+                 web: Sequence[Page] = (), worker: Optional[Worker] = None, events: Sequence[EventType] = (),
+                 modules: Sequence[str] = (), order: Optional[int] = None,
                  on_connect: Optional[Callable[[User], None]] = None,
                  on_credentials_change: Optional[Callable[[User], None]] = None,
                  on_change: Optional[Callable[[User], None]] = None,
@@ -388,6 +390,14 @@ class Addon:
         page_ids = [p.id for p in web]
         if len(set(page_ids)) != len(page_ids):
             raise ValueError(f"Addon {name!r} declares a page id twice: {page_ids}")
+        if isinstance(events, EventType) or not all(isinstance(e, EventType) for e in events):
+            raise TypeError(f"{owner}: events= takes a tuple of EventType: events=(EventType(...),)")
+        event_names = [e.name for e in events]
+        if len(set(event_names)) != len(event_names):
+            raise ValueError(f"{owner} declares an event twice: {event_names}")
+        for event_name in event_names:
+            if not event_name.startswith(f"{name}."):
+                raise ValueError(f"{owner}: its event {event_name!r} must start with {name}.")
         if isinstance(needs, Need) or not all(isinstance(n, Need) for n in needs):
             raise TypeError(f"{owner}: needs= takes a tuple of Need: needs=(Need(\"addon\", \"tasks\", \"why\"),)")
         seen = [(n.kind, n.what) for n in needs]
@@ -423,6 +433,7 @@ class Addon:
                                             for k, v in (llm_jobs or {}).items()}
         self.web: Tuple[Page, ...] = tuple(web)
         self.worker = worker
+        self.events: Tuple[EventType, ...] = tuple(events)
         self.modules: Tuple[str, ...] = tuple(modules)
         self.order = order
         self.test = test

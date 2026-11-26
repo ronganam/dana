@@ -21,6 +21,7 @@ Run: bin/test test_tasks_users
 """
 
 import asyncio
+import datetime
 import json
 import os
 import sys
@@ -55,7 +56,7 @@ from core.auth import setup_auth
 from core.db import get_db_connection
 from core.addons import registry, scheduler, store
 from addons.phone import push as phone_push
-from addons.tasks import groups, links, service, titles, triggers
+from addons.tasks import event_types, groups, links, service, titles, triggers
 
 results: List[Tuple[str, bool]] = []
 
@@ -196,6 +197,17 @@ def test_tasks_per_user() -> None:
     check("a task linked to a call is shown only to who can see it",
           [x["id"] for x in service.tasks_for_call(ADMIN, "call-1")] == [a] and service.tasks_for_call(BOB, "call-1") == [])
     check("Carl sees no task at all", service.list_tasks(CARL) == [] and service.get_task(CARL, a) is None)
+    since = clock.now() - datetime.timedelta(hours=1)
+    bob_hist = event_types.created_history(BOB, since)
+    check("event history: tasks.task.created gives the user's own tasks in the emitted shape",
+          [d for _, d in bob_hist] == [{"task_id": b, "title": "Bob task", "group_id": f"{BOB.id}-general"}]
+          and all(when.tzinfo for when, _ in bob_hist)
+          and a in [d["task_id"] for _, d in event_types.created_history(ADMIN, since)]
+          and b not in [d["task_id"] for _, d in event_types.created_history(ADMIN, since)], bob_hist)
+    names = {e.name for e in registry.event_types(BOB)}
+    check("event catalog: tasks.task.created / completed for a user with tasks, not for Carl",
+          {"tasks.task.created", "tasks.task.completed"} <= names
+          and not any(e.name.startswith("tasks.") for e in registry.event_types(CARL)), names)
 
 
 # --- 4. Triggers per user ---------------------------------------------------------------------

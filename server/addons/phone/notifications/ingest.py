@@ -5,7 +5,9 @@ The Android ``NotificationListenerService`` batches what the phone shows
 (minus denied apps, OTPs redacted) to ``POST /api/notifications/batch``
 together with removals from the shade (``{key, reason}``); everything is
 stored for the user whose token sent it. The same content on two people's
-phones is two rows, one each.
+phones is two rows, one each. Each new row is emitted as
+``phone.notification.received`` (``phone.email.received`` from an email app;
+addons/phone/event_types.py).
 """
 from __future__ import annotations
 
@@ -21,6 +23,7 @@ from core import clock
 from core.db import get_db_connection
 from core.text import redact_otp as redact
 from core.users import User
+from addons.phone import event_types
 from addons.phone.notifications.values import ESCALATION_PREFIX, MAX_BATCH, posted_iso, s
 
 logger = logging.getLogger(__name__)
@@ -83,6 +86,7 @@ def _actions(raw) -> Optional[str]:
 def ingest(user: User, posted: Iterable[Dict[str, Any]], removed: Iterable[Dict[str, Any]] = ()) -> Dict[str, Any]:
     """Store ``user``'s new notifications and apply their shade's removals. Returns ids to triage."""
     new_ids: List[str] = []
+    new_rows: List[Dict[str, Any]] = []
     duplicates = dropped = 0
     items = list(posted or [])[:MAX_BATCH]
     named: set = set()
@@ -126,8 +130,10 @@ def ingest(user: User, posted: Iterable[Dict[str, Any]], removed: Iterable[Dict[
                  n["posted_at"], n["content_hash"], n["actions"]),
             )
             new_ids.append(nid)
+            new_rows.append({**n, "id": nid})
         cleared = _apply_removals(conn, user, removed or [])
         conn.commit()
+    event_types.announce_notifications(user, new_rows)
     return {"accepted": len(new_ids), "duplicates": duplicates, "dropped": dropped,
             "removed": cleared, "ids": new_ids}
 

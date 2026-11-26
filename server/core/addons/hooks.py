@@ -4,8 +4,8 @@ rest of the app.
 
 Manifest values: :class:`Page` / :class:`Nav` (a page in the web app),
 :class:`Worker` (a sidecar), :class:`LlmJob` (an LLM purpose),
-:class:`Need` (what running it takes) / :class:`Touches` (what it may touch), and the
-schedule helpers :func:`minutes` / :func:`hours` for ``@addon.job(every=)``.
+:class:`Need` (what running it takes) / :class:`Touches` (what it may touch),
+:class:`EventType` (an event it emits, for the catalog), and the schedule helpers :func:`minutes` / :func:`hours` for ``@addon.job(every=)``.
 
 What hooks get besides the user: :class:`NowContext`, :class:`BriefingContext`,
 :class:`ContextRequest`, :class:`DemoContext`, :class:`WidgetContext`. What they return (``to_json()`` gives a payload):
@@ -25,7 +25,7 @@ import datetime
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 # --- Manifest values ----------------------------------------------------------------
 
@@ -226,6 +226,43 @@ def minutes(n: float) -> datetime.timedelta:
 def hours(n: float) -> datetime.timedelta:
     """``@addon.job(every=hours(6))``."""
     return datetime.timedelta(hours=n)
+
+
+# An event's name: ``<addon>.<thing>.<what happened>`` (core's start with ``core.``).
+EVENT_NAME = re.compile(r"^[a-z][a-z0-9_]*\.[a-z0-9_]+\.[a-z0-9_]+$")
+MAX_ABOUT = 200
+# One past event: when it happened (aware) and its data, the shape it is emitted with.
+PastEvent = Tuple[datetime.datetime, Dict[str, Any]]
+
+
+@dataclass(frozen=True)
+class EventType:
+    """An event an addon (``Addon(events=)``) or core (``core.events.CORE_EVENTS``)
+    emits, for the event catalog (``core.addons.registry.event_types``): its
+    ``name``, what it means in one sentence (``about``), its data keys with a
+    description each (units, allowed values) in ``fields``, and ``history``:
+    ``history(user, since)`` gives this user's past events of this type since
+    ``since`` (aware), oldest first, with the same data as emitted (dry runs);
+    sync, one cheap query, scoped to the user. None: no history."""
+    name: str
+    about: str
+    fields: Dict[str, str]
+    # history(user: core.users.User, since) (typed Any here: this module imports nothing of the app).
+    history: Optional[Callable[[Any, datetime.datetime], Iterable[PastEvent]]] = None
+
+    def __post_init__(self) -> None:
+        owner = f"EventType({self.name!r})"
+        if not isinstance(self.name, str) or not EVENT_NAME.match(self.name):
+            raise ValueError(f"{owner}: the name must look like <addon>.<thing>.<what happened>")
+        _line(owner, "about", self.about, MAX_ABOUT)
+        if not isinstance(self.fields, dict) or not all(
+                isinstance(k, str) and k and isinstance(v, str) and v.strip() for k, v in self.fields.items()):
+            raise ValueError(f"{owner}: fields maps each data key to its description")
+        if self.history is not None and not callable(self.history):
+            raise ValueError(f"{owner}: history must be a function of (user, since)")
+
+    def to_json(self) -> Dict[str, Any]:
+        return {"name": self.name, "about": self.about, "fields": dict(self.fields)}
 
 
 # --- Registrations ------------------------------------------------------------------

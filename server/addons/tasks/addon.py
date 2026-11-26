@@ -2,6 +2,7 @@
 
 from core.addons import Addon, LlmJob, Nav, Page, PromptPart, Need, Touches
 from addons.tasks import groups
+from addons.tasks.event_types import TASK_EVENTS
 
 # Connecting it gives the user the default task lists.
 addon = Addon(
@@ -13,6 +14,7 @@ addon = Addon(
     description="Task lists, reminders and their triggers",
     features=("Tasks and lists, by chat or voice", "Reminders at a time, when you arrive somewhere or wake up"),
     examples=("Remind me tomorrow at 9 to call the bank", "What's on my list today?"), on_connect=groups.ensure_default_groups,
+    events=TASK_EVENTS,
     prompt_parts=(
         PromptPart("tools", "task list/todos", rank=30),
         PromptPart("undoable", "adding/completing/editing tasks", rank=10),

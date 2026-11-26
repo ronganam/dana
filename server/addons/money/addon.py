@@ -16,6 +16,7 @@ from core.users import User
 from core.addons import Addon, Field, Fix, PromptPart, LlmJob, Page, Nav, Need, Touches
 from addons.money import after_sync, classify, dashboard, savings, signals, sources, store
 from addons.money.config import ADDON
+from addons.money.event_types import MONEY_EVENTS
 
 MONEY_GUIDE = (
     "Money (bank and cards):\n"
@@ -86,6 +87,7 @@ addon = Addon(
         PromptPart("guides", MONEY_GUIDE, rank=55),
     ),
     realtime=True,
+    events=MONEY_EVENTS,
 )
 
 after_sync.on_transactions(signals.reconcile_hook)

@@ -54,6 +54,7 @@ Another module of the addon imports the manifest as `from addons.<name>.addon im
 | `llm_jobs` | dict of str → str or LlmJob or None | `None` | Its LLM purposes and their default model profile (`{"task_emoji": "fast"}`, or an `LlmJob` with a label): `core.llm` accepts them as `purpose=`. |
 | `web` | list of Page | `()` | Its pages in the web app, any number: a tuple of `Page` (files served from its `web/`; page ids unique across addons). |
 | `worker` | Worker or None | `None` | Its sidecar (`Worker`): a published image, or built from its `worker/`. |
+| `events` | list of EventType | `()` | The events it emits (`EventType`), for the event catalog (`event_types`): each named `<this addon>.<thing>.<what happened>`, once. Emitting does not need a declaration; declaring makes the event watchable. |
 | `modules` | list of str | `()` | More modules of its folder the loader imports after `addon.py` and `tools.py` (dotted, relative: `"calls.tools"`): where its other tools and hooks are declared. `hooks.py` is imported without being named. |
 | `order` | int or None | `None` | Its place among the official addons (lower first; others follow by name). |
 | `on_connect` | function | `None` | Called with the user right after the addon is connected for them (e.g. `tasks` gives them the default task lists); a failure is logged and does not undo the connection. |
@@ -271,6 +272,23 @@ addon (docs/operations.md, "Workers").
 | `port` | int | required |
 | `url_env` | str | required |
 | `image` | str | `''` |
+
+### EventType
+
+An event an addon (`Addon(events=)`) or core (`core.events.CORE_EVENTS`)
+emits, for the event catalog (`core.addons.registry.event_types`): its
+`name`, what it means in one sentence (`about`), its data keys with a
+description each (units, allowed values) in `fields`, and `history`:
+`history(user, since)` gives this user's past events of this type since
+`since` (aware), oldest first, with the same data as emitted (dry runs);
+sync, one cheap query, scoped to the user. None: no history.
+
+| Field | Type | Default |
+|---|---|---|
+| `name` | str | required |
+| `about` | str | required |
+| `fields` | dict of str → str | required |
+| `history` | function | `None` |
 
 ## Functions on the manifest
 
@@ -1498,6 +1516,13 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
    ],
    "description": "Its sidecar (:class:`~core.addons.hooks.Worker`): a published image, or built from its ``worker/``."
   },
+  "events": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/EventType"
+   },
+   "description": "The events it emits (:class:`~core.addons.hooks.EventType`), for the event catalog (:func:`core.addons.registry.event_types`): each named ``<this addon>.<thing>.<what happened>``, once. Emitting does not need a declaration; declaring makes the event watchable."
+  },
   "modules": {
    "type": "array",
    "items": {
@@ -1593,6 +1618,30 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
  ],
  "additionalProperties": false,
  "$defs": {
+  "EventType": {
+   "type": "object",
+   "description": "An event an addon (``Addon(events=)``) or core (``core.events.CORE_EVENTS``) emits, for the event catalog (``core.addons.registry.event_types``): its ``name``, what it means in one sentence (``about``), its data keys with a description each (units, allowed values) in ``fields``, and ``history``: ``history(user, since)`` gives this user's past events of this type since ``since`` (aware), oldest first, with the same data as emitted (dry runs); sync, one cheap query, scoped to the user. None: no history.",
+   "properties": {
+    "name": {
+     "type": "string"
+    },
+    "about": {
+     "type": "string"
+    },
+    "fields": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "string"
+     }
+    }
+   },
+   "required": [
+    "name",
+    "about",
+    "fields"
+   ],
+   "additionalProperties": false
+  },
   "Field": {
    "type": "object",
    "description": "One credential or setting of an addon.",

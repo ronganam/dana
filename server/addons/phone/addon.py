@@ -1,6 +1,7 @@
 """The ``phone`` addon (Phone)."""
 
 from core.addons import Addon, Fix, PromptPart, LlmJob, Page, Nav, Need, Touches
+from addons.phone.event_types import PHONE_EVENTS
 
 CALLS_GUIDE = (
     "When asked to retrieve details from past calls or voice memos:\n"
@@ -27,6 +28,7 @@ addon = Addon("phone", web=(Page("inbox", panel="inbox.js", style="inbox.css", n
                               "Call recordings transcribed, with suggested tasks and events",
                               "Push notifications from Dana on your phone"),
                     reconnect_fix=Fix.screen("devices", "Open Devices"),
+                    events=PHONE_EVENTS,
                     prompt_parts=(
                         PromptPart("tools", "call/voice memo history", rank=60),
                         PromptPart("read_examples", "searching calls", rank=20),

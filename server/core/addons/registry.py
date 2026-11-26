@@ -8,7 +8,7 @@ order the tools are defined in (so the tool block stays cacheable). The same
 check runs again at execution, whoever asks: a tool the user does not have is
 refused exactly like a tool that does not exist.
 
-Hooks (:func:`jobs`, :func:`services`, :func:`handlers`, :func:`channels`,
+Hooks (:func:`jobs`, :func:`services`, :func:`handlers`, :func:`event_types`, :func:`channels`,
 :func:`hooks`, :func:`hook_for`) come in the fixed addon order. Those asked
 for a user come only from the addons the user has *active*
 (:func:`active_addons`: connected, enabled on the server, and every addon the
@@ -26,10 +26,11 @@ import inspect
 import logging
 from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Tuple
 
+from core import events
 from core.users import User
 from core.addons import state, store
 from core.addons.addon import Addon, Tool, all_tools, find_tool, get_addon, all_addons, version
-from core.addons.hooks import Channel, Handler, Hook, Job, Service
+from core.addons.hooks import Channel, EventType, Handler, Hook, Job, Service
 from core.addons.schema import flatten_for_realtime
 
 logger = logging.getLogger(__name__)
@@ -268,6 +269,13 @@ def handlers(event: str, user: User) -> List[Handler]:
     """The ``@addon.on(event)`` handlers of the addons active for ``user``."""
     active = set(active_addons(user))
     return [h for a in all_addons() if a.name in active for h in a.handlers if h.event == event]
+
+
+def event_types(user: User) -> List[EventType]:
+    """The event catalog for ``user``: core's events (``core.events.CORE_EVENTS``)
+    and those declared (``Addon(events=)``) by the addons active for them."""
+    active = set(active_addons(user))
+    return [*events.CORE_EVENTS, *(e for a in all_addons() if a.name in active for e in a.events)]
 
 
 def channels(user: User) -> List[Channel]:

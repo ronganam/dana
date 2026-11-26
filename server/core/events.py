@@ -7,8 +7,16 @@ other (../docs/addons.md, "Events").
 (``users.acting_as``), with the keyword arguments as one ``data`` dict. A
 failing handler is logged and never reaches the emitter or the other
 handlers. Names are ``<addon>.<thing>.<what happened>``; core's own start
-with ``core.`` (``core.user.woke``). Each addon's README lists the events it
-emits and their data.
+with ``core.`` (``core.user.woke``).
+
+**Taps** (:func:`tap` / :func:`untap`) see every event: ``fn(name, user,
+data)`` is started like a handler for each :func:`emit`, whoever has a handler
+for it (the ``watches`` addon matches any event this way).
+
+**The catalog**: what an event means and its data keys are declared as an
+:class:`~core.addons.hooks.EventType`: core's in :data:`CORE_EVENTS`, an
+addon's in ``Addon(events=)``; ``core.addons.registry.event_types(user)``
+lists those of a user.
 
 Where the handlers run:
 
@@ -25,14 +33,22 @@ wait for the handlers of everything emitted so far with :func:`drain`.
 """
 
 import asyncio
+import datetime
+import functools
 import logging
 import threading
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple
 
-from core import users
+from core import clock, users
+from core.db import get_db_connection
 from core.users import User
 from core.addons import registry
-from core.addons.hooks import Handler
+from core.addons.hooks import EventType, PastEvent
+
+# A tap: fn(name, user, data), called for every emitted event.
+Tap = Callable[[str, User, Dict[str, Any]], Awaitable[None]]
+# What one emit starts: (who it is, for the log; fn(user, data)).
+_Call = Tuple[str, Callable[[User, Dict[str, Any]], Awaitable[None]]]
 
 logger = logging.getLogger(__name__)
 
@@ -42,31 +58,46 @@ _loop: Optional[asyncio.AbstractEventLoop] = None
 # Handed over with call_soon_threadsafe, not started yet (drain waits for them too).
 _handed = 0
 _lock = threading.Lock()
+_taps: List[Tap] = []
 
 
-async def _run(handler: Handler, user: User, name: str, data: Dict[str, Any]) -> None:
+async def _run(call: _Call, user: User, name: str, data: Dict[str, Any]) -> None:
+    who, fn = call
     try:
         with users.acting_as(user):
-            await handler.func(user, data)
+            await fn(user, data)
     except Exception:
-        logger.exception(f"Event {name}: the {handler.addon} handler {handler.func.__name__} failed for user {user.id}")
+        logger.exception(f"Event {name}: {who} failed for user {user.id}")
 
 
-def _start(loop: asyncio.AbstractEventLoop, handlers: List[Handler], user: User, name: str,
+def _start(loop: asyncio.AbstractEventLoop, calls: List[_Call], user: User, name: str,
            data: Dict[str, Any]) -> None:
-    for h in handlers:
-        task = loop.create_task(_run(h, user, name, dict(data)), name=f"event-{name}-{h.addon}")
+    for call in calls:
+        task = loop.create_task(_run(call, user, name, dict(data)), name=f"event-{name}-{call[0]}")
         _pending.add(task)
         task.add_done_callback(_pending.discard)
 
 
-def _start_handed(handlers: List[Handler], user: User, name: str, data: Dict[str, Any]) -> None:
+def _start_handed(calls: List[_Call], user: User, name: str, data: Dict[str, Any]) -> None:
     global _handed
     try:
-        _start(asyncio.get_running_loop(), handlers, user, name, data)
+        _start(asyncio.get_running_loop(), calls, user, name, data)
     finally:
         with _lock:
             _handed -= 1
+
+
+def tap(fn: Tap) -> None:
+    """Call ``fn(name, user, data)`` for every event emitted from now on, like
+    a handler (its own task, as the user, a failure logged); once per function."""
+    if fn not in _taps:
+        _taps.append(fn)
+
+
+def untap(fn: Tap) -> None:
+    """Stop calling ``fn`` (nothing when it is not tapped)."""
+    if fn in _taps:
+        _taps.remove(fn)
 
 
 def bind(loop: asyncio.AbstractEventLoop) -> None:
@@ -77,11 +108,13 @@ def bind(loop: asyncio.AbstractEventLoop) -> None:
 
 def emit(name: str, user: User, **data: Any) -> int:
     """Hand event ``name`` for ``user`` to every handler of an addon active for
-    them; returns how many handlers were started (or handed to the server's
-    loop). Never raises because of a handler."""
+    them and to every tap; returns how many handlers were started (or handed
+    to the server's loop), taps not counted. Never raises because of a handler."""
     global _loop, _handed
     handlers = registry.handlers(name, user)
-    if not handlers:
+    calls: List[_Call] = [(f"the {h.addon} handler {h.func.__name__}", h.func) for h in handlers]
+    calls += [(f"the tap {getattr(t, '__name__', 'tap')}", functools.partial(t, name)) for t in list(_taps)]
+    if not calls:
         return 0
     try:
         running: Optional[asyncio.AbstractEventLoop] = asyncio.get_running_loop()
@@ -90,27 +123,27 @@ def emit(name: str, user: User, **data: Any) -> int:
     if running is not None:
         if _loop is None or _loop.is_closed():
             _loop = running
-        _start(running, handlers, user, name, data)
+        _start(running, calls, user, name, data)
     elif _loop is not None and _loop.is_running() and not _loop.is_closed():
         with _lock:
             _handed += 1
         try:
-            _loop.call_soon_threadsafe(_start_handed, handlers, user, name, dict(data))
+            _loop.call_soon_threadsafe(_start_handed, calls, user, name, dict(data))
         except RuntimeError:  # the loop closed in between
             with _lock:
                 _handed -= 1
-            for h in handlers:
-                asyncio.run(_run(h, user, name, dict(data)))
+            for call in calls:
+                asyncio.run(_run(call, user, name, dict(data)))
     else:
-        for h in handlers:
-            asyncio.run(_run(h, user, name, dict(data)))
-    logger.debug(f"Event {name} for user {user.id}: {len(handlers)} handler(s)")
+        for call in calls:
+            asyncio.run(_run(call, user, name, dict(data)))
+    logger.debug(f"Event {name} for user {user.id}: {len(handlers)} handler(s), {len(calls) - len(handlers)} tap(s)")
     return len(handlers)
 
 
 async def drain() -> None:
-    """Wait until every handler started so far (and any they emit, or handed
-    over from another thread) has finished (tests)."""
+    """Wait until every handler and tap started so far (and any they emit, or
+    handed over from another thread) has finished (tests)."""
     while _pending or _handed:
         running = [t for t in _pending if not t.done()]
         if running:
@@ -122,15 +155,52 @@ async def drain() -> None:
 
 
 def pending() -> List["asyncio.Task[None]"]:
-    """The handlers still running."""
+    """The handlers and taps still running."""
     return list(_pending)
 
 
 async def stop(app: Any = None) -> None:
-    """Cancel the handlers still running and forget the bound loop (the app's cleanup)."""
+    """Cancel the handlers and taps still running and forget the bound loop (the app's cleanup)."""
     global _loop
     tasks = list(_pending)
     for t in tasks:
         t.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
     _loop = None
+
+
+# --- Core's events (the catalog) --------------------------------------------------------
+
+
+def _woke_history(user: User, since: datetime.datetime) -> List[PastEvent]:
+    """``user``'s confirmed wakes since ``since`` (wake_log), oldest first."""
+    first_day = (since.astimezone(clock.get_timezone()).date() - datetime.timedelta(days=1)).isoformat()
+    with get_db_connection() as conn:
+        rows = conn.execute("SELECT at, why FROM wake_log WHERE user_id = ? AND date >= ?",
+                            (user.id, first_day)).fetchall()
+    out: List[PastEvent] = []
+    for at, why in rows:
+        try:
+            when = datetime.datetime.fromisoformat(at)
+        except (TypeError, ValueError):
+            continue
+        if when.tzinfo is None:
+            when = when.replace(tzinfo=clock.get_timezone())
+        if when >= since:
+            out.append((when, {"why": why or ""}))
+    out.sort(key=lambda item: item[0])
+    return out
+
+
+_SIGNAL_FIELDS = {"source": "the source that delivered it (\"phone\": Dana's phone app)",
+                  "late": "true when it happened more than 30 minutes before it arrived (no reminders then)"}
+
+CORE_EVENTS: Tuple[EventType, ...] = (
+    EventType("core.signal.car", "The user got into or out of their car (the phone's car Bluetooth).",
+              {"action": "enter | leave", **_SIGNAL_FIELDS}),
+    EventType("core.signal.location", "The user arrived at or left one of their places (zones).",
+              {"action": "arrive | leave", "zone": "the place's name (\"Home\")",
+               "target": "the place's name (the same as zone)", **_SIGNAL_FIELDS}),
+    EventType("core.user.woke", "The user is up for the day (once a day, from the phone's unlocks or screen time).",
+              {"why": "what showed they are up, in a few words"}, history=_woke_history),
+)

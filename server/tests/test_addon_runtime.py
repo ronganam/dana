@@ -1,11 +1,13 @@
-"""The addon runtime: jobs per user (isolation, failures, heartbeat), services restarted, events, notify channels, prompt slot joiners, LLM purposes.
+"""The addon runtime: jobs per user (isolation, failures, heartbeat), services restarted, events, taps and the event catalog, notify channels, prompt slot joiners, LLM purposes.
 
 Run: bin/test test_addon_runtime
 
 One installed addon written to a temp folder (``rt``, loaded through
 DANA_ADDON_DIRS) declares a job of each kind, a service, event handlers (one
-failing), a channel, prompt parts in three slots and an LLM job. Two users have
-it (one whose job raises), a third does not.
+failing), an event type with a history, a channel, prompt parts in three
+slots and an LLM job. Two users have it (one whose job raises), a third does
+not. Taps (core/events.py) see every event, with or without handlers;
+``registry.event_types`` gives core's events and the user's addons'.
 """
 
 import asyncio
@@ -20,10 +22,16 @@ testenv.isolate("addon_runtime_test")
 ROOT = Path(testenv.scratch_path("addon_dirs"))
 (ROOT / "rt").mkdir(parents=True)
 (ROOT / "rt" / "addon.py").write_text(textwrap.dedent('''\
-    from core.addons import Addon, PromptPart
+    from core.addons import Addon, EventType, PromptPart
+
+    def watered_history(user, since):
+        return [(since, {"plant": "Fern"})]
+
     addon = Addon("rt", description="Runtime test addon", llm_jobs={"rt_summary": "deep"},
                   prompt_parts=(PromptPart("tools", "  greeting people  "), PromptPart("tools", "waving", rank=1),
-                                PromptPart("guides", "Wave at {user}."), PromptPart("send_via", " or a wave")))
+                                PromptPart("guides", "Wave at {user}."), PromptPart("send_via", " or a wave")),
+                  events=(EventType("rt.plant.watered", "A plant was watered.", {"plant": "its name"},
+                                    history=watered_history),))
     '''))
 (ROOT / "rt" / "hooks.py").write_text(textwrap.dedent('''\
     import asyncio
@@ -71,7 +79,11 @@ ROOT = Path(testenv.scratch_path("addon_dirs"))
     '''))
 os.environ["DANA_ADDON_DIRS"] = str(ROOT)
 
-from core import db, events, llm, notify, purposes, users  # noqa: E402
+import datetime  # noqa: E402
+
+from core import clock, db, events, llm, notify, purposes, users  # noqa: E402
+from core.addons import Addon, EventType  # noqa: E402
+from core.db import get_db_connection  # noqa: E402
 from core.agent import SLOTS, slot_text  # noqa: E402
 from core.addons import loader, registry, scheduler, store  # noqa: E402
 
@@ -144,6 +156,96 @@ async def test_events() -> None:
           n == 2 and seen == [(ADMIN.id, ADMIN.id, {"task_id": "t1", "title": "Hi"})], (n, seen))
     check("events: nothing for a user without the addon", not [s for s in seen if s[0] == NONE.id])
     check("events: nothing pending after drain", events.pending() == [])
+
+
+async def test_taps() -> None:
+    seen = []
+
+    async def watcher(name, user, data):
+        await asyncio.sleep(0.05)
+        data["changed"] = True  # each tap and handler gets its own copy
+        seen.append((name, user.id, users.current().id))
+
+    async def broken(name, user, data):
+        raise RuntimeError("tap bug")
+
+    events.tap(broken)
+    events.tap(watcher)
+    events.tap(watcher)
+    n = events.emit("rt.plant.watered", NONE, plant="Fern")
+    check("taps: an event without any handler still reaches the taps (emit counts handlers only)",
+          n == 0 and seen == [], (n, seen))
+    await events.drain()
+    check("taps: called once per tap, as the user, after drain; a failing tap does not stop the other",
+          seen == [("rt.plant.watered", NONE.id, NONE.id)], seen)
+
+    seen.clear()
+    rt.SEEN.clear()
+    events.emit("tasks.task.created", ADMIN, task_id="t9", title="Both")
+    await events.drain()
+    check("taps: an event with handlers reaches both; the handler's data is untouched by the tap",
+          seen == [("tasks.task.created", ADMIN.id, ADMIN.id)]
+          and [d for what, _, _, d in rt.SEEN if what == "event"] == [{"task_id": "t9", "title": "Both"}],
+          (seen, rt.SEEN))
+
+    seen.clear()
+    await asyncio.to_thread(events.emit, "rt.plant.watered", FAILS, plant="Ivy")
+    await events.drain()
+    check("taps: emitted from another thread → run on the server's loop, drain waits for them",
+          seen == [("rt.plant.watered", FAILS.id, FAILS.id)], seen)
+
+    events.untap(watcher)
+    events.untap(broken)
+    events.untap(broken)
+    seen.clear()
+    events.emit("rt.plant.watered", ADMIN, plant="Fern")
+    await events.drain()
+    check("taps: untapped → no longer called", seen == [], seen)
+
+
+def test_event_types() -> None:
+    admin = {e.name for e in registry.event_types(ADMIN)}
+    none = {e.name for e in registry.event_types(NONE)}
+    core_names = {"core.signal.car", "core.signal.location", "core.user.woke"}
+    check("catalog: core's events and the user's addons' events", core_names | {"rt.plant.watered"} <= admin, admin)
+    check("catalog: an addon the user lacks adds none (core's kept)",
+          core_names <= none and "rt.plant.watered" not in none, none)
+    rt_type = next(e for e in registry.event_types(ADMIN) if e.name == "rt.plant.watered")
+    since = clock.now()
+    check("catalog: an event type's history and its JSON",
+          list(rt_type.history(ADMIN, since)) == [(since, {"plant": "Fern"})]
+          and rt_type.to_json() == {"name": "rt.plant.watered", "about": "A plant was watered.",
+                                    "fields": {"plant": "its name"}}, rt_type)
+    location = next(e for e in events.CORE_EVENTS if e.name == "core.signal.location")
+    check("catalog: core.signal.location names its zone, target, action, source, late",
+          set(location.fields) == {"zone", "target", "action", "source", "late"}, location.fields)
+
+    refused = []
+    for make in (lambda: EventType("not a name", "About.", {}),
+                 lambda: EventType("rt.a.b", "", {}),
+                 lambda: EventType("rt.a.b", "About.", {"x": ""}),
+                 lambda: Addon("rt_bad", events=(EventType("other.thing.done", "About.", {}),)),
+                 lambda: Addon("rt_bad", events=(EventType("rt_bad.a.b", "About.", {}),
+                                                 EventType("rt_bad.a.b", "About.", {})))):
+        try:
+            make()
+            refused.append(False)
+        except (TypeError, ValueError):
+            refused.append(True)
+    check("catalog: bad names, an empty about or field, another addon's prefix, a name twice are refused",
+          all(refused), refused)
+
+    today = clock.now()
+    with get_db_connection() as conn:
+        for user, days, why in ((ADMIN, 1, "unlocks"), (ADMIN, 5, "screen time"), (FAILS, 1, "other user")):
+            at = today - datetime.timedelta(days=days)
+            conn.execute("INSERT INTO wake_log (user_id, date, at, why) VALUES (?, ?, ?, ?)",
+                         (user.id, at.date().isoformat(), at.isoformat(timespec="seconds"), why))
+        conn.commit()
+    woke = next(e for e in events.CORE_EVENTS if e.name == "core.user.woke")
+    got = woke.history(ADMIN, today - datetime.timedelta(days=3))
+    check("catalog: core.user.woke's history is the user's own wakes since then",
+          [d for _, d in got] == [{"why": "unlocks"}] and all(t.tzinfo for t, _ in got), got)
 
 
 def test_events_without_loop() -> None:
@@ -228,11 +330,13 @@ async def main() -> None:
     await test_jobs()
     await test_service()
     await test_events()
+    await test_taps()
     await test_channels()
 
 
 asyncio.run(main())
 test_events_without_loop()
+test_event_types()
 test_slots()
 test_purposes()
 

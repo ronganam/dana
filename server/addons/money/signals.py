@@ -15,6 +15,8 @@ row of the same amount within :data:`MATCH_DAYS` days, keeping the exact
 time and the notification and learning the merchant's other spelling;
 a provisional row still alone :data:`UNMATCHED_DAYS` days after its date
 becomes ``unmatched`` (declined or reversed: shown greyed, never counted).
+A new provisional row is announced as ``money.transaction.added``
+(``event_types.py``); its scraped twin is not announced again.
 """
 
 import asyncio
@@ -33,7 +35,7 @@ from core import clock, user_locale
 from core.text import redact_otp as redact
 from core.users import User
 from core.addons import store as connections
-from addons.money import classify, config, ingest, providers, schedule, store
+from addons.money import classify, config, event_types, ingest, providers, schedule, store
 
 logger = logging.getLogger(__name__)
 
@@ -449,10 +451,10 @@ def _posted(value: Any) -> datetime.datetime:
 
 
 def _provisional(conn: sqlite3.Connection, user: User, signal_id: str, payment: Payment, posted: datetime.datetime,
-                 notification_id: Optional[str]) -> Optional[str]:
+                 notification_id: Optional[str]) -> Optional[Tuple[Optional[str], str]]:
     """Turn a stored signal into a provisional transaction (or link it to the
     payment it repeats / the scraped row already there). Returns the source id
-    to sync sooner when a new provisional row was made."""
+    to sync sooner and the new row's id when a new provisional row was made."""
     home = user_locale.currency(user)
     if payment.amount >= 0 or payment.currency != home:
         return None  # a refund, or a foreign amount whose charge in the user's currency is not known yet
@@ -504,13 +506,14 @@ def _provisional(conn: sqlite3.Connection, user: User, signal_id: str, payment: 
          "memory" if category else None, notification_id, now, now))
     # scoped: the user's signal, stored for them before this call
     conn.execute("UPDATE money_signals SET transaction_id = ? WHERE id = ?", (txn_id, signal_id))
-    return account["source_id"]
+    return account["source_id"], txn_id
 
 
 def _store(user: User, source: str, items: Iterable[Mapping[str, Any]]) -> Dict[str, int]:
     """Store signals (deduplicated) and act on the new parsed ones; then pull the cards' syncs."""
     accepted = duplicates = provisional = 0
     pull: Set[str] = set()
+    made: List[str] = []
     now = store.now_iso()
     with store.db() as conn:
         for item in items:
@@ -532,12 +535,15 @@ def _store(user: User, source: str, items: Iterable[Mapping[str, Any]]) -> Dict[
             accepted += 1
             if payment is None:
                 continue
-            source_id = _provisional(conn, user, signal_id, payment, posted, item.get("notification_id"))
-            if source_id is not None:
-                provisional += 1
-                pull.add(source_id)
+            new = _provisional(conn, user, signal_id, payment, posted, item.get("notification_id"))
+            if new is not None:
+                made.append(new[1])
+                if new[0] is not None:
+                    provisional += 1
+                    pull.add(new[0])
         mark_unmatched(conn, user)
         prune(conn, user)
+    event_types.announce(user, made, synced=False)
     for source_id in sorted(pull):
         schedule.request_soon(user, source_id, minutes=30, reason="signal")
     return {"accepted": accepted, "duplicates": duplicates, "provisional": provisional}

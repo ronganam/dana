@@ -43,7 +43,7 @@ from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Set, 
 from core import budget, llm, users
 from core.users import User
 from core.addons import store as connections
-from addons.money import categories, config, ingest, providers, store
+from addons.money import categories, config, event_types, ingest, providers, store
 
 logger = logging.getLogger(__name__)
 
@@ -626,23 +626,30 @@ async def run(user: User, ids: Iterable[str] = (), *, ref: str = "") -> Dict[str
     return counts
 
 
-async def _background(user: User, ids: List[str], ref: str) -> None:
+async def _background(user: User, ids: List[str], ref: str, new_ids: List[str]) -> None:
     try:
         counts = await run(user, ids, ref=ref)
         logger.info(f"Money classification for user {user.id}: {counts}")
     except Exception as e:
         logger.error(f"Money classification for user {user.id} failed: {e}", exc_info=True)
+    try:
+        await asyncio.to_thread(event_types.announce, user, new_ids)
+    except Exception as e:
+        logger.error(f"Money: announcing the new transactions of user {user.id} failed: {e}", exc_info=True)
 
 
 def on_sync(user: User, source_id: str, new_ids: List[str], changed_ids: List[str]) -> None:
     """The ``after_sync.on_transactions`` handler: classify in the background (the
-    sync does not wait; nothing happens without a running loop)."""
+    sync does not wait), then announce the new rows (``money.transaction.added``).
+    Without a running loop nothing is classified and the new rows are announced at once."""
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:
+        event_types.announce(user, new_ids)
         return
     with users.acting_as(user):
-        task = loop.create_task(_background(user, list(new_ids) + list(changed_ids), f"money_source:{source_id}"))
+        task = loop.create_task(_background(user, list(new_ids) + list(changed_ids), f"money_source:{source_id}",
+                                            list(new_ids)))
     _tasks.add(task)
     task.add_done_callback(_tasks.discard)
 

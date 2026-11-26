@@ -323,6 +323,10 @@ async def test_ranking(client) -> None:
         check("ranking: the phone quiet again (past the window) → the test source's event used",
               [(c.args[0], c.kwargs.get("source"), c.kwargs.get("action")) for c in emitted.call_args_list]
               == [("core.signal.location", "test_feed", "leave")], emitted.call_args_list)
+        check("core.signal.location: the zone's name as zone and target, the source, late",
+              [sorted(c.kwargs.items()) for c in emitted.call_args_list]
+              == [[("action", "leave"), ("late", False), ("source", "test_feed"), ("target", "home"),
+                   ("zone", "home")]], emitted.call_args_list)
         status, body = await post(client, ROBIN, [
             {"type": "car", "action": "leave", "at": ms(utcnow() - datetime.timedelta(hours=2)), "via": "android_auto"}])
         await settle()

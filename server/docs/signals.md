@@ -42,7 +42,7 @@ signal. The trigger engine's own refire / flap marks (`docs/tasks-and-triggers.m
 hand-over.
 
 An accepted `car` / `location` event is emitted as `core.signal.car` `{action: enter|leave, source, late}` /
-`core.signal.location` `{action: arrive|leave, target: <zone name>, source, late}`; the tasks addon fires the
+`core.signal.location` `{action: arrive|leave, zone: <zone name>, target: <the same>, source, late}`; the tasks addon fires the
 reminders. `late`: the event happened more than `SIGNAL_LATE_MINUTES` (30) before it arrived (the phone was offline);
 the transition is recorded for the refire logic, but no reminder goes out. `wake` and `sleep` are the wake flow's
 (`docs/people.md`, "Wake detection").

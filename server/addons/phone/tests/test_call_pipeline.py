@@ -1,6 +1,7 @@
 """Call pipeline: async upload → transcription → structured analysis →
 labels / suggestions → accept (task + link) / dismiss, dedupe, reanalyze,
-chat context sessions, audio retention, backfill dry run, FTS triggers.
+chat context sessions, audio retention, backfill dry run, FTS triggers,
+phone.call.ended once per call (its first analysis, not a reanalysis).
 
 The model is faked at the LiteLLM boundary (litellm.acompletion is patched, so
 core/llm.py runs for real); everything else is real:
@@ -43,7 +44,7 @@ from addons.phone import api as phone_api
 from addons.phone.calls import api as calls_api
 from addons.tasks import api as tasks_api
 from core.auth import setup_auth
-from core import clock, context_chats, paths
+from core import clock, context_chats, events, paths
 from addons.phone import suggestions as phone_suggestions
 from addons.phone.calls import analysis as call_analysis, backfill as call_backfill
 from addons.phone.calls import context as call_context, processing as call_processing
@@ -188,8 +189,26 @@ def upload_form(content: bytes, name="Call אמא_261108_114129.m4a", **fields):
     return form
 
 
+ENDED = []  # phone.call.ended data, as a tap sees it
+
+
+async def on_event(name, user, data):
+    if name == "phone.call.ended":
+        ENDED.append((user.id, data))
+
+
+async def ended_for(call_id, timeout=5.0):
+    """The phone.call.ended events of ``call_id`` (waiting a little for the one emitted after ready)."""
+    deadline = asyncio.get_running_loop().time() + timeout
+    while not [d for _, d in ENDED if d["call_id"] == call_id] and asyncio.get_running_loop().time() < deadline:
+        await asyncio.sleep(0.02)
+    await events.drain()
+    return [(u, d) for u, d in ENDED if d["call_id"] == call_id]
+
+
 async def main():
     paths.ensure_data_dirs()
+    events.tap(on_event)
     client = TestClient(TestServer(build_app()))
     await client.start_server()
     try:
@@ -201,6 +220,12 @@ async def main():
         call_id = up["id"]
         call = await wait_ready(client, call_id)
         check("call becomes ready", call["status"] == "ready", call.get("error"))
+        ended = await ended_for(call_id)
+        check("phone.call.ended once, for its owner, with the call's data",
+              len(ended) == 1 and ended[0][0] == OWNER.id
+              and ended[0][1] == {"call_id": call_id, "person": call["caller"], "direction": "incoming",
+                                  "duration_s": 95, "title": "תיאום טכנאי מזגנים", "summary": call["summary"]},
+              (ended, call["caller"]))
         check("transcribed once", calls_made["transcribe"] == 1)
         check("labels cleaned (known, deduped)", call["labels"] == ["home", "family"], call["labels"])
         check("label details included", call["label_details"][0]["emoji"] == "🏠")
@@ -335,6 +360,9 @@ async def main():
         check("reanalyze → 202", r.status == 202)
         again = await wait_ready(client, call_id)
         check("reanalyze finishes + used instructions", again["status"] == "ready" and "focus on money" in calls_made["last_prompt"])
+        await asyncio.sleep(0.1)
+        check("a reanalysis does not emit phone.call.ended again", len(await ended_for(call_id, timeout=0)) == 1)
+        check("a silent (failed) call emits no phone.call.ended", not await ended_for(silent["id"], timeout=0))
 
         # --- retention: old upload loses audio, keeps transcript; API says 410
         with get_db_connection() as conn:
@@ -410,6 +438,7 @@ async def main():
               and not call_processing.recent_call({}))
         check("timeout errors are named", call_transcription.err_text(httpx.ReadTimeout("")) == "ReadTimeout")
     finally:
+        events.untap(on_event)
         await client.close()
 
     failed = [n for n, ok in results if not ok]

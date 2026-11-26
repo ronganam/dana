@@ -225,6 +225,10 @@ What callers can rely on: once a run has ended with a model configured, every sc
 
 The merchant memory (`classify.py`, each taking an open connection): `alias(conn, user, alias_key)` → `{alias_key, merchant_key, merchant, category}` or None; `learn_alias(conn, user, alias_key, merchant_key, merchant=None, category=None)`; `remember_name(conn, user, merchant_key, merchant, category=None)` (a key known as another merchant's spelling is left alone); `memory(conn, user, merchant_key, kind=, amount=, memo=, exclude_id=, sources=)` → `{category, merchant, flow}`.
 
+## Event: a new transaction
+
+`money.transaction.added` (`event_types.py`; for watches: `../docs/addons.md`, "Events") is emitted once per transaction stored for the first time: `{transaction_id, amount (major units of the home currency, signed: + in, − out), direction (in | out), counterparty (merchant, else description), counterparty_kind, flow, category, account (its name), account_kind (bank | card), status}`. `counterparty_kind`: a `transfer_in` / `transfer_out` is a `person` unless the name looks like a company's (`בע"מ`, `LTD`, `INC`: `business`); `card_bill`, `loan`, `interest`, `investment`, `own_transfer`, `fee` are the `bank`; no flow and no name `unknown`; else `business`. A provisional row (from a payment notification) is announced when it is made; a synced or imported row after the sync's reconciliation and classification (`classify.on_sync`, so flow and category are filled), unless a payment signal points at it (the twin a provisional row was merged into: announced already). Updates are never announced, nor a row dated more than `MAX_AGE_DAYS` (7) before it was stored (a first sync's history, an old statement). Its history: the user's rows by `created_at`, the same rules.
+
 ## Instant updates from the phone
 
 `signals.py`. A payment notification on the phone becomes a transaction at once and pulls that card's sync earlier. Two ways in:
