@@ -353,9 +353,9 @@ async def test_tap_path() -> None:
     check("a done watch does not fire again", len(fires(BOB, w["id"])) == 1)
     stages = [(p["stage"], p["result"]) for p in pipeline.recent(BOB.id)]
     want = [("event", None), ("filter", "drop"), ("event", None), ("filter", "pass"), ("semantic", "no"),
-            ("event", None), ("filter", "pass"), ("semantic", "yes"), ("fire", None), ("action", "done"),
-            ("event", None), ("filter", "drop")]
-    check("the pipeline reports each stage in order", stages == want, stages)
+            ("event", None), ("filter", "pass"), ("semantic", "yes"), ("fire", None), ("action", "done")]
+    check("the pipeline reports each stage in order; an event no active watch listens to is only counted",
+          stages == want, stages)
     st = pipeline.stats(BOB.id)
     check("pipeline counters", st["events_in"] == 4 and st["filter_pass"] == 2 and st["semantic_checks"] == 2
           and st["semantic_yes"] == 1 and st["fires"] == 1 and st["actions"] == {"notify": 1}

@@ -91,6 +91,14 @@ def record(user_id: str, stage: str, *, event_type: Optional[str] = None, event_
     return ev
 
 
+def count_unwatched(user_id: str, event_type: str) -> None:
+    """Count an event no active watch listens to, without a step in the log or the stream (a busy home's
+    sensors would otherwise crowd out the steps that matter)."""
+    log = _log(user_id)
+    log.events_in += 1
+    log.by_type[event_type] = log.by_type.get(event_type, 0) + 1
+
+
 def stats(user_id: str) -> Dict[str, Any]:
     """The counters of ``user_id`` since the server started."""
     log = _log(user_id)

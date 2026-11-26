@@ -217,6 +217,13 @@ def _in_window(watch: Mapping[str, Any], now: dt.datetime) -> bool:
     return (start is None or start <= now) and (end is None or now <= end)
 
 
+def _listens(w: Dict[str, Any], name: str) -> bool:
+    """Whether watch ``w`` has an event trigger or reminder evidence on event type ``name``."""
+    sp = w["spec"]
+    return (any(t.get("kind") == "event" and t.get("event_type") == name for t in sp.get("triggers") or [])
+            or name in (sp.get("evidence_event_types") or []))
+
+
 async def on_event(name: str, user: User, data: Dict[str, Any]) -> None:
     """The ``core.events`` tap: run one event through this user's watches."""
     if name == "tasks.task.completed" and data.get("task_id"):
@@ -227,6 +234,9 @@ async def on_event(name: str, user: User, data: Dict[str, Any]) -> None:
         return
     types = catalog(user)
     if name not in types:
+        return
+    if not any(_listens(w, name) for w in active(user)):
+        pipeline.count_unwatched(user.id, name)
         return
     e = S.Event(name, dict(data), clock.now(), _event_id(data))
     summary = S.summary(name, e.data)
