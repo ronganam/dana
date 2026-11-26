@@ -723,7 +723,29 @@ server's.
 
 Home Assistant is a smart-home control only: it is no source of any signal
 (wake, screen, car, location and sleep come from Dana's phone app,
-`docs/signals.md`).
+`docs/signals.md`). Its state changes can be watched (`docs/watches.md`).
+
+**State changes** (`addons/homeassistant/states.py`, the event in
+`event_types.py`). The addon's one service keeps a WebSocket per user
+connection (`get_states`, then `subscribe_events` for `state_changed`),
+started for each user who has the addon active with a token, looked at again
+every 15 s and at once after a connect / update / disconnect (`on_change`):
+a disconnected user's subscription stops, a new host or token starts a new
+one, a failure connects again after 1 s doubling to 5 min (the longest after
+a refused token, which also marks the connection for reconnecting). It emits
+`homeassistant.state.changed` (`entity_id, name, domain, old_state,
+new_state, unit, device_class`, states as text) only when the state itself
+changed, never to or from `unavailable` / `unknown` (`old_state` is the last
+good state Dana reported, so an entity that comes back unchanged emits
+nothing), and a numeric state at most once a minute per entity unless it
+moved to another tens (52 → 49); a held value is emitted when its minute is
+up, from the last reported state, so no threshold crossing is lost. The
+event's known values (`EventType.values`) are the user's entity ids as last
+read (`"id (name, device class)"`: the phone battery sensor setting first,
+labelled "the user's phone battery", then the home map's and the dashboards'
+Home Assistant widgets' entities, then by domain; none before the first
+read); its history is the last 5,000 events Dana emitted, in memory since
+the server started.
 
 **Tools** (`addons/homeassistant/tools.py`). `get_ha_exposed_entities(search?)`:
 the voice-exposed entities with live state, only those whose id, name, alias

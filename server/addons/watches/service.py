@@ -77,7 +77,9 @@ def validate(user: User, raw: Any) -> Dict[str, Any]:
     Raises:
         Invalid: what is wrong with it.
     """
-    sp, errors = S.validate(raw, clock.now(), engine.catalog(user), compiler.available_tools(user))
+    types = engine.catalog(user)
+    sp, errors = S.validate(raw, clock.now(), types, compiler.available_tools(user),
+                            S.known_values(types.values(), user))
     if errors:
         raise Invalid(errors)
     return sp

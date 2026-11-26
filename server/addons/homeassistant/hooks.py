@@ -1,10 +1,13 @@
 """The Home Assistant addon's background work (../docs/addons.md, "The
 manifest"): at start, every user's home map fetched in the background for
-their prompt."""
+their prompt; and the service that follows each user's Home Assistant state
+changes as ``homeassistant.state.changed`` events (:mod:`.states`)."""
+
+from typing import Any
 
 from core.addons import store
 from core.users import User
-from addons.homeassistant import home_map
+from addons.homeassistant import home_map, states
 from addons.homeassistant.addon import addon
 from addons.homeassistant.config import ADDON
 
@@ -16,3 +19,9 @@ async def warm_home_map(user: User) -> None:
     task = home_map.warm_home_map(conn) if conn is not None else None
     if task is not None:
         await task
+
+
+@addon.service
+async def follow_state_changes(app: Any) -> None:
+    """One WebSocket subscription to ``state_changed`` per user connection (:func:`states.run`)."""
+    await states.run(app)

@@ -106,9 +106,10 @@ def bind(loop: asyncio.AbstractEventLoop) -> None:
     _loop = loop
 
 
-def emit(name: str, user: User, **data: Any) -> int:
+def emit(name: str, user: User, /, **data: Any) -> int:
     """Hand event ``name`` for ``user`` to every handler of an addon active for
-    them and to every tap; returns how many handlers were started (or handed
+    them and to every tap (``name`` and ``user`` are positional, so the data may
+    carry keys of those names); returns how many handlers were started (or handed
     to the server's loop), taps not counted. Never raises because of a handler."""
     global _loop, _handed
     handlers = registry.handlers(name, user)

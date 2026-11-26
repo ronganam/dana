@@ -8,7 +8,8 @@ and is then pointed at instance A; Bob has instance B; Carl has no Home
 Assistant. Checked: tools, proxies, the zone import and the home map hit only
 the user's own instance with their own token; the user without the addon
 gets 403 / no tools / no map; Home Assistant is no source of any signal (no
-wake, screen, car, location or weather source, no watcher service, no
+wake, screen, car, location or weather source (its one service only feeds
+watches: test_ha_state_events), no
 sensor self-checks, the clock never asks it, ``/api/client-config`` gone) and
 its first migration drops the old sensor settings, the watcher's marks and
 its signal records from a stored connection, keeping the rest; ``/webhook``
@@ -210,8 +211,9 @@ async def test_no_signals() -> None:
     check("providers: no weather / screen_sessions from Home Assistant",
           all(h.addon != "homeassistant" for key in ("weather", "screen_sessions")
               for h in registry.providers(key, BOB)))
-    check("no Home Assistant service (no entity watcher)",
-          not [s for s in registry.services() if s.addon == "homeassistant"], registry.services())
+    check("one Home Assistant service: the state changes for watches (no signal watcher)",
+          [s.func.__name__ for s in registry.services() if s.addon == "homeassistant"] == ["follow_state_changes"],
+          registry.services())
     keys = {c["key"] for c in checks.compute(user=BOB)}
     check("self-checks: no location / car / ha_entities / ha_watcher",
           not keys & {"location", "car", "ha_entities", "ha_watcher"}, keys)

@@ -243,12 +243,20 @@ class EventType:
     description each (units, allowed values) in ``fields``, and ``history``:
     ``history(user, since)`` gives this user's past events of this type since
     ``since`` (aware), oldest first, with the same data as emitted (dry runs);
-    sync, one cheap query, scoped to the user. None: no history."""
+    sync, one cheap query, scoped to the user. None: no history. ``values``:
+    ``values(user)`` gives the known real values of some fields
+    (``{field: ["value", "value (what it is)", ...]}``, most relevant first; the
+    text before `` (`` is the value), e.g. the user's entity ids: shown to the
+    model that writes watches, and a field listed there is a closed set (an
+    ``eq`` / ``in`` condition naming another value is refused); sync, cheap
+    (no network), scoped to the user. None: none known."""
     name: str
     about: str
     fields: Dict[str, str]
     # history(user: core.users.User, since) (typed Any here: this module imports nothing of the app).
     history: Optional[Callable[[Any, datetime.datetime], Iterable[PastEvent]]] = None
+    # values(user: core.users.User) -> {field: [known value, ...]}.
+    values: Optional[Callable[[Any], Dict[str, List[str]]]] = None
 
     def __post_init__(self) -> None:
         owner = f"EventType({self.name!r})"
@@ -260,6 +268,8 @@ class EventType:
             raise ValueError(f"{owner}: fields maps each data key to its description")
         if self.history is not None and not callable(self.history):
             raise ValueError(f"{owner}: history must be a function of (user, since)")
+        if self.values is not None and not callable(self.values):
+            raise ValueError(f"{owner}: values must be a function of (user)")
 
     def to_json(self) -> Dict[str, Any]:
         return {"name": self.name, "about": self.about, "fields": dict(self.fields)}

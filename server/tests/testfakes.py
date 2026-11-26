@@ -26,6 +26,7 @@ class FakeHA:
         self.exposed = exposed  # entity id -> registry name
         self.requests: List[Tuple[str, str]] = []  # (path, bearer token or WS auth token)
         self.service_calls: List[Tuple[str, Dict[str, Any]]] = []
+        self.subscribers: List[Tuple[Any, int]] = []  # (WebSocket, subscription id) of state_changed
         self.down = False
         app = web.Application()
         app.router.add_get("/api/websocket", self.ws)
@@ -97,7 +98,30 @@ class FakeHA:
             elif kind == "config/entity_registry/get":
                 await ws.send_json({"id": mid, "type": "result", "success": True, "result": {
                     "name": self.exposed.get(data["entity_id"]), "aliases": []}})
+            elif kind == "get_states":
+                await ws.send_json({"id": mid, "type": "result", "success": True, "result": list(self.states.values())})
+            elif kind == "subscribe_events" and data.get("event_type") == "state_changed":
+                await ws.send_json({"id": mid, "type": "result", "success": True, "result": None})
+                self.subscribers.append((ws, mid))
+        self.subscribers = [(s, i) for s, i in self.subscribers if s is not ws]
         return ws
+
+    async def push(self, entity_id: str, state: str, attributes: Optional[Dict[str, Any]] = None) -> None:
+        """Set an entity's state (``attributes`` replace its own when given; a new entity starts with
+        none) and send ``state_changed`` to every subscribed WebSocket, as Home Assistant does."""
+        old = self.states.get(entity_id)
+        attrs = dict(attributes if attributes is not None else (old or {}).get("attributes") or {})
+        new = {"entity_id": entity_id, "state": state, "attributes": attrs}
+        self.states[entity_id] = new
+        for ws, mid in list(self.subscribers):
+            await ws.send_json({"id": mid, "type": "event", "event": {
+                "event_type": "state_changed", "data": {"entity_id": entity_id, "old_state": old, "new_state": new}}})
+
+    async def drop_sockets(self) -> None:
+        """Close every open WebSocket (Home Assistant restarting)."""
+        for ws, _ in list(self.subscribers):
+            await ws.close()
+        self.subscribers.clear()
 
     def tokens_seen(self) -> set:
         return {t for _, t in self.requests}

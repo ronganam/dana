@@ -45,7 +45,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
   | about | short facts about the user, always in their prompt, learned in the background | `docs/about.md` |
   | people | people, numbers, briefs, the incoming-call card | `docs/people.md` |
   | phone | push to the user's devices, notifications Inbox (triage by `notifications/judges.py`: the background model by default, TypeSafe when `TYPESAFE_API_KEY` is set), call recordings → suggestions, the phone's signals (`POST /api/signals`: unlocks, screen time, car, zones) | `docs/notifications.md`, `docs/calls.md`, `docs/signals.md` |
-  | homeassistant | smart-home control, the home map, the TV | `docs/access.md` (Home Assistant) |
+  | homeassistant | smart-home control, the home map, the TV; state changes as watch events (one WebSocket per connection) | `docs/access.md` (Home Assistant) |
   | whatsapp | WAHA per connection: read (message ids, files by name; `read_whatsapp_file` reads a file's text), send, forward any received message or file by id, inbound voice notes routed by account | `docs/whatsapp.md` |
   | calendar | Google Calendar per connection; one Google sign-in (`addons/google_account/`) connects every Google addon | `docs/access.md` (Addons, Google account) |
   | contacts | Google Contacts: a per-user copy synced from the People API; search / read tools, add / update ask first; fills in people and unknown callers | `docs/contacts.md` |

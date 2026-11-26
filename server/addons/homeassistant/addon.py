@@ -1,7 +1,8 @@
 """The ``homeassistant`` addon (Home Assistant)."""
 
 from core.addons import ADDRESS, Field, Addon, PromptPart, Need, Touches
-from addons.homeassistant import client, home_map, options
+from addons.homeassistant import client, home_map, options, states
+from addons.homeassistant.event_types import HOMEASSISTANT_EVENTS
 from addons.homeassistant.config import ADDON, BATTERY_SENSOR, TV, TV_CHANNEL
 
 # Entity settings have no default: whose entities they are is the user's
@@ -37,6 +38,8 @@ addon = Addon(
               "Controls the TV"),
     examples=("Turn off the living room lights", "Which lights are on?", "Is the gate open?"),
     prompt_section=home_map.prompt_section,
+    events=HOMEASSISTANT_EVENTS,
+    on_change=states.poke,
     modules=("widgets",),
     test=client.check,
     options=options.entity_options,

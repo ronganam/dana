@@ -128,11 +128,11 @@ Per-user data: every query filters by the acting user. Addons can use `core.addo
 
 ### Events
 
-`core.events.emit(name, user, **data)`; handlers of the addons that user has run in the background as that user, a failing one logged (tests wait with `events.drain()`). Names are `<addon>.<thing>.<what happened>` (`tasks.task.created`, `phone.notification.ingested`); core's own start with `core.` (`core.user.woke`, `core.signal.location`, `core.zones.changed`).
+`core.events.emit(name, user, **data)` (`name` and `user` positional, so data may use those keys); handlers of the addons that user has run in the background as that user, a failing one logged (tests wait with `events.drain()`). Names are `<addon>.<thing>.<what happened>` (`tasks.task.created`, `phone.notification.ingested`); core's own start with `core.` (`core.user.woke`, `core.signal.location`, `core.zones.changed`).
 
 **Taps**: `events.tap(fn)` / `events.untap(fn)`; `async fn(name, user, data)` is called for every `emit`, whether or not any addon handles it, started like a handler (its own task, as the user, a failure logged, `drain()` waits, also when emitted from another thread). The `watches` addon matches any event this way.
 
-**The catalog**: an event others may watch is declared as an `EventType(name, about, fields, history=None)` (`core/addons/hooks.py`): `about` one sentence for the model that writes watches, `fields` each data key with its description (units, allowed values), `history(user, since)` this user's past events since an aware time, oldest first, in the emitted shape (dry runs; sync, one cheap query, scoped to the user). An addon declares its own in `Addon(events=(...))` (named `<addon>.…`, each once); core's are `core.events.CORE_EVENTS`. `core.addons.registry.event_types(user)` lists core's and those of the addons active for the user. Emitting does not need a declaration; declaring makes the event watchable.
+**The catalog**: an event others may watch is declared as an `EventType(name, about, fields, history=None, values=None)` (`core/addons/hooks.py`): `about` one sentence for the model that writes watches, `fields` each data key with its description (units, allowed values), `history(user, since)` this user's past events since an aware time, oldest first, in the emitted shape (dry runs; sync, one cheap query, scoped to the user), `values(user)` the known real values of some fields, `{field: ["value (what it is)", …]}`, most relevant first (shown to the watch compiler, capped; a field listed there is a closed set: an `eq` / `in` condition naming another value is refused with the close matches; sync, no network, scoped to the user; `{}` when nothing is known yet). An addon declares its own in `Addon(events=(...))` (named `<addon>.…`, each once); core's are `core.events.CORE_EVENTS`. `core.addons.registry.event_types(user)` lists core's and those of the addons active for the user. Emitting does not need a declaration; declaring makes the event watchable.
 
 | Event | Data | History |
 |---|---|---|
@@ -143,6 +143,7 @@ Per-user data: every query filters by the acting user. Addons can use `core.addo
 | `phone.email.received` | `notification_id, account, from, subject, text, amount` (`server/docs/notifications.md`) | the Inbox |
 | `phone.call.ended` | `call_id, person, direction, duration_s, title, summary` (`server/docs/calls.md`) | analysed calls |
 | `money.transaction.added` | `transaction_id, amount, direction, counterparty, counterparty_kind, flow, category, account, account_kind, status` (`server/docs/money.md`) | the transactions |
+| `homeassistant.state.changed` | `entity_id, name, domain, old_state, new_state, unit, device_class` (states as text; known values: the user's entity ids; `server/docs/access.md`, "Home Assistant") | the changes Dana emitted, in memory since the server started |
 | `tasks.task.created` / `tasks.task.completed` | `task_id, title` (+ `group_id` when created) | created only |
 
 Other events (`phone.notification.ingested`, `tasks.task.deleted`, `knowledge.project.deleted`, `core.zones.changed`) are for handlers only; the module that emits each says its data.
