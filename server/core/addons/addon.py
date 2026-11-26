@@ -26,7 +26,7 @@ from typing import (Any, Awaitable, Callable, Collection, Dict, List, Mapping, O
 
 from core.access import CAPABILITIES
 from core.users import User
-from core.addons.hooks import (ADDON as ADDON_NEED, CONNECT, WIDGET_SIZES, Channel, Fix, Handler, Hook, Job, LlmJob,
+from core.addons.hooks import (ADDON as ADDON_NEED, CONNECT, WIDGET_SIZES, Channel, EventType, Fix, Handler, Hook, Job, LlmJob,
                                Need, Page, Service, Touches, Worker)
 from core.addons.schema import generate_schema
 
@@ -338,6 +338,8 @@ class Addon:
             credentials stopped working (a :class:`~core.addons.hooks.Fix`);
             None: its own page on the Addons page (``Fix.connect``). ``money``
             sends it to the Money page, where each bank login is fixed.
+        events: The events it emits (:class:`~core.addons.hooks.EventType`),
+            offered to watches (``registry.event_types``).
 
     Hooks are declared with the decorators below (``@addon.job``,
     ``@addon.on``, ``@addon.now_cards``, ``@addon.live_refresh``…);
@@ -360,7 +362,7 @@ class Addon:
                  blocked: Optional[ConnectionBlock] = None, connect_url: Optional[str] = None,
                  connect_label: str = "", realtime: bool = True, icon: str = "", features: Sequence[str] = (),
                  setup: Sequence[str] = (), examples: Sequence[str] = (), disconnect_warning: str = "",
-                 reconnect_fix: Optional[Fix] = None) -> None:
+                 reconnect_fix: Optional[Fix] = None, events: Sequence[EventType] = ()) -> None:
         if not name.isidentifier():
             raise ValueError(f"Addon {name!r} must be an identifier")
         owner = f"Addon {name!r}"
@@ -439,6 +441,8 @@ class Addon:
         self.examples: Tuple[str, ...] = tuple(examples)
         self.disconnect_warning = disconnect_warning
         self.reconnect_fix: Fix = reconnect_fix or Fix(CONNECT, name, "Reconnect")
+        # The events it emits, declared for the watches engine (registry.event_types).
+        self.events: Tuple[EventType, ...] = tuple(events)
         self.tools: List[Tool] = []
         self.jobs: List[Job] = []
         self.services: List[Service] = []

@@ -271,7 +271,8 @@ def test_convert_9_0():
     expected["dashboards"] = []
     expected["connection_reconnects"] = []
     expected["live_activities"] = []
-    for table in ("signal_sources", "wake_windows", "phone_screen_sessions", "phone_signal_keys"):
+    for table in ("signal_sources", "wake_windows", "phone_screen_sessions", "phone_signal_keys",
+                  "watches", "watch_fires"):  # ... watches m0001: no watches yet
         expected[table] = []
     wizard_rows = after.get("user_wizard", [])
     check("9.0: every existing user has the wizard finished (no steps)",

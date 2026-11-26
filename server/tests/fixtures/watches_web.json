@@ -1,0 +1,881 @@
+{
+ "list": {
+  "watches": [
+   {
+    "id": "c5b946453400",
+    "title": "Dishwasher finished",
+    "kind": "watch",
+    "status": "active",
+    "request": "when the dishwasher finishes ask Gal on WhatsApp to empty it",
+    "spec": {
+     "title": "Dishwasher finished",
+     "kind": "watch",
+     "task_title": "",
+     "task_id": null,
+     "triggers": [
+      {
+       "id": "done",
+       "kind": "event",
+       "event_type": "phone.notification.received",
+       "where": [
+        {
+         "field": "app",
+         "op": "eq",
+         "value": "Home Assistant"
+        }
+       ],
+       "keywords": [
+        "dishwasher",
+        "מדיח"
+       ]
+      }
+     ],
+     "repeat": "each",
+     "cooldown_minutes": 10,
+     "on_match": [
+      {
+       "type": "agent",
+       "instructions": "Ask Gal on WhatsApp to empty the dishwasher",
+       "autonomy": "ask_first",
+       "urgency": "glance"
+      }
+     ],
+     "on_deadline": [],
+     "evidence_event_types": [],
+     "evidence_keywords": [],
+     "evidence_question": "",
+     "unsupported": "",
+     "window_start": "2026-11-26 23:03",
+     "window_end": "2026-12-03 23:03"
+    },
+    "created_at": "2026-11-26T23:03:22+02:00",
+    "window": {
+     "start": "2026-11-26 23:03",
+     "end": "2026-12-03 23:03"
+    },
+    "fires_count": 1,
+    "last_fired_at": "2026-11-26T23:03:22+02:00",
+    "next_time": null,
+    "task_id": null,
+    "load": {
+     "done": {
+      "matches_14d": 0,
+      "per_day": 0.0,
+      "semantic": false,
+      "over_budget": false
+     }
+    }
+   },
+   {
+    "id": "c91c2304f346",
+    "title": "Rent from Maya",
+    "kind": "watch",
+    "status": "done",
+    "request": "make sure the rent from Maya (about 2,000) arrives by tomorrow",
+    "spec": {
+     "title": "Rent from Maya",
+     "kind": "watch",
+     "task_title": "",
+     "task_id": null,
+     "triggers": [
+      {
+       "id": "tx",
+       "kind": "event",
+       "event_type": "money.transaction.added",
+       "where": [
+        {
+         "field": "amount",
+         "op": "approx",
+         "value": "2000",
+         "tolerance_pct": 10
+        },
+        {
+         "field": "direction",
+         "op": "eq",
+         "value": "in"
+        },
+        {
+         "field": "counterparty",
+         "op": "contains",
+         "value": "Maya"
+        }
+       ],
+       "keywords": []
+      },
+      {
+       "id": "push",
+       "kind": "event",
+       "event_type": "phone.notification.received",
+       "where": [
+        {
+         "field": "app",
+         "op": "eq",
+         "value": "Bank"
+        }
+       ],
+       "keywords": [
+        "Maya"
+       ],
+       "semantic": "Does it say money arrived from Maya?"
+      }
+     ],
+     "repeat": "once",
+     "cooldown_minutes": 10,
+     "on_match": [
+      {
+       "type": "notify",
+       "text": "Look",
+       "urgency": "now",
+       "autonomy": "ask_first"
+      }
+     ],
+     "on_deadline": [
+      {
+       "type": "notify",
+       "text": "Maya's rent has not arrived",
+       "urgency": "now",
+       "autonomy": "ask_first"
+      }
+     ],
+     "evidence_event_types": [],
+     "evidence_keywords": [],
+     "evidence_question": "",
+     "unsupported": "",
+     "window_start": "2026-11-26 23:03",
+     "window_end": "2026-11-27 23:03"
+    },
+    "created_at": "2026-11-26T23:03:22+02:00",
+    "window": {
+     "start": "2026-11-26 23:03",
+     "end": "2026-11-27 23:03"
+    },
+    "fires_count": 1,
+    "last_fired_at": "2026-11-26T23:03:22+02:00",
+    "next_time": null,
+    "task_id": null,
+    "load": {
+     "tx": {
+      "matches_14d": 0,
+      "per_day": 0.0,
+      "semantic": false,
+      "over_budget": false
+     },
+     "push": {
+      "matches_14d": 0,
+      "per_day": 0.0,
+      "semantic": true,
+      "over_budget": false
+     }
+    }
+   },
+   {
+    "id": "bd37f74fef73",
+    "title": "Pick up Noa",
+    "kind": "reminder",
+    "status": "active",
+    "request": "remind me at 20:30 to pick up Noa, 30 minutes before too, or when I get in the car",
+    "spec": {
+     "title": "Pick up Noa",
+     "kind": "reminder",
+     "task_title": "Pick up Noa from practice",
+     "task_id": "826a3d5e-8177-4568-bde9-44cd6c5eac7b",
+     "triggers": [
+      {
+       "id": "t2030",
+       "kind": "time",
+       "at": "2026-11-27 00:33",
+       "every": null
+      },
+      {
+       "id": "before",
+       "kind": "time",
+       "relative_to": "t2030",
+       "offset_minutes": -30,
+       "every": null
+      },
+      {
+       "id": "car",
+       "kind": "event",
+       "event_type": "core.signal.car",
+       "where": [
+        {
+         "field": "action",
+         "op": "eq",
+         "value": "enter"
+        }
+       ],
+       "keywords": []
+      }
+     ],
+     "repeat": "each",
+     "cooldown_minutes": 10,
+     "on_match": [
+      {
+       "type": "notify",
+       "text": "Pick up Noa at 20:30",
+       "urgency": "now",
+       "autonomy": "ask_first"
+      }
+     ],
+     "on_deadline": [],
+     "evidence_event_types": [
+      "phone.notification.received"
+     ],
+     "evidence_keywords": [
+      "picked up",
+      "אספתי"
+     ],
+     "evidence_question": "Does it show Noa was already picked up?",
+     "unsupported": "",
+     "window_start": "2026-11-26 23:03",
+     "window_end": "2026-11-27 23:59"
+    },
+    "created_at": "2026-11-26T23:03:22+02:00",
+    "window": {
+     "start": "2026-11-26 23:03",
+     "end": "2026-11-27 23:59"
+    },
+    "fires_count": 1,
+    "last_fired_at": "2026-11-26T23:03:22+02:00",
+    "next_time": "2026-11-27 00:33",
+    "task_id": "826a3d5e-8177-4568-bde9-44cd6c5eac7b",
+    "load": {
+     "car": {
+      "matches_14d": 0,
+      "per_day": 0.0,
+      "semantic": false,
+      "over_budget": false
+     }
+    }
+   }
+  ]
+ },
+ "detail": {
+  "watch": {
+   "id": "c91c2304f346",
+   "title": "Rent from Maya",
+   "kind": "watch",
+   "status": "done",
+   "request": "make sure the rent from Maya (about 2,000) arrives by tomorrow",
+   "spec": {
+    "title": "Rent from Maya",
+    "kind": "watch",
+    "task_title": "",
+    "task_id": null,
+    "triggers": [
+     {
+      "id": "tx",
+      "kind": "event",
+      "event_type": "money.transaction.added",
+      "where": [
+       {
+        "field": "amount",
+        "op": "approx",
+        "value": "2000",
+        "tolerance_pct": 10
+       },
+       {
+        "field": "direction",
+        "op": "eq",
+        "value": "in"
+       },
+       {
+        "field": "counterparty",
+        "op": "contains",
+        "value": "Maya"
+       }
+      ],
+      "keywords": []
+     },
+     {
+      "id": "push",
+      "kind": "event",
+      "event_type": "phone.notification.received",
+      "where": [
+       {
+        "field": "app",
+        "op": "eq",
+        "value": "Bank"
+       }
+      ],
+      "keywords": [
+       "Maya"
+      ],
+      "semantic": "Does it say money arrived from Maya?"
+     }
+    ],
+    "repeat": "once",
+    "cooldown_minutes": 10,
+    "on_match": [
+     {
+      "type": "notify",
+      "text": "Look",
+      "urgency": "now",
+      "autonomy": "ask_first"
+     }
+    ],
+    "on_deadline": [
+     {
+      "type": "notify",
+      "text": "Maya's rent has not arrived",
+      "urgency": "now",
+      "autonomy": "ask_first"
+     }
+    ],
+    "evidence_event_types": [],
+    "evidence_keywords": [],
+    "evidence_question": "",
+    "unsupported": "",
+    "window_start": "2026-11-26 23:03",
+    "window_end": "2026-11-27 23:03"
+   },
+   "created_at": "2026-11-26T23:03:22+02:00",
+   "window": {
+    "start": "2026-11-26 23:03",
+    "end": "2026-11-27 23:03"
+   },
+   "fires_count": 1,
+   "last_fired_at": "2026-11-26T23:03:22+02:00",
+   "next_time": null,
+   "task_id": null,
+   "load": {
+    "tx": {
+     "matches_14d": 0,
+     "per_day": 0.0,
+     "semantic": false,
+     "over_budget": false
+    },
+    "push": {
+     "matches_14d": 0,
+     "per_day": 0.0,
+     "semantic": true,
+     "over_budget": false
+    }
+   }
+  },
+  "fires": [
+   {
+    "id": "912b32fe76c5",
+    "at": "2026-11-26T23:03:22+02:00",
+    "trigger_id": "push",
+    "event_type": "phone.notification.received",
+    "event": {
+     "notification_id": "n32368955",
+     "app": "Bank",
+     "sender": "",
+     "conversation": "",
+     "is_group": false,
+     "title": "Transfer received",
+     "text": "2,000 ILS from Maya Cohen",
+     "category": "",
+     "priority": null,
+     "amount": 2000.0
+    },
+    "actions": [
+     {
+      "type": "notify",
+      "status": "done",
+      "detail": "telegram",
+      "run_id": null,
+      "session_id": null
+     }
+    ]
+   }
+  ]
+ },
+ "detail_agent": {
+  "watch": {
+   "id": "c5b946453400",
+   "title": "Dishwasher finished",
+   "kind": "watch",
+   "status": "active",
+   "request": "when the dishwasher finishes ask Gal on WhatsApp to empty it",
+   "spec": {
+    "title": "Dishwasher finished",
+    "kind": "watch",
+    "task_title": "",
+    "task_id": null,
+    "triggers": [
+     {
+      "id": "done",
+      "kind": "event",
+      "event_type": "phone.notification.received",
+      "where": [
+       {
+        "field": "app",
+        "op": "eq",
+        "value": "Home Assistant"
+       }
+      ],
+      "keywords": [
+       "dishwasher",
+       "מדיח"
+      ]
+     }
+    ],
+    "repeat": "each",
+    "cooldown_minutes": 10,
+    "on_match": [
+     {
+      "type": "agent",
+      "instructions": "Ask Gal on WhatsApp to empty the dishwasher",
+      "autonomy": "ask_first",
+      "urgency": "glance"
+     }
+    ],
+    "on_deadline": [],
+    "evidence_event_types": [],
+    "evidence_keywords": [],
+    "evidence_question": "",
+    "unsupported": "",
+    "window_start": "2026-11-26 23:03",
+    "window_end": "2026-12-03 23:03"
+   },
+   "created_at": "2026-11-26T23:03:22+02:00",
+   "window": {
+    "start": "2026-11-26 23:03",
+    "end": "2026-12-03 23:03"
+   },
+   "fires_count": 1,
+   "last_fired_at": "2026-11-26T23:03:22+02:00",
+   "next_time": null,
+   "task_id": null,
+   "load": {
+    "done": {
+     "matches_14d": 0,
+     "per_day": 0.0,
+     "semantic": false,
+     "over_budget": false
+    }
+   }
+  },
+  "fires": [
+   {
+    "id": "f8952ff2502e",
+    "at": "2026-11-26T23:03:22+02:00",
+    "trigger_id": "done",
+    "event_type": "phone.notification.received",
+    "event": {
+     "notification_id": "n43382948",
+     "app": "Home Assistant",
+     "sender": "",
+     "conversation": "",
+     "is_group": false,
+     "title": "Dishwasher",
+     "text": "The dishwasher has finished",
+     "category": "",
+     "priority": null,
+     "amount": null
+    },
+    "actions": [
+     {
+      "type": "agent",
+      "status": "done",
+      "detail": "Dana is on it (session main)",
+      "run_id": "91828569df1e40b8",
+      "session_id": "main"
+     }
+    ]
+   }
+  ]
+ },
+ "pipeline": {
+  "stats": {
+   "since": "2026-11-26T23:03:22+02:00",
+   "events_in": 4,
+   "by_type": {
+    "phone.notification.received": 3,
+    "money.transaction.added": 1
+   },
+   "filter_pass": 2,
+   "semantic_checks": 1,
+   "semantic_yes": 1,
+   "fires": 3,
+   "actions": {
+    "notify": 2,
+    "agent": 1
+   },
+   "avg_filter_us": 33.6,
+   "cost_usd": 0.000177,
+   "clock": 1
+  },
+  "recent": [
+   {
+    "seq": 1,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "event",
+    "event_type": "phone.notification.received",
+    "event_id": "n32368955",
+    "summary": "Bank · Transfer received · 2,000",
+    "watch_id": null,
+    "watch_title": null,
+    "trigger_id": null,
+    "result": null,
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 2,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "filter",
+    "event_type": "phone.notification.received",
+    "event_id": "n32368955",
+    "summary": "Bank · Transfer received · 2,000",
+    "watch_id": null,
+    "watch_title": null,
+    "trigger_id": null,
+    "result": "pass",
+    "candidates": 1,
+    "us": 46.8,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 3,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "semantic",
+    "event_type": "phone.notification.received",
+    "event_id": "n32368955",
+    "summary": "Does it say money arrived from Maya?",
+    "watch_id": "c91c2304f346",
+    "watch_title": "Rent from Maya",
+    "trigger_id": "push",
+    "result": "yes",
+    "candidates": null,
+    "us": null,
+    "cost_usd": 0.000177,
+    "action_type": null
+   },
+   {
+    "seq": 4,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "fire",
+    "event_type": "phone.notification.received",
+    "event_id": "n32368955",
+    "summary": "Bank · Transfer received · 2,000",
+    "watch_id": "c91c2304f346",
+    "watch_title": "Rent from Maya",
+    "trigger_id": "push",
+    "result": null,
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 5,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "action",
+    "event_type": "phone.notification.received",
+    "event_id": "n32368955",
+    "summary": "notify: telegram",
+    "watch_id": "c91c2304f346",
+    "watch_title": "Rent from Maya",
+    "trigger_id": "push",
+    "result": "done",
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": "notify"
+   },
+   {
+    "seq": 6,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "event",
+    "event_type": "money.transaction.added",
+    "event_id": "tx379287",
+    "summary": "Bank · Maya Cohen · 2,000",
+    "watch_id": null,
+    "watch_title": null,
+    "trigger_id": null,
+    "result": null,
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 7,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "filter",
+    "event_type": "money.transaction.added",
+    "event_id": "tx379287",
+    "summary": "Bank · Maya Cohen · 2,000",
+    "watch_id": null,
+    "watch_title": null,
+    "trigger_id": null,
+    "result": "drop",
+    "candidates": 0,
+    "us": 14.4,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 8,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "event",
+    "event_type": "phone.notification.received",
+    "event_id": "n43382948",
+    "summary": "Home Assistant · Dishwasher",
+    "watch_id": null,
+    "watch_title": null,
+    "trigger_id": null,
+    "result": null,
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 9,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "filter",
+    "event_type": "phone.notification.received",
+    "event_id": "n43382948",
+    "summary": "Home Assistant · Dishwasher",
+    "watch_id": null,
+    "watch_title": null,
+    "trigger_id": null,
+    "result": "pass",
+    "candidates": 1,
+    "us": 37.1,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 10,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "fire",
+    "event_type": "phone.notification.received",
+    "event_id": "n43382948",
+    "summary": "Home Assistant · Dishwasher",
+    "watch_id": "c5b946453400",
+    "watch_title": "Dishwasher finished",
+    "trigger_id": "done",
+    "result": null,
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 11,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "action",
+    "event_type": "phone.notification.received",
+    "event_id": "n43382948",
+    "summary": "agent: Dana is on it (session main)",
+    "watch_id": "c5b946453400",
+    "watch_title": "Dishwasher finished",
+    "trigger_id": "done",
+    "result": "done",
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": "agent"
+   },
+   {
+    "seq": 12,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "event",
+    "event_type": "phone.notification.received",
+    "event_id": "n43391463",
+    "summary": "WhatsApp · Tom Hadad",
+    "watch_id": null,
+    "watch_title": null,
+    "trigger_id": null,
+    "result": null,
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 13,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "filter",
+    "event_type": "phone.notification.received",
+    "event_id": "n43391463",
+    "summary": "WhatsApp · Tom Hadad",
+    "watch_id": null,
+    "watch_title": null,
+    "trigger_id": null,
+    "result": "drop",
+    "candidates": 0,
+    "us": 36.0,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 14,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "time",
+    "event_type": null,
+    "event_id": null,
+    "summary": "before at 2026-11-27 00:03",
+    "watch_id": "bd37f74fef73",
+    "watch_title": "Pick up Noa",
+    "trigger_id": "before",
+    "result": "pass",
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 15,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "fire",
+    "event_type": null,
+    "event_id": null,
+    "summary": "time 2026-11-27 00:03",
+    "watch_id": "bd37f74fef73",
+    "watch_title": "Pick up Noa",
+    "trigger_id": "before",
+    "result": null,
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": null
+   },
+   {
+    "seq": 16,
+    "at": "2026-11-26T23:03:22+02:00",
+    "stage": "action",
+    "event_type": null,
+    "event_id": null,
+    "summary": "notify: telegram",
+    "watch_id": "bd37f74fef73",
+    "watch_title": "Pick up Noa",
+    "trigger_id": "before",
+    "result": "done",
+    "candidates": null,
+    "us": null,
+    "cost_usd": null,
+    "action_type": "notify"
+   }
+  ],
+  "watches_active": 2,
+  "triggers_active": 4
+ },
+ "catalog": {
+  "event_types": [
+   {
+    "name": "core.signal.car",
+    "about": "The user got into or out of their car (from Dana's phone app).",
+    "fields": {
+     "action": "enter | leave",
+     "source": "which source reported it",
+     "late": "true when it arrived late"
+    }
+   },
+   {
+    "name": "core.signal.location",
+    "about": "The user arrived at or left one of their places (zones).",
+    "fields": {
+     "zone": "the place's name (home, work...)",
+     "action": "arrive | leave",
+     "target": "the place's name as the source gave it",
+     "source": "which source reported it"
+    }
+   },
+   {
+    "name": "core.user.woke",
+    "about": "The user woke up (first unlock of the morning or a wake signal).",
+    "fields": {
+     "why": "what showed it"
+    }
+   },
+   {
+    "name": "phone.notification.received",
+    "about": "A notification on the user's phone.",
+    "fields": {
+     "notification_id": "id",
+     "app": "the app",
+     "sender": "who wrote",
+     "conversation": "the chat",
+     "is_group": "bool",
+     "title": "title",
+     "text": "text",
+     "category": "category",
+     "priority": "0-4",
+     "amount": "ILS amount in the text or null"
+    }
+   },
+   {
+    "name": "phone.email.received",
+    "about": "An email notification.",
+    "fields": {
+     "notification_id": "id",
+     "account": "Gmail/Outlook",
+     "from": "sender",
+     "subject": "subject",
+     "text": "text",
+     "amount": "ILS amount or null"
+    }
+   },
+   {
+    "name": "money.transaction.added",
+    "about": "A new bank or card transaction.",
+    "fields": {
+     "transaction_id": "id",
+     "amount": "ILS, signed",
+     "direction": "in/out",
+     "counterparty": "who",
+     "counterparty_kind": "person/business/bank/unknown",
+     "flow": "flow",
+     "category": "category",
+     "account": "account",
+     "account_kind": "bank/card",
+     "status": "status"
+    }
+   }
+  ],
+  "ops": [
+   "eq",
+   "ne",
+   "in",
+   "contains",
+   "contains_any",
+   "not_contains",
+   "gt",
+   "gte",
+   "lt",
+   "lte",
+   "between",
+   "approx",
+   "exists"
+  ],
+  "action_types": [
+   "notify",
+   "create_task",
+   "complete_task",
+   "suggest_complete",
+   "tool",
+   "agent"
+  ],
+  "tools": [
+   "get_current_time",
+   "request_user_selection",
+   "web_search",
+   "share_item",
+   "run_code",
+   "add_task",
+   "update_task",
+   "delete_task",
+   "get_zones",
+   "list_tasks",
+   "list_task_groups",
+   "add_task_group",
+   "remove_task_group",
+   "create_watch",
+   "list_watches",
+   "update_watch",
+   "pause_watch",
+   "resume_watch",
+   "delete_watch"
+  ]
+ }
+}

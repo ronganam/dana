@@ -97,6 +97,7 @@ Each feature is an addon you turn on per user. Before you turn one on, this says
 | Money | Your bank and card spending, balances and ways to save | — | the Phone addon | Any |
 | Cameras | Your Frigate cameras on the dashboard | a Frigate server with your cameras | the Home Assistant addon | Any |
 | Ops | Read-only kubectl and Python run on the server (asks first; not a sandbox) | Dana running in Kubernetes, with a service account allowed to read | — | Any |
+| Watches | Dana watches for what you ask and acts when it happens | — | the Tasks addon; the Phone addon; the Money addon | Any |
 <!-- addons-table:end -->
 
 Some parts need something without being an addon:

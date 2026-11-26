@@ -25,7 +25,7 @@ import datetime
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 # --- Manifest values ----------------------------------------------------------------
 
@@ -226,6 +226,18 @@ def minutes(n: float) -> datetime.timedelta:
 def hours(n: float) -> datetime.timedelta:
     """``@addon.job(every=hours(6))``."""
     return datetime.timedelta(hours=n)
+
+
+@dataclass(frozen=True)
+class EventType:
+    """An event an addon (or core) emits, declared for the watches engine: its
+    ``name``, one sentence ``about`` it, its data ``fields`` (field → description)
+    and ``history(user, since)``: that user's past events of this type since
+    ``since`` (aware), oldest first, as ``(when, data)`` (dry runs; None: no history)."""
+    name: str
+    about: str
+    fields: Dict[str, str]
+    history: Optional[Callable[[Any, datetime.datetime], Iterable[Tuple[datetime.datetime, Dict[str, Any]]]]] = None
 
 
 # --- Registrations ------------------------------------------------------------------

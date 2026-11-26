@@ -27,12 +27,12 @@ wait for the handlers of everything emitted so far with :func:`drain`.
 import asyncio
 import logging
 import threading
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Awaitable, Callable, Dict, List, Optional, Set
 
 from core import users
 from core.users import User
 from core.addons import registry
-from core.addons.hooks import Handler
+from core.addons.hooks import EventType, Handler
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +42,42 @@ _loop: Optional[asyncio.AbstractEventLoop] = None
 # Handed over with call_soon_threadsafe, not started yet (drain waits for them too).
 _handed = 0
 _lock = threading.Lock()
+
+# Called for every emit (also when no addon handler exists): fn(name, user, data).
+Tap = Callable[[str, User, Dict[str, Any]], Awaitable[None]]
+_taps: List[Tap] = []
+
+# Core's own events, for watches (registry.event_types).
+CORE_EVENTS = [
+    EventType("core.signal.car", "The user got into or out of their car (from Dana's phone app).",
+              {"action": "enter | leave", "source": "which source reported it", "late": "true when it arrived late"}),
+    EventType("core.signal.location", "The user arrived at or left one of their places (zones).",
+              {"zone": "the place's name (home, work...)", "action": "arrive | leave",
+               "target": "the place's name as the source gave it", "source": "which source reported it"}),
+    EventType("core.user.woke", "The user woke up (first unlock of the morning or a wake signal).",
+              {"why": "what showed it"}),
+]
+registry.register_core_events(CORE_EVENTS)
+
+
+def tap(fn: Tap) -> None:
+    """Call ``fn(name, user, data)`` for every event emitted from now on (started like handlers)."""
+    if fn not in _taps:
+        _taps.append(fn)
+
+
+def untap(fn: Tap) -> None:
+    """Stop calling ``fn`` for emitted events."""
+    if fn in _taps:
+        _taps.remove(fn)
+
+
+def _tap_handler(fn: Tap, name: str) -> Handler:
+    """A tap as a handler of one emit (started, awaited and logged like the addons' handlers)."""
+    async def call(user: User, data: Dict[str, Any]) -> None:
+        await fn(name, user, data)
+    call.__name__ = getattr(fn, "__name__", "tap")
+    return Handler("tap", name, call)
 
 
 async def _run(handler: Handler, user: User, name: str, data: Dict[str, Any]) -> None:
@@ -80,7 +116,8 @@ def emit(name: str, user: User, **data: Any) -> int:
     them; returns how many handlers were started (or handed to the server's
     loop). Never raises because of a handler."""
     global _loop, _handed
-    handlers = registry.handlers(name, user)
+    own = registry.handlers(name, user)
+    handlers = own + [_tap_handler(fn, name) for fn in list(_taps)]
     if not handlers:
         return 0
     try:
@@ -105,7 +142,7 @@ def emit(name: str, user: User, **data: Any) -> int:
         for h in handlers:
             asyncio.run(_run(h, user, name, dict(data)))
     logger.debug(f"Event {name} for user {user.id}: {len(handlers)} handler(s)")
-    return len(handlers)
+    return len(own)  # the addons' handlers (taps are not counted)
 
 
 async def drain() -> None:

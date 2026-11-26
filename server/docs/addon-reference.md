@@ -74,6 +74,7 @@ Another module of the addon imports the manifest as `from addons.<name>.addon im
 | `examples` | list of str | `()` | Things to say to Dana once it is on ("Turn off the living room lights"): shown after connecting. |
 | `disconnect_warning` | str | `''` | What disconnecting deletes, in one sentence (`money`: the logins and transactions); empty: nothing is deleted. |
 | `reconnect_fix` | Fix or None | `None` | Where its Reconnect button goes when `needs_reconnect` says a connection's credentials stopped working (a `Fix`); None: its own page on the Addons page (`Fix.connect`). `money` sends it to the Money page, where each bank login is fixed. |
+| `events` | list of EventType | `()` | The events it emits (`EventType`), offered to watches (`registry.event_types`). |
 
 From [`examples/addons/showcase/addon.py`](https://github.com/ronganam/dana/blob/master/examples/addons/showcase/addon.py):
 
@@ -1586,6 +1587,13 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
     }
    ],
    "description": "Where its Reconnect button goes when :func:`core.addons.store.needs_reconnect` says a connection's credentials stopped working (a :class:`~core.addons.hooks.Fix`); None: its own page on the Addons page (``Fix.connect``). ``money`` sends it to the Money page, where each bank login is fixed."
+  },
+  "events": {
+   "type": "array",
+   "items": {
+    "$ref": "#/$defs/EventType"
+   },
+   "description": "The events it emits (:class:`~core.addons.hooks.EventType`), offered to watches (``registry.event_types``)."
   }
  },
  "required": [
@@ -1593,6 +1601,30 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
  ],
  "additionalProperties": false,
  "$defs": {
+  "EventType": {
+   "type": "object",
+   "description": "An event an addon (or core) emits, declared for the watches engine: its ``name``, one sentence ``about`` it, its data ``fields`` (field → description) and ``history(user, since)``: that user's past events of this type since ``since`` (aware), oldest first, as ``(when, data)`` (dry runs; None: no history).",
+   "properties": {
+    "name": {
+     "type": "string"
+    },
+    "about": {
+     "type": "string"
+    },
+    "fields": {
+     "type": "object",
+     "additionalProperties": {
+      "type": "string"
+     }
+    }
+   },
+   "required": [
+    "name",
+    "about",
+    "fields"
+   ],
+   "additionalProperties": false
+  },
   "Field": {
    "type": "object",
    "description": "One credential or setting of an addon.",

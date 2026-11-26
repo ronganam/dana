@@ -29,7 +29,7 @@ from typing import Any, Dict, FrozenSet, List, Mapping, Optional, Tuple
 from core.users import User
 from core.addons import state, store
 from core.addons.addon import Addon, Tool, all_tools, find_tool, get_addon, all_addons, version
-from core.addons.hooks import Channel, Handler, Hook, Job, Service
+from core.addons.hooks import Channel, EventType, Handler, Hook, Job, Service
 from core.addons.schema import flatten_for_realtime
 
 logger = logging.getLogger(__name__)
@@ -268,6 +268,21 @@ def handlers(event: str, user: User) -> List[Handler]:
     """The ``@addon.on(event)`` handlers of the addons active for ``user``."""
     active = set(active_addons(user))
     return [h for a in all_addons() if a.name in active for h in a.handlers if h.event == event]
+
+
+# Core's own event types (core/events.py registers CORE_EVENTS here at import).
+_core_events: List[EventType] = []
+
+
+def register_core_events(types: List[EventType]) -> None:
+    """Make ``types`` core's event types (core/events.py)."""
+    _core_events[:] = list(types)
+
+
+def event_types(user: User) -> List[EventType]:
+    """The event types that can reach ``user``: core's, then those of the addons active for them."""
+    active = set(active_addons(user))
+    return list(_core_events) + [e for a in all_addons() if a.name in active for e in a.events]
 
 
 def channels(user: User) -> List[Channel]:

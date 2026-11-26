@@ -2860,5 +2860,110 @@
         "code"
       ]
     }
+  },
+  {
+    "type": "function",
+    "name": "create_watch",
+    "description": "Set up a watch from the user's own words: Dana acts when something happens or by a deadline ('make sure the transfer from Maya arrives by tomorrow', 'when the dishwasher finishes ask Gal to empty it', 'remind me at 20:30, 30 min before, or when I get in the car'). A reminder also becomes a task.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "string",
+          "description": "What the user asked, in their own words and language (with the times and names they gave)."
+        }
+      },
+      "required": [
+        "request"
+      ]
+    }
+  },
+  {
+    "type": "function",
+    "name": "list_watches",
+    "description": "List the user's watches (active and paused; with include_closed also done and expired) with their triggers in words.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "include_closed": {
+          "type": "boolean",
+          "description": "Also list watches that are done or expired."
+        }
+      },
+      "required": []
+    }
+  },
+  {
+    "type": "function",
+    "name": "update_watch",
+    "description": "Change a watch in plain words ('until Friday instead', 'also when I leave work', 'send it to Gal too').",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "watch_id": {
+          "type": "string",
+          "description": "The watch's ID (from list_watches)."
+        },
+        "change": {
+          "type": "string",
+          "description": "What to change, in the user's words."
+        }
+      },
+      "required": [
+        "watch_id",
+        "change"
+      ]
+    }
+  },
+  {
+    "type": "function",
+    "name": "pause_watch",
+    "description": "Pause a watch: nothing fires until it is resumed.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "watch_id": {
+          "type": "string",
+          "description": "The watch's ID (from list_watches)."
+        }
+      },
+      "required": [
+        "watch_id"
+      ]
+    }
+  },
+  {
+    "type": "function",
+    "name": "resume_watch",
+    "description": "Resume a paused (or finished) watch.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "watch_id": {
+          "type": "string",
+          "description": "The watch's ID (from list_watches)."
+        }
+      },
+      "required": [
+        "watch_id"
+      ]
+    }
+  },
+  {
+    "type": "function",
+    "name": "delete_watch",
+    "description": "Delete a watch (with Undo).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "watch_id": {
+          "type": "string",
+          "description": "The watch's ID (from list_watches)."
+        }
+      },
+      "required": [
+        "watch_id"
+      ]
+    }
   }
 ]
