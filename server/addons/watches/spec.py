@@ -21,6 +21,7 @@ the last two weeks is refused (:func:`load_errors`).
 import calendar
 import copy
 import datetime as dt
+import difflib
 import json
 import logging
 import re
@@ -214,7 +215,68 @@ def _clean_action(a: Any, where: str, tools: Optional[Set[str]], errs: List[str]
     return out
 
 
-def _clean_trigger(t: Any, catalog: Mapping[str, EventType], errs: List[str], path: str) -> Dict[str, Any]:
+Known = Mapping[str, Mapping[str, Sequence[str]]]
+
+
+def value_of(entry: str) -> str:
+    """The value of a known-value entry ("sensor.phone_battery (Phone battery)" → "sensor.phone_battery")."""
+    return str(entry).split(" (", 1)[0].strip()
+
+
+def known_values(types: Iterable[EventType], user: Any) -> Dict[str, Dict[str, List[str]]]:
+    """Per event type, its ``values(user)`` (the known real values of some fields); a failing one gives none."""
+    out: Dict[str, Dict[str, List[str]]] = {}
+    for et in types:
+        if et.values is None:
+            continue
+        try:
+            got = et.values(user) or {}
+        except Exception:
+            logger.warning(f"Known values of {et.name} failed; none shown", exc_info=True)
+            continue
+        clean = {k: [str(v) for v in vs if str(v).strip()] for k, vs in got.items() if isinstance(vs, (list, tuple))}
+        clean = {k: v for k, v in clean.items() if v}
+        if clean:
+            out[et.name] = clean
+    return out
+
+
+def close_matches(given: str, entries: Sequence[str], n: int = 3) -> List[str]:
+    """Known-value entries closest to ``given``: by the spelling of the value or its label, then sharing a word."""
+    by_key: Dict[str, str] = {}
+    for e in entries:
+        by_key.setdefault(norm(value_of(e)), e)
+        by_key.setdefault(norm(e), e)
+    out: List[str] = []
+    for key in difflib.get_close_matches(norm(given), list(by_key), n=n * 2, cutoff=0.5):
+        if by_key[key] not in out:
+            out.append(by_key[key])
+    words = [w for w in re.split(r"[\W_]+", str(given).casefold()) if len(w) > 2 and w not in ("sensor", "binary")]
+    for e in entries:
+        if len(out) >= n:
+            break
+        if e not in out and any(w in e.casefold() for w in words):
+            out.append(e)
+    return out[:n]
+
+
+def _known_errors(cond: Mapping[str, Any], known: Sequence[str], path: str) -> List[str]:
+    """``eq`` / ``in`` values that are not among a field's known values (a closed set)."""
+    if cond.get("op") not in ("eq", "in") or not known:
+        return []
+    have = {norm(value_of(k)) for k in known}
+    given = [str(cond.get("value") or "")] if cond["op"] == "eq" else str(cond.get("value") or "").split("|")
+    errs = []
+    for v in given:
+        if v.strip() and norm(v) not in have:
+            close = close_matches(v, known)
+            errs.append(f"{path}: {v.strip()!r} is not one of the user's real {cond.get('field')} values"
+                        + (f"; close: {', '.join(close)}" if close else "; use one of the catalog's known_values"))
+    return errs
+
+
+def _clean_trigger(t: Any, catalog: Mapping[str, EventType], errs: List[str], path: str,
+                   values: Optional[Known] = None) -> Dict[str, Any]:
     if not isinstance(t, dict):
         errs.append(f"{path}: a trigger must be an object")
         return {}
@@ -267,6 +329,8 @@ def _clean_trigger(t: Any, catalog: Mapping[str, EventType], errs: List[str], pa
                 errs.append(f"{path}.where[{j}].value: {cond['op']} on {cond.get('field')} needs numbers")
             if cond.get("op") not in ("exists",) and "value" not in cond:
                 errs.append(f"{path}.where[{j}].value: {cond.get('op')} on {cond.get('field')} needs a value")
+            errs.extend(_known_errors(cond, ((values or {}).get(et) or {}).get(str(cond.get("field") or "")) or [],
+                                      f"{path}.where[{j}].value"))
             conds.append(cond)
         out["where"] = conds
         out["keywords"] = _strings(t.get("keywords"))
@@ -285,12 +349,14 @@ def _clean_trigger(t: Any, catalog: Mapping[str, EventType], errs: List[str], pa
 
 
 def validate(spec: Any, now: dt.datetime, catalog: Mapping[str, EventType],
-             tools: Optional[Set[str]] = None) -> Tuple[Dict[str, Any], List[str]]:
+             tools: Optional[Set[str]] = None, values: Optional[Known] = None) -> Tuple[Dict[str, Any], List[str]]:
     """The spec in its stored form (defaults filled in, times resolved, the
     window set) and the errors the compiler or the page gets back (empty: valid).
 
     ``catalog``: the user's event types by name; ``tools``: the names of the
-    user's tools (None: not checked)."""
+    user's tools (None: not checked); ``values``: per event type, the known
+    real values of its closed fields (:func:`known_values`): an ``eq`` / ``in``
+    value outside them is an error naming close matches (None: not checked)."""
     errs: List[str] = []
     if not isinstance(spec, dict):
         return {}, ["the spec must be a JSON object"]
@@ -312,7 +378,8 @@ def validate(spec: Any, now: dt.datetime, catalog: Mapping[str, EventType],
         raw_triggers = []
     if len(raw_triggers) > MAX_TRIGGERS:
         errs.append(f"triggers: at most {MAX_TRIGGERS} triggers")
-    triggers = [_clean_trigger(t, catalog, errs, f"triggers[{i}]") for i, t in enumerate(raw_triggers[:MAX_TRIGGERS])]
+    triggers = [_clean_trigger(t, catalog, errs, f"triggers[{i}]", values)
+                for i, t in enumerate(raw_triggers[:MAX_TRIGGERS])]
     ids = [t.get("id") for t in triggers]
     if len(set(ids)) != len(ids):
         errs.append("triggers: trigger ids must be unique")
@@ -461,9 +528,11 @@ def structured_ok(t: Mapping[str, Any], e: Event) -> bool:
 
 
 def source_of(e: Event) -> str:
-    """Who an event comes from, for the per-source cooldown: the counterparty, sender, address, person or app."""
+    """Who an event comes from, for the per-source cooldown: the counterparty, sender, address, person, app or
+    entity."""
     d = e.data
-    who = d.get("counterparty") or d.get("sender") or d.get("from") or d.get("person") or d.get("app") or ""
+    who = d.get("counterparty") or d.get("sender") or d.get("from") or d.get("person") or d.get("app") \
+        or d.get("entity_id") or ""
     return f"{e.type}|{norm(who)}"
 
 
@@ -475,12 +544,15 @@ def summary(event_type: str, data: Mapping[str, Any]) -> str:
         head = " ".join(parts[1:]).replace("_", " ").capitalize() if len(parts) > 1 else event_type
     bits = [str(head)]
     who = data.get("sender") or data.get("from") or data.get("person") or data.get("counterparty") \
-        or data.get("zone") or data.get("conversation") or data.get("title") or data.get("action") or ""
+        or data.get("zone") or data.get("conversation") or data.get("title") or data.get("name") \
+        or data.get("action") or ""
     if who:
         bits.append(str(who)[:40])
     amount = _num(data.get("amount"))
     if amount is not None:
         bits.append(f"{amount:,.0f}")
+    if data.get("new_state") not in (None, ""):
+        bits.append(f"{str(data.get('old_state') or '?')[:20]} → {str(data['new_state'])[:20]}")
     return " · ".join(bits)
 
 

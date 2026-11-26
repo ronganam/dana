@@ -202,7 +202,8 @@ def _skip_reason(watch: Dict[str, Any], t: Dict[str, Any], e: S.Event, fires: Li
                     and abs(other - amount) <= abs(amount) * SAME_THING_PCT):
                 return "same as an earlier fire"
     if watch["kind"] == "watch" and sp.get("repeat") == "each":
-        cool = dt.timedelta(minutes=int(sp.get("cooldown_minutes") or S.DEFAULT_COOLDOWN))
+        minutes = sp.get("cooldown_minutes")
+        cool = dt.timedelta(minutes=int(S.DEFAULT_COOLDOWN if minutes is None else minutes))
         src = S.source_of(e)
         for f in _event_fires(fires):
             prev = _fire_event(f)

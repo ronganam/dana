@@ -34,6 +34,8 @@ COMMON_VALUES = 6
 # triage): shown to the model as unusable.
 LIVE_EMPTY = {"phone.notification.received": ("category", "priority")}
 MAX_VALUE_CHARS = 40
+# Known real values shown per field (EventType.values: most relevant first); validation checks against all of them.
+MAX_KNOWN_VALUES = 120
 
 SYSTEM = """You are Dana's watch builder. The user speaks Hebrew or English. Turn their request into ONE watch spec: a single JSON object that follows the schema below. Always answer with that JSON object only, never with other text.
 
@@ -48,6 +50,7 @@ How to build it:
 - Each moment the user names is its own trigger, including a second time tied to the same thing ("do X at 21:30, it should be done by 22:50" = triggers at 21:30 and 22:50). "remind me at 20:30 and 30 min before and when I get in the car" = 3 triggers; a relative one uses relative_to + offset_minutes.
 - "if not X by T" / "unless" = a time trigger at T with skip_if_fired naming X's trigger ("remind me when I get home, or at 19:00 if I'm not home by then" -> the 19:00 trigger has skip_if_fired ["home"]).
 - Put everything a field can check exactly into `where` (amount ranges, direction, app, sender, zone, action). "around X" = approx with tolerance_pct 10. Names: use contains with a distinctive part of the name as it appears in events (Hebrew names stay Hebrew).
+- A field with known_values in the catalog takes only one of those values (the text before " (" is the value; the rest says what it is): pick the one the user means, never invent one. If none fits, say so in `unsupported`.
 - Times of day ("tonight", "after midnight", "during work hours") go in `during`, never in the semantic question.
 - Use `semantic` only for meaning a field cannot check ("about dinner", "is a P1 or P2 alert", "contains an event invitation"). Keep where/keywords as a cheap prefilter before semantic whenever possible.
 - The same thing can reach Dana as more than one event type (a charge from an app that is not the bank is a phone.notification with `amount`, not a money.transaction; a person may write by message or email). When unsure, add one trigger per likely type.
@@ -159,12 +162,24 @@ def people(hist: Mapping[str, List[S.Event]], limit: int = 60) -> List[str]:
     return [v for v, _ in c.most_common(limit)]
 
 
+def known_catalog(known: Mapping[str, Mapping[str, List[str]]]) -> Dict[str, Dict[str, List[str]]]:
+    """The known values as the model sees them: at most :data:`MAX_KNOWN_VALUES` per field, most relevant first."""
+    return {n: {k: list(v[:MAX_KNOWN_VALUES]) for k, v in fields.items()} for n, fields in known.items()}
+
+
 def system_prompt(user: User, types: Mapping[str, EventType], hist: Mapping[str, List[S.Event]],
-                  tools: List[str], now: dt.datetime) -> str:
-    """The compiler's instructions for ``user`` now."""
-    cat = [{"event_type": n, "about": e.about,
-            "fields": {k: ("always empty when the event fires: never use it" if k in LIVE_EMPTY.get(n, ()) else v)
-                       for k, v in e.fields.items()}} for n, e in types.items()]
+                  tools: List[str], now: dt.datetime,
+                  known: Optional[Mapping[str, Mapping[str, List[str]]]] = None) -> str:
+    """The compiler's instructions for ``user`` now (``known``: :func:`spec.known_values`)."""
+    shown = known_catalog(known or {})
+    cat: List[Dict[str, Any]] = []
+    for n, e in types.items():
+        entry: Dict[str, Any] = {"event_type": n, "about": e.about, "fields": {
+            k: ("always empty when the event fires: never use it" if k in LIVE_EMPTY.get(n, ()) else v)
+            for k, v in e.fields.items()}}
+        if shown.get(n):
+            entry["known_values"] = shown[n]
+        cat.append(entry)
     values = {n: {k: v for k, v in fields.items() if k not in LIVE_EMPTY.get(n, ())}
               for n, fields in common_values(hist).items()}
     names = people(hist)
@@ -202,13 +217,14 @@ async def compile_request(user: User, text: str, *, old: Optional[Mapping[str, A
     types = {e.name: e for e in registry.event_types(user)}
     hist = S.history_events(types.values(), user, now - dt.timedelta(days=S.DRY_RUN_DAYS))
     tools = [t.name for t in registry.tools_for(user)]
+    known = S.known_values(types.values(), user)
     if old is not None:
         clean = {k: v for k, v in old.items() if k != "task_id"}
         ask = (f"The current watch spec:\n{json.dumps(clean, ensure_ascii=False)}\n\nChange it: {text}\n"
                "Answer with the whole updated spec.")
     else:
         ask = text
-    msgs: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt(user, types, hist, tools, now)},
+    msgs: List[Dict[str, Any]] = [{"role": "system", "content": system_prompt(user, types, hist, tools, now, known)},
                                   {"role": "user", "content": ask}]
     errors: List[str] = ["no answer"]
     for attempt in range(MAX_ATTEMPTS):
@@ -219,7 +235,7 @@ async def compile_request(user: User, text: str, *, old: Optional[Mapping[str, A
             msgs += [{"role": "assistant", "content": reply or "(empty)"},
                      {"role": "user", "content": "Answer with the watch spec as one JSON object, nothing else."}]
             continue
-        spec, errors = S.validate(raw, now, types, set(tools))
+        spec, errors = S.validate(raw, now, types, set(tools), known)
         load: Dict[str, Any] = {}
         if not errors:
             load = S.estimate_load(spec, hist)

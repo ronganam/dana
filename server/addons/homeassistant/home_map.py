@@ -5,6 +5,7 @@ prompt (the addon's prompt section)."""
 import asyncio
 import logging
 import os
+import re
 import time
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Set, Tuple
@@ -132,6 +133,14 @@ def get_home_map(conn: Connection) -> str:
     if time.monotonic() >= cache.next_refresh:
         _schedule_refresh(conn)
     return cache.text
+
+
+_MAP_LINE = re.compile(r"^\s+([a-z0-9_]+\.[a-z0-9_]+) \|", re.MULTILINE)
+
+
+def exposed_ids(conn: Connection) -> List[str]:
+    """The entity ids in ``conn``'s cached home map, in its order (never fetches)."""
+    return _MAP_LINE.findall(cache_for(conn).text)
 
 
 def cached_text(user: Optional[User]) -> str:

@@ -281,7 +281,13 @@ emits, for the event catalog (`core.addons.registry.event_types`): its
 description each (units, allowed values) in `fields`, and `history`:
 `history(user, since)` gives this user's past events of this type since
 `since` (aware), oldest first, with the same data as emitted (dry runs);
-sync, one cheap query, scoped to the user. None: no history.
+sync, one cheap query, scoped to the user. None: no history. `values`:
+`values(user)` gives the known real values of some fields
+(`{field: ["value", "value (what it is)", ...]}`, most relevant first; the
+text before ` (` is the value), e.g. the user's entity ids: shown to the
+model that writes watches, and a field listed there is a closed set (an
+`eq` / `in` condition naming another value is refused); sync, cheap
+(no network), scoped to the user. None: none known.
 
 | Field | Type | Default |
 |---|---|---|
@@ -289,6 +295,7 @@ sync, one cheap query, scoped to the user. None: no history.
 | `about` | str | required |
 | `fields` | dict of str → str | required |
 | `history` | function | `None` |
+| `values` | function | `None` |
 
 ## Functions on the manifest
 
@@ -1620,7 +1627,7 @@ The manifest's plain values (functions left out) follow this JSON schema, genera
  "$defs": {
   "EventType": {
    "type": "object",
-   "description": "An event an addon (``Addon(events=)``) or core (``core.events.CORE_EVENTS``) emits, for the event catalog (``core.addons.registry.event_types``): its ``name``, what it means in one sentence (``about``), its data keys with a description each (units, allowed values) in ``fields``, and ``history``: ``history(user, since)`` gives this user's past events of this type since ``since`` (aware), oldest first, with the same data as emitted (dry runs); sync, one cheap query, scoped to the user. None: no history.",
+   "description": "An event an addon (``Addon(events=)``) or core (``core.events.CORE_EVENTS``) emits, for the event catalog (``core.addons.registry.event_types``): its ``name``, what it means in one sentence (``about``), its data keys with a description each (units, allowed values) in ``fields``, and ``history``: ``history(user, since)`` gives this user's past events of this type since ``since`` (aware), oldest first, with the same data as emitted (dry runs); sync, one cheap query, scoped to the user. None: no history. ``values``: ``values(user)`` gives the known real values of some fields (``{field: [\"value\", \"value (what it is)\", ...]}``, most relevant first; the text before `` (`` is the value), e.g. the user's entity ids: shown to the model that writes watches, and a field listed there is a closed set (an ``eq`` / ``in`` condition naming another value is refused); sync, cheap (no network), scoped to the user. None: none known.",
    "properties": {
     "name": {
      "type": "string"
