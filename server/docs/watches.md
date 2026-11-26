@@ -1,0 +1,72 @@
+# Watches
+
+The `watches` addon (`addons/watches/`, on by default) turns anything a user asks — "make sure a transfer of about 22k from a person arrives by tomorrow", "remind me at 20:30 to pick up Noa, 30 minutes before too, or when I get in the car", "when the dishwasher finishes ask Gal on WhatsApp to empty it" — into a **watch**: triggers + a window + actions. A model compiles the words into a spec once; a cheap engine fires it: structured conditions in Python first (microseconds), then keywords, then a small-model yes/no check only on the events that are left.
+
+Code: `spec.py` (shape, validation, time rules, matching, dry runs; pure), `store.py` (tables), `engine.py` (the events tap, the time pass), `pipeline.py` (what the engine did, in memory), `compiler.py`, `actions.py`, `service.py` (shared by tools and routes), `tools.py`, `api.py`, `hooks.py` (jobs, the Now card). Tests: `addons/watches/tests/test_watches.py`.
+
+## The spec
+
+Stored as JSON in `watches.spec`:
+
+```json
+{"title": "...", "kind": "watch|reminder", "task_title": "...", "task_id": null,
+ "triggers": [
+   {"id": "t1", "kind": "time", "at": "YYYY-MM-DD HH:MM", "every": "daily|weekdays|weekly|monthly|null"},
+   {"id": "t2", "kind": "time", "relative_to": "t1", "offset_minutes": -30},
+   {"id": "t3", "kind": "time", "at": "...", "skip_if_fired": ["home"]},
+   {"id": "home", "kind": "event", "event_type": "core.signal.location",
+    "where": [{"field": "zone", "op": "eq", "value": "home"}],
+    "keywords": ["..."], "during": "HH:MM-HH:MM", "semantic": "yes/no question"}],
+ "window_start": "...", "window_end": "...", "repeat": "once|each", "cooldown_minutes": 10,
+ "on_match": [Action], "on_deadline": [Action],
+ "evidence_event_types": ["..."], "evidence_keywords": ["..."], "evidence_question": "...",
+ "unsupported": "honest note or empty"}
+```
+
+- **Ops**: `eq ne in contains contains_any not_contains gt gte lt lte between approx exists` (`in` / `contains_any` values joined by `|`, `between` uses `value2`, `approx` `tolerance_pct`, default 10). Text matching ignores case, spaces and punctuation (`spec.norm`: "K S P" = "ksp" = "k.s.p").
+- **Times** are local (`core.clock`). `every: weekdays` means the five days from the day weeks start on (`clock.week_start_day`: Sunday–Thursday by default, Monday–Friday with `WEEK_START=mon`). A relative trigger follows each occurrence of the one it names. `skip_if_fired`: the trigger does not fire if any of those triggers already fired ("at 19:00 if I'm not home by then").
+- **Validation** (`spec.validate`) fills defaults (`repeat` once for a watch, each for a reminder; cooldown 10; window: from now, a reminder until the end of its last time's day, a repeating one a year, a watch 7 days) and returns errors in words the compiler can fix: unknown event types and fields (naming the valid ones), numbers for numeric ops, a bare event trigger, unknown trigger ids, a tool the user does not have ("use an agent action"). Each error starts with the path of what is at fault (`triggers[0].where[1].value: …`), a plain message otherwise.
+- **Event types** come from `registry.event_types(user)`: core's (`core.signal.car`, `core.signal.location`, `core.user.woke`) and those of the addons active for the user (`Addon(events=(EventType(name, about, fields, history), …))`). Only those can be watched.
+
+## Engine
+
+- **Events**: `engine.on_event` is a `core.events.tap`, called for every emit. A car / location signal that arrived late (`late: true`) is skipped, like the tasks addon does. For a user with the addon and an event in their catalog: `event` → the structured filter over their active watches in their window (`during`, `where`, keywords) → per candidate, drop when `skip_if_fired` names a trigger that fired, a reminder trigger already fired, the same amount (±1%) fired from a *different* event type within 72 h ("same as an earlier fire": the bank push and the later transaction), or — `repeat: each` — the same source (counterparty, sender, address, person or app) fired within `cooldown_minutes` → one `watch_match` call (fast profile) for all semantic and evidence questions of that event, the event framed by `core.text.untrusted`, the JSON read from the reply's text → `fire` (one per watch per event) → actions. `repeat: once` closes the watch (`done`) at its first event fire. Decisions for one user run under a lock, actions after it.
+- **Time**: a 30-second job (`hooks.tick`) fires due occurrences (one per trigger per pass; an occurrence missed by more than 2 h — the server was down — is skipped), runs `on_deadline` when the window ends with no event fire (`expired`), closes ended watches (`done` when anything fired, else `expired`), a time-only watch once nothing is left, and keeps `next_time` current. Paused watches do nothing.
+- **Reminders** (`kind: reminder`): the task is made through the tasks addon when the watch is created (`task_id`); each trigger fires once; the watch closes when the task is completed (`tasks.task.completed`). **Evidence**: an event of `evidence_event_types` with an `evidence_keywords` hit asks "was it done?"; a yes only records a held `suggest_complete` fire and shows a "Done?" Now card (`watch:<fire id>`, Done / Not yet) — it never closes anything by itself.
+- **Budget**: a semantic trigger whose cheap filters passed more than 20 events a day over the user's last 14 days (`EventType.history`) is pushed back to the compiler once; `load` (`{matches_14d, per_day, semantic, over_budget}`) is shown per trigger.
+- Fires older than 90 days are pruned daily.
+
+## Actions
+
+`{type, text, urgency, tool, args_json, instructions, autonomy}`; each fire stores `[{type, status: done|held|failed|skipped, detail, run_id, session_id}]` (`run_id` / `session_id`: the agent run an action started).
+
+- `notify`: `core.notify.send`; a reminder as kind `reminder` (like the tasks addon's, full screen on the phone), anything else as kind `notify` (`urgency` now → the messages channel).
+- `create_task` / `complete_task`: `registry.execute(user, "add_task" / "update_task")`, so the tasks addon stays its own.
+- `tool`: run directly only when the tool neither asks nor acts outside Dana and the action says `act_and_tell`; otherwise as an agent run, so the normal Approve card appears.
+- `agent`: `core.session_runner.start_agent_task` for the user in their shared thread (a `watch-<id>` session when the thread is busy), with the triggering event framed as untrusted — so that turn asks before every tool that acts outside Dana, even with `act_and_tell` (the taint rule wins). `ask_first` without an event frames the saved request the same way. When the run ends waiting for an approval, the fire's action is `held` and the user gets a notification.
+- `suggest_complete`: held; the Now card does it.
+
+## Compiler
+
+`compiler.compile_request(user, text, old=None)`: one `watch_compile` call (balanced profile) with the moment, the user's zones, the event catalog (fields, the spec's JSON schema), common real values and names from the last 14 days (framed as others' text) and the user's tools. Fields an event carries only in its history (a notification's `category` / `priority`: it is announced before its triage) are shown as unusable. The model answers with the spec as one JSON object (no forced tool use, no JSON mode); no JSON or validation errors go back once each (up to 3 tries), and on the first try the budget push-back. `change` compiles again from the old spec plus the change (the task is kept). `create_watch` / `update_watch` are `acts_outside`: in a turn carrying others' text they ask first, since a watch acts later on its own.
+
+## Tools
+
+`create_watch(request)`, `list_watches(include_closed)`, `update_watch(watch_id, change)`, `pause_watch`, `resume_watch`, `delete_watch` — every write with Undo; results say what was understood (each trigger in words) and what cannot be done (`unsupported`).
+
+## API
+
+All need the addon (403 `not_connected`); another user's watch id answers 404 like a missing one. Payloads: `tests/fixtures/watches_web.json` (`WRITE_WEB_FIXTURE=1 bin/test test_watches`).
+
+- `GET /api/watches` → `{watches: [Watch]}`; Watch = `{id, title, kind, status, request, spec, created_at, window: {start, end}, fires_count, last_fired_at, next_time, task_id, load}`.
+- `GET /api/watches/{id}` → `{watch, fires: [{id, at, trigger_id, event_type, event, actions}]}` (newest first, 50).
+- `POST /api/watches {text}` → 201 `{watch}`; 400 `{error: "invalid", errors}`.
+- `PATCH /api/watches/{id}` `{spec}` | `{status: active|paused}` | `{change}` → `{watch}`; 400 as above.
+- `DELETE /api/watches/{id}` → `{ok, undo_id}` (`POST /api/undo/{id}` brings it back with its fires).
+- `POST /api/watches/dry-run {spec, days}` → `{triggers: {id: {matches, per_day, over_budget, sample}}}` (sample: the last 20).
+- `GET /api/watches/catalog` → `{event_types: [{name, about, fields}], ops, action_types, tools}`.
+- `GET /api/watches/pipeline` → `{stats: {since, events_in, by_type, filter_pass, semantic_checks, semantic_yes, fires, actions, avg_filter_us, cost_usd, clock}, recent (last 100), watches_active, triggers_active}`; `GET /api/watches/pipeline/stream` → SSE, one `data: <PipelineEvent>` per step, a comment every 20 s.
+
+## Pipeline
+
+In memory per user since the server started (`pipeline.py`: the last 200 steps, counters, subscriber queues). PipelineEvent = `{seq, at, stage, event_type, event_id, summary, watch_id, watch_title, trigger_id, result, candidates, us, cost_usd, action_type}` (`action_type` on `action` steps; `clock` in the stats counts `time` and `deadline` steps). One event: `event` → `filter` (pass/drop, `candidates`, `us`; a drop of one candidate says why) → per semantic trigger `semantic` (yes/no/failed, its share of the estimated cost) → per fire `fire` → per action `action` (done/held/failed). Time: `time` → `fire` → `action`; `deadline`; reminder evidence `evidence`.

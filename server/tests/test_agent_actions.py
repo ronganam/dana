@@ -687,7 +687,8 @@ def test_device_screen_unit():
 
     outside = sorted(t.name for t in all_tools() if registry.acts_outside(t.name))
     check("device_screen: the acts_outside tools", outside ==
-          ["call_ha_service", "control_android_tv", "remember_info", "run_kubectl", "run_python"], str(outside))
+          ["call_ha_service", "control_android_tv", "create_watch", "remember_info", "run_kubectl", "run_python",
+           "update_watch"], str(outside))
     check("device_screen: acts_outside tools ask only with untrusted content (run_python always asks)",
           all(registry.needs_confirmation(t, {}, untrusted=True) and not registry.needs_confirmation(t, {})
               for t in outside if t != "run_python")

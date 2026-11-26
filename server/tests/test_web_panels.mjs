@@ -47,8 +47,8 @@ for (const key of ["list_member", "list_admin", "list_admin_for_member", "list_m
     check(`${key}: in Nav order`, got.every((e, i) => i === 0 || got[i - 1].order <= e.order), got.map(e => e.order));
 }
 const admin = panelEntries(F.list_admin.body);
-check("the admin's pages: tasks first, then shopping, inbox, people, projects, memory, calls last",
-      eq(admin.map(e => e.id), ["tasks", "shopping", "inbox", "people", "projects", "memory", "calls"]), admin.map(e => e.id));
+check("the admin's pages: tasks first, then shopping, inbox, people, watches, projects, memory, calls last",
+      eq(admin.map(e => e.id), ["tasks", "shopping", "inbox", "people", "watches", "projects", "memory", "calls"]), admin.map(e => e.id));
 check("the phone addon gives two pages, each its own entry",
       eq(admin.filter(e => e.addon === "phone").map(e => [e.id, e.panel, e.style]),
          [["inbox", "/addons/phone/web/inbox.js", "/addons/phone/web/inbox.css"], ["calls", "/addons/phone/web/calls.js", "/addons/phone/web/calls.css"]]),

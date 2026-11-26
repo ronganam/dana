@@ -74,7 +74,7 @@ for name in loader.loaded():
         for file in re.findall(r'"([^"]+)"', scripts.group(1)) if scripts else []:
             check(f"{name}/{page.id}: the script it loads first, {file}, is beside it", (web_dir / file).is_file())
         check(f"{name}/{page.id}: the panel uses no shell global (window.dana*, other pages' window.Dana*)",
-              not re.search(r"window\.dana[A-Z]|window\.Dana(?!ShoppingCore|ProjectsCore|MoneyCore|MoneyDash|TasksCore|CallsCore)[A-Z]\w*", source))
+              not re.search(r"window\.dana[A-Z]|window\.Dana(?!ShoppingCore|ProjectsCore|MoneyCore|MoneyDash|TasksCore|CallsCore|WatchesCore)[A-Z]\w*", source))
 check("the official pages are all there, Tasks and Calls among them",
       {"shopping", "inbox", "calls", "tasks", "people", "projects", "money", "memory", "calendar"} <= set(pages), sorted(pages))
 check("the phone addon has two pages, Inbox and Calls", [p.id for p in get_addon("phone").web] == ["inbox", "calls"])

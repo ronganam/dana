@@ -1,7 +1,7 @@
 {
  "catalog_admin": {
   "body": {
-   "dana_version": "10.5.0",
+   "dana_version": "10.7.1",
    "entries": [
     {
      "author": "Someone",
@@ -1711,6 +1711,86 @@
     },
     {
      "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": true,
+     "credentials": [],
+     "description": "Dana watches for what you ask and acts when it happens",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Make sure a transfer of about 2,000 from Maya arrives by tomorrow",
+      "Remind me at 20:30 to pick up Noa, 30 minutes before too, or when I get in the car",
+      "When the dishwasher finishes, ask Gal on WhatsApp to empty it"
+     ],
+     "features": [
+      "Reminders with several triggers: a time, before it, when you get in the car",
+      "Make sure something happens by a deadline (a payment, a message)",
+      "When something happens, Dana notifies you, adds a task or does the work"
+     ],
+     "icon": "radar",
+     "name": "watches",
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "tasks",
+       "why": "A reminder is also a task you can tick off"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Notifications, emails and calls to watch for"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money",
+       "why": "Bank and card transactions to watch for"
+      }
+     ],
+     "options": false,
+     "pages": [
+      "Watches"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "on",
+     "title": "Watches",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [],
+      "reads": [
+       "phone",
+       "money",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
+     "version": "",
+     "web": [
+      {
+       "id": "watches",
+       "nav": {
+        "icon": "radar",
+        "label": "Watches",
+        "order": 45,
+        "primary": false
+       },
+       "panel": "/addons/watches/web/watches.js",
+       "style": "/addons/watches/web/watches.css"
+      }
+     ],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
      "can_change": false,
      "check": false,
      "connect_label": null,
@@ -2973,6 +3053,74 @@
       ],
       "reads": [
        "homeassistant"
+      ],
+      "stores_credentials": false
+     },
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Dana watches for what you ask and acts when it happens",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Make sure a transfer of about 2,000 from Maya arrives by tomorrow",
+      "Remind me at 20:30 to pick up Noa, 30 minutes before too, or when I get in the car",
+      "When the dishwasher finishes, ask Gal on WhatsApp to empty it"
+     ],
+     "features": [
+      "Reminders with several triggers: a time, before it, when you get in the car",
+      "Make sure something happens by a deadline (a payment, a message)",
+      "When something happens, Dana notifies you, adds a task or does the work"
+     ],
+     "icon": "radar",
+     "name": "watches",
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "tasks",
+       "why": "A reminder is also a task you can tick off"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Notifications, emails and calls to watch for"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money",
+       "why": "Bank and card transactions to watch for"
+      }
+     ],
+     "options": false,
+     "pages": [
+      "Watches"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Watches",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [],
+      "reads": [
+       "phone",
+       "money",
+       "tasks"
       ],
       "stores_credentials": false
      },
@@ -4260,6 +4408,74 @@
     },
     {
      "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Dana watches for what you ask and acts when it happens",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Make sure a transfer of about 2,000 from Maya arrives by tomorrow",
+      "Remind me at 20:30 to pick up Noa, 30 minutes before too, or when I get in the car",
+      "When the dishwasher finishes, ask Gal on WhatsApp to empty it"
+     ],
+     "features": [
+      "Reminders with several triggers: a time, before it, when you get in the car",
+      "Make sure something happens by a deadline (a payment, a message)",
+      "When something happens, Dana notifies you, adds a task or does the work"
+     ],
+     "icon": "radar",
+     "name": "watches",
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "tasks",
+       "why": "A reminder is also a task you can tick off"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Notifications, emails and calls to watch for"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money",
+       "why": "Bank and card transactions to watch for"
+      }
+     ],
+     "options": false,
+     "pages": [
+      "Watches"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Watches",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [],
+      "reads": [
+       "phone",
+       "money",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
      "can_change": false,
      "check": false,
      "connect_label": null,
@@ -5520,6 +5736,74 @@
      "version": "",
      "web": [],
      "why_not": "Set by an admin",
+     "worker": false
+    },
+    {
+     "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Dana watches for what you ask and acts when it happens",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Make sure a transfer of about 2,000 from Maya arrives by tomorrow",
+      "Remind me at 20:30 to pick up Noa, 30 minutes before too, or when I get in the car",
+      "When the dishwasher finishes, ask Gal on WhatsApp to empty it"
+     ],
+     "features": [
+      "Reminders with several triggers: a time, before it, when you get in the car",
+      "Make sure something happens by a deadline (a payment, a message)",
+      "When something happens, Dana notifies you, adds a task or does the work"
+     ],
+     "icon": "radar",
+     "name": "watches",
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "tasks",
+       "why": "A reminder is also a task you can tick off"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Notifications, emails and calls to watch for"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money",
+       "why": "Bank and card transactions to watch for"
+      }
+     ],
+     "options": false,
+     "pages": [
+      "Watches"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Watches",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [],
+      "reads": [
+       "phone",
+       "money",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
+     "version": "",
+     "web": [],
+     "why_not": null,
      "worker": false
     },
     {
@@ -6791,6 +7075,74 @@
     },
     {
      "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Dana watches for what you ask and acts when it happens",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Make sure a transfer of about 2,000 from Maya arrives by tomorrow",
+      "Remind me at 20:30 to pick up Noa, 30 minutes before too, or when I get in the car",
+      "When the dishwasher finishes, ask Gal on WhatsApp to empty it"
+     ],
+     "features": [
+      "Reminders with several triggers: a time, before it, when you get in the car",
+      "Make sure something happens by a deadline (a payment, a message)",
+      "When something happens, Dana notifies you, adds a task or does the work"
+     ],
+     "icon": "radar",
+     "name": "watches",
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "tasks",
+       "why": "A reminder is also a task you can tick off"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Notifications, emails and calls to watch for"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money",
+       "why": "Bank and card transactions to watch for"
+      }
+     ],
+     "options": false,
+     "pages": [
+      "Watches"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Watches",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [],
+      "reads": [
+       "phone",
+       "money",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
      "can_change": false,
      "check": false,
      "connect_label": null,
@@ -8046,6 +8398,74 @@
     },
     {
      "account": null,
+     "can_change": true,
+     "check": false,
+     "connect_label": null,
+     "connect_url": null,
+     "connected": false,
+     "credentials": [],
+     "description": "Dana watches for what you ask and acts when it happens",
+     "disconnect_warning": null,
+     "everyone": false,
+     "examples": [
+      "Make sure a transfer of about 2,000 from Maya arrives by tomorrow",
+      "Remind me at 20:30 to pick up Noa, 30 minutes before too, or when I get in the car",
+      "When the dishwasher finishes, ask Gal on WhatsApp to empty it"
+     ],
+     "features": [
+      "Reminders with several triggers: a time, before it, when you get in the car",
+      "Make sure something happens by a deadline (a payment, a message)",
+      "When something happens, Dana notifies you, adds a task or does the work"
+     ],
+     "icon": "radar",
+     "name": "watches",
+     "needs": [
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "tasks",
+       "why": "A reminder is also a task you can tick off"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "phone",
+       "why": "Notifications, emails and calls to watch for"
+      },
+      {
+       "kind": "addon",
+       "optional": true,
+       "what": "money",
+       "why": "Bank and card transactions to watch for"
+      }
+     ],
+     "options": false,
+     "pages": [
+      "Watches"
+     ],
+     "requires": null,
+     "settings": [],
+     "setup": [],
+     "source": "official",
+     "state": "available",
+     "title": "Watches",
+     "touches": {
+      "acts_outside": true,
+      "hosts": [],
+      "reads": [
+       "phone",
+       "money",
+       "tasks"
+      ],
+      "stores_credentials": false
+     },
+     "version": "",
+     "web": [],
+     "why_not": null,
+     "worker": false
+    },
+    {
+     "account": null,
      "can_change": false,
      "check": false,
      "connect_label": null,
@@ -8105,7 +8525,8 @@
     "about",
     "people",
     "phone",
-    "homeassistant"
+    "homeassistant",
+    "watches"
    ],
    "capabilities": [
     "ops",
@@ -8123,7 +8544,8 @@
     "about",
     "people",
     "phone",
-    "homeassistant"
+    "homeassistant",
+    "watches"
    ],
    "languages": [
     "he",
