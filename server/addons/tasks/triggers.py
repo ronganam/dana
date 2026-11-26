@@ -233,6 +233,8 @@ async def trigger_reminder(item: Dict[str, Any], trigger_type: str, user: User, 
     # while still allowing genuine retriggers (leave + come back).
     if uid and should_skip_refire(user, str(uid), trigger_type, target):
         logger.info(f"Skipping reminder for '{summary}' ({trigger_type}): accidental refire, no genuine retrigger.")
+        if trigger_type == "time":
+            _strip_time_trigger(str(uid), summary)  # else the 30 s check would skip it again forever
         return
 
     emoji, title = _TRIGGER_STYLE.get(trigger_type, ("🔔", "Reminder"))
@@ -253,20 +255,25 @@ async def trigger_reminder(item: Dict[str, Any], trigger_type: str, user: User, 
 
         # Strip the time trigger so it doesn't fire again (only time triggers).
         if trigger_type == "time":
-            logger.info(f"Removing time trigger from task '{summary}' (UID: {uid}) in local DB...")
-            try:
-                with get_db_connection() as conn:
-                    # scoped: the trigger engine's task, firing for its creator
-                    row = conn.execute("SELECT triggers FROM tasks WHERE id = ?", (uid,)).fetchone()
-                    if row:
-                        trig = json.loads(row["triggers"] or '{}')
-                        trig.pop("time", None)
-                        # scoped: the trigger engine's task, firing for its creator
-                        conn.execute("UPDATE tasks SET triggers = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                                     (json.dumps(trig), uid))
-                        conn.commit()
-            except Exception as e:
-                logger.error(f"Failed to clear time trigger in local DB: {e}")
+            _strip_time_trigger(str(uid), summary)
+
+
+def _strip_time_trigger(uid: str, summary: str) -> None:
+    """Remove a task's time trigger once it fired (or was skipped as a refire), so the 30 s check stops seeing it."""
+    logger.info(f"Removing time trigger from task '{summary}' (UID: {uid}) in local DB...")
+    try:
+        with get_db_connection() as conn:
+            # scoped: the trigger engine's task, firing for its creator
+            row = conn.execute("SELECT triggers FROM tasks WHERE id = ?", (uid,)).fetchone()
+            if row:
+                trig = json.loads(row["triggers"] or '{}')
+                trig.pop("time", None)
+                # scoped: the trigger engine's task, firing for its creator
+                conn.execute("UPDATE tasks SET triggers = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
+                             (json.dumps(trig), uid))
+                conn.commit()
+    except Exception as e:
+        logger.error(f"Failed to clear time trigger in local DB: {e}")
 
 
 def _open_tasks_of(user: User) -> List[Dict[str, Any]]:

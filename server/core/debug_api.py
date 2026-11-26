@@ -33,7 +33,13 @@ class InMemoryLogHandler(logging.Handler):
         self.limit = limit
         self.logs = []
 
+    # The web server's access lines (every request, the Debug screen's own polling included) stay in
+    # the process log only; here they would push everything else out of the window.
+    SKIP = ("aiohttp.access",)
+
     def emit(self, record):
+        if record.name in self.SKIP:
+            return
         try:
             msg = self.format(record)
             self.logs.append({

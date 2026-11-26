@@ -25,13 +25,14 @@ import logging
 import re
 from typing import Any, Dict, List, Optional, Set
 
-from core import notify, runs, session_runner
+from core import approval_text, clock, live, notify, runs, session_runner
 from core.addons import registry
 from core.session import get_pending
 from core.text import untrusted
 from core.users import User
 from addons.watches import spec as S
 from addons.watches import store
+from addons.watches.addon import addon
 
 logger = logging.getLogger(__name__)
 
@@ -108,26 +109,90 @@ def _agent_message(watch: Dict[str, Any], instructions: str, autonomy: str, even
     return "\n\n".join(lines)
 
 
-async def _follow(user: User, run: runs.Run, fire_id: str, index: int, watch: Dict[str, Any]) -> None:
-    """When the agent run ends, store how it went on its fire and tell the user when it waits for an approval."""
+def _live_key(run: runs.Run) -> str:
+    """The live activity of one agent run: ``run:<session id>:<run id>`` (the Approve action finds the session in it)."""
+    return f"run:{run.session_id}:{run.run_id}"[:100]
+
+
+def _working(title: str, step: str, since: Any) -> live.Activity:
+    return live.Activity(title=title[:120], text=step[:240], context="Watch · Dana is working", icon="bot",
+                         since=since, progress=live.Progress(indeterminate=True), open="/watches")
+
+
+async def _live(op: Any, *args: Any) -> None:
+    """A live-activity call that never breaks the action (a client-only feature)."""
     try:
-        if run.task is not None:
+        await op(*args)
+    except Exception as e:
+        logger.warning(f"Watch live activity: {e}")
+
+
+async def follow(user: User, run: runs.Run, title: str, fire_id: str = "", index: int = 0,
+                 watch: Optional[Dict[str, Any]] = None) -> None:
+    """Show the agent run as a live activity (phone Live Update, the web Now strip, the Omarchy bar) while it
+    works; when it ends store how it went on its fire, and when it waits for an approval turn the activity into
+    Approve / Deny and tell the user (Telegram with the same buttons)."""
+    key, since, seq, final = _live_key(run), clock.now(), 0, ""
+    await _live(live.start, user, addon, key, _working(title, "Starting…", since))
+    while True:
+        evs = await run.wait_for_events(seq, 30.0)
+        for ev in evs:
+            seq = ev["seq"]
+            if ev.get("type") == "tool_start" and ev.get("name"):
+                await _live(live.update, user, addon, key, _working(title, f"Using {ev['name']}", since))
+            elif ev.get("type") == "final" and ev.get("content"):
+                final = str(ev["content"])
+        if run.finished and seq >= run.last_seq:
+            break
+    if run.task is not None:
+        try:
             await asyncio.wait([run.task])
-    except Exception:
-        pass
-    waiting = get_pending(user.id, run.session_id) is not None
+        except Exception:
+            pass
+    pending = get_pending(user.id, run.session_id) or {}
+    waiting = bool(pending)
     status = HELD if waiting else (FAILED if run.status in ("error", "cancelled") else DONE)
-    fire = store.get_fire(user, fire_id)
+    fire = store.get_fire(user, fire_id) if fire_id else None
     if fire is not None and index < len(fire["actions"]):
         fire["actions"][index]["status"] = status
         if waiting:
-            fire["actions"][index]["detail"] = "waiting for your approval in the chat"
+            fire["actions"][index]["detail"] = "waiting for your approval"
         store.set_fire_actions(user, fire_id, fire["actions"])
-    if waiting:
-        await notify.send(user, notify.Message(
-            f"👀 {watch['title']}: Dana prepared something and needs your OK in the chat.", kind="notify",
-            data={"title": watch["title"][:200], "text": "Dana needs your OK in the chat",
-                  "tag": f"watch-{watch['id']}", "channel": "messages"}))
+    asks = pending.get("status") == "pending_approval" and bool(pending.get("tool_name"))
+    if asks:
+        what = approval_text.plain(approval_text.describe(pending["tool_name"], pending.get("tool_args")))
+        await _live(live.update, user, addon, key, live.Activity(
+            title=title[:120], text=what[:240], context="Watch · needs your OK", icon="bot", tone="warn",
+            alert=f"ok:{run.run_id}", open="/watches",
+            actions=(live.Action("approve", "Approve"), live.Action("deny", "Deny"))))
+    elif waiting:
+        await _live(live.end, user, addon, key, live.Final("Dana is waiting for you in the chat", tone="warn",
+                                                            open="/watches"))
+    else:
+        ok = status == DONE
+        await _live(live.end, user, addon, key, live.Final(
+            "Done" if ok else "It did not work", text=final[:240], tone="good" if ok else "bad", open="/watches"))
+
+
+async def answer(user: User, current: live.Current, action: str) -> Optional[str]:
+    """Approve / Deny pressed on a run's live activity: resume that session's run and follow it in a new
+    activity. Returns an error word, or None."""
+    parts = current.key.split(":", 2)
+    if len(parts) != 3 or parts[0] != "run":
+        return "unknown"
+    session_id = parts[1]
+    pending = get_pending(user.id, session_id)
+    if pending is None or pending.get("status") != "pending_approval":
+        return "gone"
+    try:
+        run = session_runner.start_resume_task(user, session_id, "approve" if action == "approve" else "deny",
+                                               device="live")
+    except runs.SessionBusyError:
+        return "busy"
+    task = asyncio.ensure_future(follow(user, run, current.activity.title))
+    _followers.add(task)
+    task.add_done_callback(_followers.discard)
+    return None
 
 
 def start_agent(user: User, watch: Dict[str, Any], instructions: str, autonomy: str, event: Optional[S.Event],
@@ -143,7 +208,7 @@ def start_agent(user: User, watch: Dict[str, Any], instructions: str, autonomy: 
             continue
     if run is None:
         return result(kind, FAILED, "Dana was busy in both the chat and this watch's session")
-    task = asyncio.ensure_future(_follow(user, run, fire_id, index, watch))
+    task = asyncio.ensure_future(follow(user, run, watch["title"], fire_id, index, watch))
     _followers.add(task)
     task.add_done_callback(_followers.discard)
     return result(kind, DONE, f"Dana is on it (session {run.session_id})", run_id=run.run_id,

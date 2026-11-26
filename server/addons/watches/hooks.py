@@ -5,7 +5,7 @@ reminder's task got done by itself (closing it is always the user's call)."""
 import datetime as dt
 from typing import Any, Dict, List
 
-from core import cards, clock
+from core import cards, clock, live
 from core.addons import Card, NowContext
 from core.users import User
 from addons.watches import actions, engine, store
@@ -75,3 +75,14 @@ async def act(user: User, ref: str, action: str, args: Dict[str, Any], now: dt.d
     store.close(user, watch["id"], store.DONE)
     _set_evidence(user, fire, actions.DONE, "closed by you")
     return cards.result(f"Closed “{watch['title']}”")
+
+
+@addon.live_action
+async def live_act(user: User, current: live.Current, action: str, choice: str) -> live.HookResult:
+    """Approve / Deny on a watch agent run's live activity: answer it; the resumed run gets its own activity."""
+    if action not in ("approve", "deny"):
+        return None
+    why = await actions.answer(user, current, action)
+    if why == "busy":
+        return None  # Dana is busy in that chat: the card stays, try again
+    return live.END

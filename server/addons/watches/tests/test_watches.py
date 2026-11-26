@@ -170,6 +170,19 @@ def fake_start_agent_task(user: Any, session_id: str, user_text: str, **kw: Any)
 
 session_runner.start_agent_task = fake_start_agent_task
 
+RESUMED: List[Tuple[str, str, str]] = []
+
+
+def fake_start_resume_task(user: Any, session_id: str, action: str, **kw: Any) -> runs.Run:
+    async def body() -> None:
+        from core.session import pop_pending
+        RESUMED.append((user.id, session_id, action))
+        pop_pending(user.id, session_id)
+    return runs.runs.start(user, session_id, action, body)
+
+
+session_runner.start_resume_task = fake_start_resume_task
+
 
 # --- Helpers --------------------------------------------------------------------------------------
 
@@ -830,6 +843,49 @@ async def test_web_fixture(client: TestClient) -> None:
               "(regenerate with WRITE_WEB_FIXTURE=1 bin/test test_watches)", not drift, drift)
 
 
+async def test_agent_live() -> None:
+    """A watch's agent run is a live activity; held for an approval it offers Approve / Deny there and on
+    Telegram (the notice names the session), and Approve resumes that session's run."""
+    from core import live
+    from core.session import get_pending, set_pending
+    clear(BOB)
+    SENT.clear()
+    RESUMED.clear()
+
+    def holding_agent(user: Any, session_id: str, user_text: str, **kw: Any) -> runs.Run:
+        async def body() -> None:
+            runs.emit({"type": "tool_start", "id": "c1", "name": "search_calendar", "iteration": 1})
+            set_pending(user.id, session_id, {"status": "pending_approval", "tool_name": "send_whatsapp_message",
+                                              "tool_args": {"chat": "Gal", "text": "Next week: dinner Tuesday"}})
+        return runs.runs.start(user, session_id, "message", body)
+
+    session_runner.start_agent_task = holding_agent
+    try:
+        w = await make(BOB, watch_spec([{"id": "gal", "kind": "event", "event_type": "phone.notification.received",
+                                         "where": [{"field": "sender", "op": "contains", "value": "gal"}]}],
+                                       repeat="each", title="Answer Gal",
+                                       on_match=[{"type": "agent", "instructions": "Send Gal my week"}]))
+        await emit(BOB, "phone.notification.received", **notif(sender="Gal", text="what's your week?"))
+        await actions.drain()
+        acts = live.active(BOB)
+        mine = [c for c in acts if c.addon == "watches"]
+        check("a held agent run's live activity asks for the OK with Approve / Deny",
+              len(mine) == 1 and [a.id for a in mine[0].activity.actions] == ["approve", "deny"]
+              and mine[0].activity.tone == "warn" and "dinner Tuesday" in mine[0].activity.text, [c.activity for c in mine])
+        check("no separate notice: the live activity alerts (Telegram stays out of it)",
+              not [m for _, m in SENT if m.kind == "notify"], SENT)
+        fs = fires(BOB, w["id"])
+        check("the fire's agent action is held", fs and fs[0]["actions"][0]["status"] == "held", fs)
+        res = await live.act(BOB, mine[0].id, "approve")
+        await actions.drain()
+        check("Approve on the live activity resumes that session's run and ends the card",
+              RESUMED == [(BOB.id, "main", "approve")] and res is None
+              and not [c for c in live.active(BOB) if c.key == mine[0].key], RESUMED)
+        check("the pending approval is answered", get_pending(BOB.id, "main") is None)
+    finally:
+        session_runner.start_agent_task = fake_start_agent_task
+
+
 async def main() -> None:
     test_spec()
     await test_tap_path()
@@ -838,6 +894,7 @@ async def main() -> None:
     await test_evidence()
     await test_compiler()
     await test_actions()
+    await test_agent_live()
     async with TestClient(TestServer(build_app())) as client:
         await test_api(client)
         await test_tools()

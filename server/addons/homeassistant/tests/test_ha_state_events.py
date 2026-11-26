@@ -336,7 +336,7 @@ async def test_watch_end_to_end() -> None:
     check("end to end: the crossing 52 → 49 fires the watch once with the event's data", len(fires) == 1
           and fires[0]["event"]["old_state"] == "52" and fires[0]["event"]["new_state"] == "49"
           and fires[0]["event_type"] == "homeassistant.state.changed", fires)
-    told = [m.text for uid, m in SENT if uid == BOB.id]
+    told = [m.text for uid, m in SENT if uid == BOB.id and m.kind != "live"]
     check("end to end: the notify action told Bob, once, naming the entity and the change",
           len(told) == 1 and "Your phone battery is under 50%" in told[0] and "Bob phone battery · 52 → 49" in told[0]
           and not [uid for uid, _ in SENT if uid != BOB.id], SENT)

@@ -29,6 +29,10 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger("dana")
+# Libraries that log every call at INFO (LiteLLM twice per model call, Google's client a cache notice per
+# request): their warnings and errors still show.
+for _noisy in ("LiteLLM", "litellm", "LiteLLM Router", "httpx", "googleapiclient.discovery_cache"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 async def main():
     logger.info("Initializing modular AI assistant...")
