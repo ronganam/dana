@@ -7,7 +7,7 @@ It is one person's daily driver, published as is: opinionated, built around one 
 ## What it does
 
 - **Chat and voice** with an agent that uses tools: a custom ReAct loop over [LiteLLM](https://github.com/BerriAI/litellm) (Claude by default, any provider by env), streamed to every client; realtime voice calls; push-to-talk; "Hey Dana" wake word on the tablet and TV.
-- **Addons**, each self-contained, owning its tools and is connected per user: tasks and reminders (time, location, car and wake triggers), a shared shopping list, projects with decisions compared side by side, people and their briefs, phone notifications and call recordings turned into suggestions, Home Assistant, WhatsApp (WAHA), Google Calendar / Contacts / Gmail, your own Telegram account (read-only), money (bank and card sync, dashboards, a balance forecast, ways to save), Frigate cameras.
+- **Addons**, each self-contained, owning its tools and is connected per user: tasks and reminders (time, location, car and wake triggers), a shared shopping list, projects with decisions compared side by side, people and their briefs, phone notifications and call recordings turned into suggestions, Home Assistant, WhatsApp (WAHA), Google Calendar / Contacts / Gmail, your own Telegram account (reads your chats, notes to your Saved Messages), money (bank and card sync, dashboards, a balance forecast, ways to save), Frigate cameras.
 - **Proactive**: a morning briefing, a weekly review, a "Now" queue of what needs you, urgent-notification escalation, caller cards for incoming calls.
 - **Safe by default**: reversible actions run at once with Undo; sending to other people or destroying something asks first; content written by others (mail, a shared screen) cannot make Dana act outside without asking.
 - **Several users** on one server, each with their own addons, data and tokens; sharing of lists and projects between them.
@@ -93,7 +93,7 @@ Each feature is an addon you turn on per user. Before you turn one on, this says
 | Google Calendar | Your events in chat, on the Now screen and in the briefing | `GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET`; a Google account | `PUBLIC_URL` | Any |
 | Google Contacts | Names, numbers and birthdays of the people you know | `GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET`; a Google account | `PUBLIC_URL` | Any |
 | Gmail | Search, read and write your mail in chat | `GOOGLE_CLIENT_ID`; `GOOGLE_CLIENT_SECRET`; a Google account | `PUBLIC_URL` | Any |
-| Telegram account | Your own Telegram chats and channels, read-only | `TELEGRAM_API_ID`; `TELEGRAM_API_HASH`; a Telegram account | — | Any |
+| Telegram account | Reads your own Telegram chats and channels; sends notes to yourself (Saved Messages) | `TELEGRAM_API_ID`; `TELEGRAM_API_HASH`; a Telegram account | — | Any |
 | Money | Your bank and card spending, balances and ways to save | — | the Phone addon | Any |
 | Cameras | Your Frigate cameras on the dashboard | a Frigate server with your cameras | the Home Assistant addon | Any |
 | Ops | Read-only kubectl and Python run on the server (asks first; not a sandbox) | Dana running in Kubernetes, with a service account allowed to read | — | Any |

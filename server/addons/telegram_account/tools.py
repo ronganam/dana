@@ -1,8 +1,10 @@
-"""Tools over the user's own Telegram account (read-only; docs/telegram-account.md).
+"""Tools over the user's own Telegram account (docs/telegram-account.md).
 
-All three return text other people wrote (``untrusted_result``: the agent
-loop frames their results with ``core.text.untrusted``), and none marks
-anything read."""
+The three readers return text other people wrote (``untrusted_result``: the
+agent loop frames their results with ``core.text.untrusted``), and none marks
+anything read. The one writer, ``send_telegram_message_to_me``, sends only to
+the account's own Saved Messages: it takes no recipient, so it reaches nobody
+else and needs no approval."""
 
 import asyncio
 import logging
@@ -124,6 +126,28 @@ async def read_telegram_chat(conn: Connection, chat: str, limit: int = 20, unrea
     cut = f"; only the newest {len(lines)} of {len(msgs)} fit here" if len(lines) < len(msgs) else ""
     return (f"{what[0].upper() + what[1:]} in {tg.describe_chat(found)} (showing {len(lines)}{cut}, oldest first):\n"
             + "\n".join(lines) + f"\n{NOT_MARKED}")
+
+
+@addon.tool(is_write=True)
+async def send_telegram_message_to_me(conn: Connection, text: str) -> str:
+    """Send a message to the user themself on Telegram: into their own account's Saved Messages
+    (their personal account, not Dana's bot). Use it when the user asks for something "on Telegram"
+    for themself (a note, a reminder, a list, a summary to keep). It cannot message anyone else:
+    there is no recipient, and Dana cannot send Telegram messages to other people.
+    Sent at once, without asking (it reaches nobody but the user).
+
+    Args:
+        text: The message text (a long text is sent as several messages).
+    """
+    text = (text or "").strip()
+    if not text:
+        return "Error: text is empty."
+    try:
+        ids = await tg.send_to_saved_messages(conn, text)
+    except Exception as e:
+        return f"Error: {tg.explain(e, conn)}"
+    parts = f" ({len(ids)} messages)" if len(ids) > 1 else ""
+    return f"Sent to your Telegram Saved Messages{parts}."
 
 
 SUMMARY_PROMPT = """You summarize unread Telegram chats and channels for {name}.

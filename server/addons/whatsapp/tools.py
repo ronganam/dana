@@ -38,6 +38,8 @@ def _whatsapp_who(user: Optional[User], chat_id: Any) -> str:
     raw = clean(chat_id, 120)
     if not raw:
         return "someone"
+    if waha.is_self(raw):
+        return "yourself"
     if raw.endswith("@g.us"):
         return "a WhatsApp group"
     if "@" not in raw and not re.fullmatch(r"[\d\s+\-()]+", raw):
@@ -65,6 +67,15 @@ def _whatsapp_source(user: Optional[User], message_id: Any) -> str:
 def _describe_send(user: Optional[User], a: Dict[str, Any]) -> Approval:
     return Approval(f"Send a WhatsApp message to {_whatsapp_who(user, a.get('chat_id'))}", "WhatsApp message", "💬",
                     "Send this WhatsApp message?", body_label="Message", body=a.get("text"))
+
+
+def _send_needs_asking(a: Dict[str, Any]) -> bool:
+    """``confirm`` of send_whatsapp_message: every send asks first except one
+    to the user's own chat (``chat_id`` "me" / "self", resolved only to the
+    connected account's own id, never through a contact): a note to yourself
+    reaches nobody else (the confirm rule's "sends something to another
+    person")."""
+    return not waha.is_self(a.get("chat_id"))
 
 
 def _describe_file(user: Optional[User], a: Dict[str, Any]) -> Approval:
@@ -202,12 +213,26 @@ async def find_last_chats(conn: Connection, limit: int = 10) -> str:
 async def search_whatsapp_contact_or_chat(conn: Connection, query: str) -> str:
     """Search for a WhatsApp contact or group chat by name to find their chat ID.
 
+    The user's own chat ("Message yourself") is listed first as "You (your own chat)" when the
+    query is 'me', 'myself', 'אני', 'לעצמי' or the user's own name; to message the user
+    themself, simply pass chat_id='me' to send_whatsapp_message.
+
     Args:
         query: The contact name or chat group title to search for (e.g. 'John', 'Family').
     """
     url, headers, session = waha.config(conn)
     query_lower = query.lower()
     matches = []
+
+    if waha.names_self(conn.user, query):
+        own = await waha.own_chat_id(conn)
+        if own:
+            matches.append({"type": "Your own chat; or pass chat_id 'me'", "name": waha.OWN_CHAT_NAME, "id": own})
+        if query.strip().casefold() in waha.SELF_WORDS:
+            if not own:
+                return ("Your own WhatsApp chat id is not known yet (WAHA did not report the session's account). "
+                        "send_whatsapp_message with chat_id 'me' sends to it once it is.")
+            return f"- **{waha.OWN_CHAT_NAME}** -> ID: `{own}` (or pass chat_id 'me')\n"
 
     # Search the user's saved contacts first
     try:
@@ -338,9 +363,13 @@ async def read_chat_messages(conn: Connection, chat_id: str, limit: int = 10) ->
             return f"Error connecting to WAHA API: {err_msg}"
 
 
-@addon.tool(is_write=True, confirm=True, describe=_describe_send)
+@addon.tool(is_write=True, confirm=_send_needs_asking, describe=_describe_send)
 async def send_whatsapp_message(conn: Connection, chat_id: str, text: str, reply_to: Optional[str] = None) -> str:
     """Send a WhatsApp text message to a chat by contact/group name or chat ID.
+
+    To message the user themself (their own "Message yourself" chat: "send me a WhatsApp",
+    a reminder or note to the user), pass chat_id='me' — never search for the user's own
+    name. A message to 'me' is sent without asking; any other recipient asks the user first.
 
     To pass along something someone else sent (a file, photo, voice note or their message),
     use forward_whatsapp_message instead of describing it in text.
@@ -350,6 +379,7 @@ async def send_whatsapp_message(conn: Connection, chat_id: str, text: str, reply
     what the user wrote unless they explicitly ask you to rewrite it.
 
     The chat_id can be:
+      - 'me' — the user's own chat (the connected WhatsApp account itself).
       - An existing contact/group name from your WhatsApp (e.g. 'John', 'ענבל', 'Family') — auto-resolved.
       - A properly formatted chat ID (e.g. '15550100301@c.us') — use this for new/newly-validated numbers.
 
@@ -365,7 +395,7 @@ async def send_whatsapp_message(conn: Connection, chat_id: str, text: str, reply
     If the name query is still ambiguous after recency filtering, it returns all candidates so you can ask the user to clarify.
 
     Args:
-        chat_id: The WhatsApp chat ID (with @c.us/@g.us suffix), contact name, or group name.
+        chat_id: 'me' for the user's own chat, or the WhatsApp chat ID (with @c.us/@g.us suffix), contact name, or group name.
         text: The text message content to send.
         reply_to: Optional id of the message to reply to, as shown (`id: ...`) by read_chat_messages / get_latest_messages (e.g. 'false_11111111111@c.us_AAAAAAAAAAAAAAAAAAAA').
     """

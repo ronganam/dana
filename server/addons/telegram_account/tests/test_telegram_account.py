@@ -3,8 +3,10 @@ Run: bin/test test_telegram_account
 
 Telethon is replaced by an in-process fake (``client.make_client``): each
 session string is one account with its chats (channels, groups, private,
-muted, archived) and messages. Checked: the addon is chat-only and its tools
-read-only and untrusted; each user reads only their own account (Carl, who
+muted, archived) and messages. Checked: the addon is chat-only and its reading
+tools read-only and untrusted; send_telegram_message_to_me sends only to 'me'
+(Saved Messages) from the user's own session, never asks, takes no recipient,
+splits a long text; each user reads only their own account (Carl, who
 has no Telegram, has no tools); unread listing skips muted and archived
 chats unless asked and filters by type; reading a chat by name / id, only
 after the read mark when asked, media in words; nothing is ever marked read
@@ -107,6 +109,7 @@ ACCOUNTS: Dict[str, List[SimpleNamespace]] = {
 }
 MADE: List[str] = []
 REQUESTS: List[Tuple[str, str]] = []  # (session, call)
+SENT: List[Tuple[str, Any, str]] = []  # (session, entity, text)
 
 
 class FakeClient:
@@ -138,6 +141,11 @@ class FakeClient:
         found = [m for m in entity.msgs if m.id > min_id and (not search or search in (m.message or ""))]
         return list(reversed(found))[:limit]
 
+    async def send_message(self, entity, message):
+        REQUESTS.append((self.session_str, "send_message"))
+        SENT.append((self.session_str, entity, message))
+        return SimpleNamespace(id=1000 + len(SENT))
+
 
 def fake_make_client(session: str, *, receive_updates: bool = False) -> Any:
     MADE.append(session)
@@ -155,14 +163,52 @@ ADMIN_AUTH = {"Authorization": f"Bearer {os.environ['API_TOKEN']}"}
 BOB_AUTH = {"Authorization": f"Bearer {BOB_TOKEN}"}
 CARL_AUTH = {"Authorization": f"Bearer {CARL_TOKEN}"}
 TOOLS = ("list_telegram_unread", "read_telegram_chat", "summarize_telegram_unread")
+SEND = "send_telegram_message_to_me"
 
 
 def test_kind() -> None:
     k = addon_mod._addons[ADDON]
     check("kind: chat only (no voice), signed in by its own page", not k.realtime and k.connect_url == "/telegram/connect"
           and k.connect_label == "Connect Telegram")
-    check("kind: every tool reads only and returns others' text",
+    check("kind: every reading tool reads only and returns others' text",
           all(not registry.is_write_tool(n) and registry.returns_untrusted(n) for n in TOOLS))
+    check("kind: the description says it reads and sends notes to yourself, not read-only",
+          "read-only" not in k.description and "Saved Messages" in k.description, k.description)
+    check("send to me: a write that never asks (not even after others' text) and takes no recipient",
+          registry.is_write_tool(SEND) and not registry.needs_confirmation(SEND, {"text": "x"})
+          and not registry.needs_confirmation(SEND, {"text": "x"}, untrusted=True)
+          and not registry.returns_untrusted(SEND) and not registry.acts_outside(SEND))
+
+
+async def test_send_to_me() -> None:
+    check("send to me: Carl (no Telegram) does not have it, the others do",
+          not registry.has_tool(CARL, SEND) and all(registry.has_tool(u, SEND) for u in (ADMIN, BOB)))
+    schema = next(t["function"] for t in registry.tool_schemas(ADMIN) if t["function"]["name"] == SEND)
+    check("send to me: offered with just the text, described as Saved Messages",
+          list(schema["parameters"]["properties"]) == ["text"] and "Saved Messages" in schema["description"], schema)
+    SENT.clear()
+    out = await registry.execute(ADMIN, SEND, {"text": "  buy milk  "})
+    check("send to me: sent only to 'me' from the user's own session",
+          SENT == [("S-ADMIN", "me", "buy milk")] and out == "Sent to your Telegram Saved Messages.", (out, SENT))
+    SENT.clear()
+    out = await registry.execute(ADMIN, SEND, {"text": "a" * 5000})
+    check("send to me: a long text in several messages, all to 'me'",
+          [e for _, e, _ in SENT] == ["me", "me"] and [len(t) for _, _, t in SENT] == [4096, 904]
+          and "(2 messages)" in out, (out, [len(t) for _, _, t in SENT]))
+    SENT.clear()
+    out = await registry.execute(BOB, SEND, {"text": "bob note"})
+    check("send to me: Bob's goes from Bob's session", SENT == [("S-BOB", "me", "bob note")], SENT)
+    SENT.clear()
+    out = await registry.execute(ADMIN, SEND, {"text": "   "})
+    check("send to me: an empty text is refused", out.startswith("Error:") and not SENT, out)
+    try:
+        await registry.execute(ADMIN, SEND, {"text": "x", "chat": "Noa"})
+        extra = SENT == [("S-ADMIN", "me", "x")]
+    except Exception:
+        extra = not SENT
+    check("send to me: a recipient argument can never redirect it", extra, SENT)
+    check("chunks: cut at a line break in the second half",
+          tg.chunks("a" * 3000 + "\n" + "b" * 3000) == ["a" * 3000, "b" * 3000])
 
 
 async def test_tools() -> None:
@@ -358,6 +404,7 @@ async def test_login() -> None:
 async def main() -> None:
     test_kind()
     await test_tools()
+    await test_send_to_me()
     await test_login()
 
 
