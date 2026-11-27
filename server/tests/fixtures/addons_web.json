@@ -389,6 +389,7 @@
      "features": [
       "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
       "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "The weather now and today at the user's Home zone (condition, temperature, high / low, rain chance). Use this for any \"what's the weather\" — not web search.",
       "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
       "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
       "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
@@ -1861,6 +1862,7 @@
      "features": [
       "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
       "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "The weather now and today at the user's Home zone (condition, temperature, high / low, rain chance). Use this for any \"what's the weather\" — not web search.",
       "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
       "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
       "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
@@ -3195,6 +3197,7 @@
      "features": [
       "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
       "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "The weather now and today at the user's Home zone (condition, temperature, high / low, rain chance). Use this for any \"what's the weather\" — not web search.",
       "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
       "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
       "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
@@ -4542,6 +4545,7 @@
      "features": [
       "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
       "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "The weather now and today at the user's Home zone (condition, temperature, high / low, rain chance). Use this for any \"what's the weather\" — not web search.",
       "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
       "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
       "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
@@ -5879,6 +5883,7 @@
      "features": [
       "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
       "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "The weather now and today at the user's Home zone (condition, temperature, high / low, rain chance). Use this for any \"what's the weather\" — not web search.",
       "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
       "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
       "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
@@ -7216,6 +7221,7 @@
      "features": [
       "Get the current date, time, day of the week and timezone: the base for any date or time you compute.",
       "Ask the user to pick one or more options from a list; their pick comes back to you as the answer.",
+      "The weather now and today at the user's Home zone (condition, temperature, high / low, rain chance). Use this for any \"what's the weather\" — not web search.",
       "Search the web (DuckDuckGo) for public, general information: business hours, addresses, news, product specs. Never for the user's own data (memories, calendar, calls, contacts have their own tools).",
       "Share one of the user's own items with another person who uses Dana, change what they may do with it, or stop sharing it.",
       "Run Python 3 in a sandbox and get back what it prints. For calculations, parsing or reshaping data, many similar tool calls in a loop, and edge cases no tool covers. Prefer a dedicated tool when one fits."
