@@ -74,7 +74,7 @@ fun ToolRunCard(item: ThreadItem.Tools, modifier: Modifier = Modifier, reply: (@
             .padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)
     ) {
         CompositionLocalProvider(LocalNodeSurface provides surface) {
-            val done = steps.count { it.state != ToolStep.State.Running }
+            val done = steps.count { it.state == ToolStep.State.Done || it.state == ToolStep.State.Failed }
             if (steps.size == 1) {
                 Row(Modifier.padding(end = 8.dp).heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically) {
                     StepLineMini(done = done, total = 1, width = 16.dp)
@@ -108,6 +108,11 @@ fun ToolRunCard(item: ThreadItem.Tools, modifier: Modifier = Modifier, reply: (@
             color = c.ink,
             modifier = Modifier.padding(top = 10.dp, end = 8.dp)
         )
+        if (last.state == ToolStep.State.Skipped && reply == null) Text(
+            "Not done: you moved on before saying yes.",
+            style = MaterialTheme.typography.bodyMedium, color = c.inkSoft,
+            modifier = Modifier.padding(top = 8.dp, end = 8.dp)
+        )
         if (last.state == ToolStep.State.Failed && reply == null) Text(
             "That didn't work.",
             style = MaterialTheme.typography.bodyMedium, color = c.inkSoft,
@@ -126,6 +131,7 @@ private fun ToolStep.State.toStep(): StepState = when (this) {
     ToolStep.State.Done -> StepState.Done
     ToolStep.State.Running -> StepState.Current
     ToolStep.State.Failed -> StepState.Failed
+    ToolStep.State.Skipped -> StepState.Next
 }
 
 /** One step's tool, arguments and answer as they are (for the curious; mono, scrolls). */

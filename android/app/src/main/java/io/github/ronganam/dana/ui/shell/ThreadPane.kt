@@ -158,7 +158,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                 Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Close the conversation", tint = c.ink)
             }
             Text(
-                if (onClose != null) "Dana" else "Conversation",
+                "Dana",
                 style = MaterialTheme.typography.titleLarge,
                 color = c.ink,
                 maxLines = 1,

@@ -51,6 +51,9 @@ class ThreadItemsTest {
         val failed = ToolStep.of("x", ToolCallEntry("add_task", "add_task", "{}", response = "Error executing tool: nope", succeeded = true))
         assertEquals(ToolStep.State.Running, running.state)
         assertEquals(ToolStep.State.Failed, failed.state)
+        val dropped = "Not done: the user sent a new message instead of answering."
+        assertEquals(ToolStep.State.Skipped, ToolStep.of("x", ToolCallEntry("delete_task", "delete_task", "{}", response = dropped, succeeded = true)).state)
+        assertNull(resultWords(dropped))
     }
 
     @Test

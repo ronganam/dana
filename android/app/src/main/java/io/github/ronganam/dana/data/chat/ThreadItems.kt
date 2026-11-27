@@ -78,12 +78,14 @@ sealed class ThreadItem {
 
 /** One tool call as a step: what Dana did, in words, and where it is. */
 data class ToolStep(val id: String, val label: String, val state: State, val entry: ToolCallEntry) {
-    enum class State { Done, Running, Failed }
+    /** [Skipped]: it waited for an OK that never came (you wrote something else). */
+    enum class State { Done, Running, Failed, Skipped }
 
     companion object {
         fun of(id: String, tc: ToolCallEntry): ToolStep {
             val state = when {
                 tc.isRunning || tc.isPreparing || (tc.succeeded == null && tc.response.isBlank()) -> State.Running
+                tc.response.startsWith(NOT_DONE) -> State.Skipped
                 tc.succeeded == false || tc.response.startsWith("Error executing tool") -> State.Failed
                 else -> State.Done
             }
@@ -91,6 +93,9 @@ data class ToolStep(val id: String, val label: String, val state: State, val ent
         }
     }
 }
+
+/** How the server answers a call whose OK never came (session_runner drops the prompt). */
+private const val NOT_DONE = "Not done:"
 
 private val PAST = mapOf(
     "get" to "Read", "list" to "Read", "read" to "Read", "recall" to "Recalled", "search" to "Searched",
@@ -146,7 +151,7 @@ fun toolStepWords(name: String): String {
  */
 fun resultWords(response: String): String? {
     val t = response.trim()
-    if (t.isEmpty() || t.startsWith("{") || t.startsWith("[") || t.startsWith("Error")) return null
+    if (t.isEmpty() || t.startsWith("{") || t.startsWith("[") || t.startsWith("Error") || t.startsWith(NOT_DONE)) return null
     // Lists of records (ids, many lines) are for the model, not for reading here.
     if (t.length > 200 || UUID_ISH.containsMatchIn(t) || t.contains("ID:")) return null
     val lines = t.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
