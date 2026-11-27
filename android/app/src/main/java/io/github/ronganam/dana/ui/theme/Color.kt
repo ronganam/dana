@@ -182,6 +182,8 @@ class CircuitColors(
     val indicator: Color,
     val onIndicator: Color,
     val warm: Color,
+    /** A glyph or text on a filled [warm] (a waiting node). */
+    val onWarm: Color,
     val warmSurface: Color,
     val warmSurfaceHigh: Color,
     /** An idle wire on the canvas or a group, and on a raised surface. */
@@ -201,7 +203,7 @@ val DarkCircuit = CircuitColors(
     accent = AccentDark, accentFilled = AccentFilledDark, onAccentFilled = OnAccentDark,
     accentTonal = Color(0xFF4B3F73), onAccentTonal = OnAccentContainerDark,
     indicator = IndicatorDark, onIndicator = OnIndicatorDark,
-    warm = WarmDark, warmSurface = WarmSurfaceDark, warmSurfaceHigh = WarmSurfaceHighDark,
+    warm = WarmDark, onWarm = Color(0xFF3A1E0B), warmSurface = WarmSurfaceDark, warmSurfaceHigh = WarmSurfaceHighDark,
     wire = DarkOutlineSoft, wireRaised = Color(0xFF4A4160), wireDim = Color(0xFF2C263A),
     node = DarkMute, nodeDim = Color(0xFF5A5270),
     ink = DarkInk, inkSoft = DarkInkSoft, mute = DarkMute
@@ -211,7 +213,7 @@ val LightCircuit = CircuitColors(
     accent = AccentLight, accentFilled = AccentFilledLight, onAccentFilled = OnAccentLight,
     accentTonal = Color(0xFFD9CCFF), onAccentTonal = OnAccentContainerLight,
     indicator = IndicatorLight, onIndicator = OnIndicatorLight,
-    warm = WarmLight, warmSurface = WarmSurfaceLight, warmSurfaceHigh = WarmSurfaceHighLight,
+    warm = WarmLight, onWarm = Color.White, warmSurface = WarmSurfaceLight, warmSurfaceHigh = WarmSurfaceHighLight,
     wire = Color(0xFFCFC6E0), wireRaised = Color(0xFFC2B8D6), wireDim = Color(0xFFE2DCEC),
     node = LightMute, nodeDim = Color(0xFFADA5C0),
     ink = LightInk, inkSoft = LightInkSoft, mute = LightMute
