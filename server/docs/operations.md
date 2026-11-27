@@ -116,7 +116,7 @@ What an archive holds, the settings, the API and the CLI: `docs/backups.md`. In 
 ```bash
 NS=dana    # your namespace
 POD=$(kubectl -n "$NS" get pod -l app=dana -o jsonpath='{.items[0].metadata.name}')
-kubectl -n "$NS" logs "$POD" --tail 200 | grep -v aiohttp.access   # the access log is noisy (dashboard and app polling)
+kubectl -n "$NS" logs "$POD" --tail 200 | grep -v aiohttp.access   # the access log: only non-GET requests, 4xx / 5xx and slow ones (core/debug_api.py QuietAccessLog)
 kubectl -n "$NS" exec "$POD" -- python3 -c "import urllib.request as u; print(u.urlopen('http://127.0.0.1:8080/api/health').read())"
 ```
 

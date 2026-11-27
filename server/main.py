@@ -33,6 +33,9 @@ logger = logging.getLogger("dana")
 # request): their warnings and errors still show.
 for _noisy in ("LiteLLM", "litellm", "LiteLLM Router", "httpx", "googleapiclient.discovery_cache"):
     logging.getLogger(_noisy).setLevel(logging.WARNING)
+# The access log: changes, errors and slow requests only, not every poll (core/debug_api.py QuietAccessLog).
+from core.debug_api import QuietAccessLog  # noqa: E402
+logging.getLogger("aiohttp.access").addFilter(QuietAccessLog())
 
 async def main():
     logger.info("Initializing modular AI assistant...")

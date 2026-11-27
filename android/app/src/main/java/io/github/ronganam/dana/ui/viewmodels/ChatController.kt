@@ -6,6 +6,7 @@ import android.net.Uri
 import android.util.Log
 import androidx.core.content.edit
 import io.github.ronganam.dana.R
+import io.github.ronganam.dana.data.chat.BackgroundRuns
 import io.github.ronganam.dana.data.chat.ChatHistoryStore
 import io.github.ronganam.dana.data.chat.ThreadModel
 import io.github.ronganam.dana.data.chat.UndoItem
@@ -116,6 +117,10 @@ class ChatController(
     private val _sessions = MutableStateFlow<List<SessionItem>>(emptyList())
     val sessions: StateFlow<List<SessionItem>> = _sessions.asStateFlow()
 
+    private val _backgroundRuns = MutableStateFlow<List<SessionItem>>(emptyList())
+    /** Conversations Dana had on its own (a watch's AI agent run: `watch-<id>`), newest first ([BackgroundRuns]). */
+    val backgroundRuns: StateFlow<List<SessionItem>> = _backgroundRuns.asStateFlow()
+
     val pendingApproval: StateFlow<PendingApproval?> = prompts.approval
     val selectionRequest: StateFlow<SelectionRequest?> = prompts.selection
     val pendingExtension: StateFlow<PendingExtension?> = prompts.extension
@@ -189,6 +194,7 @@ class ChatController(
         store.load(ThreadModel.MAIN)?.let { transcript.value = it }
         loadActiveSessionHistory()
         fetchSessions()
+        fetchBackgroundRuns()
         fetchModels()
     }
 
@@ -242,6 +248,13 @@ class ChatController(
                     SessionItem(it.id, it.lastModified, it.snippet, status = "idle", title = offline)
                 }
             }
+        }
+    }
+
+    /** Refresh [backgroundRuns] (`GET /api/sessions`, the `watch-` ones); kept as it was when offline. */
+    fun fetchBackgroundRuns() {
+        ctx.scope.launch {
+            ctx.load("BackgroundRuns") { ctx.api.chat.sessions() }?.let { _backgroundRuns.value = BackgroundRuns.of(it) }
         }
     }
 
@@ -437,6 +450,7 @@ class ChatController(
             if (sessionId == id && !_isStreaming.value) showSession(state)
         }
         fetchSessions()
+        if (threadMode) fetchBackgroundRuns()
     }
 
     // --- Following a run (Server-Sent Events) ---

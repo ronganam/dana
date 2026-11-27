@@ -703,7 +703,7 @@ private fun PushStatusCard(s: io.github.ronganam.dana.push.PushStatus) {
             Text("Transport: ${s.transport.label}", style = MaterialTheme.typography.titleSmall)
             if (unifiedPush) {
                 Text(
-                    if (s.distributor != null) "Push app: ${s.distributor}" else "No distributor installed",
+                    if (s.distributor != null) "Push app: ${s.distributor}" else "No push app installed",
                     style = MaterialTheme.typography.titleSmall
                 )
             }
@@ -722,7 +722,8 @@ private fun PushStatusCard(s: io.github.ronganam.dana.push.PushStatus) {
                 Text(
                     "Push comes through a distributor app. Install ntfy (free, on Google Play or F-Droid) and come back: " +
                         "Dana registers with it by itself. ntfy uses the public ntfy.sh unless you point it at your own " +
-                        "ntfy server. Until then, reminders and alerts wait for the app's next check.",
+                        "ntfy server. Until then nothing wakes the phone: Dana checks for reminders and alerts when you " +
+                        "open it and about once an hour, so they can arrive up to an hour late.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

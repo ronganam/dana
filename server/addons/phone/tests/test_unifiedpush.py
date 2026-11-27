@@ -11,7 +11,8 @@ ntfy): the body equals the FCM ping's data, redirects are not followed, a
 out, an http endpoint stops being pinged once ``DANA_INSECURE_DEV`` is off;
 the endpoint is never logged or listed (only its host); one registration per
 endpoint; removing the device removes its registration; the self-check is
-fine without an FCM key when no phone uses FCM.
+fine without an FCM key when no phone uses FCM; a phone fetching in a loop with
+nothing new gets 429 + Retry-After (events and a fetch after a pause still go).
 
 Run: bin/test test_unifiedpush
 """
@@ -339,6 +340,35 @@ async def test_failures(client: TestClient, base: str) -> None:
           new_phone.id not in rows() and DEVICE[BOB.id].id in rows(), rows())
 
 
+async def test_flood(client: TestClient) -> None:
+    """A phone fetching in a loop with nothing new is told to wait; events and a fetch after a pause still go."""
+    after = push.latest_seq(BOB)
+    phone_api._empty_fetches.clear()
+    statuses = []
+    for _ in range(phone_api.FLOOD_MAX + 2):
+        r = await client.get(f"/api/phone/events?after={after}", headers=auth(BOB))
+        statuses.append((r.status, r.headers.get("Retry-After")))
+    check("flood: more than FLOOD_MAX empty fetches within the window → 429 with Retry-After",
+          statuses[:phone_api.FLOOD_MAX] == [(200, None)] * phone_api.FLOOD_MAX
+          and statuses[phone_api.FLOOD_MAX:] == [(429, str(phone_api.FLOOD_RETRY_AFTER))] * 2, statuses)
+    r = await client.get("/api/phone/events?after=0", headers=auth(ANN))
+    check("flood: another phone is not affected", r.status == 200, r.status)
+    await push.send(BOB, "reminder", {"task_id": "t-flood"})
+    r = await client.get(f"/api/phone/events?after={after}", headers=auth(BOB))
+    got = await r.json() if r.status == 200 else {}
+    check("flood: a fetch that has events gets them even mid-flood", r.status == 200
+          and [e["data"].get("task_id") for e in got.get("events", [])] == ["t-flood"], (r.status, got))
+    real_window = phone_api.FLOOD_WINDOW
+    phone_api.FLOOD_WINDOW = 0.2
+    try:
+        await asyncio.sleep(0.3)
+        r = await client.get(f"/api/phone/events?after={push.latest_seq(BOB)}", headers=auth(BOB))
+    finally:
+        phone_api.FLOOD_WINDOW = real_window
+    check("flood: a ping's fetch after a quiet moment goes through", r.status == 200 and (await r.json())["events"] == [],
+          r.status)
+
+
 def test_logs(log: io.StringIO) -> None:
     text = log.getvalue()
     check("logs: endpoints never logged in full (only the host)", "UnifiedPush via 127.0.0.1" in text
@@ -357,6 +387,7 @@ async def main() -> None:
         await test_register(client, base)
         await test_send(client, base)
         await test_failures(client, base)
+        await test_flood(client)
     test_logs(log)
 
 

@@ -15,6 +15,7 @@ import androidx.annotation.DrawableRes
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import io.github.ronganam.dana.EXTRA_OPEN_SCREEN
+import io.github.ronganam.dana.EXTRA_OPEN_SESSION
 import io.github.ronganam.dana.MainActivity
 import io.github.ronganam.dana.R
 import io.github.ronganam.dana.data.models.LiveAction
@@ -95,6 +96,8 @@ object LiveActivities {
         data class Web(val url: String) : Open
         /** A screen of the app (`MainActivity`'s `EXTRA_OPEN_SCREEN`). */
         data class Screen(val route: String) : Open
+        /** A conversation, shown in the thread pane (`EXTRA_OPEN_SESSION`; a watch's agent run, say). */
+        data class Session(val id: String) : Open
         /** Dana as it is. */
         data object Home : Open
     }
@@ -191,9 +194,14 @@ object LiveActivities {
         }
     }.take(3)
 
-    /** Where [open] leads: https as is, a "/path" to that screen (or the web app at [serverUrl]), "" to Dana. */
+    /**
+     * Where [open] leads: https as is, a conversation ("/chat/<id>",
+     * "/chat?session=<id>", "/sessions/<id>") to it in the app, a "/path" to
+     * that screen (or the web app at [serverUrl]), "" to Dana.
+     */
     fun openTarget(open: String, serverUrl: String): Open = when {
         open.startsWith("https://") -> Open.Web(open)
+        open.startsWith("/") && sessionOf(open) != null -> sessionOf(open)!!.let { if (it == "main") Open.Screen("chat") else Open.Session(it) }
         open.startsWith("/") -> {
             val first = open.removePrefix("/").split('/', '?', '#').first().lowercase()
             when {
@@ -203,6 +211,27 @@ object LiveActivities {
             }
         }
         else -> Open.Home
+    }
+
+    /** The session a "/path" names: `/chat/<id>`, `/sessions/<id>`, or `/chat?session=<id>` (`session_id=` too); else null. */
+    fun sessionOf(path: String): String? {
+        val (route, query) = path.removePrefix("/").substringBefore('#').let { it.substringBefore('?') to it.substringAfter('?', "") }
+        val parts = route.split('/').filter { it.isNotEmpty() }
+        fun decoded(s: String): String? = try {
+            java.net.URLDecoder.decode(s, "UTF-8").trim().takeIf { it.isNotEmpty() }
+        } catch (e: IllegalArgumentException) {
+            null
+        }
+        val first = parts.firstOrNull()?.lowercase() ?: return null
+        if (first !in setOf("chat", "sessions")) return null
+        if (parts.size == 2) return decoded(parts[1])
+        if (parts.size == 1 && first == "chat") {
+            return query.split('&').firstNotNullOfOrNull { kv ->
+                val k = kv.substringBefore('=')
+                if (k == "session" || k == "session_id") decoded(kv.substringAfter('=', "")) else null
+            }
+        }
+        return null
     }
 
     /**
@@ -365,6 +394,8 @@ object LiveActivities {
             is Open.Web -> Intent(Intent.ACTION_VIEW, target.url.toUri()).addCategory(Intent.CATEGORY_BROWSABLE)
             is Open.Screen -> Intent(context, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra(EXTRA_OPEN_SCREEN, target.route)
+            is Open.Session -> Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP).putExtra(EXTRA_OPEN_SESSION, target.id)
             Open.Home -> Intent(context, MainActivity::class.java)
         }.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         if (intent.data == null) intent.data = intentUri(id, "open", "").toUri()  // a web tap's data is its page

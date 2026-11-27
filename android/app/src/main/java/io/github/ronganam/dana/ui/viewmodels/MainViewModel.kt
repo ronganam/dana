@@ -185,6 +185,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }.orEmpty()
 
     private var initialized = false
+    /** A conversation asked for before the chat started (a live activity tapped on a cold start). */
+    private var pendingConversation: String? = null
 
     init {
         // Send reminder actions queued while offline as soon as the server
@@ -245,6 +247,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         if (!initialized) {
             initialized = true
             chatController.initialize()
+            pendingConversation?.let { pendingConversation = null; showConversation(it) }
         } else {
             chatController.fetchSessions()
         }
@@ -454,6 +457,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
      * "Back to the thread" on top.
      */
     fun showConversation(sessionId: String) {
+        if (!initialized) {
+            pendingConversation = sessionId
+            return
+        }
         if (!(chatController.isThreadMode && sessionId == chatController.sessionId)) chatController.loadSession(sessionId)
     }
     /** Returns false when the message was not sent (server unreachable). */

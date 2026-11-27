@@ -15,8 +15,10 @@ calls and notifications routes are in ``calls/api.py`` and ``notifications/api.p
 """
 
 import asyncio
+import collections
 import logging
-from typing import Set
+import time
+from typing import Deque, Dict, Set
 
 from aiohttp import web
 
@@ -135,6 +137,29 @@ async def phone_register_api(request: web.Request) -> web.Response:
         return web.json_response({"error": "invalid", "detail": str(e)}, status=400)
 
 
+# A phone that fetches more than FLOOD_MAX times within FLOOD_WINDOW seconds and gets nothing new is told to
+# wait (429, Retry-After): app versions up to 10.8.1 could loop between "the server forgot me" and registering
+# again, dozens of fetches a second (any error ends that loop). A fetch with events always gets them; one after
+# a quiet moment (a ping) goes through.
+FLOOD_WINDOW = 2.0
+FLOOD_MAX = 5
+FLOOD_RETRY_AFTER = 30
+_empty_fetches: Dict[str, Deque[float]] = {}
+
+
+def _flooding(key: str) -> bool:
+    """Note an empty fetch by ``key`` (a device id); whether there were more than ``FLOOD_MAX`` in the window."""
+    now = time.monotonic()
+    if len(_empty_fetches) > 1000:  # forget keys gone quiet (devices removed, tokens revoked)
+        for k in [k for k, q in _empty_fetches.items() if not q or now - q[-1] > FLOOD_WINDOW]:
+            del _empty_fetches[k]
+    recent = _empty_fetches.setdefault(key, collections.deque(maxlen=FLOOD_MAX + 1))
+    while recent and now - recent[0] > FLOOD_WINDOW:
+        recent.popleft()
+    recent.append(now)
+    return len(recent) > FLOOD_MAX
+
+
 async def phone_events_api(request: web.Request) -> web.Response:
     """GET /api/phone/events?after=<seq> — the caller's events the device hasn't
     handled yet (``registered``: whether the request's device is still
@@ -142,7 +167,9 @@ async def phone_events_api(request: web.Request) -> web.Response:
     the request was made with a paired device's own token; false (an old token
     issued by hand) tells the app to pair again, and the fetch is recorded in
     the user's ``token_fetch`` mark (the token's id, never the token) for the
-    ``push`` self-check."""
+    ``push`` self-check. More than ``FLOOD_MAX`` fetches with nothing new within
+    ``FLOOD_WINDOW`` seconds from one device → 429 ``too_many_requests`` with
+    ``Retry-After``."""
     user = phone_user(request)
     try:
         after = int(request.query.get("after", "0"))
@@ -150,6 +177,9 @@ async def phone_events_api(request: web.Request) -> web.Response:
         return web.json_response({"error": "after must be a number"}, status=400)
     device = request_device(request)
     res = phone_push.events_after(user, after, device)
+    if not res["events"] and _flooding(device.id if device else f"token:{request_token_id(request) or user.id}"):
+        return web.json_response({"error": "too_many_requests", "detail": "Fetching too often; try again later."},
+                                 status=429, headers={"Retry-After": str(FLOOD_RETRY_AFTER)})
     res["device"] = device is not None
     token_id = request_token_id(request)
     if device is None and token_id:

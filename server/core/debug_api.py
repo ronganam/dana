@@ -3,10 +3,13 @@ and the server log buffer (``manage_server`` only).
 
 - ``GET /api/debug/sessions``, ``GET|DELETE /api/debug/sessions/{session_id}`` — the caller's own
 - ``GET|DELETE /api/debug/logs`` — the in-memory log (:class:`InMemoryLogHandler`, installed by core/server.py)
+
+:class:`QuietAccessLog` (installed by main.py) keeps routine successful GETs out of the access log.
 """
 
 import datetime
 import logging
+from typing import Optional
 
 from aiohttp import web
 
@@ -53,6 +56,48 @@ class InMemoryLogHandler(logging.Handler):
                 self.logs.pop(0)
         except Exception:
             self.handleError(record)
+
+
+class QuietAccessLog(logging.Filter):
+    """The ``aiohttp.access`` lines worth keeping: anything but GET / HEAD / OPTIONS, any 4xx / 5xx, and requests
+    slower than ``SLOW_SECONDS``. The phone, the dashboards and the TV poll all day; their routine answers are
+    dropped. The time taken is the line's ``%Tf`` / ``%D`` when the access format has one; with aiohttp's default
+    format it is estimated from the start time it logs (whole seconds), so only requests that surely took
+    ``SLOW_SECONDS`` or more count as slow (those of 1-2 s may not)."""
+
+    SLOW_SECONDS = 1.0
+    ROUTINE_METHODS = ("GET", "HEAD", "OPTIONS")
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        line = getattr(record, "first_request_line", None)
+        if not isinstance(line, str):
+            return True  # not an access line (or a format without the request): keep
+        if line.split(" ", 1)[0] not in self.ROUTINE_METHODS:
+            return True
+        try:
+            if int(getattr(record, "response_status", 0)) >= 400:
+                return True
+        except (TypeError, ValueError):
+            return True
+        took = self.seconds(record)
+        return took is not None and took >= self.SLOW_SECONDS
+
+    @staticmethod
+    def seconds(record: logging.LogRecord) -> Optional[float]:
+        """How long the request took (None: unknown)."""
+        try:
+            if hasattr(record, "request_time_frac"):
+                return float(getattr(record, "request_time_frac"))
+            if hasattr(record, "request_time_micro"):
+                return float(getattr(record, "request_time_micro")) / 1e6
+            started = getattr(record, "request_start_time", None)
+            if isinstance(started, str):
+                start = datetime.datetime.strptime(started.strip("[]"), "%d/%b/%Y:%H:%M:%S %z").timestamp()
+                # The start is cut to the second: subtract that second so a fast request never counts as slow.
+                return max(0.0, record.created - start - 1.0)
+        except (TypeError, ValueError):
+            return None
+        return None
 
 
 @requires("manage_server")
