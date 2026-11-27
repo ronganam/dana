@@ -39,6 +39,13 @@ def fire_json(f: Mapping[str, Any]) -> Dict[str, Any]:
                                              for a in f["actions"]]}
 
 
+def trace_json(t: Mapping[str, Any]) -> Dict[str, Any]:
+    """One trace row as the API answers it."""
+    return {"id": t["id"], "at": t["at"], "trigger_id": t["trigger_id"], "event_type": t["event_type"] or None,
+            "event_id": t["event_id"] or None, "summary": t["summary"], "outcome": t["outcome"],
+            "reason": t["reason"], "near": t["near"], "data": t["data"]}
+
+
 def _next(sp: Mapping[str, Any]) -> Optional[str]:
     return S.fmt(S.next_time(sp, clock.now(), set()))
 

@@ -8,7 +8,9 @@ over that user's active event triggers (microseconds: type, ``during``,
 fired, the per-source cooldown, the same thing seen from another source),
 then one small-model call (purpose ``watch_match``) for every semantic
 question and evidence question the candidates raise, then the fires and
-their actions. Every stage is reported to :mod:`.pipeline`.
+their actions. Every stage is reported to :mod:`.pipeline`, and what became of
+the event for each watch listening to its type (the first failing condition
+with the value seen, the small model's reason, the fire) to :mod:`.trace`.
 
 Time: :func:`tick` (a 30 s job per user) fires due time triggers (``at``,
 ``relative_to``, ``every``), runs ``on_deadline`` when a window ends with no
@@ -34,7 +36,7 @@ from core.addons import registry
 from core.addons.hooks import EventType
 from core.text import untrusted
 from core.users import User
-from addons.watches import actions, pipeline, store
+from addons.watches import actions, pipeline, store, trace
 from addons.watches import spec as S
 from addons.watches.addon import ADDON
 
@@ -156,11 +158,12 @@ def _cost(prompt: str) -> Optional[float]:
         return None
 
 
-async def semantic_check(event: S.Event, questions: List[Dict[str, str]]) -> Tuple[Optional[Set[str]], Optional[float]]:
+async def semantic_check(event: S.Event, questions: List[Dict[str, str]]
+                         ) -> Tuple[Optional[Set[str]], Optional[float], Dict[str, str]]:
     """One small-model call: which of ``questions`` (``{id, question, request, evidence}``) ``event`` satisfies.
-    Returns (the ids answered yes — None when the call failed —, its estimated cost)."""
+    Returns (the ids answered yes — None when the call failed —, its estimated cost, a few words why per id)."""
     if not questions:
-        return set(), None
+        return set(), None, {}
     items = [{"id": q["id"], "question": q["question"], "user_request": q.get("request", "")[:300],
               **({"kind": "evidence: is the task DONE?"} if q.get("evidence") else {})} for q in questions]
     data = {k: (v[:600] if isinstance(v, str) else v) for k, v in event.data.items()}
@@ -170,15 +173,18 @@ async def semantic_check(event: S.Event, questions: List[Dict[str, str]]) -> Tup
               f"Questions: {json.dumps(items, ensure_ascii=False)}\n"
               + untrusted(f"a {event.type} event", f"time: {event.ts.strftime('%Y-%m-%d %H:%M')}\n"
                           + json.dumps(data, ensure_ascii=False))
-              + '\nReply with JSON only: {"yes": [ids of the questions the event satisfies]}')
+              + '\nReply with JSON only: {"yes": [ids of the questions the event satisfies], '
+                '"why": {"<id>": "why yes or no, at most 12 words"}} (one "why" per question)')
     cost = _cost(prompt)
     try:
         text = await llm.complete([{"role": "user", "content": prompt}], purpose="watch_match", max_tokens=2048)
-        yes = _json_from(text).get("yes") or []
-        return {str(x) for x in yes}, cost
+        got = _json_from(text)
+        yes = got.get("yes") or []
+        why = got.get("why") if isinstance(got.get("why"), dict) else {}
+        return {str(x) for x in yes}, cost, {str(k): str(v)[:200] for k, v in why.items()}
     except Exception as e:
         logger.warning(f"Watch semantic check failed: {e}")
-        return None, cost
+        return None, cost, {}
 
 
 # --- Events ---------------------------------------------------------------------------
@@ -247,23 +253,46 @@ async def on_event(name: str, user: User, data: Dict[str, Any]) -> None:
         await _run_fire(user, watch, watch["spec"].get("on_match") or [], e, trigger_id, fire_id)
 
 
+def _trace_row(w: Mapping[str, Any], tid: str, e: S.Event, summary: str, outcome: str, reason: str = "",
+               near: bool = False) -> Dict[str, Any]:
+    return {"watch_id": w["id"], "trigger_id": tid, "event_type": e.type, "event_id": e.id, "summary": summary,
+            "data": e.data, "outcome": outcome, "reason": reason, "near": near}
+
+
 async def _match(user: User, e: S.Event, summary: str) -> List[Tuple[Dict[str, Any], str, str]]:
-    """Filter, check and record the fires of one event; returns (watch, trigger id, fire id) to run."""
+    """Filter, check, trace and record the fires of one event; returns (watch, trigger id, fire id) to run."""
     watches = active(user)
     t0 = time.perf_counter()
     cands: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
+    misses: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
     evidence: List[Dict[str, Any]] = []
+    ev_misses: List[Dict[str, Any]] = []
+    outside: List[Tuple[Dict[str, Any], str]] = []
     for w in watches:
-        if not _in_window(w, e.ts):
-            continue
         sp = w["spec"]
-        for t in sp.get("triggers") or []:
-            if t.get("kind") == "event" and S.structured_ok(t, e):
-                cands.append((w, t))
-        if (w["kind"] == "reminder" and sp.get("evidence_question") and e.type in (sp.get("evidence_event_types") or [])
-                and S.keywords_ok(sp.get("evidence_keywords") or [], e.data)):
-            evidence.append(w)
+        trigs = [t for t in sp.get("triggers") or [] if t.get("kind") == "event" and t.get("event_type") == e.type]
+        ev = bool(w["kind"] == "reminder" and sp.get("evidence_question")
+                  and e.type in (sp.get("evidence_event_types") or []))
+        if not trigs and not ev:
+            continue
+        if not _in_window(w, e.ts):
+            outside += [(w, t["id"]) for t in trigs] + ([(w, "evidence")] if ev else [])
+            continue
+        for t in trigs:
+            (cands if S.structured_ok(t, e) else misses).append((w, t))
+        if ev:
+            (evidence if S.keywords_ok(sp.get("evidence_keywords") or [], e.data) else ev_misses).append(w)
     us = (time.perf_counter() - t0) * 1e6
+    rows: List[Dict[str, Any]] = []
+    for w, tid in outside:
+        start, end = S.window(w["spec"])
+        rows.append(_trace_row(w, tid, e, summary, "outside_window", f"window {S.fmt(start)} → {S.fmt(end)}"))
+    for w, t in misses:
+        kind, why, passed = S.explain(t, e)
+        rows.append(_trace_row(w, t["id"], e, summary, "during" if kind == "during" else "drop", why, passed > 0))
+    for w in ev_misses:
+        kws = "|".join(w["spec"].get("evidence_keywords") or [])[:120]
+        rows.append(_trace_row(w, "evidence", e, summary, "drop", f'evidence keywords "{kws}" not in the text'))
     fires_of: Dict[str, List[Dict[str, Any]]] = {}
     kept: List[Tuple[Dict[str, Any], Dict[str, Any]]] = []
     for w, t in cands:
@@ -272,13 +301,17 @@ async def _match(user: User, e: S.Event, summary: str) -> List[Tuple[Dict[str, A
         if why:
             pipeline.record(user.id, "filter", event_type=e.type, event_id=e.id, summary=why, watch_id=w["id"],
                             watch_title=w["title"], trigger_id=t["id"], result="drop")
+            rows.append(_trace_row(w, t["id"], e, summary, "cooldown" if why.startswith("cooldown") else "skipped",
+                                   why, True))
             continue
         kept.append((w, t))
-    evidence = [w for w in evidence if not any(f["trigger_id"] == "evidence"
-                                               for f in store.fires(user, w["id"], 50))]
+    asked = [w for w in evidence if any(f["trigger_id"] == "evidence" for f in store.fires(user, w["id"], 50))]
+    rows += [_trace_row(w, "evidence", e, summary, "skipped", "already asked whether it is done", True) for w in asked]
+    evidence = [w for w in evidence if w not in asked]
     pipeline.record(user.id, "filter", event_type=e.type, event_id=e.id, summary=summary,
                     result="pass" if kept or evidence else "drop", candidates=len(kept) + len(evidence), us=us)
     if not kept and not evidence:
+        trace.record(user, rows)
         return []
     questions: List[Dict[str, str]] = []
     for i, (w, t) in enumerate(kept):
@@ -288,41 +321,53 @@ async def _match(user: User, e: S.Event, summary: str) -> List[Tuple[Dict[str, A
         questions.append({"id": f"e{i}", "question": w["spec"]["evidence_question"], "request": w["request"],
                           "evidence": "1"})
     yes: Set[str] = set()
+    reasons: Dict[str, str] = {}
     failed = False
     cost: Optional[float] = None
     if questions:
-        got, cost = await semantic_check(e, questions)
+        got, cost, reasons = await semantic_check(e, questions)
         failed = got is None
         yes = got or set()
     share = (cost / len(questions)) if cost and questions else None
     out: List[Tuple[Dict[str, Any], str, str]] = []
     fired_watches: Set[str] = set()
     for i, (w, t) in enumerate(kept):
+        said = reasons.get(f"t{i}", "")
         if t.get("semantic"):
             ok = f"t{i}" in yes
             pipeline.record(user.id, "semantic", event_type=e.type, event_id=e.id, summary=t["semantic"][:80],
                             watch_id=w["id"], watch_title=w["title"], trigger_id=t["id"],
                             result="failed" if failed else ("yes" if ok else "no"), cost_usd=share)
             if not ok:
+                rows.append(_trace_row(w, t["id"], e, summary, "semantic_failed" if failed else "semantic_no",
+                                       "the check did not answer" if failed else (said or "no"), True))
                 continue
         if w["id"] in fired_watches:
+            rows.append(_trace_row(w, t["id"], e, summary, "semantic_yes" if t.get("semantic") else "skipped",
+                                   (said + "; " if said else "") + "the watch fired on another trigger", True))
             continue
         fired_watches.add(w["id"])
         fid = store.add_fire(user, w["id"], trigger_id=t["id"], event_type=e.type, event=e.data)
         pipeline.record(user.id, "fire", event_type=e.type, event_id=e.id, summary=summary, watch_id=w["id"],
                         watch_title=w["title"], trigger_id=t["id"])
+        rows.append(_trace_row(w, t["id"], e, summary, "fired", said, True))
         if w["kind"] == "watch" and w["spec"].get("repeat", "once") == "once":
             store.close(user, w["id"], store.DONE)
         out.append((w, t["id"], fid))
     for i, w in enumerate(evidence):
         ok = f"e{i}" in yes
+        said = reasons.get(f"e{i}", "")
         pipeline.record(user.id, "evidence", event_type=e.type, event_id=e.id, summary=summary, watch_id=w["id"],
                         watch_title=w["title"], result="failed" if failed else ("yes" if ok else "no"),
                         cost_usd=share)
+        outcome = "semantic_failed" if failed else ("semantic_yes" if ok else "semantic_no")
+        rows.append(_trace_row(w, "evidence", e, summary, outcome,
+                               ((said or "yes") + "; asks Done? on Now") if ok else (said or "no"), True))
         if ok:
             store.add_fire(user, w["id"], trigger_id="evidence", event_type=e.type, event=e.data, count=False,
                            actions=[actions.result("suggest_complete", actions.HELD,
                                                    "asks on the Now screen whether it is done")])
+    trace.record(user, rows)
     return out
 
 

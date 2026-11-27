@@ -527,6 +527,61 @@ def structured_ok(t: Mapping[str, Any], e: Event) -> bool:
             and keywords_ok(t.get("keywords") or [], e.data))
 
 
+def _seen(v: Any) -> str:
+    s = "" if v is None else str(v)
+    return s if len(s) <= 60 else s[:59] + "…"
+
+
+def cond_text(c: Mapping[str, Any], data: Mapping[str, Any]) -> str:
+    """A condition and the value the event had (``from contains_any "x|y" ← "me"``), for the trace."""
+    value = c.get("value", "")
+    if c.get("op") == "between":
+        value = f"{value}–{c.get('value2')}"
+    head = f"{c.get('field')} {c.get('op')}" + ("" if c.get("op") == "exists" else f' "{value}"')
+    return f'{head} ← "{_seen(data.get(c.get("field", "")))}"'
+
+
+def explain(t: Mapping[str, Any], e: Event) -> Tuple[str, str, int]:
+    """Why an event trigger's cheap filters fail for ``e`` (the trace): ``(kind, text, passed)`` with kind ``""``
+    (they pass), ``"during"``, ``"where"`` or ``"keywords"``, the first failing check in words, and how many of
+    its ``where`` conditions and keywords held (a near miss passed at least one)."""
+    conds = list(t.get("where") or [])
+    results = [cond_ok(c, e.data) for c in conds]
+    kws = [k for k in t.get("keywords") or [] if norm(k)]
+    kw_ok = keywords_ok(kws, e.data)
+    passed = sum(results) + (1 if kws and kw_ok else 0)
+    if not in_during(t.get("during"), e.ts):
+        return "during", f"during {t.get('during')} ← {e.ts.astimezone(clock.get_timezone()).strftime('%H:%M')}", passed
+    for c, ok in zip(conds, results):
+        if not ok:
+            return "where", cond_text(c, e.data), passed
+    if not kw_ok:
+        return "keywords", f'keywords "{"|".join(kws[:8])}" not in the text', passed
+    return "", "", passed
+
+
+def pinned_values(watches: Iterable[Mapping[str, Any]], event_type: str, field: str) -> Optional[List[str]]:
+    """The values of ``field`` the given (active) watches can fire on for ``event_type``: the union over their
+    event triggers on it of the values a ``where`` ``eq`` / ``in`` condition on ``field`` pins (``|``-joined for
+    ``in``). None when any trigger on that type pins none, or any watch takes that type as reminder evidence
+    (anything may matter); ``[]`` when none listens."""
+    out: Set[str] = set()
+    for w in watches:
+        sp = w.get("spec") or {}
+        if event_type in (sp.get("evidence_event_types") or []):
+            return None
+        for t in sp.get("triggers") or []:
+            if t.get("kind") != "event" or t.get("event_type") != event_type:
+                continue
+            pins = [c for c in t.get("where") or [] if c.get("field") == field and c.get("op") in ("eq", "in")]
+            if not pins:
+                return None
+            c = pins[0]  # conditions are ANDed: one pinning condition already bounds the values
+            vals = str(c.get("value") or "").split("|") if c.get("op") == "in" else [str(c.get("value") or "")]
+            out.update(v.strip() for v in vals if v.strip())
+    return sorted(out)
+
+
 def source_of(e: Event) -> str:
     """Who an event comes from, for the per-source cooldown: the counterparty, sender, address, person, app or
     entity."""

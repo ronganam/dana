@@ -342,5 +342,26 @@ check("curves: they start and end on the nodes, the middle is between; ease is 0
   && C.ease(0) === 0 && C.ease(1) === 1 && C.ease(0.5) === 0.5 && C.pathD(cv) === "M0,0 C50,0 50,50 100,50");
 check("the edge a move travels", C.edgeOf("lane:money", "filter") === "money-filter" && C.edgeOf("fire", "sink:agent") === "fire-agent" && C.edgeOf("filter", "filter") === null);
 
+// ---------- recent checks (the trace) ----------
+
+check("trace query: the limit, and the filter unless it is all",
+  C.traceQuery("all") === "?limit=100" && C.traceQuery("near", 50) === "?limit=50&outcome=near"
+  && C.traceQuery("fired", 9999) === "?limit=500&outcome=fired" && C.traceQuery("bogus") === "?limit=100");
+const drop = { id: 3, at: "2026-11-18T09:20:00+02:00", trigger_id: "self", event_type: "phone.email.received", event_id: "m1",
+  summary: "Email received · me", outcome: "drop", reason: 'from contains_any "tester@example.com" ← "me"', near: true,
+  data: { from: "me", subject: "list", amount: null, text: "" } };
+const v = C.traceWords(drop);
+check("trace row in words: what, outcome, hue, the reason with the value seen",
+  v.what === "Email received · me" && v.outcome === "No match" && v.hue === "mute" && v.reason.endsWith('← "me"') && v.near && v.trigger === "self", v);
+check("trace outcomes: AI no / fired / unknown",
+  C.traceWords({ outcome: "semantic_no", reason: "a newsletter" }).outcome === "AI said no"
+  && C.traceWords({ outcome: "fired" }).hue === "ember" && C.traceWords({ outcome: "new_kind" }).outcome === "new kind");
+check("trace row without a summary falls back to the event in a line",
+  C.traceWords({ outcome: "drop", event_type: "money.transaction.added", data: { counterparty: "Maya Cohen", amount: 2000 } }).what !== "");
+check("trace data lines: empty values out, long ones cut",
+  eq(C.traceDataLines(drop.data), [["from", "me"], ["subject", "list"]])
+  && C.traceDataLines({ text: "x".repeat(400) })[0][1].length === 300 && eq(C.traceDataLines({ n: 2, ok: false }), [["n", "2"], ["ok", "false"]]));
+check("the page shows Recent checks with its filter", page.includes("Recent checks") && page.includes('data-act="trace-filter"'));
+
 console.log(`\n${failures.length ? `${failures.length} check(s) failed` : "All checks passed"} (${pass} passed)`);
 process.exit(failures.length ? 1 : 0);

@@ -445,6 +445,8 @@ function switchTab(tabId, arg = null) {
 
 /** Opens a core screen or an addon page by id (`arg` reaches the page's mount). */
 function openScreen(id, arg = null) {
+    // "/chat/<session id>" (a live activity's open): that session in the chat.
+    if (id === "chat" && arg) { window.danaOpenSession(arg); return Promise.resolve(true); }
     if (CORE_SCREENS.includes(id)) { switchTab(id, arg); return Promise.resolve(true); }
     return openPanelById(id, arg);
 }

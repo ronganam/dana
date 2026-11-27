@@ -7,6 +7,7 @@
     GET    /api/watches/pipeline           → {stats, recent, watches_active, triggers_active}
     GET    /api/watches/pipeline/stream    server-sent events: one ``data: <PipelineEvent>`` per step
     GET    /api/watches/{id}               → {watch, fires} (newest first, last 50)
+    GET    /api/watches/{id}/trace         ?limit=&outcome=all|near|<outcome> → {trace, unstored}
     PATCH  /api/watches/{id}               {spec} | {status} | {change} → {watch}; 400 {error, errors}
     DELETE /api/watches/{id}               → {ok, undo_id}
     GET    /watches                        the web app, opened on the Watches page
@@ -27,12 +28,13 @@ from core.addons import registry
 from core.addons import store as addon_store
 from core.auth import request_user
 from core.users import User
-from addons.watches import compiler, engine, pipeline, service, store
+from addons.watches import compiler, engine, pipeline, service, store, trace
 from addons.watches import spec as S
 from addons.watches.addon import ADDON
 
 PING_EVERY = 20.0
 MAX_DRY_RUN_DAYS = 60
+MAX_TRACE = 500
 
 
 def watches_user(request: web.Request) -> User:
@@ -83,6 +85,24 @@ async def get_api(request: web.Request) -> web.Response:
         return _not_found()
     return web.json_response({"watch": service.watch_json(user, row),
                               "fires": [service.fire_json(f) for f in store.fires(user, row["id"], 50)]})
+
+
+async def trace_api(request: web.Request) -> web.Response:
+    """GET /api/watches/{id}/trace — the watch's recent checks, newest first (``limit`` ≤ 500, default 100;
+    ``outcome``: all, near — near misses and fires —, or one outcome such as fired)."""
+    user = watches_user(request)
+    row = store.get(user, request.match_info["id"])
+    if row is None:
+        return _not_found()
+    try:
+        limit = max(1, min(int(request.query.get("limit") or 100), MAX_TRACE))
+    except ValueError:
+        return _invalid(["limit must be a number"])
+    outcome = request.query.get("outcome") or "all"
+    if outcome not in ("all", "near", *trace.OUTCOMES):
+        return _invalid([f"outcome must be all, near or one of {', '.join(trace.OUTCOMES)}"])
+    return web.json_response({"trace": [service.trace_json(t) for t in store.trace(user, row["id"], limit, outcome)],
+                              "unstored": trace.unstored(row["id"])})
 
 
 async def patch_api(request: web.Request) -> web.Response:
@@ -183,6 +203,7 @@ def setup(app: web.Application) -> None:
     r.add_get("/api/watches/pipeline", pipeline_api)
     r.add_get("/api/watches/pipeline/stream", stream_api)
     r.add_get("/api/watches/{id}", get_api)
+    r.add_get("/api/watches/{id}/trace", trace_api)
     r.add_patch("/api/watches/{id}", patch_api)
     r.add_delete("/api/watches/{id}", delete_api)
     r.add_get("/watches", pages_api.index_handler)
