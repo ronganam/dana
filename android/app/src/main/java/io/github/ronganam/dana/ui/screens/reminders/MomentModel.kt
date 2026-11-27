@@ -104,10 +104,11 @@ fun momentPhrase(w: RemindWhen, now: LocalDateTime): String = when (w) {
 
 /**
  * A row's supporting line: its moments ("Arriving at Office or Mon 08:45"),
- * else its due date, else its list; then how often it was snoozed.
+ * else its due date, else its list; then how often it was snoozed. [omit]: moments the
+ * group already says (On waking).
  */
-fun rowLine(task: Task, now: LocalDateTime, listName: String?): String {
-    val whens = remindWhens(task)
+fun rowLine(task: Task, now: LocalDateTime, listName: String?, omit: Set<RemindWhen> = emptySet()): String {
+    val whens = remindWhens(task) - omit
     val main = when {
         whens.isNotEmpty() -> {
             val late = whens.singleOrNull() as? RemindWhen.At
@@ -272,6 +273,9 @@ fun anytimeTitle(w: RemindWhen): String = when (w) {
     RemindWhen.None -> "No moment"
 }
 
-/** The undo message after a drop ("Set to 18:00", "Set to arriving at Office", "Moment cleared"). */
-fun dropPhrase(w: RemindWhen, now: LocalDateTime): String =
-    if (w == RemindWhen.None) "Moment cleared" else "Set to " + momentPhrase(w, now).replaceFirstChar { it.lowercase() }
+/** The undo message after a drop ("Set to 18:00", "Set to tomorrow 09:00", "Set to arriving at Office", "Moment cleared"). */
+fun dropPhrase(w: RemindWhen, now: LocalDateTime): String = when (w) {
+    RemindWhen.None -> "Moment cleared"
+    is RemindWhen.At -> "Set to " + if (w.time.toLocalDate() == now.toLocalDate()) w.time.format(HM) else timeLabel(w.time, now).replaceFirstChar { it.lowercase() }
+    else -> "Set to " + momentPhrase(w, now).replaceFirstChar { it.lowercase() }
+}

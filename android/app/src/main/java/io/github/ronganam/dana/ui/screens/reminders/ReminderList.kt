@@ -246,7 +246,7 @@ private fun MomentSectionCard(
                         MomentRow(
                             task = t,
                             group = section.group,
-                            line = rowLine(t, now, listName(t)),
+                            line = rowLine(t, now, listName(t), omit = if (section.group == MomentGroup.WAKING) setOf(RemindWhen.Wake) else emptySet()),
                             first = i == 0,
                             last = i == section.tasks.lastIndex,
                             onOpen = { onOpen(t) },

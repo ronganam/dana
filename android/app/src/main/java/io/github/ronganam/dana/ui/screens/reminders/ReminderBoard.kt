@@ -213,7 +213,8 @@ fun ReminderBoard(viewModel: MainViewModel, onMoments: (String) -> Unit, onSugge
                             w = w,
                             hovered = drag.hovered == key,
                             last = i == anytime.lastIndex,
-                            modifier = Modifier.boardTarget(drag, key, w)
+                            modifier = Modifier.boardTarget(drag, key, w),
+                            timeColumn = false
                         ) { tasksFor(w, open).forEach { t -> BoardCard(t, now, drag, onDrop, onMoments) } }
                     }
                 }
@@ -268,9 +269,18 @@ private fun SubHead(text: String, color: Color) {
     Text(text, style = MaterialTheme.typography.titleSmall, color = color, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp))
 }
 
+/** A day's name on the line ("Tomorrow"), the wire running past it. */
 @Composable
 private fun DayLabel(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, color = circuitColors.inkSoft, modifier = Modifier.padding(start = 46.dp, top = 6.dp, bottom = 10.dp))
+    val c = circuitColors
+    Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Spacer(Modifier.width(44.dp))
+        Box(Modifier.width(24.dp).fillMaxHeight().drawBehind {
+            drawLine(c.wire, Offset(size.width / 2f, 0f), Offset(size.width / 2f, size.height), 1.5.dp.toPx())
+        })
+        Spacer(Modifier.width(10.dp))
+        Text(text, style = MaterialTheme.typography.titleSmall, color = c.inkSoft, modifier = Modifier.padding(top = 4.dp, bottom = 12.dp))
+    }
 }
 
 /** The line's first point: now. */
@@ -303,6 +313,7 @@ private fun MomentNodeRow(
     hovered: Boolean,
     last: Boolean,
     modifier: Modifier,
+    timeColumn: Boolean = true,
     content: @Composable ColumnScope.() -> Unit
 ) {
     val c = circuitColors
@@ -317,8 +328,8 @@ private fun MomentNodeRow(
                 )
             }
     ) {
-        if (time != null) Text(
-            time,
+        if (timeColumn) Text(
+            time.orEmpty(),
             style = MaterialTheme.typography.titleSmall.tabular(),
             color = if (title != null) c.ink else c.inkSoft,
             modifier = Modifier.width(44.dp).padding(top = 2.dp)

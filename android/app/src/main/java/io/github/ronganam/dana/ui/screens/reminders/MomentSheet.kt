@@ -265,9 +265,9 @@ private fun TimeChoice(label: String, on: Boolean, onClick: () -> Unit) {
     Text(
         label,
         style = MaterialTheme.typography.labelLarge,
-        color = c.ink,
+        color = if (on) c.onAccentFilled else c.ink,
         modifier = Modifier.clip(RoundedCornerShape(12.dp))
-            .background(if (on) c.indicator else MaterialTheme.colorScheme.surfaceContainerHighest)
+            .background(if (on) c.accentFilled else MaterialTheme.colorScheme.surfaceContainerHighest)
             .clickable(onClick = onClick)
             .heightIn(min = 40.dp)
             .padding(horizontal = 14.dp, vertical = 10.dp)

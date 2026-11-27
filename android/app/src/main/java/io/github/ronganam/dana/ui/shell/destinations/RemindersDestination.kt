@@ -25,6 +25,7 @@ import io.github.ronganam.dana.ui.screens.reminders.ReminderListPane
 import io.github.ronganam.dana.ui.screens.reminders.isOpen
 import io.github.ronganam.dana.ui.screens.reminders.momentSections
 import io.github.ronganam.dana.ui.shell.Destination
+import io.github.ronganam.dana.ui.shell.HeaderAsk
 import io.github.ronganam.dana.ui.shell.LocalShellLayout
 import io.github.ronganam.dana.ui.shell.ShellLayout
 import io.github.ronganam.dana.ui.theme.circuitColors
@@ -70,8 +71,10 @@ fun rememberRemindersDestination(viewModel: MainViewModel): Destination {
         }
     }
 
+    // Folded, Ask Dana sits in the header (it scrolls with it); unfolded, List | Board does (the rail has the mic).
     val toggle: @Composable () -> Unit = {
         if (wide) ViewToggle(board = boardMode, onBoard = { boardMode = it; if (it) shell.selectReminder(null) })
+        else HeaderAsk(viewModel)
     }
     val sheetTask = tasks.firstOrNull { it.id == sheetFor }
     if (sheetFor != null && sheetTask != null) RemindersSheet(viewModel, sheetTask, onEdit = {
@@ -95,7 +98,8 @@ fun rememberRemindersDestination(viewModel: MainViewModel): Destination {
             ) else ReminderListPane(viewModel, onMoments = { sheetFor = it }, headerExtra = toggle)
         },
         stage = if (board) null else ({ ReminderStage(viewModel, onMoments = { sheetFor = it }) }),
-        wide = board
+        wide = board,
+        askSlot = false
     )
 }
 
