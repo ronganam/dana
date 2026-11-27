@@ -40,7 +40,8 @@ from addons.phone.calls import (actions as suggestion_actions, chat as phone_cha
 from addons.phone.config import TOKEN_FETCH, mark_key
 from addons.phone.notifications import (digest, escalation, format as notif_format, judges,
                                         processing as notification_processing, retention as notification_retention,
-                                        store as notification_store, summary as notification_summary)
+                                        store as notification_store, summary as notification_summary,
+                                        whatsapp as notification_whatsapp)
 
 logger = logging.getLogger(__name__)
 SUGGESTION_DAYS = int(os.getenv("REVIEW_SUGGESTION_DAYS", "7"))
@@ -111,6 +112,13 @@ async def zones_changed(user: User, data: Dict[str, Any]) -> None:
     if not push.devices(user):
         return
     await push.send(user, "zones_changed", {"changed_at": clock.now().isoformat(timespec="seconds")}, replace=True)
+
+
+@addon.on("whatsapp.message.received")
+async def whatsapp_message(user: User, data: Dict[str, Any]) -> None:
+    """A WhatsApp message through WAHA: the source of WhatsApp suggestions while WAHA
+    covers the user (notifications/whatsapp.py)."""
+    await notification_whatsapp.on_message(user, data)
 
 
 @addon.channel("push")

@@ -75,9 +75,15 @@ async def test_messages() -> None:
                              _data={"pushName": "Noa Example"}))
     check("1:1 text: one event for Ann, as Ann, with the contract's data",
           got == [("whatsapp.message.received", ANN.id, ANN.id,
-                   {"message_id": f"false_{NOA}_T1", "chat_id": NOA, "chat": "Noa Example", "sender": "Noa Example",
-                    "is_group": False, "from_me": False, "text": "Can we meet Sunday at 10?", "has_media": False,
-                    "media_type": ""})], got)
+                   {"message_id": f"false_{NOA}_T1", "chat": "Noa Example", "chat_id": NOA, "sender": "Noa Example",
+                    "is_group": False, "from_me": False, "text": "Can we meet Sunday at 10?", "reply_to": "",
+                    "transcript": "", "has_media": False, "media_type": ""})], got)
+
+    got = await deliver(body(A_ACCOUNT, "default", id=f"false_{NOA}_R1", **{"from": NOA}, body="Yes, that one",
+                             replyTo={"id": "x", "body": "Should I bring the blue folder?"},
+                             _data={"pushName": "Noa Example"}))
+    check("a reply: reply_to carries the quoted text",
+          got and got[0][3]["reply_to"] == "Should I bring the blue folder?", got)
 
     again = await deliver(body(A_ACCOUNT, "default", id=f"false_{NOA}_T1", **{"from": NOA}, body="Can we meet Sunday at 10?",
                                _data={"pushName": "Noa Example"}))
@@ -117,7 +123,17 @@ async def test_messages() -> None:
                                  media={"url": f"{WA_A.root}/api/files/voice.ogg", "mimetype": "audio/ogg; codecs=opus"},
                                  _data={"pushName": "Noa Example", "message": {"audioMessage": {"ptt": True}}}))
     check("voice note: announced (media_type voice) and still handed to the voice pipeline",
-          got and got[0][3]["media_type"] == "voice" and transcribe.await_count == 1, (got, transcribe.await_count))
+          got and got[0][3]["media_type"] == "voice" and got[0][3]["transcript"] == ""
+          and transcribe.await_count == 1, (got, transcribe.await_count))
+
+    with patch.object(wa_events.llm, "transcribe", AsyncMock(return_value="Pick up the cake at five")), \
+            patch.object(wa_events, "_notify_phone", AsyncMock(return_value=True)), \
+            patch.object(wa_events.notify, "whatsapp_voice", AsyncMock(return_value=True)):
+        got = await deliver(body(A_ACCOUNT, "default", id=f"false_{NOA}_V2", **{"from": NOA}, hasMedia=True,
+                                 media={"url": f"{WA_A.root}/api/files/voice.ogg", "mimetype": "audio/ogg; codecs=opus"},
+                                 _data={"pushName": "Noa Example", "message": {"audioMessage": {"ptt": True}}}))
+    check("a transcribed voice note: the event carries the transcript",
+          got and got[0][3]["transcript"] == "Pick up the cake at five", got)
 
     got = await deliver(body(B_ACCOUNT, "bob", id=f"false_{NOA}_T1", **{"from": DINA}, body="Dinner at 8",
                              _data={"pushName": "Dina Example"}))
@@ -142,7 +158,8 @@ def test_catalog() -> None:
     et = ann.get("whatsapp.message.received")
     check("catalog: whatsapp.message.received for a user with WhatsApp, no history (Dana keeps no messages)",
           et is not None and et.history is None and set(et.fields) == {
-              "message_id", "chat_id", "chat", "sender", "is_group", "from_me", "text", "has_media", "media_type"}, ann.keys())
+              "message_id", "chat", "chat_id", "sender", "is_group", "from_me", "text", "reply_to", "transcript",
+              "has_media", "media_type"}, ann.keys())
     check("catalog: the from_me field says watches usually want from_me eq false",
           et is not None and "from_me eq false" in et.fields["from_me"])
     check("catalog: none for a user without WhatsApp", "whatsapp.message.received" not in carl, carl)

@@ -13,7 +13,9 @@ a chat with photos, PDFs or videos stays cheap."""
 
 import logging
 from collections import OrderedDict
-from typing import Any, Dict, Tuple
+from typing import Any, Dict, List, Tuple
+
+import httpx
 
 from core import clock, llm
 from core.addons import Connection
@@ -27,6 +29,15 @@ DOWNLOADED_MEDIA = ("audio/",)
 # Voice notes transcribed lately ((user id, message id) → transcript): reading a chat again
 # does not transcribe them again.
 _transcripts: "OrderedDict[Tuple[str, str], str]" = OrderedDict()
+
+
+def remember_transcript(conn: Connection, message_id: str, transcript: str) -> None:
+    """Keep a voice note's transcript (made when it arrived), so reading the chat does not transcribe it again."""
+    if not message_id or not transcript:
+        return
+    _transcripts[(conn.user.id if conn.user else "", message_id)] = transcript
+    while len(_transcripts) > 256:
+        _transcripts.popitem(last=False)
 
 
 def message_query(limit: int) -> Dict[str, Any]:
@@ -97,3 +108,49 @@ async def format_message(conn: Connection, msg: Dict[str, Any], names: Dict[str,
         mid = mid.get("_serialized") or mid.get("id")
     suffix = f" (id: `{mid}`)" if mid else ""
     return f"{_time(msg)}**{sender}**: {content}{suffix}"
+
+
+def _plain_media(conn: Connection, msg: Dict[str, Any], mid: str) -> str:
+    """What a media message carries, without downloading anything (a voice note's
+    transcript only when one was already made)."""
+    media = msg.get("media") or {}
+    mimetype = str(media.get("mimetype") or "")
+    filename = str(media.get("filename") or "").strip()
+    if mimetype.startswith("audio/"):
+        said = _transcripts.get((conn.user.id if conn.user else "", mid))
+        return f'[Voice message]: "{said}"' if said else "[Voice message]"
+    if not mimetype:
+        return f"[File: {filename}]" if filename else "[Media]"
+    label = _kind_of(mimetype)
+    return f"[{label}: {filename}]" if filename else f"[{label}]"
+
+
+async def recent(conn: Connection, chat_id: str, limit: int = 12) -> List[Dict[str, Any]]:
+    """The last ``limit`` messages of the chat ``chat_id`` (a WhatsApp id), oldest first, as
+    ``{id, time, sender, from_me, text}``; nothing is downloaded or transcribed. Raises on a
+    WAHA error (the caller decides what to do without them)."""
+    url, headers, session = waha.config(conn)
+    async with httpx.AsyncClient() as client:
+        r = await client.get(waha.api_url(conn, session, "chats", chat_id, "messages"), headers=headers,
+                             params={"limit": max(1, min(limit, 50)), "downloadMedia": "false"}, timeout=15.0)
+    r.raise_for_status()
+    rows = r.json() or []
+    names = await waha.get_chat_id_to_name_map(conn)
+    out: List[Dict[str, Any]] = []
+    for msg in sorted((m for m in rows if isinstance(m, dict)), key=lambda m: m.get("timestamp") or 0):
+        mid = msg.get("id")
+        if isinstance(mid, dict):  # some engines nest it
+            mid = mid.get("_serialized") or mid.get("id")
+        mid = str(mid or "")
+        body = str(msg.get("body") or "").strip()
+        text = _plain_media(conn, msg, mid) + (f" {body}" if body else "") if msg.get("hasMedia") else body
+        if not text:
+            continue
+        ts = msg.get("timestamp")
+        try:
+            when = clock.from_timestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else ""
+        except Exception:
+            when = ""
+        out.append({"id": mid, "time": when, "from_me": bool(msg.get("fromMe")),
+                    "sender": waha.get_message_sender_name(msg, names) or "", "text": text})
+    return out

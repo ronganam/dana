@@ -99,7 +99,7 @@ No linter/formatter/typecheck — only `pyrightconfig.json` (points to `.venv`).
 | `docs/notifications.md` | Notification ingest/triage/suggestions/summaries/escalation, web Inbox, phone push (`addons/phone/push.py`) |
 | `docs/calls.md` | Call upload/transcription/analysis, suggestions, task links, context chats |
 | `docs/tasks-and-triggers.md` | Task triggers (time / location / car / wake) |
-| `docs/whatsapp.md` | WAHA webhook, voice-note transcripts |
+| `docs/whatsapp.md` | WAHA webhook, voice-note transcripts, the message event (WhatsApp suggestions come from it: `docs/notifications.md`) |
 | `docs/people.md` | People, incoming-call / meeting cards, wake briefing, weekly review |
 | `docs/dashboard.md` | Dashboards of tablets and TVs: presets, addon widgets, the API; camera/Frigate proxies |
 | `docs/signals.md` | Signals and their ranked sources (Dana's phone app, Open-Meteo), `POST` / `GET /api/signals`, the per-user wake window, battery and privacy rules |
