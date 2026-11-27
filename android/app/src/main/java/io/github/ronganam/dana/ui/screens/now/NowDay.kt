@@ -31,7 +31,8 @@ data class DoneEntry(val title: String, val taskId: String, val at: LocalTime)
 
 /** One node of the calm day line: [fraction] along it (0 = its start), what it is, and its label (null when it would crowd one). */
 data class DayLineNode(val fraction: Float, val kind: Kind, val label: String?) {
-    enum class Kind { DONE, NOW, NEXT }
+    /** [START]: where the line begins (its hour as the label). */
+    enum class Kind { START, DONE, NOW, NEXT }
 }
 
 /*
@@ -99,10 +100,11 @@ object NowDay {
     }
 
     /**
-     * The calm state's day line: what was done today (squares), now, and
-     * what is still ahead today (circles), placed by time on a line from
-     * 08:00 (earlier when something was) to the last thing ahead (at least an
-     * hour past now). Labels: "Now" always, the others' times only where
+     * The calm state's day line: where it starts, what was done today
+     * (squares), now, and what is still ahead today (circles), placed by time
+     * on a line from 08:00 (earlier when something was) to the last thing
+     * ahead (at least an hour past now); a point on top of Now is left off.
+     * Labels: "Now" always, the others' times only where
      * they keep [minGapFraction] from a label already placed. Empty when
      * there is nothing done and nothing ahead.
      */
@@ -115,10 +117,14 @@ object NowDay {
         val span = (last - first).coerceAtLeast(60).toFloat()
         fun f(m: Int) = ((m - first) / span).coerceIn(0f, 1f)
         fun hm(m: Int) = "%02d:%02d".format(m / 60 % 24, m % 60)
-        val nodes = done.sorted().map { Triple(f(it), DayLineNode.Kind.DONE, hm(it)) } +
-            Triple(f(nowMin), DayLineNode.Kind.NOW, "Now") +
-            later.sorted().map { Triple(f(it), DayLineNode.Kind.NEXT, hm(it)) }
-        val placed = mutableListOf(f(nowMin))
+        val nowX = f(nowMin)
+        // A point on top of Now (done a minute ago, due in a minute) would hide under it: Now stands for it.
+        fun clear(x: Float) = kotlin.math.abs(x - nowX) >= OVERLAP
+        val nodes = listOf(Triple(0f, DayLineNode.Kind.START, hm(first))).filter { clear(it.first) } +
+            done.sorted().map { Triple(f(it), DayLineNode.Kind.DONE, hm(it)) }.filter { clear(it.first) } +
+            Triple(nowX, DayLineNode.Kind.NOW, "Now") +
+            later.sorted().map { Triple(f(it), DayLineNode.Kind.NEXT, hm(it)) }.filter { clear(it.first) }
+        val placed = mutableListOf(nowX)
         return nodes.map { (x, kind, label) ->
             val shown = when {
                 kind == DayLineNode.Kind.NOW -> label
@@ -128,4 +134,7 @@ object NowDay {
             DayLineNode(x, kind, shown)
         }
     }
+
+    /** Closer to Now than this (a fraction of the line) and a point is left off it. */
+    private const val OVERLAP = 0.03f
 }

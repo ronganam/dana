@@ -245,11 +245,14 @@ internal fun LineLayout(
                 else -> box * count * 3
             }
             val xs = given ?: (0 until count).map { ((2 * it + 1) * width / (2f * count.coerceAtLeast(1))).roundToInt() }
-            // Each label gets the room to its neighbours' midpoints.
+            // Each label gets the room to its labelled neighbours (a node without a label takes none).
+            val labelled = (0 until count).filter { labels.getOrNull(it) != null }
             val placeables = measurables.map { m ->
                 val i = m.layoutId as Int
-                val left = if (i == 0) xs[i] * 2 else xs[i] - xs[i - 1]
-                val right = if (i == count - 1) (width - xs[i]) * 2 else xs[i + 1] - xs[i]
+                val prev = labelled.lastOrNull { it < i }
+                val next = labelled.firstOrNull { it > i }
+                val left = if (prev == null) xs[i] * 2 else xs[i] - xs[prev]
+                val right = if (next == null) (width - xs[i]) * 2 else xs[next] - xs[i]
                 val room = minOf(left, right).coerceAtLeast(box)
                 m.measure(Constraints(maxWidth = room))
             }

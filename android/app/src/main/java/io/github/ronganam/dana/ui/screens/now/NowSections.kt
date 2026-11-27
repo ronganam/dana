@@ -215,6 +215,7 @@ fun CalmCard(line: String?, done: List<DoneEntry>, slots: List<DaySlotInfo>, now
                 NodeLine(
                     nodes = nodes.map { n ->
                         when (n.kind) {
+                            DayLineNode.Kind.START -> LineNode(NodeShape.Circle, NodeState.Passed, n.label, description = "From ${n.label ?: ""}".trim())
                             DayLineNode.Kind.DONE -> LineNode(NodeShape.RoundedSquare, NodeState.Passed, n.label, description = "Done at ${n.label ?: ""}".trim())
                             DayLineNode.Kind.NOW -> LineNode(NodeShape.Circle, NodeState.Done, n.label, description = "Now")
                             DayLineNode.Kind.NEXT -> LineNode(NodeShape.Circle, NodeState.Idle, n.label, description = "Later today")

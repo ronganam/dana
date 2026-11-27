@@ -184,14 +184,18 @@ class NowScreenTest {
     fun calmDayLinePlacesDoneNowAndAheadByTime() {
         // Done 09:00, now 13:00, ahead 16:00: the line runs 08:00–16:00.
         val nodes = NowDay.dayLine(listOf(9 * 60), listOf(16 * 60, 10 * 60), 13 * 60)
-        assertEquals(listOf(DayLineNode.Kind.DONE, DayLineNode.Kind.NOW, DayLineNode.Kind.NEXT), nodes.map { it.kind })
-        assertEquals(0.125f, nodes[0].fraction, 0.001f)
-        assertEquals(0.625f, nodes[1].fraction, 0.001f)
-        assertEquals(1f, nodes[2].fraction, 0.001f)
-        assertEquals(listOf("09:00", "Now", "16:00"), nodes.map { it.label })
-        // A time too close to Now loses its label; nothing at all → no line.
-        val close = NowDay.dayLine(listOf(12 * 60 + 50), emptyList(), 13 * 60)
+        assertEquals(listOf(DayLineNode.Kind.START, DayLineNode.Kind.DONE, DayLineNode.Kind.NOW, DayLineNode.Kind.NEXT), nodes.map { it.kind })
+        assertEquals(0f, nodes[0].fraction, 0.001f)
+        assertEquals(0.125f, nodes[1].fraction, 0.001f)
+        assertEquals(0.625f, nodes[2].fraction, 0.001f)
+        assertEquals(1f, nodes[3].fraction, 0.001f)
+        // 08:00 and 09:00 are too close for both labels: the first placed keeps it.
+        assertEquals(listOf("08:00", null, "Now", "16:00"), nodes.map { it.label })
+        // A time close to Now loses its label; one on top of Now leaves the line; nothing at all → no line.
+        val close = NowDay.dayLine(listOf(12 * 60 + 40), emptyList(), 13 * 60)
         assertNull(close.first { it.kind == DayLineNode.Kind.DONE }.label)
+        val onTop = NowDay.dayLine(listOf(13 * 60), listOf(18 * 60), 13 * 60)
+        assertTrue(onTop.none { it.kind == DayLineNode.Kind.DONE })
         assertTrue(NowDay.dayLine(emptyList(), listOf(9 * 60), 13 * 60).isEmpty())
     }
 }
