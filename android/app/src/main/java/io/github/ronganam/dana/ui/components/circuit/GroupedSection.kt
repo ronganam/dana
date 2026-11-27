@@ -65,7 +65,8 @@ fun SectionHeader(
         // The title keeps its room; a long meta line shortens instead.
         if (meta != null) Text(
             meta,
-            modifier = Modifier.weight(4f, fill = false).then(if (onMeta != null) Modifier.clickable(onClick = onMeta) else Modifier).padding(start = 12.dp),
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            modifier = Modifier.weight(4f).then(if (onMeta != null) Modifier.clickable(onClick = onMeta) else Modifier).padding(start = 12.dp),
             overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold).tabular(),
             color = metaColor.takeOrElse { c.inkSoft },

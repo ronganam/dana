@@ -18,7 +18,7 @@ Node shapes mean the same everywhere: Circle = source or moment, Slot = rule, Di
 - `CircuitRow(title, source, rule, ai?, action, time, state)` + `CircuitColumnHeader()` — a watch's line on the shared columns (`CircuitColumns`: When · Rule · AI check · Then · last fired).
 - `StepLine(steps)` / `StepLineMini(done, total)` — a run's steps, the current one spinning, a pulse travelling into it.
 - `TimelineRow(time, node, title, subtitle)` — time | node | content rows of a vertical timeline, the line joining row to row; the node sits on the title's first line by an offset (never negative padding).
-- `GroupedSection(title, meta, rows)`, `GroupRow(shape, leading, title, subtitle, trailing)`, `groupItemShape(index, count)` — tonal groups with joined rows.
+- `GroupedSection(title, meta, rows)`, `GroupRow(shape, leading, title, subtitle, trailing)`, `groupItemShape(index, count)` — tonal groups with joined rows. `SectionHeader(title, meta, titleColor)`: the title keeps its room, a long meta shortens (Late is warm).
 - `AskDanaButton(onClick)` — the tonal mic (48dp, 16dp corners) in the top-right header slot; `ConversationButton(onClick)` — 48dp chat glyph beside it that opens the thread. `HeaderSlot` (top 8dp, row 48dp, margin 16dp, gap 8dp) is where they sit. `PlaceHeader(title, supporting, trailing)` — a place's title on a ≥ 48dp row with its header buttons at its end, so they scroll with it and line up on the 16dp margin (Now uses it; places that still use the floating ask get the same position).
 - Motion only where something is live (pulse, breath, spinner), all off under `reducedMotion()` (animator scale 0, or TV / kiosk).
 

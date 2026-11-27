@@ -330,7 +330,7 @@ private fun MomentRow(
     }
     // In a narrow pane "Pick a moment" goes under the text, so the title keeps its width.
     BoxWithConstraints(modifier.fillMaxWidth()) {
-    val narrow = maxWidth < 380.dp
+    val narrow = maxWidth < 340.dp
     Row(
         Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable(onClick = onOpen)
             .padding(start = 16.dp, end = 8.dp)
