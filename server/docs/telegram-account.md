@@ -1,8 +1,9 @@
 # Telegram account (your own chats and channels)
 
-The `telegram_account` addon reads a user's **own** Telegram account, read-only:
-their channels, groups and private chats, to list and summarize what is
-unread. It is not Dana's Telegram bot (`core/telegram_bot.py`), which only
+The `telegram_account` addon reads a user's **own** Telegram account
+(their channels, groups and private chats, to list and summarize what is
+unread) and sends notes to the user themself: their Saved Messages, never
+anyone else. It is not Dana's Telegram bot (`core/telegram_bot.py`), which only
 sees chats with the bot.
 
 It uses Telegram's user API (MTProto) through Telethon, signed in as the user
@@ -14,10 +15,10 @@ the way a second Telegram Desktop is.
 |---|---|
 | `config.py` | the addon's name, the credential `session`, the server's Telegram app (`TELEGRAM_API_ID` / `TELEGRAM_API_HASH`) |
 | `addon.py` | the declaration: credential `session`, `connect_url=/telegram/connect`, `connect_label="Connect Telegram"`, `realtime=False`, `on_change` drops the user's clients, the prompt guide |
-| `client.py` | `make_client` (the one place Telethon is built; tests replace it), `acquire(conn)`, `dialogs`, `messages`, `check`, `explain` (errors in words), plain `Chat` / `Message` data |
+| `client.py` | `make_client` (the one place Telethon is built; tests replace it), `acquire(conn)`, `dialogs`, `messages`, `send_to_saved_messages`, `check`, `explain` (errors in words), plain `Chat` / `Message` data |
 | `login.py` | the QR sign-in, per user, in memory |
 | `api.py` | the connect page and the sign-in routes |
-| `tools.py` | the three tools |
+| `tools.py` | the three reading tools and `send_telegram_message_to_me` |
 
 **The app and the session.** An MTProto client needs an *app* id and hash
 (my.telegram.org → API development tools). They identify Dana, not a person,
@@ -82,16 +83,30 @@ there.
 - **Nothing marks anything read**: that takes an explicit `ReadHistory`
   request, which this package never sends.
 
+## Writing: Saved Messages only
+
+`send_to_saved_messages(conn, text)` is the package's one write: Telethon's
+`send_message('me', …)`, the signed-in account's own Saved Messages. The
+recipient is fixed in `client.py` and never taken from a caller, so nothing
+here can message another person. A text over 4096 characters goes as several
+messages (cut at a line break where there is one).
+
 ## Tools
 
-All three are read-only and `untrusted_result` (the rest of the turn asks
-before any `acts_outside` tool, docs/agent-actions.md); the model reads each
-result framed as others' text (`core.text.untrusted`). Chat only (`realtime=False`, as gmail).
+The three readers are read-only and `untrusted_result` (the rest of the turn
+asks before any `acts_outside` tool, docs/agent-actions.md); the model reads
+each result framed as others' text (`core.text.untrusted`).
+`send_telegram_message_to_me` is `is_write` with no `confirm` and not
+`acts_outside`: it has no recipient argument and reaches only the user, so it
+runs at once, also in a turn that read others' text. It is what "send it to
+me on Telegram" maps to (the bot is a different chat). Chat only
+(`realtime=False`, as gmail).
 
 | Tool | What |
 |---|---|
 | `list_telegram_unread(chat_type, include_muted, include_archived, limit)` | unread chats (at most 100), muted and archived skipped unless asked; `chat_type`: `all` · `channels` · `groups` · `private` |
 | `read_telegram_chat(chat, limit, unread_only, search)` | one chat by id, `@username`, exact or partial name (several matches: the candidates; none: an `Error:`), up to 100 messages; a result over 10,000 characters drops the oldest and says how many fit |
+| `send_telegram_message_to_me(text)` | sends `text` to the user's own Saved Messages (no recipient argument; an empty text is refused); "Sent to your Telegram Saved Messages" |
 | `summarize_telegram_unread(chat_type, include_muted, include_archived, max_chats, focus)` | reads the newest 40 unread messages of each unread chat (up to 30 chats, three at a time), at most 60,000 characters, framed by `core.text.untrusted` (data from Telegram chats), and has the `telegram` job (`TELEGRAM_SUMMARY_MODEL` → `BACKGROUND_MODEL`, purpose `telegram_summary`) write 1–4 bullets per chat; then what it covered and what it could not read |
 
 Tests: `bin/test test_telegram_account` (a fake Telethon client per session).

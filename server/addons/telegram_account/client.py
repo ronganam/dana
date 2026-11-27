@@ -10,6 +10,8 @@
   :func:`messages` reads one chat, optionally only what is unread. Reading
   never marks anything read: that takes an explicit ``ReadHistory`` request,
   which nothing here sends.
+- :func:`send_to_saved_messages` is the one write: a note to the account's
+  own Saved Messages (``'me'``), never to anyone else.
 
 Every value a tool prints is plain data built here (:class:`Chat`,
 :class:`Message`), so the tools never touch Telethon objects."""
@@ -329,6 +331,41 @@ def describe_chat(chat: Chat) -> str:
 def format_message(msg: Message) -> str:
     who = f"**{msg.sender}**: " if msg.sender else ""
     return f"[{msg.when}] {who}{msg.text}"
+
+
+# ---------------------------------------------------------------------------
+# Writing: the account's own Saved Messages, nothing else
+# ---------------------------------------------------------------------------
+
+SAVED_MESSAGES = "me"  # Telethon's name for the signed-in account's own chat (Saved Messages)
+MAX_SEND = 4096        # characters of one Telegram message
+
+
+def chunks(text: str, size: int = MAX_SEND) -> List[str]:
+    """``text`` cut into messages of at most ``size`` characters, at a line
+    break when there is one in the second half of a piece."""
+    out: List[str] = []
+    rest = text
+    while len(rest) > size:
+        cut = rest.rfind("\n", size // 2, size)
+        cut = cut if cut > 0 else size
+        out.append(rest[:cut])
+        rest = rest[cut:].lstrip("\n")
+    if rest:
+        out.append(rest)
+    return out
+
+
+async def send_to_saved_messages(conn: Connection, text: str) -> List[int]:
+    """Send ``text`` to the connection's own Saved Messages (the only chat
+    this module ever writes to; the recipient is fixed here, never taken
+    from a caller). Returns the sent messages' ids."""
+    client = await acquire(conn)
+    ids: List[int] = []
+    for piece in chunks(text):
+        sent = await asyncio.wait_for(client.send_message(SAVED_MESSAGES, piece), TIMEOUT)
+        ids.append(int(getattr(sent, "id", 0) or 0))
+    return ids
 
 
 # ---------------------------------------------------------------------------

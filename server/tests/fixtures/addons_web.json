@@ -186,7 +186,7 @@
    ],
    "features": [
     "Read your chats and find messages and files",
-    "Send messages and forward files (asks you first)",
+    "Send messages and forward files (asks you first; a note to yourself goes at once)",
     "Turns the voice notes you receive into text"
    ],
    "icon": "message-circle",
@@ -1065,7 +1065,7 @@
      ],
      "features": [
       "Read your chats and find messages and files",
-      "Send messages and forward files (asks you first)",
+      "Send messages and forward files (asks you first; a note to yourself goes at once)",
       "Turns the voice notes you receive into text"
      ],
      "icon": "message-circle",
@@ -1464,7 +1464,7 @@
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels, read-only",
+     "description": "Reads your own Telegram chats and channels; sends notes to yourself (Saved Messages)",
      "disconnect_warning": null,
      "everyone": false,
      "examples": [
@@ -1473,7 +1473,8 @@
      ],
      "features": [
       "Lists and summarizes your unread chats and channels",
-      "Reads a chat when you ask; never marks anything read and never sends"
+      "Reads a chat when you ask; never marks anything read",
+      "Sends notes to yourself (your Saved Messages), never to anyone else"
      ],
      "icon": "send",
      "name": "telegram_account",
@@ -2453,7 +2454,7 @@
      ],
      "features": [
       "Read your chats and find messages and files",
-      "Send messages and forward files (asks you first)",
+      "Send messages and forward files (asks you first; a note to yourself goes at once)",
       "Turns the voice notes you receive into text"
      ],
      "icon": "message-circle",
@@ -2864,7 +2865,7 @@
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels, read-only",
+     "description": "Reads your own Telegram chats and channels; sends notes to yourself (Saved Messages)",
      "disconnect_warning": null,
      "everyone": false,
      "examples": [
@@ -2873,7 +2874,8 @@
      ],
      "features": [
       "Lists and summarizes your unread chats and channels",
-      "Reads a chat when you ask; never marks anything read and never sends"
+      "Reads a chat when you ask; never marks anything read",
+      "Sends notes to yourself (your Saved Messages), never to anyone else"
      ],
      "icon": "send",
      "name": "telegram_account",
@@ -3811,7 +3813,7 @@
      ],
      "features": [
       "Read your chats and find messages and files",
-      "Send messages and forward files (asks you first)",
+      "Send messages and forward files (asks you first; a note to yourself goes at once)",
       "Turns the voice notes you receive into text"
      ],
      "icon": "message-circle",
@@ -4210,7 +4212,7 @@
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels, read-only",
+     "description": "Reads your own Telegram chats and channels; sends notes to yourself (Saved Messages)",
      "disconnect_warning": null,
      "everyone": false,
      "examples": [
@@ -4219,7 +4221,8 @@
      ],
      "features": [
       "Lists and summarizes your unread chats and channels",
-      "Reads a chat when you ask; never marks anything read and never sends"
+      "Reads a chat when you ask; never marks anything read",
+      "Sends notes to yourself (your Saved Messages), never to anyone else"
      ],
      "icon": "send",
      "name": "telegram_account",
@@ -5132,7 +5135,7 @@
      ],
      "features": [
       "Read your chats and find messages and files",
-      "Send messages and forward files (asks you first)",
+      "Send messages and forward files (asks you first; a note to yourself goes at once)",
       "Turns the voice notes you receive into text"
      ],
      "icon": "message-circle",
@@ -5543,7 +5546,7 @@
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels, read-only",
+     "description": "Reads your own Telegram chats and channels; sends notes to yourself (Saved Messages)",
      "disconnect_warning": null,
      "everyone": false,
      "examples": [
@@ -5552,7 +5555,8 @@
      ],
      "features": [
       "Lists and summarizes your unread chats and channels",
-      "Reads a chat when you ask; never marks anything read and never sends"
+      "Reads a chat when you ask; never marks anything read",
+      "Sends notes to yourself (your Saved Messages), never to anyone else"
      ],
      "icon": "send",
      "name": "telegram_account",
@@ -6468,7 +6472,7 @@
      ],
      "features": [
       "Read your chats and find messages and files",
-      "Send messages and forward files (asks you first)",
+      "Send messages and forward files (asks you first; a note to yourself goes at once)",
       "Turns the voice notes you receive into text"
      ],
      "icon": "message-circle",
@@ -6879,7 +6883,7 @@
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels, read-only",
+     "description": "Reads your own Telegram chats and channels; sends notes to yourself (Saved Messages)",
      "disconnect_warning": null,
      "everyone": false,
      "examples": [
@@ -6888,7 +6892,8 @@
      ],
      "features": [
       "Lists and summarizes your unread chats and channels",
-      "Reads a chat when you ask; never marks anything read and never sends"
+      "Reads a chat when you ask; never marks anything read",
+      "Sends notes to yourself (your Saved Messages), never to anyone else"
      ],
      "icon": "send",
      "name": "telegram_account",
@@ -7804,7 +7809,7 @@
      ],
      "features": [
       "Read your chats and find messages and files",
-      "Send messages and forward files (asks you first)",
+      "Send messages and forward files (asks you first; a note to yourself goes at once)",
       "Turns the voice notes you receive into text"
      ],
      "icon": "message-circle",
@@ -8203,7 +8208,7 @@
        "why_not": null
       }
      ],
-     "description": "Your own Telegram chats and channels, read-only",
+     "description": "Reads your own Telegram chats and channels; sends notes to yourself (Saved Messages)",
      "disconnect_warning": null,
      "everyone": false,
      "examples": [
@@ -8212,7 +8217,8 @@
      ],
      "features": [
       "Lists and summarizes your unread chats and channels",
-      "Reads a chat when you ask; never marks anything read and never sends"
+      "Reads a chat when you ask; never marks anything read",
+      "Sends notes to yourself (your Saved Messages), never to anyone else"
      ],
      "icon": "send",
      "name": "telegram_account",
@@ -8653,7 +8659,7 @@
    ],
    "features": [
     "Read your chats and find messages and files",
-    "Send messages and forward files (asks you first)",
+    "Send messages and forward files (asks you first; a note to yourself goes at once)",
     "Turns the voice notes you receive into text"
    ],
    "icon": "message-circle",

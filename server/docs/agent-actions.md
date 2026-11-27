@@ -16,7 +16,9 @@ All of it is **additive**: old web / Raycast / Android builds keep working, they
 
 | Tool | Asks first? | Undo |
 |---|---|---|
-| `send_whatsapp_message`, `send_whatsapp_file`, `edit_whatsapp_message`, `delete_whatsapp_message` | yes | — |
+| `send_whatsapp_message` | yes, except to the user's own chat (`chat_id` `me` / `self`) | — |
+| `send_whatsapp_file`, `edit_whatsapp_message`, `delete_whatsapp_message` | yes | — |
+| `send_telegram_message_to_me` | no (only to the user's own Saved Messages; no recipient argument) | — |
 | `send_email`, `reply_to_email` | yes | — |
 | `delete_event`, `delete_task`, `delete_project`, `delete_knowledge_item`, `remove_task_group` | yes | — |
 | `add_contact`, `update_contact` | yes (they change the user's Google Contacts) | — |

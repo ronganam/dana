@@ -8,6 +8,8 @@ nothing is shared between connections, caches included (keyed by
 """
 import datetime
 import logging
+import re
+import time
 from typing import Any, Dict, Optional, Tuple
 from urllib.parse import urlsplit, urlunsplit
 
@@ -122,6 +124,75 @@ async def get_my_identifiers(conn: Connection, client: httpx.AsyncClient) -> Tup
     if jid and lid:
         _me_cache[key] = (jid, lid)
     return jid, lid
+
+
+# ---------------------------------------------------------------------------
+# The user's own chat ("me")
+# ---------------------------------------------------------------------------
+#
+# ``chat_id="me"`` / ``"self"`` in the tools means the connected account's own
+# chat (WhatsApp's "Message yourself"). Its id is the account the connection
+# holds (accounts.py learns and claims it), else the session's ``me.id`` asked
+# from WAHA, kept per connection for OWN_TTL_SECONDS.
+
+SELF_CHAT_IDS = frozenset({"me", "self"})
+# What a contact search takes as "the user themself" (besides their names).
+SELF_WORDS = SELF_CHAT_IDS | frozenset({"myself", "my own chat", "אני", "לעצמי", "עצמי"})
+OWN_CHAT_NAME = "You (your own chat)"
+OWN_TTL_SECONDS = 3600.0
+_own_cache: Dict[Signature, Tuple[float, str]] = {}
+
+
+def is_self(chat_id: Any) -> bool:
+    """``chat_id`` names the user's own chat (``me`` / ``self``, any case)."""
+    return str(chat_id or "").strip().strip("`").strip().lower() in SELF_CHAT_IDS
+
+
+def own_jid(account: Any) -> Optional[str]:
+    """``<number>@c.us`` of an account as WAHA reports it (a ``:device``
+    suffix or another domain dropped); None when it has no number."""
+    local = str(account or "").strip().split("@", 1)[0].split(":", 1)[0]
+    return f"{local}@c.us" if re.fullmatch(r"\d{5,20}", local) else None
+
+
+async def own_chat_id(conn: Connection) -> Optional[str]:
+    """The chat id of the connected account's own chat (``<number>@c.us``):
+    the connection's claimed account, else the session's ``me.id`` from WAHA
+    (cached per connection for :data:`OWN_TTL_SECONDS`; a failure is not
+    cached). None when WAHA does not say (down, not logged in) or another
+    user's connection holds the account."""
+    if conn.account_conflict:
+        return None
+    own = own_jid(conn.account)
+    if own:
+        return own
+    key = signature(conn)
+    hit = _own_cache.get(key)
+    now = time.monotonic()
+    if hit and now - hit[0] < OWN_TTL_SECONDS:
+        return hit[1]
+    own = own_jid((await fetch_me(conn) or {}).get("id"))
+    if own:
+        _own_cache[key] = (now, own)
+    return own
+
+
+def names_self(user: Any, query: str) -> bool:
+    """``query`` means the user themself: one of :data:`SELF_WORDS`, their
+    name or a word of it, or one of their other names (``User.other_names``,
+    a comma list) or a word of one."""
+    q = " ".join(str(query or "").casefold().split())
+    if not q:
+        return False
+    if q in SELF_WORDS:
+        return True
+    names = [str(getattr(user, "name", "") or "")]
+    names += re.split(r"[,;/\n]", str(getattr(user, "other_names", "") or ""))
+    for name in names:
+        name = " ".join(name.casefold().split())
+        if name and (q == name or (len(q) >= 2 and q in name.split())):
+            return True
+    return False
 
 
 # ---------------------------------------------------------------------------
