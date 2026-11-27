@@ -2244,7 +2244,7 @@
   {
     "type": "function",
     "name": "search_whatsapp_contact_or_chat",
-    "description": "Search for a WhatsApp contact or group chat by name to find their chat ID. The user's own chat (\"Message yourself\") is listed first as \"You (your own chat)\" when the query is 'me', 'myself', 'אני', 'לעצמי' or the user's own name; to message the user themself, simply pass chat_id='me' to send_whatsapp_message.",
+    "description": "Search for a WhatsApp contact or group chat by name to find their chat ID.",
     "parameters": {
       "type": "object",
       "properties": {
@@ -2282,13 +2282,13 @@
   {
     "type": "function",
     "name": "send_whatsapp_message",
-    "description": "Send a WhatsApp text message to a chat by contact/group name or chat ID. To message the user themself (their own \"Message yourself\" chat: \"send me a WhatsApp\", a reminder or note to the user), pass chat_id='me' — never search for the user's own name. A message to 'me' is sent without asking; any other recipient asks the user first. To pass along something someone else sent (a file, photo, voice note or their message), use forward_whatsapp_message instead of describing it in text. IMPORTANT: The 'text' parameter must contain the user's exact original phrasing. Do not rephrase, formalize, translate, or add greetings/closings — send exactly what the user wrote unless they explicitly ask you to rewrite it. The chat_id can be: - 'me' — the user's own chat (the connected WhatsApp account itself). - An existing contact/group name from your WhatsApp (e.g. 'John', 'ענבל', 'Family') — auto-resolved. - A properly formatted chat ID (e.g. '15550100301@c.us') — use this for new/newly-validated numbers. WhatsApp chat IDs ALWAYS include a suffix: '@c.us' for individuals, '@g.us' for groups. Bare phone numbers like '0500000302' are NOT valid chat IDs. If you only have a bare phone number (not in your contacts/chats yet): 1. First call check_whatsapp_number(phone) to validate it and get the chat ID. 2. Then pass the returned chat ID (e.g. '15550100302@c.us') here. The tool supports bilingual matching (Hebrew <-> English translations/transliterations, e.g. 'ענבל' matches 'Inbal Cohen'), nicknames, and partial searches. When a name matches multiple contacts, the tool automatically prefers the most recently active one. If the name query is still ambiguous after recency filtering, it returns all candidates so you can ask the user to clarify.",
+    "description": "Send a WhatsApp text message to a chat by contact/group name or chat ID. To pass along something someone else sent (a file, photo, voice note or their message), use forward_whatsapp_message instead of describing it in text. IMPORTANT: The 'text' parameter must contain the user's exact original phrasing. Do not rephrase, formalize, translate, or add greetings/closings — send exactly what the user wrote unless they explicitly ask you to rewrite it. The chat_id can be: - An existing contact/group name from your WhatsApp (e.g. 'John', 'ענבל', 'Family') — auto-resolved. - A properly formatted chat ID (e.g. '15550100301@c.us') — use this for new/newly-validated numbers. WhatsApp chat IDs ALWAYS include a suffix: '@c.us' for individuals, '@g.us' for groups. Bare phone numbers like '0500000302' are NOT valid chat IDs. If you only have a bare phone number (not in your contacts/chats yet): 1. First call check_whatsapp_number(phone) to validate it and get the chat ID. 2. Then pass the returned chat ID (e.g. '15550100302@c.us') here. The tool supports bilingual matching (Hebrew <-> English translations/transliterations, e.g. 'ענבל' matches 'Inbal Cohen'), nicknames, and partial searches. When a name matches multiple contacts, the tool automatically prefers the most recently active one. If the name query is still ambiguous after recency filtering, it returns all candidates so you can ask the user to clarify.",
     "parameters": {
       "type": "object",
       "properties": {
         "chat_id": {
           "type": "string",
-          "description": "'me' for the user's own chat, or the WhatsApp chat ID (with @c.us/@g.us suffix), contact name, or group name."
+          "description": "The WhatsApp chat ID (with @c.us/@g.us suffix), contact name, or group name."
         },
         "text": {
           "type": "string",

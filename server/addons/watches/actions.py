@@ -280,12 +280,14 @@ async def run_one(user: User, watch: Dict[str, Any], action: Dict[str, Any], eve
             asks = (registry.needs_confirmation(name, args) or registry.acts_outside(name)
                     or action.get("autonomy") != "act_and_tell")
             if asks:
+                await identity.learn(user)
                 return start_agent(user, watch, f"Call the tool {name} with these arguments: "
                                    f"{json.dumps(args, ensure_ascii=False)}", str(action.get("autonomy")),
                                    event, fire_id, index, kind="tool")
             out = str(await registry.execute(user, name, args))
             return result(kind, FAILED if out.startswith("Error") else DONE, out)
         if kind == "agent":
+            await identity.learn(user)
             return start_agent(user, watch, str(action.get("instructions") or action.get("text")),
                                str(action.get("autonomy") or "ask_first"), event, fire_id, index)
         return result(kind, SKIPPED, "unknown action")

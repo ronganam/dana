@@ -17,10 +17,10 @@ account dropped, no ``me`` with one / several candidate connections; reading
 shows each message's id and files by name (only voice notes downloaded),
 read_whatsapp_file reads a file by id (untrusted; a made-up id refused), the
 read tools are untrusted, forwarding by id from the user's own session (a
-made-up or unknown id refused) and its approval card; chat id "me" = the
-account's own chat (the stored account, else WAHA's me.id cached per
-connection with a TTL; sent without asking; listed first by the contact
-search for "me" words and the user's names); ✨
+made-up or unknown id refused) and its approval card; own_chat_id (the
+stored account, else WAHA's me.id cached per connection with a TTL) is a
+plain helper: a send to the user's own chat id asks first like any other, and
+"me" is no special chat id; ✨
 Summarize only for the transcript's user. LiteLLM runs offline
 (``mock_response``); Telegram and phone push are mocked; no network beyond
 localhost.
@@ -357,86 +357,46 @@ async def test_saved_contacts_in_tools() -> None:
 
 
 async def test_own_chat() -> None:
-    """"me" / "self": the connected account's own chat (docs/whatsapp.md, "The user's own chat")."""
-    from core import approval_text
-    bob = users.update(BOB.id, other_names="Bobby, בובי")
-    check("own chat: a send to 'me' / 'self' does not ask, any other recipient does",
-          not registry.needs_confirmation("send_whatsapp_message", {"chat_id": "me", "text": "x"})
-          and not registry.needs_confirmation("send_whatsapp_message", {"chat_id": " Self ", "text": "x"})
-          and registry.needs_confirmation("send_whatsapp_message", {"chat_id": "Noa", "text": "x"})
-          and registry.needs_confirmation("send_whatsapp_message", {"chat_id": B_ACCOUNT, "text": "x"})
-          and registry.needs_confirmation("send_whatsapp_message", None)
-          and registry.needs_confirmation("send_whatsapp_file", {"chat_id": "me", "file_url": "u", "mimetype": "m"}))
-    with users.acting_as(bob):
-        card = approval_text.describe("send_whatsapp_message", {"chat_id": "me", "text": "x"})
-    check("own chat: the card (when one is shown) says yourself", card["title"] == "Send a WhatsApp message to yourself",
-          card)
-    schema = {t["function"]["name"]: t["function"] for t in registry.tool_schemas(bob)}
-    check("own chat: the tool descriptions tell the model to use chat_id 'me'",
-          "chat_id='me'" in schema["send_whatsapp_message"]["description"]
-          and "You (your own chat)" in schema["search_whatsapp_contact_or_chat"]["description"])
+    """own_chat_id is a plain fact about the connection; no tool treats the user's own chat specially."""
+    check("own chat: every send asks first, to the user's own chat id too, and 'me' is not special",
+          registry.needs_confirmation("send_whatsapp_message", {"chat_id": B_ACCOUNT, "text": "x"})
+          and registry.needs_confirmation("send_whatsapp_message", {"chat_id": "me", "text": "x"})
+          and registry.needs_confirmation("send_whatsapp_message", {"chat_id": "Noa", "text": "x"}))
+    check("own chat: no 'me' special case in the tool descriptions",
+          "chat_id='me'" not in str(registry.tool_schemas(BOB)))
     check("own chat: an account's id as a chat id",
           wa_client.own_jid("972500000002:12@s.whatsapp.net") == B_ACCOUNT and wa_client.own_jid("x@lid") is None
           and wa_client.own_jid("") is None)
-
-    # Known account: no request to learn it; the message goes to the own chat from Bob's session.
-    WA_A.calls(), WA_B.calls()
-    WA_B.sent.clear()
-    out = str(await registry.execute(bob, "send_whatsapp_message", {"chat_id": "me", "text": "note to self"}))
-    calls = WA_B.calls()
-    check("own chat: 'me' sends to the account's own chat, from the user's session",
-          WA_B.sent == [{"session": "bob", "chatId": B_ACCOUNT, "text": "note to self"}]
-          and "You (your own chat)" in out and not WA_A.calls()
-          and not [c for c in calls if c[1] == "/api/sessions"], (out, WA_B.sent, calls))
-
-    # Unknown account: asked from WAHA once, kept for the TTL, asked again after it.
+    conn = store.require(BOB, "whatsapp")
+    WA_B.calls()
+    check("own chat: the stored account, no request", await wa_client.own_chat_id(conn) == B_ACCOUNT
+          and not [c for c in WA_B.calls() if c[1] == "/api/sessions"])
     store.update(BOB, "whatsapp", account="")
-    wa_client._own_cache.clear()
-    conn = store.require(bob, "whatsapp")
-    first = await wa_client.own_chat_id(conn)
-    second = await wa_client.own_chat_id(conn)
-    asked = [c for c in WA_B.calls() if c[1] == "/api/sessions"]
-    check("own chat: without a stored account, the session's me.id from WAHA, cached",
-          first == second == B_ACCOUNT and len(asked) == 1, (first, second, asked))
-    with patch.object(wa_client, "OWN_TTL_SECONDS", 0.0):
-        again = await wa_client.own_chat_id(conn)
-    check("own chat: asked again once the TTL passed",
-          again == B_ACCOUNT and len([c for c in WA_B.calls() if c[1] == "/api/sessions"]) == 1)
-    check("own chat: cached per connection", set(k[0] for k in wa_client._own_cache) == {BOB.id})
-    wa_client._own_cache.clear()
-    WA_B.down = True
-    WA_B.sent.clear()
     try:
-        none = await wa_client.own_chat_id(conn)
-        out = str(await registry.execute(bob, "send_whatsapp_message", {"chat_id": "me", "text": "x"}))
+        wa_client._own_cache.clear()
+        conn = store.require(BOB, "whatsapp")
+        first = await wa_client.own_chat_id(conn)
+        second = await wa_client.own_chat_id(conn)
+        asked = [c for c in WA_B.calls() if c[1] == "/api/sessions"]
+        check("own chat: without a stored account, the session's me.id from WAHA, cached",
+              first == second == B_ACCOUNT and len(asked) == 1, (first, second, asked))
+        wa_client._own_cache.clear()
+        WA_B.down = True
+        try:
+            none = await wa_client.own_chat_id(conn)
+        finally:
+            WA_B.down = False
+        check("own chat: WAHA down → unknown, not cached", none is None and not wa_client._own_cache)
     finally:
-        WA_B.down = False
-    check("own chat: WAHA down → unknown, not cached; the send says so and sends nothing",
-          none is None and not wa_client._own_cache and "not known yet" in out and not WA_B.sent, out)
-    store.update(BOB, "whatsapp", account=B_ACCOUNT)
+        store.update(BOB, "whatsapp", account=B_ACCOUNT)
+        wa_client._own_cache.clear()
     import dataclasses
     conflicted = dataclasses.replace(conn, account=None, account_conflict=B_ACCOUNT)
     check("own chat: none while another user holds the account", await wa_client.own_chat_id(conflicted) is None)
-
-    # Search: the own chat first for "me" words and the user's names.
-    results_by_query = {}
-    for q in ("me", "אני", "לעצמי", "Bob", "bobby", "בובי", "Bob Levi", "lev", "chat"):
-        results_by_query[q] = str(await registry.execute(bob, "search_whatsapp_contact_or_chat", {"query": q}))
-    for q in ("me", "אני", "לעצמי"):
-        out = results_by_query[q]
-        check(f"search: {q!r} → only the own chat", out.startswith("- **You (your own chat)**")
-              and f"`{B_ACCOUNT}`" in out and out.count("\n") == 1, out)
-    for q in ("Bob", "bobby", "בובי", "Bob Levi"):
-        out = results_by_query[q]
-        check(f"search: the user's name {q!r} → the own chat listed first",
-              out.split("\n")[1].startswith("- **You (your own chat)**") and B_ACCOUNT in out, out)
-    check("search: part of a word or another query → no own chat",
-          "own chat" not in results_by_query["lev"] and "own chat" not in results_by_query["chat"]
-          and "Dina chat B" in results_by_query["chat"], results_by_query)
-    admin_out = str(await registry.execute(ADMIN, "search_whatsapp_contact_or_chat", {"query": "Bob"}))
-    check("search: another user's name is not their own chat", "own chat" not in admin_out
-          and B_ACCOUNT not in admin_out, admin_out)
-    users.update(BOB.id, other_names="")
+    WA_B.sent.clear()
+    out = str(await registry.execute(BOB, "send_whatsapp_message", {"chat_id": "me", "text": "x"}))
+    check("own chat: 'me' is not resolved to the user's own chat", not any(m.get("chatId") == B_ACCOUNT
+                                                                          for m in WA_B.sent), (out, WA_B.sent))
 
 
 # --- 4. Inbound events ---------------------------------------------------------------------------

@@ -2,22 +2,30 @@
 watch's agent runs (docs/watches.md, "Who the user is").
 
 A watch acts on the user's behalf later, without them in the chat: the model
-must know that "me" / "I" / "myself" (and an event's sender shown as "me")
-is the user, never guess another name for them, and know where a ``notify``
-lands (the channels ``core.notify.send`` delivers on for them) and which
-tools write to the user's own WhatsApp / Telegram chat. Tool lines appear only
-when the user has those tools.
+must know the user's name (never guess another name for them), their own
+addresses (to compare an event's real sender or recipient with, and to send
+to them like to anyone else) and where a ``notify`` lands (the channels
+``core.notify.send`` delivers on for them). Nothing here is a special rule or
+a special recipient: the addresses are plain data read from the user's
+connections.
 """
 
-from typing import Iterable, List
+import asyncio
+import logging
+from typing import Any, Dict, Iterable, List, Optional
 
 from core import user_profile, zones
-from core.addons import registry
+from core.addons import registry, store
 from core.users import User
+
+logger = logging.getLogger(__name__)
 
 # Words for the @addon.channel names core.notify.send delivers on.
 CHANNEL_WORDS = {"push": "their phone (a notification from the Dana app)"}
-SELF_WORDS = '"me", "I", "my", "myself", "אני", "לי", "שלי"'
+# How long learning the WhatsApp account's own id from WAHA may take before a prompt goes without it.
+WHATSAPP_WAIT_SECONDS = 2.0
+# user id -> the WhatsApp account's own chat id, as last learned (see :func:`learn`).
+_whatsapp_ids: Dict[str, str] = {}
 
 
 def channels(user: User) -> List[str]:
@@ -30,24 +38,69 @@ def channels(user: User) -> List[str]:
     return out
 
 
+def _connection(user: User, name: str) -> Any:
+    try:
+        return store.get(user, name)
+    except Exception:  # not installed here, or its credentials unreadable: no address from it
+        return None
+
+
+async def learn(user: User) -> None:
+    """Learn the user's WhatsApp account's own chat id when the connection
+    does not hold it (asked from WAHA, at most :data:`WHATSAPP_WAIT_SECONDS`;
+    kept for :func:`own_addresses`). Never raises; nothing to do without
+    WhatsApp."""
+    conn = _connection(user, "whatsapp")
+    if conn is None:
+        _whatsapp_ids.pop(user.id, None)
+        return
+    try:
+        from addons.whatsapp import client as waha
+        own = await asyncio.wait_for(waha.own_chat_id(conn), WHATSAPP_WAIT_SECONDS)
+    except Exception as e:  # WAHA slow or down: the prompt goes without it
+        logger.debug(f"WhatsApp own id of user {user.id} not learned: {e!r}")
+        return
+    if own:
+        _whatsapp_ids[user.id] = own
+
+
+def own_addresses(user: User) -> List[str]:
+    """The user's own addresses from their connections, in words: the Gmail
+    account, the WhatsApp account's chat id, the Telegram account."""
+    out: List[str] = []
+    gmail = _connection(user, "gmail")
+    if gmail is not None and gmail.account:
+        out.append(f"email {gmail.account}")
+    wa = _connection(user, "whatsapp")
+    if wa is not None and not wa.account_conflict:
+        own: Optional[str] = None
+        try:
+            from addons.whatsapp import client as waha
+            own = waha.own_jid(wa.account)
+        except Exception:
+            own = None
+        own = own or _whatsapp_ids.get(user.id)
+        if own:
+            out.append(f"WhatsApp {own}")
+    tg = _connection(user, "telegram_account")
+    if tg is not None and tg.account:
+        out.append(f"Telegram {tg.account}")
+    return out
+
+
 def about_user(user: User, tools: Iterable[str]) -> str:
-    """The identity block: the user's name, other names, pronoun, what "me" means, how to reach them, which tool
-    gives the weather."""
+    """The identity block: the user's name, other names, pronoun, their own addresses, how a notify reaches them,
+    which tool gives the weather."""
     p = user_profile.for_user(user)
     have = set(tools)
     lines = [f"The user: {p.name or 'unknown name'}"
-             + (f" (also called {user.other_names})" if user.other_names else "") + f"; pronoun: {p.pronoun}.",
-             f"{SELF_WORDS} in the request mean the user, and so does an event whose sender or author is shown as "
-             '"me", "Me", "You" or "אני" (Gmail and WhatsApp show the user\'s own messages that way; an email the '
-             "user sent themself is from \"me\"). Never take another person's name (a partner, a contact) for the "
-             "user.",
-             "Reaching the user themself: a notify action reaches them on "
-             + (", ".join(channels(user)) or "no channel yet (nothing would arrive)") + "."]
-    if "send_whatsapp_message" in have:
-        lines.append('"WhatsApp me": send_whatsapp_message with chat_id "me" writes to the user\'s own WhatsApp chat.')
-    if "send_telegram_message_to_me" in have:
-        lines.append('"Telegram me": send_telegram_message_to_me(text) writes to the user\'s own Telegram '
-                     "(Saved Messages).")
+             + (f" (also called {user.other_names})" if user.other_names else "") + f"; pronoun: {p.pronoun}. "
+             "Never take another person's name (a partner, a contact) for the user."]
+    addresses = own_addresses(user)
+    if addresses:
+        lines.append("The user's own addresses: " + ", ".join(addresses) + ".")
+    lines.append("A notify action reaches the user on "
+                 + (", ".join(channels(user)) or "no channel yet (nothing would arrive)") + ".")
     weather = sorted(t for t in have if "weather" in t.lower())
     if weather:
         lines.append(f"Weather: use {', '.join(weather)} (Dana's own, for the user's places), not a web search.")

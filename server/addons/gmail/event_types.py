@@ -84,9 +84,8 @@ def _same_address(a: str, b: str) -> bool:
     return bool(a and b) and norm(a) == norm(b)
 
 
-def email_data(message: Mapping[str, Any], own: str) -> Dict[str, Any]:
-    """``gmail.email.received``'s data of one message (``format=metadata``);
-    ``own``: the account's address (for ``from_me`` / ``to_me``)."""
+def email_data(message: Mapping[str, Any]) -> Dict[str, Any]:
+    """``gmail.email.received``'s data of one message (``format=metadata``)."""
     payload = message.get("payload")
     sender = content.addresses(content.raw_header(payload, "From"))
     from_name, from_email = (sender[0][0], sender[0][1].lower()) if sender else ("", "")
@@ -101,8 +100,6 @@ def email_data(message: Mapping[str, Any], own: str) -> Dict[str, Any]:
             "cc": content.show_all(cc) if cc else content.header(payload, "Cc"),
             "subject": subject, "snippet": snippet,
             "labels": ", ".join(str(label) for label in message.get("labelIds") or []),
-            "from_me": _same_address(from_email, own),
-            "to_me": any(_same_address(address, own) for _, address in to + cc),
             "amount": ils_amount(f"{subject}\n{snippet}")}
 
 
@@ -210,11 +207,10 @@ async def poll(user: User) -> int:
     if fresh:
         logger.info(f"Gmail inbox of user {user.id}: watching for new mail from now on")
     n = 0
-    own = conn.account or address
     for message in messages:
         if not is_new_mail(message):
             continue
-        data = email_data(message, own)
+        data = email_data(message)
         if data["message_id"] and _claim(user, data):
             events.emit(EVENT, user, **data)
             n += 1
@@ -250,7 +246,7 @@ def received_history(user: User, since: datetime.datetime) -> List[PastEvent]:
 
 GMAIL_EVENTS = (
     EventType(EVENT, "A new email arrived in the user's Gmail inbox (read from Gmail about every minute; "
-                     "includes emails the user sent to themself).",
+                     "an email the user sent to their own address arrives too).",
               {"message_id": "the Gmail message id (read_email takes it)",
                "thread_id": "the Gmail thread id (read_email_thread takes it)",
                "from": "the sender as \"Name <address>\" (the address alone when there is no name)",
@@ -262,9 +258,6 @@ GMAIL_EVENTS = (
                "snippet": "the start of the body as Gmail shows it in the list (plain text, short)",
                "labels": "Gmail label ids, comma-joined (INBOX, UNREAD, IMPORTANT, CATEGORY_PERSONAL, "
                          "CATEGORY_PROMOTIONS, CATEGORY_UPDATES, user label ids ...)",
-               "from_me": "true when the user's own Gmail address sent it, i.e. an email the user sent to "
-                          "themself (\"an email from myself\" = from_me eq true)",
-               "to_me": "true when the user's own address is in To or Cc (false for a Bcc or a mailing list)",
                "amount": "the first amount in shekels in the subject or snippet (ILS, positive), else null"},
               history=received_history),
 )
