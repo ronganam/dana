@@ -194,7 +194,7 @@ def system_prompt(user: User, types: Mapping[str, EventType], hist: Mapping[str,
         seen = "\n" + untrusted("the user's recent events (common values and names, written by others)",
                                 json.dumps({"common_values": values, "people": names}, ensure_ascii=False))
     return SYSTEM.format(now=now.strftime(S.TIME_FORMAT), weekday=now.strftime("%A"), tz=str(clock.get_timezone()),
-                         identity=identity.about_user(user, tools),
+                         identity=identity.about_user(user, tools) + identity.remembered(user),
                          zones=", ".join(z.name for z in zones.list_zones(user)) or "none yet",
                          people="see the frame below" if names else "none known",
                          catalog=json.dumps(cat, ensure_ascii=False) + seen,

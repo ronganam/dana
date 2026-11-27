@@ -8,7 +8,9 @@ MEMORY_GUIDE = (
     "What you know about {user} is listed in the About section of this prompt when there is one: use it without "
     "looking it up and without mentioning the list. When you learn something durable about {user} (who a person "
     "is to them, what a nickname or device name refers to, a standing preference, a contact chat ID), save it with "
-    "remember_info in one short sentence without being asked; never save secrets or one-time codes. "
+    "remember_info in one short sentence without being asked; never save secrets or one-time codes. When a task "
+    "needs something about {user} that you don't know (their phone number, an address, an account), ask them for it, "
+    "then save it with remember_info so it is never asked again. "
 )
 CONTACTS_GUIDE = (
     "When asked to invite or message someone by name (like 'dan'), first search your persistent memories/contacts "

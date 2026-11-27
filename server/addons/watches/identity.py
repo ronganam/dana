@@ -107,6 +107,19 @@ def about_user(user: User, tools: Iterable[str]) -> str:
     return "\n".join(lines)
 
 
+def remembered(user: User) -> str:
+    """What Dana remembers about the user (the About block of their prompt, when the about addon has one), and
+    what to do when something the request needs about them is missing."""
+    try:
+        from addons.about import prompt as about_prompt
+        block = about_prompt.section(user)
+    except Exception:
+        block = ""
+    return (block + "\nWhen the request needs something about the user that is not known here (their phone "
+            "number, an address, an account), do not guess: say so in `unsupported`, so Dana asks them and "
+            "remembers the answer.")
+
+
 def home_line(user: User) -> str:
     """The user's places for an agent run: Home first with its rough coordinates ("" without zones)."""
     zs = zones.list_zones(user)
