@@ -15,7 +15,7 @@ import java.util.Locale
 
 /*
  * Plain logic behind the Reminders screen, the reminder editor and the day
- * strip: what a task's triggers mean, which bucket it falls in, and the one
+ * view: what a task's triggers mean, which bucket it falls in, and the one
  * sentence that says what Dana will do. No Compose here (unit-tested in
  * ReminderModelTest).
  */
@@ -158,26 +158,14 @@ fun quickTimes(now: LocalDateTime): List<Pair<String, LocalDateTime>> {
 /** What "At a time" starts with when picked from another choice. */
 fun defaultTime(now: LocalDateTime): LocalDateTime = quickTimes(now).first().second
 
-/** The day-strip slot a reminder fires in today, if any. */
-fun slotOf(task: Task, now: LocalDateTime): DaySlot? {
-    if (!isOpen(task)) return null
-    for (w in remindWhens(task)) {
-        when (w) {
-            is RemindWhen.At -> if (w.time.toLocalDate() == now.toLocalDate() && !w.time.isBefore(now.withMinute(0).withSecond(0).withNano(0))) return DaySlot.Hour(w.time.hour)
-            is RemindWhen.Place -> if (!w.leave && isHomeZone(w.zone)) return DaySlot.AtHome
-            RemindWhen.Wake -> return DaySlot.OnWaking
-            else -> {}
-        }
-    }
-    return null
-}
-
-/** The trigger a drop on [slot] sets. Hours are today (tomorrow if that hour has already gone). */
+/** The trigger a drop on [slot] sets. Hours are today (tomorrow if that hour has already gone); a day-view time is that exact time. */
 fun remindWhenFor(slot: DaySlot, now: LocalDateTime, zones: List<String>): RemindWhen = when (slot) {
     is DaySlot.Hour -> {
         val t = now.toLocalDate().atTime(slot.hour, 0)
         RemindWhen.At(if (t.isBefore(now.withMinute(0).withSecond(0).withNano(0))) t.plusDays(1) else t)
     }
+    is DaySlot.At -> RemindWhen.At(slot.time.withSecond(0).withNano(0))
     DaySlot.AtHome -> RemindWhen.Place(homeZoneName(zones), leave = false)
     DaySlot.OnWaking -> RemindWhen.Wake
+    is DaySlot.Moment -> slot.w
 }

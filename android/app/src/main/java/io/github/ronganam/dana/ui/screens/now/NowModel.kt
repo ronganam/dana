@@ -244,6 +244,12 @@ object NowModel {
         is DaySlot.Hour -> slot.hour.toString()
         DaySlot.AtHome -> "home"
         DaySlot.OnWaking -> "wake"
+        is DaySlot.At -> slot.time.hour.toString()
+        is DaySlot.Moment -> when (val w = slot.w) {
+            io.github.ronganam.dana.ui.screens.reminders.RemindWhen.Wake -> "wake"
+            is io.github.ronganam.dana.ui.screens.reminders.RemindWhen.Place -> if (!w.leave && io.github.ronganam.dana.ui.screens.reminders.isHomeZone(w.zone)) "home" else w.kind
+            else -> w.kind
+        }
     }
 
     /**

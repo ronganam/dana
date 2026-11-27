@@ -8,11 +8,26 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Undo
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextDecoration
+import io.github.ronganam.dana.ui.theme.circuitColors
+import io.github.ronganam.dana.ui.theme.motionOff
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
@@ -36,8 +51,8 @@ import java.time.LocalDateTime
 
 /**
  * The reminder editor (the stage of Reminders): name and note edited in
- * place, its moments in a sentence (changed in the moment sheet), the list, priority, where it came from, Done and
- * Delete. Every change saves as it is made (optimistically, through the
+ * place beside the circle that completes it (the List's and the Board's circle, with Undo), its moments in a
+ * sentence (changed in the moment sheet), the list, priority, where it came from, Mark as done and Delete. Every change saves as it is made (optimistically, through the
  * offline queue); there is no Save button.
  */
 @OptIn(ExperimentalLayoutApi::class)
@@ -60,6 +75,12 @@ fun ReminderEditor(
     val whens = remember(task.triggers) { remindWhens(task) }
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val focus = LocalFocusManager.current
+    val completion = remember(task.id) { Completion() }
+    val scope = rememberCoroutineScope()
+    val haptics = LocalHapticFeedback.current
+    val animate = !motionOff()
+    val doneChanged by rememberUpdatedState(onDoneChanged)
+    fun changeDone(d: Boolean) = doneChanged(d)
 
     // Name and note: saved 0.8 s after typing stops, and when the editor goes away.
     var title by remember(task.id) { mutableStateOf(task.title) }
@@ -100,21 +121,39 @@ fun ReminderEditor(
         val listName = task.groupId?.let { id -> groups.firstOrNull { it.id == id }?.name } ?: task.groupName ?: "General"
         MetaLabel("${if (done) "Done" else momentGroupOf(task, now).title} · $listName")
 
-        InlineField(
-            value = title,
-            onValueChange = { title = it },
-            placeholder = "Name",
-            style = MaterialTheme.typography.headlineSmall.copy(
-                fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
-                fontWeight = FontWeight.SemiBold,
-                fontSize = 22.sp,
-                lineHeight = 28.sp
-            ),
-            singleLine = false,
-            imeAction = ImeAction.Done,
-            onDone = { focus.clearFocus() },
-            modifier = Modifier.padding(top = 6.dp)
-        )
+        // The same circle as in the List and on the Board: it completes the reminder (Undo in the message), or brings it back.
+        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.Top) {
+            CompleteCircle(
+                done = done,
+                hue = reminderHue(task),
+                late = !done && momentGroupOf(task, now) == MomentGroup.LATE,
+                onClick = {
+                    if (!done) {
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                        scope.launch { completion.play(animate, fold = false) { changeDone(true) } }
+                    } else changeDone(false)
+                },
+                progress = { completion.progress.value },
+                size = 26.dp,
+                modifier = Modifier.offset(x = (-10).dp, y = (-6).dp)
+            )
+            InlineField(
+                value = title,
+                onValueChange = { title = it },
+                placeholder = "Name",
+                style = MaterialTheme.typography.headlineSmall.copy(
+                    fontFamily = MaterialTheme.typography.bodyLarge.fontFamily,
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 22.sp,
+                    lineHeight = 28.sp,
+                    textDecoration = if (done) TextDecoration.LineThrough else null
+                ),
+                singleLine = false,
+                imeAction = ImeAction.Done,
+                onDone = { focus.clearFocus() },
+                modifier = Modifier.offset(x = (-8).dp)
+            )
+        }
         InlineField(
             value = note,
             onValueChange = { note = it },
@@ -176,10 +215,27 @@ fun ReminderEditor(
             }
         }
 
-        FlowRow(Modifier.padding(top = 24.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            InkChoice(if (done) "Not done" else "Done", solid = true) { onDoneChanged(!done) }
-            InkChoice("Delete") { onDeleted() }
-            TextButton(onClick = onAsk) { Text("Ask Dana about this →") }
+        FlowRow(
+            Modifier.padding(top = 28.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            itemVerticalAlignment = Alignment.CenterVertically
+        ) {
+            val c = circuitColors
+            if (done) FilledTonalButton(onClick = { changeDone(false) }) {
+                Icon(Icons.AutoMirrored.Outlined.Undo, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Not done")
+            } else Button(
+                onClick = { scope.launch { completion.play(animate, fold = false) { changeDone(true) } } },
+                colors = ButtonDefaults.buttonColors(containerColor = c.accentFilled, contentColor = c.onAccentFilled)
+            ) {
+                Icon(Icons.Outlined.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text("Mark as done")
+            }
+            OutlinedButton(onClick = onDeleted) { Text("Delete", color = c.ink) }
+            TextButton(onClick = onAsk) { Text("Ask Dana about this") }
         }
         Text("Saved as you change it.", style = MaterialTheme.typography.bodySmall, color = muted, modifier = Modifier.padding(top = 12.dp, bottom = 24.dp))
     }

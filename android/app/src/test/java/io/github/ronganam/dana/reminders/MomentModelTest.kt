@@ -3,19 +3,18 @@ package io.github.ronganam.dana.reminders
 import io.github.ronganam.dana.data.models.Task
 import io.github.ronganam.dana.data.models.Triggers
 import io.github.ronganam.dana.data.network.ApiJson
-import io.github.ronganam.dana.ui.screens.reminders.BoardMoment
 import io.github.ronganam.dana.ui.screens.reminders.MomentGroup
 import io.github.ronganam.dana.ui.screens.reminders.RemindWhen
 import io.github.ronganam.dana.ui.screens.reminders.anytimeMoments
 import io.github.ronganam.dana.ui.screens.reminders.applying
-import io.github.ronganam.dana.ui.screens.reminders.boardMoments
+import io.github.ronganam.dana.ui.screens.reminders.listSummary
 import io.github.ronganam.dana.ui.screens.reminders.dropPhrase
 import io.github.ronganam.dana.ui.screens.reminders.momentGroupOf
 import io.github.ronganam.dana.ui.screens.reminders.momentSections
 import io.github.ronganam.dana.ui.screens.reminders.remindWhens
 import io.github.ronganam.dana.ui.screens.reminders.rowLine
 import io.github.ronganam.dana.ui.screens.reminders.snoozeSuggestion
-import io.github.ronganam.dana.ui.screens.reminders.tasksAt
+import io.github.ronganam.dana.ui.screens.reminders.whenLine
 import io.github.ronganam.dana.ui.screens.reminders.tasksFor
 import io.github.ronganam.dana.ui.screens.reminders.with
 import io.github.ronganam.dana.ui.screens.reminders.without
@@ -97,18 +96,16 @@ class MomentModelTest {
     }
 
     @Test
-    fun boardLineHasHoursWakingAndOwnTimes() {
-        val own = task("a", """{"time":"2026-11-14T21:15:00"}""")
-        val m = boardMoments(now, listOf(own))
-        val times = m.filterIsInstance<BoardMoment.At>().map { it.time }
-        assertEquals(LocalDateTime.of(2026, 11, 14, 19, 0), times.first())
-        assertTrue(LocalDateTime.of(2026, 11, 14, 21, 15) in times)
-        assertTrue(times.all { it.isAfter(now) && !it.isAfter(now.plusHours(24)) })
-        assertEquals(times.sorted(), times)
-        // Waking sits just before the next morning's first hour.
-        val wake = m.indexOf(BoardMoment.Waking)
-        assertEquals(LocalDateTime.of(2026, 11, 15, 9, 0), (m[wake + 1] as BoardMoment.At).time)
-        assertEquals(listOf(own), tasksAt(BoardMoment.At(LocalDateTime.of(2026, 11, 14, 21, 15)), listOf(own)))
+    fun summaryAndWhenLine() {
+        val late = task("l", """{"time":"2026-11-14T14:00:00"}""")
+        val today = task("t", """{"time":"2026-11-14T21:00:00"}""")
+        val later = task("x", """{"time":"2026-11-18T09:00:00"}""")
+        assertEquals("1 late · 1 today · 3 open", listSummary(momentSections(listOf(late, today, later), now)))
+        assertEquals("All clear", listSummary(emptyList()))
+        // The list follows the moment (the List and the Board say the same).
+        assertEquals("At 21:00 · Work", whenLine(today, now, "Work"))
+        assertEquals("Work", whenLine(task("n"), now, "Work"))
+        assertEquals("At 21:00 · Work · snoozed 2×", whenLine(task("s", """{"time":"2026-11-14T21:00:00"}""", snoozes = 2), now, "Work"))
     }
 
     @Test

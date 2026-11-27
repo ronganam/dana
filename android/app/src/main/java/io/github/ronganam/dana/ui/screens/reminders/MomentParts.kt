@@ -4,11 +4,18 @@ import android.content.Context
 import androidx.core.content.edit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.automirrored.outlined.ArrowForward
+import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material3.Icon
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -23,7 +30,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -33,11 +39,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.Task
-import io.github.ronganam.dana.ui.components.circuit.LineNode
-import io.github.ronganam.dana.ui.components.circuit.LocalNodeSurface
-import io.github.ronganam.dana.ui.components.circuit.NodeLine
-import io.github.ronganam.dana.ui.components.circuit.NodeShape
-import io.github.ronganam.dana.ui.components.circuit.NodeState
 import io.github.ronganam.dana.ui.theme.circuitColors
 import java.time.LocalDateTime
 
@@ -77,35 +78,62 @@ fun rememberKeptSuggestions(): KeptSuggestions {
 }
 
 /**
- * Dana's suggestion for a reminder snoozed again and again: the two moments
- * as a short line (from → to), the sentence, and Move / Keep at the bottom.
- * [onKeep] null hides Keep (the sheet, where it is just an option).
+ * Dana's suggestion for a reminder snoozed again and again, built to fit any
+ * width (a narrow list pane, the cover screen): the question on its own
+ * lines, the two moments as chips that wrap (from → to), then Move / Keep,
+ * which wrap too. [onKeep] null hides Keep (the sheet, where it is just an
+ * option).
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SuggestionCard(s: MomentSuggestion, now: LocalDateTime, onMove: () -> Unit, onKeep: (() -> Unit)?, modifier: Modifier = Modifier) {
     val c = circuitColors
     val surface = MaterialTheme.colorScheme.surfaceContainerHighest
     Column(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(20.dp)).background(surface).padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 10.dp)
+        modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(surface).padding(start = 14.dp, end = 10.dp, top = 12.dp, bottom = 8.dp)
     ) {
-        CompositionLocalProvider(LocalNodeSurface provides surface) {
-            NodeLine(
-                listOf(
-                    LineNode(NodeShape.Circle, NodeState.Idle, label = momentPhrase(s.from, now), icon = momentIcon(s.from)),
-                    LineNode(NodeShape.Circle, NodeState.Firing, label = momentPhrase(s.to, now), icon = momentIcon(s.to))
-                ),
-                pulseSegment = null,
-                labelStyle = MaterialTheme.typography.bodySmall
-            )
+        Row(verticalAlignment = Alignment.Top) {
+            Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = c.accent, modifier = Modifier.padding(top = 2.dp, end = 8.dp).size(16.dp))
+            Text(s.text, style = MaterialTheme.typography.bodyMedium, color = c.ink)
         }
-        Text(s.text, style = MaterialTheme.typography.bodyMedium, color = c.ink, modifier = Modifier.padding(top = 10.dp))
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        FlowRow(
+            Modifier.padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
+            itemVerticalAlignment = Alignment.CenterVertically
+        ) {
+            MomentChip(s.from, now, on = false)
+            Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "to", tint = c.mute, modifier = Modifier.size(16.dp))
+            MomentChip(s.to, now, on = true)
+        }
+        FlowRow(
+            Modifier.padding(top = 6.dp),
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            itemVerticalAlignment = Alignment.CenterVertically
+        ) {
             Button(
                 onClick = onMove,
-                colors = ButtonDefaults.buttonColors(containerColor = c.accentFilled, contentColor = c.onAccentFilled)
-            ) { Text(s.action) }
-            if (onKeep != null) TextButton(onClick = onKeep) { Text("Keep", color = c.ink) }
+                colors = ButtonDefaults.buttonColors(containerColor = c.accentFilled, contentColor = c.onAccentFilled),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
+            ) { Text(s.action, maxLines = 1) }
+            if (onKeep != null) TextButton(onClick = onKeep) { Text("Keep it", color = c.ink, maxLines = 1) }
         }
+    }
+}
+
+/** One moment as a small chip: its glyph and its words; [on] = the suggested one (accent). */
+@Composable
+private fun MomentChip(w: RemindWhen, now: LocalDateTime, on: Boolean) {
+    val c = circuitColors
+    val fg = if (on) c.onAccentTonal else c.inkSoft
+    Row(
+        Modifier.clip(RoundedCornerShape(10.dp))
+            .background(if (on) c.accentTonal else MaterialTheme.colorScheme.surfaceContainerHigh)
+            .heightIn(min = 30.dp)
+            .padding(horizontal = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        momentIcon(w)?.let { Icon(it, contentDescription = null, tint = fg, modifier = Modifier.padding(end = 6.dp).size(15.dp)) }
+        Text(momentPhrase(w, now), style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

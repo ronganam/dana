@@ -9,7 +9,6 @@ import io.github.ronganam.dana.ui.screens.reminders.quickTimes
 import io.github.ronganam.dana.ui.screens.reminders.remindWhen
 import io.github.ronganam.dana.ui.screens.reminders.remindWhenFor
 import io.github.ronganam.dana.ui.screens.reminders.sentence
-import io.github.ronganam.dana.ui.screens.reminders.slotOf
 import io.github.ronganam.dana.ui.shell.DaySlot
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
@@ -61,18 +60,11 @@ class ReminderModelTest {
 
     @Test
     fun daySlotsAndDrops() {
-        assertEquals(DaySlot.Hour(22), slotOf(task("a", """{"time":"2026-11-14T22:00:00"}"""), now))
-        assertEquals(DaySlot.Hour(18), slotOf(task("a2", """{"time":"2026-11-14T18:50:00"}"""), now))
-        assertNull(slotOf(task("b", """{"time":"2026-11-14T17:00:00"}"""), now))
-        assertNull(slotOf(task("c", """{"time":"2026-11-15T09:00:00"}"""), now))
-        assertEquals(DaySlot.AtHome, slotOf(task("d", """{"location":{"location":"home","event":"arrive"}}"""), now))
-        assertNull(slotOf(task("e", """{"location":{"location":"home","event":"leave"}}"""), now))
-        assertEquals(DaySlot.OnWaking, slotOf(task("f", """{"wake":true}"""), now))
-        assertNull(slotOf(task("g", """{"wake":true}""", status = "completed"), now))
-
         assertEquals(RemindWhen.At(LocalDateTime.of(2026, 11, 14, 21, 0)), remindWhenFor(DaySlot.Hour(21), now, listOf("Home")))
         assertEquals(RemindWhen.At(LocalDateTime.of(2026, 11, 15, 9, 0)), remindWhenFor(DaySlot.Hour(9), now, listOf("Home")))
         assertEquals(RemindWhen.Place("home", leave = false), remindWhenFor(DaySlot.AtHome, now, listOf("Work", "home")))
+        assertEquals(RemindWhen.At(LocalDateTime.of(2026, 11, 15, 0, 30)), remindWhenFor(DaySlot.At(LocalDateTime.of(2026, 11, 15, 0, 30)), now, listOf("Home")))
+        assertEquals(RemindWhen.None, remindWhenFor(DaySlot.Moment(RemindWhen.None), now, listOf("Home")))
     }
 
     @Test

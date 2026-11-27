@@ -8,7 +8,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 /**
- * Today's calendar events, for the day strip and "Later today" on Now.
+ * Today's and tomorrow's calendar events, for the day view at the top of Reminders (its track runs past midnight).
  * The reminders in each slot come from [TasksController.tasks].
  */
 class DayController(private val ctx: ControllerContext) {
@@ -21,7 +21,7 @@ class DayController(private val ctx: ControllerContext) {
         ctx.scope.launch {
             val today = LocalDate.now()
             val events = ctx.load("DayEvents") {
-                ctx.api.tasks.calendarEvents("${today}T00:00:00", "${today.plusDays(1)}T00:00:00")
+                ctx.api.tasks.calendarEvents("${today}T00:00:00", "${today.plusDays(2)}T00:00:00")
             } ?: return@launch
             loadedFor = today
             _events.value = events

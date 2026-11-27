@@ -189,65 +189,7 @@ fun snoozeSuggestion(task: Task, zones: List<String>): MomentSuggestion? {
 /** The triggers after taking [s]: its old moment swapped for the new one. */
 fun Triggers.applying(s: MomentSuggestion): Triggers = without(s.from).with(s.to)
 
-// --- The board: the next 24 hours as moments ------------------------------------------------------
-
-/** A node on the board's 24-hour line: a time (a drop sets it), or waking. */
-sealed class BoardMoment {
-    data class At(val time: LocalDateTime) : BoardMoment()
-    object Waking : BoardMoment()
-
-    val remindWhen: RemindWhen get() = when (this) {
-        is At -> RemindWhen.At(time)
-        Waking -> RemindWhen.Wake
-    }
-}
-
-/** Hours offered on the line when nothing is set then: a time of day a reminder is often wanted. */
-private val ANCHOR_HOURS = listOf(9, 12, 15, 18, 20, 22)
-
-/** Where waking sits on the line: before the first anchor of the next morning. */
-private const val WAKING_HOUR = 7
-
-/**
- * The 24-hour line after [now]: the next full hour, the anchor hours, every
- * reminder's own time in that window, and waking (the next morning, before
- * the morning's hours), in order. Times are minute-exact and unique.
- */
-fun boardMoments(now: LocalDateTime, tasks: List<Task>): List<BoardMoment> {
-    val end = now.plusHours(24)
-    val nextHour = now.withMinute(0).withSecond(0).withNano(0).plusHours(1)
-    val times = sortedSetOf<LocalDateTime>()
-    times += nextHour
-    for (d in 0..1) for (h in ANCHOR_HOURS) {
-        val t = now.toLocalDate().plusDays(d.toLong()).atTime(h, 0)
-        if (t.isAfter(nextHour) && !t.isAfter(end)) times += t
-    }
-    tasks.filter(::isOpen).forEach { t ->
-        remindWhens(t).filterIsInstance<RemindWhen.At>().forEach { a ->
-            if (!a.time.isBefore(now) && !a.time.isAfter(end)) times += a.time.withSecond(0).withNano(0)
-        }
-    }
-    // Waking: the next morning (today's when it is still night).
-    val wakeDay = if (now.hour < WAKING_HOUR) now.toLocalDate() else now.toLocalDate().plusDays(1)
-    val wakeAt = wakeDay.atTime(WAKING_HOUR, 0)
-    val out = mutableListOf<BoardMoment>()
-    var wakePlaced = false
-    for (t in times) {
-        if (!wakePlaced && !t.isBefore(wakeAt)) { out += BoardMoment.Waking; wakePlaced = true }
-        out += BoardMoment.At(t)
-    }
-    if (!wakePlaced) out += BoardMoment.Waking
-    return out
-}
-
-/** The reminders a board moment holds: a time node its open reminders set to that minute, waking those that wait for it. */
-fun tasksAt(m: BoardMoment, open: List<Task>): List<Task> = open.filter { t ->
-    val whens = remindWhens(t)
-    when (m) {
-        is BoardMoment.At -> whens.any { it is RemindWhen.At && it.time.withSecond(0).withNano(0) == m.time }
-        BoardMoment.Waking -> whens.any { it == RemindWhen.Wake }
-    }
-}
+// --- The board's places and the car ---------------------------------------------------------------
 
 /** The "Anytime" column: arriving at / leaving each saved place, then the car. */
 fun anytimeMoments(zones: List<String>): List<RemindWhen> =
@@ -284,3 +226,16 @@ fun dropPhrase(w: RemindWhen, now: LocalDateTime): String = when (w) {
 fun sheetSubtitle(task: Task, listName: String?): String = listOfNotNull(listName, parseTriggerTime(task.dueDate)?.toLocalDate()?.let {
     "due " + it.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault()))
 }).joinToString(" · ")
+
+/** The line under the Reminders title: what is late, what is today, then how many in all ("1 late · 3 today · 12 open"); "All clear" with none. */
+fun listSummary(sections: List<MomentSection>): String {
+    val total = sections.sumOf { it.tasks.size }
+    if (total == 0) return "All clear"
+    val late = sections.firstOrNull { it.group == MomentGroup.LATE }?.tasks?.size ?: 0
+    val today = sections.filter { it.group == MomentGroup.TODAY }.sumOf { it.tasks.size }
+    return listOfNotNull(
+        late.takeIf { it > 0 }?.let { "$it late" },
+        today.takeIf { it > 0 }?.let { "$it today" },
+        "$total open"
+    ).joinToString(" · ")
+}

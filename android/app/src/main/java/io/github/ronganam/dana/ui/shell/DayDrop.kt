@@ -38,14 +38,18 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
-/** A cell of the day strip that accepts drops. */
+/** Where something can be dropped: a time on the day view, home, waking, or any other moment (the board). */
 sealed class DaySlot {
     /** That hour today ("21:00"). */
     data class Hour(val hour: Int) : DaySlot()
+    /** That exact time (the day view's track, snapped to the half hour). */
+    data class At(val time: java.time.LocalDateTime) : DaySlot()
     /** When I arrive home. */
     object AtHome : DaySlot()
     /** When I wake up. */
     object OnWaking : DaySlot()
+    /** Any other moment (a place, the car, or none at all: the board's "Needs a moment"). */
+    data class Moment(val w: io.github.ronganam.dana.ui.screens.reminders.RemindWhen) : DaySlot()
 }
 
 /**
@@ -68,9 +72,10 @@ class DayDropState {
         private set
     var hovered by mutableStateOf<DaySlot?>(null)
         private set
-    internal val targets = mutableStateMapOf<DaySlot, Rect>()
+    /** Each drop area: its bounds and what a point inside it means (a fixed slot, or a time along the day view). */
+    internal val targets = mutableStateMapOf<Any, Pair<Rect, (Offset) -> DaySlot?>>()
 
-    /** True while a day strip is on screen (rows only become draggable then). */
+    /** True while a day view is on screen (rows only become draggable then). */
     val hasTargets: Boolean get() = targets.isNotEmpty()
 
     fun start(drag: DayDrag, at: Offset) {
@@ -80,7 +85,7 @@ class DayDropState {
 
     fun move(at: Offset) {
         pointer = at
-        hovered = targets.entries.firstOrNull { it.value.contains(at) }?.key
+        hovered = targets.values.firstOrNull { it.first.contains(at) }?.let { (rect, resolve) -> resolve(at - rect.topLeft) }
     }
 
     fun drop() {
@@ -100,16 +105,23 @@ class DayDropState {
 val LocalDayDrop = staticCompositionLocalOf<DayDropState?> { null }
 
 /** Marks this element as the drop area for [slot]. */
-fun Modifier.dayDropTarget(slot: DaySlot): Modifier = composed {
+fun Modifier.dayDropTarget(slot: DaySlot): Modifier = dayDropArea(slot) { slot }
+
+/**
+ * Marks this element as a drop area whose meaning depends on where the finger
+ * is: [resolve] gets the point relative to the element's top-left.
+ */
+fun Modifier.dayDropArea(key: Any, resolve: (Offset) -> DaySlot?): Modifier = composed {
     val state = LocalDayDrop.current ?: return@composed Modifier
-    DisposableEffect(state, slot) { onDispose { state.targets.remove(slot) } }
-    Modifier.onGloballyPositioned { state.targets[slot] = it.boundsInRoot() }
+    val current by rememberUpdatedState(resolve)
+    DisposableEffect(state, key) { onDispose { state.targets.remove(key) } }
+    Modifier.onGloballyPositioned { state.targets[key] = it.boundsInRoot() to { p: Offset -> current(p) } }
 }
 
 /**
- * Long-press this element and drag it onto the day strip. Does nothing while
- * no strip is on screen (cover screen), so lists keep their normal taps and
- * scrolling there.
+ * Long-press this element and drag it onto the day view (or the board's
+ * columns). Does nothing while no drop area is on screen, so lists keep their
+ * normal taps and scrolling then.
  */
 fun Modifier.dragToDay(label: String, onDrop: (DaySlot) -> Unit): Modifier = composed {
     val state = LocalDayDrop.current

@@ -5,7 +5,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material.icons.outlined.ViewAgenda
+import androidx.compose.material.icons.outlined.ViewKanban
+import androidx.compose.ui.graphics.vector.ImageVector
+import io.github.ronganam.dana.ui.shell.DayView
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -35,11 +38,12 @@ import io.github.ronganam.dana.ui.viewmodels.ThreadContext
 import java.time.LocalDateTime
 
 /**
- * Reminders. Folded: the list by moment; a row opens the moment sheet, its
- * pencil the editor (the stage). Unfolded: the board (tray | next 24 hours |
- * anytime, drag to set a moment) across the width, or — List in the
- * header — the list beside the editor. An opened editor always shows as
- * list | editor; Back returns to the board.
+ * Reminders. Folded: the compact day view, then the list by moment; an item
+ * opens the moment sheet, the sheet's pencil the editor (the stage).
+ * Unfolded (the day view above the panes): the board (the List's groups as
+ * columns, drag onto the day or a column to set a moment) across the width,
+ * or — List in the header — the list beside the editor. An opened editor
+ * always shows as list | editor; Back returns to the board.
  */
 @Composable
 fun rememberRemindersDestination(viewModel: MainViewModel): Destination {
@@ -51,7 +55,7 @@ fun rememberRemindersDestination(viewModel: MainViewModel): Destination {
     val layout = LocalShellLayout.current
     val wide = layout != ShellLayout.STACKED
     var boardMode by rememberSaveable { mutableStateOf(true) }
-    var sheetFor by rememberSaveable { mutableStateOf<String?>(null) }
+    val sheetFor by shell.momentSheet.collectAsState()
     val board = wide && boardMode && pick?.auto != false
 
     LaunchedEffect(Unit) { if (tc.zoneItems.value.isEmpty()) tc.fetchZones() }
@@ -78,9 +82,10 @@ fun rememberRemindersDestination(viewModel: MainViewModel): Destination {
     }
     val sheetTask = tasks.firstOrNull { it.id == sheetFor }
     if (sheetFor != null && sheetTask != null) RemindersSheet(viewModel, sheetTask, onEdit = {
-        sheetFor = null
+        shell.openMoments(null)
         shell.selectReminder(sheetTask.id)
-    }, onDismiss = { sheetFor = null })
+    }, onDismiss = { shell.openMoments(null) })
+    val openSheet: (String) -> Unit = { shell.openMoments(it) }
 
     return Destination(
         place = Place.REMINDERS,
@@ -89,39 +94,42 @@ fun rememberRemindersDestination(viewModel: MainViewModel): Destination {
         list = {
             if (board) ReminderBoard(
                 viewModel,
-                onMoments = { sheetFor = it },
+                onMoments = openSheet,
                 onSuggest = {
                     shell.openThread()
                     viewModel.chatController.sendChatMessage("Suggest a moment for each of my reminders that has none. Ask me before changing them.")
                 },
                 headerExtra = toggle
-            ) else if (wide) ReminderListPane(viewModel, onMoments = { sheetFor = it }, belowHeader = toggle)
-            else ReminderListPane(viewModel, onMoments = { sheetFor = it }, headerExtra = toggle)
+            ) else if (wide) ReminderListPane(viewModel, onMoments = openSheet, belowHeader = toggle)
+            // Folded, the day view heads the list (unfolded it sits above the panes).
+            else ReminderListPane(viewModel, onMoments = openSheet, headerExtra = toggle, top = {
+                DayView(viewModel, onNow = { shell.showToday() }, onOpenReminder = openSheet, compact = true)
+            })
         },
-        stage = if (board) null else ({ ReminderStage(viewModel, onMoments = { sheetFor = it }) }),
+        stage = if (board) null else ({ ReminderStage(viewModel, onMoments = openSheet) }),
         wide = board,
         askSlot = false
     )
 }
 
-/** List | Board, unfolded: two joined buttons in the header. */
+/** List | Board, unfolded: two joined buttons in the header, each with its glyph. */
 @Composable
 private fun ViewToggle(board: Boolean, onBoard: (Boolean) -> Unit) {
     Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-        ToggleHalf("List", !board, RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 6.dp, bottomEnd = 6.dp)) { onBoard(false) }
-        ToggleHalf("Board", board, RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 20.dp, bottomEnd = 20.dp)) { onBoard(true) }
+        ToggleHalf("List", Icons.Outlined.ViewAgenda, !board, RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 6.dp, bottomEnd = 6.dp)) { onBoard(false) }
+        ToggleHalf("Board", Icons.Outlined.ViewKanban, board, RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 20.dp, bottomEnd = 20.dp)) { onBoard(true) }
     }
 }
 
 @Composable
-private fun ToggleHalf(label: String, on: Boolean, shape: RoundedCornerShape, onClick: () -> Unit) {
+private fun ToggleHalf(label: String, icon: ImageVector, on: Boolean, shape: RoundedCornerShape, onClick: () -> Unit) {
     val c = circuitColors
     Row(
         Modifier.clip(shape).background(if (on) c.indicator else MaterialTheme.colorScheme.surfaceContainerLow)
-            .clickable(role = Role.Tab, onClick = onClick).heightIn(min = 44.dp).padding(horizontal = 16.dp),
+            .clickable(role = Role.Tab, onClick = onClick).heightIn(min = 44.dp).padding(horizontal = 14.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        if (on) Icon(Icons.Outlined.Check, contentDescription = null, tint = c.onIndicator, modifier = Modifier.padding(end = 6.dp).size(18.dp))
+        Icon(icon, contentDescription = null, tint = if (on) c.onIndicator else c.inkSoft, modifier = Modifier.padding(end = 6.dp).size(18.dp))
         Text(label, style = MaterialTheme.typography.labelLarge, color = if (on) c.onIndicator else c.ink)
     }
 }

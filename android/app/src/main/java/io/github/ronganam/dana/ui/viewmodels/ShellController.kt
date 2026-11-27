@@ -215,6 +215,11 @@ class ShellController(
         _reminder.value = id?.let { Pick(it, auto) }
     }
 
+    private val _momentSheet = MutableStateFlow<String?>(null)
+    /** The reminder whose moment sheet is open (from the list, the board or the day view). */
+    val momentSheet: StateFlow<String?> = _momentSheet.asStateFlow()
+    fun openMoments(id: String?) { _momentSheet.value = id }
+
     fun selectMore(item: MoreItem?) { _more.value = item }
 
     fun selectNow(id: String?, auto: Boolean = false) {

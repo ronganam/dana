@@ -36,7 +36,7 @@ import kotlinx.coroutines.launch
  * rail (Ask Dana on top) unfolded, and one conversation with Dana — a page
  * over the place when folded, a sheet or the right pane unfolded — whose ask
  * bar comes with it. Folded, Ask Dana and the conversation button sit in each
- * place's header. Reminders alone has the day strip (unfolded).
+ * place's header. Reminders alone has the day view on top (unfolded; folded it heads the list).
  *
  * Each place is a [Destination] (list + stage) built in `destinations/`; this
  * function only wires shared state (routes, shares, messages, Back) and picks
@@ -134,8 +134,8 @@ fun DanaShell(viewModel: MainViewModel) {
                 ask = { if (!(shell.askHidden && layout != ShellLayout.FULL)) AskBar(viewModel) },
                 // Folded only: unfolded the rail beside the frame has the places.
                 nav = { if (layout == ShellLayout.STACKED) ShellNav(place, places, inboxBadge, onPlace = { shell.go(it) }) },
-                // The day strip belongs to Reminders (drop a reminder on an hour); the other places have their own day.
-                strip = { if (dest.place == Place.REMINDERS) DayStrip(viewModel, onNow = { shell.showToday() }) },
+                // The day view belongs to Reminders (drop a reminder on a time); the other places have their own day.
+                strip = { if (dest.place == Place.REMINDERS) DayView(viewModel, onNow = { shell.showToday() }, onOpenReminder = { shell.openMoments(it) }) },
                 headerAsk = { HeaderAsk(viewModel, conversation = true) },
                 snackbar = snackbar,
                 snackbarLift = shell.snackbarLift

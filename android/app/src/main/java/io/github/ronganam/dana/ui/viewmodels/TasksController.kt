@@ -166,12 +166,19 @@ class TasksController(private val ctx: ControllerContext, private val appContext
     /** Complete / reopen with "Undo". */
     fun setDone(taskId: String, done: Boolean, undoable: Boolean = true) {
         val status = if (done) "completed" else "needs_action"
+        val title = _tasks.value.firstOrNull { it.id == taskId }?.title?.takeIf { it.isNotBlank() }
         applyLocal(taskId) { it.copy(status = status, updatedAt = nowStamp()) }
         ctx.scope.launch {
             report(TaskActionQueue.setStatus(appContext, taskId, status), "Couldn't update the reminder")
         }
         if (undoable) {
-            ctx.messages.postUndoable(if (done) "Completed" else "Back on the list", onUndo = { setDone(taskId, !done, undoable = false) })
+            ctx.messages.postUndoable(
+                when {
+                    title == null -> if (done) "Done" else "Back on the list"
+                    done -> "Done: \u2068$title\u2069"
+                    else -> "Back on the list: \u2068$title\u2069"
+                },
+                onUndo = { setDone(taskId, !done, undoable = false) })
         }
     }
 
