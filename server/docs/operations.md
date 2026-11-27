@@ -31,9 +31,9 @@
 
 ## Releasing
 
-Every deployment runs a published image, the maintainer's production included: `ghcr.io/ronganam/dana:<version>` (amd64 and arm64), built by `.github/workflows/release.yml` from a pushed tag. Nothing builds an image on your machine.
+A release is a published image: `ghcr.io/ronganam/dana:<version>` (amd64 and arm64, each built on a native runner), made by `.github/workflows/release.yml` from a pushed tag. Your own Dana can also run a build of your own between releases ("Shipping without a release" below).
 
-1. Merge to `master`. Pushing master runs the tests first: the repository's `.githooks/pre-push` hook (once per clone: `git config core.hooksPath .githooks`), on a clean checkout of the pushed commit, runs `bin/test` when the push changes more than docs under `server/` or `examples/`, plus the Dockerfile's `test` stage (the suite on the exact image, Python 3.14) when it changes `server/Dockerfile` or `server/requirements.txt` / `requirements.lock`. A failure stops the push; `git push --no-verify` skips it. Android changes are not tested by the hook. It deploys nothing.
+1. Merge to `master`. Pushing master runs the tests first: the repository's `.githooks/pre-push` hook (once per clone: `git config core.hooksPath .githooks`), on a clean checkout of the pushed commit, runs `bin/test --changed <remote> --quick` (only the scripts the change touches, without the slow ones) when the push changes more than docs under `server/` or `examples/`. `DANA_FULL_TESTS=1 git push …` runs the whole suite, plus the Dockerfile's `test` stage (the suite on the exact image, Python 3.14) when it changes `server/Dockerfile` or `server/requirements.txt` / `requirements.lock`. A failure stops the push; `git push --no-verify` skips it. Android changes are not tested by the hook. It deploys nothing.
 2. Bump the version: `server/VERSION` and the apps' `versionName` / `versionCode` (`android/app/build.gradle.kts`, `android/wear/build.gradle.kts`; `../../android/docs/release.md`), in one commit.
 3. Tag and push: `git tag v<version> && git push origin v<version>`. The release workflow checks the tag equals `server/VERSION` and the apps' `versionName`, publishes the server image as `:<version>` and `:latest`, and makes the GitHub Release with the signed APKs.
 
@@ -48,6 +48,13 @@ Every deployment runs a published image, the maintainer's production included: `
 3. rolls it out: with `DANA_GITOPS_REPO`, writes `<version>` into every `tag:` line of `DANA_GITOPS_VALUES` and each worker's pinned image into its `image:` line, in that repository (from its own clone in `~/.cache/dana-deploy/gitops`), and pushes, for ArgoCD / Flux to roll the pod; `--wait` then waits until a pod in `DANA_K8S_NAMESPACE` matching `DANA_K8S_SELECTOR` runs that image and is ready. With `DANA_COMPOSE_DIR` (the folder of the repository root's `compose.yaml`), writes `DANA_VERSION=<version>` and each worker's `<ADDON>_WORKER_TAG` into its `.env`, then `docker compose pull` and `up -d`. With neither, it says the image is ready.
 
 Roll back with `bin/deploy <older version>` (within one schema: "Database schema" below). The whole release, in order: bump, tag, push the tag, then `bin/deploy <version> --wait`.
+
+### Shipping without a release
+
+For your own Dana, between releases (no version bump, no workflow, no waiting on GitHub):
+
+- **`bin/ship [--no-test] [--no-wait]`**: quick tests of what changed since the last ship (`bin/test --changed … --quick`), then builds the image's `app` stage from the committed `HEAD` on this machine (its platform only, the local layer cache: well under a minute when only code changed), pushes it as `$DANA_DEV_IMAGE:<VERSION>-<short sha>` (`DANA_DEV_IMAGE` in `deploy.env`: a registry your cluster pulls from) and runs `bin/deploy` with it (the GitOps `repository:` line follows `DANA_IMAGE`; `DANA_ARGO_APP=<namespace>/<app>` makes ArgoCD refresh at once instead of at its next poll). The next release goes back to the published image. Coding agents run it in the background and keep working.
+- **`bin/hot [FILE…]`**: copies changed web files (`static/`, `addons/*/web/`) into the running pod; a page reload shows them (the service worker's release digest follows file changes). Gone when the pod restarts: ship them too.
 
 ### Workers
 
