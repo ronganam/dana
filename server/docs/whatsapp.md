@@ -15,7 +15,7 @@ old env names.
 | `addon.py` | the declaration (`on_connect` / `on_credentials_change` learn the account, `blocked` refuses the tools of a connection in an account conflict) |
 | `config.py` | kind name, WAHA's default session name, the `voice_telegram_chat_id` setting and `voice_chat_id(conn)` (strict: an int or None, logged) |
 | `client.py` | per connection: `config(conn)` → (base url, headers, session), `signature(conn)` (cache key), `fetch_me(conn)` / `get_my_identifiers(conn, client)`, the chat-id → name map (5 min, per connection), `get_message_sender_name`, `download_media_bytes(conn, url)` |
-| `resolve.py` | `resolve_chat_id_and_name(conn, name)`: saved contacts → chat id → preferred contacts → WAHA chats / contacts (transliteration, recency, the chat model `purpose="whatsapp_match"`) → number check |
+| `resolve.py` | `resolve_chat_id_and_name(conn, name)`: saved contacts → chat id (a message id given as the chat → its chat, `chat_of`) → preferred contacts → WAHA chats / contacts (transliteration, recency, the chat model `purpose="whatsapp_match"`) → number check |
 | `contacts.py` | the user's saved contacts (table `whatsapp_contacts`): `resolve_rows` / `search_rows` (nicknames whose value is a chat id), `preferred(user, name)` (category `preferred`), `known_people(user)` (contact rows for the call-analysis prompt; empty without the addon) |
 | `accounts.py` | the account of each connection (one connection per account), the routing of inbound events (below), `blocked(conn)` |
 | `events.py` | inbound events: `handle_webhook(data)` → `process_event(conn, data)` |
@@ -166,7 +166,8 @@ Docs/knowledge.md → Sections, decisions and files.
   `message` event routed to a connection — 1:1 or group, incoming or the
   user's own from another device — is emitted once as
   `whatsapp.message.received` for that connection's user, before the voice
-  filters: `{message_id, chat (the contact, or the group's name), sender
+  filters: `{message_id, chat_id (the chat's id: `…@c.us`, `…@g.us` or `…@lid`;
+  what a reply passes as `chat_id`), chat (the contact, or the group's name), sender
   (display name; "Me" for the user's own), is_group, from_me, text (the body
   or a caption; empty for a voice note), has_media, media_type (voice |
   audio | image | video | sticker | document, or empty)}`. Names come from

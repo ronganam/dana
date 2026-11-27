@@ -4,6 +4,7 @@ contacts, their preferred contacts, their WAHA chats and contacts, a
 transliteration match, recency, the chat model, a number check."""
 import datetime
 import logging
+import re
 from typing import Dict, Optional
 
 import httpx
@@ -15,6 +16,21 @@ from addons.whatsapp import contacts as saved_contacts
 from addons.whatsapp.client import api_url, config, get_chat_id_to_name_map, normalize_to_international
 
 logger = logging.getLogger(__name__)
+
+# A chat id: digits (a group's may have a dash) at one of WhatsApp's servers.
+_CHAT_ID = re.compile(r"^[0-9]+(?:-[0-9]+)?@(?:c\.us|g\.us|lid|s\.whatsapp\.net|newsletter)$")
+# A message id: <fromMe>_<chat id>_<message key>[_<participant>] (WAHA's serialized form).
+_MESSAGE_ID = re.compile(r"^(?:true|false)_([0-9]+(?:-[0-9]+)?@(?:c\.us|g\.us|lid|s\.whatsapp\.net|newsletter))_[A-Za-z0-9]+(?:_.*)?$")
+
+
+def chat_of(value: str) -> Optional[str]:
+    """The chat id in ``value`` when it is one, or the chat a message id belongs to (a model sometimes
+    passes an event's message_id as the chat); None for anything else (a name, a phone number)."""
+    value = value.strip()
+    if _CHAT_ID.match(value):
+        return value
+    m = _MESSAGE_ID.match(value)
+    return m.group(1) if m else None
 
 _HE_EN: Dict[str, str] = {
     'א': 'a', 'ב': 'b', 'ג': 'g', 'ד': 'd', 'ה': 'h', 'ו': 'v', 'ז': 'z', 'ח': 'kh',
@@ -222,8 +238,12 @@ async def resolve_chat_id_and_name(conn: Connection, chat_id_or_name: str) -> tu
     except Exception as e:
         logger.error(f"Error querying saved contacts in resolve: {e}")
 
-    # 2. If it is already a chat ID, look up its name if possible, or fall back to the ID
-    if "@" in chat_id_or_name:
+    # 2. A chat ID (or a message ID, whose chat it is): look up its name if possible, or fall back to the ID
+    as_chat = chat_of(chat_id_or_name)
+    if as_chat and as_chat != chat_id_or_name:
+        logger.info(f"'{chat_id_or_name}' is a message id; using its chat '{as_chat}'")
+        chat_id_or_name = as_chat
+    if as_chat:
         chat_name = chat_id_or_name
         try:
             mapping = await get_chat_id_to_name_map(conn)

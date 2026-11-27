@@ -58,7 +58,7 @@ def message_data(payload: Mapping[str, Any], names: Mapping[str, str]) -> Dict[s
     mid = payload.get("id")
     if isinstance(mid, Mapping):  # some engines nest it
         mid = mid.get("_serialized") or mid.get("id")
-    return {"message_id": str(mid or ""), "chat": chat, "sender": sender, "is_group": is_group,
+    return {"message_id": str(mid or ""), "chat_id": jid, "chat": chat, "sender": sender, "is_group": is_group,
             "from_me": from_me, "text": str(payload.get("body") or ""),
             "has_media": bool(payload.get("hasMedia")), "media_type": media_type(payload)}
 
@@ -73,6 +73,8 @@ def announce_message(user: User, payload: Mapping[str, Any], names: Mapping[str,
 WHATSAPP_EVENTS = (
     EventType(EVENT, "A new WhatsApp message in one of the user's chats or groups (as WAHA delivers it).",
               {"message_id": "the message's id (forward_whatsapp_message / read_whatsapp_file take it)",
+               "chat_id": "the chat's id (e.g. 15550100301@c.us, 120363…@g.us, or …@lid): pass it as chat_id to "
+                          "send_whatsapp_message / read_chat_messages to answer in this chat",
                "chat": "the chat's name: the contact for a 1:1 chat, the group's name in a group",
                "sender": "who wrote it (a display name; \"Me\" for the user's own)",
                "is_group": "true for a group chat",

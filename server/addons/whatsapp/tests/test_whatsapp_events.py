@@ -75,7 +75,7 @@ async def test_messages() -> None:
                              _data={"pushName": "Noa Example"}))
     check("1:1 text: one event for Ann, as Ann, with the contract's data",
           got == [("whatsapp.message.received", ANN.id, ANN.id,
-                   {"message_id": f"false_{NOA}_T1", "chat": "Noa Example", "sender": "Noa Example",
+                   {"message_id": f"false_{NOA}_T1", "chat_id": NOA, "chat": "Noa Example", "sender": "Noa Example",
                     "is_group": False, "from_me": False, "text": "Can we meet Sunday at 10?", "has_media": False,
                     "media_type": ""})], got)
 
@@ -142,7 +142,7 @@ def test_catalog() -> None:
     et = ann.get("whatsapp.message.received")
     check("catalog: whatsapp.message.received for a user with WhatsApp, no history (Dana keeps no messages)",
           et is not None and et.history is None and set(et.fields) == {
-              "message_id", "chat", "sender", "is_group", "from_me", "text", "has_media", "media_type"}, ann.keys())
+              "message_id", "chat_id", "chat", "sender", "is_group", "from_me", "text", "has_media", "media_type"}, ann.keys())
     check("catalog: the from_me field says watches usually want from_me eq false",
           et is not None and "from_me eq false" in et.fields["from_me"])
     check("catalog: none for a user without WhatsApp", "whatsapp.message.received" not in carl, carl)

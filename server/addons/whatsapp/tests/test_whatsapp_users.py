@@ -294,6 +294,20 @@ async def test_read_and_forward() -> None:
     read = str(await registry.execute(ADMIN, "read_whatsapp_file", {"chat_id": WA_A.contact_id, "message_id": "the pdf"}))
     check("read file: a made-up id is refused", read.startswith("Error: message_id"), read)
 
+    from addons.whatsapp.resolve import chat_of
+    check("chat ids: a chat id is itself; a message id gives its chat; a name or number is not one",
+          (chat_of("15550100301@c.us"), chat_of("100000000000001@lid"), chat_of("120363000000000001@g.us"),
+           chat_of("false_100000000000001@lid_3AAAAAAAAAAAAAAAAAAA"),
+           chat_of("false_120363000000000001@g.us_3AB1_15550100301@c.us"), chat_of("Noa Example"),
+           chat_of("0501234567"), chat_of("noa@example.com"))
+          == ("15550100301@c.us", "100000000000001@lid", "120363000000000001@g.us", "100000000000001@lid",
+              "120363000000000001@g.us", None, None, None))
+    WA_A.sent.clear()
+    out = str(await registry.execute(ADMIN, "send_whatsapp_message",
+                                     {"chat_id": f"false_{WA_A.contact_id}_m1", "text": "On my way"}))
+    check("send: an event's message id passed as the chat goes to that message's chat",
+          [m.get("chatId") for m in WA_A.sent] == [WA_A.contact_id], (out, WA_A.sent))
+
     WA_A.forwarded.clear(), WA_B.forwarded.clear(), WA_A.calls(), WA_B.calls()
     res = str(await registry.execute(ADMIN, "forward_whatsapp_message",
                                      {"chat_id": "972509999999@c.us", "message_id": f"`{pdf_id}`"}))
