@@ -19,7 +19,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -52,11 +53,18 @@ fun rememberTts(): TextToSpeech? {
     return tts
 }
 
+/** Your bubbles' violet (R6: #3A2F55 on night, a lavender on paper). */
+@Composable
+fun userBubbleColor(): Color =
+    if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Color(0xFF3A2F55) else Color(0xFFE2D8FA)
+
 /**
- * One chat bubble: the user's (boxed) or Dana's (vermilion rule), with the
- * typing indicator, streamed thoughts, images and markdown. Direction follows
- * the message's script. Tap speaks it, long-press copies it. Shared by the
- * old chat screen and the thread.
+ * One message: yours in a violet bubble at the end, Dana's on a tonal card
+ * at the start (or, [bare], without its own card: inside the card of the
+ * steps that led to it). With the typing indicator, streamed thoughts,
+ * images and markdown; a message in Hebrew keeps its own direction. Tap
+ * speaks it, long-press copies it. Shared by the old chat screen, the
+ * thread, the power-button sheet and kiosk / TV.
  */
 @Composable
 fun ChatBubble(
@@ -65,31 +73,37 @@ fun ChatBubble(
     wide: Boolean,
     serverUrl: String,
     apiToken: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    bare: Boolean = false
 ) {
     val context = LocalContext.current
     val copy = rememberCopyText()
     val isUser = msg.isUser
     val isHebrew = remember(msg.message) { msg.message.any { it in '\u0590'..'\u05FF' } }
     val layoutDirection = if (isHebrew) LayoutDirection.Rtl else LayoutDirection.Ltr
+    val userColor = userBubbleColor()
+    val cardColor = MaterialTheme.colorScheme.surfaceContainerLow
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = if (isUser || isHebrew) Arrangement.End else Arrangement.Start
+        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
     ) {
         CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
             Box(
                 modifier = Modifier
                     .then(
-                        if (isUser) Modifier
-                            .clip(RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 4.dp))
-                            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-                            .border(1.dp, MaterialTheme.colorScheme.outline, RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp, bottomStart = 16.dp, bottomEnd = 4.dp))
-                        else {
-                            val rule = MaterialTheme.colorScheme.primary
-                            Modifier.drawBehind {
-                                val x = if (layoutDirection == LayoutDirection.Ltr) 1.dp.toPx() else size.width - 1.dp.toPx()
-                                drawLine(rule, Offset(x, 2.dp.toPx()), Offset(x, size.height - 2.dp.toPx()), 2.dp.toPx())
-                            }
+                        when {
+                            isUser -> Modifier
+                                .widthIn(max = if (wide) 480.dp else 300.dp)
+                                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 6.dp))
+                                .background(userColor)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                            bare -> Modifier.fillMaxWidth()
+                            else -> Modifier
+                                .widthIn(max = CARD_MAX)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(cardColor)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         }
                     )
                     .pointerInput(msg.id) {
@@ -109,8 +123,6 @@ fun ChatBubble(
                             }
                         )
                     }
-                    .padding(horizontal = if (isUser) 14.dp else 14.dp, vertical = if (isUser) 10.dp else 2.dp)
-                    .widthIn(max = if (wide) 640.dp else 320.dp)
             ) {
                 if (msg.isThinking) {
                     Column {
@@ -151,7 +163,7 @@ fun ChatBubble(
                                 MarkdownText(
                                     text = msg.message,
                                     color = MaterialTheme.colorScheme.onSurface,
-                                    style = MaterialTheme.typography.bodyMedium
+                                    style = MaterialTheme.typography.bodyLarge
                                 )
                             }
                         }
@@ -159,7 +171,7 @@ fun ChatBubble(
                         MarkdownText(
                             text = msg.message,
                             color = MaterialTheme.colorScheme.onSurface,
-                            style = MaterialTheme.typography.bodyMedium
+                            style = MaterialTheme.typography.bodyLarge
                         )
                     }
                 }

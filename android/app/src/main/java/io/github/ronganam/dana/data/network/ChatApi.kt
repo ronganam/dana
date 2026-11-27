@@ -45,7 +45,9 @@ data class PendingApprovalState(
     val toolArgs: String?,
     val toolCallId: String,
     /** Why it asks ("device_screen" when only the shared screen made it ask); "" when it doesn't say. */
-    val reason: String
+    val reason: String,
+    /** The call in words (`pending_approval.card`); null from an older server. */
+    val card: io.github.ronganam.dana.data.models.ApprovalWords? = null
 )
 
 /**
@@ -104,6 +106,8 @@ data class RunEvent(
     val summary: String = "",
     /** The voice socket's error code (`session_busy`). */
     val code: OptString = null,
+    /** `approval_required`: the call in words for the card (absent from older servers). */
+    val card: io.github.ronganam.dana.data.models.ApprovalWords? = null,
     @Transient val undos: List<UndoAction> = emptyList(),
     @Transient val selection: SelectionRequest? = null,
     @Transient val state: SessionState? = null
@@ -144,7 +148,8 @@ private data class PendingWire(
     val toolCallId: String = "",
     val approvalReason: OptString = null,
     /** true, or why ("untrusted_context"): the server sends a flag or a reason. */
-    val untrustedContent: JsonText = null
+    val untrustedContent: JsonText = null,
+    val card: io.github.ronganam.dana.data.models.ApprovalWords? = null
 ) {
     val untrusted: Boolean get() = untrustedContent != null && untrustedContent != "false"
 }
@@ -370,7 +375,8 @@ class ChatApi(private val http: ApiClient) {
                 pendingApproval = w.pendingApproval?.let {
                     PendingApprovalState(
                         it.toolName, it.toolArgs, it.toolCallId,
-                        it.approvalReason ?: if (it.untrusted) "device_screen" else ""
+                        it.approvalReason ?: if (it.untrusted) "device_screen" else "",
+                        it.card
                     )
                 },
                 selection = w.selectionRequest?.toModel(),

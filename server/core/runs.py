@@ -21,7 +21,11 @@ so a client can attach at any time, replay what it missed and keep following:
                                                       when a learned phrase answered it
                                                       without the model (core/shortcuts.py)
     error              {message}
-    approval_required  {id, name, args, reason?}       reason: "device_screen" when the call asks
+    approval_required  {id, name, args, card, reason?} card: the call in words (core/approval_text.py
+                                                      ``describe``: title, question, body, facts…;
+                                                      also on GET /api/sessions/{id}'s
+                                                      pending_approval)
+                                                      reason: "device_screen" when the call asks
                                                       only because the turn carries the shared
                                                       phone screen (core/device_screen.py),
                                                       "untrusted_result" when only because a

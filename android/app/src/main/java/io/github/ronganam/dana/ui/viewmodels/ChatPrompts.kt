@@ -10,7 +10,11 @@ import kotlinx.coroutines.flow.asStateFlow
 data class PendingApproval(
     val toolName: String,
     val toolArgs: String,
-    val toolCallId: String
+    val toolCallId: String,
+    /** The call in words (server `card`), null from an older server. */
+    val card: io.github.ronganam.dana.data.models.ApprovalWords? = null,
+    /** Why it asks (see [io.github.ronganam.dana.data.models.ToolCallEntry.approvalReason]). */
+    val reason: String = ""
 )
 
 /**
@@ -39,9 +43,11 @@ internal class ChatPrompts(private val transcript: ChatTranscript) {
     /** A loaded session (GET, or a POST answer): its prompts replace the shown ones. */
     fun fromSession(state: SessionState) {
         val pending = state.pendingApproval
-        _approval.value = pending?.let { PendingApproval(it.toolName.orEmpty(), it.toolArgs.orEmpty(), it.toolCallId) }
-        if (pending != null && pending.reason.isNotEmpty() && pending.toolCallId.isNotEmpty()) {
-            transcript.updateToolCall(pending.toolCallId) { it.copy(approvalReason = pending.reason) }
+        _approval.value = pending?.let { PendingApproval(it.toolName.orEmpty(), it.toolArgs.orEmpty(), it.toolCallId, it.card, it.reason) }
+        if (pending != null && pending.toolCallId.isNotEmpty() && (pending.reason.isNotEmpty() || pending.card != null)) {
+            transcript.updateToolCall(pending.toolCallId) {
+                it.copy(approvalReason = pending.reason.ifEmpty { it.approvalReason }, approvalCard = pending.card ?: it.approvalCard)
+            }
         }
         val selection = state.selection
         if (selection != null) _approval.value = null
@@ -64,10 +70,15 @@ internal class ChatPrompts(private val transcript: ChatTranscript) {
             _approval.value = PendingApproval(
                 toolName = pending.toolName ?: "Tool Execution",
                 toolArgs = pending.toolArgs ?: "null",
-                toolCallId = id
+                toolCallId = id,
+                card = pending.card,
+                reason = pending.reason
             )
             transcript.updateToolCall(id) {
-                it.copy(requiresApproval = true, isRunning = false, isCollapsed = false, approvalReason = pending.reason.ifEmpty { it.approvalReason })
+                it.copy(
+                    requiresApproval = true, isRunning = false, isCollapsed = false,
+                    approvalReason = pending.reason.ifEmpty { it.approvalReason }, approvalCard = pending.card ?: it.approvalCard
+                )
             }
         } else if (pending == null && streaming) {
             _approval.value = null
@@ -88,8 +99,11 @@ internal class ChatPrompts(private val transcript: ChatTranscript) {
     }
 
     /** `approval_required`: the card of [toolCallId] asks, expanded. */
-    fun approvalRequired(toolCallId: String, name: String, argsText: String, prettyArgs: String, reason: String) {
-        _approval.value = PendingApproval(toolName = name, toolArgs = argsText, toolCallId = toolCallId)
+    fun approvalRequired(
+        toolCallId: String, name: String, argsText: String, prettyArgs: String, reason: String,
+        card: io.github.ronganam.dana.data.models.ApprovalWords? = null
+    ) {
+        _approval.value = PendingApproval(toolName = name, toolArgs = argsText, toolCallId = toolCallId, card = card, reason = reason)
         transcript.upsertToolCall(toolCallId, name) {
             it.copy(
                 requiresApproval = true,
@@ -98,7 +112,8 @@ internal class ChatPrompts(private val transcript: ChatTranscript) {
                 parameters = it.parameters.ifEmpty { prettyArgs },
                 toolArgs = argsText,
                 isCollapsed = false,
-                approvalReason = reason
+                approvalReason = reason,
+                approvalCard = card ?: it.approvalCard
             )
         }
     }

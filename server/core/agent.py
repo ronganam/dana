@@ -727,6 +727,9 @@ class AgentOrchestrator:
                     else:
                         reason = "device_screen" if untrusted_content else "untrusted_result"
                     approval["reason"] = reason
+                # The card's words (the app's approval card; Telegram and Now use the same).
+                from core import approval_text
+                approval["card"] = approval_text.describe(tool_name, tool_args)
                 emit(approval)
                 return {
                     "status": "pending_approval",

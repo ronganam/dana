@@ -333,6 +333,12 @@ async def test_undo_over_http(client):
     status, frames = await send(client, "s_undo_http2", "delete that task")
     check("undo/http: delete_task still suspends for approval",
           "approval_required" in types(frames) and frames[-1]["state"]["status"] == "waiting_approval")
+    # The app's approval card gets the call in words, live and in the session state.
+    appr = frame(frames, "approval_required")
+    pending = frames[-1]["state"]["pending_approval"]
+    check("approval card: the event and the state carry the words",
+          appr["card"]["question"] == "Delete this reminder?" and pending["card"]["question"] == "Delete this reminder?",
+          str(appr.get("card")))
 
 
 # --- 3. The thread -------------------------------------------------------------------

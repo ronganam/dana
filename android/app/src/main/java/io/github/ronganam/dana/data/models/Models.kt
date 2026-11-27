@@ -81,8 +81,28 @@ data class ToolCallEntry(
      * turn carries the shared phone screen (server `approval_required.reason`),
      * "" for the usual send / delete tools.
      */
-    val approvalReason: String = ""
+    val approvalReason: String = "",
+    /** A waiting call in words (server `approval_required.card`); null from an older server. */
+    val approvalCard: ApprovalWords? = null
 )
+
+/**
+ * What a tool call waiting for the user's OK will do, in words (server
+ * `core/approval_text.py` `describe`, the same as Telegram's card and Now's):
+ * "Delete the reminder “Milk”" / "Delete this reminder?", the content it
+ * would send ([body]) and other details as label → value ([facts]).
+ */
+@Serializable
+data class ApprovalWords(
+    val title: String = "",
+    val question: String = "",
+    val bodyLabel: String = "",
+    val body: String = "",
+    val facts: LenientList<List<String>> = emptyList()
+) {
+    /** [facts] as label → value, malformed and empty ones left out. */
+    val details: List<Pair<String, String>> get() = facts.mapNotNull { f -> if (f.size >= 2 && f[1].isNotBlank()) f[0] to f[1] else null }
+}
 
 data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),

@@ -63,6 +63,15 @@ def _selection_request_for(state: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
 
 
+def _with_card(pending: Any) -> Any:
+    """A waiting approval with its words for the app's card (``card``: core/approval_text.py's
+    ``describe``, the same as Telegram's and Now's); other states as they are."""
+    if not isinstance(pending, dict) or pending.get("status") != "pending_approval" or not pending.get("tool_name"):
+        return pending
+    from core import approval_text
+    return {**pending, "card": approval_text.describe(str(pending["tool_name"]), pending.get("tool_args"))}
+
+
 def _fresh_context(user: User, ctx: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
     """Re-resolve the attachment card so it shows the current status/title."""
     if not ctx:
@@ -104,7 +113,7 @@ def build_state_payload(user: User, session_id: str, transcription: Optional[str
         "session_id": state["session_id"],
         "status": status,
         "title": state["title"],
-        "pending_approval": state["pending_approval"],
+        "pending_approval": _with_card(state["pending_approval"]),
         "selection_request": _selection_request_for(state),
         "messages": format_session_history(state["history"], pending_call_id=pending_call_id),
         # What the chat was opened from (call suggestion / call / task), or None.

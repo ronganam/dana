@@ -48,7 +48,13 @@ import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.components.SelectionCard
 import io.github.ronganam.dana.data.models.ToolCallEntry
-import io.github.ronganam.dana.ui.components.ToolCallCard
+import io.github.ronganam.dana.data.chat.ThreadItem
+import io.github.ronganam.dana.ui.screens.chat.ApprovalCard
+import io.github.ronganam.dana.ui.screens.chat.ToolRunCard
+import io.github.ronganam.dana.ui.theme.circuitColors
+import io.github.ronganam.dana.ui.theme.tabular
+import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Edit
 import io.github.ronganam.dana.ui.screens.chat.ChatBubble
 import io.github.ronganam.dana.ui.screens.chat.FORGOTTEN_ALPHA
 import io.github.ronganam.dana.ui.screens.chat.MemoryLine
@@ -107,9 +113,11 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
     val rows = remember(messages, gapMinutes, shownMemory, memoryNow) {
         ThreadModel.rows(messages, gapMinutes, memoryNow, ZoneId.systemDefault(), shownMemory)
     }
+    // Tool calls joined into their turn's card, a waiting one in the warm card.
+    val threadItems = remember(rows) { ThreadItem.of(rows) }
     // Messages that just arrived at the end rise in (not the ones there on opening, not older pages).
     val arrivals = remember { TailArrivals() }
-    val fresh = remember(rows) { arrivals.fresh(rows.map { it.key }) }
+    val fresh = remember(threadItems) { arrivals.fresh(threadItems.map { it.key }) }
 
     // Follow the conversation: jump to a new last message (not when older ones are
     // added on top), keep up with a streaming reply unless the user scrolled up to read.
@@ -140,25 +148,37 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
     }
 
     Column(modifier.fillMaxSize()) {
+        // The header: ← (as a page or sheet) · Dana · the model, or what Dana is doing; Runs and New topic at the end.
+        val c = circuitColors
         Row(
-            Modifier.fillMaxWidth().edgeRule(bottom = true).padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp).heightIn(min = 44.dp),
+            Modifier.fillMaxWidth().padding(start = if (onClose != null) 4.dp else 16.dp, end = 4.dp, top = 4.dp, bottom = 4.dp).heightIn(min = 56.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MetaLabel("Dana", modifier = Modifier.padding(end = 10.dp))
+            if (onClose != null) IconButton(onClick = onClose, modifier = Modifier.size(48.dp)) {
+                Icon(Icons.AutoMirrored.Outlined.ArrowBack, contentDescription = "Close the conversation", tint = c.ink)
+            }
+            Text(
+                if (onClose != null) "Dana" else "Conversation",
+                style = MaterialTheme.typography.titleLarge,
+                color = c.ink,
+                maxLines = 1,
+                modifier = Modifier.padding(start = if (onClose != null) 4.dp else 0.dp, end = 12.dp)
+            )
             if (statusText.isNotEmpty()) {
-                MetaLabel(statusText, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                Text(statusText, style = MaterialTheme.typography.bodyMedium, color = c.accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             } else {
                 if (chatModels.isNotEmpty()) ModelPickerChip(models = chatModels, selectedId = chatModel, onSelect = { viewModel.chatController.setChatModel(it) })
                 Spacer(Modifier.weight(1f))
             }
             // A watch's agent runs have their own conversations: listed here, opened as a visit.
             if (inThread && chat.isThreadMode && backgroundRuns.isNotEmpty()) {
-                TextButton(onClick = { chat.fetchBackgroundRuns(); showRuns = true }) { Text("Runs") }
+                TextButton(onClick = { chat.fetchBackgroundRuns(); showRuns = true }, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text("Runs", style = MaterialTheme.typography.labelLarge, color = c.accent)
+                }
             }
             if (inThread && chat.isThreadMode && memory.remembersAt(memoryNow)) {
                 NewTopicButton(enabled = !clearing && statusText.isEmpty(), onClick = { chat.clearThread() })
             }
-            if (onClose != null) TextButton(onClick = onClose) { Text("Done") }
         }
         if (!inThread && chat.isThreadMode) {
             val label = if (BackgroundRuns.isBackgroundRun(currentSession)) {
@@ -215,34 +235,39 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                     }
                 }
             }
-            items(rows, key = { it.key }) { row ->
-                when (row) {
-                    is ThreadModel.Row.Separator -> QuietSeparator(row.label, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
-                    is ThreadModel.Row.MemoryLine -> MemoryLine(row.label, Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null))
-                    is ThreadModel.Row.Message -> {
-                        val msg = row.msg
-                        val faded = if (row.forgotten) Modifier.alpha(FORGOTTEN_ALPHA) else Modifier
-                        if (msg.toolCall != null) {
-                            ToolCallCard(
-                                messageId = msg.id,
-                                entry = msg.toolCall,
-                                onToggleCollapse = { id -> viewModel.chatController.toggleToolCallCollapse(id) },
-                                onApprove = { approved -> viewModel.chatController.approveAction(approved) },
-                                modifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = null, fadeOutSpec = null).riseIn(row.key in fresh).then(faded)
-                            )
-                        } else Column(Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).riseIn(row.key in fresh).then(faded)) {
-                            ChatBubble(
-                                msg = msg,
-                                tts = tts,
-                                wide = wide,
-                                serverUrl = viewModel.serverConfig.url,
-                                apiToken = viewModel.serverConfig.token
-                            )
-                            if (msg.shortcut && !msg.isUser) {
-                                MetaLabel("learned phrase · no model", modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+            items(threadItems, key = { it.key }) { item ->
+                val anim = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
+                when (item) {
+                    is ThreadItem.Plain -> when (val row = item.row) {
+                        is ThreadModel.Row.Separator -> QuietSeparator(row.label, anim)
+                        is ThreadModel.Row.MemoryLine -> MemoryLine(row.label, anim)
+                        is ThreadModel.Row.Message -> {
+                            val msg = row.msg
+                            val faded = if (row.forgotten) Modifier.alpha(FORGOTTEN_ALPHA) else Modifier
+                            Column(anim.riseIn(row.key in fresh).then(faded)) {
+                                ChatBubble(msg = msg, tts = tts, wide = wide, serverUrl = viewModel.serverConfig.url, apiToken = viewModel.serverConfig.token)
+                                if (msg.shortcut && !msg.isUser) LearnedPhraseNote()
                             }
                         }
                     }
+                    // The steps of one turn on their line, Dana's answer under them.
+                    is ThreadItem.Tools -> ToolRunCard(
+                        item,
+                        modifier = anim.riseIn(item.key in fresh).then(if (item.forgotten) Modifier.alpha(FORGOTTEN_ALPHA) else Modifier),
+                        reply = item.reply?.let { r ->
+                            {
+                                Column {
+                                    ChatBubble(msg = r, tts = tts, wide = wide, serverUrl = viewModel.serverConfig.url, apiToken = viewModel.serverConfig.token, bare = true)
+                                    if (r.shortcut) LearnedPhraseNote()
+                                }
+                            }
+                        }
+                    )
+                    is ThreadItem.Approval -> ApprovalCard(
+                        item.entry,
+                        onAnswer = { approved -> viewModel.chatController.approveAction(approved) },
+                        modifier = anim.riseIn(item.key in fresh)
+                    )
                 }
             }
             // A tool that asks first but has no card in the loaded messages (an older
@@ -250,19 +275,19 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
             val orphanApproval = pendingApproval?.takeIf { p -> messages.none { it.toolCall?.requiresApproval == true } }
             orphanApproval?.let { p ->
                 item(key = "pending_approval_card") {
-                    ToolCallCard(
-                        messageId = "pending_approval",
-                        entry = ToolCallEntry(
+                    ApprovalCard(
+                        ToolCallEntry(
                             toolName = p.toolName,
                             toolSummary = "",
                             parameters = prettyArgs(p.toolArgs),
                             requiresApproval = true,
                             toolCallId = p.toolCallId,
-                            toolArgs = p.toolArgs
+                            toolArgs = p.toolArgs,
+                            approvalReason = p.reason,
+                            approvalCard = p.card
                         ),
-                        onToggleCollapse = {},
-                        onApprove = { approved -> viewModel.chatController.approveAction(approved) },
-                        modifier = Modifier.fillMaxWidth().animateItem(fadeInSpec = null, fadeOutSpec = null)
+                        onAnswer = { approved -> viewModel.chatController.approveAction(approved) },
+                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null)
                     )
                 }
             }
@@ -295,30 +320,44 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
 
 private fun prettyArgs(raw: String): String = JsonPrimitive(raw).pretty()
 
+/** Under a reply a learned phrase answered (no model). */
+@Composable
+internal fun LearnedPhraseNote() {
+    Text(
+        "Learned phrase, no model",
+        style = MaterialTheme.typography.bodySmall,
+        color = circuitColors.mute,
+        modifier = Modifier.padding(start = 4.dp, top = 4.dp)
+    )
+}
+
 /**
  * "New topic": Dana forgets the conversation so far (the messages stay).
  * Shown only while Dana remembers something.
  */
 @Composable
 internal fun NewTopicButton(enabled: Boolean, onClick: () -> Unit) {
-    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(44.dp)) {
+    // A pencil (start fresh), as in the design's header.
+    IconButton(onClick = onClick, enabled = enabled, modifier = Modifier.size(48.dp)) {
         Icon(
-            Icons.Filled.RestartAlt,
+            Icons.Outlined.Edit,
             contentDescription = "New topic — Dana forgets this conversation",
-            tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = if (enabled) 1f else 0.4f),
-            modifier = Modifier.size(20.dp)
+            tint = circuitColors.inkSoft.copy(alpha = if (enabled) 1f else 0.4f),
+            modifier = Modifier.size(22.dp)
         )
     }
 }
 
-/** "13:32 · watch" between two hairlines: a new conversation started here. */
+/** "13:32 · watch", centred in the mute: a new conversation started here. */
 @Composable
 private fun QuietSeparator(label: String, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-        Rule(Modifier.weight(1f))
-        MetaLabel(label, modifier = Modifier.padding(horizontal = 10.dp))
-        Rule(Modifier.weight(1f))
-    }
+    Text(
+        label,
+        style = MaterialTheme.typography.labelMedium.tabular(),
+        color = circuitColors.mute,
+        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+        modifier = modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp)
+    )
 }
 
 /**

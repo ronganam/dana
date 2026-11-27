@@ -18,6 +18,15 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowUpward
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import io.github.ronganam.dana.ui.theme.circuitColors
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Stop
@@ -59,27 +68,27 @@ import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import coil.compose.AsyncImage
 
 /**
- * The ask bar, always on screen: what you type or say goes to Dana's thread.
- * On the cover screen and unfolded portrait a one-line peek of the last
- * message sits above it and opens / closes the thread sheet; sending or
- * speaking opens the sheet too. Unfolded, "On screen · …" above the field
- * names what goes with the next message (× drops it). The button is the mic while the field is
- * empty, send once there is text, stop while Dana is answering.
+ * The conversation's docked ask bar (it comes with the open thread, and sits
+ * under the conversation pane unfolded): "+" (an image) in a tonal field,
+ * then the talk button. Empty, the button is "Hold to talk" (hold and let go
+ * to send what you said; a tap listens until you stop, or Dana hears the end);
+ * with text it sends; while Dana answers it stops her. Beside the narrow
+ * conversation pane it is a round mic. Unfolded, "On screen · …" above the
+ * field names what goes with the next message (× drops it).
  */
 @Composable
 fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val shell = viewModel.shellController
     val layout = LocalShellLayout.current
     val sheet = layout != ShellLayout.FULL
-    val threadOpen by shell.threadOpen.collectAsState()
     val screen by shell.screen.collectAsState()
-    val messages by viewModel.chatController.chatMessages.collectAsState()
     val isRecording by viewModel.chatController.isRecording.collectAsState()
     val isStreaming by viewModel.chatController.isStreaming.collectAsState()
     val isCallActive by viewModel.callController.isCallActive.collectAsState()
     val pendingImage by viewModel.chatController.pendingImageUri.collectAsState()
     val serverStatus by viewModel.serverStatus.collectAsState()
     val draft = shell.askDraft
+    val c = circuitColors
 
     val mic = rememberVoiceToggle(viewModel)
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
@@ -98,36 +107,12 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     Column(
         modifier
             .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .edgeRule(top = true)
-            .padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 10.dp)
+            .padding(start = 16.dp, end = 16.dp, top = 6.dp, bottom = 12.dp)
     ) {
-        if (sheet) {
-            val last = messages.lastOrNull { !it.isThinking && it.toolCall == null && it.message.isNotBlank() }
-            val inThread by viewModel.chatController.inThread.collectAsState()
-            Row(
-                Modifier.fillMaxWidth().clickable { shell.toggleThread() }.heightIn(min = 36.dp).padding(horizontal = 2.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MetaLabel(if (inThread) "Thread" else "Conversation", modifier = Modifier.padding(end = 8.dp))
-                Text(
-                    last?.message?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim() ?: if (inThread) "empty" else "nothing yet",
-                    style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Content),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Left,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                MetaLabel(if (threadOpen) "close ↓" else "open ↑", modifier = Modifier.padding(start = 10.dp))
-            }
-        } else {
-            Spacer(Modifier.height(6.dp))
-        }
         // Unfolded: what Dana sees with the next message (on the cover it is at the top of the sheet).
         val onScreen = screen
         if (layout != ShellLayout.STACKED && onScreen != null) {
-            OnScreenLine(onScreen, onDrop = { shell.dropScreen() }, modifier = Modifier.padding(bottom = 4.dp))
+            OnScreenLine(onScreen, onDrop = { shell.dropScreen() }, modifier = Modifier.padding(bottom = 6.dp))
         }
 
         pendingImage?.let { uri ->
@@ -136,31 +121,22 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     model = uri,
                     contentDescription = "Image to send",
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
+                    modifier = Modifier.size(56.dp).clip(RoundedCornerShape(12.dp))
                 )
                 IconButton(onClick = { viewModel.chatController.clearPendingImage() }) {
-                    Icon(Icons.Filled.Close, contentDescription = "Remove the image", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Icon(Icons.Filled.Close, contentDescription = "Remove the image", tint = c.inkSoft)
                 }
             }
         }
 
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            IconButton(
-                onClick = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
-                modifier = Modifier.size(40.dp)
-            ) {
-                Icon(Icons.Outlined.Image, contentDescription = "Attach an image", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            val fieldShape = RoundedCornerShape(14.dp)
+        val listening = isRecording || isCallActive
+        val hasText = draft.text.isNotBlank() || pendingImage != null
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             BasicTextField(
                 value = draft,
                 onValueChange = { shell.askDraft = it },
-                textStyle = MaterialTheme.typography.bodyLarge.copy(
-                    color = MaterialTheme.colorScheme.onSurface,
-                    textDirection = TextDirection.Content,
-                    fontSize = 15.sp
-                ),
-                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.ink, textDirection = TextDirection.Content),
+                cursorBrush = SolidColor(c.accent),
                 maxLines = 4,
                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Send),
                 keyboardActions = KeyboardActions(onSend = { send() }),
@@ -172,69 +148,127 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     } else false
                 },
                 decorationBox = { inner ->
-                    Box(
+                    Row(
                         Modifier
-                            .heightIn(min = 44.dp)
-                            .clip(fieldShape)
-                            .background(MaterialTheme.colorScheme.background)
-                            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, fieldShape)
-                            .padding(horizontal = 14.dp, vertical = 11.dp),
-                        contentAlignment = Alignment.CenterStart
+                            .heightIn(min = 56.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(start = 4.dp, end = 16.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        if (draft.text.isEmpty()) {
-                            if (isRecording || isCallActive) Row(verticalAlignment = Alignment.CenterVertically) {
-                                VoiceWaveformIndicator()
-                                Spacer(Modifier.width(8.dp))
-                                Text("Listening…", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyLarge)
-                            } else Text(
-                                "Ask or tell Dana…",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                style = MaterialTheme.typography.bodyLarge,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis
-                            )
+                        IconButton(
+                            onClick = { imagePicker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+                            modifier = Modifier.size(48.dp)
+                        ) {
+                            Icon(Icons.Filled.Add, contentDescription = "Attach an image", tint = c.inkSoft)
                         }
-                        // Full width, so a Hebrew line starts at the right.
-                        Box(Modifier.fillMaxWidth()) { inner() }
+                        Box(Modifier.weight(1f).padding(vertical = 14.dp), contentAlignment = Alignment.CenterStart) {
+                            if (draft.text.isEmpty()) {
+                                if (listening) Row(verticalAlignment = Alignment.CenterVertically) {
+                                    VoiceWaveformIndicator()
+                                    Spacer(Modifier.width(8.dp))
+                                    Text("Listening…", color = c.accent, style = MaterialTheme.typography.bodyLarge, maxLines = 1)
+                                } else Text(
+                                    "Message Dana",
+                                    color = c.mute,
+                                    style = MaterialTheme.typography.bodyLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            // Full width, so a Hebrew line starts at the right.
+                            Box(Modifier.fillMaxWidth()) { inner() }
+                        }
                     }
                 }
             )
-            val hasText = draft.text.isNotBlank() || pendingImage != null
-            val (icon, label) = when {
-                isRecording || isCallActive -> Icons.Filled.Stop to "Stop listening"
-                hasText -> Icons.Filled.ArrowUpward to "Send"
-                isStreaming -> Icons.Filled.Stop to "Stop Dana"
-                else -> Icons.Filled.Mic to "Speak"
-            }
-            Box(
-                Modifier
-                    .size(44.dp)
-                    // Listening: a gentle ring leaves the button until it stops.
-                    .pulseRing(isRecording || isCallActive, MaterialTheme.colorScheme.primary)
-                    .clip(CircleShape)
-                    .background(accentFill())
-                    // Dimmed while the server is unreachable (sending refuses and re-checks).
-                    .alpha(if (serverStatus.isOffline && !isRecording) 0.5f else 1f)
-                    .clickable {
-                        when {
-                            isRecording || isCallActive -> mic()
-                            hasText -> send()
-                            isStreaming -> viewModel.chatController.stopAssistant()
-                            else -> mic()
-                        }
-                    },
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    icon,
-                    contentDescription = label,
-                    tint = MaterialTheme.colorScheme.onPrimary,
-                    modifier = Modifier.size(20.dp)
-                )
-            }
+            TalkButton(
+                round = layout == ShellLayout.FULL,
+                listening = listening,
+                hasText = hasText,
+                streaming = isStreaming,
+                offline = serverStatus.isOffline,
+                onToggleMic = mic,
+                onSend = { send() },
+                onStop = { viewModel.chatController.stopAssistant() }
+            )
         }
     }
 }
+
+/**
+ * The ask bar's filled button: "Hold to talk" (press listens; a hold ends
+ * when you let go, a tap keeps listening until tapped again or Dana hears the
+ * end), Send with text, Stop while listening or while Dana answers. [round]:
+ * just the icon (beside the narrow conversation pane).
+ */
+@Composable
+private fun TalkButton(
+    round: Boolean,
+    listening: Boolean,
+    hasText: Boolean,
+    streaming: Boolean,
+    offline: Boolean,
+    onToggleMic: () -> Unit,
+    onSend: () -> Unit,
+    onStop: () -> Unit
+) {
+    val c = circuitColors
+    val toggle by rememberUpdatedState(onToggleMic)
+    val send by rememberUpdatedState(onSend)
+    val stop by rememberUpdatedState(onStop)
+    val isListening by rememberUpdatedState(listening)
+    val withText by rememberUpdatedState(hasText)
+    val answering by rememberUpdatedState(streaming)
+    val (icon, label) = when {
+        listening -> Icons.Filled.Stop to "Stop"
+        hasText -> Icons.Filled.ArrowUpward to "Send"
+        streaming -> Icons.Filled.Stop to "Stop"
+        else -> Icons.Filled.Mic to "Hold to talk"
+    }
+    val showLabel = !round && !hasText
+    Row(
+        Modifier
+            .height(56.dp)
+            .then(if (showLabel) Modifier.widthIn(min = 56.dp) else Modifier.width(56.dp))
+            // Listening: a gentle ring leaves the button until it stops.
+            .pulseRing(listening, c.accent)
+            .clip(RoundedCornerShape(28.dp))
+            .background(c.accentFilled)
+            // Dimmed while the server is unreachable (sending refuses and re-checks).
+            .alpha(if (offline && !listening) 0.5f else 1f)
+            .semantics { role = Role.Button; contentDescription = label }
+            // Keyed on nothing: listening starts mid-press, and the hold must survive it.
+            .pointerInput(Unit) {
+                detectTapGestures(onPress = {
+                    when {
+                        isListening -> if (tryAwaitRelease()) toggle()
+                        withText -> if (tryAwaitRelease()) send()
+                        answering -> if (tryAwaitRelease()) stop()
+                        else -> {
+                            val down = System.currentTimeMillis()
+                            toggle()
+                            tryAwaitRelease()
+                            // Held: letting go ends it (a tap keeps listening).
+                            if (System.currentTimeMillis() - down > HOLD_MS && isListening) toggle()
+                        }
+                    }
+                })
+            }
+            .padding(horizontal = if (showLabel) 20.dp else 0.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Center
+    ) {
+        Icon(icon, contentDescription = null, tint = c.onAccentFilled, modifier = Modifier.size(22.dp))
+        if (showLabel) {
+            Spacer(Modifier.width(8.dp))
+            Text(label, style = MaterialTheme.typography.titleMedium, color = c.onAccentFilled, maxLines = 1)
+        }
+    }
+}
+
+/** How long a press must last to count as a hold (let go = stop listening). */
+private const val HOLD_MS = 500L
 
 /**
  * Push-to-talk, the ask bar's and the header's: ends a call or a recording

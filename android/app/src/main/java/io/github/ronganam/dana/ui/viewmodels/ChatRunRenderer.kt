@@ -137,7 +137,7 @@ internal class ChatRunRenderer(
             }
 
             "approval_required" -> {
-                prompts.approvalRequired(event.id, event.name, event.argsText, event.args.pretty(), event.reason.orEmpty())
+                prompts.approvalRequired(event.id, event.name, event.argsText, event.args.pretty(), event.reason.orEmpty(), event.card)
                 transcript.removeThinking()
                 status.value = texts.get(R.string.chat_waiting_approval)
             }

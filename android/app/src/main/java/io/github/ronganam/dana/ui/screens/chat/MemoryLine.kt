@@ -3,6 +3,8 @@ package io.github.ronganam.dana.ui.screens.chat
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -31,11 +33,22 @@ const val FORGOTTEN_ALPHA = 0.45f
  */
 @Composable
 fun MemoryLine(label: String, modifier: Modifier = Modifier) {
-    val accent = MaterialTheme.colorScheme.primary
-    Row(modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-        HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = 0.35f))
-        MetaLabel(label, color = accent, modifier = Modifier.padding(horizontal = 10.dp))
-        HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = 0.35f))
+    val c = io.github.ronganam.dana.ui.theme.circuitColors
+    // The circuit's wire with a moment node where Dana's memory starts (or stops).
+    Row(modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        HorizontalDivider(Modifier.weight(1f), thickness = 1.5.dp, color = c.wire)
+        androidx.compose.foundation.layout.Box(
+            Modifier.padding(start = 8.dp).size(8.dp)
+                .border(1.5.dp, c.accent, androidx.compose.foundation.shape.CircleShape)
+        )
+        androidx.compose.material3.Text(
+            label,
+            style = MaterialTheme.typography.bodySmall,
+            color = c.accent,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 8.dp)
+        )
+        HorizontalDivider(Modifier.weight(1f), thickness = 1.5.dp, color = c.wire)
     }
 }
 
