@@ -669,6 +669,13 @@ async def test_api(client: TestClient) -> None:
           and set(body["watch"]) == {"id", "title", "kind", "status", "request", "spec", "created_at", "window",
                                      "fires_count", "last_fired_at", "next_time", "task_id", "load"}, body)
     bob_id = body["watch"]["id"]
+    check("a new watch is on by default", body["watch"]["status"] == "active", body["watch"]["status"])
+    COMPILE_REPLIES[:] = [spec_json()]
+    r = await client.post("/api/watches", headers=h(BOB), json={"text": "make sure the transfer arrives", "status": "paused"})
+    off = (await r.json())["watch"]
+    check("POST with status paused stores it off", r.status == 201 and off["status"] == "paused"
+          and status(BOB, off["id"]) == "paused", off)
+    await client.delete(f"/api/watches/{off['id']}", headers=h(BOB))
     COMPILE_REPLIES[:] = ["no idea", "still no", "nope"]
     r = await client.post("/api/watches", headers=h(BOB), json={"text": "something odd"})
     body = await r.json()
