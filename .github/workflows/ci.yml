@@ -83,7 +83,7 @@ jobs:
         with:
           distribution: temurin
           java-version: 21
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       # The contract tests read the server's fixtures (server/tests/fixtures,
       # a test resources dir of :app); a copy kept under android/ must match.
       - name: Server fixtures are not copied stale
