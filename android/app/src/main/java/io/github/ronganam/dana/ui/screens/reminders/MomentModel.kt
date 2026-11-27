@@ -279,3 +279,8 @@ fun dropPhrase(w: RemindWhen, now: LocalDateTime): String = when (w) {
     is RemindWhen.At -> "Set to " + if (w.time.toLocalDate() == now.toLocalDate()) w.time.format(HM) else timeLabel(w.time, now).replaceFirstChar { it.lowercase() }
     else -> "Set to " + momentPhrase(w, now).replaceFirstChar { it.lowercase() }
 }
+
+/** The moment sheet's line under the title: its list and due date ("Work · due Monday 30 November"). */
+fun sheetSubtitle(task: Task, listName: String?): String = listOfNotNull(listName, parseTriggerTime(task.dueDate)?.toLocalDate()?.let {
+    "due " + it.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault()))
+}).joinToString(" · ")

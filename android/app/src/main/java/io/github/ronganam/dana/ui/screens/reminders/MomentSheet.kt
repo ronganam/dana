@@ -46,8 +46,6 @@ import io.github.ronganam.dana.ui.components.circuit.SectionHeader
 import io.github.ronganam.dana.ui.shell.rememberNow
 import io.github.ronganam.dana.ui.theme.circuitColors
 import java.time.LocalDateTime
-import java.time.format.DateTimeFormatter
-import java.util.Locale
 
 /**
  * The moment picker: a sheet that sets when a reminder reaches you, with the
@@ -87,9 +85,7 @@ fun MomentSheet(
             Row(verticalAlignment = Alignment.Top) {
                 Column(Modifier.weight(1f).padding(start = 8.dp, top = 4.dp)) {
                     Text(task.title, style = MaterialTheme.typography.titleLarge.copy(textDirection = TextDirection.Content), color = c.ink, maxLines = 3, overflow = TextOverflow.Ellipsis)
-                    val sub = listOfNotNull(listName, parseTriggerTime(task.dueDate)?.toLocalDate()?.let {
-                        "due " + it.format(DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.getDefault()))
-                    }).joinToString(" · ")
+                    val sub = sheetSubtitle(task, listName)
                     if (sub.isNotEmpty()) Text(sub, style = MaterialTheme.typography.bodyMedium, color = c.inkSoft)
                 }
                 IconButton(onClick = onEdit) { Icon(Icons.Outlined.Edit, contentDescription = "Edit the reminder", tint = c.inkSoft) }

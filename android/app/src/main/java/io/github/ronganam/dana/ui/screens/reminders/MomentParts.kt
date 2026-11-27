@@ -1,6 +1,7 @@
 package io.github.ronganam.dana.ui.screens.reminders
 
 import android.content.Context
+import androidx.core.content.edit
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -63,7 +64,7 @@ class KeptSuggestions(context: Context) {
     fun keep(task: Task) {
         val next = state.value.filterNot { it.startsWith("${task.id}:") }.toSet() + "${task.id}:${task.snoozeCount}"
         state.value = next
-        prefs.edit().putStringSet(KEY, next).apply()
+        prefs.edit { putStringSet(KEY, next) }
     }
 
     private companion object { const val KEY = "kept" }
