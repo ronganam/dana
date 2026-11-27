@@ -1,7 +1,8 @@
 """Plain words → a watch spec (docs/watches.md, "Compiler").
 
 One call of the user's balanced model (purpose ``watch_compile``) with the
-moment, the user's places, the names that appear in their events, their event
+moment, who the user is and how a notify / their own chats reach them
+(``identity.py``), the user's places, the names that appear in their events, their event
 catalog (fields and a few common real values from the last two weeks) and
 their tools. The model answers with the spec as one JSON object (no forced
 tool use, no JSON mode: the reply's text is parsed). A reply with no spec or
@@ -23,6 +24,7 @@ from core.addons import registry
 from core.addons.hooks import EventType
 from core.text import untrusted
 from core.users import User
+from addons.watches import identity
 from addons.watches import spec as S
 
 logger = logging.getLogger(__name__)
@@ -40,6 +42,7 @@ MAX_KNOWN_VALUES = 120
 SYSTEM = """You are Dana's watch builder. The user speaks Hebrew or English. Turn their request into ONE watch spec: a single JSON object that follows the schema below. Always answer with that JSON object only, never with other text.
 
 Now: {now} ({weekday}), timezone {tz}.
+{identity}
 The user's places (zones): {zones}
 People Dana knows (names as they appear in events): {people}
 Event catalog (the only events that exist; fields):
@@ -53,12 +56,15 @@ How to build it:
 - A field with known_values in the catalog takes only one of those values (the text before " (" is the value; the rest says what it is): pick the one the user means, never invent one. If none fits, say so in `unsupported`.
 - Times of day ("tonight", "after midnight", "during work hours") go in `during`, never in the semantic question.
 - Use `semantic` only for meaning a field cannot check ("about dinner", "is a P1 or P2 alert", "contains an event invitation"). Keep where/keywords as a cheap prefilter before semantic whenever possible.
+- A semantic question is judged from that event's fields ONLY (exactly the catalog fields of its type, nothing else: no address book, no other events, not who the user is). Never ask about anything the event does not carry (who it was sent to when the type has no recipient field, whether an address is the user's): check it with `where` on a field that carries it (e.g. a `from_me` field), or leave it out and say so in `unsupported`. Ask a semantic question only about the meaning of the text the event carries.
+- The same thing may be in the catalog from its own source and from the phone's notification of it (an email from the mail account vs the phone's email notification): prefer the most specific type, from the source itself, which carries more fields.
 - The same thing can reach Dana as more than one event type (a charge from an app that is not the bank is a phone.notification with `amount`, not a money.transaction; a person may write by message or email). When unsure, add one trigger per likely type.
 - repeat: "once" for a single expected thing (a person writes, an email arrives, a payment comes in); "each" when the user asks about a recurring kind ("any payment over", "every time", "whenever", "all").
 - "until X" sets window_end. "make sure", "check that", "if not ... by" => also on_deadline (tell the user it did not happen). Default window: reminders until the end of the day of their last time; watches 7 days.
 - kind=reminder when the user wants to be reminded of something to do (task_title = the thing to do). For reminders ALSO fill evidence_event_types/evidence_keywords (Hebrew and English forms)/evidence_question so Dana can notice the task got done by itself (an email with tickets, a payment, a message saying it is done). The evidence_question asks whether the thing WAS DONE, never whether it was talked about.
 - Actions: notify (default for watches; a reminder's own trigger fire IS the reminder, so on_match for a reminder is notify with the reminder text). create_task, tool (a direct Dana tool call, args_json), agent (instructions for an AI agent that gets the triggering event and Dana's tools, for multi-step work like "summarize and send to Gil", "put it in my calendar and invite Gil"). Outbound messages default to autonomy ask_first unless the user said to just do it. A tool action needs real ids (a device entity, a chat): if you do not know them, use an agent action that looks them up instead of guessing.
-- If something cannot be expressed (no such event source, a condition across two events), set `unsupported` honestly and build the closest watch.
+- If something cannot be expressed (no such event source, a condition across two events), set `unsupported` honestly and build the closest watch. Never claim the user cannot be reached on a channel or tool listed above, nor call a notify a poor substitute: it reaches them where it says.
+- An agent action already knows who the user is and how to reach them; write its instructions with "me" kept as the user.
 - Titles in the user's language, short.
 
 The JSON schema of the spec:
@@ -188,6 +194,7 @@ def system_prompt(user: User, types: Mapping[str, EventType], hist: Mapping[str,
         seen = "\n" + untrusted("the user's recent events (common values and names, written by others)",
                                 json.dumps({"common_values": values, "people": names}, ensure_ascii=False))
     return SYSTEM.format(now=now.strftime(S.TIME_FORMAT), weekday=now.strftime("%A"), tz=str(clock.get_timezone()),
+                         identity=identity.about_user(user, tools),
                          zones=", ".join(z.name for z in zones.list_zones(user)) or "none yet",
                          people="see the frame below" if names else "none known",
                          catalog=json.dumps(cat, ensure_ascii=False) + seen,

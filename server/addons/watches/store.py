@@ -1,10 +1,11 @@
-"""The watches and their fires in the database, always for one user (another
-user's id answers like a missing one). Tables from ``migrations/m0001_watches.py``."""
+"""The watches, their fires and their trace in the database, always for one user
+(another user's id answers like a missing one). Tables from
+``migrations/m0001_watches.py`` and ``m0002_trace.py``."""
 
 import datetime as dt
 import json
 import uuid
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Mapping, Optional
 
 from core import clock
 from core.db import get_db_connection
@@ -13,6 +14,10 @@ from core.users import User
 ACTIVE, PAUSED, DONE, EXPIRED = "active", "paused", "done", "expired"
 STATUSES = (ACTIVE, PAUSED, DONE, EXPIRED)
 FIRE_DAYS = 90
+TRACE_DAYS = 30
+TRACE_PER_WATCH = 2000
+TRACE_DATA_CHARS = 4000
+TRACE_COLUMNS = "id, watch_id, at, trigger_id, event_type, event_id, summary, data, outcome, reason, near"
 COLUMNS = ("id, user_id, title, kind, status, request, spec, task_id, created_at, updated_at, next_time, "
            "fires_count, last_fired_at, closed_at")
 
@@ -201,3 +206,75 @@ def prune(user: User, now: dt.datetime) -> int:
         cur = conn.execute("DELETE FROM watch_fires WHERE user_id = ? AND at < ?", (user.id, cutoff))
         conn.commit()
     return cur.rowcount
+
+
+# --- Trace ----------------------------------------------------------------------------
+
+
+def trace_data(data: Mapping[str, Any]) -> str:
+    """An event's data as the trace stores it: JSON of at most :data:`TRACE_DATA_CHARS` characters (long texts
+    cut first, then whole fields dropped)."""
+    out = json.dumps(data, ensure_ascii=False, default=str)
+    if len(out) <= TRACE_DATA_CHARS:
+        return out
+    cut = {k: (v[:400] + "…" if isinstance(v, str) and len(v) > 400 else v) for k, v in data.items()}
+    out = json.dumps(cut, ensure_ascii=False, default=str)
+    while len(out) > TRACE_DATA_CHARS and cut:
+        cut.pop(max(cut, key=lambda k: len(json.dumps(cut[k], ensure_ascii=False, default=str))))
+        cut["_cut"] = True
+        out = json.dumps(cut, ensure_ascii=False, default=str)
+    return out
+
+
+def add_trace(user: User, rows: List[Dict[str, Any]]) -> None:
+    """Store trace rows of ``user`` (``{watch_id, trigger_id, event_type, event_id, summary, data, outcome,
+    reason, near, at?}``; ``data`` a dict) in one transaction."""
+    if not rows:
+        return
+    when = _now()
+    with get_db_connection() as conn:
+        conn.executemany(
+            "INSERT INTO watch_trace (user_id, watch_id, at, trigger_id, event_type, event_id, summary, data, "
+            "outcome, reason, near) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [(user.id, r["watch_id"], r.get("at") or when, r.get("trigger_id") or "", r.get("event_type") or "",
+              r.get("event_id") or "", str(r.get("summary") or "")[:200], trace_data(r.get("data") or {}),
+              r["outcome"], str(r.get("reason") or "")[:300], 1 if r.get("near") else 0) for r in rows])
+        conn.commit()
+
+
+def trace(user: User, watch_id: str, limit: int = 100, outcome: str = "") -> List[Dict[str, Any]]:
+    """The trace of ``user``'s watch, newest first; ``outcome``: ``near`` (near misses and fires), ``fired``,
+    or one outcome name ("" or ``all``: every row)."""
+    sql = f"SELECT {TRACE_COLUMNS} FROM watch_trace WHERE user_id = ? AND watch_id = ?"
+    args: List[Any] = [user.id, watch_id]
+    if outcome == "near":
+        sql += " AND near = 1"
+    elif outcome and outcome != "all":
+        sql += " AND outcome = ?"
+        args.append(outcome)
+    with get_db_connection() as conn:
+        rows = conn.execute(sql + " ORDER BY id DESC LIMIT ?", (*args, limit)).fetchall()
+    out = []
+    for r in rows:
+        d = dict(r)
+        d["data"] = json.loads(d.get("data") or "{}")
+        d["near"] = bool(d["near"])
+        out.append(d)
+    return out
+
+
+def prune_trace(user: User, now: dt.datetime) -> int:
+    """Delete ``user``'s trace rows older than :data:`TRACE_DAYS` and all but the newest
+    :data:`TRACE_PER_WATCH` of each watch; returns how many."""
+    cutoff = (now - dt.timedelta(days=TRACE_DAYS)).isoformat(timespec="seconds")
+    with get_db_connection() as conn:
+        n = conn.execute("DELETE FROM watch_trace WHERE user_id = ? AND at < ?", (user.id, cutoff)).rowcount
+        over = conn.execute("SELECT watch_id FROM watch_trace WHERE user_id = ? GROUP BY watch_id HAVING COUNT(*) > ?",
+                            (user.id, TRACE_PER_WATCH)).fetchall()
+        for r in over:
+            n += conn.execute(
+                "DELETE FROM watch_trace WHERE user_id = ? AND watch_id = ? AND id <= (SELECT id FROM watch_trace "
+                "WHERE user_id = ? AND watch_id = ? ORDER BY id DESC LIMIT 1 OFFSET ?)",
+                (user.id, r["watch_id"], user.id, r["watch_id"], TRACE_PER_WATCH)).rowcount
+        conn.commit()
+    return n

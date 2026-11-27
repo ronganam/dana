@@ -5,7 +5,8 @@
  * addons/watches/tests/test_web_watches.mjs.
  *
  * Payloads: GET /api/watches (Watch), GET /api/watches/{id} (fires), POST /api/watches/dry-run,
- * GET /api/watches/catalog, GET /api/watches/pipeline and its stream (PipelineEvent).
+ * GET /api/watches/catalog, GET /api/watches/pipeline and its stream (PipelineEvent), GET /api/watches/{id}/trace
+ * (the recent checks: the filter in its query, each row in words, its event data as lines).
  */
 (() => {
   "use strict";
@@ -582,6 +583,39 @@
     }));
   }
 
+  // ---------- recent checks (GET /api/watches/{id}/trace) ----------
+
+  const TRACE_FILTERS = [["all", "All"], ["near", "Near misses"], ["fired", "Fires"]];
+  const TRACE_OUTCOMES = {
+    drop: { label: "No match", hue: "mute" }, during: { label: "Outside its hours", hue: "mute" },
+    outside_window: { label: "Outside its window", hue: "mute" }, semantic_no: { label: "AI said no", hue: "plum" },
+    semantic_yes: { label: "AI said yes", hue: "plum" }, semantic_failed: { label: "AI check failed", hue: "rose" },
+    fired: { label: "Fired", hue: "ember" }, cooldown: { label: "Cooldown", hue: "amber" },
+    skipped: { label: "Skipped", hue: "amber" }, unstored: { label: "Not stored", hue: "mute" },
+  };
+  /** The query string of a trace request: "?limit=100" plus the filter when it is not "all". */
+  function traceQuery(filter, limit = 100) {
+    const f = TRACE_FILTERS.some(([k]) => k === filter) ? filter : "all";
+    return `?limit=${Math.max(1, Math.min(500, Number(limit) || 100))}${f === "all" ? "" : `&outcome=${f}`}`;
+  }
+  /** One trace row in words: {what, outcome, hue, reason, near, trigger}. */
+  function traceWords(row) {
+    const r = row || {};
+    const o = TRACE_OUTCOMES[r.outcome] || { label: words(r.outcome || "?"), hue: "mute" };
+    const what = r.summary || (r.event_type ? eventSummary(r.event_type, r.data || {}) : "");
+    return { what, outcome: o.label, hue: o.hue, reason: r.reason || "", near: Boolean(r.near), trigger: r.trigger_id || "" };
+  }
+  /** An event's data as [field, value] lines for the expanded row (empty values left out, long ones cut). */
+  function traceDataLines(data) {
+    const out = [];
+    for (const [k, v] of Object.entries(data || {})) {
+      if (v === null || v === undefined || v === "") continue;
+      const s = typeof v === "string" ? v : JSON.stringify(v);
+      out.push([k, s.length > 300 ? `${s.slice(0, 299)}…` : s]);
+    }
+    return out;
+  }
+
   // ---------- the live pipeline ----------
 
   const SINKS = [
@@ -900,6 +934,7 @@
     clone, same, nextTriggerId, fieldsOf, addTrigger, removeTrigger, setTrigger, addCondition, removeCondition, setCondition,
     addKeyword, removeKeyword, toggleEvidenceType, addAction, removeAction, setAction, setSpec,
     validate, normalizeErrors, errorsAt, errorsElsewhere, loadWords, eventSummary, money, fireActions,
+    TRACE_FILTERS, TRACE_OUTCOMES, traceQuery, traceWords, traceDataLines,
     sinkOf, actionTypeOf, pipelineInit, pipelineApply, lanes, laneCount, counters, feedWords,
     layout, curve, pointAt, pathD, ease, edgeOf, usWords, costWords,
   };

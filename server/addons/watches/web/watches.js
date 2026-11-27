@@ -3,11 +3,12 @@
  *   Watches: the list (Active reminders, Active watches, Paused, Done and expired; search; a "New watch" box that
  *            takes plain words) and the editor of one watch (title, window, once / every time, triggers with their
  *            field conditions, keywords, hours and AI check, actions, deadline actions, evidence for reminders,
- *            "Change in words", Save with the errors on their fields, a live dry run, the history of fires).
+ *            "Change in words", Save with the errors on their fields, a live dry run, the history of fires, the recent
+ *            checks: each event it looked at and why it did or did not fire, all / near misses / fires).
  *   Live:    the pipeline drawn as it works: sources → Filter → AI check → Fire → actions, a dot per step of the
  *            stream, the counters on the nodes and a feed of the latest steps in plain words.
  *
- *   GET    /api/watches · GET /api/watches/{id} · POST /api/watches {text} · PATCH /api/watches/{id}
+ *   GET    /api/watches · GET /api/watches/{id} · GET /api/watches/{id}/trace · POST /api/watches {text} · PATCH /api/watches/{id}
  *          {spec} | {status} | {change} · DELETE /api/watches/{id} → {undo_id} · POST /api/undo/{id}
  *   POST   /api/watches/dry-run {spec, days} · GET /api/watches/catalog
  *   GET    /api/watches/pipeline · GET /api/watches/pipeline/stream (SSE, one PipelineEvent per message)
@@ -28,6 +29,9 @@
     draft: null, orig: null,
     errors: [],           // [{path, message}] shown on their fields
     fires: null,          // the selected watch's fires (GET /api/watches/{id})
+    trace: null,          // its recent checks (GET /api/watches/{id}/trace)
+    traceFilter: "all",   // "all" | "near" | "fired"
+    traceUnstored: 0,
     dry: {},              // trigger id → dry-run result
     dryState: "",         // "" | "busy" | "error"
     openSamples: new Set(),
@@ -122,6 +126,14 @@
       if (r.body.watch) replaceWatch(r.body.watch, { keepDraft: true });
     } else S.fires = [];
     renderHistory();
+  }
+
+  async function loadTrace(id) {
+    const r = await A.json("GET", `/api/watches/${encodeURIComponent(id)}/trace${C.traceQuery(S.traceFilter)}`);
+    if (S.selected !== id) return;
+    S.trace = r.status === 200 && r.body ? r.body.trace || [] : [];
+    S.traceUnstored = r.status === 200 && r.body ? Number(r.body.unstored) || 0 : 0;
+    renderTrace();
   }
 
   const watchOf = (id) => S.watches.find((w) => w.id === id);
@@ -301,7 +313,7 @@
     const w = id ? watchOf(id) : null;
     S.draft = w ? C.clone(w.spec) : null;
     S.orig = w ? C.clone(w.spec) : null;
-    S.errors = []; S.dry = {}; S.dryState = ""; S.fires = null; S.changeError = ""; S.openSamples = new Set();
+    S.errors = []; S.dry = {}; S.dryState = ""; S.fires = null; S.trace = null; S.changeError = ""; S.openSamples = new Set();
     $("wch-list-view").classList.toggle("detail-open", Boolean(id));
     root.querySelectorAll(".wch-row").forEach((r) => {
       const on = r.dataset.id === id;
@@ -310,7 +322,7 @@
       if (b) { if (on) b.setAttribute("aria-current", "true"); else b.removeAttribute("aria-current"); }
     });
     renderDetail();
-    if (id) { loadFires(id); $("wch-detail").scrollTop = 0; }
+    if (id) { loadFires(id); loadTrace(id); $("wch-detail").scrollTop = 0; }
   }
 
   const sel = (path, options, value) => `<select class="form-control wch-in" data-path="${esc(path)}">${options.map(([v, l]) => `<option value="${esc(v)}"${String(v) === String(value == null ? "" : value) ? " selected" : ""}>${esc(l)}</option>`).join("")}</select>`;
@@ -517,6 +529,29 @@
         </li>`;
     }).join("")}</ol>`;
   }
+  function traceHtml() {
+    const filters = `<div class="segmented-control wch-seg" role="group" aria-label="Which checks">${C.TRACE_FILTERS.map(([k, l]) => `<button type="button" class="segmented-btn${S.traceFilter === k ? " active" : ""}" data-act="trace-filter" data-value="${k}" aria-pressed="${S.traceFilter === k}">${l}</button>`).join("")}</div>`;
+    if (S.trace === null) return `${filters}<div class="wch-skel dn-shimmer"></div>`;
+    const more = S.traceUnstored ? `<p class="wch-mute">${S.traceUnstored} more checks this hour were not stored (far misses over the hourly cap).</p>` : "";
+    if (!S.trace.length) return `${filters}<p class="wch-mute">${S.traceFilter === "all" ? "No events of the kinds it watches have come in yet." : "None yet."}</p>${more}`;
+    return `${filters}<ol class="wch-fires wch-checks">${S.trace.map((row) => {
+      const v = C.traceWords(row);
+      const lines = C.traceDataLines(row.data);
+      return `
+        <li class="wch-fire">
+          <span class="wch-dot hue-${v.hue}" aria-hidden="true"></span>
+          <div class="wch-fire-text">
+            <div class="wch-fire-line"><span class="wch-fire-what" dir="auto">${esc(v.what || row.event_type || "")}</span><span class="wch-fire-when">${esc(C.whenWords(row.at))}</span></div>
+            <div class="wch-fire-acts"><span class="wch-status hue-${v.hue}">${esc(v.outcome)}</span>${v.trigger ? `<span class="wch-mute">${esc(v.trigger)}</span>` : ""}${v.reason ? `<span class="wch-check-why" dir="auto">${esc(v.reason)}</span>` : ""}</div>
+            ${lines.length ? `<details class="wch-check-data"><summary>Event data</summary><dl>${lines.map(([k, val]) => `<dt>${esc(k)}</dt><dd dir="auto">${esc(val)}</dd>`).join("")}</dl></details>` : ""}
+          </div>
+        </li>`;
+    }).join("")}</ol>${more}`;
+  }
+  function renderTrace() {
+    const el = $("wch-trace");
+    if (el) { el.innerHTML = traceHtml(); A.icons(); }
+  }
   function renderHistory() {
     const el = $("wch-history");
     if (el) { el.innerHTML = historyHtml(); A.icons(); }
@@ -617,6 +652,11 @@
           <section class="wch-sec">
             <h3 class="wch-sec-head dn-eyebrow">History</h3>
             <div id="wch-history">${historyHtml()}</div>
+          </section>
+
+          <section class="wch-sec">
+            <h3 class="wch-sec-head dn-eyebrow">Recent checks</h3>
+            <div id="wch-trace">${traceHtml()}</div>
           </section>
           <datalist id="wch-tools">${(S.catalog.tools || []).map((t) => `<option value="${esc(t)}">`).join("")}</datalist>
         </div>
@@ -1116,6 +1156,9 @@
           break;
         }
         case "run": A.openSession(n.dataset.session); break;
+        case "trace-filter":
+          if (S.selected && n.dataset.value !== S.traceFilter) { S.traceFilter = n.dataset.value; S.trace = null; renderTrace(); loadTrace(S.selected); }
+          break;
         case "save": save(); break;
         case "discard": discard(); break;
         default: break;

@@ -128,6 +128,7 @@ COMPILE_REPLIES: List[str] = []
 COMPILE_CALLS: List[List[Dict[str, Any]]] = []
 MATCH_CALLS: List[str] = []
 MATCH_RULE: Dict[str, Callable[[str], List[str]]] = {"rule": lambda prompt: []}
+MATCH_WHY: Dict[str, Callable[[str], Dict[str, str]]] = {"rule": lambda prompt: {}}
 
 
 async def fake_complete(messages: List[Dict[str, Any]], *, job: Optional[str] = None, purpose: str = "",
@@ -138,7 +139,8 @@ async def fake_complete(messages: List[Dict[str, Any]], *, job: Optional[str] = 
     if purpose == "watch_match":
         prompt = messages[0]["content"]
         MATCH_CALLS.append(prompt)
-        return json.dumps({"yes": MATCH_RULE["rule"](prompt)})
+        why = MATCH_WHY["rule"](prompt)
+        return json.dumps({"yes": MATCH_RULE["rule"](prompt), **({"why": why} if why else {})})
     raise RuntimeError("offline in this test")
 
 
@@ -620,10 +622,17 @@ async def test_actions() -> None:
     fs = fires(BOB, w["id"])
     acts = fs[0]["actions"] if fs else []
     check("an agent action starts a run and records its run id", len(acts) == 3 and acts[0]["type"] == "agent"
-          and acts[0]["status"] == "done" and acts[0]["run_id"] and acts[0]["session_id"] == "main", acts)
-    check("the agent runs as the user in their thread, the event framed as untrusted",
-          AGENT_TEXTS and AGENT_TEXTS[0][0] == BOB.id and AGENT_TEXTS[0][1] == "main"
+          and acts[0]["status"] == "done" and acts[0]["run_id"] and acts[0]["session_id"] == f"watch-{w['id']}", acts)
+    check("the agent runs as the user in the watch's own session, the event framed as untrusted",
+          AGENT_TEXTS and AGENT_TEXTS[0][0] == BOB.id and AGENT_TEXTS[0][1] == f"watch-{w['id']}"
           and carries_untrusted(AGENT_TEXTS[0][2]) and "Summarize and send it to Gal" in AGENT_TEXTS[0][2])
+    check("the agent message starts with who the user is and that 'me' is them",
+          "The user: Bob Builder" in AGENT_TEXTS[0][2] and '"me"' in AGENT_TEXTS[0][2]
+          and "watch's own session" in AGENT_TEXTS[0][2], AGENT_TEXTS[0][2][:400])
+    from core.session import list_all_sessions
+    listed = {x["session_id"]: x["title"] for x in list_all_sessions(BOB.id)}
+    check("GET /api/sessions lists the watch's session with its title",
+          listed.get(f"watch-{w['id']}") == "👀 Mom about the car", listed)
     with get_db_connection() as conn:
         titles = [r["title"] for r in conn.execute("SELECT title FROM tasks WHERE user_id = ?", (BOB.id,)).fetchall()]
     check("create_task adds a task through the tasks addon", acts[1]["status"] == "done"
@@ -825,6 +834,7 @@ async def test_web_fixture(client: TestClient) -> None:
         "list": await (await client.get("/api/watches", headers=h(BOB))).json(),
         "detail": await (await client.get(f"/api/watches/{money['id']}", headers=h(BOB))).json(),
         "detail_agent": await (await client.get(f"/api/watches/{dish['id']}", headers=h(BOB))).json(),
+        "trace": await (await client.get(f"/api/watches/{money['id']}/trace", headers=h(BOB))).json(),
         "pipeline": await (await client.get("/api/watches/pipeline", headers=h(BOB))).json(),
         "catalog": await (await client.get("/api/watches/catalog", headers=h(BOB))).json(),
     }
@@ -872,6 +882,8 @@ async def test_agent_live() -> None:
         check("a held agent run's live activity asks for the OK with Approve / Deny",
               len(mine) == 1 and [a.id for a in mine[0].activity.actions] == ["approve", "deny"]
               and mine[0].activity.tone == "warn" and "dinner Tuesday" in mine[0].activity.text, [c.activity for c in mine])
+        check("tapping the live activity opens the watch's session", mine[0].activity.open == f"/chat/watch-{w['id']}",
+              mine[0].activity.open)
         check("no separate notice: the live activity alerts (Telegram stays out of it)",
               not [m for _, m in SENT if m.kind == "notify"], SENT)
         fs = fires(BOB, w["id"])
@@ -879,11 +891,212 @@ async def test_agent_live() -> None:
         res = await live.act(BOB, mine[0].id, "approve")
         await actions.drain()
         check("Approve on the live activity resumes that session's run and ends the card",
-              RESUMED == [(BOB.id, "main", "approve")] and res is None
+              RESUMED == [(BOB.id, f"watch-{w['id']}", "approve")] and res is None
               and not [c for c in live.active(BOB) if c.key == mine[0].key], RESUMED)
-        check("the pending approval is answered", get_pending(BOB.id, "main") is None)
+        check("the pending approval is answered", get_pending(BOB.id, f"watch-{w['id']}") is None)
     finally:
         session_runner.start_agent_task = fake_start_agent_task
+
+
+# --- 9. Identity, own sessions, interest hints, the trace --------------------------------------
+
+async def test_identity() -> None:
+    """The compiler and the agent runs know who the user is, what "me" means and how to reach them."""
+    import dataclasses
+    from addons.watches import identity
+    fake = dataclasses.replace(BOB, name="Dana Tester", other_names="Danny, דנה", pronoun="she", telegram_chat_id=None)
+    tools = ["send_whatsapp_message", "send_telegram_message_to_me", "weather_at_home", "web_search"]
+    sysmsg = compiler.system_prompt(fake, engine.catalog(BOB), {}, tools, now())
+    check("compiler prompt: the user's name, other names and pronoun",
+          "The user: Dana Tester (also called Danny, דנה); pronoun: she." in sysmsg, sysmsg[:600])
+    check("compiler prompt: 'me' / a sender shown as 'me' is the user, never another person's name",
+          '"me", "I", "my", "myself"' in sysmsg and 'shown as "me"' in sysmsg and "Never take another person" in sysmsg)
+    check("compiler prompt: how to reach the user themself (only the tools they have)",
+          'chat_id "me"' in sysmsg and "send_telegram_message_to_me" in sysmsg and "weather_at_home" in sysmsg
+          and "not a web search" in sysmsg)
+    check("compiler prompt: no Telegram as a notify channel without a chat",
+          "Telegram (their chat" not in identity.about_user(fake, []))
+    with_chat = dataclasses.replace(fake, telegram_chat_id=4242)
+    check("a notify reaches Telegram when the user has a chat with the bot",
+          "Telegram (their chat with Dana's bot)" in identity.about_user(with_chat, []))
+    bare = identity.about_user(fake, [])
+    check("no WhatsApp / Telegram / weather tool lines without those tools",
+          "chat_id" not in bare and "send_telegram_message_to_me" not in bare and "Weather" not in bare, bare)
+    check("compiler prompt: semantic questions only about what the event carries; the most specific source",
+          "Never ask about anything the event does not carry" in sysmsg and "prefer the most specific type" in sysmsg)
+    check("compiler prompt: never claims the user cannot be reached", "Never claim the user cannot be reached" in sysmsg)
+
+
+async def test_sessions() -> None:
+    """Each watch agent run has the watch's own session; a busy one moves to watch-<id>-2."""
+    clear(BOB)
+    AGENT_TEXTS.clear()
+    w = await make(BOB, watch_spec([{"id": "gal", "kind": "event", "event_type": "phone.notification.received",
+                                     "where": [{"field": "sender", "op": "contains", "value": "gal"}]}],
+                                   repeat="each", cooldown_minutes=0, title="Gal writes",
+                                   on_match=[{"type": "agent", "instructions": "Summarize it for me"}]))
+    gate = asyncio.Event()
+
+    async def hold() -> None:
+        await gate.wait()
+    busy = runs.runs.start(BOB, f"watch-{w['id']}", "message", hold)
+    try:
+        await emit(BOB, "phone.notification.received", **notif(sender="Gal", text="hello"))
+    finally:
+        gate.set()
+        await asyncio.wait([busy.task]) if busy.task else None
+    acts = fires(BOB, w["id"])[0]["actions"]
+    check("a busy watch session moves the run to watch-<id>-2", acts[0]["session_id"] == f"watch-{w['id']}-2"
+          and AGENT_TEXTS[-1][1] == f"watch-{w['id']}-2", acts)
+    from core.session import list_all_sessions
+    listed = {x["session_id"]: x["title"] for x in list_all_sessions(BOB.id)}
+    check("the second session has the watch's title too", listed.get(f"watch-{w['id']}-2") == "👀 Gal writes", listed)
+    check("the shared thread is never used", all(t[1] != "main" for t in AGENT_TEXTS), AGENT_TEXTS)
+
+
+async def test_interest() -> None:
+    """Interest hints: the values active watches pin, None when one does not pin, [] when none listens."""
+    from addons.watches import interest
+    ha = "homeassistant.state.changed"
+
+    def w(*trigs: Dict[str, Any], evidence: Optional[List[str]] = None) -> Dict[str, Any]:
+        return {"spec": {"triggers": list(trigs), "evidence_event_types": evidence or []}}
+
+    def trig(*where: Dict[str, Any], et: str = ha) -> Dict[str, Any]:
+        return {"id": "t", "kind": "event", "event_type": et, "where": list(where)}
+    led = {"field": "entity_id", "op": "eq", "value": "light.kitchen_led"}
+    two = {"field": "entity_id", "op": "in", "value": "sensor.a|sensor.b"}
+    state = {"field": "new_state", "op": "eq", "value": "on"}
+    check("interest: [] when no watch listens", S.pinned_values([w(trig(state, et="core.signal.car"))], ha, "entity_id") == [])
+    check("interest: the union of eq / in values", S.pinned_values([w(trig(led, state)), w(trig(two))], ha, "entity_id")
+          == ["light.kitchen_led", "sensor.a", "sensor.b"])
+    check("interest: None when a trigger on the type pins no entity",
+          S.pinned_values([w(trig(led)), w(trig(state))], ha, "entity_id") is None)
+    check("interest: None when a reminder takes the type as evidence",
+          S.pinned_values([w(trig(led)), w(evidence=[ha])], ha, "entity_id") is None)
+
+    got: List[Tuple[str, str, str, Any]] = []
+    had = getattr(events, "set_interest", None)
+    old_hints = interest.HINTS
+    events.set_interest = lambda uid, et, field, values: got.append((uid, et, field, None if values is None else list(values)))
+    interest.HINTS = (("phone.notification.received", "sender"),)
+    try:
+        clear(BOB)
+        got.clear()
+        row = await make(BOB, watch_spec([{"id": "g", "kind": "event", "event_type": "phone.notification.received",
+                                           "where": [{"field": "sender", "op": "eq", "value": "Gal"}]}], title="Gal"))
+        check("interest: sent when a watch is created", got and got[-1] == (BOB.id, "phone.notification.received", "sender", ["Gal"]), got)
+        service.set_status(BOB, row, "paused")
+        check("interest: [] once it is paused", got[-1][3] == [], got[-1])
+        service.set_status(BOB, store.get(BOB, row["id"]), "active")
+        check("interest: back when resumed", got[-1][3] == ["Gal"], got[-1])
+        service.delete(BOB, row["id"])
+        check("interest: [] once deleted", got[-1][3] == [], got[-1])
+        got.clear()
+        await hooks.hint_interest(BOB)
+        check("interest: sent at start-up per user", got == [(BOB.id, "phone.notification.received", "sender", [])], got)
+    finally:
+        interest.HINTS = old_hints
+        if had is None:
+            del events.set_interest
+        else:
+            events.set_interest = had
+
+
+async def test_trace() -> None:
+    """Each event of a type a watch listens to is traced with its outcome and why; caps and prune."""
+    from addons.watches import trace
+    clear(BOB)
+    trace.reset()
+    w = await make(BOB, watch_spec([{"id": "self", "kind": "event", "event_type": "phone.email.received",
+                                     "where": [{"field": "account", "op": "eq", "value": "Gmail"},
+                                               {"field": "from", "op": "contains_any", "value": "tester@example.com|Dana Tester"}],
+                                     "semantic": "Is it a note to summarize?"}],
+                                   repeat="each", cooldown_minutes=0, title="Emails from me"))
+    MATCH_RULE["rule"] = lambda p: question_ids(p) if "groceries" in p else []
+    MATCH_WHY["rule"] = lambda p: {q: ("a shopping list note" if "groceries" in p else "a newsletter, not a note")
+                                   for q in question_ids(p)}
+    email = lambda **kw: {"notification_id": f"m{dt.datetime.now().microsecond}", "account": "Gmail", "from": "",
+                          "subject": "", "text": "", "amount": None, **kw}
+    await emit(BOB, "phone.email.received", **email(**{"from": "me", "subject": "list"}))
+    await emit(BOB, "phone.email.received", **email(**{"from": "Shop <news@example.com>", "account": "Outlook"}))
+    await emit(BOB, "phone.email.received", **email(**{"from": "Dana Tester", "subject": "weekly digest"}))
+    await emit(BOB, "phone.email.received", **email(**{"from": "Dana Tester", "subject": "groceries: milk"}))
+    await emit(BOB, "phone.notification.received", **notif(sender="Gal"))
+    rows = store.trace(BOB, w["id"], 50)
+    outs = [(r["outcome"], r["reason"], r["near"]) for r in rows][::-1]
+    check("trace: a drop names the first failing condition and the value seen (a near miss when one held)",
+          outs and outs[0] == ("drop", 'from contains_any "tester@example.com|Dana Tester" ← "me"', True), outs)
+    check("trace: a drop where nothing held is not a near miss",
+          len(outs) > 1 and outs[1] == ("drop", 'account eq "Gmail" ← "Outlook"', False), outs)
+    check("trace: semantic no with the small model's reason",
+          len(outs) > 2 and outs[2] == ("semantic_no", "a newsletter, not a note", True), outs)
+    check("trace: a fire with the reason", len(outs) > 3 and outs[3] == ("fired", "a shopping list note", True), outs)
+    check("trace: only events of a type the watch listens to", len(outs) == 4, outs)
+    check("trace: the event's data and summary are stored", rows[0]["data"].get("subject") == "groceries: milk"
+          and rows[0]["event_type"] == "phone.email.received" and rows[0]["summary"], rows[0])
+    MATCH_WHY["rule"] = lambda p: {}
+
+    big = {"text": "x" * 9000, "subject": "s" * 3000, "from": "y"}
+    check("trace: event data is capped at ~4 KB", len(store.trace_data(big)) <= store.TRACE_DATA_CHARS)
+
+    old = trace.PER_HOUR
+    trace.PER_HOUR = 2
+    try:
+        trace.reset()
+        far = [{"watch_id": "wx", "outcome": "drop", "near": False} for _ in range(5)]
+        t0 = now()
+        kept = trace.keep(far + [{"watch_id": "wx", "outcome": "fired", "near": True}], t0)
+        check("trace cap: over N an hour only near misses and fires are stored",
+              len(kept) == 3 and kept[-1]["outcome"] == "fired" and trace._rate["wx"][2] == 3, kept)
+        later = trace.keep([{"watch_id": "wx", "outcome": "drop", "near": False}], t0 + dt.timedelta(hours=1))
+        check("trace cap: the next hour starts with one 'unstored' row counting the rest",
+              len(later) == 2 and later[0]["outcome"] == "unstored" and later[0]["summary"].startswith("3 more"), later)
+    finally:
+        trace.PER_HOUR = old
+        trace.reset()
+
+    old_cap = store.TRACE_PER_WATCH
+    store.TRACE_PER_WATCH = 3
+    try:
+        store.add_trace(BOB, [{"watch_id": "old", "outcome": "drop", "at": S.fmt(now() - dt.timedelta(days=40))}])
+        store.add_trace(BOB, [{"watch_id": "cap", "outcome": "drop", "summary": f"n{i}"} for i in range(5)])
+        n = await hooks.prune(BOB)
+        left = [r["summary"] for r in store.trace(BOB, "cap", 10)]
+        check("prune: trace rows older than 30 days go, and all but the newest N per watch",
+              n >= 3 and not store.trace(BOB, "old", 10) and left == ["n4", "n3", "n2"], (n, left))
+    finally:
+        store.TRACE_PER_WATCH = old_cap
+
+
+async def test_trace_api(client: TestClient) -> None:
+    from addons.watches import trace
+    clear(BOB)
+    trace.reset()
+    w = await make(BOB, watch_spec([{"id": "g", "kind": "event", "event_type": "phone.notification.received",
+                                     "where": [{"field": "app", "op": "eq", "value": "WhatsApp"},
+                                               {"field": "sender", "op": "contains", "value": "Gal"}]}],
+                                   repeat="each", cooldown_minutes=0, title="Gal writes"))
+    await emit(BOB, "phone.notification.received", **notif(app="Telegram", sender="Tom"))
+    await emit(BOB, "phone.notification.received", **notif(app="WhatsApp", sender="Tom"))
+    await emit(BOB, "phone.notification.received", **notif(app="WhatsApp", sender="Gal"))
+    r = await client.get(f"/api/watches/{w['id']}/trace", headers=h(BOB))
+    body = await r.json()
+    check("GET trace: newest first, with outcome, reason, near and data", r.status == 200
+          and [t["outcome"] for t in body["trace"]] == ["fired", "drop", "drop"] and body["unstored"] == 0
+          and set(body["trace"][0]) == {"id", "at", "trigger_id", "event_type", "event_id", "summary", "outcome",
+                                        "reason", "near", "data"} and body["trace"][0]["data"]["sender"] == "Gal", body)
+    r = await client.get(f"/api/watches/{w['id']}/trace?outcome=near", headers=h(BOB))
+    check("GET trace?outcome=near: near misses and fires", [t["outcome"] for t in (await r.json())["trace"]]
+          == ["fired", "drop"])
+    r = await client.get(f"/api/watches/{w['id']}/trace?outcome=fired&limit=5", headers=h(BOB))
+    check("GET trace?outcome=fired", [t["outcome"] for t in (await r.json())["trace"]] == ["fired"])
+    r = await client.get(f"/api/watches/{w['id']}/trace?outcome=nope", headers=h(BOB))
+    check("GET trace: an unknown outcome is 400", r.status == 400)
+    r = await client.get(f"/api/watches/{w['id']}/trace", headers=h(ADMIN))
+    check("GET trace: another user's watch is 404", r.status == 404)
+    r = await client.get(f"/api/watches/{w['id']}/trace", headers=h(CARL))
+    check("GET trace: without the addon 403", r.status == 403)
 
 
 async def main() -> None:
@@ -895,8 +1108,13 @@ async def main() -> None:
     await test_compiler()
     await test_actions()
     await test_agent_live()
+    await test_identity()
+    await test_sessions()
+    await test_interest()
+    await test_trace()
     async with TestClient(TestServer(build_app())) as client:
         await test_api(client)
+        await test_trace_api(client)
         await test_tools()
         await test_web_fixture(client)
     await events.drain()

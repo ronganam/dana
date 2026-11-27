@@ -2,7 +2,7 @@
 
 The `watches` addon (`addons/watches/`, on by default) turns anything a user asks — "make sure a transfer of about 22k from a person arrives by tomorrow", "remind me at 20:30 to pick up Noa, 30 minutes before too, or when I get in the car", "when the dishwasher finishes ask Gal on WhatsApp to empty it" — into a **watch**: triggers + a window + actions. A model compiles the words into a spec once; a cheap engine fires it: structured conditions in Python first (microseconds), then keywords, then a small-model yes/no check only on the events that are left.
 
-Code: `spec.py` (shape, validation, time rules, matching, dry runs; pure), `store.py` (tables), `engine.py` (the events tap, the time pass), `pipeline.py` (what the engine did, in memory), `compiler.py`, `actions.py`, `service.py` (shared by tools and routes), `tools.py`, `api.py`, `hooks.py` (jobs, the Now card). Tests: `addons/watches/tests/test_watches.py`.
+Code: `spec.py` (shape, validation, time rules, matching, dry runs, `explain`, `pinned_values`; pure), `store.py` (tables), `trace.py`, `interest.py`, `identity.py`, `engine.py` (the events tap, the time pass), `pipeline.py` (what the engine did, in memory), `compiler.py`, `actions.py`, `service.py` (shared by tools and routes), `tools.py`, `api.py`, `hooks.py` (jobs, the Now card). Tests: `addons/watches/tests/test_watches.py`.
 
 ## The spec
 
@@ -35,7 +35,7 @@ Stored as JSON in `watches.spec`:
 - **Time**: a 30-second job (`hooks.tick`) fires due occurrences (one per trigger per pass; an occurrence missed by more than 2 h — the server was down — is skipped), runs `on_deadline` when the window ends with no event fire (`expired`), closes ended watches (`done` when anything fired, else `expired`), a time-only watch once nothing is left, and keeps `next_time` current. Paused watches do nothing.
 - **Reminders** (`kind: reminder`): the task is made through the tasks addon when the watch is created (`task_id`); each trigger fires once; the watch closes when the task is completed (`tasks.task.completed`). **Evidence**: an event of `evidence_event_types` with an `evidence_keywords` hit asks "was it done?"; a yes only records a held `suggest_complete` fire and shows a "Done?" Now card (`watch:<fire id>`, Done / Not yet) — it never closes anything by itself.
 - **Budget**: a semantic trigger whose cheap filters passed more than 20 events a day over the user's last 14 days (`EventType.history`) is pushed back to the compiler once; `load` (`{matches_14d, per_day, semantic, over_budget}`) is shown per trigger.
-- Fires older than 90 days are pruned daily.
+- Fires older than 90 days are pruned daily (the trace: see "Trace").
 
 ## Actions
 
@@ -44,12 +44,26 @@ Stored as JSON in `watches.spec`:
 - `notify`: `core.notify.send`; a reminder as kind `reminder` (like the tasks addon's, full screen on the phone), anything else as kind `notify` (`urgency` now → the messages channel).
 - `create_task` / `complete_task`: `registry.execute(user, "add_task" / "update_task")`, so the tasks addon stays its own.
 - `tool`: run directly only when the tool neither asks nor acts outside Dana and the action says `act_and_tell`; otherwise as an agent run, so the normal Approve card appears.
-- `agent`: `core.session_runner.start_agent_task` for the user in their shared thread (a `watch-<id>` session when the thread is busy), with the triggering event framed as untrusted — so that turn asks before every tool that acts outside Dana, even with `act_and_tell` (the taint rule wins). `ask_first` without an event frames the saved request the same way. While it runs it is a **live activity** (`core/live.py`, key `run:<session id>:<run id>`: the phone's Live Update, the web Now strip, the Omarchy bar) showing its current step ("Using search_calendar"); it ends with "Done" and the reply, or "It did not work". When the run ends waiting for an approval, the fire's action is `held`, the activity turns into what Dana wants to do with **Approve / Deny** (`@addon.live_action` → `actions.answer` resumes that session's run, which gets its own activity) (on the phone: buttons on the Live Update, with its alert); the approval also stays in the chat and on Now as before.
+- `agent`: `core.session_runner.start_agent_task` for the user in the watch's own session `watch-<id>` (never the shared thread; `watch-<id>-2`, `-3` while it is busy), created with the title `👀 <watch title>` so `GET /api/sessions` lists it; the live activity's `open` is `/chat/<session id>` (the web app opens that session). The message starts with the identity block (below), with the triggering event framed as untrusted — so that turn asks before every tool that acts outside Dana, even with `act_and_tell` (the taint rule wins). `ask_first` without an event frames the saved request the same way. While it runs it is a **live activity** (`core/live.py`, key `run:<session id>:<run id>`: the phone's Live Update, the web Now strip, the Omarchy bar) showing its current step ("Using search_calendar"); it ends with "Done" and the reply, or "It did not work". When the run ends waiting for an approval, the fire's action is `held`, the activity turns into what Dana wants to do with **Approve / Deny** (`@addon.live_action` → `actions.answer` resumes that session's run, which gets its own activity) (on the phone: buttons on the Live Update, with its alert); the approval also stays in the chat and on Now as before.
 - `suggest_complete`: held; the Now card does it.
 
 ## Compiler
 
 `compiler.compile_request(user, text, old=None)`: one `watch_compile` call (balanced profile) with the moment, the user's zones, the event catalog (fields, each type's known values, at most 120 per field, most relevant first, and the spec's JSON schema), common real values and names from the last 14 days (framed as others' text) and the user's tools. Fields an event carries only in its history (a notification's `category` / `priority`: it is announced before its triage) are shown as unusable. The model answers with the spec as one JSON object (no forced tool use, no JSON mode); no JSON or validation errors go back once each (up to 3 tries), and on the first try the budget push-back. `change` compiles again from the old spec plus the change (the task is kept). `create_watch` / `update_watch` are `acts_outside`: in a turn carrying others' text they ask first, since a watch acts later on its own.
+
+The compiler prompt also says: a `semantic` question is judged from the event's fields only, so never ask about what the event does not carry (use `where` on a field such as `from_me`, or `unsupported`); prefer the most specific event type, from the source itself (e.g. `gmail.email.received` over `phone.email.received`); never claim the user cannot be reached on a listed channel.
+
+## Who the user is
+
+`identity.py`, in the compiler prompt and every agent run's message: the user's name, other names and pronoun (`core.users.User`); "me" / "I" / "myself" and an event sender shown as "me" mean the user, never another person; where a `notify` reaches them (Telegram when `telegram_chat_id` is set, plus each `@addon.channel` that `core.notify.send` delivers on, e.g. the phone); `send_whatsapp_message` with `chat_id="me"`, `send_telegram_message_to_me` and a weather tool (over web search) only when the user has those tools. Agent runs also get the user's places (Home first, rough coordinates).
+
+## Interest
+
+`interest.py`: after any change to the user's watches (`store.on_change`: create, change, pause, resume, delete, expire, undo) and at start-up (`hooks.hint_interest`), `core.events.set_interest(user.id, "homeassistant.state.changed", "entity_id", values)` with `spec.pinned_values` over the active watches: the union of `eq` / `in` values on that field; None when any trigger on the type pins none or a reminder takes it as evidence; `[]` when none listens. Skipped while `core.events` has no `set_interest`.
+
+## Trace
+
+`watch_trace` (`migrations/m0002_trace.py`, `trace.py`): per active watch, each event of a type it listens to with `{at, trigger_id, event_type, event_id, summary, data (JSON ≤ 4 KB), outcome, reason, near}`. Outcomes: `drop` (the first failing condition and the value seen: `from contains_any "x|y" ← "me"`), `during`, `outside_window`, `semantic_no` / `semantic_yes` / `semantic_failed` (the small model's reason: `watch_match` also answers `why` per question), `fired`, `cooldown`, `skipped`, `unstored`. `near`: at least one condition held, or it got past the filter. Past 200 rows an hour for one watch only near misses and fires are stored; the rest are counted (one `unstored` row when that watch's next hour starts). The daily prune keeps 30 days and the newest 2000 rows per watch. A deleted watch's rows stay (for undo) and age out.
 
 ## Tools
 
@@ -61,6 +75,7 @@ All need the addon (403 `not_connected`); another user's watch id answers 404 li
 
 - `GET /api/watches` → `{watches: [Watch]}`; Watch = `{id, title, kind, status, request, spec, created_at, window: {start, end}, fires_count, last_fired_at, next_time, task_id, load}`.
 - `GET /api/watches/{id}` → `{watch, fires: [{id, at, trigger_id, event_type, event, actions}]}` (newest first, 50).
+- `GET /api/watches/{id}/trace?limit=&outcome=all|near|<outcome>` → `{trace: [{id, at, trigger_id, event_type, event_id, summary, outcome, reason, near, data}], unstored}` (newest first, limit ≤ 500, default 100; `unstored`: this hour's checks over the cap). The Watches page shows it as "Recent checks" (All / Near misses / Fires, the event data expandable).
 - `POST /api/watches {text}` → 201 `{watch}`; 400 `{error: "invalid", errors}`.
 - `PATCH /api/watches/{id}` `{spec}` | `{status: active|paused}` | `{change}` → `{watch}`; 400 as above.
 - `DELETE /api/watches/{id}` → `{ok, undo_id}` (`POST /api/undo/{id}` brings it back with its fires).

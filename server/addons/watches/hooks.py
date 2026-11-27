@@ -1,5 +1,5 @@
 """The watches addon's background work and Now card: the 30-second time pass,
-the daily prune of old fires, and "Done?" cards when evidence suggests a
+the daily prune of old fires and trace rows, the interest hints at start-up, and "Done?" cards when evidence suggests a
 reminder's task got done by itself (closing it is always the user's call)."""
 
 import datetime as dt
@@ -8,7 +8,7 @@ from typing import Any, Dict, List
 from core import cards, clock, live
 from core.addons import Card, NowContext
 from core.users import User
-from addons.watches import actions, engine, store
+from addons.watches import actions, engine, interest, store
 from addons.watches import spec as S
 from addons.watches.addon import addon
 
@@ -21,8 +21,16 @@ async def tick(user: User) -> int:
 
 @addon.job(daily="03:40")
 async def prune(user: User) -> int:
-    """Forget fires older than 90 days."""
-    return store.prune(user, clock.now())
+    """Forget fires older than 90 days and trace rows older than 30 days or past 2000 per watch."""
+    now = clock.now()
+    return store.prune(user, now) + store.prune_trace(user, now)
+
+
+@addon.job(at_start=True)
+async def hint_interest(user: User) -> int:
+    """Tell the event sources which values the user's active watches can fire on (``interest.py``)."""
+    interest.update(user)
+    return 0
 
 
 def _held_evidence(user: User) -> List[Dict[str, Any]]:
