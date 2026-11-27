@@ -12,7 +12,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, List, Tuple
 
 from aiohttp import web
 
@@ -65,18 +65,40 @@ def _digest_files(digest: Any, label: str, folder: Path) -> None:
         digest.update(path.read_bytes())
 
 
-@functools.lru_cache(maxsize=1)
-def web_release() -> str:
-    """What the web app's files are in this process: a digest of ``static/`` and of the ``web/`` folder of
-    every loaded addon (they change only with a deploy or a restart). The service worker's cache is named
-    after it, so any change to the shell or to an addon's page installs a new one (static/sw.js)."""
-    digest = hashlib.sha256()
-    _digest_files(digest, "static", _STATIC_DIR)
+def _web_folders() -> List[Tuple[str, Path]]:
+    folders = [("static", _STATIC_DIR)]
     for name in loader.loaded():
         web_dir = loader.folder(name).path / "web"
         if web_dir.is_dir():
-            _digest_files(digest, f"addons/{name}", web_dir)
+            folders.append((f"addons/{name}", web_dir))
+    return folders
+
+
+def _stamp() -> Tuple[Tuple[str, int, int], ...]:
+    """Every web file's path, size and mtime: cheap to take, and it changes whenever a file does."""
+    out = []
+    for label, folder in _web_folders():
+        for path in folder.rglob("*"):
+            if path.is_file():
+                st = path.stat()
+                out.append((f"{label}/{path.relative_to(folder).as_posix()}", st.st_size, st.st_mtime_ns))
+    return tuple(sorted(out))
+
+
+@functools.lru_cache(maxsize=4)
+def _release_of(stamp: Tuple[Tuple[str, int, int], ...]) -> str:
+    digest = hashlib.sha256()
+    for label, folder in _web_folders():
+        _digest_files(digest, label, folder)
     return digest.hexdigest()[:16]
+
+
+def web_release() -> str:
+    """What the web app's files are now: a digest of ``static/`` and of the ``web/`` folder of every loaded
+    addon, recomputed when a file's size or mtime changes (a deploy, or bin/hot copying files into the
+    running server). The service worker's cache is named after it, so any change to the shell or to an
+    addon's page installs a new one (static/sw.js)."""
+    return _release_of(_stamp())
 
 
 async def service_worker_handler(request: web.Request) -> web.StreamResponse:

@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Copy changed web files (static/, addons/*/web/) straight into the running Dana pod: a
+# reload of the page shows them in seconds (docs/operations.md, "Shipping without a release").
+#
+#   bin/hot                web files changed since the last bin/ship (committed or not)
+#   bin/hot FILE…          these files (paths from server/)
+#
+# Kubernetes only (your site's deploy.env: DANA_K8S_NAMESPACE, DANA_K8S_SELECTOR). Nothing
+# else changes: Python files need bin/ship. The pod forgets the copies when it restarts, so
+# ship them too (bin/ship) once they look right.
+set -euo pipefail
+server="$(cd "$(dirname "$0")/.." && pwd)"
+site="${DANA_SITE:-$(dirname "$server")/site}"
+config="${DANA_DEPLOY_CONFIG:-$site/deploy.env}"
+[ -r "$config" ] || { echo "hot: no $config (docs/site.md)" >&2; exit 2; }
+# shellcheck disable=SC1090
+. "$config"
+ns="${DANA_K8S_NAMESPACE:-dana}"; selector="${DANA_K8S_SELECTOR:-app=dana}"
+cd "$server"
+
+files=("$@")
+if [ ${#files[@]} = 0 ]; then
+  base="$(cat "${XDG_CACHE_HOME:-$HOME/.cache}/dana-ship/last" 2>/dev/null || git merge-base HEAD origin/master)"
+  mapfile -t files < <({ git diff --name-only --relative "$base"; git ls-files --others --exclude-standard; } | sort -u)
+fi
+web=(); other=()
+for f in "${files[@]}"; do
+  [ -f "$f" ] || continue
+  case "$f" in static/*|addons/*/web/*) web+=("$f") ;; *) other+=("$f") ;; esac
+done
+[ ${#other[@]} -gt 0 ] && echo "hot: not web files, left for bin/ship: ${other[*]}"
+[ ${#web[@]} = 0 ] && { echo "hot: no web files to copy"; exit 0; }
+
+pod="$(kubectl -n "$ns" get pod -l "$selector" -o jsonpath='{.items[0].metadata.name}')"
+tar -cf - "${web[@]}" | kubectl -n "$ns" exec -i "$pod" -c dana -- tar -xf - -C /app
+printf 'hot: copied into %s: %s\n' "$pod" "${web[*]}"
