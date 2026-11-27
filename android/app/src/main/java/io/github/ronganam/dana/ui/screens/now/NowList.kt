@@ -73,7 +73,7 @@ private val TWO_COLUMNS = 440.dp
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun NowListPane(state: NowListState, handlers: NowHandlers, live: LiveHandlers, actions: NowListActions) {
+fun NowListPane(state: NowListState, handlers: NowHandlers, live: LiveHandlers, actions: NowListActions, headerAsk: (@Composable () -> Unit)? = null) {
     val pull = rememberPullToRefreshState()
     var pullRefreshing by remember { mutableStateOf(false) }
     LaunchedEffect(state.loading) { if (!state.loading) pullRefreshing = false }
@@ -99,10 +99,11 @@ fun NowListPane(state: NowListState, handlers: NowHandlers, live: LiveHandlers, 
         }
     ) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
-            val two = maxWidth >= TWO_COLUMNS
+            // Side by side only unfolded (a wide cover screen keeps one column).
+            val two = maxWidth >= TWO_COLUMNS && io.github.ronganam.dana.ui.shell.LocalShellLayout.current != io.github.ronganam.dana.ui.shell.ShellLayout.STACKED
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
                 // Calm, the lede goes in the calm card instead.
-                item(key = "head") { Header(state, showLede = !calm) }
+                item(key = "head") { Header(state, showLede = !calm, headerAsk) }
                 when {
                     calm -> item(key = "calm") {
                         CalmCard(
@@ -187,12 +188,13 @@ private val DATE = DateTimeFormatter.ofPattern("EEEE d MMMM", Locale.ENGLISH)
 
 /** The greeting in the header row (beside Ask Dana), the date and the server's lede under it, and how old the data is when the last refresh failed. */
 @Composable
-private fun Header(state: NowListState, showLede: Boolean) {
+private fun Header(state: NowListState, showLede: Boolean, trailing: (@Composable () -> Unit)?) {
     val lede = state.payload?.lede?.trim()?.trimEnd('.')?.takeIf { it.isNotEmpty() && showLede }
     val date = state.now.format(DATE)
     PlaceHeader(
         NowModel.greeting(state.now.hour),
-        supporting = if (lede != null) "$date · $lede" else date
+        supporting = if (lede != null) "$date · $lede" else date,
+        trailing = trailing
     )
     val at = state.updatedAt
     if (state.payload != null && state.failed && at != null) Text(

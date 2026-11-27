@@ -79,7 +79,8 @@ private fun LiveTrailingView(t: LiveTrailing, nowMs: Long) {
     val style = MaterialTheme.typography.bodyMedium.tabular()
     when (t) {
         is LiveTrailing.Steps -> Column(horizontalAlignment = Alignment.End) {
-            Text("${(t.done + 1).coerceAtMost(t.total)} of ${t.total}", style = style, color = c.inkSoft)
+            // Steps done, as the server writes them in its line ("step 2/4").
+            Text("${t.done}/${t.total}", style = style, color = c.inkSoft)
             StepLineMini(t.done, t.total, Modifier.padding(top = 2.dp), width = (14 * t.total).coerceIn(40, 72).dp)
         }
         is LiveTrailing.Since -> Text(NowLive.elapsed(t.sinceMs, nowMs), style = style, color = c.inkSoft)

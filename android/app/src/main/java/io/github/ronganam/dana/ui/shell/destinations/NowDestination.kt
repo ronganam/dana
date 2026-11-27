@@ -24,6 +24,9 @@ import io.github.ronganam.dana.ui.screens.now.NowModel
 import io.github.ronganam.dana.ui.screens.now.NowWebLink
 import io.github.ronganam.dana.ui.shell.DaySlot
 import io.github.ronganam.dana.ui.shell.Destination
+import io.github.ronganam.dana.ui.shell.HeaderAsk
+import io.github.ronganam.dana.ui.shell.LocalShellLayout
+import io.github.ronganam.dana.ui.shell.ShellLayout
 import io.github.ronganam.dana.ui.shell.rememberNow
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import io.github.ronganam.dana.ui.viewmodels.Place
@@ -158,9 +161,14 @@ fun rememberNowDestination(viewModel: MainViewModel): Destination {
         place = Place.NOW,
         picked = false,
         onBack = { shell.selectNow(null) },
-        list = { NowListPane(listState, handlers, liveHandlers, listActions) },
+        // Folded, Ask Dana and the conversation button sit in Now's own header (they scroll with it); unfolded the rail and the pane have them.
+        list = {
+            val folded = LocalShellLayout.current == ShellLayout.STACKED
+            NowListPane(listState, handlers, liveHandlers, listActions, headerAsk = if (folded) ({ HeaderAsk(viewModel, conversation = true) }) else null)
+        },
         stage = null,
-        conversation = true
+        conversation = true,
+        askSlot = false
     )
 }
 

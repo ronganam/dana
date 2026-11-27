@@ -98,7 +98,7 @@ fun Modifier.askSlotInset(): Modifier = padding(end = LocalAskSlotInset.current)
  * supporting line under it. Unfolded (no slot) the same, without the room.
  */
 @Composable
-fun PlaceHeader(title: String, modifier: Modifier = Modifier, supporting: String? = null) {
+fun PlaceHeader(title: String, modifier: Modifier = Modifier, supporting: String? = null, trailing: (@Composable () -> Unit)? = null) {
     val c = circuitColors
     Column(modifier.fillMaxWidth().padding(start = HeaderSlot.margin, end = HeaderSlot.margin, top = HeaderSlot.top)) {
         Row(Modifier.fillMaxWidth().heightIn(min = HeaderSlot.row).askSlotInset(), verticalAlignment = Alignment.CenterVertically) {
@@ -108,8 +108,10 @@ fun PlaceHeader(title: String, modifier: Modifier = Modifier, supporting: String
                 color = c.ink,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.semantics { heading() }
+                modifier = Modifier.weight(1f).semantics { heading() }
             )
+            // The place's own header buttons (Now's Ask Dana): they scroll with the header.
+            if (trailing != null) Row(Modifier.padding(start = HeaderSlot.gap), verticalAlignment = Alignment.CenterVertically) { trailing() }
         }
         if (supporting != null) Text(
             supporting,

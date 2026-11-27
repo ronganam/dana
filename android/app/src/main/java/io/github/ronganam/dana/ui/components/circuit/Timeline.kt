@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.MaterialTheme
@@ -84,7 +85,8 @@ fun TimelineRow(
                 },
             contentAlignment = Alignment.TopCenter
         ) {
-            CircuitNode(node.shape, node.state, Modifier.padding(top = nodeCenter - size.box / 2), size = size, icon = node.icon)
+            // An offset, not padding: a 24dp node box centred on an 11dp line starts above the row.
+            CircuitNode(node.shape, node.state, Modifier.offset(y = nodeCenter - size.box / 2), size = size, icon = node.icon)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f).padding(bottom = gap), content = content)
