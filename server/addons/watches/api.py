@@ -67,14 +67,20 @@ async def list_api(request: web.Request) -> web.Response:
 
 async def create_api(request: web.Request) -> web.Response:
     user = watches_user(request)
-    text = str((await _body(request)).get("text") or "").strip()
+    body = await _body(request)
+    text = str(body.get("text") or "").strip()
     if not text:
         return _invalid(["text is required"])
+    paused = body.get("status") == store.PAUSED
     with users.acting_as(user):
         try:
             row, _ = await service.create_from_text(user, text)
         except compiler.CompileError as e:
             return _invalid(e.errors)
+        if paused:
+            # Made off (the phone's New watch: tried on past days first); no await
+            # between storing and pausing, so no event meets it on.
+            row = service.set_status(user, row, store.PAUSED)
     return web.json_response({"watch": service.watch_json(user, row)}, status=201)
 
 

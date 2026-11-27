@@ -1,90 +1,72 @@
 package io.github.ronganam.dana.ui.shell.destinations
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.unit.dp
-import io.github.ronganam.dana.ui.components.circuit.GroupedSection
-import io.github.ronganam.dana.ui.components.circuit.LineNode
-import io.github.ronganam.dana.ui.components.circuit.NodeLine
-import io.github.ronganam.dana.ui.components.circuit.NodeShape
-import io.github.ronganam.dana.ui.components.circuit.askSlotInset
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import io.github.ronganam.dana.data.watches.WatchRun
+import io.github.ronganam.dana.ui.screens.watching.NewWatchPage
+import io.github.ronganam.dana.ui.screens.watching.WatchDetailPage
+import io.github.ronganam.dana.ui.screens.watching.WatchingList
 import io.github.ronganam.dana.ui.shell.Destination
-import io.github.ronganam.dana.ui.theme.Space
+import io.github.ronganam.dana.ui.shell.LocalShellLayout
+import io.github.ronganam.dana.ui.shell.ShellLayout
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import io.github.ronganam.dana.ui.viewmodels.Place
 
 /**
- * Watching: what Dana watches for the owner, each watch drawn as its circuit
- * (source → rule → AI check → action). A stub for now — its header and an
- * empty state that explains the shapes; the list of watches
- * (`/api/watches`), one watch and a new watch come in phase 2
- * (`docs/redesign-circuit.md`).
+ * Watching (server docs/watches.md; docs/phone.md, "Watching"): the
+ * watches as circuits ([WatchingList]), one watch ([WatchDetailPage]) and a
+ * new one ([NewWatchPage]). Folded the list drills into a watch or the new
+ * page; unfolded with nothing open the list takes the whole width with
+ * today's track on each line, and an open watch or the new page is the stage
+ * beside the list. While a page with its own field shows, the ask bar steps
+ * aside. Visible, [io.github.ronganam.dana.ui.viewmodels.WatchingController]
+ * follows the engine's live stream and the runs' live activities.
  */
 @Composable
-fun rememberWatchingDestination(@Suppress("UNUSED_PARAMETER") viewModel: MainViewModel): Destination = Destination(
-    place = Place.WATCHING,
-    picked = false,
-    onBack = {},
-    list = { WatchingList() },
-    stage = null
-)
+fun rememberWatchingDestination(viewModel: MainViewModel): Destination {
+    val c = viewModel.watchingController
+    val shell = viewModel.shellController
+    val selected by c.selected.collectAsState()
+    val newWatch by c.newWatch.collectAsState()
+    val stacked = LocalShellLayout.current == ShellLayout.STACKED
 
-@Composable
-private fun WatchingList() {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Space.screen, vertical = 12.dp)
-    ) {
-        Text(
-            "Watching",
-            style = MaterialTheme.typography.displayMedium,
-            modifier = Modifier.askSlotInset().semantics { heading() }
-        )
-        Text(
-            "What Dana keeps an eye on for you shows here.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 4.dp).askSlotInset()
-        )
-        GroupedSection(Modifier.padding(top = 24.dp)) {
-            item {
-                Column(Modifier.padding(16.dp)) {
-                    Text("Each watch is a line", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Something happens, a rule and Dana check it, then Dana acts or asks you.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(top = 2.dp, bottom = 16.dp)
-                    )
-                    NodeLine(
-                        listOf(
-                            LineNode(NodeShape.Circle, label = "When"),
-                            LineNode(NodeShape.Slot, label = "Rule"),
-                            LineNode(NodeShape.Diamond, label = "AI check"),
-                            LineNode(NodeShape.RoundedSquare, label = "Then")
-                        ),
-                        Modifier.fillMaxWidth()
-                    )
-                }
-            }
-        }
-        Text(
-            "Ask Dana to watch something, like “tell me when the laundry is done”.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(top = 16.dp)
-        )
+    DisposableEffect(c) {
+        c.start()
+        onDispose { c.stop() }
     }
+    val page = selected != null || newWatch != null
+    DisposableEffect(page) {
+        shell.askHidden = page
+        onDispose { shell.askHidden = false }
+    }
+    val openRun: (WatchRun) -> Unit = { run ->
+        viewModel.showConversation(run.sessionId)
+        shell.openThread()
+    }
+    val back = { if (newWatch != null) c.closeNew() else c.open(null) }
+
+    return Destination(
+        place = Place.WATCHING,
+        picked = page,
+        onBack = back,
+        list = {
+            WatchingList(
+                controller = c,
+                tracks = !stacked && !page,
+                onOpen = { c.open(it) },
+                onNew = { c.startNew() },
+                onOpenRun = openRun,
+            )
+        },
+        stage = if (!page) null else {
+            {
+                val id = selected
+                if (newWatch != null) NewWatchPage(c, showBack = true, onBack = back)
+                else if (id != null) WatchDetailPage(c, id, showBack = true, onBack = back, onOpenRun = openRun)
+            }
+        },
+        wide = true,
+    )
 }

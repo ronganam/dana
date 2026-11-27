@@ -143,8 +143,11 @@ private data class PendingWire(
     val toolArgs: JsonText = null,
     val toolCallId: String = "",
     val approvalReason: OptString = null,
-    val untrustedContent: Boolean = false
-)
+    /** true, or why ("untrusted_context"): the server sends a flag or a reason. */
+    val untrustedContent: JsonText = null
+) {
+    val untrusted: Boolean get() = untrustedContent != null && untrustedContent != "false"
+}
 
 @Serializable
 private data class SelectionOptionWire(val label: String = "", val value: String = "")
@@ -367,7 +370,7 @@ class ChatApi(private val http: ApiClient) {
                 pendingApproval = w.pendingApproval?.let {
                     PendingApprovalState(
                         it.toolName, it.toolArgs, it.toolCallId,
-                        it.approvalReason ?: if (it.untrustedContent) "device_screen" else ""
+                        it.approvalReason ?: if (it.untrusted) "device_screen" else ""
                     )
                 },
                 selection = w.selectionRequest?.toModel(),

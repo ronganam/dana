@@ -76,7 +76,7 @@ All need the addon (403 `not_connected`); another user's watch id answers 404 li
 - `GET /api/watches` → `{watches: [Watch]}`; Watch = `{id, title, kind, status, request, spec, created_at, window: {start, end}, fires_count, last_fired_at, next_time, task_id, load}`.
 - `GET /api/watches/{id}` → `{watch, fires: [{id, at, trigger_id, event_type, event, actions}]}` (newest first, 50).
 - `GET /api/watches/{id}/trace?limit=&outcome=all|near|<outcome>` → `{trace: [{id, at, trigger_id, event_type, event_id, summary, outcome, reason, near, data}], unstored}` (newest first, limit ≤ 500, default 100; `unstored`: this hour's checks over the cap). The Watches page shows it as "Recent checks" (All / Near misses / Fires, the event data expandable).
-- `POST /api/watches {text}` → 201 `{watch}`; 400 `{error: "invalid", errors}`.
+- `POST /api/watches {text, status?}` → 201 `{watch}`; 400 `{error: "invalid", errors}`. `status: "paused"` stores it off (the phone tries a new watch on past days before turning it on).
 - `PATCH /api/watches/{id}` `{spec}` | `{status: active|paused}` | `{change}` → `{watch}`; 400 as above.
 - `DELETE /api/watches/{id}` → `{ok, undo_id}` (`POST /api/undo/{id}` brings it back with its fires).
 - `POST /api/watches/dry-run {spec, days}` → `{triggers: {id: {matches, per_day, over_budget, sample}}}` (sample: the last 20).
