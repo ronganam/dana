@@ -30,6 +30,15 @@ Where the handlers run:
 
 :func:`stop` (the app's cleanup) cancels the handlers still running. Tests
 wait for the handlers of everything emitted so far with :func:`drain`.
+
+**Interest** (:func:`set_interest` / :func:`interest` / :func:`on_interest`):
+a hint from consumers so producers can skip work, e.g. the ``watches`` addon
+says which ``entity_id`` values of ``homeassistant.state.changed`` its active
+watches name, and the Home Assistant addon subscribes to just those. Per
+(user, event type, field): ``None`` = no narrowing (everything may be
+wanted), a set = only events whose field is one of those, an empty set =
+nothing. In memory only. A producer that ignores it stays correct: emitting
+more than asked never breaks a consumer.
 """
 
 import asyncio
@@ -37,7 +46,7 @@ import datetime
 import functools
 import logging
 import threading
-from typing import Any, Awaitable, Callable, Dict, List, Optional, Set, Tuple
+from typing import Any, Awaitable, Callable, Dict, FrozenSet, Iterable, List, Optional, Set, Tuple
 
 from core import clock, users
 from core.db import get_db_connection
@@ -59,6 +68,9 @@ _loop: Optional[asyncio.AbstractEventLoop] = None
 _handed = 0
 _lock = threading.Lock()
 _taps: List[Tap] = []
+# (user id, event type, field) -> the values wanted (absent: None, no narrowing).
+_interest: Dict[Tuple[str, str, str], FrozenSet[str]] = {}
+_interest_listeners: List[Callable[[str, str], None]] = []
 
 
 async def _run(call: _Call, user: User, name: str, data: Dict[str, Any]) -> None:
@@ -98,6 +110,41 @@ def untap(fn: Tap) -> None:
     """Stop calling ``fn`` (nothing when it is not tapped)."""
     if fn in _taps:
         _taps.remove(fn)
+
+
+def set_interest(user_id: str, event_type: str, field: str, values: Optional[Iterable[str]]) -> None:
+    """Say which values of ``field`` the consumers of ``event_type`` want for ``user_id``:
+    ``None`` = no narrowing, an empty iterable = nothing. Calls every :func:`on_interest`
+    listener (``fn(user_id, event_type)``) when the value changed."""
+    key = (user_id, event_type, field)
+    new = None if values is None else frozenset(str(v) for v in values)
+    with _lock:
+        if _interest.get(key) == new:
+            return
+        if new is None:
+            del _interest[key]
+        else:
+            _interest[key] = new
+        listeners = list(_interest_listeners)
+    for fn in listeners:
+        try:
+            fn(user_id, event_type)
+        except Exception:
+            logger.exception(f"Interest listener {getattr(fn, '__name__', 'fn')} failed for {event_type}")
+
+
+def interest(user_id: str, event_type: str, field: str) -> Optional[FrozenSet[str]]:
+    """The values of ``field`` wanted of ``event_type`` for ``user_id``; None when never set or set to None."""
+    with _lock:
+        return _interest.get((user_id, event_type, field))
+
+
+def on_interest(fn: Callable[[str, str], None]) -> None:
+    """Call ``fn(user_id, event_type)`` synchronously (in the setter's thread) after each
+    :func:`set_interest` that changes a value; once per function, a failure logged."""
+    with _lock:
+        if fn not in _interest_listeners:
+            _interest_listeners.append(fn)
 
 
 def bind(loop: asyncio.AbstractEventLoop) -> None:

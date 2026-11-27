@@ -727,12 +727,21 @@ Home Assistant is a smart-home control only: it is no source of any signal
 
 **State changes** (`addons/homeassistant/states.py`, the event in
 `event_types.py`). The addon's one service keeps a WebSocket per user
-connection (`get_states`, then `subscribe_events` for `state_changed`),
-started for each user who has the addon active with a token, looked at again
-every 15 s and at once after a connect / update / disconnect (`on_change`):
-a disconnected user's subscription stops, a new host or token starts a new
-one, a failure connects again after 1 s doubling to 5 min (the longest after
-a refused token, which also marks the connection for reconnecting). It emits
+connection (`get_states`, then a subscription), started for each user who has
+the addon active with a token, looked at again every 15 s and at once after a
+connect / update / disconnect (`on_change`): a disconnected user's
+subscription stops, a new host or token starts a new one, a failure connects
+again after 1 s doubling to 5 min (the longest after a refused token, which
+also marks the connection for reconnecting). What it subscribes to follows
+the consumers' interest (`events.interest(user, "homeassistant.state.changed",
+"entity_id")`, which the watches addon sets to the entity ids its active
+watches name; `core/events.py`, "Interest"): not said → `subscribe_events`
+for `state_changed` (every entity); some ids → `subscribe_entities` for just
+those (Home Assistant 2022.4+; one that refuses it gets `state_changed`,
+the other entities dropped in Dana); none → no WebSocket, the entity list
+read over REST every 15 min for the known values. A change of interest
+re-subscribes on the open socket 1 s later (`unsubscribe_events`, then the
+new subscription), or closes / opens it. It emits
 `homeassistant.state.changed` (`entity_id, name, domain, old_state,
 new_state, unit, device_class`, states as text) only when the state itself
 changed, never to or from `unavailable` / `unknown` (`old_state` is the last
