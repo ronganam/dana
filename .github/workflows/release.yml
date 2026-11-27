@@ -1,6 +1,6 @@
 # A release: on a pushed tag v<version> (or by hand for an existing tag).
 #   1. the tag must equal server/VERSION and the versionName of :app and :wear;
-#   2. the server image ghcr.io/<owner>/dana:<version> and :latest (amd64 + arm64);
+#   2. the server image ghcr.io/<owner>/dana:<version> and :latest (amd64 + arm64, each on a native runner);
 #   3. the Android release APKs (phone, tablet = kiosk, TV, watch, watch face), signed with
 #      the project key from the repository secrets, built with no site (no server, no defaults);
 #   4. the GitHub Release: the APKs, SHA256SUMS, versions.json (read by servers that offer
@@ -50,9 +50,18 @@ jobs:
           [ "$status" = 0 ] && echo "version=$version" >> "$GITHUB_OUTPUT"
           exit $status
 
+  # Each platform on its own native runner (no QEMU: arm64 under emulation took ~15 min),
+  # pushed by digest; image-manifest joins them under the version tag and :latest.
   image:
     needs: version
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
@@ -61,30 +70,62 @@ jobs:
         with:
           ref: ${{ env.TAG }}
       - id: name
-        run: echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dana" >> "$GITHUB_OUTPUT"
-      - uses: docker/setup-qemu-action@v3
+        run: |
+          echo "image=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dana" >> "$GITHUB_OUTPUT"
+          p="${{ matrix.platform }}"; echo "pair=${p//\//-}" >> "$GITHUB_OUTPUT"
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
+      - id: build
+        uses: docker/build-push-action@v6
         with:
           context: server
           target: app
-          platforms: linux/amd64,linux/arm64
-          push: true
-          tags: |
-            ${{ steps.name.outputs.image }}:${{ needs.version.outputs.version }}
-            ${{ steps.name.outputs.image }}:latest
+          platforms: ${{ matrix.platform }}
           labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.version=${{ needs.version.outputs.version }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=MIT
-          cache-from: type=gha,scope=release
-          cache-to: type=gha,scope=release,mode=max
+          outputs: type=image,name=${{ steps.name.outputs.image }},push-by-digest=true,name-canonical=true,push=true
+          cache-from: type=gha,scope=release-${{ steps.name.outputs.pair }}
+          cache-to: type=gha,scope=release-${{ steps.name.outputs.pair }},mode=max
+      - run: |
+          mkdir -p "${{ runner.temp }}/digests"
+          d="${{ steps.build.outputs.digest }}"; touch "${{ runner.temp }}/digests/${d#sha256:}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ steps.name.outputs.pair }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
+  image-manifest:
+    needs: [version, image]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - working-directory: ${{ runner.temp }}/digests
+        run: |
+          image="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/dana"
+          docker buildx imagetools create -t "$image:${{ needs.version.outputs.version }}" -t "$image:latest" \
+            $(printf "$image@sha256:%s " *)
 
   android:
     needs: version
@@ -180,7 +221,7 @@ jobs:
           retention-days: 7
 
   release:
-    needs: [version, image, android]
+    needs: [version, image-manifest, android]
     runs-on: ubuntu-latest
     permissions:
       contents: write

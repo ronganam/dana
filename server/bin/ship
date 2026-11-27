@@ -49,7 +49,7 @@ fi
 echo "ship: building $image"
 start=$SECONDS
 ctx="$(mktemp -d)"; trap 'rm -rf "$ctx"' EXIT
-git archive --format=tar HEAD:server | tar -x -C "$ctx"
+git -C "$(git rev-parse --show-toplevel)" archive --format=tar HEAD:server | tar -x -C "$ctx"
 DOCKER_BUILDKIT=1 docker build -q --target app -t "$image" "$ctx" >/dev/null
 docker push -q "$image" >/dev/null
 echo "ship: $image built and pushed in $((SECONDS - start)) s"
