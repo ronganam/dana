@@ -71,10 +71,10 @@ fun rememberRemindersDestination(viewModel: MainViewModel): Destination {
         }
     }
 
-    // Folded, Ask Dana sits in the header (it scrolls with it); unfolded, List | Board does (the rail has the mic).
+    // Folded, the conversation button and Ask Dana sit in the header (they scroll with it); unfolded, List | Board does (the rail has the mic).
     val toggle: @Composable () -> Unit = {
         if (wide) ViewToggle(board = boardMode, onBoard = { boardMode = it; if (it) shell.selectReminder(null) })
-        else HeaderAsk(viewModel)
+        else HeaderAsk(viewModel, conversation = true)
     }
     val sheetTask = tasks.firstOrNull { it.id == sheetFor }
     if (sheetFor != null && sheetTask != null) RemindersSheet(viewModel, sheetTask, onEdit = {

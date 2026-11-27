@@ -167,7 +167,9 @@ fun FloatingAssistantOverlay(
     }
     // Turns that arrive while the sheet is open rise in (not the ones there when it opened).
     val arrivals = remember { TailArrivals() }
-    val fresh = remember(rows) { arrivals.fresh(rows.map { it.key }) }
+    // As in the thread: a turn's tool calls in one card with their step line, a call that asks first in the warm card.
+    val items = remember(rows) { io.github.ronganam.dana.data.chat.ThreadItem.of(rows) }
+    val fresh = remember(items) { arrivals.fresh(items.map { it.key }) }
     val rich = richMotion
     // The sheet's fresh view hides older messages Dana may still have in mind: say so.
     val remembersHidden = remember(messages, memory, memoryNow) {
@@ -471,7 +473,7 @@ fun FloatingAssistantOverlay(
                                         .weight(1f, fill = false)
                                         .fillMaxWidth(),
                                     contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 8.dp),
-                                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                                    verticalArrangement = Arrangement.spacedBy(10.dp)
                                 ) {
                                     if (remembersHidden) {
                                         item(key = "remembers_hidden") {
@@ -481,42 +483,44 @@ fun FloatingAssistantOverlay(
                                             )
                                         }
                                     }
-                                    items(rows, key = { it.key }) { row ->
-                                        when (row) {
-                                            is io.github.ronganam.dana.data.chat.ThreadModel.Row.MemoryLine ->
-                                                io.github.ronganam.dana.ui.screens.chat.MemoryLine(
-                                                    row.label,
-                                                    modifier = Modifier.padding(horizontal = 20.dp).animateItem(fadeInSpec = null, fadeOutSpec = null)
+                                    items(items, key = { it.key }) { item ->
+                                        val anim = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).riseIn(item.key in fresh)
+                                        val dim = io.github.ronganam.dana.ui.screens.chat.FORGOTTEN_ALPHA
+                                        when (item) {
+                                            is io.github.ronganam.dana.data.chat.ThreadItem.Plain -> when (val row = item.row) {
+                                                is io.github.ronganam.dana.data.chat.ThreadModel.Row.MemoryLine ->
+                                                    io.github.ronganam.dana.ui.screens.chat.MemoryLine(
+                                                        row.label,
+                                                        modifier = Modifier.padding(horizontal = 20.dp).animateItem(fadeInSpec = null, fadeOutSpec = null)
+                                                    )
+                                                is io.github.ronganam.dana.data.chat.ThreadModel.Row.Message -> AssistantTurn(
+                                                    msg = row.msg,
+                                                    context = context,
+                                                    copy = copy,
+                                                    tapToSpeech = tapToSpeech,
+                                                    serverUrl = viewModel.serverConfig.url,
+                                                    apiToken = viewModel.serverConfig.token,
+                                                    modifier = anim.then(if (row.forgotten) Modifier.alpha(dim) else Modifier)
                                                 )
-                                            is io.github.ronganam.dana.data.chat.ThreadModel.Row.Message -> {
-                                                val msg = row.msg
-                                                val faded = if (row.forgotten) Modifier.alpha(io.github.ronganam.dana.ui.screens.chat.FORGOTTEN_ALPHA) else Modifier
-                                                if (msg.toolCall != null) {
-                                                    ToolCallCard(
-                                                        messageId = msg.id,
-                                                        entry = msg.toolCall,
-                                                        onToggleCollapse = { id -> viewModel.chatController.toggleToolCallCollapse(id) },
-                                                        onApprove = { approved -> viewModel.chatController.approveAction(approved) },
-                                                        modifier = Modifier
-                                                            .fillMaxWidth()
-                                                            .padding(horizontal = 20.dp)
-                                                            .animateItem(fadeInSpec = null, fadeOutSpec = null)
-                                                            .riseIn(row.key in fresh)
-                                                            .then(faded)
-                                                    )
-                                                } else {
-                                                    AssistantTurn(
-                                                        msg = msg,
-                                                        context = context,
-                                                        copy = copy,
-                                                        tapToSpeech = tapToSpeech,
-                                                        serverUrl = viewModel.serverConfig.url,
-                                                        apiToken = viewModel.serverConfig.token,
-                                                        modifier = Modifier.animateItem(fadeInSpec = null, fadeOutSpec = null).riseIn(row.key in fresh).then(faded)
-                                                    )
-                                                }
+                                                is io.github.ronganam.dana.data.chat.ThreadModel.Row.Separator -> {}
                                             }
-                                            is io.github.ronganam.dana.data.chat.ThreadModel.Row.Separator -> {}
+                                            is io.github.ronganam.dana.data.chat.ThreadItem.Tools -> io.github.ronganam.dana.ui.screens.chat.ToolRunCard(
+                                                item,
+                                                modifier = Modifier.padding(horizontal = 16.dp).then(anim).then(if (item.forgotten) Modifier.alpha(dim) else Modifier),
+                                                reply = item.reply?.let { r ->
+                                                    {
+                                                        AssistantTurn(
+                                                            msg = r, context = context, copy = copy, tapToSpeech = tapToSpeech,
+                                                            serverUrl = viewModel.serverConfig.url, apiToken = viewModel.serverConfig.token, bare = true
+                                                        )
+                                                    }
+                                                }
+                                            )
+                                            is io.github.ronganam.dana.data.chat.ThreadItem.Approval -> io.github.ronganam.dana.ui.screens.chat.ApprovalCard(
+                                                item.entry,
+                                                onAnswer = { approved -> viewModel.chatController.approveAction(approved) },
+                                                modifier = Modifier.padding(horizontal = 16.dp).then(anim)
+                                            )
                                         }
                                     }
 

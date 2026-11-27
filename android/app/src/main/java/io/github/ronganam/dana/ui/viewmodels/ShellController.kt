@@ -99,10 +99,6 @@ class ShellController(
     /** Inbox: the "Quiet apps" fold is open. */
     val quietAppsOpen: StateFlow<Boolean> = _quietAppsOpen.asStateFlow()
 
-    /** Reminders list grouping: true = "By list", false = "By when". */
-    private val _remindersByList = MutableStateFlow(false)
-    val remindersByList: StateFlow<Boolean> = _remindersByList.asStateFlow()
-
     private val _doneOpen = MutableStateFlow(false)
     val doneOpen: StateFlow<Boolean> = _doneOpen.asStateFlow()
 
@@ -255,7 +251,6 @@ class ShellController(
     fun toggleQuiet() { _quietOpen.value = !_quietOpen.value }
     fun toggleQuietApps() { _quietAppsOpen.value = !_quietAppsOpen.value }
 
-    fun setRemindersByList(byList: Boolean) { _remindersByList.value = byList }
     fun toggleDone() { _doneOpen.value = !_doneOpen.value }
 
     fun clearPick(place: Place = _place.value) {

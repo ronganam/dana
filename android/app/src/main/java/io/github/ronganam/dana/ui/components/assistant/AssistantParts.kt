@@ -185,8 +185,10 @@ internal fun AssistantStage(isRecording: Boolean, modifier: Modifier = Modifier)
 }
 
 /**
- * One conversation turn, set editorially: the user's words as a large serif line,
- * the assistant's reply as ruled body text. No chat bubbles. RTL-aware per message.
+ * One conversation turn, as in the thread: your words in a violet bubble at
+ * the end, Dana's reply on a tonal card at the start ([bare]: without its own
+ * card, inside the card of the steps that led to it). Tap speaks a reply,
+ * long-press copies. RTL-aware per message.
  */
 @Composable
 internal fun AssistantTurn(
@@ -196,101 +198,102 @@ internal fun AssistantTurn(
     tapToSpeech: io.github.ronganam.dana.ui.components.TapToSpeech,
     serverUrl: String,
     apiToken: String,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    bare: Boolean = false
 ) {
     val isHebrew = remember(msg.message) { msg.message.any { it in '֐'..'׿' } }
     val direction = if (isHebrew) LayoutDirection.Rtl else LayoutDirection.Ltr
     val isUser = msg.isUser
+    val c = io.github.ronganam.dana.ui.theme.circuitColors
+    val userColor = io.github.ronganam.dana.ui.screens.chat.userBubbleColor()
+    val cardColor = MaterialTheme.colorScheme.surfaceContainerLow
 
-    CompositionLocalProvider(LocalLayoutDirection provides direction) {
-        Column(
-            modifier = modifier
-                .fillMaxWidth()
-                .pointerInput(msg.id) {
-                    detectTapGestures(
-                        onTap = {
-                            if (!msg.isThinking && !isUser) tapToSpeech.speak(msg.message)
-                        },
-                        onLongPress = {
-                            if (!msg.isThinking) {
-                                copy(msg.message)
-                                Toast.makeText(context, R.string.toast_copied_to_clipboard, Toast.LENGTH_SHORT).show()
-                            }
+    Row(
+        modifier.fillMaxWidth().padding(horizontal = if (bare) 0.dp else 16.dp),
+        horizontalArrangement = if (isUser) Arrangement.End else Arrangement.Start
+    ) {
+        CompositionLocalProvider(LocalLayoutDirection provides direction) {
+            Column(
+                modifier = Modifier
+                    .then(
+                        when {
+                            isUser -> Modifier
+                                .widthIn(max = 320.dp)
+                                .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp, bottomStart = 20.dp, bottomEnd = 6.dp))
+                                .background(userColor)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                            bare -> Modifier.fillMaxWidth()
+                            else -> Modifier
+                                .widthIn(max = io.github.ronganam.dana.ui.screens.chat.CARD_MAX)
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(cardColor)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         }
                     )
-                }
-                .padding(horizontal = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            if (isUser) {
-                MetaLabel("You")
-                if (msg.images.isNotEmpty()) {
-                    msg.images.forEach { url ->
-                        AsyncImage(
-                            model = serverImageRequest(context, url, serverUrl, apiToken),
-                            contentDescription = if (msg.screen.isNotEmpty()) "Screen sent with the message" else "Attached image",
-                            // A sent screen is a small portrait thumbnail, not a full-width picture.
-                            modifier = if (msg.screen.isNotEmpty()) Modifier
-                                .height(120.dp)
-                                .clip(RoundedCornerShape(6.dp))
-                                .border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(6.dp))
-                            else Modifier
-                                .widthIn(max = 220.dp)
-                                .clip(RoundedCornerShape(10.dp)),
-                            contentScale = if (msg.screen.isNotEmpty()) ContentScale.FillHeight else ContentScale.FillWidth
-                        )
-                    }
-                }
-                if (msg.screen.isNotEmpty()) ScreenCaption(msg)
-                if (msg.message.isNotBlank()) {
-                    Text(
-                        text = msg.message,
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                }
-            } else {
-                // Ruled reply: a 2dp vermilion rule on the reading-start edge.
-                Row(modifier = Modifier.height(IntrinsicSize.Min)) {
-                    Box(
-                        modifier = Modifier
-                            .width(2.dp)
-                            .fillMaxHeight()
-                            .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.8f))
-                    )
-                    Spacer(Modifier.width(12.dp))
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        // A learned phrase ran without the model: said quietly next to the name.
-                        MetaLabel(if (msg.shortcut) "Dana · learned phrase" else "Dana", color = MaterialTheme.colorScheme.primary)
-                        if (msg.isThinking) {
-                            TypingIndicator()
-                            ThinkingCaption(msg.thinkingLabel)
-                        } else if (msg.isStreaming && msg.message.isEmpty() && msg.reasoning.isEmpty()) {
-                            TypingIndicator()
-                        } else {
-                            if (msg.reasoning.isNotEmpty()) {
-                                ReasoningBlock(text = msg.reasoning, thinking = msg.isStreaming && msg.message.isEmpty())
-                            }
-                            if (msg.images.isNotEmpty()) {
-                                msg.images.forEach { url ->
-                                    AsyncImage(
-                                        model = serverImageRequest(context, url, serverUrl, apiToken),
-                                        contentDescription = "Attached image",
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clip(RoundedCornerShape(10.dp)),
-                                        contentScale = ContentScale.FillWidth
-                                    )
+                    .pointerInput(msg.id) {
+                        detectTapGestures(
+                            onTap = {
+                                if (!msg.isThinking && !isUser) tapToSpeech.speak(msg.message)
+                            },
+                            onLongPress = {
+                                if (!msg.isThinking) {
+                                    copy(msg.message)
+                                    Toast.makeText(context, R.string.toast_copied_to_clipboard, Toast.LENGTH_SHORT).show()
                                 }
                             }
-                            if (msg.message.isNotEmpty()) {
-                                MarkdownText(
-                                    text = msg.message,
-                                    color = MaterialTheme.colorScheme.onSurface,
-                                    style = MaterialTheme.typography.bodyLarge
+                        )
+                    },
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                if (isUser) {
+                    if (msg.images.isNotEmpty()) {
+                        msg.images.forEach { url ->
+                            AsyncImage(
+                                model = serverImageRequest(context, url, serverUrl, apiToken),
+                                contentDescription = if (msg.screen.isNotEmpty()) "Screen sent with the message" else "Attached image",
+                                // A sent screen is a small portrait thumbnail, not a full-width picture.
+                                modifier = if (msg.screen.isNotEmpty()) Modifier
+                                    .height(120.dp)
+                                    .clip(RoundedCornerShape(10.dp))
+                                else Modifier
+                                    .widthIn(max = 220.dp)
+                                    .clip(RoundedCornerShape(10.dp)),
+                                contentScale = if (msg.screen.isNotEmpty()) ContentScale.FillHeight else ContentScale.FillWidth
+                            )
+                        }
+                    }
+                    if (msg.screen.isNotEmpty()) ScreenCaption(msg)
+                    if (msg.message.isNotBlank()) {
+                        Text(text = msg.message, style = MaterialTheme.typography.bodyLarge, color = c.ink)
+                    }
+                } else {
+                    if (msg.isThinking) {
+                        TypingIndicator()
+                        ThinkingCaption(msg.thinkingLabel)
+                    } else if (msg.isStreaming && msg.message.isEmpty() && msg.reasoning.isEmpty()) {
+                        TypingIndicator()
+                    } else {
+                        if (msg.reasoning.isNotEmpty()) {
+                            ReasoningBlock(text = msg.reasoning, thinking = msg.isStreaming && msg.message.isEmpty())
+                        }
+                        if (msg.images.isNotEmpty()) {
+                            msg.images.forEach { url ->
+                                AsyncImage(
+                                    model = serverImageRequest(context, url, serverUrl, apiToken),
+                                    contentDescription = "Attached image",
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .clip(RoundedCornerShape(10.dp)),
+                                    contentScale = ContentScale.FillWidth
                                 )
                             }
                         }
+                        if (msg.message.isNotEmpty()) {
+                            MarkdownText(text = msg.message, color = c.ink, style = MaterialTheme.typography.bodyLarge)
+                        }
+                        // A learned phrase ran without the model: said quietly under it.
+                        if (msg.shortcut) Text("Learned phrase, no model", style = MaterialTheme.typography.bodySmall, color = c.mute)
                     }
                 }
             }

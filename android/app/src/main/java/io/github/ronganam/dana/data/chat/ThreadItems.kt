@@ -144,14 +144,17 @@ fun toolStepWords(name: String): String {
  * What a finished step said, when it reads as words: its first lines, or
  * nothing for JSON, errors and long dumps (those stay behind Details).
  */
-fun resultWords(response: String, maxLines: Int = 3): String? {
+fun resultWords(response: String): String? {
     val t = response.trim()
     if (t.isEmpty() || t.startsWith("{") || t.startsWith("[") || t.startsWith("Error")) return null
+    // Lists of records (ids, many lines) are for the model, not for reading here.
+    if (t.length > 200 || UUID_ISH.containsMatchIn(t) || t.contains("ID:")) return null
     val lines = t.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.toList()
-    if (lines.isEmpty()) return null
-    val shown = lines.take(maxLines).joinToString("\n")
-    return if (lines.size > maxLines) "$shown…" else shown
+    if (lines.isEmpty() || lines.size > 3) return null
+    return lines.joinToString("\n")
 }
+
+private val UUID_ISH = Regex("[0-9a-f]{8}-[0-9a-f]{4}-")
 
 /** What kind of thing a waiting call does, for its buttons and its line. */
 enum class ApprovalKind { Send, Delete, Other }
