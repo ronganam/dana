@@ -24,6 +24,8 @@ data class Task(
     val groupName: OptString = null,
     val groupEmoji: OptString = null,
     val groupColor: OptString = null,
+    /** How many times it was snoozed (Now's snooze, `POST /api/tasks/{id}/snooze`). */
+    val snoozeCount: Int = 0,
     /** Where the task came from / what it relates to (calls, chats…). */
     val links: LenientList<TaskLink> = emptyList()
 )

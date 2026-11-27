@@ -44,23 +44,30 @@ fun groupItemShape(index: Int, count: Int, outer: Dp = Group.outer, inner: Dp = 
 
 /** A section's heading: its name (18sp) and an optional count or word at the end. */
 @Composable
-fun SectionHeader(title: String, modifier: Modifier = Modifier, meta: String? = null, metaColor: Color = Color.Unspecified, onMeta: (() -> Unit)? = null) {
+fun SectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    meta: String? = null,
+    metaColor: Color = Color.Unspecified,
+    onMeta: (() -> Unit)? = null,
+    titleColor: Color = Color.Unspecified
+) {
     val c = circuitColors
     Row(modifier.fillMaxWidth().heightIn(min = 32.dp).padding(bottom = 8.dp), verticalAlignment = Alignment.Bottom) {
         Text(
             title,
             style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-            color = c.ink,
+            color = titleColor.takeOrElse { c.ink },
             modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
         if (meta != null) Text(
             meta,
+            modifier = (if (onMeta != null) Modifier.clickable(onClick = onMeta) else Modifier).padding(start = 12.dp),
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold).tabular(),
             color = metaColor.takeOrElse { c.inkSoft },
-            maxLines = 1,
-            modifier = if (onMeta != null) Modifier.clickable(onClick = onMeta) else Modifier
+            maxLines = 1
         )
     }
 }
