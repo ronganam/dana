@@ -197,7 +197,7 @@ object CallerCards {
 
 /**
  * The floating card itself: plain Views in a TYPE_APPLICATION_OVERLAY window
- * (no Compose: no lifecycle owner outside an activity). Ink & Paper colours,
+ * (no Compose: no lifecycle owner outside an activity). Circuit colours (a tonal card, no border),
  * drag to move (the height is remembered), tap to open the person in Dana,
  * × to close. It never takes focus, so the dialer's buttons keep working.
  */
@@ -217,7 +217,7 @@ object CallerCardOverlay {
         val surface = (if (dark) DarkSurface else LightSurface).copy(alpha = 0.96f).toArgb()
         val outline = (if (dark) DarkOutlineSoft else LightOutlineSoft).toArgb()
         val accent = (if (dark) AccentDark else AccentLight).toArgb()
-        val open = Hue.AMBER.of(dark).toArgb()
+        val open = (if (dark) AccentDark else AccentLight).toArgb()
         private val hues = DanaHues(dark)
         /** The person's hue (as in People): its tint behind the initials, the letters in it. */
         fun personTint(key: String) = hues.tint(hues.forName(key)).toArgb()
@@ -266,7 +266,7 @@ object CallerCardOverlay {
     /** Once the call is answered: keep just the header. */
     fun collapse() {
         details?.visibility = View.GONE
-        kickerView?.text = ("On the call" + relation.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty()).uppercase()
+        kickerView?.text = ("On the call" + relation.takeIf { it.isNotBlank() }?.let { " · $it" }.orEmpty())
         root?.let { v -> params?.let { runCatching { (v.context.getSystemService(Context.WINDOW_SERVICE) as WindowManager).updateViewLayout(v, it) } } }
     }
 
@@ -302,14 +302,13 @@ object CallerCardOverlay {
     @SuppressLint("ClickableViewAccessibility", "SetTextI18n")
     private fun build(context: Context, card: PersonCard, incoming: Boolean): View {
         val c = Palette(isDark(context))
-        val pad = dp(context, 14f)
+        val pad = dp(context, 16f)
         val panel = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, pad)
             background = GradientDrawable().apply {
-                cornerRadius = dp(context, 18f).toFloat()
+                cornerRadius = dp(context, 24f).toFloat()
                 setColor(c.surface)
-                setStroke(dp(context, 1f), c.outline)
             }
             elevation = dp(context, 8f).toFloat()
         }
@@ -328,7 +327,7 @@ object CallerCardOverlay {
         val titles = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(context, 12f), 0, dp(context, 8f), 0) }
         val kicker = (if (incoming) "Calling" else "Calling out") + (card.relation.takeIf { it.isNotBlank() }?.let { " · $it" } ?: "")
         relation = card.relation
-        titles.addView(text(context, kicker.uppercase(), 10.5f, c.accent, bold = true, lines = 1).also { kickerView = it })
+        titles.addView(text(context, kicker, 13f, c.inkSoft, lines = 1).also { kickerView = it })
         titles.addView(text(context, card.name, 18f, c.ink, bold = true, lines = 1))
         titles.addView(text(context, card.headline, 13f, c.inkSoft, lines = 1))
         header.addView(titles, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
