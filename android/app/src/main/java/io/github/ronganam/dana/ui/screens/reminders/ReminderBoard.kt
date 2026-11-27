@@ -48,7 +48,7 @@ private enum class BoardColumn(val title: String, val groups: List<MomentGroup>,
     LATER("Later", listOf(MomentGroup.LATER), "")
 }
 
-private val MIN_COLUMN: Dp = 232.dp
+private val MIN_COLUMN: Dp = 196.dp
 
 /**
  * Unfolded Reminders, the board: the List's groups as four columns —
