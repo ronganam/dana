@@ -1,6 +1,8 @@
 package io.github.ronganam.dana.ui.screens.reminders
 
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -56,11 +58,17 @@ fun listNameOf(task: Task, groups: List<TaskGroup>): String? =
 
 /** A group's header: its title (Late warm) and what the data says about it. */
 @Composable
-fun GroupHeader(section: MomentSection, modifier: Modifier = Modifier) {
+fun GroupHeader(section: MomentSection, modifier: Modifier = Modifier, withMeta: Boolean = true) {
     val late = section.group == MomentGroup.LATE
-    SectionHeader(
+    // Inside a Board column: a quiet subhead under the column's title.
+    if (!withMeta) Text(
         section.group.title,
-        meta = section.meta,
+        style = MaterialTheme.typography.labelLarge,
+        color = if (late) circuitColors.warm else circuitColors.inkSoft,
+        modifier = modifier.padding(bottom = 6.dp)
+    ) else SectionHeader(
+        section.group.title,
+        meta = section.meta?.takeIf { withMeta },
         titleColor = if (late) circuitColors.warm else Color.Unspecified,
         modifier = modifier
     )
@@ -81,7 +89,8 @@ fun GroupItem(
     listName: String?,
     zones: List<String>,
     actions: ReminderActions,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    surface: Color = MaterialTheme.colorScheme.surfaceContainerLow
 ) {
     val late = group == MomentGroup.LATE
     val suggestion = remember(task, zones) { snoozeSuggestion(task, zones) }?.takeIf { !actions.isKept(task) }
@@ -92,13 +101,14 @@ fun GroupItem(
         onOpen = { actions.open(task) },
         onComplete = { actions.complete(task) },
         shape = groupItemShape(index, count),
+        surface = surface,
         modifier = modifier.dragToDay(task.title) { slot -> actions.drop(task, slot) }
     ) {
         if (suggestion != null) SuggestionCard(
             suggestion, now,
             onMove = { actions.move(task, suggestion) },
             onKeep = { actions.keep(task) },
-            modifier = Modifier.padding(top = 10.dp, end = 4.dp)
+            modifier = Modifier.padding(bottom = 12.dp)
         )
     }
 }

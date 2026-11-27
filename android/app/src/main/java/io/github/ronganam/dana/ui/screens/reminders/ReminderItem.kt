@@ -195,8 +195,9 @@ fun ReminderItem(
     val animate = !motionOff()
     val complete by rememberUpdatedState(onComplete)
     val done = !isOpen(task)
+    val firstLine = remember { floatArrayOf(0f, 0f) }
 
-    Box(
+    Column(
         modifier
             // Fold away after the check (the one animated size in the app).
             .layout { measurable, constraints ->
@@ -232,13 +233,16 @@ fun ReminderItem(
                     color = c.ink,
                     maxLines = titleLines,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.strikeThrough(c.inkSoft, startsRtl(task.title)) { if (done) 1f else completion.progress.value }
+                    onTextLayout = { firstLine[0] = it.getLineLeft(0); firstLine[1] = it.getLineRight(0) },
+                    // Full width, so a Hebrew title sits on the right (its own script's side).
+                    modifier = Modifier.fillMaxWidth().strikeThrough(c.inkSoft, startsRtl(task.title), firstLine) { if (done) 1f else completion.progress.value }
                 )
                 if (line.isNotEmpty()) WhenLine(task, line, late)
-                below()
             }
             if (trailing != null) Box(Modifier.padding(top = 6.dp)) { trailing() }
         }
+        // Under the whole item (Dana's suggestion), so it has the item's full width.
+        Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp)) { below() }
     }
 }
 
@@ -259,13 +263,16 @@ fun startsRtl(text: String): Boolean =
     text.firstOrNull { it.isLetter() }?.let { Character.getDirectionality(it) == Character.DIRECTIONALITY_RIGHT_TO_LEFT } == true
 
 /** A strike-through that grows along the text's first line in its reading order as [progress] goes 0 → 1 (drawn, no relayout). */
-private fun Modifier.strikeThrough(color: Color, rtl: Boolean, progress: () -> Float): Modifier = drawWithContent {
+private fun Modifier.strikeThrough(color: Color, rtl: Boolean, line: FloatArray, progress: () -> Float): Modifier = drawWithContent {
     drawContent()
     val p = progress()
     if (p > 0f) {
         val y = 13.dp.toPx()
-        val w = size.width
-        if (rtl) drawLine(color, Offset(w, y), Offset(w * (1f - p), y), 1.5.dp.toPx())
-        else drawLine(color, Offset(0f, y), Offset(w * p, y), 1.5.dp.toPx())
+        // The first line's own extent (the text, not the full-width box).
+        val left = line[0]
+        val right = if (line[1] > line[0]) line[1] else size.width
+        val w = right - left
+        if (rtl) drawLine(color, Offset(right, y), Offset(right - w * p, y), 1.5.dp.toPx())
+        else drawLine(color, Offset(left, y), Offset(left + w * p, y), 1.5.dp.toPx())
     }
 }

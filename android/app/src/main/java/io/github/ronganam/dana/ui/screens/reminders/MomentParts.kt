@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.automirrored.outlined.ArrowForward
 import androidx.compose.material.icons.outlined.AutoAwesome
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.Icon
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Column
@@ -96,15 +99,17 @@ fun SuggestionCard(s: MomentSuggestion, now: LocalDateTime, onMove: () -> Unit, 
             Icon(Icons.Outlined.AutoAwesome, contentDescription = null, tint = c.accent, modifier = Modifier.padding(top = 2.dp, end = 8.dp).size(16.dp))
             Text(s.text, style = MaterialTheme.typography.bodyMedium, color = c.ink)
         }
-        FlowRow(
-            Modifier.padding(top = 10.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            itemVerticalAlignment = Alignment.CenterVertically
-        ) {
-            MomentChip(s.from, now, on = false)
-            Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "to", tint = c.mute, modifier = Modifier.size(16.dp))
-            MomentChip(s.to, now, on = true)
+        // Side by side when they fit, else one under the other.
+        BoxWithConstraints(Modifier.padding(top = 10.dp).fillMaxWidth()) {
+            if (maxWidth >= 300.dp) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                MomentChip(s.from, now, on = false, modifier = Modifier.weight(1f, fill = false))
+                Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "to", tint = c.mute, modifier = Modifier.size(16.dp))
+                MomentChip(s.to, now, on = true, modifier = Modifier.weight(1f, fill = false))
+            } else Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                MomentChip(s.from, now, on = false)
+                Icon(Icons.Outlined.ArrowDownward, contentDescription = "to", tint = c.mute, modifier = Modifier.padding(start = 12.dp).size(14.dp))
+                MomentChip(s.to, now, on = true)
+            }
         }
         FlowRow(
             Modifier.padding(top = 6.dp),
@@ -115,7 +120,7 @@ fun SuggestionCard(s: MomentSuggestion, now: LocalDateTime, onMove: () -> Unit, 
                 onClick = onMove,
                 colors = ButtonDefaults.buttonColors(containerColor = c.accentFilled, contentColor = c.onAccentFilled),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-            ) { Text(s.action, maxLines = 1) }
+            ) { Text(s.action, maxLines = 2, textAlign = TextAlign.Center) }
             if (onKeep != null) TextButton(onClick = onKeep) { Text("Keep it", color = c.ink, maxLines = 1) }
         }
     }
@@ -123,17 +128,17 @@ fun SuggestionCard(s: MomentSuggestion, now: LocalDateTime, onMove: () -> Unit, 
 
 /** One moment as a small chip: its glyph and its words; [on] = the suggested one (accent). */
 @Composable
-private fun MomentChip(w: RemindWhen, now: LocalDateTime, on: Boolean) {
+private fun MomentChip(w: RemindWhen, now: LocalDateTime, on: Boolean, modifier: Modifier = Modifier) {
     val c = circuitColors
     val fg = if (on) c.onAccentTonal else c.inkSoft
     Row(
-        Modifier.clip(RoundedCornerShape(10.dp))
+        modifier.clip(RoundedCornerShape(10.dp))
             .background(if (on) c.accentTonal else MaterialTheme.colorScheme.surfaceContainerHigh)
             .heightIn(min = 30.dp)
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         momentIcon(w)?.let { Icon(it, contentDescription = null, tint = fg, modifier = Modifier.padding(end = 6.dp).size(15.dp)) }
-        Text(momentPhrase(w, now), style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(momentPhrase(w, now), style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(vertical = 5.dp))
     }
 }

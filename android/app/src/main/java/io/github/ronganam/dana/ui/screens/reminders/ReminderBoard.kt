@@ -132,7 +132,9 @@ fun ReminderBoard(viewModel: MainViewModel, onMoments: (String) -> Unit, onSugge
                         }
                         var row = 0
                         colSections.forEach { section ->
-                            GroupHeader(section, Modifier.padding(horizontal = 8.dp).padding(top = 16.dp))
+                            // A column of one group needs no second title; the board leaves the group's note to the List (no room).
+                            if (col.groups.size > 1) GroupHeader(section, Modifier.padding(horizontal = 8.dp).padding(top = 16.dp), withMeta = false)
+                            else Spacer(Modifier.height(12.dp))
                             section.tasks.forEachIndexed { i, t ->
                                 key(t.id) {
                                     GroupItem(
@@ -150,6 +152,10 @@ fun ReminderBoard(viewModel: MainViewModel, onMoments: (String) -> Unit, onSugge
                             }
                         }
                         if (col == BoardColumn.NEEDS && count > 0) TextButton(onClick = onSuggest, modifier = Modifier.padding(top = 8.dp)) { Text("Ask Dana for moments") }
+                        if (col != BoardColumn.NEEDS && count == 0 && !dragging) Text(
+                            "Nothing here.", style = MaterialTheme.typography.bodyMedium, color = circuitColors.mute,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp)
+                        )
                         if (col == BoardColumn.NEEDS && count == 0) Text(
                             "Every reminder has a moment.", style = MaterialTheme.typography.bodyMedium, color = circuitColors.inkSoft,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp)
@@ -166,7 +172,7 @@ fun ReminderBoard(viewModel: MainViewModel, onMoments: (String) -> Unit, onSugge
 private fun ColumnHead(title: String, count: Int, modifier: Modifier = Modifier) {
     val c = circuitColors
     Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = MaterialTheme.typography.titleLarge, color = c.ink, maxLines = 1, modifier = Modifier.weight(1f, fill = false))
+        Text(title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold), color = c.ink, maxLines = 2, modifier = Modifier.weight(1f, fill = false))
         if (count > 0) Text(
             count.toString(),
             style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold).tabular(),

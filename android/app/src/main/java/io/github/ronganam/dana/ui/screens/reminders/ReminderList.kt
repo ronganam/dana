@@ -83,6 +83,8 @@ fun ReminderListPane(
     val done = remember(tasks, filter) { doneRecently(tasks.filter { filter == null || it.groupId == filter }, limit = 10) }
     fun listName(t: Task) = listNameOf(t, groups)
     val rowIndex = remember(sections) { sections.flatMap { it.tasks }.withIndex().associate { (i, t) -> t.id to i } }
+    // Beside the editor the list pane is tinted: its items sit one step up.
+    val itemSurface = if (belowHeader != null) MaterialTheme.colorScheme.surfaceContainerHigh else MaterialTheme.colorScheme.surfaceContainerLow
     val placement = tween<androidx.compose.ui.unit.IntOffset>(Motion.SLOW, easing = Motion.Standard)
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
@@ -139,6 +141,7 @@ fun ReminderListPane(
                     listName = listName(t),
                     zones = zones,
                     actions = actions,
+                    surface = itemSurface,
                     modifier = Modifier
                         .padding(horizontal = GUTTER)
                         .padding(top = if (i == 0) 0.dp else 2.dp)
@@ -165,6 +168,7 @@ fun ReminderListPane(
                     onOpen = { actions.open(t) },
                     onComplete = { actions.complete(t) },
                     shape = groupItemShape(i, done.size),
+                    surface = itemSurface,
                     titleLines = 1,
                     modifier = Modifier.padding(horizontal = GUTTER).padding(top = if (i == 0) 0.dp else 2.dp)
                         .animateItem(fadeInSpec = null, fadeOutSpec = null, placementSpec = placement)

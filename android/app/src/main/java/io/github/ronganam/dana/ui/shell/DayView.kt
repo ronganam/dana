@@ -129,7 +129,7 @@ fun DayView(
     BoxWithConstraints(
         modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = if (compact) 8.dp else 12.dp)
     ) {
-        val nowW = if (compact) 76.dp else 112.dp
+        val nowW = if (compact) 90.dp else 112.dp
         val momentsW = if (compact) 52.dp else 140.dp
         val trackW = maxWidth - nowW - momentsW - 24.dp
         val hours = trackHours(trackW.value)
@@ -139,7 +139,7 @@ fun DayView(
                 .padding(start = 16.dp, end = 10.dp, top = 12.dp, bottom = 10.dp),
             verticalAlignment = Alignment.Top
         ) {
-            NowBlock(now, track.allDay, onNow, Modifier.width(nowW - 16.dp))
+            NowBlock(now, track.allDay, onNow, Modifier.width(nowW - 16.dp), compact)
             Spacer(Modifier.width(8.dp))
             Track(
                 track = track,
@@ -171,13 +171,16 @@ private fun dropWords(slot: DaySlot): String = when (slot) {
 }
 
 @Composable
-private fun NowBlock(now: LocalDateTime, allDay: List<String>, onNow: () -> Unit, modifier: Modifier) {
+private fun NowBlock(now: LocalDateTime, allDay: List<String>, onNow: () -> Unit, modifier: Modifier, compact: Boolean) {
     val c = circuitColors
     Column(modifier.clip(RoundedCornerShape(12.dp)).clickable(onClick = onNow).padding(vertical = 2.dp)) {
         Text("Now", style = MaterialTheme.typography.labelLarge, color = c.accent)
         RollingText(
             now.format(HM),
-            style = MaterialTheme.typography.headlineMedium.copy(fontSize = 26.sp, lineHeight = 30.sp, fontWeight = FontWeight.SemiBold).tabular(),
+            // Sized so "23:59" never clips in its column.
+            style = MaterialTheme.typography.headlineMedium.copy(
+                fontSize = if (compact) 22.sp else 26.sp, lineHeight = if (compact) 26.sp else 30.sp, fontWeight = FontWeight.SemiBold
+            ).tabular(),
             color = c.ink
         )
         Text(
