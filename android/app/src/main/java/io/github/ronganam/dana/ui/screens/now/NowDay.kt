@@ -1,31 +1,13 @@
 package io.github.ronganam.dana.ui.screens.now
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.hideFromAccessibility
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDirection
-import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.DaySlotInfo
-import io.github.ronganam.dana.ui.components.MetaLabel
-import io.github.ronganam.dana.ui.theme.Hue
-import io.github.ronganam.dana.ui.theme.hues
+import io.github.ronganam.dana.data.models.Task
+import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.ZoneOffset
 
 /**
  * One thing left today (from `day.slots`): [time] for a timed one, [place]
@@ -39,21 +21,24 @@ data class DayEntry(
     val taskId: String?,
     val eventId: String?,
     val place: String? = null,
-    val next: Boolean = false
+    val next: Boolean = false,
+    /** The slot's key for a place entry: "home", "wake" (an addon's own otherwise). */
+    val placeKey: String? = null
 )
 
-/** One hour of the day strip: [past] before the current hour, [busy] when something happens in it. */
-data class DaySegment(val hour: Int, val past: Boolean, val busy: Boolean)
+/** A reminder finished today ([at]: when, local), for "Earlier today" and the calm day line. */
+data class DoneEntry(val title: String, val taskId: String, val at: LocalTime)
+
+/** One node of the calm day line: [fraction] along it (0 = its start), what it is, and its label (null when it would crowd one). */
+data class DayLineNode(val fraction: Float, val kind: Kind, val label: String?) {
+    enum class Kind { DONE, NOW, NEXT }
+}
 
 /*
- * Pure rules of Now's day (tested in NowScreenTest): the strip's hours (which
- * are past, which hold something) and the list of what is left today.
+ * Pure rules of Now's day (tested in NowScreenTest): what is left today (the
+ * Next timeline), the reminders done today and the calm state's day line.
  */
 object NowDay {
-
-    /** The strip starts at 07:00 (earlier when it is earlier) and runs to 23:00 (later when a slot does). */
-    private const val FIRST_HOUR = 7
-    private const val LAST_HOUR = 23
 
     /** "19:30" → minutes since midnight; null when it isn't a time. */
     fun minutesOf(hhmm: String?): Int? {
@@ -66,23 +51,6 @@ object NowDay {
     private fun hourOf(slot: DaySlotInfo): Int? = slot.key.toIntOrNull()?.takeIf { it in 0..23 }
 
     /**
-     * The day strip, one segment per hour: the past hours (before the current
-     * one), then the current hour and the rest. An hour is busy when a slot
-     * item falls in it (by its own time, else by its slot). The server lists
-     * only the hours still ahead, so past hours are never busy.
-     */
-    fun segments(slots: List<DaySlotInfo>, now: LocalTime): List<DaySegment> {
-        val busy = HashSet<Int>()
-        slots.forEach { slot ->
-            val hour = hourOf(slot) ?: return@forEach
-            slot.items.forEach { item -> busy += (minutesOf(item.time)?.div(60) ?: hour) }
-        }
-        val last = maxOf(LAST_HOUR, slots.mapNotNull(::hourOf).maxOrNull() ?: 0)
-        val first = minOf(FIRST_HOUR, now.hour)
-        return (first..last).map { h -> DaySegment(h, past = h < now.hour, busy = h >= now.hour && h in busy) }
-    }
-
-    /**
      * What is left today, in order: timed items from now on (one timed before
      * now is gone), then the place slots' items. The first timed one is next.
      */
@@ -93,98 +61,71 @@ object NowDay {
         slots.forEach { slot ->
             val hour = hourOf(slot)
             slot.items.forEach { item ->
-                val e = DayEntry(item.title, item.kind, item.time, item.taskId, item.eventId, place = if (hour == null) slot.label else null)
+                val e = DayEntry(
+                    item.title, item.kind, item.time, item.taskId, item.eventId,
+                    place = if (hour == null) slot.label else null,
+                    placeKey = if (hour == null) slot.key else null
+                )
                 if (hour == null) places += e
                 else {
                     val at = minutesOf(item.time) ?: (hour * 60)
-                    if (at >= nowMin) timed += at to e
+                    if (at >= nowMin) timed += at to e.copy(time = e.time ?: "%02d:00".format(hour))
                 }
             }
         }
         val ordered = timed.sortedBy { it.first }.mapIndexed { i, (_, e) -> if (i == 0) e.copy(next = true) else e }
         return ordered + places
     }
-}
 
-/** Up to this many of the day's entries show under the strip; the rest are "+N later". */
-private const val UPCOMING_SHOWN = 3
+    /**
+     * The reminders done today, newest first: completed ones whose last
+     * change (`updated_at`, the server's UTC "yyyy-MM-dd HH:mm:ss" or ISO
+     * with an offset) falls on [today] in [zone].
+     */
+    fun doneToday(tasks: List<Task>, today: LocalDate, zone: ZoneId = ZoneId.systemDefault()): List<DoneEntry> =
+        tasks.mapNotNull { t ->
+            if (t.status != "completed") return@mapNotNull null
+            val at = utcToLocal(t.updatedAt, zone) ?: return@mapNotNull null
+            if (at.toLocalDate() != today) null else DoneEntry(t.title, t.id, at.toLocalTime())
+        }.sortedByDescending { it.at }
 
-/**
- * Today in one line: 4dp segments, one per hour, sky where something happens
- * and a hairline where nothing does, past hours at 30 %, and a 2dp ember
- * now-mark before the current hour. Static and decorative (the list under it
- * says the same in words).
- */
-@Composable
-fun NowDayStrip(segments: List<DaySegment>, modifier: Modifier = Modifier) {
-    val accent = MaterialTheme.colorScheme.primary
-    val sky = hues.of(Hue.SKY)
-    val idle = MaterialTheme.colorScheme.outlineVariant
-    val mark = segments.count { it.past }
-    Row(
-        modifier.widthIn(max = 300.dp).fillMaxWidth().height(18.dp).semantics { hideFromAccessibility() },
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp)
-    ) {
-        segments.forEachIndexed { i, s ->
-            if (i == mark) NowMark(accent)
-            val color = if (s.busy) sky else idle
-            Box(Modifier.weight(1f).height(4.dp).clip(RoundedCornerShape(2.dp)).background(if (s.past) color.copy(alpha = color.alpha * 0.3f) else color))
-        }
-        if (mark == segments.size) NowMark(accent)
+    /** A server time ("2026-11-27 11:18:24" in UTC, or ISO with an offset) in [zone]; null when unreadable. */
+    fun utcToLocal(raw: String?, zone: ZoneId): LocalDateTime? {
+        val s = raw?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        runCatching { return OffsetDateTime.parse(s).atZoneSameInstant(zone).toLocalDateTime() }
+        return runCatching {
+            LocalDateTime.parse(s.replace(' ', 'T').substringBefore('.')).atOffset(ZoneOffset.UTC).atZoneSameInstant(zone).toLocalDateTime()
+        }.getOrNull()
     }
-}
 
-@Composable
-private fun NowMark(color: Color) {
-    Box(Modifier.width(2.dp).height(18.dp).clip(RoundedCornerShape(1.dp)).background(color))
-}
-
-/**
- * The strip and what is left today under it as a dot list (a dot in the
- * kind's hue, the title, its time or place in mono): the first three, then
- * "+N later". An entry with a reminder behind it opens it. [centred] is the
- * all-clear layout: the strip and the list's block centred, lines at their start.
- */
-@Composable
-fun NowDayBlock(slots: List<DaySlotInfo>, now: LocalTime, onOpen: (DayEntry) -> Unit, centred: Boolean, modifier: Modifier = Modifier) {
-    val segments = remember(slots, now.hour) { NowDay.segments(slots, now) }
-    val upcoming = remember(slots, now.hour, now.minute) { NowDay.upcoming(slots, now) }
-    Column(modifier.fillMaxWidth(), horizontalAlignment = if (centred) Alignment.CenterHorizontally else Alignment.Start) {
-        NowDayStrip(segments)
-        if (upcoming.isNotEmpty()) Column(Modifier.padding(top = 12.dp).then(if (centred) Modifier.width(IntrinsicSize.Max) else Modifier)) {
-            upcoming.take(UPCOMING_SHOWN).forEach { e -> DayEntryLine(e, onOpen) }
-            if (upcoming.size > UPCOMING_SHOWN) MetaLabel("+${upcoming.size - UPCOMING_SHOWN} later", modifier = Modifier.padding(start = 16.dp, top = 2.dp))
-        }
-    }
-}
-
-@Composable
-private fun DayEntryLine(e: DayEntry, onOpen: (DayEntry) -> Unit) {
-    val hue = hues.of(NowModel.dayHue(e.kind))
-    Row(
-        Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .then(if (e.taskId != null) Modifier.clickable(onClickLabel = "Open") { onOpen(e) } else Modifier)
-            .semantics(mergeDescendants = true) {
-                contentDescription = listOfNotNull(e.title, e.time ?: e.place, if (e.next) "next" else null).joinToString(", ")
+    /**
+     * The calm state's day line: what was done today (squares), now, and
+     * what is still ahead today (circles), placed by time on a line from
+     * 08:00 (earlier when something was) to the last thing ahead (at least an
+     * hour past now). Labels: "Now" always, the others' times only where
+     * they keep [minGapFraction] from a label already placed. Empty when
+     * there is nothing done and nothing ahead.
+     */
+    fun dayLine(done: List<Int>, ahead: List<Int>, nowMin: Int, minGapFraction: Float = 0.16f): List<DayLineNode> {
+        val later = ahead.filter { it >= nowMin }
+        if (done.isEmpty() && later.isEmpty()) return emptyList()
+        val first = (listOf(8 * 60, nowMin) + done).min() / 60 * 60
+        val lastAt = (later + (nowMin + 60)).max()
+        val last = minOf(24 * 60, (lastAt + 59) / 60 * 60)
+        val span = (last - first).coerceAtLeast(60).toFloat()
+        fun f(m: Int) = ((m - first) / span).coerceIn(0f, 1f)
+        fun hm(m: Int) = "%02d:%02d".format(m / 60 % 24, m % 60)
+        val nodes = done.sorted().map { Triple(f(it), DayLineNode.Kind.DONE, hm(it)) } +
+            Triple(f(nowMin), DayLineNode.Kind.NOW, "Now") +
+            later.sorted().map { Triple(f(it), DayLineNode.Kind.NEXT, hm(it)) }
+        val placed = mutableListOf(f(nowMin))
+        return nodes.map { (x, kind, label) ->
+            val shown = when {
+                kind == DayLineNode.Kind.NOW -> label
+                placed.all { kotlin.math.abs(it - x) >= minGapFraction } -> label.also { placed += x }
+                else -> null
             }
-            .heightIn(min = 30.dp)
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(Modifier.size(8.dp).clip(CircleShape).background(hue))
-        Spacer(Modifier.width(8.dp))
-        Text(
-            e.title,
-            style = MaterialTheme.typography.bodyMedium.copy(
-                fontSize = 13.5.sp, textDirection = TextDirection.Content,
-                fontWeight = if (e.next) FontWeight.Medium else FontWeight.Normal
-            ),
-            color = if (e.next) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.weight(1f, fill = false)
-        )
-        (e.time ?: e.place)?.let { MetaLabel(it, modifier = Modifier.padding(start = 8.dp)) }
+            DayLineNode(x, kind, shown)
+        }
     }
 }

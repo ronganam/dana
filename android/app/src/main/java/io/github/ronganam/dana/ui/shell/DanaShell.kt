@@ -141,7 +141,8 @@ fun DanaShell(viewModel: MainViewModel) {
                 },
                 title = placeDest.title,
                 kicker = placeDest.kicker,
-                wide = placeDest.wide
+                wide = placeDest.wide,
+                conversation = placeDest.conversation
             )
             // What Dana sees with the next message (shown as "On screen · …").
             val live = rememberLiveScreen(viewModel)
@@ -161,7 +162,7 @@ fun DanaShell(viewModel: MainViewModel) {
                 // Folded only: unfolded the rail beside the frame has the places.
                 nav = { if (layout == ShellLayout.STACKED) ShellNav(place, places, inboxBadge, onPlace = { shell.go(it) }) },
                 strip = { DayStrip(viewModel, onNow = { shell.showToday() }) },
-                headerAsk = { HeaderAsk(viewModel) },
+                headerAsk = { conversation -> HeaderAsk(viewModel, conversation = conversation) },
                 snackbar = snackbar,
                 snackbarLift = if (!searching) shell.snackbarLift else 0.dp
             )
@@ -175,10 +176,15 @@ fun DanaShell(viewModel: MainViewModel) {
                 val travel = remember { PlaceTravel(place) }.update(place, places)
                 Row(Modifier.weight(1f).fillMaxWidth()) {
                 if (layout != ShellLayout.STACKED) {
-                    ShellRail(place, places, inboxBadge, onPlace = { shell.go(it) }, header = { HeaderAsk(viewModel) })
+                    ShellRail(place, places, inboxBadge, onPlace = { shell.go(it) }, header = {
+                        // Beside a conversation pane the mic listens there (no sheet).
+                        CompositionLocalProvider(LocalShellLayout provides if (dest.conversation) ShellLayout.FULL else layout) { HeaderAsk(viewModel) }
+                    })
                 }
                 Box(Modifier.weight(1f).fillMaxHeight().enterOnChange(place, travel)) {
-                    when (layout) {
+                    when {
+                        layout != ShellLayout.STACKED && dest.conversation -> ConversationFrame(dest, slots)
+                        else -> when (layout) {
                         ShellLayout.STACKED -> StackedFrame(dest, slots, threadOpen, { shell.closeThread() }, showNav = !imeVisible)
                         ShellLayout.SPLIT -> SplitFrame(dest, slots, threadOpen, { shell.closeThread() })
                         // A wide place gets the whole width: drawn like portrait, the thread as a sheet.
@@ -187,6 +193,7 @@ fun DanaShell(viewModel: MainViewModel) {
                                 SplitFrame(dest, slots, threadOpen, { shell.closeThread() })
                             }
                         } else FullFrame(dest, slots) { TitleCell(dest) }
+                        }
                     }
                 }
                 }

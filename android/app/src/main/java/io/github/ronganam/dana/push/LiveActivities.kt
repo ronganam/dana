@@ -79,6 +79,13 @@ object LiveActivities {
     /** The cache, prefs and the shade change together. */
     private val lock = Any()
 
+    private val _updates = kotlinx.coroutines.flow.MutableSharedFlow<List<LiveActivity>>(
+        replay = 1, onBufferOverflow = kotlinx.coroutines.channels.BufferOverflow.DROP_OLDEST
+    )
+
+    /** Every list the shade was made to match (a push, an action's answer): the app's Now follows it. */
+    val updates: kotlinx.coroutines.flow.SharedFlow<List<LiveActivity>> = _updates
+
     /** What was shown per activity id: the last `rev` posted, the last alert shown, whether it was live. */
     @Serializable
     data class Shown(val rev: Int = 0, val alert: String = "", val live: Boolean = false)
@@ -510,6 +517,7 @@ object LiveActivities {
         runCatching { LiveApi.parse(cacheFile(context).readText()) }.getOrDefault(emptyList())
 
     private fun saveCache(context: Context, list: List<LiveActivity>) {
+        _updates.tryEmit(list)
         try {
             cacheFile(context).writeText(LiveApi.encode(list))
         } catch (e: IOException) {

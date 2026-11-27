@@ -42,7 +42,7 @@ import kotlinx.coroutines.withContext
 internal val NOW_TILE = 30.dp
 internal val NOW_TILE_GAP = 12.dp
 
-private fun NowGlyph.vector(): ImageVector = when (this) {
+internal fun NowGlyph.vector(): ImageVector = when (this) {
     NowGlyph.APPROVAL -> Icons.Outlined.Shield
     NowGlyph.ALERT -> Icons.Outlined.WarningAmber
     NowGlyph.CALL -> Icons.Outlined.Call

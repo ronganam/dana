@@ -54,6 +54,7 @@ import androidx.core.content.ContextCompat
 import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.screens.VoiceWaveformIndicator
 import io.github.ronganam.dana.ui.components.circuit.AskDanaButton
+import io.github.ronganam.dana.ui.components.circuit.ConversationButton
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import coil.compose.AsyncImage
 
@@ -271,14 +272,18 @@ internal fun rememberVoiceToggle(viewModel: MainViewModel): () -> Unit {
  * it while listening.
  */
 @Composable
-fun HeaderAsk(viewModel: MainViewModel, modifier: Modifier = Modifier) {
+fun HeaderAsk(viewModel: MainViewModel, modifier: Modifier = Modifier, conversation: Boolean = false) {
     val toggle = rememberVoiceToggle(viewModel)
     val isRecording by viewModel.chatController.isRecording.collectAsState()
     val isCallActive by viewModel.callController.isCallActive.collectAsState()
     val listening = isRecording || isCallActive
-    AskDanaButton(
-        onClick = toggle,
-        modifier = modifier.pulseRing(listening, MaterialTheme.colorScheme.primary),
-        label = if (listening) "Stop listening" else "Ask Dana"
-    )
+    // A place without the docked ask bar (Now) reaches the thread from here too.
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (conversation) ConversationButton(onClick = { viewModel.shellController.openThread() })
+        AskDanaButton(
+            onClick = toggle,
+            modifier = Modifier.pulseRing(listening, MaterialTheme.colorScheme.primary),
+            label = if (listening) "Stop listening" else "Ask Dana"
+        )
+    }
 }

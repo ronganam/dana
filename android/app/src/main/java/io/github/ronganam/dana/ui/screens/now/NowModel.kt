@@ -179,16 +179,11 @@ object NowModel {
     /** A day-strip item's hue: events sky, reminders amber, anything else (an addon's) sky. */
     fun dayHue(kind: String): Hue = if (kind == "reminder") Hue.AMBER else Hue.SKY
 
-    /**
-     * The header's line when the server sends no `lede`: "Nothing needs you
-     * right now." only when the queue is empty, else a calm line from the hour.
-     */
-    fun ledeFallback(hour: Int, queueEmpty: Boolean): String = when {
-        queueEmpty -> "Nothing needs you right now."
-        hour in 5..11 -> "Good morning."
-        hour in 12..17 -> "Good afternoon."
-        hour in 18..22 -> "Good evening."
-        else -> "Late night."
+    /** The header's greeting from the hour: morning 05–11, afternoon 12–17, evening otherwise. */
+    fun greeting(hour: Int): String = when (hour) {
+        in 5..11 -> "Good morning"
+        in 12..17 -> "Good afternoon"
+        else -> "Good evening"
     }
 
     /** "Updated just now" / "Updated 2 min ago" / "Updated 3 h ago" / "Updated 2 days ago". */
@@ -201,13 +196,6 @@ object NowModel {
             else -> "Updated ${min / (24 * 60)} days ago"
         }
     }
-
-    /** The notifications line: "17 notifications · 1 needs you · 11 noise" (zero parts left out). */
-    fun notificationsLine(total: Int, needsYou: Int, noise: Int): String = buildList {
-        add("$total notification${if (total == 1) "" else "s"}")
-        if (needsYou > 0) add("$needsYou need${if (needsYou == 1) "s" else ""} you")
-        if (noise > 0) add("$noise noise")
-    }.joinToString(" · ")
 
     fun choiceBlocks(item: NowItem): List<NowBlock.Choices> = item.blocks.filterIsInstance<NowBlock.Choices>()
     fun checkBlocks(item: NowItem): List<NowBlock.Checks> = item.blocks.filterIsInstance<NowBlock.Checks>()

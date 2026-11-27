@@ -76,12 +76,28 @@ class NowController(
     /** The owner's choice / check picks per card (kept across fold/unfold). */
     val drafts: StateFlow<Map<String, ItemDraft>> = _drafts.asStateFlow()
 
+    private val _live = MutableStateFlow<List<io.github.ronganam.dana.data.models.LiveActivity>>(emptyList())
+    /**
+     * What is going on (`GET /api/live` with each refresh, then every `live`
+     * push and action answer the shade gets through [io.github.ronganam.dana.push.LiveActivities.updates]).
+     */
+    val live: StateFlow<List<io.github.ronganam.dana.data.models.LiveActivity>> = _live.asStateFlow()
+
+    /** A live activity's `server` button (Approve / Deny) pressed on Now: the shade and Now follow the answer. */
+    fun actLive(id: String, action: String) {
+        ctx.scope.launch {
+            io.github.ronganam.dana.push.LiveActivities.act(appContext, id, action)
+            refresh()
+        }
+    }
+
     private val cacheFile = File(appContext.filesDir, "now_cache.json")
     private var refreshJob: Job? = null
     private var pollJob: Job? = null
     private var refreshAgain = false
 
     init {
+        ctx.scope.launch { io.github.ronganam.dana.push.LiveActivities.updates.collect { _live.value = it } }
         ctx.scope.launch {
             val cached = withContext(Dispatchers.IO) {
                 runCatching { if (cacheFile.exists()) NowApi.parse(cacheFile.readText()) else null }.getOrNull()
@@ -116,6 +132,14 @@ class NowController(
                     pending.refreshed(token)
                     publishHidden()
                     withContext(Dispatchers.IO) { runCatching { cacheFile.writeText(raw) } }
+                    // What is going on: its own call, so a failure leaves the last list (the queue already loaded).
+                    try {
+                        _live.value = ctx.api.live.list()
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        Log.w("Now", "Live load failed: $e")
+                    }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {

@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.ui.adaptive.asidePaneWidth
 import io.github.ronganam.dana.ui.adaptive.sidePaneWidth
+import io.github.ronganam.dana.ui.components.circuit.HeaderSlot
 import io.github.ronganam.dana.ui.components.circuit.LocalAskSlotInset
 import io.github.ronganam.dana.ui.components.enterOnChange
 import io.github.ronganam.dana.ui.theme.Motion
@@ -67,7 +68,8 @@ val LocalShellLayout = compositionLocalOf { ShellLayout.STACKED }
  * - [wide]: unfolded landscape gives the content the whole width (list | stage, the thread as a
  *   sheet and the ask bar under them, as in portrait) instead of three columns: Projects, Money.
  * - [askSlot]: on the cover, Ask Dana floats in the list's top-right header slot (the list's
- *   header keeps room for it through `askSlotInset()`).
+ *   header keeps room for it through `askSlotInset()`, or uses `PlaceHeader`).
+ * - [conversation]: see the property.
  */
 class Destination(
     val place: Place,
@@ -80,7 +82,13 @@ class Destination(
     val backable: Boolean = picked,
     val wide: Boolean = false,
     /** The cover floats Ask Dana in the list's top-right header slot (not on a More item's own pages). */
-    val askSlot: Boolean = true
+    val askSlot: Boolean = true,
+    /**
+     * The place holds the conversation differently (Now): folded, no docked ask bar (Ask Dana and a
+     * conversation button sit in the header; the bar comes with the open thread); unfolded, the
+     * conversation is a pane beside [list], which spans the rest ([ConversationFrame]).
+     */
+    val conversation: Boolean = false
 )
 
 /**
@@ -124,16 +132,16 @@ class ShellSlots(
     val ask: @Composable () -> Unit,
     val nav: @Composable () -> Unit,
     val strip: @Composable () -> Unit,
-    /** Ask Dana for the cover's header slot. */
-    val headerAsk: @Composable () -> Unit,
+    /** Ask Dana for the cover's header slot ([conversation]: with the conversation button). */
+    val headerAsk: @Composable (conversation: Boolean) -> Unit,
     val snackbar: SnackbarHostState,
     /** Kept free under the snackbar (a place's own bar at the bottom of its content). */
     val snackbarLift: Dp = 0.dp
 )
 
 private const val STAGE_KEY = "stage"
-/** What a header keeps free for Ask Dana: the 48dp button and its 8dp margin. */
-private val ASK_SLOT = 56.dp
+/** What a header keeps free for Ask Dana: the 48dp button (two with the conversation button) and the gap before it. */
+private fun askSlotWidth(conversation: Boolean): Dp = (if (conversation) 96.dp else 48.dp) + HeaderSlot.gap
 private const val LIST_KEY = "list"
 
 /**
@@ -151,15 +159,17 @@ internal fun StackedFrame(dest: Destination, slots: ShellSlots, threadOpen: Bool
             val ask = !drilled && dest.askSlot
             Box(Modifier.fillMaxSize().enterOnChange(drilled, if (drilled) 1 else -1)) {
                 if (drilled) holder.SaveableStateProvider("${dest.place}-$STAGE_KEY") { stage() }
-                else CompositionLocalProvider(LocalAskSlotInset provides if (ask) ASK_SLOT else 0.dp) {
+                else CompositionLocalProvider(LocalAskSlotInset provides if (ask) askSlotWidth(dest.conversation) else 0.dp) {
                     holder.SaveableStateProvider("${dest.place}-$LIST_KEY") { dest.list() }
                 }
             }
-            if (ask) Box(Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp)) { slots.headerAsk() }
+            // On the header row, its end on the content's margin.
+            if (ask) Box(Modifier.align(Alignment.TopEnd).padding(top = HeaderSlot.top, end = HeaderSlot.margin)) { slots.headerAsk(dest.conversation) }
             SnackbarHost(slots.snackbar, Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = slots.snackbarLift))
             ThreadSheet(threadOpen, onCloseThread) { slots.thread(onCloseThread) }
         }
-        slots.ask()
+        // A conversation place docks the ask bar only with the thread open.
+        if (!dest.conversation || threadOpen) slots.ask()
         if (showNav) slots.nav()
     }
 }
@@ -185,6 +195,32 @@ internal fun SplitFrame(dest: Destination, slots: ShellSlots, threadOpen: Boolea
         }
         slots.ask()
         slots.nav()
+    }
+}
+
+/**
+ * Unfolded, a [Destination.conversation] place: its content across the
+ * width, the conversation as a tinted pane at the end with the ask bar under
+ * it (drawn as in landscape: always there, no sheet). No day strip.
+ */
+@Composable
+internal fun ConversationFrame(dest: Destination, slots: ShellSlots) {
+    Row(Modifier.fillMaxSize()) {
+        Box(Modifier.weight(1f).fillMaxHeight()) {
+            // A pick (search results from the ask bar) takes the content's place.
+            val stage = dest.stage
+            if (dest.picked && stage != null) stage() else dest.list()
+            SnackbarHost(slots.snackbar, Modifier.align(Alignment.BottomStart).padding(12.dp).widthIn(max = 520.dp))
+        }
+        CompositionLocalProvider(LocalShellLayout provides ShellLayout.FULL) {
+            Column(
+                Modifier.width(asidePaneWidth()).fillMaxHeight()
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow).edgeRule(start = true)
+            ) {
+                Box(Modifier.weight(1f).fillMaxWidth()) { slots.thread(null) }
+                slots.ask()
+            }
+        }
     }
 }
 

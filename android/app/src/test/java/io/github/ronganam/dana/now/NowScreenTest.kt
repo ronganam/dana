@@ -2,7 +2,10 @@ package io.github.ronganam.dana.now
 
 import io.github.ronganam.dana.data.models.NowBlock
 import io.github.ronganam.dana.data.network.NowApi
+import io.github.ronganam.dana.ui.screens.now.DayLineNode
 import io.github.ronganam.dana.ui.screens.now.NewCards
+import io.github.ronganam.dana.ui.screens.now.calmLine
+import io.github.ronganam.dana.ui.screens.now.placeLabel
 import io.github.ronganam.dana.ui.screens.now.NowDay
 import io.github.ronganam.dana.ui.screens.now.NowModel
 import io.github.ronganam.dana.ui.theme.Hue
@@ -71,17 +74,22 @@ class NowScreenTest {
 
     @Test
     fun headerLines() {
-        assertEquals("Nothing needs you right now.", NowModel.ledeFallback(9, queueEmpty = true))
-        assertEquals("Good morning.", NowModel.ledeFallback(9, queueEmpty = false))
-        assertEquals("Good evening.", NowModel.ledeFallback(20, queueEmpty = false))
-        assertEquals("Late night.", NowModel.ledeFallback(2, queueEmpty = false))
+        assertEquals("Good morning", NowModel.greeting(9))
+        assertEquals("Good afternoon", NowModel.greeting(13))
+        assertEquals("Good evening", NowModel.greeting(20))
+        assertEquals("Good evening", NowModel.greeting(2))
         val t = 1_000_000_000L
         assertEquals("Updated just now", NowModel.updatedAgo(t, t + 30_000))
         assertEquals("Updated 2 min ago", NowModel.updatedAgo(t, t + 150_000))
         assertEquals("Updated 3 h ago", NowModel.updatedAgo(t, t + 3 * 3_600_000L))
-        assertEquals("17 notifications · 1 needs you · 11 noise", NowModel.notificationsLine(17, 1, 11))
-        assertEquals("1 notification", NowModel.notificationsLine(1, 0, 0))
-        assertEquals("4 notifications · 2 need you", NowModel.notificationsLine(4, 2, 0))
+    }
+
+    @Test
+    fun calmLineIsTheLedeElseWhatIsKeptQuiet() {
+        assertEquals("Standup at 09:30.", calmLine(" Standup at 09:30. ", 4))
+        assertEquals("Dana is keeping 4 notifications quiet.", calmLine(null, 4))
+        assertEquals("Dana is keeping 1 notification quiet.", calmLine("", 1))
+        assertNull(calmLine(null, 0))
     }
 
     @Test
@@ -123,40 +131,67 @@ class NowScreenTest {
     }
 
     @Test
-    fun dayStripHoursPastAndBusy() {
-        val slots = NowApi.parse(slotsJson).daySlots
-        val seg = NowDay.segments(slots, LocalTime.of(14, 30))
-        // 07:00 to 23:00, one per hour; before 14:00 past (never busy).
-        assertEquals((7..23).toList(), seg.map { it.hour })
-        assertEquals((7..13).toList(), seg.filter { it.past }.map { it.hour })
-        // Busy by the item's own time (14:40 → 14, 15:20 → 15, 19:05 → 19); 14:10 is earlier but still in the current hour.
-        assertEquals(listOf(14, 15, 19), seg.filter { it.busy }.map { it.hour })
-        assertTrue(seg.none { it.past && it.busy })
+    fun placeEntriesCarryTheirSlotKeyAndAShortLabel() {
+        val up = NowDay.upcoming(NowApi.parse(slotsJson).daySlots, LocalTime.of(14, 30))
+        assertEquals("home", up[3].placeKey)
+        assertEquals("Home", placeLabel(up[3]))
+        assertNull(up[0].placeKey)
     }
 
     @Test
-    fun emptyDayStillHasItsStrip() {
+    fun emptyDayHasNothingUpcoming() {
         val empty = NowApi.parse("""{"day":{"slots":[{"key":"15","label":"15:00","items":[]},{"key":"home","label":"At home","items":[]}]}}""").daySlots
         assertTrue(NowDay.upcoming(empty, LocalTime.of(14, 0)).isEmpty())
-        val seg = NowDay.segments(emptyList(), LocalTime.of(23, 5))
-        assertEquals(17, seg.size)
-        assertEquals(16, seg.count { it.past })
-        assertTrue(seg.none { it.busy })
     }
 
     @Test
     fun nightAndUntimedItems() {
-        // 01:00: the strip starts at 01:00; a 02:30 reminder is next, an untimed one counts in its slot's hour.
+        // 01:00: a 02:30 reminder is next; an untimed one takes its slot's hour as its time.
         val night = NowApi.parse(
             """{"day":{"slots":[{"key":"6","label":"06:00","items":[{"title":"Early","kind":"reminder","time":"02:30"},{"title":"Run","kind":"event"}]}]}}"""
         ).daySlots
         val up = NowDay.upcoming(night, LocalTime.of(1, 0))
         assertEquals(listOf("Early", "Run"), up.map { it.title })
+        assertEquals("06:00", up[1].time)
         assertTrue(up[0].next)
-        val seg = NowDay.segments(night, LocalTime.of(1, 0))
-        assertEquals(1, seg.first().hour)
-        assertEquals(listOf(2, 6), seg.filter { it.busy }.map { it.hour })
         assertEquals(null, NowDay.minutesOf("soon"))
         assertEquals(19 * 60 + 5, NowDay.minutesOf("19:05"))
+    }
+
+    private fun task(id: String, status: String, updated: String?) =
+        io.github.ronganam.dana.data.models.Task(id = id, title = "T$id", status = status, updatedAt = updated)
+
+    @Test
+    fun doneTodayReadsTheServersUtcTimesInTheLocalZone() {
+        val zone = java.time.ZoneId.of("Asia/Jerusalem") // +02:00 in November
+        val today = java.time.LocalDate.of(2026, 11, 27)
+        val done = NowDay.doneToday(
+            listOf(
+                task("1", "completed", "2026-11-27 07:30:00"), // 09:30 local
+                task("2", "completed", "2026-11-26 23:10:00"), // 01:10 local, today
+                task("3", "completed", "2026-11-26 21:00:00"), // 23:00 yesterday
+                task("4", "needs_action", "2026-11-27 08:00:00"),
+                task("5", "completed", "2026-11-27T10:15:00+02:00"),
+                task("6", "completed", null)
+            ),
+            today, zone
+        )
+        assertEquals(listOf("5", "1", "2"), done.map { it.taskId })
+        assertEquals(LocalTime.of(9, 30), done[1].at)
+    }
+
+    @Test
+    fun calmDayLinePlacesDoneNowAndAheadByTime() {
+        // Done 09:00, now 13:00, ahead 16:00: the line runs 08:00–16:00.
+        val nodes = NowDay.dayLine(listOf(9 * 60), listOf(16 * 60, 10 * 60), 13 * 60)
+        assertEquals(listOf(DayLineNode.Kind.DONE, DayLineNode.Kind.NOW, DayLineNode.Kind.NEXT), nodes.map { it.kind })
+        assertEquals(0.125f, nodes[0].fraction, 0.001f)
+        assertEquals(0.625f, nodes[1].fraction, 0.001f)
+        assertEquals(1f, nodes[2].fraction, 0.001f)
+        assertEquals(listOf("09:00", "Now", "16:00"), nodes.map { it.label })
+        // A time too close to Now loses its label; nothing at all → no line.
+        val close = NowDay.dayLine(listOf(12 * 60 + 50), emptyList(), 13 * 60)
+        assertNull(close.first { it.kind == DayLineNode.Kind.DONE }.label)
+        assertTrue(NowDay.dayLine(emptyList(), listOf(9 * 60), 13 * 60).isEmpty())
     }
 }

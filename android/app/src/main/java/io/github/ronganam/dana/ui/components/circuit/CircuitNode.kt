@@ -30,6 +30,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.isUnspecified
 import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
@@ -261,6 +262,8 @@ internal fun rememberPulse(on: Boolean, millis: Int = 2200): State<Float>? {
  * One node on its own: a row's leading node, a timeline's node, a legend.
  * Fills [NodeSize.box]; a waiting node breathes past it (not clipped). The
  * fill matches [surface] so a line drawn behind it stops at its edge.
+ * [strokeColor] / [glyphColor] override the state's (a row's leading node:
+ * a warm ring for something that needs you, the glyph in soft ink).
  */
 @Composable
 fun CircuitNode(
@@ -270,9 +273,13 @@ fun CircuitNode(
     size: NodeSize = NodeSize.Small,
     icon: ImageVector? = null,
     surface: Color = nodeSurface(),
-    contentDescription: String? = null
+    contentDescription: String? = null,
+    strokeColor: Color = Color.Unspecified,
+    glyphColor: Color = Color.Unspecified
 ) {
-    val paint = nodePaint(state, circuitColors, surface)
+    val base = nodePaint(state, circuitColors, surface)
+    val paint = if (strokeColor.isUnspecified && glyphColor.isUnspecified) base
+    else NodePaint(strokeColor.takeOrElse { base.stroke }, base.fill, glyphColor.takeOrElse { base.glyph }, base.dashed, base.breath, base.spinner)
     val glyph = icon?.let { rememberVectorPainter(it) }
     val breath = rememberBreath(state == NodeState.Waiting)
     Box(
