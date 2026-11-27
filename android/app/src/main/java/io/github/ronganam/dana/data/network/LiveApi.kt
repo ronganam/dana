@@ -20,6 +20,9 @@ private data class LiveAnswer(val activity: LiveActivity? = null)
  */
 class LiveApi(private val http: ApiClient) {
 
+    /** `GET /api/live`: every activity, newest-updated first. */
+    suspend fun list(): List<LiveActivity> = parse(http.jsonOrThrow(http.request("/api/live"), "Couldn't load live activities"))
+
     /** `POST /api/live/{id}/act`: run the add-on's action [action]; the activity after it, null when it ended. */
     suspend fun act(id: String, action: String, choice: String? = null): LiveActivity? {
         val body = buildJsonObject { put("action", action); if (choice != null) put("choice", choice) }
