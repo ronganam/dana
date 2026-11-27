@@ -17,6 +17,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.ui.components.HueMark
 import io.github.ronganam.dana.ui.components.MetaLabel
+import io.github.ronganam.dana.ui.components.riseIn
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -34,8 +35,9 @@ fun QuietEmptyState(
     hue: Color = MaterialTheme.colorScheme.primary,
     onAction: (() -> Unit)? = null
 ) {
+    // It rises in as it appears, its hue mark growing in from the start (phone only).
     Column(
-        modifier = modifier.fillMaxWidth().padding(horizontal = 28.dp, vertical = 40.dp),
+        modifier = modifier.riseIn(true).fillMaxWidth().padding(horizontal = 28.dp, vertical = 40.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         HueMark(hue, Modifier.padding(bottom = 4.dp))

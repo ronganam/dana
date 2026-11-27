@@ -234,7 +234,7 @@ private fun TalkButton(
             // Listening: a gentle ring leaves the button until it stops.
             .pulseRing(listening, c.accent)
             .clip(RoundedCornerShape(28.dp))
-            .background(c.accentFilled)
+            .background(io.github.ronganam.dana.ui.components.accentFill())
             // Dimmed while the server is unreachable (sending refuses and re-checks).
             .alpha(if (offline && !listening) 0.5f else 1f)
             .semantics { role = Role.Button; contentDescription = label }

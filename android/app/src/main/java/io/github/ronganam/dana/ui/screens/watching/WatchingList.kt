@@ -39,6 +39,8 @@ import io.github.ronganam.dana.data.watches.circuitOf
 import io.github.ronganam.dana.data.watches.quietUntil
 import io.github.ronganam.dana.data.watches.summaryWords
 import io.github.ronganam.dana.data.watches.whenWords
+import io.github.ronganam.dana.ui.components.arrive
+import io.github.ronganam.dana.ui.components.riseIn
 import io.github.ronganam.dana.ui.components.circuit.CircuitColumnHeader
 import io.github.ronganam.dana.ui.components.circuit.CircuitColumns
 import io.github.ronganam.dana.ui.components.circuit.CircuitRow
@@ -144,9 +146,9 @@ fun WatchingList(
             trailing = if (LocalCircuitColumns.current === CircuitColumns.Default) "Last fired" else null, startInset = 16.dp, endInset = 16.dp)
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            for (w in withRuns) {
+            withRuns.forEachIndexed { i, w ->
                 val run = runs.getValue(w.id)
-                GroupedSection {
+                GroupedSection(Modifier.arrive("watching", i)) {
                     item(key = w.id, color = if (run.waiting) c.warmSurface else null) {
                         RunCard(
                             watch = w,
@@ -165,11 +167,11 @@ fun WatchingList(
                 }
             }
             if (rest.isNotEmpty()) GroupedSection {
-                for (w in rest) item(key = w.id) {
+                rest.forEachIndexed { j, w -> item(key = w.id, modifier = Modifier.arrive("watching", withRuns.size + j)) {
                     val rows = today[w.id].orEmpty()
                     val live = watchLive(w, null, rows.any { it.outcome == "fired" }, (pulses[w.id]?.let { now - it < PULSE_MS }) == true)
                     WatchLine(w, live, rows, tracks, zoned) { onOpen(w.id) }
-                }
+                } }
             }
             if (ended.isNotEmpty()) {
                 SectionHeader("Ended", Modifier.padding(top = 16.dp), meta = ended.size.toString())
@@ -220,7 +222,7 @@ private fun WatchLine(w: Watch, live: WatchLive, rows: List<io.github.ronganam.d
 @Composable
 private fun EmptyWatching(onNew: () -> Unit) {
     val c = circuitColors
-    GroupedSection(Modifier.padding(top = 24.dp)) {
+    GroupedSection(Modifier.padding(top = 24.dp).riseIn(true)) {
         item {
             Column(Modifier.padding(16.dp)) {
                 Text("Each watch is a line", style = MaterialTheme.typography.titleMedium)

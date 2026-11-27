@@ -90,12 +90,13 @@ fun ScreenTopBar(
 }
 
 /**
- * The one small hue mark an empty state may carry above its italic serif
- * line (an 18 × 3dp bar), never an icon in a circle.
+ * The one small hue mark an empty state may carry above its line (an
+ * 18 × 3dp bar), never an icon in a circle. It grows in from its start once,
+ * as it appears ([growIn]; phone only, not with animations off).
  */
 @Composable
 fun HueMark(color: Color, modifier: Modifier = Modifier) {
-    Box(modifier.size(18.dp, 3.dp).clip(RoundedCornerShape(2.dp)).background(color))
+    Box(modifier.growIn().size(18.dp, 3.dp).clip(RoundedCornerShape(2.dp)).background(color))
 }
 
 /**
@@ -234,13 +235,17 @@ fun InkChoice(
 }
 
 /**
- * A filled button's container: the filled accent (dark text on it in the
- * dark theme, [MaterialTheme]'s onPrimary). Dimmed when disabled.
+ * A filled button's container: the filled accent leaning towards plum at its
+ * end (`circuitColors.accentFilled` → `accentFilledEnd`, mirrored in RTL;
+ * dark text on it in the dark theme, [MaterialTheme]'s onPrimary). Static.
+ * Dimmed and flat when disabled.
  */
 @Composable
 fun accentFill(enabled: Boolean = true): Brush {
-    val fill = circuitColors.accentFilled
-    return SolidColor(if (enabled) fill else fill.copy(alpha = 0.5f))
+    val c = circuitColors
+    if (!enabled) return SolidColor(c.accentFilled.copy(alpha = 0.5f))
+    val stops = listOf(c.accentFilled, c.accentFilledEnd)
+    return Brush.horizontalGradient(if (androidx.compose.ui.platform.LocalLayoutDirection.current == androidx.compose.ui.unit.LayoutDirection.Rtl) stops.reversed() else stops)
 }
 
 /** How loud an [InkButton] is. */

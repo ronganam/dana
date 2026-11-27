@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import io.github.ronganam.dana.ui.components.RollingText
 import io.github.ronganam.dana.ui.theme.Group
 import io.github.ronganam.dana.ui.theme.circuitColors
 import io.github.ronganam.dana.ui.theme.tabular
@@ -63,7 +64,16 @@ fun SectionHeader(
         )
         Spacer(Modifier.weight(1f))
         // The title keeps its room; a long meta line shortens instead.
-        if (meta != null) Text(
+        // A plain count rolls when it changes (Needs you · 3 → 2).
+        if (meta != null && onMeta == null && meta.length <= 4 && meta.all { it.isDigit() }) Box(
+            Modifier.weight(4f).padding(start = 12.dp), contentAlignment = Alignment.CenterEnd
+        ) {
+            RollingText(
+                meta,
+                style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold).tabular(),
+                color = metaColor.takeOrElse { c.inkSoft }
+            )
+        } else if (meta != null) Text(
             meta,
             textAlign = androidx.compose.ui.text.style.TextAlign.End,
             modifier = Modifier.weight(4f).then(if (onMeta != null) Modifier.clickable(onClick = onMeta) else Modifier).padding(start = 12.dp),
@@ -77,15 +87,17 @@ fun SectionHeader(
 
 /** What [GroupedSection] collects: its rows, in order. */
 class GroupedSectionScope internal constructor() {
-    internal class Item(val key: Any?, val color: Color?, val content: @Composable () -> Unit)
+    internal class Item(val key: Any?, val color: Color?, val modifier: Modifier, val content: @Composable () -> Unit)
     internal val items = mutableListOf<Item>()
 
     /**
      * One joined row. [color]: its own surface (a "needs you" row on
-     * `circuitColors.warmSurface`); the group's by default.
+     * `circuitColors.warmSurface`); the group's by default. [modifier] goes
+     * on the row's tile itself, outside its clip (`Modifier.arrive(…)`, so
+     * the tile and its content arrive together).
      */
-    fun item(key: Any? = null, color: Color? = null, content: @Composable () -> Unit) {
-        items += Item(key, color, content)
+    fun item(key: Any? = null, color: Color? = null, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
+        items += Item(key, color, modifier, content)
     }
 }
 
@@ -113,7 +125,7 @@ fun GroupedSection(
             items.forEachIndexed { i, item ->
                 androidx.compose.runtime.key(item.key ?: i) {
                     val color = item.color ?: containerColor
-                    Box(Modifier.fillMaxWidth().clip(groupItemShape(i, items.size)).background(color)) {
+                    Box(item.modifier.fillMaxWidth().clip(groupItemShape(i, items.size)).background(color)) {
                         CompositionLocalProvider(LocalNodeSurface provides color) { item.content() }
                     }
                 }

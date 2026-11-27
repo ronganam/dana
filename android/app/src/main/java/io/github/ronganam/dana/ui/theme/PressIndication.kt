@@ -17,7 +17,9 @@ import kotlinx.coroutines.launch
 /**
  * Every clickable's press feedback (the app's `LocalIndication`, set by
  * [DanaTheme]): the theme's ripple gives the slight tint (and the focus
- * state), and the pressed thing shrinks to 0.97, fast.
+ * state), and the pressed thing squishes to 0.96, fast, then springs back
+ * on release with a hair of overshoot ([Motion.bouncy]), so a tap feels
+ * tactile.
  *
  * The shrink is draw-phase only: a scale of the canvas around the content
  * (ripple included), no layer, no recomposition. Big targets shrink by at
@@ -54,7 +56,8 @@ private class ShrinkNode(private val source: InteractionSource) : Modifier.Node(
                 launch {
                     // A quick tap still shows the press: reach it before letting go.
                     if (target == 0f && pressed.targetValue == 1f) pressed.animateTo(1f, Motion.fast())
-                    pressed.animateTo(target, Motion.fast())
+                    // Let go: spring back, passing rest a little (the scale goes just above 1).
+                    pressed.animateTo(target, if (target == 0f) Motion.bouncy() else Motion.fast())
                 }
             }
         }
@@ -68,6 +71,7 @@ private class ShrinkNode(private val source: InteractionSource) : Modifier.Node(
         } else {
             val longest = maxOf(size.width, size.height).coerceAtLeast(1f)
             val most = (16.dp.toPx() / longest).coerceAtMost(1f - Motion.PRESS_SCALE)
+            // p < 0 while the release overshoots: a touch larger than at rest.
             scale(1f - most * p) { this@draw.drawContent() }
         }
     }

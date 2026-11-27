@@ -55,6 +55,9 @@ val OnAccentContainerLight = Color(0xFF22124F)
 /** A filled button's container (dark text on it: [OnAccentDark] / [OnAccentLight]). */
 val AccentFilledDark = Color(0xFFC9B8FF)
 val AccentFilledLight = Color(0xFF5F45C2)
+/** Where a filled button's fill leans at its end: violet warming towards plum (`accentFill()`). */
+val AccentFilledEndDark = Color(0xFFDDB6F4)
+val AccentFilledEndLight = Color(0xFF7A3DB4)
 
 /** The bottom bar's and rail's pill indicator, and the tonal header buttons (Ask Dana). */
 val IndicatorDark = DarkSurfaceHighest
@@ -197,7 +200,9 @@ class CircuitColors(
     val nodeDim: Color,
     val ink: Color,
     val inkSoft: Color,
-    val mute: Color
+    val mute: Color,
+    /** The end of a filled button's gradient ([accentFilled] → this, towards plum). */
+    val accentFilledEnd: Color = accentFilled
 )
 
 val DarkCircuit = CircuitColors(
@@ -207,7 +212,8 @@ val DarkCircuit = CircuitColors(
     warm = WarmDark, onWarm = Color(0xFF3A1E0B), warmSurface = WarmSurfaceDark, warmSurfaceHigh = WarmSurfaceHighDark,
     wire = DarkOutlineSoft, wireRaised = Color(0xFF4A4160), wireDim = Color(0xFF2C263A),
     node = DarkMute, nodeDim = Color(0xFF5A5270),
-    ink = DarkInk, inkSoft = DarkInkSoft, mute = DarkMute
+    ink = DarkInk, inkSoft = DarkInkSoft, mute = DarkMute,
+    accentFilledEnd = AccentFilledEndDark
 )
 
 val LightCircuit = CircuitColors(
@@ -217,7 +223,8 @@ val LightCircuit = CircuitColors(
     warm = WarmLight, onWarm = Color.White, warmSurface = WarmSurfaceLight, warmSurfaceHigh = WarmSurfaceHighLight,
     wire = Color(0xFFCFC6E0), wireRaised = Color(0xFFC2B8D6), wireDim = Color(0xFFE2DCEC),
     node = LightMute, nodeDim = Color(0xFFADA5C0),
-    ink = LightInk, inkSoft = LightInkSoft, mute = LightMute
+    ink = LightInk, inkSoft = LightInkSoft, mute = LightMute,
+    accentFilledEnd = AccentFilledEndLight
 )
 
 val LocalCircuitColors = staticCompositionLocalOf { DarkCircuit }

@@ -29,6 +29,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.graphics.Color
+import io.github.ronganam.dana.ui.components.arrive
+import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.ui.components.circuit.GroupRow
 import io.github.ronganam.dana.ui.components.circuit.GroupedSection
 import io.github.ronganam.dana.ui.components.circuit.PlaceHeader
@@ -174,13 +178,16 @@ private fun ColumnScope.MoreRows(
     Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp)) {
         // One tonal group; unfolded the open item's row is lifted (and marked by the accent at its start).
         GroupedSection {
-            rows.forEach { (item, meta, matches) ->
+            rows.forEachIndexed { index, (item, meta, matches) ->
                 val on = wide && selected in matches
-                item(key = item, color = if (on) canvas else null) {
+                item(key = item, color = if (on) canvas else null, modifier = Modifier.arrive("more", index)) {
                     // A count sits at the end of the row; a description goes under the name.
                     val isCount = meta.all { it.isDigit() }
+                    val hue = item.hue()
                     GroupRow(
                         title = item.label,
+                        // The kind's hue as a small dot (people plum, money sage, …).
+                        leading = { if (hue != null) Box(Modifier.size(10.dp).clip(CircleShape).background(hue)) },
                         subtitle = if (!isCount) meta.replaceFirstChar { it.uppercase() } else null,
                         trailing = if (isCount && meta.isNotEmpty()) ({ Text(meta, style = MaterialTheme.typography.bodyMedium, color = c.inkSoft) }) else null,
                         modifier = if (on) Modifier.drawBehind {
@@ -191,6 +198,20 @@ private fun ColumnScope.MoreRows(
                 }
             }
         }
+    }
+}
+
+/** A More item's hue, by what it is about (the named hues' meanings); null for none. */
+@Composable
+private fun MoreItem.hue(): Color? {
+    val h = hues
+    return when (this) {
+        MoreItem.SHOPPING -> h.amber
+        MoreItem.MONEY, MoreItem.CALLS -> h.sage
+        MoreItem.PROJECTS -> h.sky
+        MoreItem.PEOPLE, MoreItem.ABOUT, MoreItem.MEMORY -> h.plum
+        MoreItem.REVIEW -> h.sky
+        MoreItem.SETTINGS, MoreItem.SIGNALS -> null
     }
 }
 

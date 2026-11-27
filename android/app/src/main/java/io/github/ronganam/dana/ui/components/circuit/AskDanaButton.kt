@@ -104,7 +104,7 @@ fun PlaceHeader(title: String, modifier: Modifier = Modifier, supporting: String
         Row(Modifier.fillMaxWidth().heightIn(min = HeaderSlot.row).askSlotInset(), verticalAlignment = Alignment.CenterVertically) {
             Text(
                 title,
-                style = MaterialTheme.typography.displaySmall.copy(textDirection = TextDirection.Content),
+                style = io.github.ronganam.dana.ui.theme.PlaceTitle.copy(textDirection = TextDirection.Content),
                 color = c.ink,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,

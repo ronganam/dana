@@ -122,8 +122,8 @@ private class ArriveNode(val screen: String, val index: Int) : Modifier.Node(), 
 /**
  * Plays an entrance each time [key] changes (not on first composition): fade
  * in + slide [distance] from the side of travel ([direction] -1 from the
- * start, +1 from the end, 0 from below). The screen/pane/tab switch pattern;
- * phone only (the TV and the wall tablet just switch).
+ * start, +1 from the end, 0 from below) on a soft spring ([Motion.settle]).
+ * The screen/pane/tab switch pattern; phone only (the TV and the wall tablet just switch).
  */
 fun Modifier.enterOnChange(key: Any?, direction: Int = 1, distance: Dp = Motion.Slide): Modifier =
     this then EnterElement(key, direction, distance)
@@ -147,7 +147,8 @@ private class EnterNode(var key: Any?, var direction: Int, var distance: Dp) : M
         coroutineScope.launch {
             a.snapTo(0f)
             invalidatePlacement()
-            a.animateTo(1f, Motion.arrive(Motion.BASE))
+            // A soft spring: the new place glides in, passes its spot by a hair and settles.
+            a.animateTo(1f, Motion.settle())
             progress = null
             invalidatePlacement()
         }
@@ -160,7 +161,7 @@ private class EnterNode(var key: Any?, var direction: Int, var distance: Dp) : M
             if (a == null) p.place(0, 0)
             else p.placeRelativeWithLayer(0, 0) {
                 val v = a.value
-                alpha = v
+                alpha = v.coerceIn(0f, 1f)
                 // Fade each draw instead of an offscreen buffer the size of the content.
                 compositingStrategy = CompositingStrategy.ModulateAlpha
                 val d = (1f - v) * distance.toPx()

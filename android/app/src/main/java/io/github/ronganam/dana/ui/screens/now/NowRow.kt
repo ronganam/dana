@@ -350,7 +350,7 @@ internal fun FilledAction(text: String, onClick: () -> Unit) {
         Modifier
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(22.dp))
-            .background(c.accentFilled)
+            .background(io.github.ronganam.dana.ui.components.accentFill())
             .clickable(role = Role.Button, onClick = onClick)
             .padding(horizontal = 20.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center

@@ -3,6 +3,7 @@ package io.github.ronganam.dana.ui.theme
 import android.provider.Settings
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.ReadOnlyComposable
@@ -38,7 +39,11 @@ object Motion {
     /** TV focus: the focused tile scales to [FOCUS_SCALE] in this long. */
     const val FOCUS = 150
     const val FOCUS_SCALE = 1.05f
-    const val PRESS_SCALE = 0.97f
+    const val PRESS_SCALE = 0.96f
+    /** A count that rose, a nav icon picked: it swells to this and springs back. */
+    const val POP_SCALE = 1.15f
+    /** The one-shot burst of hue dots (`celebrate`): its whole flight. */
+    const val CELEBRATE = 700
 
     val Standard = CubicBezierEasing(0.2f, 0f, 0f, 1f)
     /** Things arriving. */
@@ -55,6 +60,17 @@ object Motion {
     fun <T> slow(): FiniteAnimationSpec<T> = tween(SLOW, easing = Standard)
     fun <T> arrive(duration: Int = BASE): FiniteAnimationSpec<T> = tween(duration, easing = Decelerate)
     fun <T> leave(duration: Int = FAST): FiniteAnimationSpec<T> = tween(duration, easing = Accelerate)
+
+    /**
+     * A lively spring with a visible overshoot (~15%): things popping in, a
+     * pressed thing let go, a picked nav icon. Settles in ~350 ms.
+     */
+    fun <T> bouncy(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.5f, stiffness = 520f)
+    /**
+     * A soft spring that just passes its target (~5%) and settles: a place or
+     * drill-down sliding in. Settles in ~400 ms.
+     */
+    fun <T> settle(): FiniteAnimationSpec<T> = spring(dampingRatio = 0.7f, stiffness = 380f)
 }
 
 /**

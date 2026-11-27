@@ -235,7 +235,7 @@ fun ApprovalCard(entry: ToolCallEntry, onAnswer: (Boolean) -> Unit, modifier: Mo
                 Modifier
                     .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(24.dp))
-                    .background(c.accentFilled)
+                    .background(io.github.ronganam.dana.ui.components.accentFill())
                     .clickable(role = Role.Button) { onAnswer(true) }
                     .padding(horizontal = 24.dp, vertical = 12.dp),
                 contentAlignment = Alignment.Center
