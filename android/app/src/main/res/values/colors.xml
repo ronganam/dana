@@ -2,7 +2,6 @@
 <!-- The window theme's colours before Compose draws (Circuit's night values; ui/theme/Color.kt is the source). -->
 <resources>
     <color name="black">#000000</color>
-    <color name="white">#FFFFFF</color>
 
     <color name="primary">#B9A5FF</color>
     <color name="on_primary">#21163A</color>

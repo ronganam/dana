@@ -13,7 +13,7 @@ import io.github.ronganam.dana.R
 
 /*
  * One face (Circuit): Roboto Flex, a Google Fonts downloadable font fetched
- * through Play services (certificates in res/values/font_certs.xml), with the
+ * through Play services (certificates in res/values/font_certs.xml, `dana_font_certs`), with the
  * system sans as the fallback (no Play services, offline before the first
  * download, previews). Hebrew falls through to the system's Hebrew face.
  * Sizes: display 34–40 for screen titles, title 22, body 16, supporting 14,
@@ -23,7 +23,7 @@ import io.github.ronganam.dana.R
 private val GoogleFonts = GoogleFont.Provider(
     providerAuthority = "com.google.android.gms.fonts",
     providerPackage = "com.google.android.gms",
-    certificates = R.array.com_google_android_gms_fonts_certs
+    certificates = R.array.dana_font_certs
 )
 
 private val RobotoFlex = GoogleFont("Roboto Flex")
