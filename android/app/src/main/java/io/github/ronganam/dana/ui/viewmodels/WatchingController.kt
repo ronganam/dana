@@ -67,6 +67,9 @@ class WatchingController(private val ctx: ControllerContext) {
 
     private val _failed = MutableStateFlow(false)
     val failed: StateFlow<Boolean> = _failed.asStateFlow()
+    private val _off = MutableStateFlow(false)
+    /** The server answered 403 `not_connected`: watches are not turned on for this account. */
+    val off: StateFlow<Boolean> = _off.asStateFlow()
 
     private val _runs = MutableStateFlow<Map<String, WatchRun>>(emptyMap())
     /** Each watch's agent run that is going on, by watch id. */
@@ -143,7 +146,10 @@ class WatchingController(private val ctx: ControllerContext) {
 
     /** Everything again: the watches, today's checks, the runs (and the open watch). */
     fun refresh(): Job = ctx.scope.launch {
-        val list = ctx.load(TAG) { ctx.api.watches.list() }
+        val list = ctx.load(TAG) {
+            try { ctx.api.watches.list() } catch (e: ApiException) { if (e.code == 403) null.also { _off.value = true } else throw e }
+        }
+        if (list != null) _off.value = false
         _failed.value = list == null
         if (list != null) {
             _watches.value = list

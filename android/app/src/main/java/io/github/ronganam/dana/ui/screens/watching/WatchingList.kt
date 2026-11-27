@@ -75,6 +75,7 @@ fun WatchingList(
     val watches by controller.watches.collectAsState()
     val loaded by controller.loaded.collectAsState()
     val failed by controller.failed.collectAsState()
+    val off by controller.off.collectAsState()
     val runs by controller.runs.collectAsState()
     val steps by controller.steps.collectAsState()
     val drafts by controller.drafts.collectAsState()
@@ -115,20 +116,21 @@ fun WatchingList(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.askSlotInset()) {
             Text("Watching", style = MaterialTheme.typography.displayMedium, modifier = Modifier.weight(1f).semantics { heading() })
-            if (tracks) {
+            if (!off && tracks) {
                 Button(onClick = onNew, colors = ButtonDefaults.buttonColors(containerColor = c.accentFilled, contentColor = c.onAccentFilled), modifier = Modifier.height(48.dp)) {
                     Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(20.dp))
                     Spacer(Modifier.width(8.dp))
                     Text("New watch", style = MaterialTheme.typography.titleMedium)
                 }
-            } else {
+            } else if (!off) {
                 IconButton(onClick = onNew, modifier = Modifier.size(48.dp)) {
                     Icon(Icons.Outlined.Add, contentDescription = "New watch", tint = c.ink)
                 }
             }
         }
         val line = when {
-            !loaded && failed -> "Couldn't reach Dana. Pull down later."
+            !loaded && off -> "Watches are off on your Dana. An admin turns them on under Addons."
+            !loaded && failed -> "Couldn't reach Dana."
             !loaded -> "Loading…"
             watches.isEmpty() -> "Nothing yet."
             tracks -> summaryWords(watches, needsYou) + todayWords(today.values.flatten())
