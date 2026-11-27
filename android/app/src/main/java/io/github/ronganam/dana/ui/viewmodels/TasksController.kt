@@ -46,6 +46,10 @@ class TasksController(private val ctx: ControllerContext, private val appContext
     private val _zones = MutableStateFlow<List<String>>(emptyList())
     val zones: StateFlow<List<String>> = _zones.asStateFlow()
 
+    /** The user's saved places as the server lists them (`isHome` marks home). */
+    private val _zoneItems = MutableStateFlow<List<io.github.ronganam.dana.data.models.ZoneItem>>(emptyList())
+    val zoneItems: StateFlow<List<io.github.ronganam.dana.data.models.ZoneItem>> = _zoneItems.asStateFlow()
+
     fun fetchTasks() {
         ctx.scope.launch {
             _isLoadingTasks.value = true
@@ -115,6 +119,7 @@ class TasksController(private val ctx: ControllerContext, private val appContext
         ctx.scope.launch {
             val zones = ctx.load("Zones") { ctx.api.tasks.zones() }
             _zones.value = zones?.map { it.name } ?: listOf("Home")
+            if (zones != null) _zoneItems.value = zones
         }
     }
 

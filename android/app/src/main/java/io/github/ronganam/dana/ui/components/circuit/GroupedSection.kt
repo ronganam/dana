@@ -44,23 +44,33 @@ fun groupItemShape(index: Int, count: Int, outer: Dp = Group.outer, inner: Dp = 
 
 /** A section's heading: its name (18sp) and an optional count or word at the end. */
 @Composable
-fun SectionHeader(title: String, modifier: Modifier = Modifier, meta: String? = null, metaColor: Color = Color.Unspecified, onMeta: (() -> Unit)? = null) {
+fun SectionHeader(
+    title: String,
+    modifier: Modifier = Modifier,
+    meta: String? = null,
+    metaColor: Color = Color.Unspecified,
+    onMeta: (() -> Unit)? = null,
+    titleColor: Color = Color.Unspecified
+) {
     val c = circuitColors
     Row(modifier.fillMaxWidth().heightIn(min = 32.dp).padding(bottom = 8.dp), verticalAlignment = Alignment.Bottom) {
         Text(
             title,
             style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
-            color = c.ink,
-            modifier = Modifier.weight(1f),
+            color = titleColor.takeOrElse { c.ink },
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+        Spacer(Modifier.weight(1f))
+        // The title keeps its room; a long meta line shortens instead.
         if (meta != null) Text(
             meta,
+            textAlign = androidx.compose.ui.text.style.TextAlign.End,
+            modifier = Modifier.weight(4f).then(if (onMeta != null) Modifier.clickable(onClick = onMeta) else Modifier).padding(start = 12.dp),
+            overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold).tabular(),
             color = metaColor.takeOrElse { c.inkSoft },
-            maxLines = 1,
-            modifier = if (onMeta != null) Modifier.clickable(onClick = onMeta) else Modifier
+            maxLines = 1
         )
     }
 }

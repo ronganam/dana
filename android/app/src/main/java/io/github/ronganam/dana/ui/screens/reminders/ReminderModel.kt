@@ -2,7 +2,6 @@ package io.github.ronganam.dana.ui.screens.reminders
 
 import io.github.ronganam.dana.data.models.Task
 import io.github.ronganam.dana.data.models.LocationTrigger
-import io.github.ronganam.dana.data.models.TaskGroup
 import io.github.ronganam.dana.data.models.Triggers
 import io.github.ronganam.dana.ui.shell.DaySlot
 import java.time.DayOfWeek
@@ -41,10 +40,6 @@ sealed class RemindWhen {
     val kind: String get() = when (this) {
         None -> "none"; is At -> "time"; is Place -> "place"; is Car -> "car"; Wake -> "wake"
     }
-}
-
-enum class Bucket(val label: String) {
-    OVERDUE("Overdue"), TODAY("Today"), WHEN_THERE("When I get there"), LATER("Later"), SOMEDAY("Someday")
 }
 
 private val TRIGGER_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:00")
@@ -104,95 +99,18 @@ fun timeLabel(t: LocalDateTime, now: LocalDateTime): String {
     }
 }
 
-/** The short mono label of one trigger ("Today 18:30", "At Home", "In the car", "On waking"). */
-fun whenLabel(w: RemindWhen, now: LocalDateTime): String = when (w) {
-    RemindWhen.None -> "No reminder set"
-    is RemindWhen.At -> timeLabel(w.time, now)
-    is RemindWhen.Place -> (if (w.leave) "Leaving " else "At ") + zoneLabel(w.zone)
-    is RemindWhen.Car -> if (w.leave) "Getting out of the car" else "In the car"
-    RemindWhen.Wake -> "On waking"
-}
-
-/** The row's mono label: its first trigger, else its due date, else "No reminder set". */
-fun taskWhenText(task: Task, now: LocalDateTime): String {
-    val w = remindWhen(task)
-    if (w != RemindWhen.None) return whenLabel(w, now)
-    val due = parseTriggerTime(task.dueDate)?.toLocalDate() ?: return "No reminder set"
-    val today = now.toLocalDate()
-    return when (due) {
-        today -> "Due today"
-        today.plusDays(1) -> "Due tomorrow"
-        else -> "Due " + due.format(DateTimeFormatter.ofPattern(if (due.year == today.year) "EEE d MMM" else "d MMM yyyy", Locale.getDefault()))
-    }
-}
-
-/**
- * Overdue / Today / When I get there / Later / Someday:
- * a time trigger decides by its time; otherwise a place, car or wake trigger
- * means "when I get there"; otherwise the due date decides; nothing at all is Someday.
- */
-fun bucketOf(task: Task, now: LocalDateTime): Bucket {
-    val whens = remindWhens(task)
-    val at = whens.filterIsInstance<RemindWhen.At>().firstOrNull()
-    if (at != null) return dayBucket(at.time, now, timed = true)
-    if (whens.isNotEmpty()) return Bucket.WHEN_THERE
-    val due = parseTriggerTime(task.dueDate) ?: return Bucket.SOMEDAY
-    return dayBucket(due, now, timed = false)
-}
-
-private fun dayBucket(t: LocalDateTime, now: LocalDateTime, timed: Boolean): Bucket {
-    val day = t.toLocalDate()
-    val today = now.toLocalDate()
-    return when {
-        day.isBefore(today) -> Bucket.OVERDUE
-        timed && t.isBefore(now) -> Bucket.OVERDUE
-        day == today -> Bucket.TODAY
-        else -> Bucket.LATER
-    }
-}
-
 fun isOpen(task: Task) = task.status != "completed"
-
-data class ReminderSection(val key: String, val title: String, val tasks: List<Task>)
-
-/** "By when": the five buckets in order, each sorted by time (untimed by title), empty ones dropped. */
-fun sectionsByWhen(open: List<Task>, now: LocalDateTime): List<ReminderSection> {
-    val byBucket = open.groupBy { bucketOf(it, now) }
-    return Bucket.values().mapNotNull { b ->
-        val list = byBucket[b].orEmpty()
-        if (list.isEmpty()) null else ReminderSection(b.name, b.label, list.sortedWith(timeOrder()))
-    }
-}
-
-/** "By list": one section per task group, in the groups' order; tasks without a known group go to "General". */
-fun sectionsByList(open: List<Task>, groups: List<TaskGroup>): List<ReminderSection> {
-    val known = groups.associateBy { it.id }
-    val byGroup = open.groupBy { t -> t.groupId?.takeIf { it in known } }
-    val ordered = groups.sortedBy { it.sortOrder }.mapNotNull { g ->
-        byGroup[g.id]?.let { ReminderSection(g.id, g.name, it.sortedWith(timeOrder())) }
-    }
-    val rest = byGroup[null]?.let { list ->
-        // Unknown group ids (groups not loaded yet): fall back to the name the task carries.
-        list.groupBy { it.groupName ?: "General" }.map { (name, l) -> ReminderSection("name:$name", name, l.sortedWith(timeOrder())) }
-    }.orEmpty()
-    return ordered + rest
-}
-
-private fun timeOrder(): Comparator<Task> = compareBy<Task>(
-    { t -> remindWhens(t).filterIsInstance<RemindWhen.At>().firstOrNull()?.time ?: parseTriggerTime(t.dueDate) ?: LocalDateTime.MAX },
-    { it.title.lowercase() }
-)
 
 /** Completed reminders, most recently changed first. */
 fun doneRecently(tasks: List<Task>, limit: Int = 20): List<Task> =
     tasks.filter { !isOpen(it) }.sortedByDescending { it.updatedAt ?: it.createdAt ?: "" }.take(limit)
 
-/** The plain sentence under "Remind me". */
+/** The plain sentence that says when a reminder reaches you (the moment sheet, the editor). */
 fun sentence(task: Task, now: LocalDateTime): String {
     val whens = remindWhens(task)
     if (whens.isEmpty()) {
         val due = parseTriggerTime(task.dueDate)?.toLocalDate()
-            ?: return "Dana will not remind you. It waits under Someday."
+            ?: return "Dana will not remind you. Pick a moment so it reaches you."
         val day = due.format(DateTimeFormatter.ofPattern("EEE d MMM", Locale.getDefault()))
         return if (due.isBefore(now.toLocalDate())) "Dana will not remind you. It was due $day." else "Dana will not remind you. It is due $day."
     }
@@ -262,11 +180,4 @@ fun remindWhenFor(slot: DaySlot, now: LocalDateTime, zones: List<String>): Remin
     }
     DaySlot.AtHome -> RemindWhen.Place(homeZoneName(zones), leave = false)
     DaySlot.OnWaking -> RemindWhen.Wake
-}
-
-/** "Moved to 21:00" / "Moved to when you get home" / "Moved to when you wake". */
-fun slotPhrase(slot: DaySlot): String = when (slot) {
-    is DaySlot.Hour -> "%02d:00".format(slot.hour)
-    DaySlot.AtHome -> "when you get home"
-    DaySlot.OnWaking -> "when you wake"
 }

@@ -1,35 +1,22 @@
 package io.github.ronganam.dana.ui.screens.reminders
 
-import io.github.ronganam.dana.ui.components.circuit.askSlotInset
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.lerp
-import androidx.compose.ui.layout.layout
-import androidx.compose.ui.text.TextLayoutResult
-import androidx.compose.ui.text.style.ResolvedTextDirection
-import androidx.compose.ui.text.style.TextOverflow
-import io.github.ronganam.dana.ui.components.RollingText
-import io.github.ronganam.dana.ui.components.arrive
-import io.github.ronganam.dana.ui.components.startBar
-import io.github.ronganam.dana.ui.theme.Motion
-import io.github.ronganam.dana.ui.theme.hues
-import kotlin.math.roundToInt
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.Check
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
@@ -38,173 +25,180 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.Task
-import io.github.ronganam.dana.ui.components.MetaLabel
-import io.github.ronganam.dana.ui.components.Rule
-import io.github.ronganam.dana.ui.shell.LocalShellLayout
-import io.github.ronganam.dana.ui.shell.ShellLayout
+import io.github.ronganam.dana.ui.components.circuit.CircuitNode
+import io.github.ronganam.dana.ui.components.circuit.LocalNodeSurface
+import io.github.ronganam.dana.ui.components.circuit.NodeShape
+import io.github.ronganam.dana.ui.components.circuit.NodeSize
+import io.github.ronganam.dana.ui.components.circuit.NodeState
+import io.github.ronganam.dana.ui.components.circuit.PlaceHeader
+import io.github.ronganam.dana.ui.components.circuit.SectionHeader
 import io.github.ronganam.dana.ui.shell.dragToDay
 import io.github.ronganam.dana.ui.shell.rememberNow
+import io.github.ronganam.dana.ui.theme.circuitColors
+import io.github.ronganam.dana.ui.theme.tabular
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
+import java.time.LocalDateTime
 
-private val GUTTER = 18.dp
+private val GUTTER = 16.dp
 
 /**
- * Reminders, the list pane: every open reminder grouped By when or By list,
- * "+ Add a reminder", a circle to complete (with Undo) and "Done recently"
- * folded at the end. Unfolded, a row can be long-pressed and dragged onto the
- * day strip.
+ * Reminders, the list: every open reminder grouped by the moment it reaches
+ * you (Late · On waking · Today · Places & car · Later · No moment), each
+ * group a tonal card whose rows sit on a line of moment nodes. Dana's
+ * suggestion for a reminder snoozed again and again opens under its row.
+ * The lists filter at the top; "Done recently" stays at the end (tap to
+ * bring one back). A row opens the moment sheet ([onMoments]); unfolded, a
+ * row can still be dragged onto the day strip.
  */
 @Composable
-fun ReminderListPane(viewModel: MainViewModel) {
-    val shell = viewModel.shellController
+fun ReminderListPane(
+    viewModel: MainViewModel,
+    onMoments: (String) -> Unit,
+    headerExtra: (@Composable () -> Unit)? = null,
+    belowHeader: (@Composable () -> Unit)? = null
+) {
     val tc = viewModel.tasksController
     val tasks by tc.tasks.collectAsState()
     val groups by tc.taskGroups.collectAsState()
     val zones by tc.zones.collectAsState()
     val loading by tc.isLoadingTasks.collectAsState()
-    val byList by shell.remindersByList.collectAsState()
-    val doneOpen by shell.doneOpen.collectAsState()
-    val pick by shell.reminder.collectAsState()
+    val filter by tc.selectedGroupFilter.collectAsState()
     val now by rememberNow()
-    val showSelection = LocalShellLayout.current != ShellLayout.STACKED
+    val kept = rememberKeptSuggestions()
+    var adding by rememberSaveable { mutableStateOf(false) }
+    val doneOpen by viewModel.shellController.doneOpen.collectAsState()
 
-    // A reminder being completed stays (as it was) until its animation ends; one coming back (Undo) animates in.
-    val completing = remember { mutableStateMapOf<String, Task>() }
-    val flow = remember { CompletionFlow() }
-    val open = tasks.mapNotNull { t -> completing[t.id] ?: t.takeIf(::isOpen) }
-    open.forEach { if (it.id in flow.gone && it.id !in completing) { flow.gone -= it.id; flow.returning += it.id } }
-    val sections = remember(open, groups, byList, now.toLocalDate(), now.hour) {
-        if (byList) sectionsByList(open, groups) else sectionsByWhen(open, now)
-    }
-    val done = remember(tasks) { doneRecently(tasks) }
-    val forToday = remember(open, now) { open.count { bucketOf(it, now).let { b -> b == Bucket.OVERDUE || b == Bucket.TODAY } } }
+    val open = remember(tasks) { tasks.filter(::isOpen) }
+    val shown = remember(open, filter) { if (filter == null) open else open.filter { it.groupId == filter } }
+    val sections = remember(shown, now) { momentSections(shown, now) }
+    val done = remember(tasks, filter) { doneRecently(tasks.filter { filter == null || it.groupId == filter }, limit = 10) }
     val groupNames = remember(groups) { groups.associate { it.id to it.name } }
-    val groupColors = remember(groups) { groups.associate { it.id to it.color } }
-    val h = hues
+    fun listName(t: Task) = t.groupId?.let { groupNames[it] } ?: t.groupName
 
-    fun listName(t: Task) = t.groupId?.let { groupNames[it] } ?: t.groupName ?: "General"
-    // The list's stored colour (the theme's value when it is one of the hues); reminders' amber without one.
-    fun listColor(t: Task) = h.fromHex(t.groupId?.let { groupColors[it] } ?: t.groupColor) ?: h.amber
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
+        item(key = "head") {
+            val add: @Composable () -> Unit = {
+                IconButton(onClick = { adding = !adding }) { Icon(Icons.Outlined.Add, contentDescription = "Add a reminder", tint = circuitColors.ink) }
+            }
+            // A narrow pane (unfolded, beside the editor) puts its buttons on a row of their own.
+            if (belowHeader != null) {
+                PlaceHeader("Reminders")
+                Row(Modifier.fillMaxWidth().padding(horizontal = GUTTER).padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    belowHeader()
+                    Spacer(Modifier.weight(1f))
+                    add()
+                }
+            } else PlaceHeader("Reminders", trailing = {
+                add()
+                headerExtra?.invoke()
+            })
+        }
+        if (groups.size > 1) item(key = "filters") {
+            ListFilters(
+                all = open.size,
+                groups = groups.sortedBy { it.sortOrder }.map { g -> Triple(g.id, g.name, open.count { it.groupId == g.id }) }.filter { it.third > 0 || it.first == filter },
+                selected = filter,
+                onSelect = { tc.setGroupFilter(it) }
+            )
+        }
+        if (adding) item(key = "add") {
+            QuickAdd(onAdd = { title ->
+                tc.quickAdd(title, filter) { id -> onMoments(id) }
+                adding = false
+            }, onCancel = { adding = false })
+        }
+        if (shown.isEmpty() && !loading) item(key = "empty") {
+            Column(Modifier.padding(horizontal = GUTTER, vertical = 24.dp)) {
+                Text("Nothing to remember.", style = MaterialTheme.typography.titleLarge, color = circuitColors.ink)
+                Text("Add one with +, or tell Dana.", style = MaterialTheme.typography.bodyMedium, color = circuitColors.inkSoft)
+            }
+        }
+        sections.forEach { section ->
+            item(key = "s_${section.group}") {
+                MomentSectionCard(
+                    section = section,
+                    now = now,
+                    zones = zones,
+                    kept = kept,
+                    listName = ::listName,
+                    onOpen = { onMoments(it.id) },
+                    onToggle = { tc.setDone(it.id, true) },
+                    onMove = { t, s -> tc.setTriggers(t.id, t.triggers.applying(s), dropPhrase(s.to, now)) },
+                    onDrop = { t, w -> tc.setTriggers(t.id, w, "Moved") },
+                    zonesFor = zones,
+                    modifier = Modifier.padding(horizontal = GUTTER).padding(top = 16.dp)
+                )
+            }
+        }
+        if (done.isNotEmpty()) item(key = "done") {
+            DoneCard(done, doneOpen, onFold = { viewModel.shellController.toggleDone() }, onReopen = { tc.setDone(it.id, false) },
+                modifier = Modifier.padding(horizontal = GUTTER).padding(top = 24.dp))
+        }
+    }
+}
 
-    val row: @Composable (Task, Int) -> Unit = { t, index ->
-        val id = t.id
-        ReminderRow(
-            task = t,
-            whenText = taskWhenText(t, now),
-            listName = if (byList) null else listName(t),
-            hue = listColor(t),
-            selected = showSelection && pick?.id == t.id,
-            phase = when (id) {
-                in completing -> RowPhase.COMPLETING
-                in flow.returning -> RowPhase.RETURNING
-                else -> RowPhase.REST
-            },
-            onPhaseDone = {
-                if (completing.remove(id) != null) flow.gone += id
-                flow.returning -= id
-            },
-            onClick = { shell.selectReminder(t.id) },
-            onToggle = {
-                if (isOpen(t)) completing[id] = t else flow.gone += id
-                tc.setDone(id, isOpen(t))
-            },
-            modifier = if (isOpen(t)) Modifier.dragToDay(t.title) { slot ->
-                tc.setTriggers(t.id, remindWhenFor(slot, java.time.LocalDateTime.now(), zones).toTriggers(), "Moved to ${slotPhrase(slot)}")
-            }.arrive("reminders", index) else Modifier
+/** "All 14 · Personal 6 · Work 5": one pill per list with open reminders. */
+@Composable
+private fun ListFilters(all: Int, groups: List<Triple<String, String, Int>>, selected: String?, onSelect: (String?) -> Unit) {
+    LazyRow(
+        contentPadding = PaddingValues(horizontal = GUTTER),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.padding(top = 8.dp)
+    ) {
+        item(key = "all") { FilterPill("All", all, selected == null) { onSelect(null) } }
+        items(groups, key = { it.first }) { (id, name, n) -> FilterPill(name, n, selected == id) { onSelect(if (selected == id) null else id) } }
+    }
+}
+
+@Composable
+private fun FilterPill(label: String, count: Int, on: Boolean, onClick: () -> Unit) {
+    val c = circuitColors
+    Row(
+        Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .background(if (on) c.indicator else MaterialTheme.colorScheme.surfaceContainerLow)
+            .clickable(role = Role.Tab, onClick = onClick)
+            .heightIn(min = 36.dp)
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(label, style = MaterialTheme.typography.labelLarge, color = if (on) c.onIndicator else c.ink, maxLines = 1)
+        Text(
+            " $count",
+            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Normal).tabular(),
+            color = if (on) c.onIndicator.copy(alpha = 0.75f) else c.inkSoft
         )
     }
-
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)) {
-        item(key = "head") {
-            Column(Modifier.padding(horizontal = GUTTER)) {
-                MetaLabel("${open.size} open · $forToday for today", modifier = Modifier.askSlotInset())
-                Text("Reminders", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp).askSlotInset())
-                Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                    SegTab("By when", !byList) { shell.setRemindersByList(false) }
-                    SegTab("By list", byList) { shell.setRemindersByList(true) }
-                }
-                QuickAdd { title ->
-                    // "By list" adds to the list of the open reminder, else Dana picks the list.
-                    val group = if (byList) tasks.firstOrNull { it.id == pick?.id }?.groupId else null
-                    tc.quickAdd(title, group) { id -> shell.selectReminder(id) }
-                }
-            }
-        }
-        if (open.isEmpty() && !loading) item(key = "empty") {
-            Column(Modifier.padding(horizontal = GUTTER, vertical = 24.dp)) {
-                Text(
-                    "Nothing to remember.",
-                    style = MaterialTheme.typography.headlineSmall
-                )
-                Text("Add one above, or tell Dana.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-        var shown = 0
-        sections.forEach { section ->
-            val first = shown
-            shown += section.tasks.size
-            // By list: the section head carries the list's colour as a dot.
-            val dot = if (byList) section.tasks.firstOrNull()?.let(::listColor) else null
-            item(key = "h_${section.key}") { SectionHead(section.title, section.tasks.size, dot) }
-            itemsIndexed(section.tasks, key = { _, t -> "t_${section.key}_${t.id}" }) { i, t -> row(t, first + i) }
-        }
-        if (done.isNotEmpty()) {
-            item(key = "done_fold") {
-                Row(
-                    Modifier.fillMaxWidth().clickable { shell.toggleDone() }.padding(horizontal = GUTTER, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Done recently · ${done.size}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    MetaLabel(if (doneOpen) "hide" else "show")
-                }
-                Rule(Modifier.padding(horizontal = GUTTER))
-            }
-            if (doneOpen) items(done, key = { "d_${it.id}" }) { row(it, Motion.STAGGER_ROWS) }
-        }
-    }
 }
 
 @Composable
-private fun SegTab(text: String, on: Boolean, onClick: () -> Unit) {
-    val accent = MaterialTheme.colorScheme.primary
-    Box(
-        Modifier
-            .clickable(onClick = onClick)
-            .heightIn(min = 36.dp)
-            .drawBehind { if (on) drawLine(accent, Offset(0f, size.height - 4.dp.toPx()), Offset(size.width, size.height - 4.dp.toPx()), 1.5.dp.toPx()) }
-            .padding(vertical = 8.dp),
-        contentAlignment = Alignment.Center
-    ) {
-        MetaLabel(text, color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
-    }
-}
-
-@Composable
-private fun QuickAdd(onAdd: (String) -> Unit) {
+private fun QuickAdd(onAdd: (String) -> Unit, onCancel: () -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
     val focus = LocalFocusManager.current
-    val rule = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+    val requester = remember { FocusRequester() }
+    val c = circuitColors
+    LaunchedEffect(Unit) { requester.requestFocus() }
     fun submit() {
         val t = text.trim()
-        if (t.isEmpty()) return
+        if (t.isEmpty()) { onCancel(); return }
         onAdd(t)
         text = ""
         focus.clearFocus()
@@ -213,200 +207,208 @@ private fun QuickAdd(onAdd: (String) -> Unit) {
         value = text,
         onValueChange = { text = it },
         singleLine = true,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = MaterialTheme.colorScheme.onSurface, textDirection = TextDirection.Content),
-        cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.ink, textDirection = TextDirection.Content),
+        cursorBrush = SolidColor(c.accent),
         keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences, imeAction = ImeAction.Done),
         keyboardActions = KeyboardActions(onDone = { submit() }),
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp).semantics { contentDescription = "Add a reminder" },
+        modifier = Modifier.fillMaxWidth().padding(horizontal = GUTTER).padding(top = 12.dp).focusRequester(requester)
+            .semantics { contentDescription = "New reminder" },
         decorationBox = { inner ->
             Box(
-                Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 44.dp)
-                    .drawBehind {
-                        drawRoundRect(
-                            rule,
-                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(12.dp.toPx()),
-                            style = Stroke(1.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(6.dp.toPx(), 4.dp.toPx())))
-                        )
-                    }
-                    .padding(horizontal = 12.dp, vertical = 11.dp),
+                Modifier.fillMaxWidth().heightIn(min = 52.dp).clip(RoundedCornerShape(16.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = 16.dp, vertical = 14.dp),
                 contentAlignment = Alignment.CenterStart
             ) {
-                if (text.isEmpty()) Text("+ Add a reminder", style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                if (text.isEmpty()) Text("New reminder, then pick its moment", style = MaterialTheme.typography.bodyLarge, color = c.inkSoft)
                 inner()
             }
         }
     )
 }
 
-@Composable
-private fun SectionHead(title: String, count: Int, dot: Color? = null) {
-    Column(Modifier.padding(horizontal = GUTTER).padding(top = 20.dp)) {
-        Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            if (dot != null) Box(Modifier.padding(end = 8.dp).size(7.dp).clip(CircleShape).background(dot))
-            MetaLabel(title, modifier = Modifier.weight(1f))
-            RollingText(count.toString(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        Rule()
-    }
-}
-
-/** Where a row is in its completion: at rest, being completed (then it leaves), or coming back (Undo). */
-enum class RowPhase { REST, COMPLETING, RETURNING }
-
-/** Which reminders were completed here (their return animates) and which are animating back in. */
-private class CompletionFlow {
-    val gone = HashSet<String>()
-    val returning = HashSet<String>()
-}
-
-private fun part(p: Float, from: Float, to: Float) = ((p - from) / (to - from)).coerceIn(0f, 1f)
-
 /**
- * One reminder, a row on the canvas: the circle (its ring softly in the
- * list's [hue]), title (● when important), mono "when" line with its list as
- * a chip tinted in that hue; no start bar.
- * Selected (unfolded) = canvas + accent bar. Done = the circle filled with the
- * hue and checked.
- *
- * Completing (~420ms, [Motion.COMPLETE]): the circle fills with the hue and its
- * check draws, the title's strike-through grows line by line, then the row
- * fades and collapses; RETURNING plays it backwards. One Animatable read only
- * in draw / layer / layout, so no frame recomposes the list.
+ * One group: its header (Late in warm), then one tonal card (warm for Late)
+ * whose rows sit on a vertical line through their moment nodes — dashed
+ * where nothing will reach you.
  */
 @Composable
-fun ReminderRow(
-    task: Task,
-    whenText: String,
-    listName: String?,
-    hue: Color,
-    selected: Boolean,
-    onClick: () -> Unit,
-    onToggle: () -> Unit,
-    modifier: Modifier = Modifier,
-    phase: RowPhase = RowPhase.REST,
-    onPhaseDone: () -> Unit = {}
+private fun MomentSectionCard(
+    section: MomentSection,
+    now: LocalDateTime,
+    zones: List<String>,
+    kept: KeptSuggestions,
+    listName: (Task) -> String?,
+    onOpen: (Task) -> Unit,
+    onToggle: (Task) -> Unit,
+    onMove: (Task, MomentSuggestion) -> Unit,
+    onDrop: (Task, io.github.ronganam.dana.data.models.Triggers) -> Unit,
+    zonesFor: List<String>,
+    modifier: Modifier = Modifier
 ) {
-    val done = !isOpen(task)
-    val accent = MaterialTheme.colorScheme.primary
-    val canvas = MaterialTheme.colorScheme.background
-    val h = hues
-    val ink = MaterialTheme.colorScheme.onSurface
-    val outline = MaterialTheme.colorScheme.outline
-    val onHue = if (h.dark) MaterialTheme.colorScheme.background else Color.White
-    // 0 = open and at rest, 1 = completed and gone.
-    val progress = remember(task.id) { Animatable(if (phase == RowPhase.RETURNING) 1f else 0f) }
-    val latestDone by rememberUpdatedState(onPhaseDone)
-    LaunchedEffect(phase) {
-        when (phase) {
-            RowPhase.COMPLETING -> { progress.animateTo(1f, tween(Motion.COMPLETE, easing = LinearEasing)); latestDone() }
-            RowPhase.RETURNING -> { progress.animateTo(0f, tween(Motion.COMPLETE, easing = LinearEasing)); latestDone() }
-            RowPhase.REST -> progress.snapTo(0f)
+    val c = circuitColors
+    val late = section.group == MomentGroup.LATE
+    val surface = if (late) c.warmSurface else MaterialTheme.colorScheme.surfaceContainerLow
+    Column(modifier.fillMaxWidth()) {
+        SectionHeader(section.group.title, meta = section.meta, titleColor = if (late) c.warm else Color.Unspecified)
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(surface).padding(vertical = 8.dp)) {
+            CompositionLocalProvider(LocalNodeSurface provides surface) {
+                section.tasks.forEachIndexed { i, t ->
+                    key(t.id) {
+                        val suggestion = remember(t, zones) { snoozeSuggestion(t, zones) }?.takeIf { !kept.isKept(t) }
+                        MomentRow(
+                            task = t,
+                            group = section.group,
+                            line = rowLine(t, now, listName(t), omit = if (section.group == MomentGroup.WAKING) setOf(RemindWhen.Wake) else emptySet()),
+                            first = i == 0,
+                            last = i == section.tasks.lastIndex,
+                            onOpen = { onOpen(t) },
+                            onToggle = { onToggle(t) },
+                            modifier = Modifier.dragToDay(t.title) { slot ->
+                                onDrop(t, remindWhenFor(slot, LocalDateTime.now(), zonesFor).toTriggers())
+                            }
+                        ) {
+                            if (suggestion != null) SuggestionCard(
+                                suggestion, now,
+                                onMove = { onMove(t, suggestion) },
+                                onKeep = { kept.keep(t) },
+                                modifier = Modifier.padding(top = 10.dp, bottom = 4.dp)
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
-    var titleLayout by remember { mutableStateOf<TextLayoutResult?>(null) }
-    Column(
-        modifier
-            .clipToBounds()
-            .layout { measurable, constraints ->
-                // Collapse in the last 40%: the one layout animation Ember allows.
-                val p = measurable.measure(constraints)
-                val f = part(progress.value, 0.6f, 1f)
-                val height = (p.height * (1f - f)).roundToInt()
-                layout(p.width, height) { if (f == 0f) p.place(0, 0) else p.placeWithLayer(0, 0) { alpha = 1f - f } }
-            }
-            .fillMaxWidth()
-            .then(
-                if (selected) Modifier.background(canvas).startBar(accent) else Modifier
-            )
-            .clickable(onClick = onClick)
+}
+
+/** A row's node: its first moment's glyph in a circle; dashed (warm when late) with no moment. */
+@Composable
+fun MomentNode(task: Task, late: Boolean, modifier: Modifier = Modifier) {
+    val c = circuitColors
+    val w = remindWhen(task)
+    CircuitNode(
+        NodeShape.Circle,
+        if (w == RemindWhen.None) NodeState.Paused else NodeState.Idle,
+        modifier,
+        size = NodeSize.Timeline,
+        icon = momentIcon(w),
+        strokeColor = if (late) c.warm else Color.Unspecified,
+        glyphColor = if (late) c.warm else c.inkSoft
+    )
+}
+
+/**
+ * One reminder on its group's line: node | title and its moment line |
+ * "Pick a moment" when late, else a box to complete it. [below] goes under
+ * the text (the suggestion), on the same line.
+ */
+@Composable
+private fun MomentRow(
+    task: Task,
+    group: MomentGroup,
+    line: String,
+    first: Boolean,
+    last: Boolean,
+    onOpen: () -> Unit,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    below: @Composable ColumnScope.() -> Unit
+) {
+    val c = circuitColors
+    val late = group == MomentGroup.LATE
+    val dashed = remindWhens(task).isEmpty()
+    val wire = if (late) c.warm.copy(alpha = 0.6f) else c.wire
+    val nodeCenter = 22.dp
+    val pick: @Composable () -> Unit = {
+        Text(
+            "Pick a moment",
+            style = MaterialTheme.typography.labelLarge,
+            color = c.warm,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(role = Role.Button, onClick = onOpen)
+                .padding(horizontal = 8.dp, vertical = 10.dp)
+        )
+    }
+    // In a narrow pane "Pick a moment" goes under the text, so the title keeps its width.
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+    val narrow = maxWidth < 340.dp
+    Row(
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable(onClick = onOpen)
+            .padding(start = 16.dp, end = 8.dp)
     ) {
-        Row(Modifier.fillMaxWidth().padding(start = GUTTER - 6.dp, end = GUTTER, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.Top) {
-            Box(
-                Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .clickable(onClick = onToggle)
-                    .semantics { contentDescription = if (done) "Mark not done" else "Mark done" },
-                contentAlignment = Alignment.Center
-            ) {
-                Canvas(Modifier.size(20.dp)) {
-                    val fill = if (done) 1f else part(progress.value, 0f, 0.3f)
-                    val tick = if (done) 1f else part(progress.value, 0.1f, 0.4f)
-                    val r = size.minDimension / 2f
-                    val stroke = 1.5.dp.toPx()
-                    if (fill > 0f) drawCircle(hue.copy(alpha = fill), r)
-                    // At rest the ring carries the list's hue, softly (the row has no bar).
-                    drawCircle(lerp(lerp(outline, hue, 0.55f), hue, fill), r - stroke / 2, style = Stroke(stroke))
-                    if (tick > 0f) {
-                        // The check draws itself: down-stroke, then the long up-stroke.
-                        val a = Offset(size.width * 0.28f, size.height * 0.52f)
-                        val b = Offset(size.width * 0.44f, size.height * 0.68f)
-                        val c = Offset(size.width * 0.73f, size.height * 0.36f)
-                        val w = 1.8.dp.toPx()
-                        val first = (tick / 0.4f).coerceAtMost(1f)
-                        drawLine(onHue, a, a + (b - a) * first, w, StrokeCap.Round)
-                        if (tick > 0.4f) drawLine(onHue, b, b + (c - b) * ((tick - 0.4f) / 0.6f), w, StrokeCap.Round)
-                    }
-                }
-            }
-            Spacer(Modifier.width(6.dp))
-            Column(Modifier.weight(1f).padding(top = 5.dp)) {
-                Text(
-                    buildAnnotatedString {
-                        if (task.priority.equals("high", true) && !done) {
-                            pushStyle(SpanStyle(color = accent)); append("● "); pop()
-                        }
-                        append(task.title)
-                    },
-                    style = MaterialTheme.typography.bodyLarge.copy(
-                        fontWeight = if (done) FontWeight.Normal else FontWeight.Medium,
-                        fontSize = 15.sp,
-                        textDirection = TextDirection.Content,
-                        textDecoration = if (done) TextDecoration.LineThrough else null
-                    ),
-                    color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else ink,
-                    onTextLayout = { titleLayout = it },
-                    modifier = Modifier.fillMaxWidth().drawWithContent {
-                        drawContent()
-                        val strike = part(progress.value, 0.25f, 0.6f)
-                        val layout = titleLayout
-                        if (strike > 0f && layout != null && !done) {
-                            // Grows along the lines in reading order (from the right on a Hebrew line).
-                            val total = (0 until layout.lineCount).sumOf { (layout.getLineRight(it) - layout.getLineLeft(it)).toDouble() }.toFloat()
-                            var left = strike * total
-                            for (line in 0 until layout.lineCount) {
-                                if (left <= 0f) break
-                                val l = layout.getLineLeft(line)
-                                val r = layout.getLineRight(line)
-                                val len = minOf(left, r - l)
-                                val y = (layout.getLineTop(line) + layout.getLineBottom(line)) / 2f
-                                val rtl = layout.getParagraphDirection(layout.getLineStart(line)) == ResolvedTextDirection.Rtl
-                                if (rtl) drawLine(ink, Offset(r, y), Offset(r - len, y), 1.5.dp.toPx())
-                                else drawLine(ink, Offset(l, y), Offset(l + len, y), 1.5.dp.toPx())
-                                left -= len
-                            }
-                        }
-                    }
+        Box(
+            Modifier.width(24.dp).fillMaxHeight().drawBehind {
+                val x = size.width / 2f
+                val cy = nodeCenter.toPx()
+                val top = if (first) cy else 0f
+                val bottom = if (last) cy else size.height
+                if (bottom > top) drawLine(
+                    wire, Offset(x, top), Offset(x, bottom), 1.5.dp.toPx(),
+                    pathEffect = if (dashed) PathEffect.dashPathEffect(floatArrayOf(3.dp.toPx(), 4.dp.toPx())) else null
                 )
-                Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MetaLabel(whenText, modifier = Modifier.weight(1f, fill = false))
-                    if (listName != null) Text(
-                        listName.uppercase(),
-                        style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),
-                        color = h.text(hue),
+            },
+            contentAlignment = Alignment.TopCenter
+        ) {
+            MomentNode(task, late, Modifier.offset(y = nodeCenter - 12.dp))
+        }
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f).padding(vertical = 10.dp)) {
+            Text(
+                task.title,
+                style = MaterialTheme.typography.titleMedium.copy(textDirection = TextDirection.Content),
+                color = c.ink,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(line, style = MaterialTheme.typography.bodyMedium, color = if (late) c.warm.copy(alpha = 0.85f) else c.inkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (late && narrow) Box(Modifier.offset(x = (-8).dp)) { pick() }
+            below()
+        }
+        if (!(late && narrow)) Box(Modifier.padding(top = 6.dp, start = 4.dp)) {
+            if (late) pick() else CheckBox(done = false, onClick = onToggle)
+        }
+    }
+    }
+}
+
+/** The square to complete a reminder (48dp target). */
+@Composable
+private fun CheckBox(done: Boolean, onClick: () -> Unit) {
+    val c = circuitColors
+    Box(
+        Modifier.size(44.dp).clip(CircleShape).clickable(role = Role.Checkbox, onClickLabel = if (done) "Bring back" else "Done", onClick = onClick)
+            .semantics { contentDescription = if (done) "Done" else "Not done" },
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            Modifier.size(20.dp).clip(RoundedCornerShape(5.dp))
+                .then(if (done) Modifier.background(c.accentTonal) else Modifier.border(1.5.dp, c.node, RoundedCornerShape(5.dp))),
+            contentAlignment = Alignment.Center
+        ) {
+            if (done) Icon(Icons.Outlined.Check, contentDescription = null, tint = c.onAccentTonal, modifier = Modifier.size(14.dp))
+        }
+    }
+}
+
+/** "Done recently": folded under its header; open, each done reminder with its box to bring it back. */
+@Composable
+private fun DoneCard(done: List<Task>, open: Boolean, onFold: () -> Unit, onReopen: (Task) -> Unit, modifier: Modifier = Modifier) {
+    val c = circuitColors
+    Column(modifier.fillMaxWidth()) {
+        SectionHeader("Done recently", meta = if (open) "Hide" else "Show ${done.size}", metaColor = c.accent, onMeta = onFold)
+        if (open) Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(MaterialTheme.colorScheme.surfaceContainerLow).padding(vertical = 4.dp)) {
+            done.forEach { t ->
+                Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(start = 16.dp, end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        t.title,
+                        style = MaterialTheme.typography.bodyLarge.copy(textDecoration = TextDecoration.LineThrough, textDirection = TextDirection.Content),
+                        color = c.inkSoft,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .padding(start = 8.dp)
-                            .clip(RoundedCornerShape(5.dp))
-                            .background(h.tint(hue))
-                            .padding(horizontal = 6.dp, vertical = 1.dp)
+                        modifier = Modifier.weight(1f)
                     )
+                    CheckBox(done = true) { onReopen(t) }
                 }
             }
         }
-        Rule(Modifier.padding(horizontal = GUTTER).background(Color.Transparent))
     }
 }
