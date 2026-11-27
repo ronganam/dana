@@ -19,7 +19,7 @@ old env names.
 | `contacts.py` | the user's saved contacts (table `whatsapp_contacts`): `resolve_rows` / `search_rows` (nicknames whose value is a chat id), `preferred(user, name)` (category `preferred`), `known_people(user)` (contact rows for the call-analysis prompt; empty without the addon) |
 | `accounts.py` | the account of each connection (one connection per account), the routing of inbound events (below), `blocked(conn)` |
 | `events.py` | inbound events: `handle_webhook(data)` → `process_event(conn, data)` |
-| `messages.py` | one message as a line of a read tool's result (below), the messages query |
+| `messages.py` | one message as a line of a read tool's result (below), the messages query, `recent(conn, chat_id, limit)` (a chat's last messages as plain rows, nothing downloaded: the phone addon's suggestion context) |
 | `tools.py`, `latest.py` | the tools (`get_latest_messages` in `latest.py`, registered last so the order is unchanged) |
 
 Everything a tool, an event or a cache touches comes from the user's
@@ -154,28 +154,39 @@ Docs/knowledge.md → Sections, decisions and files.
   seam; phone push is not per user yet, so only a user with the `phone` addon
   gets it) and to Telegram (`core.notify.whatsapp_voice(user, chat_id, …)`,
   the chat of their `voice_telegram_chat_id` setting; none set: logged, not
-  sent). Groups, outgoing and non-voice messages are not transcribed (only
-  announced, below); redelivered message ids are deduped in memory per
-  connection. Transcription needs a
+  sent). This happens before the message is announced, so its event carries
+  the transcript (`transcript`, below; remembered for the read tools, so
+  reading the chat does not transcribe it again). Groups, outgoing and
+  non-voice messages are not transcribed (only announced, below);
+  redelivered message ids are deduped in memory per connection. Transcription needs a
   model that hears audio (docs/configuration.md, "Transcription": an OpenAI or
   Gemini key, or a local Whisper server); without one the voice note is
   logged and skipped, the admins' `transcription` self-check says why, and a
   voice note read through the tools reads "not transcribed: the server needs
   a transcription model".
-- **Events for watches** (`event_types.py`, `Addon(events=)`): every new
+- **Events for watches and suggestions** (`event_types.py`, `Addon(events=)`): every new
   `message` event routed to a connection — 1:1 or group, incoming or the
   user's own from another device — is emitted once as
-  `whatsapp.message.received` for that connection's user, before the voice
-  filters: `{message_id, chat (the contact, or the group's name), sender
-  (display name; "Me" for the user's own), is_group, from_me, text (the body
-  or a caption; empty for a voice note), has_media, media_type (voice |
-  audio | image | video | sticker | document, or empty)}`. Names come from
+  `whatsapp.message.received` for that connection's user (an incoming 1:1
+  voice note after its transcription): `{message_id, chat (the contact, or the
+  group's name), chat_id (its WhatsApp id), sender (display name; "Me" for the
+  user's own), is_group, from_me, text (the body or a caption; empty for a
+  voice note), reply_to (the quoted message's text, WAHA's `replyTo.body`;
+  empty when it quotes none), transcript (an incoming 1:1 voice note's text;
+  empty otherwise or without a transcription model), has_media, media_type
+  (voice | audio | image | video | sticker | document, or empty)}`. Besides
+  watches, the phone addon reads it: while WAHA covers the user, WhatsApp
+  suggestions come from these events (bursts per chat, with the chat's recent
+  history read through `messages.recent`) instead of the phone's WhatsApp
+  notifications (docs/notifications.md, "WhatsApp through WAHA"). Names come from
   the connection's chat-id map (`client.get_chat_id_to_name_map`, cached 5
   min). Redeliveries are deduped by message id per connection (the same set
   as the voice notes', in memory). Watches usually want `from_me eq false`.
   The data is other people's text: the watches engine frames it
-  (`core.text.untrusted`), nothing in the addon puts it in a prompt. No
-  history: Dana keeps no copy of messages (dry runs see none).
+  (`core.text.untrusted`), and so does the phone addon's extraction prompt.
+  No history: Dana keeps no copy of messages (dry runs see none; the phone
+  addon keeps the burst rows it suggests from, like any notification, under
+  its retention).
 - The Telegram copy carries a `✨ Summarize` inline button (`wa_sum:<hash>` →
   `TelegramBot.handle_whatsapp_summary_callback`), which summarizes the
   transcript on demand with the model (`core/voice.summarize_text`) and edits
@@ -187,7 +198,8 @@ Docs/knowledge.md → Sections, decisions and files.
   (`report_whatsapp_voice_chats`; a missing / malformed setting is a warning).
 - Tests: `bin/test test_waha_voice` (the pipeline, all network calls mocked),
   `bin/test test_whatsapp_events` (`whatsapp.message.received`: shapes, groups,
-  from_me, media, dedupe, two users),
+  from_me, media, replies, transcripts, dedupe, two users),
+  `bin/test test_whatsapp_suggestions` (the phone addon's suggestions from it),
   `bin/test test_whatsapp_users` (two fake WAHA instances: tools, caches,
   contacts, images, reading with ids and file names, forwarding, accounts,
   routing, Summarize per user), `bin/test

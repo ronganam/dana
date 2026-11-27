@@ -44,9 +44,16 @@ def media_type(payload: Mapping[str, Any]) -> str:
     return major if major in ("image", "video") else "document"
 
 
-def message_data(payload: Mapping[str, Any], names: Mapping[str, str]) -> Dict[str, Any]:
+def reply_to(payload: Mapping[str, Any]) -> str:
+    """The text of the message this one quotes (WAHA's ``replyTo.body``), or ""."""
+    quoted = payload.get("replyTo")
+    return str(quoted.get("body") or "").strip() if isinstance(quoted, Mapping) else ""
+
+
+def message_data(payload: Mapping[str, Any], names: Mapping[str, str], transcript: str = "") -> Dict[str, Any]:
     """``whatsapp.message.received``'s data of one WAHA ``message`` payload;
-    ``names``: the connection's chat id → name map (``client.get_chat_id_to_name_map``)."""
+    ``names``: the connection's chat id → name map (``client.get_chat_id_to_name_map``);
+    ``transcript``: the voice note's text when it was transcribed."""
     jid = chat_id(payload)
     is_group = jid.endswith(GROUP_SUFFIX)
     from_me = bool(payload.get("fromMe"))
@@ -58,14 +65,16 @@ def message_data(payload: Mapping[str, Any], names: Mapping[str, str]) -> Dict[s
     mid = payload.get("id")
     if isinstance(mid, Mapping):  # some engines nest it
         mid = mid.get("_serialized") or mid.get("id")
-    return {"message_id": str(mid or ""), "chat": chat, "sender": sender, "is_group": is_group,
-            "from_me": from_me, "text": str(payload.get("body") or ""),
+    return {"message_id": str(mid or ""), "chat": chat, "chat_id": jid, "sender": sender, "is_group": is_group,
+            "from_me": from_me, "text": str(payload.get("body") or ""), "reply_to": reply_to(payload),
+            "transcript": transcript or "",
             "has_media": bool(payload.get("hasMedia")), "media_type": media_type(payload)}
 
 
-def announce_message(user: User, payload: Mapping[str, Any], names: Mapping[str, str]) -> Dict[str, Any]:
+def announce_message(user: User, payload: Mapping[str, Any], names: Mapping[str, str],
+                     transcript: str = "") -> Dict[str, Any]:
     """Emit ``whatsapp.message.received`` for ``user``'s new message; returns its data."""
-    data = message_data(payload, names)
+    data = message_data(payload, names, transcript)
     events.emit(EVENT, user, **data)
     return data
 
@@ -74,11 +83,15 @@ WHATSAPP_EVENTS = (
     EventType(EVENT, "A new WhatsApp message in one of the user's chats or groups (as WAHA delivers it).",
               {"message_id": "the message's id (forward_whatsapp_message / read_whatsapp_file take it)",
                "chat": "the chat's name: the contact for a 1:1 chat, the group's name in a group",
+               "chat_id": "the chat's WhatsApp id (…@c.us / …@lid for a person, …@g.us for a group)",
                "sender": "who wrote it (a display name; \"Me\" for the user's own)",
                "is_group": "true for a group chat",
                "from_me": "true when the user sent it (from another device); watches usually want "
                           "from_me eq false",
                "text": "its text, or a file's caption (empty for a voice note or a file without one)",
+               "reply_to": "the text of the message it replies to (quotes), empty when it quotes none",
+               "transcript": "a voice note's text: incoming 1:1 voice notes are transcribed (when the "
+                             "server has a transcription model), empty otherwise",
                "has_media": "true when it carries a file, photo, video or voice note",
                "media_type": "voice | audio | image | video | sticker | document, empty without media"}),
 )

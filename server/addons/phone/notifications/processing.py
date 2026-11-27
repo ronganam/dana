@@ -34,6 +34,7 @@ from addons.phone.calls.analysis import analysis_schema, normalize_analysis
 from addons.phone.calls.context import feedback_prompt, gather_context
 from addons.phone.calls.suggest import replace_pending_suggestions, suggestions_from_analysis
 from addons.phone.notifications import escalation, judges, rules, triage
+from addons.phone.notifications import whatsapp as notif_whatsapp
 from addons.phone.notifications.values import (CONCURRENCY, ESCALATE_MAX_AGE_SECONDS, EXTRACT_MAX_AGE_HOURS,
                                                      age_seconds, row)
 
@@ -79,6 +80,12 @@ def schedule(user: User, ids: Iterable[str]) -> int:
     if ids:
         events.emit("phone.notification.ingested", user, ids=ids)
     return _enqueue(user, ids)
+
+
+def queue(user: User, ids: Iterable[str]) -> int:
+    """Queue ``user``'s ``ids`` for triage without telling other addons (rows that are not
+    the phone's own notifications, e.g. WhatsApp bursts from WAHA). Returns how many."""
+    return _enqueue(user, [i for i in dict.fromkeys(ids or []) if isinstance(i, str) and i])
 
 
 def _enqueue(user: User, ids: Sequence[str]) -> int:
@@ -174,7 +181,8 @@ async def _process(user: User, ids: Sequence[str]) -> Dict[str, Dict[str, Any]]:
                 logger.warning(f"Triage failed for {len(part)} notification(s) of user {user.id}: {e}")
             for n in part:
                 if n["id"] in answers:
-                    d = triage.decide(answers[n["id"]], rule=n["_rule"], low_engagement=n["_low"])
+                    d = _source_rules(user, n, triage.decide(answers[n["id"]], rule=n["_rule"],
+                                                             low_engagement=n["_low"]))
                     decided[n["id"]] = _store(user, n, d, "done", judge.model())
                 else:
                     _not_judged(user, n, error)
@@ -183,6 +191,16 @@ async def _process(user: User, ids: Sequence[str]) -> Dict[str, Dict[str, Any]]:
         if n["id"] in decided:
             await _follow_up(user, n["id"], decided[n["id"]])
     return decided
+
+
+def _source_rules(user: User, n: Dict[str, Any], decision: Dict[str, Any]) -> Dict[str, Any]:
+    """WhatsApp through WAHA (:mod:`.whatsapp`): its bursts make the suggestions and are never
+    announced (the phone's own notification is); the phone's WhatsApp notifications then make none."""
+    if (n.get("source") or "phone") != "phone":
+        return {**decision, "escalate": False}
+    if decision["extract"] and n.get("package") in notif_whatsapp.PACKAGES and notif_whatsapp.suppresses(user, n):
+        return {**decision, "extract": False, "signals": {**decision["signals"], "suggested_from": "waha"}}
+    return decision
 
 
 def _store(user: User, n: Dict[str, Any], decision: Dict[str, Any], status: str, model: str) -> Dict[str, Any]:
@@ -308,11 +326,17 @@ def build_extraction_prompt(user: User, n: Dict[str, Any], ctx: Dict[str, Any]) 
     conv = f"In the group \"{n['conversation']}\"\n" if n.get("conversation") and n.get("is_group") else ""
     shown = untrusted("the notification", f"{conv}Title: {n.get('title') or ''}\nSender: {who}\n"
                                           f"Text:\n{(n.get('text') or '')[:6000]}")
+    chat_note = ""
+    if (n.get("source") or "phone") == notif_whatsapp.SOURCE:
+        chat_note = (f"These are new WhatsApp messages{' in a group' if n.get('is_group') else ''}, read from the chat itself: "
+                     f"the new messages first (with the text each one replies to), then earlier messages of the chat for context. "
+                     f"Suggest only from the new messages; use the earlier ones to understand them (who asks what, a date said before) "
+                     f"and to skip what {me} already answered, refused or did.\n")
     return f"""A notification appeared on {who_am_i.name}'s phone. Decide whether {who_am_i.called} needs a to-do or calendar event because of it — most notifications need none.
 
 {who_am_i.about()}Now: {clock.describe_now()}
 Notification from the app "{n.get('app_name')}", posted {str(n.get('posted_at') or '')[:16].replace('T', ' ')}:
-{shown}
+{chat_note}{shown}
 
 Return JSON with action_items: an empty list unless there is a clear thing {me} must remember to do later (at most 2).
 A good suggestion is something nothing else will remind {me} of: a person asking {him} to do something, a benefit or form with a deadline, a bill {he} must pay {himself} before it is due, a pickup.

@@ -133,6 +133,7 @@ Nothing: a server with no users and no `API_TOKEN` starts in **setup mode** and 
 | `SHORTCUTS` | `0` turns learned phrases off, both learning and use (default on) |
 | `UNDO_TTL_SECONDS` | how long an Undo stays usable, in memory (900) |
 | `CALL_SUGGESTIONS_MAX_AGE_DAYS` | A call recording older than this (days, default 3) makes only suggestions still ahead (`docs/calls.md`, "Old recordings") |
+| `WHATSAPP_SUGGEST_QUIET_SECONDS` / `WHATSAPP_SUGGEST_MAX_HOLD_SECONDS` / `WHATSAPP_SUGGEST_HISTORY` | WhatsApp suggestions through WAHA (`docs/notifications.md`, "WhatsApp through WAHA"): how long a chat stays quiet before its new messages are read as one (60 s), the longest a burst waits in a chat that keeps going (300 s), how many earlier messages of the chat are read as context (12; 0 = none) |
 | `SUGGESTION_POPUP_NOTIFICATIONS` | `1` = suggestions that come from notifications also open the phone's suggestions pop-up (default 0: they wait quietly in Now) |
 | `NOW_MAX_NOTIFICATIONS` / `NOW_MAX_SUGGESTIONS` / `NOW_MAX_REMINDERS` | cards per kind in Now (3 / 4 / 4; further call suggestions go to the quiet list) |
 | `NOW_QUIET_CONFIDENCE` / `NOW_REMINDER_MAX_HOURS` / `NOW_CALENDAR_WAIT_SECONDS` | call suggestions below this confidence go to the quiet list (0.7); how long a fired, unhandled reminder stays in Now (48); longest wait for the calendar on a cold cache (1.5) |

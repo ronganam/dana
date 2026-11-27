@@ -65,8 +65,9 @@ def list_notifications(user: User, *, status: Optional[str] = "active", bucket: 
                        category: Optional[str] = None, package: Optional[str] = None, q: Optional[str] = None,
                        since: Optional[str] = None, limit: int = 200,
                        with_suggestions: bool = True) -> List[Dict[str, Any]]:
-    """``user``'s notifications, newest first (``q``: full-text search)."""
-    where, params = ["n.user_id = ?"], [user.id]
+    """``user``'s notifications, newest first (``q``: full-text search). Only the
+    phone's (``source='phone'``): WhatsApp bursts from WAHA feed suggestions, not the Inbox."""
+    where, params = ["n.user_id = ?", "n.source = 'phone'"], [user.id]
     now = utc_now_iso()
     if status == "snoozed":
         where.append("n.status = 'active' AND n.snoozed_until > ?")

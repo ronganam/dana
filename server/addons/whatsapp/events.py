@@ -7,12 +7,14 @@ WAHA pushes WhatsApp events to us via a global webhook (``WHATSAPP_HOOK_URL`` /
 Each event is routed to the connection(s) whose WhatsApp account it names
 (:mod:`addons.whatsapp.accounts`) and processed as that connection's
 user. Every new message (redeliveries deduped per connection) is announced
-as ``whatsapp.message.received`` (:mod:`addons.whatsapp.event_types`, for
-watches). Beyond that we only act on **voice messages**: incoming 1:1 audio notes are
+as ``whatsapp.message.received`` (:mod:`addons.whatsapp.event_types`: watches,
+and the phone addon's suggestions from WhatsApp). Beyond that we only act on
+**voice messages**: incoming 1:1 audio notes are
 downloaded from the user's WAHA, transcribed (``core/llm.transcribe``, usage
 theirs) and delivered to the phone (:func:`_notify_phone`) and to the
 Telegram chat of the user's ``voice_telegram_chat_id`` setting, where the
-transcript carries a "✨ Summarize" button handled by core/telegram_bot.py.
+transcript carries a "✨ Summarize" button handled by core/telegram_bot.py,
+before the message is announced, so its event carries the transcript.
 """
 
 import logging
@@ -23,7 +25,7 @@ import httpx
 
 from core import llm, notify, users
 from core.addons import Connection
-from addons.whatsapp import accounts, event_types
+from addons.whatsapp import accounts, event_types, messages
 from addons.whatsapp.client import (api_url, config, download_media_bytes, get_chat_id_to_name_map,
                                           get_message_sender_name, session_status, signature)
 from addons.whatsapp.config import voice_chat_id
@@ -131,6 +133,53 @@ async def _notify_phone(conn: Connection, sender: str, transcript: str, message_
     return ok
 
 
+async def _voice_note(conn: Connection, payload: Dict[str, Any], message_id: str, mapping: Dict[str, str]) -> str:
+    """An incoming 1:1 voice note: download → transcribe → phone + Telegram. Returns
+    the transcript ("" for anything else, or when it could not be transcribed)."""
+    if payload.get("fromMe"):
+        logger.debug(f"Ignoring outgoing WhatsApp message {message_id}")
+        return ""
+
+    sender_jid = str(payload.get("from") or "").strip()
+    if not _is_direct_chat(sender_jid):
+        logger.info(f"Not transcribing non-1:1 WhatsApp message from '{sender_jid}'")
+        return ""
+
+    mimetype = _voice_mimetype(payload)
+    if not mimetype:
+        logger.debug(f"Ignoring non-voice WhatsApp message {message_id}")
+        return ""
+
+    logger.info(f"Processing WhatsApp voice message {message_id} from '{sender_jid}' ({mimetype}) "
+                f"for user {conn.user.id}")
+
+    media_url = await _resolve_media_url(conn, payload)
+    if not media_url:
+        logger.warning(f"No media URL for WhatsApp voice message {message_id}; skipping")
+        return ""
+
+    audio_bytes = await download_media_bytes(conn, media_url)
+    if not audio_bytes:
+        logger.warning(f"Failed to download audio for WhatsApp voice message {message_id}; skipping")
+        return ""
+
+    try:
+        transcript = await llm.transcribe(audio_bytes, _clean_mimetype(mimetype), source="whatsapp",
+                                         ref=f"whatsapp:{message_id}")
+    except llm.TranscriptionUnavailable as e:
+        # The server's "transcription" self-check tells the admin; nothing to send without text.
+        logger.warning(f"WhatsApp voice message {message_id} not transcribed: {e}")
+        return ""
+    logger.info(f"Transcribed WhatsApp voice message {message_id}: {transcript[:100]!r}")
+    messages.remember_transcript(conn, message_id, transcript)
+
+    sender = get_message_sender_name(payload, mapping) or "Unknown"
+
+    await _notify_phone(conn, sender, transcript, message_id)
+    await notify.whatsapp_voice(conn.user, voice_chat_id(conn), sender, transcript, message_id)
+    return transcript
+
+
 async def handle_webhook(data: Dict[str, Any]) -> None:
     """One WAHA webhook body: route it to its connection and process it as
     that connection's user. Never raises (the webhook has already been answered)."""
@@ -146,9 +195,10 @@ async def handle_webhook(data: Dict[str, Any]) -> None:
 async def process_event(conn: Connection, data: Dict[str, Any]) -> None:
     """Handle one WAHA event for ``conn`` (whose WhatsApp it is), as its user.
 
-    Every new message is announced (``whatsapp.message.received``); only
-    incoming 1:1 voice messages are acted on: download -> transcribe ->
-    notify. Never raises; errors are logged so the webhook always stays healthy.
+    Every new message is announced (``whatsapp.message.received``); an
+    incoming 1:1 voice message is first downloaded, transcribed and sent to
+    the phone and Telegram, and its event carries the transcript. Never
+    raises; errors are logged so the webhook always stays healthy.
     """
     with users.acting_as(conn.user):
         await _process(conn, data)
@@ -178,51 +228,17 @@ async def _process(conn: Connection, data: Dict[str, Any]) -> None:
         except Exception as e:
             logger.warning(f"Could not resolve WhatsApp contact names: {e}")
             mapping = {}
+
+        # An incoming 1:1 voice note is transcribed first, so the event carries its text.
+        transcript = ""
         try:
-            event_types.announce_message(conn.user, payload, mapping)
+            transcript = await _voice_note(conn, payload, message_id, mapping)
+        except Exception as e:
+            logger.error(f"Handling WhatsApp voice message {message_id} failed: {e}", exc_info=True)
+        try:
+            event_types.announce_message(conn.user, payload, mapping, transcript)
         except Exception as e:
             logger.error(f"Announcing WhatsApp message {message_id} failed: {e}", exc_info=True)
-
-        if payload.get("fromMe"):
-            logger.debug(f"Ignoring outgoing WhatsApp message {message_id}")
-            return
-
-        sender_jid = str(payload.get("from") or "").strip()
-        if not _is_direct_chat(sender_jid):
-            logger.info(f"Ignoring non-1:1 WhatsApp message from '{sender_jid}'")
-            return
-
-        mimetype = _voice_mimetype(payload)
-        if not mimetype:
-            logger.debug(f"Ignoring non-voice WhatsApp message {message_id}")
-            return
-
-        logger.info(f"Processing WhatsApp voice message {message_id} from '{sender_jid}' ({mimetype}) "
-                    f"for user {conn.user.id}")
-
-        media_url = await _resolve_media_url(conn, payload)
-        if not media_url:
-            logger.warning(f"No media URL for WhatsApp voice message {message_id}; skipping")
-            return
-
-        audio_bytes = await download_media_bytes(conn, media_url)
-        if not audio_bytes:
-            logger.warning(f"Failed to download audio for WhatsApp voice message {message_id}; skipping")
-            return
-
-        try:
-            transcript = await llm.transcribe(audio_bytes, _clean_mimetype(mimetype), source="whatsapp",
-                                             ref=f"whatsapp:{message_id}")
-        except llm.TranscriptionUnavailable as e:
-            # The server's "transcription" self-check tells the admin; nothing to send without text.
-            logger.warning(f"WhatsApp voice message {message_id} not transcribed: {e}")
-            return
-        logger.info(f"Transcribed WhatsApp voice message {message_id}: {transcript[:100]!r}")
-
-        sender = get_message_sender_name(payload, mapping) or "Unknown"
-
-        await _notify_phone(conn, sender, transcript, message_id)
-        await notify.whatsapp_voice(conn.user, voice_chat_id(conn), sender, transcript, message_id)
 
     except Exception as e:
         logger.error(f"Error processing WAHA event: {e}", exc_info=True)

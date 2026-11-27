@@ -276,6 +276,12 @@ def test_convert_9_0():
                   "calendar_starting",  # calendar m0001: nothing announced yet
                   "gmail_inbox", "gmail_received", "watch_trace"):  # gmail m0001: no inbox read yet
         expected[table] = []
+    # phone m0005: every existing notification is the phone's (source 'phone', the last column).
+    notif_rows = after.get("notifications", [])
+    check("9.0: every notification kept, its source the phone",
+          sorted(r[:-1] for r in notif_rows) == sorted(expected.get("notifications", []))
+          and all(r[-1] == "'phone'" for r in notif_rows), str(notif_rows[:1]))
+    expected["notifications"] = notif_rows
     wizard_rows = after.get("user_wizard", [])
     check("9.0: every existing user has the wizard finished (no steps)",
           sorted(r[0] for r in wizard_rows) == sorted(r[0] for r in after["users"])
