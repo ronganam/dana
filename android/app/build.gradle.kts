@@ -65,6 +65,9 @@ android {
         minSdk = 26
         targetSdk = 36
         versionCode = 72
+        // The release number above × 1000 + a dev build (bin/deploy-app.sh --dev passes -PdanaBuild=N): an
+        // in-app update between releases needs a higher code, so dev builds count up without a bump.
+        versionCode = (versionCode ?: 0) * 1000 + ((project.findProperty("danaBuild") as String?)?.toIntOrNull() ?: 0)
         versionName = "10.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // LAN resolvers the TV asks when the system DNS has no answer (comma-separated).
@@ -162,6 +165,8 @@ android {
     // errors fail the build.
     lint {
         baseline = file("lint-baseline.xml")
+        // Dev builds (bin/deploy-app.sh --dev) skip the release lint pass; releases keep it.
+        if (project.hasProperty("danaBuild")) checkReleaseBuilds = false
     }
 
     testOptions {

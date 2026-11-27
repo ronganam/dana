@@ -23,6 +23,9 @@ android {
         minSdk = 30
         targetSdk = 34
         versionCode = 72
+        // The release number above × 1000 + a dev build (bin/deploy-app.sh --dev passes -PdanaBuild=N): an
+        // in-app update between releases needs a higher code, so dev builds count up without a bump.
+        versionCode = (versionCode ?: 0) * 1000 + ((project.findProperty("danaBuild") as String?)?.toIntOrNull() ?: 0)
         versionName = "10.9.0"
     }
 

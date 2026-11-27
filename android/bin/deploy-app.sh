@@ -10,6 +10,9 @@
 #   bin/deploy-app.sh --bump 6.1.0 --notes "Bug fixes"
 #   bin/deploy-app.sh                       # rebuild + republish current version
 #   bin/deploy-app.sh --install-phone       # also adb-install if device connected
+#   bin/deploy-app.sh --dev                 # fast: the phone app only, a dev build between releases
+#                                           # (a higher versionCode, no bump), adb-installed when the
+#                                           # phone is connected, else offered as an in-app update
 #   bin/deploy-app.sh --watch-ip 10.0.0.5:5555   # install wear APK on the watch
 #   bin/deploy-app.sh --skip-upload --watch-ip <adb serial>   # watch over USB
 #
@@ -39,6 +42,7 @@ RELEASE_NOTES=""
 SKIP_BUILD=0
 SKIP_UPLOAD=0
 INSTALL_PHONE=0
+DEV=0
 
 usage() { sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-0}"; }
 
@@ -50,6 +54,7 @@ while [[ $# -gt 0 ]]; do
     --token)       PUBLISH_TOKEN="$2"; shift 2 ;;
     --watch-ip)    WATCH_IP="$2"; shift 2 ;;
     --install-phone) INSTALL_PHONE=1; shift ;;
+    --dev)         DEV=1; INSTALL_PHONE=1; shift ;;
     --skip-build)  SKIP_BUILD=1; shift ;;
     --skip-upload) SKIP_UPLOAD=1; shift ;;
     -h|--help)     usage 0 ;;
@@ -60,7 +65,7 @@ done
 GRADLE_FILES=(app/build.gradle.kts wear/build.gradle.kts)
 
 get_version_name() { grep -m1 'versionName = ' "$1" | sed 's/.*versionName = "\(.*\)".*/\1/'; }
-get_version_code() { grep -m1 'versionCode = ' "$1" | sed 's/.*versionCode = \([0-9]*\).*/\1/'; }
+get_version_code() { grep -m1 -E 'versionCode = [0-9]+' "$1" | sed 's/.*versionCode = \([0-9]*\).*/\1/'; }
 
 # --- Optional version bump (applied to both phone and wear to keep them in sync) ---
 if [[ -n "$BUMP_VERSION" ]]; then
@@ -73,10 +78,19 @@ if [[ -n "$BUMP_VERSION" ]]; then
   done
 fi
 
+# The real versionCode: the release number × 1000 + the dev build (build.gradle.kts).
+DEV_BUILD=0
+if [[ $DEV -eq 1 ]]; then
+  counter="${XDG_CACHE_HOME:-$HOME/.cache}/dana-ship/app-build-$(get_version_code app/build.gradle.kts)"
+  mkdir -p "$(dirname "$counter")"
+  DEV_BUILD=$(( $(cat "$counter" 2>/dev/null || echo 0) + 1 ))
+  echo "$DEV_BUILD" > "$counter"
+fi
 PHONE_VERSION_NAME=$(get_version_name app/build.gradle.kts)
-PHONE_VERSION_CODE=$(get_version_code app/build.gradle.kts)
+PHONE_VERSION_CODE=$(( $(get_version_code app/build.gradle.kts) * 1000 + DEV_BUILD ))
 WEAR_VERSION_NAME=$(get_version_name wear/build.gradle.kts)
-WEAR_VERSION_CODE=$(get_version_code wear/build.gradle.kts)
+WEAR_VERSION_CODE=$(( $(get_version_code wear/build.gradle.kts) * 1000 + DEV_BUILD ))
+[[ $DEV -eq 1 ]] && PHONE_VERSION_NAME="$PHONE_VERSION_NAME-dev$DEV_BUILD"
 echo "Phone: $PHONE_VERSION_NAME (code $PHONE_VERSION_CODE) | Wear: $WEAR_VERSION_NAME (code $WEAR_VERSION_CODE)"
 
 # --- Build ---
@@ -86,10 +100,14 @@ FACE_APK="watchface/build/outputs/apk/release/watchface-release.apk"
 
 if [[ $SKIP_BUILD -eq 0 ]]; then
   echo "==> Building release APKs"
-  ./gradlew :app:assemblePhoneRelease :wear:assembleRelease :watchface:assembleRelease
+  if [[ $DEV -eq 1 ]]; then
+    ./gradlew -q -PdanaBuild="$DEV_BUILD" :app:assemblePhoneRelease
+  else
+    ./gradlew :app:assemblePhoneRelease :wear:assembleRelease :watchface:assembleRelease
+  fi
 fi
 [[ -f "$PHONE_APK" ]] || { echo "ERROR: $PHONE_APK not found — build failed?" >&2; exit 1; }
-[[ -f "$WEAR_APK" ]] || { echo "ERROR: $WEAR_APK not found — build failed?" >&2; exit 1; }
+[[ $DEV -eq 1 || -f "$WEAR_APK" ]] || { echo "ERROR: $WEAR_APK not found — build failed?" >&2; exit 1; }
 
 # --- Publish to the assistant server ---
 if [[ $SKIP_UPLOAD -eq 0 ]]; then
@@ -109,15 +127,16 @@ if [[ $SKIP_UPLOAD -eq 0 ]]; then
     echo
   }
   publish phone "$PHONE_APK" "$PHONE_VERSION_NAME" "$PHONE_VERSION_CODE"
-  publish wear  "$WEAR_APK"  "$WEAR_VERSION_NAME"  "$WEAR_VERSION_CODE"
+  [[ $DEV -eq 1 ]] || publish wear "$WEAR_APK" "$WEAR_VERSION_NAME" "$WEAR_VERSION_CODE"
   echo "==> Published. The phone app will offer $PHONE_VERSION_NAME in Settings > App Update."
 fi
 
 # --- Phone install (optional, fast path when a device is USB-connected) ---
 if [[ $INSTALL_PHONE -eq 1 ]]; then
-  if adb get-state >/dev/null 2>&1; then
+  phone=(); [[ -n "${PHONE_SERIAL:-}" ]] && phone=(-s "$PHONE_SERIAL")
+  if adb "${phone[@]}" get-state >/dev/null 2>&1; then
     echo "==> Installing phone APK via adb"
-    adb install -r "$PHONE_APK"
+    adb "${phone[@]}" install -r "$PHONE_APK"
   else
     echo "==> No adb device connected — skipping phone install (use in-app update instead)"
   fi

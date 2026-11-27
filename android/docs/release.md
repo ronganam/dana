@@ -42,6 +42,10 @@ bin/deploy-app.sh --watch-ip <watch-ip>:5555    # wear APK; uses adb wireless de
 - The phone app checks `/api/app/version` on launch and in **Settings > App Update**, downloads to `cacheDir/updates/`, verifies sha256, then hands off to the system installer (`FileProvider` + `REQUEST_INSTALL_PACKAGES`).
 - Version tracking: `app` and `wear` `versionName`/`versionCode` are kept in sync by the script. The phone pushes its `version_code` in the `/dana_config` DataMap; the watch publishes its own version on the `/dana/version` data item (`WearVersionPublisher`). The watch itself cannot self-update — install over adb via the script.
 
+### Dev builds between releases
+
+`bin/deploy-app.sh --dev` builds only the phone app (release-signed, R8 kept, the release lint pass skipped) as a dev build: its `versionCode` is the release number in `build.gradle.kts` × 1000 + a counter kept per release in `~/.cache/dana-ship/` (passed as `-PdanaBuild=N`; a release is `× 1000 + 0`), its name `<version>-dev<N>`. It is published to your server (the phone offers it as an update) and adb-installed when `PHONE_SERIAL` (site `android.env`) is connected. No version bump, no tag; the next release (`<n+1> × 1000`) is newer than every dev build of `<n>`.
+
 ## Wear ↔ Phone companion signing (CRITICAL — do not break)
 
 `:app` and `:wear` share `applicationId = io.github.ronganam.dana`. Wear OS's data layer (Google Play Services `WearableService`) treats same-named packages on phone and watch as the same app and **enforces signature match**: if the two sides are signed with different certificates, all watch→phone messages are silently dropped (`Mismatched certificate ... Failed to deliver message` in the phone's logcat). Symptoms: watch shows normal UI but nothing reaches the phone; `WearMessageListenerService` never logs "Handled message path".
