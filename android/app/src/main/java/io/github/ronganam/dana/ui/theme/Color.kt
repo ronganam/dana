@@ -80,7 +80,8 @@ val WarmSurfaceHighLight = Color(0xFFF4DDCD)
  * EMBER reads orange.
  */
 enum class Hue(val dark: Color, val light: Color, private val stored: Long, private val legacyLight: Long) {
-    EMBER(WarmDark, WarmLight, 0xFF6A3D, 0xD1401A),
+    // Literals only: a top-level val here would make Hue and this file initialise each other (nulls in CategoryHues).
+    EMBER(Color(0xFFFFB27A), Color(0xFFAD4F12), 0xFF6A3D, 0xD1401A),
     AMBER(Color(0xFFE8C66A), Color(0xFF7F6200), 0xF2A93B, 0xA86A00),
     SAGE(Color(0xFF7FD3A2), Color(0xFF2B7A50), 0x5FBF8A, 0x2E7D52),
     TEAL(Color(0xFF6CCFC6), Color(0xFF1C7770), 0x3DBFB3, 0x1F7A72),
