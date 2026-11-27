@@ -58,6 +58,28 @@ fun SourceKind.icon(): ImageVector = when (this) {
     SourceKind.Wake -> Icons.Outlined.WbSunny
 }
 
+/** The circuit columns of the list's rows: [CircuitColumns.Default], narrowed in a narrow pane ([fitColumns]). */
+val LocalCircuitColumns = androidx.compose.runtime.compositionLocalOf { CircuitColumns.Default }
+
+/**
+ * The list's circuit columns for a list [width] wide: the default ones, or
+ * squeezed to the row when its state word (about 88dp) no longer fits beside
+ * the circuit (the side pane next to an open watch); the word then shows on
+ * the title line ([narrowRow]).
+ */
+fun fitColumns(width: Dp): CircuitColumns {
+    val d = CircuitColumns.Default
+    if (width - 64.dp - 88.dp >= d.width) return d
+    // Narrow: the state word moves up to the title line, the circuit takes the row.
+    val f = ((width - 64.dp) / d.width).coerceIn(0.5f, 1f)
+    return CircuitColumns(source = d.source, rule = d.source + (d.rule - d.source) * f, ai = d.source + (d.ai - d.source) * f,
+        action = d.source + (d.action - d.source) * f, width = d.source + (d.width - d.source) * f)
+}
+
+/** Rows on squeezed columns put their state word on the title line. */
+@Composable
+fun narrowRow(): Boolean = LocalCircuitColumns.current !== CircuitColumns.Default
+
 /** A watch's four nodes, in states. */
 @Immutable
 data class CircuitNodes(val source: LineNode, val rule: LineNode, val ai: LineNode?, val action: LineNode) {
@@ -121,6 +143,9 @@ fun stateWord(live: WatchLive, quiet: String?): StateWord {
     }
 }
 
+/** The large circuit's columns: room for each column's words (84dp) on both sides of its node. */
+private val LARGE = CircuitColumns(source = 42.dp, rule = 124.dp, ai = 206.dp, action = 288.dp, width = 330.dp)
+
 /**
  * One watch's circuit drawn large: today's counts over the wires (events
  * in → past the rule → fired), the nodes, then each column's name and words.
@@ -128,7 +153,7 @@ fun stateWord(live: WatchLive, quiet: String?): StateWord {
 @Composable
 fun LargeCircuit(circuit: Circuit, nodes: CircuitNodes, counts: TodayCounts?, modifier: Modifier = Modifier) {
     val c = circuitColors
-    val cols = CircuitColumns.Large
+    val cols = LARGE
     val xs = listOfNotNull(cols.source, cols.rule, cols.ai.takeIf { circuit.ai != null }, cols.action)
     val nums: List<String?> = if (counts == null) xs.map { null } else if (circuit.ai != null)
         listOf(null, counts.checks.toString(), counts.passedRule.toString(), counts.fired.toString())
@@ -138,8 +163,8 @@ fun LargeCircuit(circuit: Circuit, nodes: CircuitNodes, counts: TodayCounts?, mo
     Column(modifier.width(cols.width)) {
         PlacedTexts(numXs, nums, MaterialTheme.typography.titleMedium.tabular(), c.ink, room = 64.dp)
         NodeLine(nodes.list, size = NodeSize.Large, positions = xs, modifier = Modifier.padding(top = 4.dp))
-        PlacedTexts(xs, listOfNotNull("When", "Rule", if (circuit.ai != null) "AI check" else null, "Then"), MaterialTheme.typography.bodyMedium, c.mute, room = 84.dp, modifier = Modifier.padding(top = 8.dp))
-        PlacedTexts(xs, listOfNotNull(circuit.source, circuit.rule, circuit.ai, circuit.action), MaterialTheme.typography.bodyMedium, c.ink, room = 84.dp, maxLines = 4, modifier = Modifier.padding(top = 2.dp))
+        PlacedTexts(xs, listOfNotNull("When", "Rule", if (circuit.ai != null) "AI check" else null, "Then"), MaterialTheme.typography.bodyMedium, c.mute, room = 78.dp, modifier = Modifier.padding(top = 8.dp))
+        PlacedTexts(xs, listOfNotNull(circuit.source, circuit.rule, circuit.ai, circuit.action), MaterialTheme.typography.bodyMedium, c.ink, room = 78.dp, maxLines = 4, modifier = Modifier.padding(top = 2.dp))
     }
 }
 

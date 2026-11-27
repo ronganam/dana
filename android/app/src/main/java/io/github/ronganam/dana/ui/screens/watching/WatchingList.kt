@@ -40,6 +40,7 @@ import io.github.ronganam.dana.data.watches.quietUntil
 import io.github.ronganam.dana.data.watches.summaryWords
 import io.github.ronganam.dana.data.watches.whenWords
 import io.github.ronganam.dana.ui.components.circuit.CircuitColumnHeader
+import io.github.ronganam.dana.ui.components.circuit.CircuitColumns
 import io.github.ronganam.dana.ui.components.circuit.CircuitRow
 import io.github.ronganam.dana.ui.components.circuit.GroupedSection
 import io.github.ronganam.dana.ui.components.circuit.LineNode
@@ -104,9 +105,10 @@ fun WatchingList(
             io.github.ronganam.dana.data.watches.trackMarks(today.values.flatten()), java.time.LocalDate.now(), java.time.ZoneId.systemDefault()
         )
     }
-    androidx.compose.runtime.CompositionLocalProvider(LocalTrackStart provides trackFrom) {
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
+    androidx.compose.runtime.CompositionLocalProvider(LocalTrackStart provides trackFrom, LocalCircuitColumns provides fitColumns(maxWidth)) {
     Column(
-        modifier
+        Modifier
             .fillMaxSize()
             .verticalScroll(rememberScrollState())
             .padding(horizontal = Space.screen, vertical = 12.dp)
@@ -137,7 +139,9 @@ fun WatchingList(
         if (loaded && watches.isEmpty()) EmptyWatching(onNew)
         if (watches.isNotEmpty()) {
         if (tracks) TrackHeader(Modifier.padding(top = 20.dp, bottom = 8.dp))
-        else CircuitColumnHeader(Modifier.padding(top = 16.dp, bottom = 8.dp), startInset = 16.dp, endInset = 16.dp)
+        else CircuitColumnHeader(Modifier.padding(top = 16.dp, bottom = 8.dp), columns = LocalCircuitColumns.current,
+            labels = if (LocalCircuitColumns.current === CircuitColumns.Default) listOf("When", "Rule", "AI check", "Then") else listOf("When", "Rule", "AI", "Then"),
+            trailing = if (LocalCircuitColumns.current === CircuitColumns.Default) "Last fired" else null, startInset = 16.dp, endInset = 16.dp)
 
         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (w in withRuns) {
@@ -179,6 +183,7 @@ fun WatchingList(
         Spacer(Modifier.height(24.dp))
     }
     }
+    }
 }
 
 /** ". Today: 71 checks, 4 reached the AI check, 3 fired." over every watch's checks today. */
@@ -202,8 +207,10 @@ private fun WatchLine(w: Watch, live: WatchLive, rows: List<io.github.ronganam.d
         CircuitRow(
             title = w.title,
             source = nodes.source, rule = nodes.rule, ai = nodes.ai, action = nodes.action,
-            time = time, state = state.text, stateColor = state.color,
+            time = if (narrowRow() && state.text != "On" && live != WatchLive.FiredToday && live != WatchLive.Idle) state.text else time,
+            state = if (narrowRow()) null else state.text, stateColor = state.color,
             dimmed = live == WatchLive.Off || live == WatchLive.Closed,
+            columns = LocalCircuitColumns.current,
             onClick = onClick,
         )
     }

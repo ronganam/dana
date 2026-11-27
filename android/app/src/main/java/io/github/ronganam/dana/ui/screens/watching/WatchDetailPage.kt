@@ -142,7 +142,7 @@ fun WatchDetailPage(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = Space.screen)
             ) {
-                Text(watch.title, style = MaterialTheme.typography.displaySmall, color = c.ink, modifier = Modifier.semantics { heading() })
+                Text(watch.title, style = MaterialTheme.typography.headlineLarge, color = c.ink, modifier = Modifier.semantics { heading() })
                 Text(sinceWords(watch, zone), style = MaterialTheme.typography.bodyMedium, color = c.inkSoft, modifier = Modifier.padding(top = 4.dp))
                 CircuitCard(watch, trace, run, Modifier.padding(top = 20.dp))
                 if (run != null) {

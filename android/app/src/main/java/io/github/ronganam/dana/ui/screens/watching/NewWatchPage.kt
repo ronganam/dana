@@ -82,7 +82,7 @@ fun NewWatchPage(controller: WatchingController, showBack: Boolean, onBack: () -
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = Space.screen)
         ) {
-            Text(if (made != null) "${made.title}, off" else "New watch", style = MaterialTheme.typography.displaySmall, color = c.ink, modifier = Modifier.semantics { heading() })
+            Text(if (made != null) "${made.title}, off" else "New watch", style = MaterialTheme.typography.headlineLarge, color = c.ink, modifier = Modifier.semantics { heading() })
             if (made == null) {
                 Text("Say what to watch for and what Dana should do.", style = MaterialTheme.typography.bodyMedium, color = c.inkSoft, modifier = Modifier.padding(top = 4.dp))
                 WordsField(s.text, enabled = s.phase !is NewWatchPhase.Compiling, onChange = controller::setNewText, modifier = Modifier.padding(top = 20.dp))

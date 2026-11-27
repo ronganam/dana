@@ -78,10 +78,11 @@ fun RunCard(
         if (wide) TrackedRow(watch.title, time, nodes, state, todayRows, ZonedDateTime.now(), dimmed = false, heldSince = if (run.waiting) run.updatedMs else null, onClick = onOpen)
         else CircuitRow(
             title = watch.title, source = nodes.source, rule = nodes.rule, ai = nodes.ai, action = nodes.action,
-            time = time, state = state.text, stateColor = state.color, onClick = onOpen,
+            time = if (narrowRow()) state.text else time, state = if (narrowRow()) null else state.text, stateColor = state.color,
+            onClick = onOpen, columns = LocalCircuitColumns.current,
         )
         if (run.waiting) {
-            if (wide) Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+            if (wide && steps.size > 1) Row(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp), horizontalArrangement = Arrangement.spacedBy(24.dp)) {
                 StepList(steps, Modifier.weight(1f))
                 RequestBlock(run, draft, busy, onApprove, onDeny, onOpenRun, Modifier.weight(1f))
             } else RequestBlock(run, draft, busy, onApprove, onDeny, onOpenRun, Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 16.dp))
@@ -129,20 +130,32 @@ internal fun RequestBlock(run: WatchRun, draft: String?, busy: Boolean, onApprov
                     .padding(16.dp)
             )
         }
-        Row(Modifier.padding(top = 16.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Button(
-                onClick = onApprove, enabled = !busy,
-                colors = ButtonDefaults.buttonColors(containerColor = c.accentFilled, contentColor = c.onAccentFilled),
-                modifier = Modifier.heightIn(min = 48.dp)
-            ) { Text("Approve", style = MaterialTheme.typography.titleMedium) }
-            Spacer(Modifier.width(8.dp))
-            TextButton(onClick = onDeny, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("Deny", style = MaterialTheme.typography.titleMedium, color = c.accent)
+        androidx.compose.foundation.layout.BoxWithConstraints(Modifier.padding(top = 16.dp).fillMaxWidth()) {
+            // Narrow (the side pane, large text): Open run goes under the answers.
+            val narrow = maxWidth < 330.dp
+            val openRun = @Composable {
+                TextButton(onClick = onOpenRun, modifier = Modifier.heightIn(min = 48.dp)) {
+                    Text("Open run", style = MaterialTheme.typography.titleMedium, color = c.inkSoft, maxLines = 1)
+                    Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = c.inkSoft, modifier = Modifier.size(20.dp))
+                }
             }
-            Spacer(Modifier.weight(1f))
-            TextButton(onClick = onOpenRun, modifier = Modifier.heightIn(min = 48.dp)) {
-                Text("Open run", style = MaterialTheme.typography.titleMedium, color = c.inkSoft)
-                Icon(Icons.AutoMirrored.Outlined.KeyboardArrowRight, contentDescription = null, tint = c.inkSoft, modifier = Modifier.size(20.dp))
+            Column {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    Button(
+                        onClick = onApprove, enabled = !busy,
+                        colors = ButtonDefaults.buttonColors(containerColor = c.accentFilled, contentColor = c.onAccentFilled),
+                        modifier = Modifier.heightIn(min = 48.dp)
+                    ) { Text("Approve", style = MaterialTheme.typography.titleMedium, maxLines = 1) }
+                    Spacer(Modifier.width(8.dp))
+                    TextButton(onClick = onDeny, enabled = !busy, modifier = Modifier.heightIn(min = 48.dp)) {
+                        Text("Deny", style = MaterialTheme.typography.titleMedium, color = c.accent, maxLines = 1)
+                    }
+                    if (!narrow) {
+                        Spacer(Modifier.weight(1f))
+                        openRun()
+                    }
+                }
+                if (narrow) Box(Modifier.padding(top = 4.dp)) { openRun() }
             }
         }
     }

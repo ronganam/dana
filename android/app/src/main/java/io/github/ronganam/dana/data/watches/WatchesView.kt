@@ -46,7 +46,7 @@ fun circuitOf(spec: WatchSpec): Circuit {
         else -> sourceWords(t, kind)
     }
     val semantic = spec.triggers.firstNotNullOfOrNull { it.semantic?.takeIf(String::isNotBlank) }
-    return Circuit(kind, source, t?.let(::ruleWords) ?: "Any", semantic?.let { shorten(it, 60) }, actionWords(spec.onMatch.firstOrNull()))
+    return Circuit(kind, source, t?.let(::ruleWords) ?: "Every time", semantic?.let { shorten(it, 60) }, actionWords(spec.onMatch.firstOrNull()))
 }
 
 internal fun sourceKind(t: WatchTrigger?): SourceKind {
@@ -115,6 +115,11 @@ internal fun conditionWords(c: WatchCondition): String {
     val f = fieldWord(c.field)
     val v = c.value.orEmpty()
     val q = "“$v”"
+    val yes = v.lowercase().takeIf { (c.op == "eq" || c.op == "ne") && (it == "true" || it == "false") }?.let { (it == "true") == (c.op == "eq") }
+    if (yes != null) return when (c.field) {
+        "is_group" -> if (yes) "In a group" else "Not a group"
+        else -> if (yes) f else "Not ${f.lowercase()}"
+    }
     return when (c.op) {
         "eq" -> if (c.field == "amount") "$f $v" else "$f $q"
         "ne" -> "$f not $q"
@@ -134,7 +139,7 @@ internal fun conditionWords(c: WatchCondition): String {
 
 /**
  * The rule node's words: the first condition the source does not already
- * say, else the keywords, else the time of day; "Any" when nothing narrows it.
+ * say, else the keywords, else the time of day; "Every time" when nothing narrows it.
  */
 internal fun ruleWords(t: WatchTrigger): String {
     if (t.kind == "time") return t.every?.let { "Repeats" } ?: "Once"
@@ -144,7 +149,7 @@ internal fun ruleWords(t: WatchTrigger): String {
         c != null -> conditionWords(c)
         t.keywords.isNotEmpty() -> "Says " + t.keywords.take(2).joinToString(" or ") { "“$it”" }
         t.during != null -> t.during!!.replace("-", "–")
-        else -> "Any"
+        else -> "Every time"
     }
 }
 

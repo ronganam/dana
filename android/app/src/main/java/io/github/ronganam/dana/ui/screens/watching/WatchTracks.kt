@@ -150,7 +150,7 @@ fun TrackHeader(modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
         BoxWithConstraints(Modifier.weight(1f)) {
             val w = maxWidth
-            val hours = trackHours(start, now)
+            val hours = trackHours(start, now, maxLabels = (w / 56.dp).toInt() - 1)
             val span = (now - start).coerceAtLeast(1).toFloat()
             val xs = hours.map { 4.dp + (w - 8.dp) * ((it - start) / span) } + (w - 4.dp)
             val labels = hours.map { clockWords(it, ZoneId.systemDefault()) } + "Now"
@@ -164,13 +164,15 @@ fun TrackHeader(modifier: Modifier = Modifier) {
     }
 }
 
-/** Every second full hour between [start] and [now], leaving room before "Now". */
-internal fun trackHours(start: Long, now: Long): List<Long> {
+/** Full hours between [start] and [now] (every 1, 2, 3, 4 or 6 h: at most [maxLabels]), leaving room before "Now". */
+internal fun trackHours(start: Long, now: Long, maxLabels: Int): List<Long> {
     val zone = ZoneId.systemDefault()
     var t = Instant.ofEpochMilli(start).atZone(zone).truncatedTo(ChronoUnit.HOURS)
     if (t.toInstant().toEpochMilli() < start) t = t.plusHours(1)
     val out = mutableListOf<Long>()
-    val step = if (now - start > 10 * 3_600_000L) 4L else 2L
+    val hours = (now - start) / 3_600_000L
+    val step = listOf(1L, 2L, 3L, 4L, 6L).firstOrNull { hours / it < maxLabels.coerceAtLeast(1) } ?: 12L
+    if (maxLabels < 1) return emptyList()
     while (t.toInstant().toEpochMilli() < now - 45 * 60_000L) {
         out += t.toInstant().toEpochMilli()
         t = t.plusHours(step)
