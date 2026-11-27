@@ -1,10 +1,11 @@
 package io.github.ronganam.dana.ui.screens.watching
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
@@ -143,28 +144,31 @@ fun stateWord(live: WatchLive, quiet: String?): StateWord {
     }
 }
 
-/** The large circuit's columns: room for each column's words (84dp) on both sides of its node. */
-private val LARGE = CircuitColumns(source = 42.dp, rule = 124.dp, ai = 206.dp, action = 288.dp, width = 330.dp)
-
 /**
- * One watch's circuit drawn large: today's counts over the wires (events
- * in → past the rule → fired), the nodes, then each column's name and words.
+ * One watch's circuit drawn large, across the width it is given: today's
+ * counts over the wires (events in → past the rule → fired), the nodes, then
+ * each column's name and words, each column as wide as its share of the row
+ * so long words stay whole at large font sizes.
  */
 @Composable
 fun LargeCircuit(circuit: Circuit, nodes: CircuitNodes, counts: TodayCounts?, modifier: Modifier = Modifier) {
     val c = circuitColors
-    val cols = LARGE
-    val xs = listOfNotNull(cols.source, cols.rule, cols.ai.takeIf { circuit.ai != null }, cols.action)
-    val nums: List<String?> = if (counts == null) xs.map { null } else if (circuit.ai != null)
-        listOf(null, counts.checks.toString(), counts.passedRule.toString(), counts.fired.toString())
-    else listOf(null, counts.checks.toString(), counts.fired.toString())
-    // Each count sits over the wire into its node.
-    val numXs = xs.mapIndexed { i, x -> if (i == 0) x else (xs[i - 1] + x) / 2 }
-    Column(modifier.width(cols.width)) {
-        PlacedTexts(numXs, nums, MaterialTheme.typography.titleMedium.tabular(), c.ink, room = 64.dp)
-        NodeLine(nodes.list, size = NodeSize.Large, positions = xs, modifier = Modifier.padding(top = 4.dp))
-        PlacedTexts(xs, listOfNotNull("When", "Rule", if (circuit.ai != null) "AI check" else null, "Then"), MaterialTheme.typography.bodyMedium, c.mute, room = 78.dp, modifier = Modifier.padding(top = 8.dp))
-        PlacedTexts(xs, listOfNotNull(circuit.source, circuit.rule, circuit.ai, circuit.action), MaterialTheme.typography.bodyMedium, c.ink, room = 78.dp, maxLines = 4, modifier = Modifier.padding(top = 2.dp))
+    BoxWithConstraints(modifier.widthIn(max = 480.dp).fillMaxWidth()) {
+        val n = if (circuit.ai != null) 4 else 3
+        val step = maxWidth / n
+        val xs = List(n) { step * it + step / 2 }
+        val nums: List<String?> = if (counts == null) xs.map { null } else if (circuit.ai != null)
+            listOf(null, counts.checks.toString(), counts.passedRule.toString(), counts.fired.toString())
+        else listOf(null, counts.checks.toString(), counts.fired.toString())
+        // Each count sits over the wire into its node.
+        val numXs = xs.mapIndexed { i, x -> if (i == 0) x else (xs[i - 1] + x) / 2 }
+        val room = step - 4.dp
+        Column(Modifier.fillMaxWidth()) {
+            PlacedTexts(numXs, nums, MaterialTheme.typography.titleMedium.tabular(), c.ink, room = room)
+            NodeLine(nodes.list, size = NodeSize.Large, positions = xs, modifier = Modifier.padding(top = 4.dp))
+            PlacedTexts(xs, listOfNotNull("When", "Rule", if (circuit.ai != null) "AI check" else null, "Then"), MaterialTheme.typography.bodyMedium, c.mute, room = room, modifier = Modifier.padding(top = 8.dp))
+            PlacedTexts(xs, listOfNotNull(circuit.source, circuit.rule, circuit.ai, circuit.action), MaterialTheme.typography.bodyMedium, c.ink, room = room, maxLines = 4, modifier = Modifier.padding(top = 2.dp))
+        }
     }
 }
 
