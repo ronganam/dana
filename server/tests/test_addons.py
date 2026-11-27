@@ -177,7 +177,7 @@ def test_per_user_lists():
           str(store.connected_addons(MEMBER_USER)))
     member_tools = names(registry.tool_schemas(MEMBER_USER))
     check("tools: the member gets the core tools only", member_tools
-          == ["get_current_time", "request_user_selection", "web_search", "run_code"], str(member_tools))
+          == ["get_current_time", "request_user_selection", "get_weather", "web_search", "run_code"], str(member_tools))
     admin_tools = names(registry.tool_schemas(ADMIN))
     expected = [t.name for k in all_addons() if k.name in store.connected_addons(ADMIN) for t in k.tools]
     check("tools: the admin's list is the tools of their addons, in addon then definition order",

@@ -1,5 +1,5 @@
 """Tools every user has (the ``essentials`` addon): the current time, asking the user
-to pick between options, web search, sharing an item with another user
+to pick between options, the weather at Home, web search, sharing an item with another user
 (offered only on a server with more than one user) and running Python in the sandbox
 (``run_code``: core/sandbox.py, docs/sandbox.md)."""
 
@@ -61,6 +61,22 @@ def _search(query: str) -> List[Dict[str, Any]]:
 
     with DDGS(timeout=SEARCH_TIMEOUT // 2) as ddgs:
         return list(ddgs.text(query, max_results=SEARCH_RESULTS))
+
+
+@addon.tool()
+async def get_weather(conn: Connection) -> str:
+    """The weather now and today at the user's Home zone (condition, temperature, high / low, rain chance). Use this for any "what's the weather" — not web search."""
+    from core import briefing
+    w = await briefing.weather(conn.user)
+    if not w or w.get("temperature") is None:
+        return "No weather: the user has no Home zone (Settings → Zones) or the weather service did not answer."
+    unit = w.get("unit") or "°"
+    parts = [f"{(w.get('condition') or '').capitalize()}, {w['temperature']}{unit}"]
+    if w.get("high") is not None:
+        parts.append(f"high {w['high']}{unit}, low {w.get('low')}{unit}")
+    if w.get("rain_chance") is not None:
+        parts.append(f"rain chance {w['rain_chance']}%")
+    return "Weather at Home: " + "; ".join(parts) + "."
 
 
 @addon.tool(untrusted_result=True)
