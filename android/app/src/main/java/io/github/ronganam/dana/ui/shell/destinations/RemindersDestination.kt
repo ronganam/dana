@@ -95,7 +95,8 @@ fun rememberRemindersDestination(viewModel: MainViewModel): Destination {
                     viewModel.chatController.sendChatMessage("Suggest a moment for each of my reminders that has none. Ask me before changing them.")
                 },
                 headerExtra = toggle
-            ) else ReminderListPane(viewModel, onMoments = { sheetFor = it }, headerExtra = toggle)
+            ) else if (wide) ReminderListPane(viewModel, onMoments = { sheetFor = it }, belowHeader = toggle)
+            else ReminderListPane(viewModel, onMoments = { sheetFor = it }, headerExtra = toggle)
         },
         stage = if (board) null else ({ ReminderStage(viewModel, onMoments = { sheetFor = it }) }),
         wide = board,
@@ -106,7 +107,7 @@ fun rememberRemindersDestination(viewModel: MainViewModel): Destination {
 /** List | Board, unfolded: two joined buttons in the header. */
 @Composable
 private fun ViewToggle(board: Boolean, onBoard: (Boolean) -> Unit) {
-    Row(Modifier.padding(start = 8.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         ToggleHalf("List", !board, RoundedCornerShape(topStart = 20.dp, bottomStart = 20.dp, topEnd = 6.dp, bottomEnd = 6.dp)) { onBoard(false) }
         ToggleHalf("Board", board, RoundedCornerShape(topStart = 6.dp, bottomStart = 6.dp, topEnd = 20.dp, bottomEnd = 20.dp)) { onBoard(true) }
     }

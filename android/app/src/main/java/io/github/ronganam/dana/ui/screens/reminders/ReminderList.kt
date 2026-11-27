@@ -72,7 +72,8 @@ private val GUTTER = 16.dp
 fun ReminderListPane(
     viewModel: MainViewModel,
     onMoments: (String) -> Unit,
-    headerExtra: (@Composable () -> Unit)? = null
+    headerExtra: (@Composable () -> Unit)? = null,
+    belowHeader: (@Composable () -> Unit)? = null
 ) {
     val tc = viewModel.tasksController
     val tasks by tc.tasks.collectAsState()
@@ -94,8 +95,19 @@ fun ReminderListPane(
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 32.dp)) {
         item(key = "head") {
-            PlaceHeader("Reminders", trailing = {
+            val add: @Composable () -> Unit = {
                 IconButton(onClick = { adding = !adding }) { Icon(Icons.Outlined.Add, contentDescription = "Add a reminder", tint = circuitColors.ink) }
+            }
+            // A narrow pane (unfolded, beside the editor) puts its buttons on a row of their own.
+            if (belowHeader != null) {
+                PlaceHeader("Reminders")
+                Row(Modifier.fillMaxWidth().padding(horizontal = GUTTER).padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    belowHeader()
+                    Spacer(Modifier.weight(1f))
+                    add()
+                }
+            } else PlaceHeader("Reminders", trailing = {
+                add()
                 headerExtra?.invoke()
             })
         }
@@ -307,8 +319,20 @@ private fun MomentRow(
     val dashed = remindWhens(task).isEmpty()
     val wire = if (late) c.warm.copy(alpha = 0.6f) else c.wire
     val nodeCenter = 22.dp
+    val pick: @Composable () -> Unit = {
+        Text(
+            "Pick a moment",
+            style = MaterialTheme.typography.labelLarge,
+            color = c.warm,
+            modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(role = Role.Button, onClick = onOpen)
+                .padding(horizontal = 8.dp, vertical = 10.dp)
+        )
+    }
+    // In a narrow pane "Pick a moment" goes under the text, so the title keeps its width.
+    BoxWithConstraints(modifier.fillMaxWidth()) {
+    val narrow = maxWidth < 380.dp
     Row(
-        modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable(onClick = onOpen)
+        Modifier.fillMaxWidth().height(IntrinsicSize.Min).clickable(onClick = onOpen)
             .padding(start = 16.dp, end = 8.dp)
     ) {
         Box(
@@ -336,17 +360,13 @@ private fun MomentRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(line, style = MaterialTheme.typography.bodyMedium, color = if (late) c.warm.copy(alpha = 0.85f) else c.inkSoft, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (late && narrow) Box(Modifier.offset(x = (-8).dp)) { pick() }
             below()
         }
-        Box(Modifier.padding(top = 6.dp, start = 4.dp)) {
-            if (late) Text(
-                "Pick a moment",
-                style = MaterialTheme.typography.labelLarge,
-                color = c.warm,
-                modifier = Modifier.clip(RoundedCornerShape(12.dp)).clickable(role = Role.Button, onClick = onOpen)
-                    .padding(horizontal = 8.dp, vertical = 10.dp)
-            ) else CheckBox(done = false, onClick = onToggle)
+        if (!(late && narrow)) Box(Modifier.padding(top = 6.dp, start = 4.dp)) {
+            if (late) pick() else CheckBox(done = false, onClick = onToggle)
         }
+    }
     }
 }
 

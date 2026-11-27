@@ -58,13 +58,15 @@ fun SectionHeader(
             title,
             style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold),
             color = titleColor.takeOrElse { c.ink },
-            modifier = Modifier.weight(1f),
             maxLines = 1,
             overflow = TextOverflow.Ellipsis
         )
+        Spacer(Modifier.weight(1f))
+        // The title keeps its room; a long meta line shortens instead.
         if (meta != null) Text(
             meta,
-            modifier = (if (onMeta != null) Modifier.clickable(onClick = onMeta) else Modifier).padding(start = 12.dp),
+            modifier = Modifier.weight(4f, fill = false).then(if (onMeta != null) Modifier.clickable(onClick = onMeta) else Modifier).padding(start = 12.dp),
+            overflow = TextOverflow.Ellipsis,
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold).tabular(),
             color = metaColor.takeOrElse { c.inkSoft },
             maxLines = 1
