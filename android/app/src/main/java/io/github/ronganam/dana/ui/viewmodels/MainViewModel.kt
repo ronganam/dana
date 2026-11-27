@@ -94,6 +94,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     /** The Shopping screen (the list itself is shared with the widget and the watch: `ShoppingSync`). */
     val shoppingController = ShoppingController(ctx, appContext)
     val moneyController = MoneyController(ctx, appContext)
+    /** The Watching place: watches, their checks and runs, a new watch. */
+    val watchingController = WatchingController(ctx)
     /** Settings → Signals: where each signal comes from, the wake window, the phone sources. */
     val signalsController = SignalsController(ctx, appContext)
     /** The addons the user has connected (`/api/me`), as they change: which places and More rows show. */

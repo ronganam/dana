@@ -2,6 +2,9 @@ package io.github.ronganam.dana.data.watches
 
 import io.github.ronganam.dana.data.models.ChatMessage
 import io.github.ronganam.dana.data.models.LiveActivity
+import io.github.ronganam.dana.data.network.ApiJson
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -380,6 +383,15 @@ fun summaryWords(watches: List<Watch>, needsYou: Int): String {
     }.joinToString(", ") + "."
     val needs = when (needsYou) { 0 -> ""; 1 -> " One needs you."; else -> " $needsYou need you." }
     return parts + needs
+}
+
+private val DRAFT_KEYS = listOf("text", "message", "body", "content", "reply")
+
+/** The words a waiting tool call would send (its `text` / `message` / `body` argument); null when it has none. */
+fun draftOf(toolArgs: String?): String? {
+    if (toolArgs.isNullOrBlank()) return null
+    val obj = runCatching { ApiJson.parseToJsonElement(toolArgs) as? JsonObject }.getOrNull() ?: return null
+    return DRAFT_KEYS.firstNotNullOfOrNull { k -> (obj[k] as? JsonPrimitive)?.takeIf { it.isString }?.content?.takeIf(String::isNotBlank) }
 }
 
 /** A watch's quiet hours as their start ("From 23:00") when they are not now; null when it has none or they are now. */
