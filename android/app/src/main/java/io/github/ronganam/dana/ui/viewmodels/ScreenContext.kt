@@ -60,12 +60,12 @@ object ScreenContext {
         }
         Place.REMINDERS -> s.reminder?.let { (id, title) -> ScreenRef("task", id, title) }
         // An app page has no kind of its own: its newest waiting notification stands for it.
-        Place.NOTIFICATIONS -> s.notifApp?.let { a -> a.newestId?.let { ScreenRef("notification", it, a.appName) } }
-        Place.PROJECTS -> s.placeRef
+        Place.INBOX -> s.notifApp?.let { a -> a.newestId?.let { ScreenRef("notification", it, a.appName) } }
+        Place.WATCHING -> null
         Place.MORE -> when (s.more) {
             // Dana reads the shopping list with her own tool; it adds no context.
             MoreItem.SHOPPING -> null
-            MoreItem.MONEY -> s.placeRef
+            MoreItem.MONEY, MoreItem.PROJECTS -> s.placeRef
             MoreItem.CALLS -> s.call?.let { (id, title) -> ScreenRef("call", id, title) }
             MoreItem.PEOPLE -> s.person?.let { (id, name) -> ScreenRef("person", id, name) }
             MoreItem.REVIEW -> s.reviewId?.let { ScreenRef("review", it, "Weekly review") }

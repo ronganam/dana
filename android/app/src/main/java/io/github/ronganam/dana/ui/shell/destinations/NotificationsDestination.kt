@@ -20,10 +20,10 @@ import io.github.ronganam.dana.ui.viewmodels.OverviewMath
 import io.github.ronganam.dana.ui.viewmodels.Place
 
 /**
- * Notifications, per app (`NotificationOverviewController`, from
+ * The Inbox: notifications per app (`NotificationOverviewController`, from
  * `GET /api/notifications/overview`): the apps as the list, the open app on
  * the stage (unfolded: the first app is picked for you; on the cover a tap
- * drills down with "← Notifications"). The old Inbox stays behind Settings'
+ * drills down with "← Inbox"). The old Inbox stays behind Settings'
  * "Previous layout".
  */
 @Composable
@@ -107,7 +107,7 @@ fun rememberNotificationsDestination(viewModel: MainViewModel): Destination {
 
     val userPicked = pick != null && pick?.auto == false
     return Destination(
-        place = Place.NOTIFICATIONS,
+        place = Place.INBOX,
         picked = userPicked && shown != null,
         onBack = { shell.selectNotifApp(null) },
         list = {

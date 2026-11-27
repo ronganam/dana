@@ -53,6 +53,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.screens.VoiceWaveformIndicator
+import io.github.ronganam.dana.ui.components.circuit.AskDanaButton
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import coil.compose.AsyncImage
 
@@ -77,15 +78,9 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
     val isCallActive by viewModel.callController.isCallActive.collectAsState()
     val pendingImage by viewModel.chatController.pendingImageUri.collectAsState()
     val serverStatus by viewModel.serverStatus.collectAsState()
-    val context = LocalContext.current
     val draft = shell.askDraft
 
-    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-        if (granted) {
-            viewModel.chatController.startVoiceRecording()
-            if (sheet) shell.openThread()
-        }
-    }
+    val mic = rememberVoiceToggle(viewModel)
     val imagePicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
         if (uri != null) viewModel.chatController.setPendingImage(uri)
     }
@@ -97,19 +92,6 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
         if (sheet) shell.openThread()
         // Keep the text when the server is unreachable so it can be sent again.
         if (viewModel.chatController.sendChatMessage(text)) shell.askDraft = TextFieldValue("")
-    }
-
-    fun mic() {
-        when {
-            isCallActive -> viewModel.callController.endCall()
-            isRecording -> viewModel.chatController.stopVoiceRecording()
-            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ->
-                micPermission.launch(Manifest.permission.RECORD_AUDIO)
-            else -> {
-                viewModel.chatController.startVoiceRecording()
-                if (sheet) shell.openThread()
-            }
-        }
     }
 
     Column(
@@ -249,4 +231,54 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
             }
         }
     }
+}
+
+/**
+ * Push-to-talk, the ask bar's and the header's: ends a call or a recording
+ * that is on, else asks for the microphone if needed and starts listening,
+ * opening the thread sheet where the thread is a sheet.
+ */
+@Composable
+internal fun rememberVoiceToggle(viewModel: MainViewModel): () -> Unit {
+    val shell = viewModel.shellController
+    val sheet = LocalShellLayout.current != ShellLayout.FULL
+    val context = LocalContext.current
+    val isRecording by viewModel.chatController.isRecording.collectAsState()
+    val isCallActive by viewModel.callController.isCallActive.collectAsState()
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            viewModel.chatController.startVoiceRecording()
+            if (sheet) shell.openThread()
+        }
+    }
+    return {
+        when {
+            isCallActive -> viewModel.callController.endCall()
+            isRecording -> viewModel.chatController.stopVoiceRecording()
+            ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ->
+                micPermission.launch(Manifest.permission.RECORD_AUDIO)
+            else -> {
+                viewModel.chatController.startVoiceRecording()
+                if (sheet) shell.openThread()
+            }
+        }
+    }
+}
+
+/**
+ * Ask Dana from a place's header (the top-right slot on the cover, the top
+ * of the rail unfolded): starts listening like the ask bar's mic, and stops
+ * it while listening.
+ */
+@Composable
+fun HeaderAsk(viewModel: MainViewModel, modifier: Modifier = Modifier) {
+    val toggle = rememberVoiceToggle(viewModel)
+    val isRecording by viewModel.chatController.isRecording.collectAsState()
+    val isCallActive by viewModel.callController.isCallActive.collectAsState()
+    val listening = isRecording || isCallActive
+    AskDanaButton(
+        onClick = toggle,
+        modifier = modifier.pulseRing(listening, MaterialTheme.colorScheme.primary),
+        label = if (listening) "Stop listening" else "Ask Dana"
+    )
 }

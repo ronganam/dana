@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.notifications
 
+import io.github.ronganam.dana.ui.components.circuit.askSlotInset
 import androidx.compose.foundation.lazy.itemsIndexed
 import io.github.ronganam.dana.ui.components.RollingText
 import io.github.ronganam.dana.ui.components.arrive
@@ -92,7 +93,7 @@ class NotificationsActions(
 )
 
 /**
- * Notifications, the list: counts, "Notifications", the noise box (Clear the
+ * The Inbox, the list: counts, "Inbox", the noise box (Clear the
  * noise · M, or the calm line when there is none), "Dana noticed" for the
  * first rule suggestion, the apps (name, count, needs you, summary, Clear) and
  * the quiet apps folded at the end.
@@ -126,8 +127,8 @@ fun NotificationsListPane(
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)) {
             item(key = "head") {
                 Column(Modifier.padding(horizontal = GUTTER)) {
-                    MetaLabel(if (counts != null) "${counts.total} on your phone · ${counts.noise} noise" else "Your phone's notifications")
-                    Text("Notifications", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp))
+                    MetaLabel(if (counts != null) "${counts.total} on your phone · ${counts.noise} noise" else "Your phone's notifications", modifier = Modifier.askSlotInset())
+                    Text("Inbox", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp).askSlotInset())
                     if (!accessGranted) AccessBox(actions.allowAccess)
                     if (overview != null) NoiseBox(overview, wide, actions.clearNoise)
                     overview?.ruleSuggestions?.firstOrNull()?.let { s -> NoticedBox(s, actions.answer) }
@@ -317,7 +318,7 @@ fun AppDetail(app: OverviewApp, items: List<PhoneNotification>?, onBack: (() -> 
             .padding(horizontal = if (onBack != null) GUTTER else 26.dp, vertical = 20.dp).widthIn(max = 720.dp)
     ) {
         if (onBack != null) Text(
-            "← Notifications",
+            "← Inbox",
             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier = Modifier.clickable(onClick = onBack).padding(bottom = 10.dp, top = 2.dp)

@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.reminders
 
+import io.github.ronganam.dana.ui.components.circuit.askSlotInset
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.tween
@@ -134,8 +135,8 @@ fun ReminderListPane(viewModel: MainViewModel) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)) {
         item(key = "head") {
             Column(Modifier.padding(horizontal = GUTTER)) {
-                MetaLabel("${open.size} open · $forToday for today")
-                Text("Reminders", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp))
+                MetaLabel("${open.size} open · $forToday for today", modifier = Modifier.askSlotInset())
+                Text("Reminders", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp).askSlotInset())
                 Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     SegTab("By when", !byList) { shell.setRemindersByList(false) }
                     SegTab("By list", byList) { shell.setRemindersByList(true) }

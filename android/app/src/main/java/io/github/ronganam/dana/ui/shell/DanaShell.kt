@@ -22,7 +22,7 @@ import io.github.ronganam.dana.ui.shell.destinations.rememberMoreDestination
 import io.github.ronganam.dana.ui.shell.destinations.rememberNotificationsDestination
 import io.github.ronganam.dana.ui.shell.destinations.rememberNowDestination
 import io.github.ronganam.dana.ui.shell.destinations.rememberRemindersDestination
-import io.github.ronganam.dana.ui.shell.destinations.rememberProjectsDestination
+import io.github.ronganam.dana.ui.shell.destinations.rememberWatchingDestination
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import io.github.ronganam.dana.ui.viewmodels.Place
 import io.github.ronganam.dana.ui.viewmodels.ScreenContext
@@ -32,10 +32,11 @@ import io.github.ronganam.dana.ui.viewmodels.ShellSnapshot
 import kotlinx.coroutines.launch
 
 /**
- * The phone's main screen: its places (Now, Reminders, Notifications, Projects
- * for a user with `knowledge`, More — which also opens Shopping and Money),
- * the ask bar that is always there, and one conversation with Dana — a sheet
- * when folded, the right pane when unfolded — under a day strip.
+ * The phone's main screen: its places (Now, Reminders, Watching, Inbox, More —
+ * which also opens Shopping, Money and Projects), a bottom bar folded and a
+ * rail (Ask Dana on top) unfolded, the ask bar that is always there, and one
+ * conversation with Dana — a sheet when folded, the right pane when unfolded —
+ * under a day strip. Folded, Ask Dana also sits in each place's header.
  *
  * Each place is a [Destination] (list + stage) built in `destinations/`; this
  * function only wires shared state (routes, shares, messages, Back) and picks
@@ -50,14 +51,10 @@ fun DanaShell(viewModel: MainViewModel) {
     val serverStatus by viewModel.serverStatus.collectAsState()
     val overview by viewModel.notificationOverviewController.overview.collectAsState()
     val nowPayload by viewModel.nowController.payload.collectAsState()
-    // The needs-you number (the Notifications screen's, else Now's copy of it); nothing when zero.
-    val notificationsBadge = overview?.counts?.needsYou ?: nowPayload?.notifications?.needsYou ?: 0
+    // The needs-you number (the Inbox's, else Now's copy of it); nothing when zero.
+    val inboxBadge = overview?.counts?.needsYou ?: nowPayload?.notifications?.needsYou ?: 0
     val search by viewModel.searchController.state.collectAsState()
-    val addons by viewModel.addons.collectAsState()
-    val projectsOn = "knowledge" in addons
-    val places = remember(projectsOn) { Place.values().filter { it != Place.PROJECTS || projectsOn } }
-    // Projects went away (disconnected): back to Now.
-    LaunchedEffect(projectsOn, place) { if (!projectsOn && place == Place.PROJECTS) shell.go(Place.NOW) }
+    val places = remember { Place.entries.toList() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val dropState = remember { DayDropState() }
@@ -115,8 +112,8 @@ fun DanaShell(viewModel: MainViewModel) {
             val placeDest = when (place) {
                 Place.NOW -> rememberNowDestination(viewModel)
                 Place.REMINDERS -> rememberRemindersDestination(viewModel)
-                Place.NOTIFICATIONS -> rememberNotificationsDestination(viewModel)
-                Place.PROJECTS -> rememberProjectsDestination(viewModel)
+                Place.WATCHING -> rememberWatchingDestination(viewModel)
+                Place.INBOX -> rememberNotificationsDestination(viewModel)
                 Place.MORE -> rememberMoreDestination(viewModel)
             }
             // Search: unfolded the results take the stage; on the cover they cover the content (not over an open thread sheet).
@@ -161,8 +158,10 @@ fun DanaShell(viewModel: MainViewModel) {
                 thread = { onClose -> ThreadPane(viewModel, onClose) },
                 // A place's own field with the keyboard (Shopping's add field) takes the ask bar's spot.
                 ask = { if (!(shell.askHidden && layout != ShellLayout.FULL)) AskBar(viewModel) },
-                nav = { ShellNav(place, places, notificationsBadge, onPlace = { shell.go(it) }) },
+                // Folded only: unfolded the rail beside the frame has the places.
+                nav = { if (layout == ShellLayout.STACKED) ShellNav(place, places, inboxBadge, onPlace = { shell.go(it) }) },
                 strip = { DayStrip(viewModel, onNow = { shell.showToday() }) },
+                headerAsk = { HeaderAsk(viewModel) },
                 snackbar = snackbar,
                 snackbarLift = if (!searching) shell.snackbarLift else 0.dp
             )
@@ -174,7 +173,11 @@ fun DanaShell(viewModel: MainViewModel) {
                 )
                 // Switching place: the new one fades in and slides 12dp from the side of travel.
                 val travel = remember { PlaceTravel(place) }.update(place, places)
-                Box(Modifier.weight(1f).fillMaxWidth().enterOnChange(place, travel)) {
+                Row(Modifier.weight(1f).fillMaxWidth()) {
+                if (layout != ShellLayout.STACKED) {
+                    ShellRail(place, places, inboxBadge, onPlace = { shell.go(it) }, header = { HeaderAsk(viewModel) })
+                }
+                Box(Modifier.weight(1f).fillMaxHeight().enterOnChange(place, travel)) {
                     when (layout) {
                         ShellLayout.STACKED -> StackedFrame(dest, slots, threadOpen, { shell.closeThread() }, showNav = !imeVisible)
                         ShellLayout.SPLIT -> SplitFrame(dest, slots, threadOpen, { shell.closeThread() })
@@ -185,6 +188,7 @@ fun DanaShell(viewModel: MainViewModel) {
                             }
                         } else FullFrame(dest, slots) { TitleCell(dest) }
                     }
+                }
                 }
             }
             DayDragGhost(dropState)

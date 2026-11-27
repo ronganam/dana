@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.ui.adaptive.asidePaneWidth
 import io.github.ronganam.dana.ui.adaptive.sidePaneWidth
+import io.github.ronganam.dana.ui.components.circuit.LocalAskSlotInset
 import io.github.ronganam.dana.ui.components.enterOnChange
 import io.github.ronganam.dana.ui.theme.Motion
 import io.github.ronganam.dana.ui.viewmodels.Place
@@ -65,6 +66,8 @@ val LocalShellLayout = compositionLocalOf { ShellLayout.STACKED }
  *   over the place is backable from its own list, back to More).
  * - [wide]: unfolded landscape gives the content the whole width (list | stage, the thread as a
  *   sheet and the ask bar under them, as in portrait) instead of three columns: Projects, Money.
+ * - [askSlot]: on the cover, Ask Dana floats in the list's top-right header slot (the list's
+ *   header keeps room for it through `askSlotInset()`).
  */
 class Destination(
     val place: Place,
@@ -75,7 +78,9 @@ class Destination(
     val title: String = place.label,
     val kicker: String? = null,
     val backable: Boolean = picked,
-    val wide: Boolean = false
+    val wide: Boolean = false,
+    /** The cover floats Ask Dana in the list's top-right header slot (not on a More item's own pages). */
+    val askSlot: Boolean = true
 )
 
 /**
@@ -119,15 +124,22 @@ class ShellSlots(
     val ask: @Composable () -> Unit,
     val nav: @Composable () -> Unit,
     val strip: @Composable () -> Unit,
+    /** Ask Dana for the cover's header slot. */
+    val headerAsk: @Composable () -> Unit,
     val snackbar: SnackbarHostState,
     /** Kept free under the snackbar (a place's own bar at the bottom of its content). */
     val snackbarLift: Dp = 0.dp
 )
 
 private const val STAGE_KEY = "stage"
+/** What a header keeps free for Ask Dana: the 48dp button and its 8dp margin. */
+private val ASK_SLOT = 56.dp
 private const val LIST_KEY = "list"
 
-/** Cover screen: content, then the ask bar, then the places. The thread slides up over the content. */
+/**
+ * Cover screen: content, then the ask bar, then the places. The thread slides up over the content.
+ * A place's list gets Ask Dana in its top-right header slot.
+ */
 @Composable
 internal fun StackedFrame(dest: Destination, slots: ShellSlots, threadOpen: Boolean, onCloseThread: () -> Unit, showNav: Boolean) {
     val holder = rememberSaveableStateHolder()
@@ -136,10 +148,14 @@ internal fun StackedFrame(dest: Destination, slots: ShellSlots, threadOpen: Bool
             val stage = dest.stage
             // The list keeps its scroll position while a pick is open. Drilling in slides from the end, Back from the start.
             val drilled = stage != null && dest.picked
+            val ask = !drilled && dest.askSlot
             Box(Modifier.fillMaxSize().enterOnChange(drilled, if (drilled) 1 else -1)) {
                 if (drilled) holder.SaveableStateProvider("${dest.place}-$STAGE_KEY") { stage() }
-                else holder.SaveableStateProvider("${dest.place}-$LIST_KEY") { dest.list() }
+                else CompositionLocalProvider(LocalAskSlotInset provides if (ask) ASK_SLOT else 0.dp) {
+                    holder.SaveableStateProvider("${dest.place}-$LIST_KEY") { dest.list() }
+                }
             }
+            if (ask) Box(Modifier.align(Alignment.TopEnd).padding(top = 8.dp, end = 8.dp)) { slots.headerAsk() }
             SnackbarHost(slots.snackbar, Modifier.align(Alignment.BottomCenter).padding(start = 12.dp, end = 12.dp, bottom = slots.snackbarLift))
             ThreadSheet(threadOpen, onCloseThread) { slots.thread(onCloseThread) }
         }

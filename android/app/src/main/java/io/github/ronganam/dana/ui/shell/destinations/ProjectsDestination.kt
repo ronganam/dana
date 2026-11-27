@@ -44,7 +44,7 @@ fun rememberProjectsDestination(viewModel: MainViewModel): Destination {
 
     val picked = stacked && projectId != null && !auto
     return Destination(
-        place = Place.PROJECTS,
+        place = Place.MORE,
         picked = picked,
         onBack = { c.back() },
         list = {

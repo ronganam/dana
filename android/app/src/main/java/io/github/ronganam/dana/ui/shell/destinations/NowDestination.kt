@@ -160,7 +160,7 @@ fun rememberNowDestination(viewModel: MainViewModel): Destination {
                 if (a != null) nc.actQuiet(q, a)
             },
             quietDismissAll = { nc.dismissAllQuiet() },
-            openNotifications = { shell.go(Place.NOTIFICATIONS) },
+            openNotifications = { shell.go(Place.INBOX) },
             openDay = { e -> e.taskId?.let { shell.openReminder(it) } }
         )
     }

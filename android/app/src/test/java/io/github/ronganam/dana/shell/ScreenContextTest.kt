@@ -33,9 +33,9 @@ class ScreenContextTest {
         assertEquals(ScreenRef("task", "t1", "לקנות חלב"), ScreenContext.forShell(ShellSnapshot(Place.REMINDERS, reminder = "t1" to "לקנות חלב")))
         assertEquals(
             ScreenRef("notification", "n9", "WhatsApp"),
-            ScreenContext.forShell(ShellSnapshot(Place.NOTIFICATIONS, notifApp = ShellSnapshot.NotifPick("com.whatsapp", "WhatsApp", "n9")))
+            ScreenContext.forShell(ShellSnapshot(Place.INBOX, notifApp = ShellSnapshot.NotifPick("com.whatsapp", "WhatsApp", "n9")))
         )
-        assertNull(ScreenContext.forShell(ShellSnapshot(Place.NOTIFICATIONS, notifApp = ShellSnapshot.NotifPick("com.whatsapp", "WhatsApp", null))))
+        assertNull(ScreenContext.forShell(ShellSnapshot(Place.INBOX, notifApp = ShellSnapshot.NotifPick("com.whatsapp", "WhatsApp", null))))
         assertEquals(ScreenRef("call", "c1", "Mom"), ScreenContext.forShell(ShellSnapshot(Place.MORE, more = MoreItem.CALLS, call = "c1" to "Mom")))
         assertEquals(ScreenRef("person", "p1", "Gal"), ScreenContext.forShell(ShellSnapshot(Place.MORE, more = MoreItem.PEOPLE, person = "p1" to "Gal")))
         assertEquals("review", ScreenContext.forShell(ShellSnapshot(Place.MORE, more = MoreItem.REVIEW, reviewId = "w46"))?.kind)
@@ -102,5 +102,31 @@ class ScreenContextTest {
         assertEquals(MoreItem.ABOUT, shell.more.value)
         shell.clearPick()
         assertNull(shell.more.value)
+    }
+
+    @Test
+    fun routesReachTheCircuitPlaces() {
+        val shell = ShellController()
+        shell.openRoute("notifications")
+        assertEquals(Place.INBOX, shell.place.value)
+        shell.openRoute("now")
+        shell.openRoute("inbox")
+        assertEquals(Place.INBOX, shell.place.value)
+        shell.openRoute("watching")
+        assertEquals(Place.WATCHING, shell.place.value)
+        // Projects lives under More now.
+        shell.openRoute("projects")
+        assertEquals(Place.MORE, shell.place.value)
+        assertEquals(MoreItem.PROJECTS, shell.more.value)
+        // Back from it returns to More's list.
+        shell.clearPick(Place.MORE)
+        assertNull(shell.more.value)
+    }
+
+    @Test
+    fun projectsUnderMoreCarryTheirOwnContext() {
+        val ref = ScreenRef("project", "p1", "Kitchen")
+        assertEquals(ref, ScreenContext.forShell(ShellSnapshot(Place.MORE, more = MoreItem.PROJECTS, placeRef = ref)))
+        assertNull(ScreenContext.forShell(ShellSnapshot(Place.WATCHING)))
     }
 }

@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
+import io.github.ronganam.dana.ui.components.circuit.askSlotInset
 import io.github.ronganam.dana.ui.screens.CallsScreen
 import io.github.ronganam.dana.ui.screens.MemoryScreen
 import io.github.ronganam.dana.ui.screens.SettingsScreen
@@ -32,9 +33,10 @@ import io.github.ronganam.dana.ui.viewmodels.MoreItem
 import io.github.ronganam.dana.ui.viewmodels.Place
 
 /**
- * More: Shopping and Money (each only with its addon), Calls, People and
- * About you. Shopping and Money take over the place with their own list and
- * stage, under a "← More" link; the others open their screen in the stage
+ * More: Shopping, Money and Projects (each only with its addon: `shopping`,
+ * `money`, `knowledge`), Calls, People and About you. Shopping, Money and
+ * Projects take over the place with their own list and stage, under a
+ * "← More" link; the others open their screen in the stage
  * (full screen with "← More" on the cover). Settings opens from About you, the
  * weekly review from its notification; the old Memory screen only from a
  * "memory" route (previous-layout links), backing out to About you.
@@ -47,11 +49,14 @@ fun rememberMoreDestination(viewModel: MainViewModel): Destination {
     val toMore = { shell.selectMore(null) }
     // Its addon went away (turned off): back to More's list.
     LaunchedEffect(item, addons) {
-        if ((item == MoreItem.SHOPPING && "shopping" !in addons) || (item == MoreItem.MONEY && "money" !in addons)) toMore()
+        if ((item == MoreItem.SHOPPING && "shopping" !in addons) || (item == MoreItem.MONEY && "money" !in addons) ||
+            (item == MoreItem.PROJECTS && "knowledge" !in addons)
+        ) toMore()
     }
     return when (item) {
         MoreItem.SHOPPING -> takeOver(rememberShoppingDestination(viewModel), toMore)
         MoreItem.MONEY -> takeOver(rememberMoneyDestination(viewModel), toMore)
+        MoreItem.PROJECTS -> takeOver(rememberProjectsDestination(viewModel), toMore)
         else -> Destination(
             place = Place.MORE,
             picked = item != null,
@@ -80,7 +85,8 @@ private fun takeOver(inner: Destination, toMore: () -> Unit) = Destination(
     title = inner.title,
     kicker = inner.kicker,
     backable = true,
-    wide = inner.wide
+    wide = inner.wide,
+    askSlot = false
 )
 
 @Composable
@@ -96,6 +102,7 @@ private fun MoreList(viewModel: MainViewModel, selected: MoreItem?) {
     val rows = listOfNotNull(
         Triple(MoreItem.SHOPPING, if (toBuy > 0) "$toBuy to buy" else "the list", setOf(MoreItem.SHOPPING)).takeIf { "shopping" in addons },
         Triple(MoreItem.MONEY, "spending · accounts · savings", setOf(MoreItem.MONEY)).takeIf { "money" in addons },
+        Triple(MoreItem.PROJECTS, "plans · decisions · files", setOf(MoreItem.PROJECTS)).takeIf { "knowledge" in addons },
         Triple(MoreItem.CALLS, calls.size.takeIf { it > 0 }?.toString().orEmpty(), setOf(MoreItem.CALLS)),
         Triple(MoreItem.PEOPLE, people.size.takeIf { it > 0 }?.toString().orEmpty(), setOf(MoreItem.PEOPLE)),
         Triple(MoreItem.ABOUT, "what Dana knows · settings", setOf(MoreItem.ABOUT, MoreItem.SETTINGS, MoreItem.SIGNALS, MoreItem.MEMORY))
@@ -104,8 +111,8 @@ private fun MoreList(viewModel: MainViewModel, selected: MoreItem?) {
     val canvas = MaterialTheme.colorScheme.background
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 20.dp)) {
         Column(Modifier.padding(horizontal = 18.dp)) {
-            MetaLabel("Everything else Dana keeps")
-            Text("More", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp))
+            MetaLabel("Everything else Dana keeps", modifier = Modifier.askSlotInset())
+            Text("More", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp).askSlotInset())
             Rule()
         }
         rows.forEach { (item, meta, matches) ->
@@ -162,7 +169,7 @@ private fun MoreItemStage(viewModel: MainViewModel, item: MoreItem, stacked: Boo
                 MoreItem.CALLS -> CallsScreen(viewModel)
                 MoreItem.PEOPLE -> PeopleScreen(viewModel, onBack = if (stacked) back else null)
                 // They take over the place (rememberMoreDestination); never shown in this stage.
-                MoreItem.SHOPPING, MoreItem.MONEY -> Unit
+                MoreItem.SHOPPING, MoreItem.MONEY, MoreItem.PROJECTS -> Unit
                 MoreItem.MEMORY -> MemoryScreen(viewModel)
                 MoreItem.ABOUT -> AboutScreen(viewModel, onBack = if (stacked) back else null, onOpenSettings = { shell.selectMore(MoreItem.SETTINGS) })
                 // Reached from About you, so Back always returns there.

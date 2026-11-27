@@ -1,90 +1,157 @@
 package io.github.ronganam.dana.ui.shell
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Inbox
+import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.outlined.Inbox
+import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
+import androidx.compose.material3.NavigationRailItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import io.github.ronganam.dana.ui.components.RollingText
-import io.github.ronganam.dana.ui.theme.Motion
-import io.github.ronganam.dana.ui.theme.hues
+import io.github.ronganam.dana.ui.theme.circuitColors
 import io.github.ronganam.dana.ui.viewmodels.Place
 
+/** A place's icon in the nav: outlined, filled when it is the current place. */
+private fun Place.icon(selected: Boolean): ImageVector = when (this) {
+    Place.NOW -> if (selected) Icons.Filled.Home else Icons.Outlined.Home
+    Place.REMINDERS -> if (selected) Icons.Filled.Notifications else Icons.Outlined.Notifications
+    Place.WATCHING -> if (selected) Icons.Filled.Visibility else Icons.Outlined.Visibility
+    Place.INBOX -> if (selected) Icons.Filled.Inbox else Icons.Outlined.Inbox
+    Place.MORE -> Icons.Filled.Menu
+}
+
+/** What a screen reader hears for a place: its name, and the Inbox's needs-you count. */
+private fun Place.spoken(count: Int): String = if (count > 0) "$label, $count need you" else label
+
+@Composable
+private fun PlaceIcon(place: Place, selected: Boolean, count: Int) {
+    val c = circuitColors
+    if (count > 0) {
+        BadgedBox(badge = {
+            // Warm: the count is what waits on the owner.
+            Badge(containerColor = c.warm, contentColor = c.onWarm) { Text(if (count > 99) "99+" else count.toString()) }
+        }) { Icon(place.icon(selected), contentDescription = null) }
+    } else Icon(place.icon(selected), contentDescription = null)
+}
+
+@Composable
+private fun PlaceLabel(place: Place, selected: Boolean) {
+    Text(
+        place.label,
+        style = MaterialTheme.typography.labelMedium.copy(fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium),
+        maxLines = 1,
+        softWrap = false
+    )
+}
+
 /**
- * The places as a slim row of mono labels (the current one gets a vermilion
- * rule on top that grows from its middle, and a faint accent wash under the
- * label). Notifications carries the Inbox's needs-you count (rolls when it
- * changes). Bottom of the screen when folded, bottom of the list pane when
- * unfolded; a pane too narrow for one row wraps it onto two.
+ * The folded nav: a bottom bar of the places with a pill under the current
+ * one's icon (Now · Reminders · Watching · Inbox · More). The Inbox carries its
+ * needs-you count. Tapping the current place again goes back to its list.
  */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ShellNav(
     current: Place,
     places: List<Place>,
-    notificationsCount: Int,
+    inboxCount: Int,
     onPlace: (Place) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    FlowRow(
-        modifier
-            .fillMaxWidth()
-            .background(MaterialTheme.colorScheme.surfaceContainerLow)
-            .edgeRule(top = true)
-            .padding(horizontal = 14.dp),
-        horizontalArrangement = Arrangement.SpaceBetween
+    val scheme = MaterialTheme.colorScheme
+    val colors = NavigationBarItemDefaults.colors(
+        selectedIconColor = scheme.onSecondaryContainer,
+        selectedTextColor = scheme.onSurface,
+        indicatorColor = scheme.secondaryContainer,
+        unselectedIconColor = scheme.onSurfaceVariant,
+        unselectedTextColor = scheme.onSurfaceVariant
+    )
+    NavigationBar(
+        modifier = modifier,
+        containerColor = scheme.surfaceContainerLow,
+        tonalElevation = 0.dp,
+        // The shell already pads for the system bars.
+        windowInsets = WindowInsets(0, 0, 0, 0)
     ) {
         places.forEach { place ->
             val selected = place == current
-            val count = if (place == Place.NOTIFICATIONS) notificationsCount else 0
-            val accent = MaterialTheme.colorScheme.primary
-            val label = place.label + when {
-                count <= 0 -> ""
-                else -> ", $count need you"
-            }
-            // Read only in the draw lambda below: switching place redraws two labels, nothing recomposes per frame.
-            val on = animateFloatAsState(if (selected) 1f else 0f, Motion.base(), label = "nav")
-            val wash = hues.tint(accent).copy(alpha = hues.tint(accent).alpha * 0.6f)
-            Row(
-                Modifier
-                    .heightIn(min = 48.dp)
-                    .clickable(role = Role.Tab) { onPlace(place) }
-                    .semantics { this.selected = selected; contentDescription = label }
-                    .drawBehind {
-                        val v = on.value
-                        if (v > 0f) {
-                            val half = size.width / 2f * v
-                            drawRect(wash.copy(alpha = wash.alpha * v), size = size)
-                            drawLine(accent, Offset(size.width / 2f - half, 1.dp.toPx()), Offset(size.width / 2f + half, 1.dp.toPx()), 2.dp.toPx())
-                        }
-                    }
-                    .padding(horizontal = 4.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    place.label.uppercase(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = if (selected) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                    maxLines = 1,
-                    softWrap = false
-                )
-                if (count > 0) RollingText(
-                    " " + if (count > 99) "99+" else count.toString(),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = accent
-                )
-            }
+            val count = if (place == Place.INBOX) inboxCount else 0
+            NavigationBarItem(
+                selected = selected,
+                onClick = { onPlace(place) },
+                icon = { PlaceIcon(place, selected, count) },
+                label = { PlaceLabel(place, selected) },
+                colors = colors,
+                modifier = Modifier.semantics { contentDescription = place.spoken(count) }
+            )
+        }
+    }
+}
+
+/**
+ * The unfolded nav: a rail with Ask Dana at the top ([header]) and the same
+ * places, the current one on a pill.
+ */
+@Composable
+fun ShellRail(
+    current: Place,
+    places: List<Place>,
+    inboxCount: Int,
+    onPlace: (Place) -> Unit,
+    modifier: Modifier = Modifier,
+    header: @Composable () -> Unit = {}
+) {
+    val scheme = MaterialTheme.colorScheme
+    val colors = NavigationRailItemDefaults.colors(
+        selectedIconColor = scheme.onSecondaryContainer,
+        selectedTextColor = scheme.onSurface,
+        indicatorColor = scheme.secondaryContainer,
+        unselectedIconColor = scheme.onSurfaceVariant,
+        unselectedTextColor = scheme.onSurfaceVariant
+    )
+    NavigationRail(
+        modifier = modifier,
+        containerColor = scheme.background,
+        header = {
+            Spacer(Modifier.height(8.dp))
+            header()
+            Spacer(Modifier.height(20.dp))
+        },
+        windowInsets = WindowInsets(0, 0, 0, 0)
+    ) {
+        places.forEach { place ->
+            val selected = place == current
+            val count = if (place == Place.INBOX) inboxCount else 0
+            NavigationRailItem(
+                selected = selected,
+                onClick = { onPlace(place) },
+                icon = { PlaceIcon(place, selected, count) },
+                label = { PlaceLabel(place, selected) },
+                colors = colors,
+                modifier = Modifier.semantics { contentDescription = place.spoken(count) }
+            )
         }
     }
 }

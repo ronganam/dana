@@ -1,5 +1,6 @@
 package io.github.ronganam.dana.ui.screens.now
 
+import io.github.ronganam.dana.ui.components.circuit.askSlotInset
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -194,14 +195,14 @@ private fun Header(state: NowListState, wide: Boolean) {
     val lede = state.payload?.lede?.takeIf { it.isNotBlank() }
         ?: if (state.payload != null) NowModel.ledeFallback(state.now.hour, state.items.isEmpty()) else null
     Column(Modifier.padding(horizontal = NOW_GUTTER)) {
-        MetaLabel(state.now.format(DATE))
+        MetaLabel(state.now.format(DATE), modifier = Modifier.askSlotInset())
         if (lede != null) Text(
             lede,
             style = MaterialTheme.typography.displayMedium.copy(
                 fontSize = if (wide) 34.sp else 40.sp, lineHeight = if (wide) 38.sp else 44.sp, textDirection = TextDirection.Content
             ),
             color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(top = 12.dp).fillMaxWidth().semantics { heading() }
+            modifier = Modifier.padding(top = 12.dp).askSlotInset().fillMaxWidth().semantics { heading() }
         )
         UpdatedAgo(state, Modifier.padding(top = 10.dp))
     }

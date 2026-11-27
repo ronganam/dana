@@ -10,23 +10,28 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /** The places of the main screen. PROJECTS only for a user with the `knowledge` addon. */
+/**
+ * The main screen's places, in the nav's order. INBOX is the phone's
+ * notifications per app (the "notifications" and "inbox" routes); Projects
+ * lives under More ([MoreItem.PROJECTS]).
+ */
 enum class Place(val label: String) {
-    NOW("Now"), REMINDERS("Reminders"), NOTIFICATIONS("Notifications"), PROJECTS("Projects"), MORE("More")
+    NOW("Now"), REMINDERS("Reminders"), WATCHING("Watching"), INBOX("Inbox"), MORE("More")
 }
 
 /**
- * What More can open. SHOPPING (the `shopping` addon) and MONEY (`money`)
- * take over the whole place with their own list and stage, with a way back to
- * More. SETTINGS opens from About you, SIGNALS from Settings, MEMORY only
+ * What More can open. SHOPPING (the `shopping` addon), MONEY (`money`) and
+ * PROJECTS (`knowledge`) take over the whole place with their own list and
+ * stage, with a way back to More. SETTINGS opens from About you, SIGNALS from Settings, MEMORY only
  * from the old Settings link (previous layout), REVIEW from its notification;
  * none of them are rows of the list.
  */
 enum class MoreItem(val label: String) {
-    SHOPPING("Shopping"), MONEY("Money"), CALLS("Calls"), PEOPLE("People"), ABOUT("About you"),
+    SHOPPING("Shopping"), MONEY("Money"), PROJECTS("Projects"), CALLS("Calls"), PEOPLE("People"), ABOUT("About you"),
     SETTINGS("Settings"), SIGNALS("Signals"), MEMORY("Memory"), REVIEW("Weekly review");
 
     /** Items with their own list + stage, shown in place of More's list. */
-    val takesOver: Boolean get() = this == SHOPPING || this == MONEY
+    val takesOver: Boolean get() = this == SHOPPING || this == MONEY || this == PROJECTS
 }
 
 /**
@@ -83,7 +88,7 @@ class ShellController(
     val nowDay: StateFlow<Boolean> = _nowDay.asStateFlow()
 
     private val _notifApp = MutableStateFlow<Pick?>(null)
-    /** The app open on the Notifications screen (package name). */
+    /** The app open in the Inbox (package name). */
     val notifApp: StateFlow<Pick?> = _notifApp.asStateFlow()
 
     private val _quietOpen = MutableStateFlow(false)
@@ -91,7 +96,7 @@ class ShellController(
     val quietOpen: StateFlow<Boolean> = _quietOpen.asStateFlow()
 
     private val _quietAppsOpen = MutableStateFlow(false)
-    /** Notifications: the "Quiet apps" fold is open. */
+    /** Inbox: the "Quiet apps" fold is open. */
     val quietAppsOpen: StateFlow<Boolean> = _quietAppsOpen.asStateFlow()
 
     /** Reminders list grouping: true = "By list", false = "By when". */
@@ -230,10 +235,10 @@ class ShellController(
         _notifApp.value = packageName?.let { Pick(it, auto) }
     }
 
-    /** Open [packageName] on the Notifications screen (from search, Now). */
+    /** Open [packageName] in the Inbox (from search, Now). */
     fun openNotifApp(packageName: String) {
         closeThread()
-        _place.value = Place.NOTIFICATIONS
+        _place.value = Place.INBOX
         _notifApp.value = Pick(packageName)
     }
 
@@ -254,9 +259,9 @@ class ShellController(
         when (place) {
             Place.NOW -> _now.value = null
             Place.REMINDERS -> _reminder.value = null
-            Place.NOTIFICATIONS -> _notifApp.value = null
-            // Projects keeps its own picks (ProjectsController); its destination's onBack clears them.
-            Place.PROJECTS -> Unit
+            Place.INBOX -> _notifApp.value = null
+            // Phase 2 gives Watching its picks.
+            Place.WATCHING -> Unit
             Place.MORE -> _more.value = when (_more.value) {
                 MoreItem.SETTINGS -> MoreItem.ABOUT
                 MoreItem.SIGNALS -> MoreItem.SETTINGS
@@ -268,22 +273,24 @@ class ShellController(
 
     /**
      * Routes used by deep links, notifications and older code
-     * (`MainViewModel.navigateTo`): "chat", "tasks", "inbox", "shopping",
-     * "money", "calls", "people", "projects", "memory", "settings", "signals", "review".
+     * (`MainViewModel.navigateTo`): "chat", "now", "tasks", "inbox" /
+     * "notifications", "watching" / "watches", "shopping", "money", "projects"
+     * (under More), "calls", "people", "memory", "about", "settings", "signals", "review".
      */
     fun openRoute(route: String) {
         when (route) {
             "chat" -> openThread()
             "tasks" -> { closeThread(); _place.value = Place.REMINDERS }
-            "inbox", "notifications" -> { closeThread(); _place.value = Place.NOTIFICATIONS }
+            "inbox", "notifications" -> { closeThread(); _place.value = Place.INBOX }
             "now" -> { closeThread(); _place.value = Place.NOW }
-            "projects" -> { closeThread(); _place.value = Place.PROJECTS }
+            "watching", "watches" -> { closeThread(); _place.value = Place.WATCHING }
             else -> {
                 val item = when (route) {
                     "calls" -> MoreItem.CALLS
                     "people" -> MoreItem.PEOPLE
                     "shopping" -> MoreItem.SHOPPING
                     "money" -> MoreItem.MONEY
+                    "projects" -> MoreItem.PROJECTS
                     "memory" -> MoreItem.MEMORY
                     "about" -> MoreItem.ABOUT
                     "settings" -> MoreItem.SETTINGS
