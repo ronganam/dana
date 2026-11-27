@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# Ship the committed HEAD to your own Dana in about two minutes, without a release
+# (docs/operations.md, "Shipping without a release").
+#
+#   bin/ship               quick tests of what changed since the last ship, build, deploy, wait for the pod
+#   bin/ship --no-test     skip the tests (they also run on push)
+#   bin/ship --no-wait     return once the deploy commit is pushed
+#
+# Builds the image's `app` stage from HEAD (git archive: uncommitted changes are left out) for
+# this machine's platform only, with the local Docker layer cache, tags it
+# "$DANA_DEV_IMAGE:<VERSION>-<short sha>" (DANA_DEV_IMAGE in your site's deploy.env, e.g. a
+# registry your cluster pulls from), pushes it and hands it to bin/deploy (DANA_IMAGE set to
+# it). The next release (tag v<version> + bin/deploy) goes back to the published image.
+# Coding agents: run it in the background and keep working.
+set -euo pipefail
+server="$(cd "$(dirname "$0")/.." && pwd)"
+site="${DANA_SITE:-$(dirname "$server")/site}"
+config="${DANA_DEPLOY_CONFIG:-$site/deploy.env}"
+[ -r "$config" ] || { echo "ship: no $config (docs/site.md)" >&2; exit 2; }
+# shellcheck disable=SC1090
+. "$config"
+: "${DANA_DEV_IMAGE:?ship: set DANA_DEV_IMAGE in $config (a registry your Dana pulls from)}"
+
+test=1; wait=(--wait)
+for arg in "$@"; do
+  case "$arg" in
+    --no-test) test=0 ;;
+    --no-wait) wait=() ;;
+    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    *) echo "ship: unknown option $arg" >&2; exit 2 ;;
+  esac
+done
+
+cd "$server"
+state="${XDG_CACHE_HOME:-$HOME/.cache}/dana-ship"; mkdir -p "$state"
+sha="$(git rev-parse --short HEAD)"
+tag="$(tr -d '[:space:]' < VERSION)-$sha"
+image="$DANA_DEV_IMAGE:$tag"
+[ -n "$(git status --porcelain -- . ':!.venv')" ] && echo "ship: note: uncommitted changes are not shipped (HEAD $sha only)"
+
+if [ "$test" = 1 ]; then
+  base="$(cat "$state/last" 2>/dev/null || true)"
+  git cat-file -e "${base:-x}^{commit}" 2>/dev/null || base="$(git merge-base HEAD origin/master 2>/dev/null || echo HEAD~1)"
+  py=.venv/bin/python; [ -x "$py" ] || py=python3
+  echo "ship: quick tests of what changed since ${base:0:7}"
+  "$py" bin/test --changed "$base" --quick || { echo "ship: tests failed; nothing shipped (--no-test to skip)" >&2; exit 1; }
+fi
+
+echo "ship: building $image"
+start=$SECONDS
+git archive --format=tar HEAD:server | DOCKER_BUILDKIT=1 docker build -q --target app -t "$image" - >/dev/null
+docker push -q "$image" >/dev/null
+echo "ship: $image built and pushed in $((SECONDS - start)) s"
+git rev-parse HEAD > "$state/last"
+DANA_IMAGE="$DANA_DEV_IMAGE" "$server/bin/deploy" "$tag" "${wait[@]}"

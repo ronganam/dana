@@ -11,7 +11,9 @@
 # "$DANA_IMAGE:<version>" (default ghcr.io/ronganam/dana) when the tag v<version> is pushed.
 # This waits for that image to exist (up to DANA_IMAGE_WAIT seconds), then rolls it out:
 #   - GitOps (DANA_GITOPS_REPO set): every `tag:` line of DANA_GITOPS_VALUES in that
-#     repository becomes "<version>", and each installed add-on's worker image
+#     repository becomes "<version>" (and a `repository: …/dana` line DANA_IMAGE, so bin/ship's
+#     dev images and releases take turns; DANA_ARGO_APP=<namespace>/<app> asks ArgoCD to refresh
+#     right away), and each installed add-on's worker image
 #     (`image: <published image>:<tag>`) is pinned to what `dana addons workers --json`
 #     says where Dana runs ($DANA_EXEC, e.g. kubectl -n dana exec deploy/dana -c dana --);
 #     the commit is pushed for the GitOps tool (ArgoCD, Flux) to roll the pod. It is made in
@@ -108,7 +110,8 @@ if [ -n "$DANA_GITOPS_REPO" ]; then
   for attempt in 1 2 3; do
     git -C "$GITOPS" fetch -q origin "$DANA_GITOPS_BRANCH"
     git -C "$GITOPS" checkout -q -B "$DANA_GITOPS_BRANCH" "origin/$DANA_GITOPS_BRANCH"
-    sed -i -E -e "s/^(\s*tag:\s*).*/\1\"$version\"/" "$GITOPS/$DANA_GITOPS_VALUES"
+    sed -i -E -e "s/^(\s*tag:\s*).*/\1\"$version\"/" \
+      -e "s#^(\s*repository:\s*)\"?[^\"[:space:]]*/dana\"?\s*\$#\1$DANA_IMAGE#" "$GITOPS/$DANA_GITOPS_VALUES"
     # Each worker's image (any key naming that repository: "<image>:<tag>" or "<image>@<digest>").
     for w in "${workers[@]}"; do
       read -r name wimage tag <<< "$w"
@@ -121,7 +124,11 @@ if [ -n "$DANA_GITOPS_REPO" ]; then
     fi
     git -C "$GITOPS" commit -q -m "chore($app): deploy $version" -- "$DANA_GITOPS_VALUES"
     if git -C "$GITOPS" push -q origin "$DANA_GITOPS_BRANCH"; then
-      echo "deploy: $DANA_GITOPS_VALUES set to $version; the GitOps tool rolls the pod"
+      echo "deploy: $DANA_GITOPS_VALUES set to $image; the GitOps tool rolls the pod"
+      if [ -n "${DANA_ARGO_APP:-}" ]; then  # namespace/name: ask ArgoCD to look now, not at its next poll
+        kubectl -n "${DANA_ARGO_APP%%/*}" annotate application "${DANA_ARGO_APP#*/}" \
+          argocd.argoproj.io/refresh=normal --overwrite >/dev/null && echo "deploy: ArgoCD asked to refresh ${DANA_ARGO_APP#*/}"
+      fi
       break
     fi
     [ "$attempt" = 3 ] && { echo "deploy: could not push the GitOps change" >&2; exit 1; }

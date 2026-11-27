@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Test on this machine before pushing (docs: server/docs/operations.md, "Releasing").
 #
-# Pushing master/main runs the server's `bin/test` on a clean checkout of the pushed commit
-# when it changes anything under server/ or examples/ besides docs; when it changes
+# Pushing master/main runs the server's `bin/test --changed <remote> --quick` (only the scripts the
+# pushed change touches, the slow ones left out; DANA_FULL_TESTS=1 runs everything) on a clean
+# checkout of the pushed commit when it changes anything under server/ or examples/ besides docs; when it changes
 # server/Dockerfile or server/requirements.lock also the image's `test` stage (the suite on
 # the exact image), after bin/test, never at once. It deploys nothing: a release is a pushed
 # tag v<version> (.github/workflows/release.yml publishes the image), then server/bin/deploy.
@@ -20,6 +21,7 @@ root="$PWD"
 zero=0000000000000000000000000000000000000000
 changed=""
 tested=""
+base=""
 while read -r _local_ref local_sha remote_ref remote_sha; do
   case "$remote_ref" in refs/heads/master|refs/heads/main) ;; *) continue ;; esac
   [ "$local_sha" = "$zero" ] && continue                      # deleting the branch
@@ -27,6 +29,7 @@ while read -r _local_ref local_sha remote_ref remote_sha; do
     changed+=$'\n'"(everything)"
   else
     changed+=$'\n'"$(git diff --name-only "$remote_sha" "$local_sha")"
+    base="$remote_sha"
   fi
   tested="$local_sha"
 done
@@ -48,10 +51,12 @@ trap 'git -C "$root" worktree remove --force "$checkout" >/dev/null 2>&1 || rm -
 git worktree add --detach -q "$checkout" "$tested"
 python="$root/server/.venv/bin/python"; [ -x "$python" ] || python=python3
 
-echo "pre-push: bin/test on ${tested:0:7} (skip once with git push --no-verify)"
-(cd "$checkout/server" && "$python" bin/test) || { echo "pre-push: tests failed; nothing pushed."; exit 1; }
+args=()
+if [ -z "${DANA_FULL_TESTS:-}" ] && [ -n "$base" ]; then args=(--changed "$base" --quick); fi
+echo "pre-push: bin/test ${args[*]:-(everything)} on ${tested:0:7} (DANA_FULL_TESTS=1 for all; skip with --no-verify)"
+(cd "$checkout/server" && "$python" bin/test "${args[@]}") || { echo "pre-push: tests failed; nothing pushed."; exit 1; }
 
-if grep -qE '^(server/Dockerfile|server/requirements\.(txt|lock)|\(everything\))$' <<< "$changed"; then
+if [ -n "${DANA_FULL_TESTS:-}" ] && grep -qE '^(server/Dockerfile|server/requirements\.(txt|lock)|\(everything\))$' <<< "$changed"; then
   echo "pre-push: the image changed: running the suite in the image's test stage"
   docker build --target test -q -t dana:test "$checkout/server" >/dev/null \
     || { echo "pre-push: the image's test stage failed (docker build --target test server); nothing pushed."; exit 1; }

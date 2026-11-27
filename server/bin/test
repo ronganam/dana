@@ -5,7 +5,7 @@
     bin/test shopping users      only scripts whose path contains one of the words
     bin/test --changed           only scripts touched by, or importing, what changed since HEAD
     bin/test --changed master    … since another ref (e.g. the branch point)
-    bin/test --quick             leave out the slow import smoke test (test_imports.py)
+    bin/test --quick             leave out the slow scripts (imports smoke test, addon scaffold, addon loading)
     bin/test --list              each script and the first line of its docstring
     bin/test -v                  print the whole output of failed scripts, not the tail
     bin/test -j 4                at most 4 at a time (default: one per CPU, fewer when memory is short)
@@ -37,7 +37,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 NEVER = {"test_agent.py"}            # calls the real model
-SLOW = {"test_imports.py"}
+SLOW = {"test_imports.py", "test_addon_scaffold.py", "test_addon_loading.py"}  # 75-100 s each: --quick leaves them out
 # Changing one of these can break anything: --changed runs everything.
 EVERYTHING = ("tests/testenv.py", "tests/testfakes.py", "requirements.txt", "main.py", "core/db/",
               "core/addons/", "addons/__init__.py", "core/users.py", "core/auth.py",
