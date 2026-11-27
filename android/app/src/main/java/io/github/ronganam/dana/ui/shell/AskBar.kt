@@ -189,7 +189,9 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                             } else Text(
                                 "Ask or tell Dana…",
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                                style = MaterialTheme.typography.bodyLarge
+                                style = MaterialTheme.typography.bodyLarge,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
                         }
                         // Full width, so a Hebrew line starts at the right.

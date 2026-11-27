@@ -214,7 +214,7 @@ internal fun ConversationFrame(dest: Destination, slots: ShellSlots) {
         }
         CompositionLocalProvider(LocalShellLayout provides ShellLayout.FULL) {
             Column(
-                Modifier.width(asidePaneWidth()).fillMaxHeight()
+                Modifier.width(io.github.ronganam.dana.ui.adaptive.PaneWidth.aside).fillMaxHeight()
                     .background(MaterialTheme.colorScheme.surfaceContainerLow).edgeRule(start = true)
             ) {
                 Box(Modifier.weight(1f).fillMaxWidth()) { slots.thread(null) }
