@@ -1,8 +1,6 @@
 package io.github.ronganam.dana.ui.screens.reminders
 
 import io.github.ronganam.dana.data.network.TaskChanges
-import android.app.DatePickerDialog
-import android.app.TimePickerDialog
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -16,7 +14,6 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -39,8 +36,7 @@ import java.time.LocalDateTime
 
 /**
  * The reminder editor (the stage of Reminders): name and note edited in
- * place, "Remind me" as one choice with its follow-ups and a sentence that
- * says what will happen, the list, priority, where it came from, Done and
+ * place, its moments in a sentence (changed in the moment sheet), the list, priority, where it came from, Done and
  * Delete. Every change saves as it is made (optimistically, through the
  * offline queue); there is no Save button.
  */
@@ -50,24 +46,20 @@ fun ReminderEditor(
     task: Task,
     tasks: TasksController,
     groups: List<TaskGroup>,
-    zones: List<String>,
     onBack: (() -> Unit)?,
     onDoneChanged: (done: Boolean) -> Unit,
     onDeleted: () -> Unit,
     onOpenCall: (String) -> Unit,
     onAsk: () -> Unit,
+    onMoments: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val now by rememberNow()
     val current by rememberUpdatedState(task)
     val done = !isOpen(task)
     val whens = remember(task.triggers) { remindWhens(task) }
-    val primary = whens.firstOrNull() ?: RemindWhen.None
     val muted = MaterialTheme.colorScheme.onSurfaceVariant
     val focus = LocalFocusManager.current
-
-    fun setWhen(w: RemindWhen) = tasks.setTriggers(task.id, w.toTriggers())
 
     // Name and note: saved 0.8 s after typing stops, and when the editor goes away.
     var title by remember(task.id) { mutableStateOf(task.title) }
@@ -106,7 +98,7 @@ fun ReminderEditor(
             )
         }
         val listName = task.groupId?.let { id -> groups.firstOrNull { it.id == id }?.name } ?: task.groupName ?: "General"
-        MetaLabel("${if (done) "Done" else bucketOf(task, now).label} · $listName")
+        MetaLabel("${if (done) "Done" else momentGroupOf(task, now).title} · $listName")
 
         InlineField(
             value = title,
@@ -133,53 +125,14 @@ fun ReminderEditor(
             modifier = Modifier.padding(top = 4.dp)
         )
 
-        Field("Remind me") {
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                InkChoice("No reminder", primary == RemindWhen.None) { setWhen(RemindWhen.None) }
-                InkChoice("At a time", primary is RemindWhen.At) { if (primary !is RemindWhen.At) setWhen(RemindWhen.At(defaultTime(now))) }
-                InkChoice("At a place", primary is RemindWhen.Place) {
-                    if (primary !is RemindWhen.Place) setWhen(RemindWhen.Place(homeZoneName(zones), leave = false))
-                }
-                InkChoice("In the car", primary is RemindWhen.Car) { if (primary !is RemindWhen.Car) setWhen(RemindWhen.Car(leave = false)) }
-                InkChoice("On waking", primary == RemindWhen.Wake) { setWhen(RemindWhen.Wake) }
+        Field("Moments") {
+            Text(sentence(task, now), style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.onSurface)
+            if (task.snoozeCount > 0) Text(
+                "Snoozed ${task.snoozeCount}×", style = MaterialTheme.typography.bodyMedium, color = muted, modifier = Modifier.padding(top = 4.dp)
+            )
+            FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                InkChoice(if (whens.isEmpty()) "Pick a moment" else "Change moments", solid = whens.isEmpty()) { onMoments() }
             }
-            when (primary) {
-                is RemindWhen.At -> {
-                    val quick = quickTimes(now)
-                    FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        if (quick.none { it.second == primary.time }) InkChoice(timeLabel(primary.time, now), selected = true) {}
-                        quick.forEach { (label, t) -> InkChoice(label, t == primary.time) { setWhen(RemindWhen.At(t)) } }
-                        InkChoice("Pick a time…") {
-                            val start = primary.time
-                            DatePickerDialog(context, { _, y, m, d ->
-                                TimePickerDialog(context, { _, h, min ->
-                                    setWhen(RemindWhen.At(LocalDateTime.of(y, m + 1, d, h, min)))
-                                }, start.hour, start.minute, true).show()
-                            }, start.year, start.monthValue - 1, start.dayOfMonth).apply {
-                                datePicker.minDate = System.currentTimeMillis() - 1000
-                            }.show()
-                        }
-                    }
-                }
-                is RemindWhen.Place -> {
-                    val choices = (zones + primary.zone).distinctBy { it.lowercase() }
-                    FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        choices.forEach { z ->
-                            InkChoice(z.replaceFirstChar { it.titlecase() }, z.equals(primary.zone, true)) { setWhen(primary.copy(zone = z)) }
-                        }
-                    }
-                    FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        InkChoice("When I arrive", !primary.leave) { setWhen(primary.copy(leave = false)) }
-                        InkChoice("When I leave", primary.leave) { setWhen(primary.copy(leave = true)) }
-                    }
-                }
-                is RemindWhen.Car -> FlowRow(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    InkChoice("Getting in", !primary.leave) { setWhen(RemindWhen.Car(leave = false)) }
-                    InkChoice("Getting out", primary.leave) { setWhen(RemindWhen.Car(leave = true)) }
-                }
-                else -> {}
-            }
-            Text(sentence(task, now), style = MaterialTheme.typography.bodyMedium, color = muted, modifier = Modifier.padding(top = 10.dp))
         }
 
         if (groups.isNotEmpty()) Field("List") {
