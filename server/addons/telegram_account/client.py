@@ -10,8 +10,8 @@
   :func:`messages` reads one chat, optionally only what is unread. Reading
   never marks anything read: that takes an explicit ``ReadHistory`` request,
   which nothing here sends.
-- :func:`send_to_saved_messages` is the one write: a note to the account's
-  own Saved Messages (``'me'``), never to anyone else.
+- :func:`send` is the one write: a message to a chat the account sees (the
+  tool asks the user first).
 
 Every value a tool prints is plain data built here (:class:`Chat`,
 :class:`Message`), so the tools never touch Telethon objects."""
@@ -334,11 +334,10 @@ def format_message(msg: Message) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Writing: the account's own Saved Messages, nothing else
+# Writing: a message to one of the account's chats
 # ---------------------------------------------------------------------------
 
-SAVED_MESSAGES = "me"  # Telethon's name for the signed-in account's own chat (Saved Messages)
-MAX_SEND = 4096        # characters of one Telegram message
+MAX_SEND = 4096  # characters of one Telegram message
 
 
 def chunks(text: str, size: int = MAX_SEND) -> List[str]:
@@ -356,14 +355,13 @@ def chunks(text: str, size: int = MAX_SEND) -> List[str]:
     return out
 
 
-async def send_to_saved_messages(conn: Connection, text: str) -> List[int]:
-    """Send ``text`` to the connection's own Saved Messages (the only chat
-    this module ever writes to; the recipient is fixed here, never taken
-    from a caller). Returns the sent messages' ids."""
+async def send(conn: Connection, chat: Chat, text: str) -> List[int]:
+    """Send ``text`` to ``chat`` as the connection's account (a long text as
+    several messages). Returns the sent messages' ids."""
     client = await acquire(conn)
     ids: List[int] = []
     for piece in chunks(text):
-        sent = await asyncio.wait_for(client.send_message(SAVED_MESSAGES, piece), TIMEOUT)
+        sent = await asyncio.wait_for(client.send_message(chat.entity, piece), TIMEOUT)
         ids.append(int(getattr(sent, "id", 0) or 0))
     return ids
 

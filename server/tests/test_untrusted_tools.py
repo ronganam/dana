@@ -97,7 +97,7 @@ ALLOWED = {
     "create_section": "the user's section", "update_section": "the user's section",
     "list_projects": "project titles the user chose",
     "get_weather": "the weather service's numbers",
-    "send_telegram_message_to_me": "a send to the user's own Saved Messages; Dana's own words",
+    "send_telegram_message": "a send; asks first",
 }
 
 names = {t.name for t in all_tools()}
@@ -122,8 +122,7 @@ for must in ("web_search", "read_chat_messages", "get_latest_messages", "find_la
 check("every read tool of gmail and telegram_account is untrusted",
       not [t.name for t in all_tools() if t.addon in ("gmail", "telegram_account") and not t.is_write
            and not t.untrusted_result])
-senders = sorted(t.name for t in all_tools() if t.name.startswith(("send_", "forward_", "reply_"))
-                 and not t.name.endswith("_to_me") and not t.confirm)  # _to_me: only to the user themself
+senders = sorted(t.name for t in all_tools() if t.name.startswith(("send_", "forward_", "reply_")) and not t.confirm)
 check("every tool that sends to other people asks first (confirm)", not senders, senders)
 
 

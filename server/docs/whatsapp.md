@@ -14,8 +14,8 @@ old env names.
 |---|---|
 | `addon.py` | the declaration (`on_connect` / `on_credentials_change` learn the account, `blocked` refuses the tools of a connection in an account conflict) |
 | `config.py` | kind name, WAHA's default session name, the `voice_telegram_chat_id` setting and `voice_chat_id(conn)` (strict: an int or None, logged) |
-| `client.py` | per connection: `config(conn)` → (base url, headers, session), `signature(conn)` (cache key), `fetch_me(conn)` / `get_my_identifiers(conn, client)`, the own chat (`own_chat_id(conn)`, `is_self`, `names_self`), the chat-id → name map (5 min, per connection), `get_message_sender_name`, `download_media_bytes(conn, url)` |
-| `resolve.py` | `resolve_chat_id_and_name(conn, name)`: `me` / `self` → the own chat; saved contacts → chat id → preferred contacts → WAHA chats / contacts (transliteration, recency, the chat model `purpose="whatsapp_match"`) → number check |
+| `client.py` | per connection: `config(conn)` → (base url, headers, session), `signature(conn)` (cache key), `fetch_me(conn)` / `get_my_identifiers(conn, client)`, the chat-id → name map (5 min, per connection), `get_message_sender_name`, `download_media_bytes(conn, url)` |
+| `resolve.py` | `resolve_chat_id_and_name(conn, name)`: saved contacts → chat id → preferred contacts → WAHA chats / contacts (transliteration, recency, the chat model `purpose="whatsapp_match"`) → number check |
 | `contacts.py` | the user's saved contacts (table `whatsapp_contacts`): `resolve_rows` / `search_rows` (nicknames whose value is a chat id), `preferred(user, name)` (category `preferred`), `known_people(user)` (contact rows for the call-analysis prompt; empty without the addon) |
 | `accounts.py` | the account of each connection (one connection per account), the routing of inbound events (below), `blocked(conn)` |
 | `events.py` | inbound events: `handle_webhook(data)` → `process_event(conn, data)` |
@@ -48,25 +48,6 @@ reads it framed (`core.text.untrusted`) and the rest of the turn asks before
 any `acts_outside` tool (docs/agent-actions.md, "Text written by others").
 The voice-note summary (the Telegram button) frames the transcript the same
 way.
-
-**The user's own chat ("me").** `chat_id="me"` (or `"self"`) in any tool
-taking a chat is the connected account's own chat (WhatsApp's "Message
-yourself"): `client.own_chat_id(conn)` = the connection's claimed account
-(`addons.account`, below) as `<number>@c.us`, else the session's `me.id`
-from `GET {url}/sessions`, kept per connection for an hour (a failure is not
-kept); none while another user holds the account. It is resolved before
-anything else, so a saved nickname "me" never redirects it; unknown (WAHA
-down, not logged in) → an error, never a guess. `send_whatsapp_message`'s
-`confirm` is a rule: every send asks first except one with `chat_id` `me` /
-`self` (it reaches nobody else; the tool rule "asks only for sending to
-another person or destroying something", docs/agent-actions.md). A send to the
-own chat by its `@c.us` id still asks (the rule sees only the arguments).
-`search_whatsapp_contact_or_chat` lists "You (your own chat)" with its id
-first when the query is `me`, `self`, `myself`, `אני`, `לעצמי`, `עצמי`, or the
-user's name, a word of it, or one of their other names (`User.other_names`);
-for the words alone it returns just that line. The tool descriptions tell the
-model to pass `chat_id='me'` for "send me a WhatsApp" instead of searching
-for the user's name.
 
 **Forwarding.** `forward_whatsapp_message(chat_id, message_id, what)`
 (`confirm`) posts WAHA's `/api/forwardMessage` with the connection's session:

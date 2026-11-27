@@ -34,6 +34,8 @@ import json
 import os
 import re
 import sys
+import time
+from unittest.mock import patch
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import testenv  # first: clean env, temp DB removed at exit, no .env (see testenv.py)
@@ -626,8 +628,8 @@ async def test_actions() -> None:
     check("the agent runs as the user in the watch's own session, the event framed as untrusted",
           AGENT_TEXTS and AGENT_TEXTS[0][0] == BOB.id and AGENT_TEXTS[0][1] == f"watch-{w['id']}"
           and carries_untrusted(AGENT_TEXTS[0][2]) and "Summarize and send it to Gal" in AGENT_TEXTS[0][2])
-    check("the agent message starts with who the user is and that 'me' is them",
-          "The user: Bob Builder" in AGENT_TEXTS[0][2] and '"me"' in AGENT_TEXTS[0][2]
+    check("the agent message starts with who the user is",
+          "The user: Bob Builder" in AGENT_TEXTS[0][2] and "Never take another person" in AGENT_TEXTS[0][2]
           and "watch's own session" in AGENT_TEXTS[0][2], AGENT_TEXTS[0][2][:400])
     from core.session import list_all_sessions
     listed = {x["session_id"]: x["title"] for x in list_all_sessions(BOB.id)}
@@ -901,27 +903,66 @@ async def test_agent_live() -> None:
 # --- 9. Identity, own sessions, interest hints, the trace --------------------------------------
 
 async def test_identity() -> None:
-    """The compiler and the agent runs know who the user is, what "me" means and how to reach them."""
+    """The compiler and the agent runs know who the user is, their own addresses and how a notify reaches them."""
     import dataclasses
     from addons.watches import identity
     fake = dataclasses.replace(BOB, name="Dana Tester", other_names="Danny, דנה", pronoun="she", telegram_chat_id=None)
-    tools = ["send_whatsapp_message", "send_telegram_message_to_me", "weather_at_home", "web_search"]
+    tools = ["send_whatsapp_message", "send_telegram_message", "weather_at_home", "web_search"]
     sysmsg = compiler.system_prompt(fake, engine.catalog(BOB), {}, tools, now())
     check("compiler prompt: the user's name, other names and pronoun",
           "The user: Dana Tester (also called Danny, דנה); pronoun: she." in sysmsg, sysmsg[:600])
-    check("compiler prompt: 'me' / a sender shown as 'me' is the user, never another person's name",
-          '"me", "I", "my", "myself"' in sysmsg and 'shown as "me"' in sysmsg and "Never take another person" in sysmsg)
-    check("compiler prompt: how to reach the user themself (only the tools they have)",
-          'chat_id "me"' in sysmsg and "send_telegram_message_to_me" in sysmsg and "weather_at_home" in sysmsg
-          and "not a web search" in sysmsg)
+    check("compiler prompt: never another person's name for the user", "Never take another person" in sysmsg)
+    check("compiler prompt: no special 'me' rules or recipients",
+          'shown as "me"' not in sysmsg and 'chat_id "me"' not in sysmsg and "_to_me" not in sysmsg
+          and "from_me" not in sysmsg, sysmsg)
+    check("compiler prompt: the weather tool the user has", "weather_at_home" in sysmsg and "not a web search" in sysmsg)
     check("compiler prompt: no Telegram as a notify channel without a chat",
           "Telegram (their chat" not in identity.about_user(fake, []))
     with_chat = dataclasses.replace(fake, telegram_chat_id=4242)
     check("a notify reaches Telegram when the user has a chat with the bot",
           "Telegram (their chat with Dana's bot)" in identity.about_user(with_chat, []))
     bare = identity.about_user(fake, [])
-    check("no WhatsApp / Telegram / weather tool lines without those tools",
-          "chat_id" not in bare and "send_telegram_message_to_me" not in bare and "Weather" not in bare, bare)
+    check("no addresses and no weather line without connections or tools",
+          "own addresses" not in bare and "Weather" not in bare, bare)
+
+    # The user's own addresses, read from their connections (fake ones: nothing is reached).
+    class Conn:
+        def __init__(self, account, conflict=None):
+            self.account, self.account_conflict = account, conflict
+    conns = {"gmail": Conn("dana.tester@example.com"), "whatsapp": Conn("15550100301@c.us"),
+             "telegram_account": Conn("Dana Tester (@danatester)")}
+    with patch.object(identity.store, "get", lambda user, name, **kw: conns.get(name)):
+        line = identity.about_user(fake, [])
+        check("own addresses: email, WhatsApp chat id and Telegram from the connections",
+              "The user's own addresses: email dana.tester@example.com, WhatsApp 15550100301@c.us, "
+              "Telegram Dana Tester (@danatester)." in line, line)
+        conns["whatsapp"] = Conn("")
+        from addons.whatsapp import client as waha
+        calls = []
+
+        async def own(conn):
+            calls.append(conn)
+            return "15550100302@c.us"
+        with patch.object(waha, "own_chat_id", own):
+            await identity.learn(fake)
+        check("own addresses: a WhatsApp id not stored is learned once and kept",
+              len(calls) == 1 and "WhatsApp 15550100302@c.us" in identity.about_user(fake, []))
+
+        async def slow(conn):
+            await asyncio.sleep(30)
+        identity._whatsapp_ids.clear()
+        with patch.object(waha, "own_chat_id", slow), patch.object(identity, "WHATSAPP_WAIT_SECONDS", 0.05):
+            t0 = time.monotonic()
+            await identity.learn(fake)
+            waited = time.monotonic() - t0
+        check("own addresses: WAHA slow -> the prompt goes without the WhatsApp id, fast",
+              waited < 1 and "WhatsApp" not in identity.about_user(fake, []), waited)
+        conns["whatsapp"] = Conn(None, conflict="15550100301@c.us")
+        check("own addresses: no WhatsApp id while another user holds the account",
+              "WhatsApp" not in identity.about_user(fake, []))
+        del conns["gmail"]
+        check("own addresses: only the connected ones", "email" not in identity.about_user(fake, []))
+    identity._whatsapp_ids.clear()
     check("compiler prompt: semantic questions only about what the event carries; the most specific source",
           "Never ask about anything the event does not carry" in sysmsg and "prefer the most specific type" in sysmsg)
     check("compiler prompt: never claims the user cannot be reached", "Never claim the user cannot be reached" in sysmsg)

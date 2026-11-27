@@ -1,6 +1,6 @@
 """Gmail events for the catalog (addons/gmail/event_types.py): gmail.email.received from Gmail's history —
-the first poll only takes a baseline, a new message gives one event with the contract's data (from_me for
-mail to oneself, to_me), a repeat poll emits nothing and asks Gmail once, an expired historyId starts over,
+the first poll only takes a baseline, a new message gives one event with the contract's data (the real
+sender and recipients), a repeat poll emits nothing and asks Gmail once, an expired historyId starts over,
 spam / drafts / sent-only mail skipped, a failing poll logged once and never raising, two users isolated,
 history from what was emitted, the prune, the event in the catalog.
 
@@ -210,17 +210,17 @@ async def test_poll() -> None:
     check("a poll with news: one history request and one batch of gets",
           ANN_BOX.calls == ["history", "get", "get", "get", "get"], ANN_BOX.calls)
     d1 = got[0][3] if got else {}
-    check("mail to oneself: the contract's data, from_me and to_me true (case and +tag aside)",
+    check("mail to oneself: the contract's data, the real sender and recipient",
           d1 == {"message_id": "m1", "thread_id": "t-m1", "from": "Ann Tester <Ann@Example.com>",
                  "from_name": "Ann Tester", "from_email": "ann@example.com", "to": "ann+notes@example.com", "cc": "",
                  "subject": "Note to self", "snippet": 'Remember the "deck" and pay ₪120',
-                 "labels": "INBOX, UNREAD, SENT, CATEGORY_PERSONAL", "from_me": True, "to_me": True,
-                 "amount": 120.0}, d1)
+                 "labels": "INBOX, UNREAD, SENT, CATEGORY_PERSONAL", "amount": 120.0}, d1)
     d2 = got[1][3] if len(got) > 1 else {}
-    check("someone else's mail with the user in Cc: decoded name, from_me false, to_me true, the amount",
-          (d2.get("from"), d2.get("from_email"), d2.get("to"), d2.get("cc"), d2.get("from_me"), d2.get("to_me"),
+    check("someone else's mail with the user in Cc: decoded name, the recipients, the amount",
+          (d2.get("from"), d2.get("from_email"), d2.get("to"), d2.get("cc"),
            d2.get("amount")) == ("Shop Example <billing@shop.example.com>", "billing@shop.example.com",
-                                 "Dana Tester <tester@example.com>", "ann@example.com", False, True, 45.9), d2)
+                                 "Dana Tester <tester@example.com>", "ann@example.com", 45.9), d2)
+    check("no derived self flags: only the real data", not {"from_me", "to_me"} & set(d1), sorted(d1))
     check("the data keys are exactly the contract's", set(d1) == set(event_types.GMAIL_EVENTS[0].fields), sorted(d1))
 
     n, got = await run(ANN)
@@ -239,8 +239,8 @@ async def test_poll() -> None:
     ANN_BOX.expired_before = 0
     ANN_BOX.add("m4", ["INBOX"], "Someone <someone@example.com>", "list@example.com", "After the reset")
     n, got = await run(ANN)
-    check("after the reset: the next new message is announced (to a list: to_me false)",
-          n == 1 and got[0][3]["message_id"] == "m4" and got[0][3]["to_me"] is False, got)
+    check("after the reset: the next new message is announced (to a list)",
+          n == 1 and got[0][3]["message_id"] == "m4" and got[0][3]["to"] == "list@example.com", got)
 
     records = Records()
     log = logging.getLogger("addons.gmail.event_types")
@@ -270,8 +270,9 @@ async def test_poll() -> None:
           n == 0 and event_types._state(BOB) == ("100", "bob@example.com"), event_types._state(BOB))
     BOB_BOX.add("b1", ["INBOX"], "bob@example.com", "bob@example.com", "Bob to Bob")
     n, got = await run(BOB)
-    check("Bob: his own message only, as Bob, from_me true",
-          n == 1 and [(u, a, d["message_id"], d["from_me"]) for _, u, a, d in got] == [(BOB.id, BOB.id, "b1", True)],
+    check("Bob: his own message only, as Bob, from his address",
+          n == 1 and [(u, a, d["message_id"], d["from_email"]) for _, u, a, d in got]
+          == [(BOB.id, BOB.id, "b1", "bob@example.com")],
           got)
     n, got = await run(CARL)
     check("Carl (no Gmail): nothing", n == 0 and got == [])

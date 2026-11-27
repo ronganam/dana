@@ -2,17 +2,19 @@
 
 The three readers return text other people wrote (``untrusted_result``: the
 agent loop frames their results with ``core.text.untrusted``), and none marks
-anything read. The one writer, ``send_telegram_message_to_me``, sends only to
-the account's own Saved Messages: it takes no recipient, so it reaches nobody
-else and needs no approval."""
+anything read. The one writer, ``send_telegram_message``, sends to any chat
+the account sees, resolved like the readers resolve one, and asks the user
+first like every send."""
 
 import asyncio
 import logging
-from typing import List, Optional, Tuple
+import re
+from typing import Any, Dict, List, Optional, Tuple
 
 from core import llm, user_profile
 from core.text import untrusted
-from core.addons import Connection
+from core.addons import Approval, Connection
+from core.users import User
 from addons.telegram_account import client as tg
 from addons.telegram_account.addon import addon
 
@@ -72,10 +74,15 @@ async def list_telegram_unread(conn: Connection, chat_type: str = "all", include
 
 
 def _resolve(chats: List[tg.Chat], query: str) -> Tuple[Optional[tg.Chat], List[tg.Chat]]:
-    """The chat ``query`` names (its id, @username or name), or the candidates."""
+    """The chat ``query`` names (its id, @username, phone number or name), or the candidates."""
     q = (query or "").strip().strip("`")
     if q.lstrip("-").isdigit():
         found = [c for c in chats if str(c.id) == q]
+        if found or not q.isdigit():
+            return (found[0] if found else None), []
+    if re.fullmatch(r"\+?[\d\s\-()]{7,}", q):
+        digits = re.sub(r"\D", "", q)
+        found = [c for c in chats if digits and re.sub(r"\D", "", str(getattr(c.entity, "phone", "") or "")) == digits]
         return (found[0] if found else None), []
     if q.startswith("@"):
         found = [c for c in chats if (getattr(c.entity, "username", "") or "").lower() == q[1:].lower()]
@@ -128,26 +135,41 @@ async def read_telegram_chat(conn: Connection, chat: str, limit: int = 20, unrea
             + "\n".join(lines) + f"\n{NOT_MARKED}")
 
 
-@addon.tool(is_write=True)
-async def send_telegram_message_to_me(conn: Connection, text: str) -> str:
-    """Send a message to the user themself on Telegram: into their own account's Saved Messages
-    (their personal account, not Dana's bot). Use it when the user asks for something "on Telegram"
-    for themself (a note, a reminder, a list, a summary to keep). It cannot message anyone else:
-    there is no recipient, and Dana cannot send Telegram messages to other people.
-    Sent at once, without asking (it reaches nobody but the user).
+def _describe_send(user: Optional[User], a: Dict[str, Any]) -> Approval:
+    chat = str((a or {}).get("chat") or "").strip().strip("`") or "a chat"
+    return Approval(f"Send a Telegram message to {chat}", "Telegram message", "✈️", "Send this Telegram message?",
+                    body_label="Message", body=(a or {}).get("text"))
+
+
+@addon.tool(is_write=True, confirm=True, describe=_describe_send)
+async def send_telegram_message(conn: Connection, chat: str, text: str) -> str:
+    """Send a Telegram message as the user (from their own account, not Dana's bot) to one of their
+    chats: a person, a group, a channel they can post in, or their own Saved Messages. Asks the user
+    first.
 
     Args:
-        text: The message text (a long text is sent as several messages).
+        chat: The chat's name (or part of it), @username, phone number, or id (as list_telegram_unread shows).
+        text: The message text, as the user wants it sent (a long text is sent as several messages).
     """
     text = (text or "").strip()
     if not text:
         return "Error: text is empty."
     try:
-        ids = await tg.send_to_saved_messages(conn, text)
+        chats = await tg.dialogs(conn)
+    except Exception as e:
+        return f"Error: {tg.explain(e, conn)}"
+    found, candidates = _resolve(chats, chat)
+    if found is None:
+        if candidates:
+            return (f"Several Telegram chats match '{chat}'; ask which one:\n"
+                    + "\n".join(f"- {tg.describe_chat(c)}" for c in candidates))
+        return f"Error: no Telegram chat matches '{chat}'."
+    try:
+        ids = await tg.send(conn, found, text)
     except Exception as e:
         return f"Error: {tg.explain(e, conn)}"
     parts = f" ({len(ids)} messages)" if len(ids) > 1 else ""
-    return f"Sent to your Telegram Saved Messages{parts}."
+    return f"Sent to {tg.describe_chat(found)}{parts}."
 
 
 SUMMARY_PROMPT = """You summarize unread Telegram chats and channels for {name}.

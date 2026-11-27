@@ -12,8 +12,7 @@ from core import clock, llm
 from core.addons import Connection
 from core.text import transliterate_he_to_en
 from addons.whatsapp import contacts as saved_contacts
-from addons.whatsapp.client import (OWN_CHAT_NAME, api_url, config, get_chat_id_to_name_map, is_self,
-                                    normalize_to_international, own_chat_id)
+from addons.whatsapp.client import api_url, config, get_chat_id_to_name_map, normalize_to_international
 
 logger = logging.getLogger(__name__)
 
@@ -205,16 +204,6 @@ async def resolve_chat_id_and_name(conn: Connection, chat_id_or_name: str) -> tu
     chat_id_or_name = chat_id_or_name.strip()
     if not chat_id_or_name:
         raise ValueError("Recipient chat ID or name cannot be empty.")
-
-    # 0. "me" / "self": the connected account's own chat, before anything else
-    #    (a saved nickname "me" never redirects it: send_whatsapp_message sends
-    #    there without asking, see tools.py).
-    if is_self(chat_id_or_name):
-        own = await own_chat_id(conn)
-        if not own:
-            raise ValueError("Your own WhatsApp chat id is not known yet (WAHA did not report the session's "
-                             "account; is the session logged in?). Try again in a minute.")
-        return own, OWN_CHAT_NAME
 
     url, headers, session = config(conn)
 

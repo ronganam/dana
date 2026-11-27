@@ -143,7 +143,7 @@ Per-user data: every query filters by the acting user. Addons can use `core.addo
 | `core.user.woke` | `why` | the wake log |
 | `phone.notification.received` | `notification_id, app, sender, conversation, is_group, title, text, category, priority, amount` (`server/docs/notifications.md`) | the Inbox |
 | `phone.email.received` | `notification_id, account, from, subject, text, amount` (`server/docs/notifications.md`) | the Inbox |
-| `gmail.email.received` | `message_id, thread_id, from, from_name, from_email, to, cc, subject, snippet, labels, from_me, to_me, amount` (`from_me`: mail the user sent to themself; `server/docs/gmail.md`, "New mail for watches") | the emails announced (30 days) |
+| `gmail.email.received` | `message_id, thread_id, from, from_name, from_email, to, cc, subject, snippet, labels, amount` (`server/docs/gmail.md`, "New mail for watches") | the emails announced (30 days) |
 | `phone.call.ended` | `call_id, person, direction, duration_s, title, summary` (`server/docs/calls.md`) | analysed calls |
 | `money.transaction.added` | `transaction_id, amount, direction, counterparty, counterparty_kind, flow, category, account, account_kind, status` (`server/docs/money.md`) | the transactions |
 | `homeassistant.state.changed` | `entity_id, name, domain, old_state, new_state, unit, device_class` (states as text; known values: the user's entity ids; `server/docs/access.md`, "Home Assistant") | the changes Dana emitted, in memory since the server started |

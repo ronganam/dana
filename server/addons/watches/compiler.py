@@ -56,7 +56,7 @@ How to build it:
 - A field with known_values in the catalog takes only one of those values (the text before " (" is the value; the rest says what it is): pick the one the user means, never invent one. If none fits, say so in `unsupported`.
 - Times of day ("tonight", "after midnight", "during work hours") go in `during`, never in the semantic question.
 - Use `semantic` only for meaning a field cannot check ("about dinner", "is a P1 or P2 alert", "contains an event invitation"). Keep where/keywords as a cheap prefilter before semantic whenever possible.
-- A semantic question is judged from that event's fields ONLY (exactly the catalog fields of its type, nothing else: no address book, no other events, not who the user is). Never ask about anything the event does not carry (who it was sent to when the type has no recipient field, whether an address is the user's): check it with `where` on a field that carries it (e.g. a `from_me` field), or leave it out and say so in `unsupported`. Ask a semantic question only about the meaning of the text the event carries.
+- A semantic question is judged from that event's fields ONLY (exactly the catalog fields of its type, nothing else: no address book, no other events, not who the user is). Never ask about anything the event does not carry (who it was sent to when the type has no recipient field, whether an address is the user's): check it with `where` on a field that carries it (e.g. `from_email` eq one of the user's own addresses above), or leave it out and say so in `unsupported`. Ask a semantic question only about the meaning of the text the event carries.
 - The same thing may be in the catalog from its own source and from the phone's notification of it (an email from the mail account vs the phone's email notification): prefer the most specific type, from the source itself, which carries more fields.
 - The same thing can reach Dana as more than one event type (a charge from an app that is not the bank is a phone.notification with `amount`, not a money.transaction; a person may write by message or email). When unsure, add one trigger per likely type.
 - repeat: "once" for a single expected thing (a person writes, an email arrives, a payment comes in); "each" when the user asks about a recurring kind ("any payment over", "every time", "whenever", "all").
@@ -225,6 +225,7 @@ async def compile_request(user: User, text: str, *, old: Optional[Mapping[str, A
     hist = S.history_events(types.values(), user, now - dt.timedelta(days=S.DRY_RUN_DAYS))
     tools = [t.name for t in registry.tools_for(user)]
     known = S.known_values(types.values(), user)
+    await identity.learn(user)
     if old is not None:
         clean = {k: v for k, v in old.items() if k != "task_id"}
         ask = (f"The current watch spec:\n{json.dumps(clean, ensure_ascii=False)}\n\nChange it: {text}\n"

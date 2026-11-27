@@ -35,7 +35,7 @@ addon = Addon(
     touches=Touches(hosts=("your WAHA server",), acts_outside=True, stores_credentials=True, reads=("knowledge", "people")),
     description="Read and send WhatsApp messages, voice notes as text",
     features=("Read your chats and find messages and files",
-              "Send messages and forward files (asks you first; a note to yourself goes at once)",
+              "Send messages and forward files (asks you first)",
               "Turns the voice notes you receive into text"),
     setup=("Run a WAHA server (a WhatsApp Web bridge) that Dana's server can reach; the link on the address "
            "below shows how.",
