@@ -26,6 +26,10 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.DaySlotInfo
+import io.github.ronganam.dana.ui.components.celebrate
+import io.github.ronganam.dana.ui.components.celebrationHues
+import io.github.ronganam.dana.ui.components.heroBrush
+import io.github.ronganam.dana.ui.components.popIn
 import io.github.ronganam.dana.ui.components.circuit.CircuitNode
 import io.github.ronganam.dana.ui.components.circuit.GroupRow
 import io.github.ronganam.dana.ui.components.circuit.GroupedSection
@@ -181,7 +185,7 @@ fun EarlierSection(done: List<DoneEntry>, onOpen: (DoneEntry) -> Unit, modifier:
  * today (circles), by time. Only real points; no line when there are none.
  */
 @Composable
-fun CalmCard(line: String?, done: List<DoneEntry>, slots: List<DaySlotInfo>, now: LocalTime, modifier: Modifier = Modifier) {
+fun CalmCard(line: String?, done: List<DoneEntry>, slots: List<DaySlotInfo>, now: LocalTime, modifier: Modifier = Modifier, celebrate: Boolean = false) {
     val c = circuitColors
     val surface = MaterialTheme.colorScheme.surfaceContainerLow
     val nowMin = now.hour * 60 + now.minute
@@ -191,12 +195,17 @@ fun CalmCard(line: String?, done: List<DoneEntry>, slots: List<DaySlotInfo>, now
     val doneMin = done.map { it.at.hour * 60 + it.at.minute }
     val nodes = remember(doneMin, ahead, nowMin) { NowDay.dayLine(doneMin, ahead, nowMin) }
     Column(
-        modifier.fillMaxWidth().padding(horizontal = NOW_GUTTER).clip(RoundedCornerShape(24.dp)).background(surface)
+        // A soft violet wash at the card's top (static): the calm state is the hero of Now.
+        modifier.fillMaxWidth().padding(horizontal = NOW_GUTTER).clip(RoundedCornerShape(24.dp)).background(heroBrush(surface))
             .padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 16.dp)
     ) {
         CompositionLocalProvider(LocalNodeSurface provides surface) {
             Row(verticalAlignment = Alignment.Top) {
-                CircuitNode(NodeShape.RoundedSquare, NodeState.Done, size = NodeSize.Leading, icon = Icons.Outlined.Check, modifier = Modifier.padding(top = 2.dp))
+                // When calm has just come: the check pops in and a few hue dots fly off it, once.
+                CircuitNode(
+                    NodeShape.RoundedSquare, NodeState.Done, size = NodeSize.Leading, icon = Icons.Outlined.Check,
+                    modifier = Modifier.padding(top = 2.dp).celebrate(celebrate, celebrationHues()).popIn(celebrate)
+                )
                 Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
                     Text("Nothing needs you", style = MaterialTheme.typography.titleLarge, color = c.ink)

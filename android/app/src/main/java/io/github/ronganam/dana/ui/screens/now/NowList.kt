@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.NowItem
 import io.github.ronganam.dana.data.models.NowPayload
 import io.github.ronganam.dana.data.models.QuietEntry
+import io.github.ronganam.dana.ui.components.Celebrations
 import io.github.ronganam.dana.ui.components.arrive
 import io.github.ronganam.dana.ui.components.circuit.PlaceHeader
 import io.github.ronganam.dana.ui.components.circuit.SectionHeader
@@ -88,6 +89,9 @@ fun NowListPane(state: NowListState, handlers: NowHandlers, live: LiveHandlers, 
     val slots = state.payload?.daySlots.orEmpty()
     val calendarOk = state.payload?.calendarOk ?: true
     val c = circuitColors
+    // Calm that has just come (the last needs-you row went while Now was open), or the day's first calm in this process, gets one small celebration.
+    val sawNeeds = remember { booleanArrayOf(false) }
+    if (needsCount > 0) sawNeeds[0] = true
 
     PullToRefreshBox(
         isRefreshing = pullRefreshing, onRefresh = { pullRefreshing = true; actions.refresh() }, state = pull, modifier = Modifier.fillMaxSize(),
@@ -106,10 +110,17 @@ fun NowListPane(state: NowListState, handlers: NowHandlers, live: LiveHandlers, 
                 item(key = "head") { Header(state, showLede = !calm, headerAsk) }
                 when {
                     calm -> item(key = "calm") {
+                        // Decided once as the card appears (scrolling it back into view doesn't replay it).
+                        val party = remember {
+                            val cleared = sawNeeds[0]
+                            sawNeeds[0] = false
+                            Celebrations.claim("now-calm-" + state.now.toLocalDate()) || cleared
+                        }
                         CalmCard(
                             calmLine(state.payload?.lede, state.payload?.notifications?.noise ?: 0),
                             state.done, slots, state.now.toLocalTime(),
-                            Modifier.padding(top = 16.dp)
+                            Modifier.padding(top = 16.dp),
+                            celebrate = party
                         )
                     }
                     needsCount > 0 -> {

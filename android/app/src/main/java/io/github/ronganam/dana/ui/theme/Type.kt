@@ -54,6 +54,13 @@ val DmMono = FontFamily(
 /** Tabular figures, so times and counts line up and don't jitter as they change. */
 fun TextStyle.tabular(): TextStyle = copy(fontFeatureSettings = "tnum")
 
+/**
+ * A place's title (`PlaceHeader`: "Good evening", "Watching"): displaySmall's
+ * size, a heavier cut of Roboto Flex and tighter tracking, so the place names
+ * read with a little more voice than the rest of the display styles.
+ */
+val PlaceTitle = TextStyle(fontFamily = DanaSans, fontWeight = FontWeight.SemiBold, fontSize = 34.sp, lineHeight = 40.sp, letterSpacing = (-0.75).sp)
+
 val DanaTypography = Typography(
     // Screen titles ("Watching", "Good morning") and big values.
     displayLarge = TextStyle(fontFamily = DanaSans, fontWeight = FontWeight.Medium, fontSize = 40.sp, lineHeight = 48.sp, letterSpacing = (-0.5).sp),
