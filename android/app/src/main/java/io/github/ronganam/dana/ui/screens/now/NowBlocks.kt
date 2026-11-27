@@ -24,9 +24,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.NowBlock
 import io.github.ronganam.dana.ui.components.InkChoice
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.theme.Warning
 
 /*
@@ -54,8 +53,8 @@ fun EvidenceBlock(block: NowBlock, modifier: Modifier = Modifier) {
 private fun BlockLabel(label: String?, trailing: String? = null) {
     if (label != null || trailing != null) {
         Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 6.dp)) {
-            MonoLabel(label.orEmpty(), modifier = Modifier.weight(1f))
-            if (trailing != null) MonoLabel(trailing)
+            MetaLabel(label.orEmpty(), modifier = Modifier.weight(1f))
+            if (trailing != null) MetaLabel(trailing)
         }
     }
 }
@@ -81,7 +80,7 @@ private fun LinesBlock(b: NowBlock.Lines, modifier: Modifier) {
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.Top
             ) {
-                if (anyWho) Box(Modifier.width(52.dp).padding(top = 2.dp)) { MonoLabel(line.who.orEmpty()) }
+                if (anyWho) Box(Modifier.width(52.dp).padding(top = 2.dp)) { MetaLabel(line.who.orEmpty()) }
                 Text(line.text, style = bodyStyle, color = MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f))
             }
         }
@@ -151,10 +150,10 @@ private fun WeekBlock(b: NowBlock.Week, modifier: Modifier) {
                     Modifier.weight(1f).border(1.dp, MaterialTheme.colorScheme.outlineVariant, shape).padding(vertical = 8.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    MonoLabel(c.label)
+                    MetaLabel(c.label)
                     Text(
                         c.value,
-                        style = MaterialTheme.typography.titleMedium.copy(fontFamily = DanaSerif, fontSize = 18.sp),
+                        style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp),
                         color = when (c.ok) {
                             false -> Warning
                             null -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)

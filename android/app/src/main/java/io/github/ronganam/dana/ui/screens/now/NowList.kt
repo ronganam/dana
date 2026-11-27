@@ -23,7 +23,6 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -38,13 +37,12 @@ import io.github.ronganam.dana.ui.components.OverflowMenu
 import androidx.compose.ui.text.font.FontWeight
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.RollingText
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.components.arrive
 import io.github.ronganam.dana.ui.components.riseIn
 import io.github.ronganam.dana.ui.shell.DayItem
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.theme.Hue
 import io.github.ronganam.dana.ui.theme.Motion
 import io.github.ronganam.dana.ui.theme.hues
@@ -129,14 +127,14 @@ fun NowListPane(state: NowListState, handlers: NowHandlers, actions: NowListActi
                         Modifier.fillMaxWidth().padding(horizontal = NOW_GUTTER).padding(top = 30.dp, bottom = 2.dp).semantics(mergeDescendants = true) { heading() },
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        MonoLabel(if (state.items.isNotEmpty()) "Needs you · " else "Needs you")
+                        MetaLabel(if (state.items.isNotEmpty()) "Needs you · " else "Needs you")
                         if (state.items.isNotEmpty()) RollingText(
                             state.items.size.toString(),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Spacer(Modifier.weight(1f))
-                        if (state.items.isNotEmpty() && !wide) MonoLabel(
+                        if (state.items.isNotEmpty() && !wide) MetaLabel(
                             "← dismiss · snooze →",
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                         )
@@ -196,7 +194,7 @@ private fun Header(state: NowListState, wide: Boolean) {
     val lede = state.payload?.lede?.takeIf { it.isNotBlank() }
         ?: if (state.payload != null) NowModel.ledeFallback(state.now.hour, state.items.isEmpty()) else null
     Column(Modifier.padding(horizontal = NOW_GUTTER)) {
-        MonoLabel(state.now.format(DATE))
+        MetaLabel(state.now.format(DATE))
         if (lede != null) Text(
             lede,
             style = MaterialTheme.typography.displayMedium.copy(
@@ -213,7 +211,7 @@ private fun Header(state: NowListState, wide: Boolean) {
 @Composable
 private fun UpdatedAgo(state: NowListState, modifier: Modifier = Modifier) {
     val at = state.updatedAt
-    if (state.payload != null && state.failed && at != null) MonoLabel(
+    if (state.payload != null && state.failed && at != null) MetaLabel(
         NowModel.updatedAgo(at, System.currentTimeMillis()),
         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
         modifier = modifier
@@ -233,10 +231,10 @@ private fun AllClear(state: NowListState, slots: List<io.github.ronganam.dana.da
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center
     ) {
-        MonoLabel(state.now.format(DATE))
+        MetaLabel(state.now.format(DATE))
         Text(
             "All clear.",
-            style = MaterialTheme.typography.displayLarge.copy(fontStyle = FontStyle.Italic, fontSize = 46.sp, lineHeight = 50.sp),
+            style = MaterialTheme.typography.displayLarge.copy(fontSize = 44.sp, lineHeight = 52.sp),
             color = MaterialTheme.colorScheme.onSurface,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             modifier = Modifier.padding(top = 12.dp).semantics { heading() }
@@ -270,7 +268,7 @@ private fun CalendarNote(centred: Boolean = false) {
 private fun Empty(title: String, line: String, action: String? = null, mark: Color? = null, onAction: (() -> Unit)? = null) {
     Column(Modifier.padding(horizontal = NOW_GUTTER).padding(top = 26.dp, bottom = 10.dp)) {
         if (mark != null) HueMark(mark, Modifier.padding(bottom = 10.dp))
-        Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic, fontSize = 26.sp))
+        Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 26.sp))
         Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
         if (action != null && onAction != null) InkButton(action, emphasis = InkEmphasis.SOLID, modifier = Modifier.padding(top = 12.dp), onClick = onAction)
     }
@@ -286,10 +284,10 @@ private fun CanWait(total: Int, open: Boolean, onClick: () -> Unit) {
                 .padding(horizontal = NOW_GUTTER, vertical = 13.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MonoLabel("Can wait · ")
+            MetaLabel("Can wait · ")
             RollingText(total.toString(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Spacer(Modifier.weight(1f))
-            MonoLabel(if (open) "hide ↑" else "show ↓")
+            MetaLabel(if (open) "hide ↑" else "show ↓")
         }
         Rule(Modifier.padding(horizontal = NOW_GUTTER))
     }
@@ -339,7 +337,7 @@ private fun NotificationsLine(total: Int, needsYou: Int, noise: Int, onOpen: () 
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.weight(1f)
             )
-            MonoLabel("→")
+            MetaLabel("→")
         }
         Rule(Modifier.padding(horizontal = NOW_GUTTER))
     }
@@ -350,7 +348,7 @@ internal fun LaterRow(at: String, item: DayItem, gutter: Dp = NOW_GUTTER) {
     Column(Modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(horizontal = gutter, vertical = 10.dp), verticalAlignment = Alignment.Top) {
             // Events in sky, reminders in amber (Ember's kinds).
-            Box(Modifier.width(80.dp).padding(top = 2.dp)) { MonoLabel(at, color = hues.text(if (item.isEvent) Hue.SKY else Hue.AMBER)) }
+            Box(Modifier.width(80.dp).padding(top = 2.dp)) { MetaLabel(at, color = hues.text(if (item.isEvent) Hue.SKY else Hue.AMBER)) }
             Text(
                 item.title,
                 style = MaterialTheme.typography.bodyLarge.copy(textDirection = TextDirection.Content),

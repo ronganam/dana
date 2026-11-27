@@ -34,7 +34,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -45,7 +44,7 @@ import io.github.ronganam.dana.ui.components.ContextAttachmentCard
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.IterationPromptCard
 import io.github.ronganam.dana.ui.components.ModelPickerChip
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.components.SelectionCard
 import io.github.ronganam.dana.data.models.ToolCallEntry
@@ -56,7 +55,6 @@ import io.github.ronganam.dana.ui.screens.chat.MemoryLine
 import io.github.ronganam.dana.ui.screens.chat.rememberMemoryNow
 import io.github.ronganam.dana.ui.screens.chat.rememberTts
 import io.github.ronganam.dana.ui.screens.common.byScript
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import io.github.ronganam.dana.ui.viewmodels.ScreenRef
 import java.time.ZoneId
@@ -146,9 +144,9 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
             Modifier.fillMaxWidth().edgeRule(bottom = true).padding(start = 18.dp, end = 6.dp, top = 6.dp, bottom = 6.dp).heightIn(min = 44.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            MonoLabel("Dana", modifier = Modifier.padding(end = 10.dp))
+            MetaLabel("Dana", modifier = Modifier.padding(end = 10.dp))
             if (statusText.isNotEmpty()) {
-                MonoLabel(statusText, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+                MetaLabel(statusText, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
             } else {
                 if (chatModels.isNotEmpty()) ModelPickerChip(models = chatModels, selectedId = chatModel, onSelect = { viewModel.chatController.setChatModel(it) })
                 Spacer(Modifier.weight(1f))
@@ -186,7 +184,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
         ) {
             if (hasOlder || loadingOlder) {
                 item(key = "older") {
-                    MonoLabel(
+                    MetaLabel(
                         if (loadingOlder) "Loading earlier…" else "Earlier ↑",
                         modifier = Modifier.fillMaxWidth().clickable { chat.loadOlder() }.padding(vertical = 8.dp)
                     )
@@ -207,7 +205,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                     Column(Modifier.padding(top = 24.dp, bottom = 8.dp)) {
                         Text(
                             "Nothing said yet.",
-                            style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic)
+                            style = MaterialTheme.typography.headlineSmall
                         )
                         Text(
                             "Type or speak below. The watch, the TV and the Mac talk here too.",
@@ -241,7 +239,7 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                                 apiToken = viewModel.serverConfig.token
                             )
                             if (msg.shortcut && !msg.isUser) {
-                                MonoLabel("learned phrase · no model", modifier = Modifier.padding(start = 12.dp, top = 2.dp))
+                                MetaLabel("learned phrase · no model", modifier = Modifier.padding(start = 12.dp, top = 2.dp))
                             }
                         }
                     }
@@ -318,7 +316,7 @@ internal fun NewTopicButton(enabled: Boolean, onClick: () -> Unit) {
 private fun QuietSeparator(label: String, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp), verticalAlignment = Alignment.CenterVertically) {
         Rule(Modifier.weight(1f))
-        MonoLabel(label, modifier = Modifier.padding(horizontal = 10.dp))
+        MetaLabel(label, modifier = Modifier.padding(horizontal = 10.dp))
         Rule(Modifier.weight(1f))
     }
 }
@@ -407,7 +405,7 @@ fun OnScreenLine(ref: ScreenRef, onDrop: () -> Unit, modifier: Modifier = Modifi
             .padding(start = 10.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MonoLabel("On screen ·", modifier = Modifier.padding(end = 6.dp))
+        MetaLabel("On screen ·", modifier = Modifier.padding(end = 6.dp))
         Text(
             title,
             style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Content),

@@ -20,7 +20,7 @@ import io.github.ronganam.dana.data.money.Txn
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.viewmodels.MoneyController
 import io.github.ronganam.dana.ui.viewmodels.MoneyView
@@ -80,7 +80,7 @@ private fun TxnBody(money: MoneyController, t: Txn, full: Boolean, error: String
             color = toneColor(tone),
             modifier = Modifier.padding(top = 4.dp)
         )
-        MonoLabel(listOf(MoneyLedger.longDate(t.purchaseDate), time, acct).filter { it.isNotEmpty() }.joinToString(" · "), Modifier.padding(top = 2.dp))
+        MetaLabel(listOf(MoneyLedger.longDate(t.purchaseDate), time, acct).filter { it.isNotEmpty() }.joinToString(" · "), Modifier.padding(top = 2.dp))
         val badges = MoneyLedger.badges(t, company)
         if (badges.isNotEmpty()) BadgeRow(badges, Modifier.padding(top = 10.dp))
         if (explain.isNotEmpty()) Muted(explain, Modifier.padding(top = 10.dp))
@@ -217,7 +217,7 @@ private fun CategoryPicker(money: MoneyController, t: Txn) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(horizontal = 18.dp)) {
             Text(t.title, style = MaterialTheme.typography.titleMedium.copy(textDirection = TextDirection.Content), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            MonoLabel("${MoneyFormat.amount(t.amount)} · ${MoneyLedger.shortDate(t.purchaseDate)}", Modifier.padding(bottom = 10.dp))
+            MetaLabel("${MoneyFormat.amount(t.amount)} · ${MoneyLedger.shortDate(t.purchaseDate)}", Modifier.padding(bottom = 10.dp))
             Segments(listOf("merchant" to "Always for this merchant", "one" to "Only this one"), if (forMerchant) "merchant" else "one") {
                 ledger.setForMerchant(it == "merchant")
             }

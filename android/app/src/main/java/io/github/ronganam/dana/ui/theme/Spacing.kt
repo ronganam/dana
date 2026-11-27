@@ -2,7 +2,10 @@ package io.github.ronganam.dana.ui.theme
 
 import androidx.compose.ui.unit.dp
 
-/** 4dp-based spacing scale. Screens use [screen] horizontally; cards use [lg] inside. */
+/**
+ * Spacing on an 8dp rhythm (4dp steps where a row needs them). Screens use
+ * [screen] (16dp margins) horizontally; groups use [lg] inside.
+ */
 object Space {
     val xxs = 2.dp
     val xs = 4.dp

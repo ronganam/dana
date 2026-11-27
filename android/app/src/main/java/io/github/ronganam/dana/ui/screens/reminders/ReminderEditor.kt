@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.Task
 import io.github.ronganam.dana.data.models.TaskGroup
 import io.github.ronganam.dana.ui.components.InkChoice
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.components.friendlyDateTime
 import io.github.ronganam.dana.ui.components.isolate
@@ -106,7 +106,7 @@ fun ReminderEditor(
             )
         }
         val listName = task.groupId?.let { id -> groups.firstOrNull { it.id == id }?.name } ?: task.groupName ?: "General"
-        MonoLabel("${if (done) "Done" else bucketOf(task, now).label} · $listName")
+        MetaLabel("${if (done) "Done" else bucketOf(task, now).label} · $listName")
 
         InlineField(
             value = title,
@@ -235,7 +235,7 @@ fun ReminderEditor(
 @Composable
 private fun Field(label: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth().padding(top = 20.dp)) {
-        MonoLabel(label, modifier = Modifier.padding(bottom = 8.dp))
+        MetaLabel(label, modifier = Modifier.padding(bottom = 8.dp))
         content()
     }
 }

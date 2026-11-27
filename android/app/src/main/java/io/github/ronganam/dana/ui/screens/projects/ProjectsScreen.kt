@@ -15,7 +15,7 @@ import io.github.ronganam.dana.data.projects.ProjectsCore
 import io.github.ronganam.dana.ui.adaptive.sidePaneWidth
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.shell.edgeRule
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import io.github.ronganam.dana.ui.viewmodels.ProjectsController
@@ -39,7 +39,7 @@ fun ProjectsStage(viewModel: MainViewModel, cover: Boolean) {
         projectId == null -> NothingOpen(c, list?.isEmpty() == true)
         its == null -> Column(Modifier.padding(24.dp)) {
             if (cover) BackLink("Projects") { c.leaveProject() }
-            Text(error ?: "Loading…", style = if (error != null) MaterialTheme.typography.bodyMedium else serifItalic(20),
+            Text(error ?: "Loading…", style = if (error != null) MaterialTheme.typography.bodyMedium else quietText(20),
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (error != null) InkButton("Try again", modifier = Modifier.padding(top = 10.dp)) { c.refresh() }
         }
@@ -72,10 +72,10 @@ fun ProjectsStage(viewModel: MainViewModel, cover: Boolean) {
 @Composable
 private fun NothingOpen(c: ProjectsController, empty: Boolean) {
     Column(Modifier.fillMaxSize().padding(horizontal = 32.dp, vertical = 40.dp)) {
-        MonoLabel("Projects")
+        MetaLabel("Projects")
         Text(
             if (empty) "Keep a project in one place." else "Pick a project.",
-            style = serifItalic(28), modifier = Modifier.padding(top = 6.dp)
+            style = quietText(28), modifier = Modifier.padding(top = 6.dp)
         )
         Text(
             "A wedding, a trip, a flat hunt: decisions with their options side by side, notes, links and the files people send.",

@@ -29,7 +29,7 @@ import io.github.ronganam.dana.data.models.CallSuggestion
 import io.github.ronganam.dana.data.models.PhoneCall
 import io.github.ronganam.dana.ui.components.LabelChips
 import io.github.ronganam.dana.ui.components.MetaChips
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.components.SuggestionRow
 import io.github.ronganam.dana.ui.theme.Danger
@@ -68,7 +68,7 @@ internal fun CallDetailPane(
         item(key = "head") {
             Column(Modifier.fillMaxWidth()) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    MonoLabel(
+                    MetaLabel(
                         text = buildString {
                             append(call.fullDateLabel())
                             if (call.durationSeconds > 0) append(" · ").append(formatDuration(call.durationSeconds))
@@ -89,13 +89,13 @@ internal fun CallDetailPane(
                     style = MaterialTheme.typography.headlineLarge
                 )
                 Spacer(Modifier.height(6.dp))
-                MonoLabel(buildString {
+                MetaLabel(buildString {
                     append("${call.caller}  →  ${call.receiver}")
                     call.direction?.let { append(" · ").append(it) }
                 })
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    if (call.labels.isEmpty()) MonoLabel("No labels", modifier = Modifier.padding(end = 4.dp))
+                    if (call.labels.isEmpty()) MetaLabel("No labels", modifier = Modifier.padding(end = 4.dp))
                     LabelChips(call.labels, Modifier.weight(1f, fill = false))
                     IconButton(onClick = onEditLabels) {
                         Icon(Icons.Outlined.Edit, contentDescription = "Edit labels",
@@ -206,7 +206,7 @@ internal fun CallActionsPane(call: PhoneCall, player: CallAudioPlayer, modifier:
             .verticalScroll(rememberScrollState())
             .padding(horizontal = 18.dp, vertical = 16.dp)
     ) {
-        MonoLabel("Playback", color = MaterialTheme.colorScheme.primary)
+        MetaLabel("Playback", color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(12.dp))
         CallPlayer(call, player)
 
@@ -239,7 +239,7 @@ internal fun CallActionsPane(call: PhoneCall, player: CallAudioPlayer, modifier:
 @Composable
 private fun SectionHead(text: String) {
     Column(Modifier.fillMaxWidth().padding(top = 20.dp, bottom = 10.dp)) {
-        MonoLabel(text, color = MaterialTheme.colorScheme.onSurface)
+        MetaLabel(text, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(6.dp))
         Rule()
     }
@@ -261,7 +261,7 @@ internal fun FollowUpList(points: List<String>) {
     Column(Modifier.fillMaxWidth()) {
         points.forEachIndexed { i, p ->
             Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.Top) {
-                MonoLabel((i + 1).toString().padStart(2, '0'), color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(30.dp).padding(top = 3.dp))
+                MetaLabel((i + 1).toString().padStart(2, '0'), color = MaterialTheme.colorScheme.primary, modifier = Modifier.width(30.dp).padding(top = 3.dp))
                 RtlSupportingText(
                     text = p,
                     color = MaterialTheme.colorScheme.onSurface,
@@ -276,7 +276,7 @@ internal fun FollowUpList(points: List<String>) {
 @Composable
 private fun Fact(label: String, value: String) {
     Column(Modifier.fillMaxWidth().padding(vertical = 7.dp)) {
-        MonoLabel(label)
+        MetaLabel(label)
         Spacer(Modifier.height(2.dp))
         Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
     }
@@ -291,7 +291,7 @@ private fun TurnRow(turn: TranscriptTurn, speakerIndex: Int) {
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
             if (turn.speaker != null) {
-                MonoLabel(turn.speaker, color = if (speakerIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                MetaLabel(turn.speaker, color = if (speakerIndex == 0) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(3.dp))
             }
             RtlSupportingText(

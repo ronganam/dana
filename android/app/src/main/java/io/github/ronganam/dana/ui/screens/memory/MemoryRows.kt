@@ -22,7 +22,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.Memory
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.screens.common.DotLabel
 import io.github.ronganam.dana.ui.screens.common.auto
 
@@ -177,7 +177,7 @@ private fun ChipLabel(text: String, count: Int) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Text(text, maxLines = 1)
         Spacer(Modifier.width(6.dp))
-        MonoLabel(count.toString())
+        MetaLabel(count.toString())
     }
 }
 
@@ -197,7 +197,7 @@ internal fun MemoryCategoryPane(
             .padding(horizontal = 8.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp)
     ) {
-        MonoLabel("Types", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
+        MetaLabel("Types", modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
         CategoryRow("All", total, null, categoryFilter.isEmpty()) { onSelectCategory("") }
         categories.forEach { cat ->
             CategoryRow(
@@ -235,6 +235,6 @@ private fun CategoryRow(label: String, count: Int, color: Color?, selected: Bool
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f)
         )
-        MonoLabel(count.toString())
+        MetaLabel(count.toString())
     }
 }

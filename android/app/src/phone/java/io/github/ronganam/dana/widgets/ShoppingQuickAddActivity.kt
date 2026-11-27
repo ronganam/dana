@@ -31,7 +31,7 @@ import io.github.ronganam.dana.data.shopping.ShoppingView
 import io.github.ronganam.dana.data.shopping.Usual
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.screens.common.byScript
 import io.github.ronganam.dana.ui.screens.shopping.AddField
 import io.github.ronganam.dana.ui.screens.shopping.SuggestionList
@@ -147,7 +147,7 @@ private fun QuickAddSheet(onClose: () -> Unit) {
         ) {
             Row(Modifier.padding(start = 18.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    MonoLabel("Shopping", color = MaterialTheme.colorScheme.primary)
+                    MetaLabel("Shopping", color = MaterialTheme.colorScheme.primary)
                     Text(
                         screen?.let { ShoppingView.subtitle(it, null) } ?: "Loading…",
                         style = MaterialTheme.typography.bodyMedium,

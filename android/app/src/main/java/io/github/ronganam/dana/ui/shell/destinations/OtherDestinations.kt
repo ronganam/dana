@@ -12,11 +12,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.CallsScreen
 import io.github.ronganam.dana.ui.screens.MemoryScreen
@@ -28,7 +27,6 @@ import io.github.ronganam.dana.ui.shell.Destination
 import io.github.ronganam.dana.ui.shell.LocalShellLayout
 import io.github.ronganam.dana.ui.shell.PaneWindow
 import io.github.ronganam.dana.ui.shell.ShellLayout
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import io.github.ronganam.dana.ui.viewmodels.MoreItem
 import io.github.ronganam.dana.ui.viewmodels.Place
@@ -106,7 +104,7 @@ private fun MoreList(viewModel: MainViewModel, selected: MoreItem?) {
     val canvas = MaterialTheme.colorScheme.background
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 20.dp)) {
         Column(Modifier.padding(horizontal = 18.dp)) {
-            MonoLabel("Everything else Dana keeps")
+            MetaLabel("Everything else Dana keeps")
             Text("More", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp))
             Rule()
         }
@@ -127,9 +125,9 @@ private fun MoreList(viewModel: MainViewModel, selected: MoreItem?) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(item.label, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 25.sp), maxLines = 1)
-                        if (!isCount) MonoLabel(meta, modifier = Modifier.padding(top = 2.dp))
+                        if (!isCount) MetaLabel(meta, modifier = Modifier.padding(top = 2.dp))
                     }
-                    if (isCount && meta.isNotEmpty()) MonoLabel(meta)
+                    if (isCount && meta.isNotEmpty()) MetaLabel(meta)
                 }
                 Rule(Modifier.padding(horizontal = 18.dp))
             }
@@ -143,7 +141,7 @@ private fun MoreStage(viewModel: MainViewModel, item: MoreItem?) {
     val stacked = LocalShellLayout.current == ShellLayout.STACKED
     if (item == null) {
         Column(Modifier.padding(horizontal = 26.dp, vertical = 28.dp)) {
-            Text("Pick one on the left.", style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic))
+            Text("Pick one on the left.", style = MaterialTheme.typography.headlineSmall)
             Text("Calls, people and settings open here.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else MoreItemStage(viewModel, item, stacked)

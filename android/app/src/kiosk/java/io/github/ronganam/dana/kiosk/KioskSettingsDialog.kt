@@ -1,6 +1,6 @@
 package io.github.ronganam.dana.kiosk
 
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.SectionLabel
 import io.github.ronganam.dana.ui.theme.hues
 import io.github.ronganam.dana.data.network.ServerConfig
@@ -81,7 +81,7 @@ fun KioskSettingsDialog(
                 Modifier.padding(24.dp).verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                MonoLabel("Settings", color = MaterialTheme.colorScheme.primary)
+                MetaLabel("Settings", color = MaterialTheme.colorScheme.primary)
                 Text("Dana kiosk", style = MaterialTheme.typography.headlineSmall)
                 Text("v${BuildConfig.VERSION_NAME} · $status", style = MaterialTheme.typography.bodySmall)
 

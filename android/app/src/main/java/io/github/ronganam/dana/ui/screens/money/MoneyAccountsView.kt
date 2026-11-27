@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -31,10 +30,9 @@ import io.github.ronganam.dana.data.money.MoneyLedger
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.theme.Danger
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.theme.Info
 import io.github.ronganam.dana.ui.theme.Warning
 import io.github.ronganam.dana.ui.viewmodels.LoginForm
@@ -71,7 +69,7 @@ internal fun AccountsView(money: MoneyController, modifier: Modifier = Modifier)
             when {
                 list == null -> Muted("Loading…", Modifier.padding(top = 18.dp))
                 list.isEmpty() && f == null -> Column(Modifier.padding(top = 24.dp)) {
-                    Text("No bank or card yet.", style = MaterialTheme.typography.headlineMedium.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic))
+                    Text("No bank or card yet.", style = MaterialTheme.typography.headlineMedium)
                     Muted("Add the login you use on your bank's or card's site, and Dana keeps your transactions here.", Modifier.padding(top = 6.dp, bottom = 12.dp))
                     InkButton("Add a bank or card", emphasis = InkEmphasis.SOLID) { ledger.openAdd() }
                 }
@@ -143,7 +141,7 @@ private fun LoginBlock(money: MoneyController, s: MoneySource, form: LoginForm?,
             if (s.lastOkAt != null) "Last good sync ${MoneyLedger.whenText(s.lastOkAt, now)}" else "Never synced yet",
             s.nextSyncAt?.takeIf { s.state != "syncing" && s.state != "needs_attention" }?.let { "next ${MoneyLedger.whenText(it, now)} (${MoneyLedger.until(it, now)})" }
         ).joinToString(" · ")
-        // Wraps (MonoLabel is one line) so "next … (in 7 h)" is never cut in a narrow column.
+        // Wraps (MetaLabel is one line) so "next … (in 7 h)" is never cut in a narrow column.
         Text(times.uppercase(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 6.dp))
         Rule(Modifier.padding(vertical = 10.dp))
         if (s.accounts.isEmpty()) Muted("No accounts yet — they appear after the first sync.")
@@ -181,7 +179,7 @@ private fun AccountLine(s: MoneySource, a: MoneyAccount, now: Instant) {
     Row(Modifier.fillMaxWidth().padding(vertical = 5.dp), verticalAlignment = Alignment.Top) {
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium, textDirection = TextDirection.Content))
-            MonoLabel(MoneyLedger.kindWord(a.kind))
+            MetaLabel(MoneyLedger.kindWord(a.kind))
         }
         Column(horizontalAlignment = Alignment.End) {
             if (value.isNotEmpty()) Text(value, style = MaterialTheme.typography.bodyMedium.merge(MoneyNumbers).copy(fontWeight = FontWeight.Medium))
@@ -209,7 +207,7 @@ private fun AddForm(money: MoneyController, f: LoginForm) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(c.name, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
-                    MonoLabel(MoneyLedger.kindWord(c.kind))
+                    MetaLabel(MoneyLedger.kindWord(c.kind))
                     Text("  ›", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 Rule()

@@ -226,7 +226,7 @@ private fun SuggestionsPopupScreen(
         Column(Modifier.fillMaxSize().wrapContentWidth().widthIn(max = 760.dp).fillMaxWidth()
             .systemBarsPadding().padding(horizontal = 20.dp)) {
             Spacer(Modifier.height(20.dp))
-            MonoLabel(
+            MetaLabel(
                 when {
                     list == null -> "Suggestions"
                     allHandled -> "All handled"

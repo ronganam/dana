@@ -55,13 +55,12 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.Task
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.shell.LocalShellLayout
 import io.github.ronganam.dana.ui.shell.ShellLayout
 import io.github.ronganam.dana.ui.shell.dragToDay
 import io.github.ronganam.dana.ui.shell.rememberNow
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 
 private val GUTTER = 18.dp
@@ -135,7 +134,7 @@ fun ReminderListPane(viewModel: MainViewModel) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)) {
         item(key = "head") {
             Column(Modifier.padding(horizontal = GUTTER)) {
-                MonoLabel("${open.size} open · $forToday for today")
+                MetaLabel("${open.size} open · $forToday for today")
                 Text("Reminders", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp))
                 Row(Modifier.padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
                     SegTab("By when", !byList) { shell.setRemindersByList(false) }
@@ -152,7 +151,7 @@ fun ReminderListPane(viewModel: MainViewModel) {
             Column(Modifier.padding(horizontal = GUTTER, vertical = 24.dp)) {
                 Text(
                     "Nothing to remember.",
-                    style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = androidx.compose.ui.text.font.FontStyle.Italic)
+                    style = MaterialTheme.typography.headlineSmall
                 )
                 Text("Add one above, or tell Dana.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -173,7 +172,7 @@ fun ReminderListPane(viewModel: MainViewModel) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text("Done recently · ${done.size}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                    MonoLabel(if (doneOpen) "hide" else "show")
+                    MetaLabel(if (doneOpen) "hide" else "show")
                 }
                 Rule(Modifier.padding(horizontal = GUTTER))
             }
@@ -193,7 +192,7 @@ private fun SegTab(text: String, on: Boolean, onClick: () -> Unit) {
             .padding(vertical = 8.dp),
         contentAlignment = Alignment.Center
     ) {
-        MonoLabel(text, color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+        MetaLabel(text, color = if (on) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
     }
 }
 
@@ -245,7 +244,7 @@ private fun SectionHead(title: String, count: Int, dot: Color? = null) {
     Column(Modifier.padding(horizontal = GUTTER).padding(top = 20.dp)) {
         Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             if (dot != null) Box(Modifier.padding(end = 8.dp).size(7.dp).clip(CircleShape).background(dot))
-            MonoLabel(title, modifier = Modifier.weight(1f))
+            MetaLabel(title, modifier = Modifier.weight(1f))
             RollingText(count.toString(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Rule()
@@ -391,7 +390,7 @@ fun ReminderRow(
                     }
                 )
                 Row(Modifier.padding(top = 3.dp), verticalAlignment = Alignment.CenterVertically) {
-                    MonoLabel(whenText, modifier = Modifier.weight(1f, fill = false))
+                    MetaLabel(whenText, modifier = Modifier.weight(1f, fill = false))
                     if (listName != null) Text(
                         listName.uppercase(),
                         style = MaterialTheme.typography.labelMedium.copy(textDirection = TextDirection.Content),

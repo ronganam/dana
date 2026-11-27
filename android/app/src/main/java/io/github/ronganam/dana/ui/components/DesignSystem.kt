@@ -25,12 +25,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
-import io.github.ronganam.dana.ui.theme.AccentWarmDark
-import io.github.ronganam.dana.ui.theme.AccentWarmLight
+import io.github.ronganam.dana.ui.theme.circuitColors
 import io.github.ronganam.dana.ui.theme.Space
 import io.github.ronganam.dana.ui.theme.hues
 
@@ -63,7 +61,7 @@ fun ScreenTopBar(
     ) {
         navigationIcon?.invoke()
         Column(modifier = Modifier.weight(1f).padding(vertical = 8.dp)) {
-            if (kicker != null) MonoLabel(kicker, color = MaterialTheme.colorScheme.primary)
+            if (kicker != null) MetaLabel(kicker, color = MaterialTheme.colorScheme.primary)
             Text(
                 text = title,
                 style = MaterialTheme.typography.headlineMedium,
@@ -166,11 +164,14 @@ fun initialsOf(name: String): String {
     }
 }
 
-/** Mono, uppercase micro-label for metadata (counts, timestamps, section kickers). */
+/**
+ * A one-line metadata label (counts, times, a short kicker): 12sp medium with
+ * tabular figures, in sentence case — never tiny uppercase.
+ */
 @Composable
-fun MonoLabel(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
+fun MetaLabel(text: String, modifier: Modifier = Modifier, color: Color = MaterialTheme.colorScheme.onSurfaceVariant) {
     Text(
-        text = text.uppercase(),
+        text = text.replaceFirstChar { it.uppercaseChar() },
         style = MaterialTheme.typography.labelMedium,
         color = color,
         maxLines = 1,
@@ -201,7 +202,7 @@ fun InkChoice(
     val accent = MaterialTheme.colorScheme.primary
     val shape = RoundedCornerShape(10.dp)
     val fill = when {
-        solid -> Modifier.background(emberGradient())
+        solid -> Modifier.background(accentFill())
         selected -> Modifier.background(hues.tint(accent))
         else -> Modifier
     }
@@ -233,16 +234,13 @@ fun InkChoice(
 }
 
 /**
- * A primary button's fill: the accent warming slightly towards its end
- * (start → end, so it follows the reading direction). Dimmed when disabled.
+ * A filled button's container: the filled accent (dark text on it in the
+ * dark theme, [MaterialTheme]'s onPrimary). Dimmed when disabled.
  */
 @Composable
-fun emberGradient(enabled: Boolean = true): Brush {
-    val accent = MaterialTheme.colorScheme.primary
-    val warm = if (hues.dark) AccentWarmDark else AccentWarmLight
-    val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
-    val colors = listOf(accent, warm).map { if (enabled) it else it.copy(alpha = 0.5f) }
-    return Brush.horizontalGradient(if (rtl) colors.reversed() else colors)
+fun accentFill(enabled: Boolean = true): Brush {
+    val fill = circuitColors.accentFilled
+    return SolidColor(if (enabled) fill else fill.copy(alpha = 0.5f))
 }
 
 /** How loud an [InkButton] is. */
@@ -273,7 +271,7 @@ fun InkButton(
         modifier = modifier
             .heightIn(min = 34.dp)
             .clip(shape)
-            .then(if (emphasis == InkEmphasis.SOLID) Modifier.background(emberGradient(enabled)) else Modifier)
+            .then(if (emphasis == InkEmphasis.SOLID) Modifier.background(accentFill(enabled)) else Modifier)
             .border(1.dp, border, shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(horizontal = if (emphasis == InkEmphasis.BARE) 4.dp else 12.dp, vertical = 7.dp),
@@ -309,7 +307,7 @@ fun ActionPill(text: String, modifier: Modifier = Modifier, solid: Boolean = fal
         modifier = modifier
             .heightIn(min = 34.dp)
             .clip(shape)
-            .then(if (solid) Modifier.background(emberGradient(enabled)) else Modifier.background(hues.tint(accent)))
+            .then(if (solid) Modifier.background(accentFill(enabled)) else Modifier.background(hues.tint(accent)))
             .clickable(enabled = enabled, role = androidx.compose.ui.semantics.Role.Button, onClick = onClick)
             .padding(horizontal = 15.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center

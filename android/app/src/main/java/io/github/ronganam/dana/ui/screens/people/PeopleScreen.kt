@@ -48,7 +48,7 @@ import io.github.ronganam.dana.ui.adaptive.PaneRow
 import io.github.ronganam.dana.ui.adaptive.WindowTier
 import io.github.ronganam.dana.ui.adaptive.sidePaneWidth
 import io.github.ronganam.dana.ui.adaptive.windowTier
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.ScreenTopBar
 import io.github.ronganam.dana.ui.screens.common.QuietEmptyState
 import io.github.ronganam.dana.ui.theme.Space
@@ -261,8 +261,8 @@ private fun SectionHeader(title: String, count: Int, accent: Boolean) {
         Modifier.fillMaxWidth().padding(start = Space.screen, end = Space.screen, top = Space.lg, bottom = Space.xs),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MonoLabel(title, Modifier.weight(1f), color = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
-        MonoLabel(count.toString())
+        MetaLabel(title, Modifier.weight(1f), color = if (accent) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+        MetaLabel(count.toString())
     }
 }
 

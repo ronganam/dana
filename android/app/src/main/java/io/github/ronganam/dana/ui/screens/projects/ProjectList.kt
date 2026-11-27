@@ -29,7 +29,7 @@ import io.github.ronganam.dana.data.projects.ProjectsCore
 import io.github.ronganam.dana.data.projects.Section
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.viewmodels.ProjectsController
 import java.time.LocalDate
@@ -55,7 +55,7 @@ internal fun ProjectList(c: ProjectsController, tree: Boolean) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(top = if (tree) 12.dp else 4.dp, bottom = 24.dp)) {
         Row(Modifier.padding(horizontal = 18.dp), verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
-                MonoLabel(
+                MetaLabel(
                     when {
                         list == null && error == null -> "Loading…"
                         else -> ProjectsCore.plural(all.size - archived, "project") + if (archived > 0) " · $archived archived" else ""
@@ -75,7 +75,7 @@ internal fun ProjectList(c: ProjectsController, tree: Boolean) {
         }
         if (list != null && all.isEmpty()) {
             Column(Modifier.padding(horizontal = 18.dp, vertical = 24.dp)) {
-                Text("Keep a project in one place.", style = serifItalic(22))
+                Text("Keep a project in one place.", style = quietText(22))
                 Text(
                     "A wedding, a trip, a flat hunt: decisions with their options side by side, notes, links and the files people send.",
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,

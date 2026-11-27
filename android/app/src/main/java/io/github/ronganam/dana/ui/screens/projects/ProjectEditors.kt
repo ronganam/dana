@@ -19,7 +19,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.input.KeyboardType
@@ -32,7 +31,7 @@ import io.github.ronganam.dana.data.projects.ProjectsCore
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.theme.CategoryHues
 import io.github.ronganam.dana.ui.theme.hues
@@ -73,7 +72,7 @@ private fun FormHeader(title: String, onClose: () -> Unit) {
 @Composable
 private fun Labeled(label: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
     Column(modifier.padding(top = 14.dp)) {
-        MonoLabel(label, Modifier.padding(bottom = 6.dp))
+        MetaLabel(label, Modifier.padding(bottom = 6.dp))
         content()
     }
 }
@@ -123,8 +122,8 @@ private fun ColumnScope.ProjectForm(c: ProjectsController, d: ProjectsEditor.Pro
         Labeled("Colour") {
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 CategoryHues.forEach { hue ->
-                    // Stored as the hue's dark value (the same on every client); shown in the theme's value.
-                    val hex = String.format("#%06x", hue.dark.toArgb() and 0xFFFFFF)
+                    // Stored as the hue's shared value (the same on every client); shown in the theme's value.
+                    val hex = hue.storedHex
                     val color = hues.of(hue)
                     val on = d.color.equals(hex, ignoreCase = true)
                     Box(

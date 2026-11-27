@@ -42,7 +42,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.ui.components.InkChip
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.components.StatusPill
 import kotlin.math.cos
@@ -135,7 +135,7 @@ fun ReminderScreen(
         }
         val quickSnoozes: @Composable () -> Unit = {
             Spacer(Modifier.height(if (compact) 10.dp else 14.dp))
-            MonoLabel("Snooze")
+            MetaLabel("Snooze")
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 QUICK_SNOOZES.forEach { leaf ->
@@ -264,7 +264,7 @@ private fun ReminderHeader(
     compact: Boolean
 ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        MonoLabel(kicker, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
+        MetaLabel(kicker, color = MaterialTheme.colorScheme.primary, modifier = Modifier.weight(1f))
         StatusPill(priority.replaceFirstChar { it.uppercase() }, priorityColor)
     }
     Spacer(Modifier.height(if (compact) 10.dp else 14.dp))
@@ -429,7 +429,7 @@ private fun SnoozeDialDock(
             }
         }
         Spacer(Modifier.height(8.dp))
-        MonoLabel(
+        MetaLabel(
             "Hold & drag up · time · place · car",
             color = inkSoft,
             modifier = Modifier.alpha(if (dragging) 0f else 1f)
@@ -513,7 +513,7 @@ private fun SnoozeReadout(path: List<MenuNode>, modifier: Modifier = Modifier) {
     val (headline, hint) = snoozeReadout(path)
     val onLeaf = path.lastOrNull() is MenuNode.Leaf
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
-        MonoLabel(
+        MetaLabel(
             (listOf("Snooze") + path.drop(1).map(::shortLabel)).joinToString("  ›  "),
             color = MaterialTheme.colorScheme.primary
         )

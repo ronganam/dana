@@ -37,7 +37,7 @@ import io.github.ronganam.dana.data.projects.Section
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.viewmodels.ProjectsController
 
@@ -90,7 +90,7 @@ internal fun SectionPage(c: ProjectsController, items: ProjectItems, s: Section,
                 mine.isEmpty() -> Text(
                     if (s.isOptions) t("No options yet. Add the first one below, or ask Dana to collect them.", "אין עדיין אפשרויות. אפשר להוסיף כאן למטה, או לבקש מדנה לאסוף אותן.")
                     else t("Nothing here yet.", "עדיין ריק."),
-                    style = serifItalic(18).byContent(), color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = quietText(18).byContent(), color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(horizontal = gutter, vertical = 16.dp)
                 )
                 mode == "compare" -> {
@@ -121,7 +121,7 @@ private fun Summary(c: ProjectsController, s: Section, canEdit: Boolean) {
         val d = draft
         when {
             d != null -> Boxed(Modifier.fillMaxWidth()) {
-                MonoLabel(t("Summary", "סיכום") + " · Markdown")
+                MetaLabel(t("Summary", "סיכום") + " · Markdown")
                 InkField(d, { c.setSummaryDraft(it) }, Modifier.fillMaxWidth().heightIn(min = 160.dp).padding(top = 8.dp),
                     placeholder = t("TL;DR, a comparison table, the recommendation…", "תקציר, טבלת השוואה, המלצה…"), singleLine = false)
                 Row(Modifier.align(Alignment.End).padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -143,7 +143,7 @@ private fun Summary(c: ProjectsController, s: Section, canEdit: Boolean) {
                     drawLine(accent, Offset(0f, 0f), Offset(0f, size.height), 2.dp.toPx())
                 }.padding(start = 16.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        MonoLabel(t("Summary", "סיכום"), Modifier.weight(1f), color = accent)
+                        MetaLabel(t("Summary", "סיכום"), Modifier.weight(1f), color = accent)
                         if (canEdit) InkButton(t("Edit", "עריכה"), emphasis = InkEmphasis.BARE) { c.editSummary() }
                     }
                     Box(if (long && !open) Modifier.heightIn(max = 260.dp).clip(RoundedCornerShape(0.dp)) else Modifier) {
@@ -246,7 +246,7 @@ private fun CompareTable(s: Section, options: List<Entry>, openId: String?, gutt
         // Sticky names
         Column(Modifier.width(nameW).background(canvas)) {
             Box(Modifier.height(HEAD_H).fillMaxWidth().then(ruled), contentAlignment = Alignment.BottomStart) {
-                MonoLabel(lang.t("Option", "אפשרות"), Modifier.padding(bottom = 8.dp))
+                MetaLabel(lang.t("Option", "אפשרות"), Modifier.padding(bottom = 8.dp))
             }
             options.forEach { e ->
                 Column(

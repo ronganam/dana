@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.money.MoneyText
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.money.*
 import io.github.ronganam.dana.ui.shell.Destination
@@ -146,9 +146,9 @@ private fun MoneyHeader(money: MoneyController, compact: Boolean) {
             Text("Money", style = MaterialTheme.typography.displaySmall, modifier = Modifier.weight(1f))
             if (view.monthly) MonthSwitcher(month, onShift = { money.shiftMonth(it) })
         }
-        synced?.let { MonoLabel(it, Modifier.padding(bottom = 6.dp)) }
+        synced?.let { MetaLabel(it, Modifier.padding(bottom = 6.dp)) }
     } else {
-        MonoLabel(synced ?: "Spending · accounts · savings")
+        MetaLabel(synced ?: "Spending · accounts · savings")
         Text("Money", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp, bottom = 8.dp))
         if (view.monthly) MonthSwitcher(month, onShift = { money.shiftMonth(it) })
     }

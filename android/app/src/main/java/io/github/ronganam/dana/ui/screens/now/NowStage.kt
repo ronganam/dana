@@ -8,7 +8,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
@@ -17,10 +16,9 @@ import io.github.ronganam.dana.data.models.NowItem
 import io.github.ronganam.dana.ui.components.ActionPill
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.shell.DayItem
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -78,8 +76,8 @@ private fun ItemDetail(item: NowItem, draft: ItemDraft?, handlers: NowHandlers) 
     item.blocks.filterNot { it.isDecide() }.forEach { EvidenceBlock(it, Modifier.padding(top = 4.dp)) }
 
     Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 8.dp)) {
-        MonoLabel("Decide", modifier = Modifier.weight(1f))
-        if (item.schedulable) MonoLabel("or drag it onto the day")
+        MetaLabel("Decide", modifier = Modifier.weight(1f))
+        if (item.schedulable) MetaLabel("or drag it onto the day")
     }
     Rule()
     item.blocks.filter { it.isDecide() }.forEach { b ->
@@ -104,12 +102,12 @@ private val DAY_KICKER = DateTimeFormatter.ofPattern("EEE d MMM · 'from' HH:mm"
 
 @Composable
 private fun RestOfToday(now: LocalDateTime, later: List<Pair<String, DayItem>>, hint: Boolean) {
-    MonoLabel(now.format(DAY_KICKER))
+    MetaLabel(now.format(DAY_KICKER))
     Text("The rest of today", style = MaterialTheme.typography.displaySmall, modifier = Modifier.padding(top = 2.dp, bottom = 10.dp))
     Rule()
     if (later.isEmpty()) Text(
         "Nothing else today.",
-        style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic),
+        style = MaterialTheme.typography.headlineSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(vertical = 14.dp)
     )

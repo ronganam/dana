@@ -39,7 +39,7 @@ fun windowTier(): WindowTier {
  * - SIDE = the index/list/filter column: 280dp (248dp when the window is < 960dp wide).
  * - ASIDE = contextual extras (context, actions, inspector): 288dp (256dp when < 960dp).
  * - MAIN panes share the remaining width equally; they are never tinted.
- * - Panes carry no headers of their own; use a MonoLabel row for pane-level labels.
+ * - Panes carry no headers of their own; use a MetaLabel row for pane-level labels.
  * Use [sidePaneWidth] / [asidePaneWidth] — never hardcode a pane width in a screen.
  */
 object PaneWidth {

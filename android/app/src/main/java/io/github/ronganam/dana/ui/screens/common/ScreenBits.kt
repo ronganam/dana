@@ -13,12 +13,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.ui.components.HueMark
-import io.github.ronganam.dana.ui.components.MonoLabel
-import io.github.ronganam.dana.ui.theme.DanaSerif
+import io.github.ronganam.dana.ui.components.MetaLabel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -43,7 +41,7 @@ fun QuietEmptyState(
         HueMark(hue, Modifier.padding(bottom = 4.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineMedium.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic),
+            style = MaterialTheme.typography.headlineMedium,
             color = MaterialTheme.colorScheme.onSurface
         )
         Text(
@@ -68,7 +66,7 @@ fun DotLabel(text: String, color: Color, modifier: Modifier = Modifier) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(6.dp).clip(CircleShape).background(color))
         Spacer(Modifier.width(6.dp))
-        MonoLabel(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        MetaLabel(text, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 

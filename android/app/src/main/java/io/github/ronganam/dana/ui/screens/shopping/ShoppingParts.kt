@@ -34,7 +34,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -52,10 +51,9 @@ import io.github.ronganam.dana.data.shopping.Usual
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.common.byScript
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -102,7 +100,7 @@ fun ShoppingHeader(
     Column(modifier.fillMaxWidth().padding(start = 18.dp, end = 8.dp, top = 14.dp, bottom = 6.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
-                Text("Shopping", style = MaterialTheme.typography.headlineMedium.copy(fontFamily = DanaSerif), maxLines = 1)
+                Text("Shopping", style = MaterialTheme.typography.headlineMedium, maxLines = 1)
                 Text(
                     model.subtitle,
                     style = MaterialTheme.typography.bodyMedium,
@@ -118,7 +116,7 @@ fun ShoppingHeader(
             if (menu.isNotEmpty()) ListMenu(menu, onMenu)
         }
         if (viewing) InkButton("← Back to your list", emphasis = InkEmphasis.BARE, onClick = onBack, modifier = Modifier.padding(top = 2.dp))
-        if (syncLine != null) MonoLabel(syncLine, modifier = Modifier.padding(top = 6.dp))
+        if (syncLine != null) MetaLabel(syncLine, modifier = Modifier.padding(top = 6.dp))
     }
 }
 
@@ -168,7 +166,7 @@ private fun ListMenu(menu: List<ShoppingView.MenuEntry>, onMenu: (ShoppingView.M
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             val lists = menu.filter { it.act != "clear" }
-            if (lists.isNotEmpty()) MonoLabel("Lists", modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
+            if (lists.isNotEmpty()) MetaLabel("Lists", modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp))
             menu.forEach { e ->
                 if (e.act == "clear" && lists.isNotEmpty()) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
                 DropdownMenuItem(
@@ -245,7 +243,7 @@ fun InviteBanner(
 @Composable
 fun UsualsRow(usuals: List<Usual>, onAdd: (String) -> Unit, modifier: Modifier = Modifier, label: Boolean = true) {
     if (usuals.isNotEmpty()) Column(modifier.fillMaxWidth()) {
-        if (label) MonoLabel("Usuals", modifier = Modifier.padding(start = 18.dp, top = 8.dp, bottom = 6.dp))
+        if (label) MetaLabel("Usuals", modifier = Modifier.padding(start = 18.dp, top = 8.dp, bottom = 6.dp))
         Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 14.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -357,8 +355,8 @@ fun AisleHeader(key: String, name: String, count: Int) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 8.dp)) {
             Icon(aisleIcon(key), null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(10.dp))
-            MonoLabel(name, modifier = Modifier.weight(1f))
-            MonoLabel(count.toString())
+            MetaLabel(name, modifier = Modifier.weight(1f))
+            MetaLabel(count.toString())
         }
         Rule()
     }
@@ -536,7 +534,7 @@ fun BoughtHeader(count: Int, open: Boolean, canEdit: Boolean, onToggle: () -> Un
                 tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(18.dp)
             )
             Spacer(Modifier.width(10.dp))
-            MonoLabel("Bought · $count", modifier = Modifier.weight(1f))
+            MetaLabel("Bought · $count", modifier = Modifier.weight(1f))
             if (canEdit) InkButton("Clear", emphasis = InkEmphasis.BARE, onClick = onClear)
         }
         Rule(Modifier.padding(horizontal = 18.dp))
@@ -549,7 +547,7 @@ fun ShoppingEmpty(canEdit: Boolean, addBelow: Boolean, modifier: Modifier = Modi
     Column(modifier.fillMaxWidth().padding(horizontal = 26.dp, vertical = 36.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Text(
             "Nothing to buy",
-            style = MaterialTheme.typography.headlineMedium.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic)
+            style = MaterialTheme.typography.headlineMedium
         )
         Text(
             when {
@@ -743,7 +741,7 @@ fun ShareContent(
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         ) else {
-            MonoLabel("On the list")
+            MetaLabel("On the list")
             model.people.forEach { p ->
                 Column {
                     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 52.dp)) {
@@ -763,7 +761,7 @@ fun ShareContent(
             }
         }
         if (model != null && model.others.isNotEmpty()) {
-            MonoLabel("Add someone", modifier = Modifier.padding(top = 4.dp))
+            MetaLabel("Add someone", modifier = Modifier.padding(top = 4.dp))
             model.others.forEach { u ->
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.heightIn(min = 52.dp)) {
                     Initials(u.name, size = 30)

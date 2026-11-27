@@ -38,7 +38,7 @@ import io.github.ronganam.dana.data.money.SavingItem
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.theme.Danger
 import io.github.ronganam.dana.ui.theme.Info
@@ -96,7 +96,7 @@ internal fun SaveView(money: MoneyController, modifier: Modifier = Modifier) {
 @Composable
 private fun Tile(label: String, value: String, sub: String, color: Color, modifier: Modifier) {
     Column(modifier.border(1.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(14.dp)).padding(14.dp)) {
-        MonoLabel(label)
+        MetaLabel(label)
         Text(value, style = MaterialTheme.typography.headlineMedium.merge(MoneyNumbers), color = color, modifier = Modifier.padding(top = 4.dp))
         if (sub.isNotEmpty()) Muted(sub, Modifier.padding(top = 2.dp))
     }
@@ -111,7 +111,7 @@ private fun Part(money: MoneyController, p: SavePart, day: String?) {
     Column(Modifier.fillMaxWidth().padding(top = 18.dp)) {
         Row(verticalAlignment = Alignment.Bottom) {
             Text(p.label, style = MaterialTheme.typography.headlineSmall, modifier = Modifier.weight(1f))
-            if (p.count > 0) MonoLabel("${p.count}")
+            if (p.count > 0) MetaLabel("${p.count}")
         }
         Rule(Modifier.padding(top = 6.dp))
         if (p.count == 0) Muted(
@@ -126,8 +126,8 @@ private fun Part(money: MoneyController, p: SavePart, day: String?) {
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(if (shut) "›" else "⌄", color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(18.dp))
-                MonoLabel(s.label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
-                MonoLabel("${s.items.size}")
+                MetaLabel(s.label, Modifier.weight(1f), color = MaterialTheme.colorScheme.onSurface)
+                MetaLabel("${s.items.size}")
             }
             if (!shut) s.items.forEach { it2 -> SavingCard(money, it2, s.key, day, selected = it2.key == open) }
         }
@@ -169,9 +169,9 @@ private fun SavingCard(money: MoneyController, it: SavingItem, section: String, 
             color = outcomeColor(oc.tone), modifier = Modifier.padding(top = 6.dp)
         )
         if (line.isNotEmpty() || !it.active) Row(Modifier.padding(top = 6.dp)) {
-            if (line.isNotEmpty()) MonoLabel(line, color = MaterialTheme.colorScheme.onSurface)
-            if (line.isNotEmpty() && !it.active) MonoLabel("  ·  ")
-            if (!it.active) MonoLabel("Dana no longer sees this")
+            if (line.isNotEmpty()) MetaLabel(line, color = MaterialTheme.colorScheme.onSurface)
+            if (line.isNotEmpty() && !it.active) MetaLabel("  ·  ")
+            if (!it.active) MetaLabel("Dana no longer sees this")
         }
         if (section == "choices") FlowRow(Modifier.padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             MoneySave.actions(it).filter { a -> !a.input && a.body != null }.forEach { a ->
@@ -250,7 +250,7 @@ private fun SavingBody(money: MoneyController, it: SavingItem, day: String?) {
         if (it.summary.isNotEmpty()) Text(MoneySave.isolateHebrew(it.summary), style = MaterialTheme.typography.bodyMedium.merge(Sentence), color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
         Chips(it, Modifier.padding(top = 8.dp))
         val line = MoneySave.statusLine(it, today)
-        if (line.isNotEmpty() || !it.active) MonoLabel(listOf(line, if (!it.active) "Dana no longer sees this" else "").filter { s -> s.isNotEmpty() }.joinToString(" · "), Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.onSurface)
+        if (line.isNotEmpty() || !it.active) MetaLabel(listOf(line, if (!it.active) "Dana no longer sees this" else "").filter { s -> s.isNotEmpty() }.joinToString(" · "), Modifier.padding(top = 8.dp), color = MaterialTheme.colorScheme.onSurface)
 
         MoneySave.outcomeText(it.outcome)?.let { oc ->
             Column(Modifier.padding(top = 14.dp).fillMaxWidth().border(1.dp, outcomeColor(oc.tone).copy(alpha = 0.5f), RoundedCornerShape(10.dp)).padding(12.dp)) {
@@ -271,7 +271,7 @@ private fun SavingBody(money: MoneyController, it: SavingItem, day: String?) {
             Kicker("Why")
             spark?.let { sp ->
                 Sparkline(sp, Modifier.padding(bottom = 2.dp))
-                MonoLabel(sp.range, Modifier.padding(bottom = 6.dp))
+                MetaLabel(sp.range, Modifier.padding(bottom = 6.dp))
             }
             ev.lines.forEach { l -> Bullet(l) }
             link?.let { l ->
@@ -451,7 +451,7 @@ private fun PricesBody(money: MoneyController, it: SavingItem, v: io.github.rong
     if (table != null) {
         Muted(v.checked + if (v.stale.isNotEmpty()) " · ${v.stale}" else "", Modifier.padding(top = 8.dp))
         if (table.sources.isNotEmpty()) {
-            MonoLabel("Sources", Modifier.padding(top = 6.dp))
+            MetaLabel("Sources", Modifier.padding(top = 6.dp))
             table.sources.forEach { s -> TextLink("${s.title} ↗") { open(s.url) } }
         }
     }

@@ -43,7 +43,7 @@ import io.github.ronganam.dana.data.sync.RecordingNames
 import io.github.ronganam.dana.data.sync.RecordingsFolder
 import io.github.ronganam.dana.data.sync.SharedAudio
 import io.github.ronganam.dana.ui.components.InkChip
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.calls.formatDuration
 import io.github.ronganam.dana.ui.theme.DanaTheme
@@ -266,7 +266,7 @@ private fun ShareSheet(
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp, vertical = 20.dp)
         ) {
-            MonoLabel(
+            MetaLabel(
                 buildString {
                     append("Share to Dana")
                     position?.let { append(" · ").append(it) }

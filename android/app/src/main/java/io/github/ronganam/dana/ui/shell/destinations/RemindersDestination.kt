@@ -6,7 +6,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.ui.screens.reminders.ReminderEditor
 import io.github.ronganam.dana.ui.screens.reminders.ReminderListPane
@@ -15,7 +14,6 @@ import io.github.ronganam.dana.ui.screens.reminders.sectionsByWhen
 import io.github.ronganam.dana.ui.shell.Destination
 import io.github.ronganam.dana.ui.shell.LocalShellLayout
 import io.github.ronganam.dana.ui.shell.ShellLayout
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import io.github.ronganam.dana.ui.viewmodels.Place
 import io.github.ronganam.dana.ui.viewmodels.ThreadContext
@@ -69,7 +67,7 @@ private fun ReminderStage(viewModel: MainViewModel) {
 
     if (task == null) {
         Column(Modifier.padding(horizontal = 26.dp, vertical = 28.dp)) {
-            Text("Nothing open.", style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic))
+            Text("Nothing open.", style = MaterialTheme.typography.headlineSmall)
             Text("Add one on the left, or tell Dana.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else OpenReminder(viewModel, task, stacked)

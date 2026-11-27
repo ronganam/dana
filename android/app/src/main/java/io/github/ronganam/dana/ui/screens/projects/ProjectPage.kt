@@ -21,7 +21,7 @@ import io.github.ronganam.dana.data.projects.ProjectItems
 import io.github.ronganam.dana.data.projects.ProjectsCore
 import io.github.ronganam.dana.data.projects.Section
 import io.github.ronganam.dana.ui.components.InkButton
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.viewmodels.ProjectsController
 import java.time.LocalDate
@@ -63,7 +63,7 @@ internal fun ProjectPage(c: ProjectsController, items: ProjectItems, cover: Bool
                     ).joinToString(" · ").ifEmpty { t("Project", "פרויקט") },
                         color = if (cd != null && cd.days in 0..30) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(p.title, style = MaterialTheme.typography.displaySmall.byContent(), modifier = Modifier.padding(top = 2.dp))
-                    if (p.description.isNotBlank()) Text(p.description, style = serifItalic(18).byContent(),
+                    if (p.description.isNotBlank()) Text(p.description, style = quietText(18).byContent(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 2.dp))
                     p.sharedBy?.let {
                         Kicker(t("Shared by", "שותף על ידי") + " $it" + if (p.access == "read") t(" · view only", " · צפייה בלבד") else "",
@@ -195,7 +195,7 @@ private fun AsideBlock(c: ProjectsController, items: ProjectItems, budget: Budge
 @Composable
 internal fun BudgetCard(b: BudgetInfo) {
     Boxed(Modifier.fillMaxWidth()) {
-        MonoLabel(t("Committed", "סגור"))
+        MetaLabel(t("Committed", "סגור"))
         Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.padding(top = 2.dp)) {
             Text(MoneyFormat.major(b.committed), style = MaterialTheme.typography.headlineMedium.copy(textDirection = androidx.compose.ui.text.style.TextDirection.Ltr))
             b.budget?.let {
@@ -229,7 +229,7 @@ internal fun ItemRow(e: Entry, onClick: () -> Unit) {
             if (sub.isNotBlank()) Text(sub, style = MaterialTheme.typography.bodySmall.byContent(), color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (e.files.isNotEmpty()) MonoLabel("📎 ${e.files.size}")
+        if (e.files.isNotEmpty()) MetaLabel("📎 ${e.files.size}")
     }
     Rule()
 }

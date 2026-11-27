@@ -26,7 +26,6 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,7 +39,6 @@ import io.github.ronganam.dana.data.projects.ValueShown
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
 import io.github.ronganam.dana.ui.screens.common.isolatedParts
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.theme.Success
 import io.github.ronganam.dana.ui.viewmodels.ProjectsController
 
@@ -60,10 +58,10 @@ internal fun ProjectScope(lang: Lang, content: @Composable () -> Unit) {
 @Composable
 internal fun t(en: String, he: String): String = LocalProjectLang.current.t(en, he)
 
-/** Italic serif for descriptions and quiet statements. */
+/** Plain body text for descriptions and quiet statements. */
 @Composable
-internal fun serifItalic(size: Int = 17): TextStyle = MaterialTheme.typography.bodyLarge.copy(
-    fontFamily = DanaSerif, fontStyle = FontStyle.Italic, fontSize = size.sp, lineHeight = (size + 6).sp
+internal fun quietText(size: Int = 17): TextStyle = MaterialTheme.typography.bodyLarge.copy(
+    fontSize = size.sp, lineHeight = (size + 6).sp
 )
 
 /** Body text whose direction follows its own script. */

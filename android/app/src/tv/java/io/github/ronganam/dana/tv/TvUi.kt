@@ -39,7 +39,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.ui.theme.DmMono
-import io.github.ronganam.dana.ui.theme.DanaFontFamily
+import io.github.ronganam.dana.ui.theme.DanaSans
 import io.github.ronganam.dana.ui.theme.DanaSerif
 
 /**
@@ -50,9 +50,9 @@ object TvType {
     val clock = TextStyle(fontFamily = DanaSerif, fontSize = 60.sp, lineHeight = 60.sp)
     val value = TextStyle(fontFamily = DanaSerif, fontSize = 30.sp, lineHeight = 32.sp)
     val title = TextStyle(fontFamily = DanaSerif, fontSize = 34.sp, lineHeight = 38.sp)
-    val name = TextStyle(fontFamily = DanaFontFamily, fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
-    val body = TextStyle(fontFamily = DanaFontFamily, fontSize = 15.sp, lineHeight = 21.sp)
-    val small = TextStyle(fontFamily = DanaFontFamily, fontSize = 13.sp, lineHeight = 17.sp)
+    val name = TextStyle(fontFamily = DanaSans, fontSize = 15.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
+    val body = TextStyle(fontFamily = DanaSans, fontSize = 15.sp, lineHeight = 21.sp)
+    val small = TextStyle(fontFamily = DanaSans, fontSize = 13.sp, lineHeight = 17.sp)
     val mono = TextStyle(fontFamily = DmMono, fontSize = 12.sp, letterSpacing = 1.2.sp)
 }
 

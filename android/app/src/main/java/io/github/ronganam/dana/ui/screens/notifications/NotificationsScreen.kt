@@ -38,7 +38,6 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -56,11 +55,10 @@ import io.github.ronganam.dana.data.notifications.PhoneNotificationActions
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.components.relativeAge
 import io.github.ronganam.dana.ui.screens.common.byScript
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.viewmodels.AppRule
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -128,7 +126,7 @@ fun NotificationsListPane(
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)) {
             item(key = "head") {
                 Column(Modifier.padding(horizontal = GUTTER)) {
-                    MonoLabel(if (counts != null) "${counts.total} on your phone · ${counts.noise} noise" else "Your phone's notifications")
+                    MetaLabel(if (counts != null) "${counts.total} on your phone · ${counts.noise} noise" else "Your phone's notifications")
                     Text("Notifications", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp))
                     if (!accessGranted) AccessBox(actions.allowAccess)
                     if (overview != null) NoiseBox(overview, wide, actions.clearNoise)
@@ -146,7 +144,7 @@ fun NotificationsListPane(
                 else -> {
                     item(key = "apps_head") {
                         Row(Modifier.fillMaxWidth().padding(horizontal = GUTTER).padding(top = 22.dp, bottom = 8.dp)) {
-                            MonoLabel("By app", modifier = Modifier.weight(1f))
+                            MetaLabel("By app", modifier = Modifier.weight(1f))
                             RollingText(overview.apps.size.toString(), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         Rule(Modifier.padding(horizontal = GUTTER))
@@ -166,7 +164,7 @@ fun NotificationsListPane(
                             ) {
                                 Text("Quiet apps · ${overview.quietApps.size}", style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.weight(1f))
-                                MonoLabel(if (quietOpen) "hide" else "show")
+                                MetaLabel(if (quietOpen) "hide" else "show")
                             }
                             Rule(Modifier.padding(horizontal = GUTTER))
                         }
@@ -221,7 +219,7 @@ private fun NoticedBox(s: RuleSuggestion, onAnswer: (RuleSuggestion, Boolean) ->
         Modifier.padding(top = 10.dp).fillMaxWidth().clip(RoundedCornerShape(14.dp))
             .border(1.dp, hues.teal.copy(alpha = 0.5f), RoundedCornerShape(14.dp)).padding(13.dp)
     ) {
-        MonoLabel("Dana noticed", color = hues.text(hues.teal))
+        MetaLabel("Dana noticed", color = hues.text(hues.teal))
         Text("${s.reason} Keep it quiet?", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp))
         Row(Modifier.padding(top = 10.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             InkButton("Keep it quiet", emphasis = InkEmphasis.PRIMARY) { onAnswer(s, true) }
@@ -233,7 +231,7 @@ private fun NoticedBox(s: RuleSuggestion, onAnswer: (RuleSuggestion, Boolean) ->
 @Composable
 private fun Calm(title: String, line: String, modifier: Modifier = Modifier) {
     Column(modifier.padding(top = 26.dp, bottom = 10.dp)) {
-        Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic, fontSize = 26.sp))
+        Text(title, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 26.sp))
         Text(line, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 4.dp))
     }
 }
@@ -326,7 +324,7 @@ fun AppDetail(app: OverviewApp, items: List<PhoneNotification>?, onBack: (() -> 
         )
         Row(verticalAlignment = Alignment.Bottom) {
             Column(Modifier.weight(1f)) {
-                MonoLabel("${app.count} waiting")
+                MetaLabel("${app.count} waiting")
                 Text(app.app, style = MaterialTheme.typography.displayMedium, maxLines = 2, modifier = Modifier.padding(top = 2.dp))
             }
             if (app.count > 0) InkButton("Clear all", modifier = Modifier.padding(bottom = 6.dp)) { actions.clearApp(app) }
@@ -342,14 +340,14 @@ fun AppDetail(app: OverviewApp, items: List<PhoneNotification>?, onBack: (() -> 
             }
         }
 
-        Row(Modifier.padding(top = 20.dp, bottom = 8.dp)) { MonoLabel("From this app") }
+        Row(Modifier.padding(top = 20.dp, bottom = 8.dp)) { MetaLabel("From this app") }
         val rule = AppRule.of(app.rule)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             AppRule.values().forEach { r -> InkChoice(r.label, selected = r == rule) { actions.setRule(app, r) } }
         }
         Text(rule.sentence, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(top = 9.dp))
 
-        Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 8.dp)) { MonoLabel("Waiting") }
+        Row(Modifier.fillMaxWidth().padding(top = 22.dp, bottom = 8.dp)) { MetaLabel("Waiting") }
         Rule()
         when {
             items == null && app.count > 0 -> Text("Loading…", style = MaterialTheme.typography.bodyMedium,
@@ -441,7 +439,7 @@ fun NoAppPicked(allClear: Boolean) {
     Column(Modifier.padding(horizontal = 26.dp, vertical = 28.dp)) {
         Text(
             if (allClear) "All clear." else "Pick an app on the left.",
-            style = MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic)
+            style = MaterialTheme.typography.headlineSmall
         )
         Text(
             if (allClear) "Nothing is waiting on your phone." else "Its notifications and how it behaves open here.",

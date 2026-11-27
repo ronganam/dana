@@ -34,7 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.pairing.PairingFlow
 import io.github.ronganam.dana.ui.components.FoundServers
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.rememberFoundServers
 import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.theme.DmMono
@@ -55,7 +55,7 @@ fun KioskPairingScreen(flow: PairingFlow, onSettings: () -> Unit) {
             Modifier.widthIn(max = 640.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(32.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            MonoLabel("Dana kiosk", color = MaterialTheme.colorScheme.primary)
+            MetaLabel("Dana kiosk", color = MaterialTheme.colorScheme.primary)
             Text("Pair this tablet", style = TextStyle(fontFamily = DanaSerif, fontSize = 44.sp, lineHeight = 48.sp),
                 color = MaterialTheme.colorScheme.onBackground)
             Text(

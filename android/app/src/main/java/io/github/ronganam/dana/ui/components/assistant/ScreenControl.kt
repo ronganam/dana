@@ -46,7 +46,7 @@ import io.github.ronganam.dana.data.screen.ScreenShare.Missing
 import io.github.ronganam.dana.data.screen.ScreenShot
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.screens.common.isolatedParts
 import androidx.core.net.toUri
 
@@ -172,7 +172,7 @@ private fun IncludedLine(
             Spacer(Modifier.width(10.dp))
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            MonoLabel(
+            MetaLabel(
                 if (state.availability == Availability.PENDING) "Screen · capturing…" else "Screen goes with this message",
                 color = accent
             )

@@ -191,7 +191,7 @@ internal fun MarkdownBody(content: String, modifier: Modifier = Modifier) {
                 is MdBlock.Quote -> ByScript(block.content) {
                     Text(
                         inlineMarkdown(block.content, accent, codeBg),
-                        style = serifItalic(18).copy(textDirection = TextDirection.Content),
+                        style = quietText(18).copy(textDirection = TextDirection.Content),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.fillMaxWidth()
                             .drawBehind { drawRect(accent, Offset.Zero, Size(2.dp.toPx(), size.height)) }

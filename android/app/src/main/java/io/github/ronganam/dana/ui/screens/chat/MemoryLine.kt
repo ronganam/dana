@@ -19,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import io.github.ronganam.dana.data.chat.ThreadModel
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import kotlinx.coroutines.delay
 
 /** How faint a message Dana no longer remembers is drawn. */
@@ -34,7 +34,7 @@ fun MemoryLine(label: String, modifier: Modifier = Modifier) {
     val accent = MaterialTheme.colorScheme.primary
     Row(modifier.fillMaxWidth().padding(top = 10.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = 0.35f))
-        MonoLabel(label, color = accent, modifier = Modifier.padding(horizontal = 10.dp))
+        MetaLabel(label, color = accent, modifier = Modifier.padding(horizontal = 10.dp))
         HorizontalDivider(Modifier.weight(1f), thickness = 1.dp, color = accent.copy(alpha = 0.35f))
     }
 }

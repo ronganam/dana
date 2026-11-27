@@ -33,7 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.theme.Danger
 import io.github.ronganam.dana.ui.theme.Info
 import io.github.ronganam.dana.ui.theme.Success
@@ -82,7 +82,7 @@ internal fun Badge(text: String, type: String, modifier: Modifier = Modifier) {
 /** A label above a block of the detail ("CATEGORY", "COUNTS AS"…). */
 @Composable
 internal fun Kicker(text: String, modifier: Modifier = Modifier) {
-    MonoLabel(text, modifier.padding(top = 16.dp, bottom = 6.dp))
+    MetaLabel(text, modifier.padding(top = 16.dp, bottom = 6.dp))
 }
 
 /** A row of segments (Yes / No / Automatic, Keep / Cancel): the chosen one in accent. */
@@ -133,7 +133,7 @@ internal fun InkField(
 ) {
     val accent = MaterialTheme.colorScheme.primary
     Column(modifier) {
-        label?.let { MonoLabel(it, Modifier.padding(bottom = 4.dp)) }
+        label?.let { MetaLabel(it, Modifier.padding(bottom = 4.dp)) }
         val shape = RoundedCornerShape(10.dp)
         Box(
             Modifier
@@ -175,7 +175,7 @@ internal fun InkField(
 @Composable
 internal fun PaneTop(kicker: String, onClose: () -> Unit) {
     Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        MonoLabel(kicker, Modifier.weight(1f))
+        MetaLabel(kicker, Modifier.weight(1f))
         Text(
             "×",
             style = MaterialTheme.typography.headlineSmall,

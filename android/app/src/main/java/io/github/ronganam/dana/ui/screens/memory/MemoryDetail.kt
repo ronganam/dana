@@ -23,7 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.Memory
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.screens.common.DotLabel
 import io.github.ronganam.dana.ui.screens.common.auto
 import io.github.ronganam.dana.ui.theme.Danger
@@ -86,7 +86,7 @@ internal fun MemoryDetailPane(
 
         if (!memory.updatedAt.isNullOrBlank()) {
             Spacer(Modifier.height(24.dp))
-            MonoLabel("Updated ${memory.updatedAt.take(16).replace("T", " · ")}", color = muted.copy(alpha = 0.7f))
+            MetaLabel("Updated ${memory.updatedAt.take(16).replace("T", " · ")}", color = muted.copy(alpha = 0.7f))
         }
     }
 
@@ -160,7 +160,7 @@ internal fun MemoryEditorForm(
         )
 
         Spacer(Modifier.height(22.dp))
-        MonoLabel("Type")
+        MetaLabel("Type")
         Spacer(Modifier.height(8.dp))
         // Every existing type plus the defaults is selectable.
         val typeChips = remember(availableCategories, category) {

@@ -36,7 +36,7 @@ import io.github.ronganam.dana.data.models.SelfCheck
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.common.byScript
 import io.github.ronganam.dana.ui.theme.Success
@@ -78,7 +78,7 @@ fun AboutScreen(viewModel: MainViewModel, onBack: (() -> Unit)?, onOpenSettings:
                     modifier = Modifier.clickable(onClick = onBack).padding(vertical = 12.dp)
                 )
             }
-            MonoLabel("Dana keeps this · edit any line")
+            MetaLabel("Dana keeps this · edit any line")
             Text("About you", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp, bottom = 4.dp))
 
             val p = page
@@ -100,7 +100,7 @@ fun AboutScreen(viewModel: MainViewModel, onBack: (() -> Unit)?, onOpenSettings:
                     }
                 }
                 AddLine(onAdd = { about.add(it) })
-                if (p.maxChars > 0) MonoLabel("${p.usedChars} of ${p.maxChars} characters", modifier = Modifier.padding(top = 6.dp))
+                if (p.maxChars > 0) MetaLabel("${p.usedChars} of ${p.maxChars} characters", modifier = Modifier.padding(top = 6.dp))
             }
 
             Section("How Dana acts")
@@ -124,9 +124,9 @@ fun AboutScreen(viewModel: MainViewModel, onBack: (() -> Unit)?, onOpenSettings:
             ) {
                 Column(Modifier.weight(1f)) {
                     Text("Settings", style = MaterialTheme.typography.titleMedium)
-                    MonoLabel("server, permissions, updates", modifier = Modifier.padding(top = 2.dp))
+                    MetaLabel("server, permissions, updates", modifier = Modifier.padding(top = 2.dp))
                 }
-                MonoLabel("→", color = MaterialTheme.colorScheme.primary)
+                MetaLabel("→", color = MaterialTheme.colorScheme.primary)
             }
             Rule()
         }
@@ -136,7 +136,7 @@ fun AboutScreen(viewModel: MainViewModel, onBack: (() -> Unit)?, onOpenSettings:
 @Composable
 private fun Section(label: String) {
     Column(Modifier.padding(top = 22.dp)) {
-        MonoLabel(label, modifier = Modifier.padding(bottom = 6.dp))
+        MetaLabel(label, modifier = Modifier.padding(bottom = 6.dp))
         Rule()
     }
 }

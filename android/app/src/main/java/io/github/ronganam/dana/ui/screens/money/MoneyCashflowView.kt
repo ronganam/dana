@@ -20,7 +20,7 @@ import io.github.ronganam.dana.data.money.MoneyFormat.Sign
 import io.github.ronganam.dana.data.money.MoneyOverview
 import io.github.ronganam.dana.data.money.MoneyRecurring
 import io.github.ronganam.dana.data.money.RecurringItem
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.screens.money.charts.BalanceChart
 import io.github.ronganam.dana.ui.screens.money.charts.CashflowChart
 import io.github.ronganam.dana.ui.screens.money.charts.ChartLegend
@@ -144,7 +144,7 @@ private fun FixedCosts(d: Dash) {
 }
 
 @Composable
-private fun SubLabel(text: String) = MonoLabel(text, Modifier.padding(top = 16.dp, bottom = 2.dp))
+private fun SubLabel(text: String) = MetaLabel(text, Modifier.padding(top = 16.dp, bottom = 2.dp))
 
 @Composable
 private fun RecurringRow(d: Dash, x: RecurringItem) {

@@ -51,7 +51,7 @@ import io.github.ronganam.dana.ui.components.MenuEntry
 import io.github.ronganam.dana.ui.components.OverflowMenu
 import androidx.compose.ui.text.style.TextOverflow
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.shell.DaySlot
 import io.github.ronganam.dana.ui.shell.dragToDay
@@ -304,7 +304,7 @@ fun ReplyBox(item: NowItem, handlers: NowHandlers) {
     if (n != null && button != null) {
         val who = item.source.split(" · ").takeIf { it.size >= 3 }?.get(1)
         Column(Modifier.fillMaxWidth()) {
-            Row(Modifier.padding(top = 14.dp, bottom = 6.dp)) { MonoLabel(if (who != null) "Reply to $who" else "Reply") }
+            Row(Modifier.padding(top = 14.dp, bottom = 6.dp)) { MetaLabel(if (who != null) "Reply to $who" else "Reply") }
             if (quick.isNotEmpty()) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 quick.forEach { q -> InkButton(q) { text = q } }
             }

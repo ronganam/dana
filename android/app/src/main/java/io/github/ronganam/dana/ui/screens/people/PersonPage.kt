@@ -41,7 +41,7 @@ import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.Person
 import io.github.ronganam.dana.data.models.PersonDetail
 import io.github.ronganam.dana.ui.adaptive.asidePaneWidth
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.common.auto
 import io.github.ronganam.dana.ui.theme.Space
@@ -203,7 +203,7 @@ private fun Facts(p: Person, stacked: Boolean) {
     ).joinToString(" · ").ifBlank { "—" }
     Column(Modifier.padding(top = if (stacked) Space.md else Space.lg)) {
         if (stacked) {
-            MonoLabel("At a glance", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = Space.md, bottom = Space.sm))
+            MetaLabel("At a glance", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(top = Space.md, bottom = Space.sm))
             Column(Modifier.padding(bottom = Space.md), verticalArrangement = Arrangement.spacedBy(Space.md)) {
                 Fact("Last in touch", last, Modifier.fillMaxWidth())
                 Fact("Rhythm", rhythmLabel(s.typicalGapDays) ?: "—", Modifier.fillMaxWidth())
@@ -236,7 +236,7 @@ private fun Facts(p: Person, stacked: Boolean) {
 @Composable
 private fun Fact(label: String, value: String, modifier: Modifier) {
     Column(modifier) {
-        MonoLabel(label)
+        MetaLabel(label)
         Spacer(Modifier.height(2.dp))
         Text(value, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 2)
     }
@@ -245,7 +245,7 @@ private fun Fact(label: String, value: String, modifier: Modifier) {
 @Composable
 private fun SectionTitle(title: String, trailing: @Composable RowScope.() -> Unit = {}) {
     Row(Modifier.fillMaxWidth().padding(top = Space.xl, bottom = Space.xs).heightIn(min = 32.dp), verticalAlignment = Alignment.CenterVertically) {
-        MonoLabel(title, Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
+        MetaLabel(title, Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
         trailing()
     }
 }
@@ -255,8 +255,8 @@ private fun LazyListScope.briefSection(detail: PersonDetail, refreshing: Boolean
     item(key = "brief") {
         SectionTitle("What's going on") {
             val updated = brief?.updatedAt?.let(::shortWhen)
-            if (detail.briefStale) MonoLabel("Outdated", color = Warning)
-            else if (!updated.isNullOrBlank()) MonoLabel("Updated $updated")
+            if (detail.briefStale) MetaLabel("Outdated", color = Warning)
+            else if (!updated.isNullOrBlank()) MetaLabel("Updated $updated")
             IconButton(onClick = onRefresh, enabled = !refreshing, modifier = Modifier.size(36.dp)) {
                 if (refreshing) CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
                 else Icon(Icons.Filled.Refresh, "Rewrite the summary", Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -274,7 +274,7 @@ private fun LazyListScope.briefSection(detail: PersonDetail, refreshing: Boolean
             Modifier.padding(top = Space.md).fillMaxWidth().clip(RoundedCornerShape(14.dp))
                 .background(MaterialTheme.colorScheme.surfaceContainerLow).padding(horizontal = Space.lg, vertical = Space.md)
         ) {
-            MonoLabel("Open between you")
+            MetaLabel("Open between you")
             Spacer(Modifier.height(2.dp))
             brief.open.forEach { DirBullet(it, MaterialTheme.colorScheme.primary) }
         }
@@ -284,7 +284,7 @@ private fun LazyListScope.briefSection(detail: PersonDetail, refreshing: Boolean
 private fun LazyListScope.remindersSection(detail: PersonDetail, onComplete: (String) -> Unit) {
     if (detail.tasks.isEmpty() && detail.suggestions.isEmpty()) return
     item(key = "rem-h") {
-        SectionTitle("Reminders") { MonoLabel((detail.tasks.size + detail.suggestions.size).toString()) }
+        SectionTitle("Reminders") { MetaLabel((detail.tasks.size + detail.suggestions.size).toString()) }
     }
     items(detail.tasks.size, key = { "t" + detail.tasks[it].id }) { i ->
         val t = detail.tasks[i]
@@ -298,7 +298,7 @@ private fun LazyListScope.remindersSection(detail: PersonDetail, onComplete: (St
             Column(Modifier.weight(1f)) {
                 DirText(t.title, MaterialTheme.typography.bodyMedium, color = if (done) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface, maxLines = 2)
             }
-            t.dueDate?.takeIf { it.length >= 10 }?.let { Spacer(Modifier.width(Space.sm)); MonoLabel(it.substring(8, 10) + "/" + it.substring(5, 7)) }
+            t.dueDate?.takeIf { it.length >= 10 }?.let { Spacer(Modifier.width(Space.sm)); MetaLabel(it.substring(8, 10) + "/" + it.substring(5, 7)) }
         }
     }
     items(detail.suggestions.size, key = { "s" + detail.suggestions[it].id }) { i ->
@@ -364,7 +364,7 @@ private fun HistoryRow(h: HistoryEntry, last: Boolean, onClick: () -> Unit) {
                 Text(kind, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 Spacer(Modifier.width(Space.sm))
-                MonoLabel(timeOf(e.at))
+                MetaLabel(timeOf(e.at))
             }
             if (isCall) {
                 if (e.title.isNotBlank()) DirText(e.title, MaterialTheme.typography.titleSmall, Modifier.padding(top = 2.dp), color = MaterialTheme.colorScheme.onSurface)

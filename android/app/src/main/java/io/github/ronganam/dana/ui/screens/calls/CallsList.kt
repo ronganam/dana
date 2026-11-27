@@ -29,7 +29,7 @@ import androidx.compose.foundation.rememberScrollState
 import io.github.ronganam.dana.data.models.CallLabel
 import io.github.ronganam.dana.data.models.PhoneCall
 import io.github.ronganam.dana.ui.components.InkChip
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 
 /**
@@ -76,7 +76,7 @@ internal fun CallListPane(
 
         when {
             isLoading && !hasAnyCalls -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                MonoLabel("Loading calls…")
+                MetaLabel("Loading calls…")
             }
             days.isEmpty() -> CallsEmpty(searching = query.isNotBlank(), query = query, onUpload = onUpload)
             else -> LazyColumn(
@@ -91,8 +91,8 @@ internal fun CallListPane(
                                 horizontalArrangement = Arrangement.SpaceBetween,
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                MonoLabel(day.label, color = MaterialTheme.colorScheme.onSurface)
-                                MonoLabel("${day.calls.size}")
+                                MetaLabel(day.label, color = MaterialTheme.colorScheme.onSurface)
+                                MetaLabel("${day.calls.size}")
                             }
                             Rule()
                         }
@@ -169,8 +169,8 @@ private fun CallRow(call: PhoneCall, selected: Boolean, playing: Boolean, onClic
                 )
                 Spacer(Modifier.height(2.dp))
                 when (call.status) {
-                    "processing" -> MonoLabel("Analysing…", color = accent)
-                    "failed" -> MonoLabel("Couldn't analyse", color = io.github.ronganam.dana.ui.theme.Danger)
+                    "processing" -> MetaLabel("Analysing…", color = accent)
+                    "failed" -> MetaLabel("Couldn't analyse", color = io.github.ronganam.dana.ui.theme.Danger)
                     else -> RtlSupportingText(
                         text = call.displayTitle(),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -196,11 +196,11 @@ private fun CallRow(call: PhoneCall, selected: Boolean, playing: Boolean, onClic
                         Box(Modifier.size(7.dp).clip(CircleShape).background(accent))
                         Spacer(Modifier.width(6.dp))
                     }
-                    MonoLabel(call.timeLabel(), color = if (playing) accent else MaterialTheme.colorScheme.onSurfaceVariant)
+                    MetaLabel(call.timeLabel(), color = if (playing) accent else MaterialTheme.colorScheme.onSurfaceVariant)
                 }
                 if (call.durationSeconds > 0) {
                     Spacer(Modifier.height(2.dp))
-                    MonoLabel(formatDuration(call.durationSeconds))
+                    MetaLabel(formatDuration(call.durationSeconds))
                 }
                 if (playing) {
                     Spacer(Modifier.height(4.dp))
@@ -237,7 +237,7 @@ internal fun CallsEmpty(searching: Boolean, query: String, onUpload: () -> Unit)
         modifier = Modifier.fillMaxSize().padding(horizontal = 28.dp, vertical = 40.dp),
         verticalArrangement = Arrangement.Center
     ) {
-        MonoLabel(if (searching) "No matches" else "Call log", color = MaterialTheme.colorScheme.primary)
+        MetaLabel(if (searching) "No matches" else "Call log", color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(8.dp))
         Text(
             text = if (searching) "No call mentions “${query.trim()}”." else "Nothing recorded yet.",

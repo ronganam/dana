@@ -25,7 +25,7 @@ import io.github.ronganam.dana.data.money.MoneyOverview
 import io.github.ronganam.dana.data.money.MoneyPace
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.money.charts.ChartLegend
 import io.github.ronganam.dana.ui.screens.money.charts.LegendItem
@@ -216,7 +216,7 @@ private fun ComingUp(d: Dash) {
                     val e = u.event
                     if (e.date != lastDate) {
                         lastDate = e.date
-                        MonoLabel(MoneyDashText.dayLabel(e.date, d.today), Modifier.padding(top = 12.dp, bottom = 2.dp))
+                        MetaLabel(MoneyDashText.dayLabel(e.date, d.today), Modifier.padding(top = 12.dp, bottom = 2.dp))
                     }
                     val bill = e.kind == "card_bill"
                     val key = MoneyDashState.billKey(e.date, e.accountId, e.label)
@@ -228,7 +228,7 @@ private fun ComingUp(d: Dash) {
                             Meta((KIND_WORDS[e.kind] ?: e.kind) + if (bill && u.range.isNotEmpty()) " · ${u.range}" else "")
                         }
                         Column(horizontalAlignment = Alignment.End) {
-                            if (e.estimated) MonoLabel("about")
+                            if (e.estimated) MetaLabel("about")
                             Amount(
                                 MoneyFormat.amount(e.amount, if (e.amount > 0) Sign.PLUS else Sign.MINUS, cents = !e.estimated),
                                 MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.SemiBold),
@@ -259,7 +259,7 @@ private fun BillParts(u: MoneyDashText.Upcoming) {
             }
         }
         if (u.event.items.isNotEmpty()) {
-            MonoLabel("On this bill", Modifier.padding(top = 8.dp, bottom = 2.dp))
+            MetaLabel("On this bill", Modifier.padding(top = 8.dp, bottom = 2.dp))
             u.event.items.forEach { it ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.weight(1f).padding(end = 8.dp)) { Name(it.label, style = MaterialTheme.typography.bodySmall) }

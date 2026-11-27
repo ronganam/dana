@@ -14,7 +14,9 @@ import androidx.compose.ui.unit.dp
 import kotlin.coroutines.CoroutineContext
 
 /**
- * Ember's motion tokens (shared with the web app and the watch).
+ * Motion tokens (shared with the web app and the watch). Circuit moves only
+ * where something is live: a pulse travels a running line, a node waiting for
+ * the owner breathes ([reducedMotion] turns both off).
  *
  * Only alpha, translation and scale animate (graphicsLayer or a draw
  * transform), never size or layout — except collapsing the one completed row.
@@ -73,6 +75,14 @@ fun motionOff(): Boolean {
         Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
     }
 }
+
+/**
+ * Live motion (a line's travelling pulse, a waiting node's breath, a step's
+ * spinner) is off: the system turned animations off, or this flavour has no
+ * rich motion (TV, wall tablet). Those loops draw their still state instead.
+ */
+@Composable
+fun reducedMotion(): Boolean = motionOff() || !richMotion
 
 /** Inside an animation coroutine: are animations turned off for this window? */
 fun CoroutineContext.motionOff(): Boolean = (this[MotionDurationScale]?.scaleFactor ?: 1f) == 0f

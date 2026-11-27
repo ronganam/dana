@@ -34,7 +34,7 @@ import io.github.ronganam.dana.data.projects.ProjectsCore
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.components.serverImageRequest
 import io.github.ronganam.dana.ui.viewmodels.ProjectsController
@@ -148,7 +148,7 @@ internal fun EntryPane(c: ProjectsController, items: ProjectItems, e: Entry, ser
 private fun Block(title: String, action: (() -> Unit)? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.padding(top = 20.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 6.dp)) {
-            MonoLabel(title, Modifier.weight(1f))
+            MetaLabel(title, Modifier.weight(1f))
             action?.let { InkButton(t("Edit", "עריכה"), emphasis = InkEmphasis.BARE, onClick = it) }
         }
         content()
@@ -244,7 +244,7 @@ private fun Files(c: ProjectsController, e: Entry, edit: Boolean, serverUrl: Str
         if (e.files.isEmpty() && uploading == 0) Text(t("No files.", "אין קבצים."), style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         e.files.forEach { f -> FileRow(c, f, edit, opening == f.id, lang, serverUrl, apiToken) }
-        if (uploading > 0) MonoLabel(t("Uploading…", "מעלה…"), Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.primary)
+        if (uploading > 0) MetaLabel(t("Uploading…", "מעלה…"), Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.primary)
         if (edit) Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
             InkField(note, { note = it.take(500) }, Modifier.weight(1f), placeholder = t("Note for the files (optional)", "הערה לקבצים (לא חובה)"))
             InkButton(t("+ Add files", "+ הוספת קבצים"), emphasis = InkEmphasis.PRIMARY, modifier = Modifier.padding(start = 8.dp)) { picker.launch("*/*") }

@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.money.MoneyDashText
 import io.github.ronganam.dana.ui.components.InkChoice
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.common.isolatedParts
 import io.github.ronganam.dana.ui.screens.money.charts.MoneyPalette
@@ -140,7 +140,7 @@ fun DashSection(
 ) {
     Column(modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            MonoLabel(title, Modifier.weight(1f).padding(end = 10.dp), color = MaterialTheme.colorScheme.onSurface)
+            MetaLabel(title, Modifier.weight(1f).padding(end = 10.dp), color = MaterialTheme.colorScheme.onSurface)
             trailing?.invoke(this)
         }
         Rule()
@@ -150,7 +150,7 @@ fun DashSection(
 
 /** A muted mono hint at a section's right ("next 45 days"). */
 @Composable
-fun Hint(text: String) = MonoLabel(text)
+fun Hint(text: String) = MetaLabel(text)
 
 /** A total at a section's right ("₪4,786 / month"). */
 @Composable
@@ -298,7 +298,7 @@ private fun Tile(t: TileData, modifier: Modifier) {
             .then(if (t.onClick != null) Modifier.clickable(role = Role.Button, onClick = t.onClick) else Modifier)
             .padding(horizontal = 12.dp, vertical = 12.dp)
     ) {
-        MonoLabel(t.label)
+        MetaLabel(t.label)
         // The amount and "/ month" are whole pieces: a narrow tile moves "/ month" under the amount.
         AmountPer(Modifier.padding(top = 4.dp, bottom = 2.dp)) {
             Amount(t.value, MaterialTheme.typography.titleLarge.copy(fontSize = 23.sp, fontWeight = FontWeight.SemiBold, letterSpacing = (-0.4).sp), t.tone ?: Color.Unspecified)

@@ -244,7 +244,7 @@ fun SuggestionRow(
                     if (showSource && source?.contact != null) append(" · ").append(isolate(source.contact))
                     relativeAge(source?.callTimestamp).takeIf { showSource && it.isNotEmpty() }?.let { append(" · ").append(it) }
                 }
-                MonoLabel(kicker, color = accent)
+                MetaLabel(kicker, color = accent)
                 Spacer(Modifier.height(3.dp))
                 Text(
                     suggestion.title,
@@ -313,8 +313,8 @@ fun SuggestionCard(
             .padding(16.dp)
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-            MonoLabel(suggestion.kindLabel(), color = accent, modifier = Modifier.weight(1f))
-            if (resolved) MonoLabel(if (suggestion.status == "accepted") "Created" else "Dismissed")
+            MetaLabel(suggestion.kindLabel(), color = accent, modifier = Modifier.weight(1f))
+            if (resolved) MetaLabel(if (suggestion.status == "accepted") "Created" else "Dismissed")
         }
         Spacer(Modifier.height(6.dp))
         Text(
@@ -406,7 +406,7 @@ fun ContextAttachmentCard(
             Box(Modifier.width(3.dp).height(36.dp).background(MaterialTheme.colorScheme.primary))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                MonoLabel(
+                MetaLabel(
                     when (context.kind) {
                         "suggestion" -> if (done) "Attached · ${context.status}" else "Attached · suggestion"
                         "call" -> "Attached · call"
@@ -494,7 +494,7 @@ fun SuggestionSourceBlock(
                 Spacer(Modifier.width(10.dp))
             }
             Column(Modifier.weight(1f)) {
-                MonoLabel(kicker)
+                MetaLabel(kicker)
                 src?.title?.takeIf { it.isNotBlank() }?.let {
                     Text(it, style = MaterialTheme.typography.titleSmall.copy(textDirection = TextDirection.Content),
                         color = MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -584,7 +584,7 @@ fun SuggestionEditSheet(
             .navigationBarsPadding()
             .imePadding()
     ) {
-        MonoLabel(if (sourceBlock != null) "Review suggestion" else "Edit before creating", color = MaterialTheme.colorScheme.primary)
+        MetaLabel(if (sourceBlock != null) "Review suggestion" else "Edit before creating", color = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.height(4.dp))
         Text(
             when { isEvent -> "Calendar event"; isAlert -> "Security alert"; else -> "Reminder" },
@@ -635,7 +635,7 @@ fun SuggestionEditSheet(
                 )
             }
             Spacer(Modifier.height(14.dp))
-            MonoLabel("Priority")
+            MetaLabel("Priority")
             Spacer(Modifier.height(6.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf("low", "medium", "high").forEach { p ->
@@ -645,14 +645,14 @@ fun SuggestionEditSheet(
             }
             if (groups.isNotEmpty()) {
                 Spacer(Modifier.height(14.dp))
-                MonoLabel("Group")
+                MetaLabel("Group")
                 Spacer(Modifier.height(6.dp))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     groups.forEach { g -> InkChip(g, selected = group.equals(g, true), onClick = { group = g }) }
                 }
             }
             Spacer(Modifier.height(18.dp))
-            MonoLabel("Remind me")
+            MetaLabel("Remind me")
             Spacer(Modifier.height(6.dp))
             val cal = Calendar.getInstance()
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

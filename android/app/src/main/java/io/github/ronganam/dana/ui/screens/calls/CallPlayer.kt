@@ -25,7 +25,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.PhoneCall
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 
 /** Deterministic pseudo-waveform (the server exposes no peaks), so every call has its own stable "signature". */
 private fun waveformPeaks(seed: String, count: Int = 96): FloatArray {
@@ -126,8 +126,8 @@ internal fun CallPlayer(call: PhoneCall, player: CallAudioPlayer, modifier: Modi
             )
             Spacer(Modifier.height(4.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                MonoLabel(formatMsec(posMs))
-                MonoLabel(if (totalMs > 0) formatMsec(totalMs) else "--:--")
+                MetaLabel(formatMsec(posMs))
+                MetaLabel(if (totalMs > 0) formatMsec(totalMs) else "--:--")
             }
         }
     }

@@ -41,7 +41,7 @@ import io.github.ronganam.dana.data.money.Txn
 import io.github.ronganam.dana.data.money.TxnDay
 import io.github.ronganam.dana.ui.components.InkButton
 import io.github.ronganam.dana.ui.components.InkEmphasis
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.common.QuietEmptyState
 import io.github.ronganam.dana.ui.viewmodels.FilterPanel
@@ -126,7 +126,7 @@ internal fun TransactionsView(money: MoneyController, modifier: Modifier = Modif
             if (list.loaded) item(key = "end") {
                 Box(Modifier.fillMaxWidth().padding(vertical = 18.dp), contentAlignment = Alignment.Center) {
                     when {
-                        list.next != null -> if (list.loading) MonoLabel("Loading…") else TextLink("Show more") { ledger.more(filter, month) }
+                        list.next != null -> if (list.loading) MetaLabel("Loading…") else TextLink("Show more") { ledger.more(filter, month) }
                         list.rows.size > 8 -> Muted("That's everything$where.")
                     }
                 }
@@ -156,7 +156,7 @@ private fun LazyListScope.dayRows(
 private fun DayHeader(d: TxnDay, today: LocalDate) {
     Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background)) {
         Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, top = 14.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            MonoLabel(MoneyLedger.dayLabel(d.date, today), Modifier.weight(1f))
+            MetaLabel(MoneyLedger.dayLabel(d.date, today), Modifier.weight(1f))
             if (d.income > 0) Text(MoneyFormat.amount(d.income, sign = MoneyFormat.Sign.PLUS), style = MaterialTheme.typography.labelMedium.merge(MoneyNumbers), color = toneColor("in"))
             if (d.income > 0 && d.spent != 0L) Spacer(Modifier.width(10.dp))
             when {
@@ -390,7 +390,7 @@ internal fun CategoryList(taxonomy: List<TaxGroup>, q: String, income: Boolean, 
     else if (groups.isEmpty()) Muted("No category matches “$q”.", Modifier.padding(18.dp))
     groups.forEach { g ->
         if (groupsPickable) PickRow(g.label, g.labelHe, current == g.key, head = true, trailing = "all") { onPick(g.key) }
-        else MonoLabel(g.label, Modifier.padding(start = 18.dp, top = 12.dp, bottom = 2.dp))
+        else MetaLabel(g.label, Modifier.padding(start = 18.dp, top = 12.dp, bottom = 2.dp))
         g.categories.forEach { c -> PickRow(c.label, c.labelHe, current == c.key, head = false) { onPick(c.key) } }
     }
 }
@@ -409,7 +409,7 @@ internal fun PickRow(label: String, he: String?, on: Boolean, head: Boolean, tra
             modifier = Modifier.weight(1f)
         )
         he?.let { Text(it, style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Rtl), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        trailing?.let { MonoLabel(it, Modifier.padding(start = 10.dp)) }
+        trailing?.let { MetaLabel(it, Modifier.padding(start = 10.dp)) }
         if (on) Text("✓", color = MaterialTheme.colorScheme.primary, modifier = Modifier.padding(start = 10.dp))
     }
 }

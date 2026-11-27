@@ -15,11 +15,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.ServerStatusBanner
-import io.github.ronganam.dana.ui.components.emberGlow
 import io.github.ronganam.dana.ui.components.enterOnChange
-import io.github.ronganam.dana.ui.theme.richMotion
 import io.github.ronganam.dana.ui.shell.destinations.rememberMoreDestination
 import io.github.ronganam.dana.ui.shell.destinations.rememberNotificationsDestination
 import io.github.ronganam.dana.ui.shell.destinations.rememberNowDestination
@@ -107,7 +105,6 @@ fun DanaShell(viewModel: MainViewModel) {
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .emberGlow(MaterialTheme.colorScheme.primary, enabled = richMotion)
     ) {
         val layout = shellLayoutFor(maxWidth.value)
         CompositionLocalProvider(
@@ -260,7 +257,7 @@ private fun rememberLiveScreen(viewModel: MainViewModel): ScreenRef? {
 @Composable
 private fun TitleCell(dest: Destination) {
     Column(Modifier.fillMaxSize().padding(horizontal = 18.dp, vertical = 12.dp), verticalArrangement = Arrangement.Bottom) {
-        dest.kicker?.let { MonoLabel(it) }
+        dest.kicker?.let { MetaLabel(it) }
         Text(dest.title, style = MaterialTheme.typography.displaySmall)
     }
 }

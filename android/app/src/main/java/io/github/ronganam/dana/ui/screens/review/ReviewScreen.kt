@@ -23,7 +23,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.ReviewItem
 import io.github.ronganam.dana.data.models.WeeklyReview
@@ -32,13 +31,12 @@ import io.github.ronganam.dana.ui.adaptive.PaneRow
 import io.github.ronganam.dana.ui.adaptive.WindowTier
 import io.github.ronganam.dana.ui.adaptive.sidePaneWidth
 import io.github.ronganam.dana.ui.adaptive.windowTier
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.components.ScreenTopBar
 import io.github.ronganam.dana.ui.screens.common.QuietEmptyState
 import io.github.ronganam.dana.ui.screens.people.DirText
 import io.github.ronganam.dana.ui.screens.people.Tag
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.theme.Space
 import io.github.ronganam.dana.ui.theme.Warning
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
@@ -164,7 +162,7 @@ fun ReviewScreen(viewModel: MainViewModel, onBack: () -> Unit) {
                                     ) {
                                         Text(label, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                                         val picked = items.count { it.type == type && it.enabled && it.action != "keep" }
-                                        MonoLabel(if (picked > 0) "$picked/$n" else "$n")
+                                        MetaLabel(if (picked > 0) "$picked/$n" else "$n")
                                     }
                                 }
                             }
@@ -188,13 +186,13 @@ fun ReviewScreen(viewModel: MainViewModel, onBack: () -> Unit) {
 @Composable
 private fun Intro(r: WeeklyReview, items: List<ReviewItem>, changes: Int) {
     Column(Modifier.padding(top = Space.sm)) {
-        DirText(r.headline, MaterialTheme.typography.headlineSmall.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic),
+        DirText(r.headline, MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface)
         r.summary.forEach {
             DirText(it, MaterialTheme.typography.bodyMedium, Modifier.padding(top = 4.dp), color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(Space.md))
-        MonoLabel(
+        MetaLabel(
             "${items.size} to go through · " + if (changes == 0) "no changes yet" else if (changes == 1) "1 change" else "$changes changes",
             color = MaterialTheme.colorScheme.primary
         )
@@ -238,8 +236,8 @@ private fun LazyListScope.reviewItems(
         first = false
         item(key = "h-$type") {
             Row(Modifier.fillMaxWidth().padding(top = top, bottom = Space.xs), verticalAlignment = Alignment.CenterVertically) {
-                MonoLabel(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
-                MonoLabel(list.size.toString())
+                MetaLabel(label, Modifier.weight(1f), color = MaterialTheme.colorScheme.primary)
+                MetaLabel(list.size.toString())
             }
         }
         list.forEachIndexed { i, it ->
@@ -270,7 +268,7 @@ private fun ReviewRow(item: ReviewItem, groups: List<String>, edit: ((ReviewItem
             val (why, warn) = whyLabel(item.why)
             Tag(why, if (warn) Warning else MaterialTheme.colorScheme.onSurfaceVariant)
             item.group?.takeIf { it.isNotBlank() && item.type == "task" }?.let {
-                Spacer(Modifier.width(Space.sm)); MonoLabel(it)
+                Spacer(Modifier.width(Space.sm)); MetaLabel(it)
             }
         }
         Column(Modifier.alpha(if (leaving) 0.62f else 1f)) {
@@ -303,7 +301,7 @@ private fun ReviewRow(item: ReviewItem, groups: List<String>, edit: ((ReviewItem
                 Choice(if (custom) niceDate(current) ?: "Pick a date" else "Pick a date…", selected = custom, subtle = true, icon = true) { picking = true }
             }
             niceDate(current)?.let {
-                MonoLabel((if (item.action == "reach_out") "Reminder on " else "Moves to ") + it, Modifier.padding(top = Space.sm))
+                MetaLabel((if (item.action == "reach_out") "Reminder on " else "Moves to ") + it, Modifier.padding(top = Space.sm))
             }
         }
         if (item.action == "move_group" && groups.isNotEmpty()) {

@@ -20,19 +20,17 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.CalendarEvent
 import io.github.ronganam.dana.data.models.Task
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.screens.reminders.parseTriggerTime
 import io.github.ronganam.dana.ui.screens.reminders.remindWhens
 import io.github.ronganam.dana.ui.screens.reminders.RemindWhen
 import io.github.ronganam.dana.ui.screens.reminders.slotOf
-import io.github.ronganam.dana.ui.theme.DanaSerif
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import kotlinx.coroutines.delay
 import java.time.LocalDateTime
@@ -106,10 +104,10 @@ fun DayStrip(viewModel: MainViewModel, onNow: () -> Unit, modifier: Modifier = M
             Column(
                 Modifier.width(84.dp).fillMaxHeight().clickable(onClick = onNow).edgeRule(end = true).padding(horizontal = 10.dp, vertical = 10.dp)
             ) {
-                MonoLabel("Now", color = MaterialTheme.colorScheme.primary)
+                MetaLabel("Now", color = MaterialTheme.colorScheme.primary)
                 Text(
                     now.format(HM),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontFamily = DanaSerif, fontStyle = FontStyle.Italic, fontSize = 26.sp),
+                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 26.sp),
                     maxLines = 1
                 )
                 items[null].orEmpty().take(2).forEach { SlotItem(it) }
@@ -137,10 +135,10 @@ private fun SlotCell(slot: DaySlot, label: String, items: List<DayItem>, hovered
             .then(if (last) Modifier else Modifier.edgeRule(end = true))
             .padding(horizontal = 8.dp, vertical = 10.dp)
     ) {
-        MonoLabel(label)
+        MetaLabel(label)
         val shown = items.take(3)
         shown.forEach { SlotItem(it) }
-        if (items.size > shown.size) MonoLabel("+${items.size - shown.size}", modifier = Modifier.padding(top = 4.dp))
+        if (items.size > shown.size) MetaLabel("+${items.size - shown.size}", modifier = Modifier.padding(top = 4.dp))
     }
 }
 

@@ -63,7 +63,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.ChatMessage
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.serverImageRequest
 import io.github.ronganam.dana.ui.screens.MarkdownText
 import io.github.ronganam.dana.ui.screens.TypingIndicator
@@ -122,10 +122,10 @@ internal fun AssistantHeader(
                         )
                 )
                 Spacer(Modifier.width(8.dp))
-                MonoLabel(stateLabel, color = if (live) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                MetaLabel(stateLabel, color = if (live) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
             }
             if (sessionId.isNotEmpty()) {
-                MonoLabel(
+                MetaLabel(
                     "#${sessionId.take(8)}",
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                     modifier = Modifier
@@ -169,7 +169,7 @@ internal fun AssistantStage(isRecording: Boolean, modifier: Modifier = Modifier)
             .padding(horizontal = 24.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp)
     ) {
-        MonoLabel(date, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        MetaLabel(date, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(
             text = if (isRecording) "I'm listening." else "Say it, or type it.",
             style = MaterialTheme.typography.displaySmall,
@@ -223,7 +223,7 @@ internal fun AssistantTurn(
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             if (isUser) {
-                MonoLabel("You")
+                MetaLabel("You")
                 if (msg.images.isNotEmpty()) {
                     msg.images.forEach { url ->
                         AsyncImage(
@@ -261,7 +261,7 @@ internal fun AssistantTurn(
                     Spacer(Modifier.width(12.dp))
                     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         // A learned phrase ran without the model: said quietly next to the name.
-                        MonoLabel(if (msg.shortcut) "Dana · learned phrase" else "Dana", color = MaterialTheme.colorScheme.primary)
+                        MetaLabel(if (msg.shortcut) "Dana · learned phrase" else "Dana", color = MaterialTheme.colorScheme.primary)
                         if (msg.isThinking) {
                             TypingIndicator()
                             ThinkingCaption(msg.thinkingLabel)
@@ -302,7 +302,7 @@ internal fun AssistantTurn(
 @Composable
 internal fun ScreenCaption(msg: ChatMessage, modifier: Modifier = Modifier) {
     val parts = listOfNotNull("Screen", msg.screen.takeIf { it != "Screen" }, if (msg.images.isEmpty()) "text only" else null)
-    MonoLabel(
+    MetaLabel(
         io.github.ronganam.dana.ui.screens.common.isolatedParts(parts.joinToString(" · ")),
         color = MaterialTheme.colorScheme.primary,
         modifier = modifier
@@ -411,8 +411,8 @@ internal fun AssistantDock(
                 onValueChange = onInputTextChange,
                 placeholder = {
                     when (mode) {
-                        VoiceDialMode.LISTENING -> MonoLabel("Listening…", color = MaterialTheme.colorScheme.primary)
-                        VoiceDialMode.THINKING -> MonoLabel("Working on it…")
+                        VoiceDialMode.LISTENING -> MetaLabel("Listening…", color = MaterialTheme.colorScheme.primary)
+                        VoiceDialMode.THINKING -> MetaLabel("Working on it…")
                         VoiceDialMode.IDLE -> Text("Type instead…", style = MaterialTheme.typography.bodyMedium)
                     }
                 },

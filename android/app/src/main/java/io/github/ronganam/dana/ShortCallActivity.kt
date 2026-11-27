@@ -29,7 +29,7 @@ import io.github.ronganam.dana.data.sync.CallUploads
 import io.github.ronganam.dana.data.sync.CallUploads.readMeta
 import io.github.ronganam.dana.data.sync.RecordingMeta
 import io.github.ronganam.dana.data.sync.RecordingsFolder
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.screens.calls.formatDuration
 import io.github.ronganam.dana.ui.theme.DanaTheme
@@ -134,7 +134,7 @@ private fun ShortCallSheet(
                 .navigationBarsPadding()
                 .padding(horizontal = 24.dp, vertical = 20.dp)
         ) {
-            MonoLabel(
+            MetaLabel(
                 buildString {
                     append("Call · ").append(formatDuration(meta.durationSeconds))
                     meta.direction?.let { append(" · ").append(it) }
@@ -171,7 +171,7 @@ private fun ShortCallSheet(
                     modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
                     trackColor = MaterialTheme.colorScheme.outlineVariant
                 )
-                MonoLabel("${formatDuration(position)} / ${formatDuration(meta.durationSeconds)}")
+                MetaLabel("${formatDuration(position)} / ${formatDuration(meta.durationSeconds)}")
             }
             Rule()
             Spacer(Modifier.height(18.dp))

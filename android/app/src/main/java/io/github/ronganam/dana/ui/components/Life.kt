@@ -15,15 +15,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
-import androidx.compose.ui.graphics.layer.CompositingStrategy as LayerCompositing
-import androidx.compose.ui.graphics.layer.GraphicsLayer
-import androidx.compose.ui.graphics.layer.drawLayer
 import androidx.compose.ui.layout.Measurable
 import androidx.compose.ui.layout.MeasureResult
 import androidx.compose.ui.layout.MeasureScope
@@ -34,12 +29,11 @@ import androidx.compose.ui.node.ModifierNodeElement
 import androidx.compose.ui.node.currentValueOf
 import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.node.invalidatePlacement
-import androidx.compose.ui.node.requireGraphicsContext
 import androidx.compose.ui.platform.InspectorInfo
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.ui.theme.LocalRichMotion
 import io.github.ronganam.dana.ui.theme.Motion
@@ -272,60 +266,7 @@ fun RollingText(
     ) { t -> Text(t, style = style, color = color, maxLines = 1, softWrap = false) }
 }
 
-// ---------------------------------------------------------------- canvas glow
-
-/**
- * The faint, static ember glow at the top of the main canvas (accent at ~7%),
- * drawn behind the content. Phone only: [enabled] false on other flavours.
- */
-fun Modifier.emberGlow(accent: Color, enabled: Boolean = true): Modifier =
-    if (!enabled) this else this then GlowElement(accent)
-
-private data class GlowElement(val accent: Color) : ModifierNodeElement<GlowNode>() {
-    override fun create() = GlowNode(accent)
-    override fun update(node: GlowNode) { node.accent = accent; node.invalidateDraw() }
-    override fun InspectorInfo.inspectableProperties() { name = "emberGlow" }
-}
-
-private class GlowNode(var accent: Color) : Modifier.Node(), DrawModifierNode {
-    // Recorded once per size / colour into its own offscreen layer: the root
-    // re-records often, and evaluating the gradient over the canvas each frame
-    // costs whole frames where the GPU is weak. Each frame only composites it.
-    private var layer: GraphicsLayer? = null
-    private var recorded: Pair<Size, Color>? = null
-
-    override fun onAttach() {
-        layer = requireGraphicsContext().createGraphicsLayer().apply { compositingStrategy = LayerCompositing.Offscreen }
-    }
-
-    override fun onDetach() {
-        layer?.let { requireGraphicsContext().releaseGraphicsLayer(it) }
-        layer = null
-        recorded = null
-    }
-
-    override fun ContentDrawScope.draw() {
-        val l = layer
-        if (l != null) {
-            val r = maxOf(size.width * 0.9f, 360.dp.toPx())
-            val area = size.copy(height = minOf(size.height, r))
-            if (recorded != area to accent) {
-                l.record(IntSize(area.width.toInt(), area.height.toInt())) {
-                    drawRect(
-                        Brush.radialGradient(
-                            colors = listOf(accent.copy(alpha = 0.075f), accent.copy(alpha = 0.03f), Color.Transparent),
-                            center = Offset(area.width * 0.28f, -r * 0.18f),
-                            radius = r
-                        )
-                    )
-                }
-                recorded = area to accent
-            }
-            drawLayer(l)
-        }
-        drawContent()
-    }
-}
+// ---------------------------------------------------------------- start bar
 
 /** A row's start bar in [color] (3dp), drawn behind; for reminder groups and tinted rows. */
 fun Modifier.startBar(color: Color, width: Dp = 3.dp): Modifier = this then StartBarElement(color, width)

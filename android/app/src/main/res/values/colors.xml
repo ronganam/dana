@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- The window theme's colours before Compose draws (Circuit's night values; ui/theme/Color.kt is the source). -->
 <resources>
     <color name="black">#000000</color>
     <color name="white">#FFFFFF</color>
-    
-    <!-- Primary vibrant accent -->
-    <color name="primary">#7C3AED</color> <!-- Electric Indigo / Purple -->
-    <color name="primaryVariant">#5B21B6</color>
-    
-    <!-- Secondary accent -->
-    <color name="secondary">#38BDF8</color> <!-- Bright Light Blue -->
-    
-    <!-- Modern dark surfaces -->
-    <color name="background_dark">#09090B</color> <!-- Almost OLED black -->
-    <color name="surface_dark">#18181B</color> <!-- Deep dark gray -->
-    <color name="surface_variant">#27272A</color> <!-- Slightly lighter for cards/bubbles -->
-    
-    <color name="text_primary">#FAFAFA</color>
-    <color name="text_secondary">#A1A1AA</color>
+
+    <color name="primary">#B9A5FF</color>
+    <color name="on_primary">#21163A</color>
+    <color name="primaryVariant">#3A2F55</color>
+    <color name="on_primary_variant">#EBDDFF</color>
+
+    <color name="secondary">#B9B0C9</color>
+
+    <color name="background_dark">#14101C</color>
+    <color name="surface_dark">#1C1726</color>
+    <color name="surface_variant">#241E30</color>
+
+    <color name="text_primary">#F2EEF8</color>
+    <color name="text_secondary">#B9B0C9</color>
 </resources>

@@ -58,7 +58,7 @@ import io.github.ronganam.dana.data.signals.SignalInfo
 import io.github.ronganam.dana.data.signals.SignalSource
 import io.github.ronganam.dana.data.signals.WakeWindow
 import io.github.ronganam.dana.ui.components.GlassCard
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.ScreenTopBar
 import io.github.ronganam.dana.ui.components.SectionLabel
 import io.github.ronganam.dana.ui.components.StatusPill
@@ -200,7 +200,7 @@ private fun SourceRow(source: SignalSource) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(source.label, style = MaterialTheme.typography.titleSmall)
-            MonoLabel(lastLine(source), modifier = Modifier.padding(top = 2.dp))
+            MetaLabel(lastLine(source), modifier = Modifier.padding(top = 2.dp))
         }
         if (source.active) {
             Spacer(Modifier.width(8.dp))
@@ -406,7 +406,7 @@ private fun PlacesControl(p: PhoneSignalStatus, controller: SignalsController) {
     if (p.places) when (p.location) {
         LocationAccess.NONE -> { Missing("Needs location access."); ActionButton("Allow location") { ask(p.location) } }
         LocationAccess.WHILE_IN_USE -> { Missing("Needs location all the time, or arrivals are missed while Dana is closed."); ActionButton("Allow all the time") { ask(p.location) } }
-        LocationAccess.ALWAYS -> MonoLabel(if (p.fences == 1) "Watching 1 place" else "Watching ${p.fences} places")
+        LocationAccess.ALWAYS -> MetaLabel(if (p.fences == 1) "Watching 1 place" else "Watching ${p.fences} places")
     }
     if (explainBackground) AlertDialog(
         onDismissRequest = { explainBackground = false },
@@ -464,8 +464,8 @@ private fun SleepControl(p: PhoneSignalStatus, controller: SignalsController) {
                 Missing("Read only while Dana is open. Allow reading in the background so your wake counts before you open it.")
                 ActionButton("Allow in the background") { ask() }
             }
-            !p.sleepBackgroundSupported -> MonoLabel("Read while Dana is open (this Health Connect can't share in the background)")
-            else -> MonoLabel("Reading sleep from Health Connect")
+            !p.sleepBackgroundSupported -> MetaLabel("Read while Dana is open (this Health Connect can't share in the background)")
+            else -> MetaLabel("Reading sleep from Health Connect")
         }
     }
 }

@@ -14,7 +14,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.SearchResult
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.viewmodels.SearchController
 
@@ -38,7 +38,7 @@ fun SearchPane(
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 18.dp, bottom = 24.dp)) {
         item(key = "head") {
             Column(Modifier.padding(horizontal = gutter).widthIn(max = 720.dp)) {
-                MonoLabel(
+                MetaLabel(
                     when {
                         state.failed && current -> "Search didn't answer"
                         state.searching || !current -> "Looking…"
@@ -56,7 +56,7 @@ fun SearchPane(
         groups.forEach { (kind, results) ->
             item(key = "k_$kind") {
                 Column(Modifier.padding(horizontal = gutter).padding(top = 16.dp)) {
-                    MonoLabel(SearchController.kindLabel(kind), modifier = Modifier.padding(bottom = 6.dp))
+                    MetaLabel(SearchController.kindLabel(kind), modifier = Modifier.padding(bottom = 6.dp))
                     Rule()
                 }
             }
@@ -64,7 +64,7 @@ fun SearchPane(
         }
         item(key = "ask") {
             Column(Modifier.padding(horizontal = gutter).padding(top = 22.dp)) {
-                MonoLabel("Or ask Dana", modifier = Modifier.padding(bottom = 6.dp))
+                MetaLabel("Or ask Dana", modifier = Modifier.padding(bottom = 6.dp))
                 Rule()
                 Row(
                     Modifier.fillMaxWidth().clickable(onClick = onAsk).padding(vertical = 13.dp),
@@ -78,7 +78,7 @@ fun SearchPane(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f)
                     )
-                    MonoLabel("↵")
+                    MetaLabel("↵")
                 }
                 Rule()
             }

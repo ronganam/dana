@@ -18,7 +18,7 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.network.SessionItem
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 
 /**
  * "Background runs": the conversations Dana had on its own (a watch's AI
@@ -49,7 +49,7 @@ fun BackgroundRunsDialog(runs: List<SessionItem>, onOpen: (String) -> Unit, onDi
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        MonoLabel(
+                        MetaLabel(
                             listOfNotNull(
                                 run.status.takeIf { it != "idle" && it.isNotBlank() },
                                 run.timestamp.takeIf { it > 0 }?.let {

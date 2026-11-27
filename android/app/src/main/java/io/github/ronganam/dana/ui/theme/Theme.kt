@@ -24,12 +24,13 @@ enum class ThemeMode(val label: String) { SYSTEM("System"), LIGHT("Light"), DARK
 /** User theme preference, persisted in DanaPrefs ("theme_mode"). Observable from Compose. */
 object ThemeSettings {
     private const val KEY = "theme_mode"
-    var mode by mutableStateOf(ThemeMode.SYSTEM)
+    /** Dana opens dark (Circuit is dark first) until the owner picks Light or System. */
+    var mode by mutableStateOf(ThemeMode.DARK)
         private set
 
     fun load(context: Context) {
         val raw = ServerConfig.prefs(context).getString(KEY, null)
-        mode = ThemeMode.values().firstOrNull { it.name == raw } ?: ThemeMode.SYSTEM
+        mode = ThemeMode.values().firstOrNull { it.name == raw } ?: ThemeMode.DARK
     }
 
     fun set(context: Context, value: ThemeMode) {
@@ -42,7 +43,8 @@ private val DarkScheme = darkColorScheme(
     primary = AccentDark, onPrimary = OnAccentDark,
     primaryContainer = AccentContainerDark, onPrimaryContainer = OnAccentContainerDark,
     secondary = DarkInkSoft, onSecondary = DarkCanvas,
-    secondaryContainer = DarkSurfaceHighest, onSecondaryContainer = DarkInk,
+    // Material's NavigationBar / NavigationRail draw their pill in secondaryContainer.
+    secondaryContainer = IndicatorDark, onSecondaryContainer = OnIndicatorDark,
     tertiary = Hue.SKY.dark, onTertiary = DarkCanvas,
     tertiaryContainer = DarkSurfaceHigh, onTertiaryContainer = DarkInkSoft,
     background = DarkCanvas, onBackground = DarkInk,
@@ -57,8 +59,8 @@ private val DarkScheme = darkColorScheme(
     inverseSurface = DarkInk, inverseOnSurface = DarkCanvas, inversePrimary = AccentLight,
     outline = DarkOutline, outlineVariant = DarkOutlineSoft,
     error = Hue.ROSE.dark, onError = DarkCanvas,
-    errorContainer = androidx.compose.ui.graphics.Color(0xFF5A1F1B),
-    onErrorContainer = androidx.compose.ui.graphics.Color(0xFFFFD9D5),
+    errorContainer = androidx.compose.ui.graphics.Color(0xFF4D1F33),
+    onErrorContainer = androidx.compose.ui.graphics.Color(0xFFFFD9E3),
     scrim = androidx.compose.ui.graphics.Color.Black
 )
 
@@ -66,14 +68,14 @@ private val LightScheme = lightColorScheme(
     primary = AccentLight, onPrimary = OnAccentLight,
     primaryContainer = AccentContainerLight, onPrimaryContainer = OnAccentContainerLight,
     secondary = LightInkSoft, onSecondary = LightSurface,
-    secondaryContainer = LightSurfaceHighest, onSecondaryContainer = LightInk,
+    secondaryContainer = IndicatorLight, onSecondaryContainer = OnIndicatorLight,
     tertiary = Hue.SKY.light, onTertiary = LightSurface,
     tertiaryContainer = LightSurfaceHigh, onTertiaryContainer = LightInkSoft,
     background = LightCanvas, onBackground = LightInk,
     surface = LightCanvas, onSurface = LightInk,
     surfaceVariant = LightSurface, onSurfaceVariant = LightInkSoft,
     surfaceTint = AccentLight,
-    surfaceContainerLowest = LightSurface,
+    surfaceContainerLowest = LightCanvas,
     surfaceContainerLow = LightSurface,
     surfaceContainer = LightSurface,
     surfaceContainerHigh = LightSurfaceHigh,
@@ -81,8 +83,8 @@ private val LightScheme = lightColorScheme(
     inverseSurface = LightInk, inverseOnSurface = LightCanvas, inversePrimary = AccentDark,
     outline = LightOutline, outlineVariant = LightOutlineSoft,
     error = Hue.ROSE.light, onError = androidx.compose.ui.graphics.Color.White,
-    errorContainer = androidx.compose.ui.graphics.Color(0xFFFFDAD6),
-    onErrorContainer = androidx.compose.ui.graphics.Color(0xFF410002)
+    errorContainer = androidx.compose.ui.graphics.Color(0xFFFFDAE3),
+    onErrorContainer = androidx.compose.ui.graphics.Color(0xFF3E0018)
 )
 
 
@@ -122,6 +124,7 @@ fun DanaTheme(
         // Inside MaterialTheme: it would otherwise put its ripple back as the indication.
         CompositionLocalProvider(
             LocalHues provides if (darkTheme) DarkHues else LightHues,
+            LocalCircuitColors provides if (darkTheme) DarkCircuit else LightCircuit,
             LocalRichMotion provides !(BuildConfig.TV || BuildConfig.KIOSK),
             LocalIndication provides PressIndication,
             content = content

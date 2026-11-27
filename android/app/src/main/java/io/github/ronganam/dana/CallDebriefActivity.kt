@@ -256,11 +256,11 @@ private fun DebriefScreen(
     ) { padding ->
         when {
             call == null && error != null -> Column(Modifier.padding(padding).padding(28.dp)) {
-                MonoLabel("Couldn't load", color = MaterialTheme.colorScheme.primary)
+                MetaLabel("Couldn't load", color = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.height(8.dp))
                 Text(error ?: "", style = MaterialTheme.typography.headlineSmall, fontStyle = FontStyle.Italic)
             }
-            call == null -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) { MonoLabel("Loading…") }
+            call == null -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) { MetaLabel("Loading…") }
             else -> Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.TopCenter) { LazyColumn(
                 // A readable measure on the unfolded screen; full width on the cover.
                 Modifier.widthIn(max = 720.dp).fillMaxSize(),
@@ -283,7 +283,7 @@ private fun DebriefScreen(
                 if (call.status == "processing") {
                     item(key = "processing") {
                         Column(Modifier.padding(vertical = 24.dp)) {
-                            MonoLabel("Analysing", color = MaterialTheme.colorScheme.primary)
+                            MetaLabel("Analysing", color = MaterialTheme.colorScheme.primary)
                             Spacer(Modifier.height(8.dp))
                             LinearProgressIndicator(Modifier.fillMaxWidth())
                             Spacer(Modifier.height(8.dp))
@@ -350,11 +350,11 @@ private fun DebriefScreen(
                         DebriefSection("Reminders from this call")
                         tasks.forEach { t ->
                             Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                                MonoLabel(if (t.status == "completed") "Done" else "Open",
+                                MetaLabel(if (t.status == "completed") "Done" else "Open",
                                     color = if (t.status == "completed") MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.primary,
                                     modifier = Modifier.width(52.dp))
                                 Text(t.title, style = MaterialTheme.typography.bodyMedium.copy(textDirection = TextDirection.Content), modifier = Modifier.weight(1f))
-                                t.dueDate?.let { MonoLabel(friendlyDate(it) ?: it) }
+                                t.dueDate?.let { MetaLabel(friendlyDate(it) ?: it) }
                             }
                             Rule()
                         }
@@ -403,7 +403,7 @@ private fun DebriefScreen(
 @Composable
 private fun DebriefSection(text: String) {
     Column(Modifier.fillMaxWidth().padding(top = 24.dp, bottom = 10.dp)) {
-        MonoLabel(text, color = MaterialTheme.colorScheme.onSurface)
+        MetaLabel(text, color = MaterialTheme.colorScheme.onSurface)
         Spacer(Modifier.height(6.dp))
         Rule()
     }
@@ -426,7 +426,7 @@ fun LabelEditorDialog(
             Column {
                 Text("Up to three.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 Spacer(Modifier.height(12.dp))
-                if (catalog.isEmpty()) MonoLabel("Loading…")
+                if (catalog.isEmpty()) MetaLabel("Loading…")
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     catalog.forEach { l ->
                         val on = l.id in picked

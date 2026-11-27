@@ -1,6 +1,6 @@
 package io.github.ronganam.dana.ui.shell
 
-import io.github.ronganam.dana.ui.components.emberGradient
+import io.github.ronganam.dana.ui.components.accentFill
 import io.github.ronganam.dana.ui.components.pulseRing
 import android.Manifest
 import android.content.pm.PackageManager
@@ -51,7 +51,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.screens.VoiceWaveformIndicator
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import coil.compose.AsyncImage
@@ -126,7 +126,7 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                 Modifier.fillMaxWidth().clickable { shell.toggleThread() }.heightIn(min = 36.dp).padding(horizontal = 2.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                MonoLabel(if (inThread) "Thread" else "Conversation", modifier = Modifier.padding(end = 8.dp))
+                MetaLabel(if (inThread) "Thread" else "Conversation", modifier = Modifier.padding(end = 8.dp))
                 Text(
                     last?.message?.lineSequence()?.firstOrNull { it.isNotBlank() }?.trim() ?: if (inThread) "empty" else "nothing yet",
                     style = MaterialTheme.typography.bodySmall.copy(textDirection = TextDirection.Content),
@@ -136,7 +136,7 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f)
                 )
-                MonoLabel(if (threadOpen) "close ↓" else "open ↑", modifier = Modifier.padding(start = 10.dp))
+                MetaLabel(if (threadOpen) "close ↓" else "open ↑", modifier = Modifier.padding(start = 10.dp))
             }
         } else {
             Spacer(Modifier.height(6.dp))
@@ -227,7 +227,7 @@ fun AskBar(viewModel: MainViewModel, modifier: Modifier = Modifier) {
                     // Listening: a gentle ring leaves the button until it stops.
                     .pulseRing(isRecording || isCallActive, MaterialTheme.colorScheme.primary)
                     .clip(CircleShape)
-                    .background(emberGradient())
+                    .background(accentFill())
                     // Dimmed while the server is unreachable (sending refuses and re-checks).
                     .alpha(if (serverStatus.isOffline && !isRecording) 0.5f else 1f)
                     .clickable {

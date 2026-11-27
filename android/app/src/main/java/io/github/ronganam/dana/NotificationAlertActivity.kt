@@ -43,7 +43,7 @@ import io.github.ronganam.dana.data.notifications.AppIcons
 import io.github.ronganam.dana.data.notifications.DanaNotificationListener
 import io.github.ronganam.dana.data.notifications.Snoozer
 import io.github.ronganam.dana.ui.components.InkChip
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.components.Rule
 import io.github.ronganam.dana.ui.theme.Danger
 import io.github.ronganam.dana.ui.theme.DanaTheme
@@ -283,7 +283,7 @@ fun NotificationAlertScreen(
                     }
                     Spacer(Modifier.width(16.dp))
                     Column {
-                        MonoLabel("⚡ ${if (alert.priority == "urgent") "Urgent" else "Needs you"}" +
+                        MetaLabel("⚡ ${if (alert.priority == "urgent") "Urgent" else "Needs you"}" +
                             if (alert.attempt > 1) " · still waiting" else "", color = accent)
                         Text(alert.app, style = MaterialTheme.typography.titleMedium)
                     }
@@ -304,7 +304,7 @@ fun NotificationAlertScreen(
                 Text("Open in ${alert.app}", style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(16.dp))
-            MonoLabel("Snooze")
+            MetaLabel("Snooze")
             Spacer(Modifier.height(8.dp))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Snoozer.options().forEach { opt ->

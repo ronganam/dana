@@ -22,7 +22,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.DaySlotInfo
-import io.github.ronganam.dana.ui.components.MonoLabel
+import io.github.ronganam.dana.ui.components.MetaLabel
 import io.github.ronganam.dana.ui.theme.Hue
 import io.github.ronganam.dana.ui.theme.hues
 import java.time.LocalTime
@@ -154,7 +154,7 @@ fun NowDayBlock(slots: List<DaySlotInfo>, now: LocalTime, onOpen: (DayEntry) -> 
         NowDayStrip(segments)
         if (upcoming.isNotEmpty()) Column(Modifier.padding(top = 12.dp).then(if (centred) Modifier.width(IntrinsicSize.Max) else Modifier)) {
             upcoming.take(UPCOMING_SHOWN).forEach { e -> DayEntryLine(e, onOpen) }
-            if (upcoming.size > UPCOMING_SHOWN) MonoLabel("+${upcoming.size - UPCOMING_SHOWN} later", modifier = Modifier.padding(start = 16.dp, top = 2.dp))
+            if (upcoming.size > UPCOMING_SHOWN) MetaLabel("+${upcoming.size - UPCOMING_SHOWN} later", modifier = Modifier.padding(start = 16.dp, top = 2.dp))
         }
     }
 }
@@ -185,6 +185,6 @@ private fun DayEntryLine(e: DayEntry, onOpen: (DayEntry) -> Unit) {
             maxLines = 1, overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f, fill = false)
         )
-        (e.time ?: e.place)?.let { MonoLabel(it, modifier = Modifier.padding(start = 8.dp)) }
+        (e.time ?: e.place)?.let { MetaLabel(it, modifier = Modifier.padding(start = 8.dp)) }
     }
 }
