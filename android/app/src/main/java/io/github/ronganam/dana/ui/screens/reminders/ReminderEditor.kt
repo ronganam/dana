@@ -38,6 +38,8 @@ import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.ronganam.dana.data.models.Task
+import io.github.ronganam.dana.ui.components.celebrate
+import io.github.ronganam.dana.ui.components.celebrationHues
 import io.github.ronganam.dana.data.models.TaskGroup
 import io.github.ronganam.dana.ui.components.InkChoice
 import io.github.ronganam.dana.ui.components.MetaLabel
@@ -136,6 +138,7 @@ fun ReminderEditor(
                 progress = { completion.progress.value },
                 size = 26.dp,
                 modifier = Modifier.offset(x = (-10).dp, y = (-6).dp)
+                    .then(if (completion.running) Modifier.celebrate(true, celebrationHues(), reach = 22.dp) else Modifier)
             )
             InlineField(
                 value = title,

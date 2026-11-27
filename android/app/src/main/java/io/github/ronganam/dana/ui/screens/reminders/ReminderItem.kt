@@ -52,6 +52,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.ronganam.dana.data.models.Task
+import io.github.ronganam.dana.ui.components.celebrate
+import io.github.ronganam.dana.ui.components.celebrationHues
 import io.github.ronganam.dana.ui.theme.Motion
 import io.github.ronganam.dana.ui.theme.circuitColors
 import io.github.ronganam.dana.ui.theme.hues
@@ -223,7 +225,9 @@ fun ReminderItem(
                     } else complete()
                 },
                 progress = { completion.progress.value },
+                // A small burst of hue dots as the check lands (once; never with animations off, TV or kiosk).
                 modifier = Modifier.padding(top = 6.dp)
+                    .then(if (completion.running) Modifier.celebrate(true, celebrationHues(), reach = 16.dp) else Modifier)
             )
             Spacer(Modifier.width(4.dp))
             Column(Modifier.weight(1f).padding(vertical = 14.dp)) {
