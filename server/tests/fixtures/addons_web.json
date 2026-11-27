@@ -1,7 +1,7 @@
 {
  "catalog_admin": {
   "body": {
-   "dana_version": "10.7.1",
+   "dana_version": "10.8.1",
    "entries": [
     {
      "author": "Someone",
@@ -1385,7 +1385,8 @@
      "features": [
       "Search and read your mail",
       "Write new mail and replies (asks you before sending)",
-      "Archive, mark read and move to the trash, with Undo"
+      "Archive, mark read and move to the trash, with Undo",
+      "Watches can act on new mail as it arrives"
      ],
      "icon": "mail",
      "name": "gmail",
@@ -2784,7 +2785,8 @@
      "features": [
       "Search and read your mail",
       "Write new mail and replies (asks you before sending)",
-      "Archive, mark read and move to the trash, with Undo"
+      "Archive, mark read and move to the trash, with Undo",
+      "Watches can act on new mail as it arrives"
      ],
      "icon": "mail",
      "name": "gmail",
@@ -4129,7 +4131,8 @@
      "features": [
       "Search and read your mail",
       "Write new mail and replies (asks you before sending)",
-      "Archive, mark read and move to the trash, with Undo"
+      "Archive, mark read and move to the trash, with Undo",
+      "Watches can act on new mail as it arrives"
      ],
      "icon": "mail",
      "name": "gmail",
@@ -5461,7 +5464,8 @@
      "features": [
       "Search and read your mail",
       "Write new mail and replies (asks you before sending)",
-      "Archive, mark read and move to the trash, with Undo"
+      "Archive, mark read and move to the trash, with Undo",
+      "Watches can act on new mail as it arrives"
      ],
      "icon": "mail",
      "name": "gmail",
@@ -6796,7 +6800,8 @@
      "features": [
       "Search and read your mail",
       "Write new mail and replies (asks you before sending)",
-      "Archive, mark read and move to the trash, with Undo"
+      "Archive, mark read and move to the trash, with Undo",
+      "Watches can act on new mail as it arrives"
      ],
      "icon": "mail",
      "name": "gmail",
@@ -8119,7 +8124,8 @@
      "features": [
       "Search and read your mail",
       "Write new mail and replies (asks you before sending)",
-      "Archive, mark read and move to the trash, with Undo"
+      "Archive, mark read and move to the trash, with Undo",
+      "Watches can act on new mail as it arrives"
      ],
      "icon": "mail",
      "name": "gmail",

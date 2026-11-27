@@ -3,6 +3,7 @@
 from core.addons import Field, Addon, LlmJob, PromptPart, Need, Touches
 from addons.gmail import client
 from addons.gmail.config import ADDON
+from addons.gmail.event_types import GMAIL_EVENTS
 from addons.google_account import oauth
 
 # Read, send, change labels, drafts and the trash (modify); filters and labels' settings (settings.basic).
@@ -40,7 +41,8 @@ addon = Addon(
     description="Search, read and write your mail in chat",
     features=("Search and read your mail",
               "Write new mail and replies (asks you before sending)",
-              "Archive, mark read and move to the trash, with Undo"),
+              "Archive, mark read and move to the trash, with Undo",
+              "Watches can act on new mail as it arrives"),
     setup=oauth.SETUP,
     examples=("Summarize my unread emails", "Did the electricity company send me a bill this month?"),
     test=client.check,
@@ -48,6 +50,7 @@ addon = Addon(
     on_connect=client.on_connect,
     on_credentials_change=client.on_credentials_change,
     realtime=False,
+    events=GMAIL_EVENTS,
     prompt_parts=(
         PromptPart("tools", "email (Gmail)", rank=55),
         PromptPart("read_examples", "searching and reading email", rank=40),

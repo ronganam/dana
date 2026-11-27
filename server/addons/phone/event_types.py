@@ -181,7 +181,9 @@ PHONE_EVENTS = (
                "priority": "0 (noise) to 4 (urgent) once sorted; null when emitted",
                "amount": "the first amount in shekels in the title or text (ILS, positive), else null"},
               history=notification_history),
-    EventType("phone.email.received", "A new email, from the Gmail or Outlook app's notification on the phone.",
+    EventType("phone.email.received", "A new email, from the Gmail or Outlook app's notification on the phone "
+                                         "(no recipients; \"from\" is \"me\" for mail to oneself): prefer "
+                                         "gmail.email.received when the user has the gmail add-on.",
               {"notification_id": "the Inbox notification's id",
                "account": "Gmail | Outlook",
                "from": "the sender's name or address",
