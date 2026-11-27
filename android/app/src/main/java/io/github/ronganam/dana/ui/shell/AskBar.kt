@@ -274,18 +274,24 @@ internal fun rememberVoiceToggle(viewModel: MainViewModel): () -> Unit {
  * it while listening.
  */
 @Composable
-fun HeaderAsk(viewModel: MainViewModel, modifier: Modifier = Modifier, conversation: Boolean = false) {
+fun HeaderAsk(viewModel: MainViewModel, modifier: Modifier = Modifier, conversation: Boolean = false, vertical: Boolean = false) {
     val toggle = rememberVoiceToggle(viewModel)
     val isRecording by viewModel.chatController.isRecording.collectAsState()
     val isCallActive by viewModel.callController.isCallActive.collectAsState()
     val listening = isRecording || isCallActive
-    // A place without the docked ask bar (Now) reaches the thread from here too.
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(0.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (conversation) ConversationButton(onClick = { viewModel.shellController.openThread() })
+    val ask = @Composable {
         AskDanaButton(
             onClick = toggle,
             modifier = Modifier.pulseRing(listening, MaterialTheme.colorScheme.primary),
             label = if (listening) "Stop listening" else "Ask Dana"
         )
+    }
+    // No place docks the ask bar, so the thread opens from here too (the rail: under the mic).
+    if (vertical) Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        ask()
+        if (conversation) ConversationButton(onClick = { viewModel.shellController.openThread() })
+    } else Row(modifier, verticalAlignment = Alignment.CenterVertically) {
+        if (conversation) ConversationButton(onClick = { viewModel.shellController.openThread() })
+        ask()
     }
 }

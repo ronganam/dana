@@ -98,17 +98,19 @@ fun DayStrip(viewModel: MainViewModel, onNow: () -> Unit, modifier: Modifier = M
     val drop = LocalDayDrop.current
 
     BoxWithConstraints(modifier.fillMaxWidth()) {
-        val hourCells = ((maxWidth.value - 84f - 2 * 92f) / 84f).toInt().coerceIn(2, 8)
+        val hourCells = ((maxWidth.value - 100f - 2 * 92f) / 84f).toInt().coerceIn(2, 8)
         val hours = ((now.hour + 1)..23).take(hourCells)
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).heightIn(min = 92.dp)) {
             Column(
-                Modifier.width(84.dp).fillMaxHeight().clickable(onClick = onNow).edgeRule(end = true).padding(horizontal = 10.dp, vertical = 10.dp)
+                Modifier.width(100.dp).fillMaxHeight().clickable(onClick = onNow).edgeRule(end = true).padding(horizontal = 10.dp, vertical = 10.dp)
             ) {
                 MetaLabel("Now", color = MaterialTheme.colorScheme.primary)
                 Text(
                     now.format(HM),
-                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 26.sp),
-                    maxLines = 1
+                    // Tabular figures, never wrapped or cut: the cell is sized for "23:59" at this size.
+                    style = MaterialTheme.typography.headlineMedium.copy(fontSize = 24.sp, fontFeatureSettings = "tnum"),
+                    maxLines = 1,
+                    softWrap = false
                 )
                 items[null].orEmpty().take(2).forEach { SlotItem(it) }
             }

@@ -47,7 +47,7 @@ import io.github.ronganam.dana.ui.components.circuit.LineNode
 import io.github.ronganam.dana.ui.components.circuit.NodeLine
 import io.github.ronganam.dana.ui.components.circuit.NodeShape
 import io.github.ronganam.dana.ui.components.circuit.SectionHeader
-import io.github.ronganam.dana.ui.components.circuit.askSlotInset
+import io.github.ronganam.dana.ui.components.circuit.PlaceHeader
 import io.github.ronganam.dana.ui.theme.Space
 import io.github.ronganam.dana.ui.theme.circuitColors
 import io.github.ronganam.dana.ui.viewmodels.WatchingController
@@ -71,6 +71,8 @@ fun WatchingList(
     onNew: () -> Unit,
     onOpenRun: (WatchRun) -> Unit,
     modifier: Modifier = Modifier,
+    /** Folded: the conversation button and Ask Dana, at the end of the header row. */
+    headerAsk: (@Composable () -> Unit)? = null,
 ) {
     val watches by controller.watches.collectAsState()
     val loaded by controller.loaded.collectAsState()
@@ -108,14 +110,17 @@ fun WatchingList(
     }
     androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
     androidx.compose.runtime.CompositionLocalProvider(LocalTrackStart provides trackFrom, LocalCircuitColumns provides fitColumns(maxWidth)) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = Space.screen, vertical = 12.dp)
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.askSlotInset()) {
-            Text("Watching", style = MaterialTheme.typography.displayMedium, modifier = Modifier.weight(1f).semantics { heading() })
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+        val line = when {
+            !loaded && off -> "Watches are off on your Dana. An admin turns them on under Addons."
+            !loaded && failed -> "Couldn't reach Dana."
+            !loaded -> "Loading…"
+            watches.isEmpty() -> "Nothing yet."
+            tracks -> summaryWords(watches, needsYou) + todayWords(today.values.flatten())
+            else -> summaryWords(watches, needsYou)
+        }
+        // The header buttons sit on the 16dp margin like every place's: New watch, then (folded) the conversation and Ask Dana.
+        PlaceHeader("Watching", supporting = line, trailing = if (off && headerAsk == null) null else ({
             if (!off && tracks) {
                 Button(onClick = onNew, colors = ButtonDefaults.buttonColors(containerColor = c.accentFilled, contentColor = c.onAccentFilled), modifier = Modifier.height(48.dp)) {
                     Icon(Icons.Outlined.Add, contentDescription = null, modifier = Modifier.size(20.dp))
@@ -127,16 +132,9 @@ fun WatchingList(
                     Icon(Icons.Outlined.Add, contentDescription = "New watch", tint = c.ink)
                 }
             }
-        }
-        val line = when {
-            !loaded && off -> "Watches are off on your Dana. An admin turns them on under Addons."
-            !loaded && failed -> "Couldn't reach Dana."
-            !loaded -> "Loading…"
-            watches.isEmpty() -> "Nothing yet."
-            tracks -> summaryWords(watches, needsYou) + todayWords(today.values.flatten())
-            else -> summaryWords(watches, needsYou)
-        }
-        Text(line, style = MaterialTheme.typography.bodyMedium, color = c.inkSoft, modifier = Modifier.padding(top = 4.dp).askSlotInset())
+            headerAsk?.invoke()
+        }))
+    Column(Modifier.fillMaxWidth().padding(horizontal = Space.screen)) {
 
         if (loaded && watches.isEmpty()) EmptyWatching(onNew)
         if (watches.isNotEmpty()) {
@@ -183,6 +181,7 @@ fun WatchingList(
         if (tracks) TrackLegend(Modifier.padding(top = 16.dp))
         }
         Spacer(Modifier.height(24.dp))
+    }
     }
     }
     }

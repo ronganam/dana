@@ -13,6 +13,7 @@ import io.github.ronganam.dana.ui.screens.notifications.NoAppPicked
 import io.github.ronganam.dana.ui.screens.notifications.NotificationsActions
 import io.github.ronganam.dana.ui.screens.notifications.NotificationsListPane
 import io.github.ronganam.dana.ui.shell.Destination
+import io.github.ronganam.dana.ui.shell.HeaderAsk
 import io.github.ronganam.dana.ui.shell.LocalShellLayout
 import io.github.ronganam.dana.ui.shell.ShellLayout
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
@@ -111,8 +112,12 @@ fun rememberNotificationsDestination(viewModel: MainViewModel): Destination {
         picked = userPicked && shown != null,
         onBack = { shell.selectNotifApp(null) },
         list = {
-            NotificationsListPane(overview, pick?.id, wide, loading, failed, access, quietOpen, actions)
+            NotificationsListPane(
+                overview, pick?.id, wide, loading, failed, access, quietOpen, actions,
+                headerAsk = if (!wide) ({ HeaderAsk(viewModel, conversation = true) }) else null
+            )
         },
+        askSlot = false,
         stage = {
             val app = shown
             if (app != null) AppDetail(app, appItems[app.packageName], onBack = if (wide) null else ({ shell.selectNotifApp(null) }), actions)

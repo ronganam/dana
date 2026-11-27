@@ -1,23 +1,41 @@
 package io.github.ronganam.dana.ui.shell.destinations
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
+import androidx.compose.ui.text.style.TextDirection
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import io.github.ronganam.dana.ui.components.MetaLabel
-import io.github.ronganam.dana.ui.components.Rule
-import io.github.ronganam.dana.ui.components.circuit.askSlotInset
+import io.github.ronganam.dana.ui.components.circuit.GroupRow
+import io.github.ronganam.dana.ui.components.circuit.GroupedSection
+import io.github.ronganam.dana.ui.components.circuit.PlaceHeader
+import io.github.ronganam.dana.ui.shell.HeaderAsk
+import io.github.ronganam.dana.ui.shell.SearchPane
+import io.github.ronganam.dana.ui.theme.circuitColors
+import io.github.ronganam.dana.ui.viewmodels.SearchController
 import io.github.ronganam.dana.ui.screens.CallsScreen
 import io.github.ronganam.dana.ui.screens.MemoryScreen
 import io.github.ronganam.dana.ui.screens.SettingsScreen
@@ -62,7 +80,9 @@ fun rememberMoreDestination(viewModel: MainViewModel): Destination {
             picked = item != null,
             onBack = { shell.clearPick(Place.MORE) },
             list = { MoreList(viewModel, item) },
-            stage = { MoreStage(viewModel, item) }
+            stage = { MoreStage(viewModel, item) },
+            // Its header has the buttons (PlaceHeader's trailing slot).
+            askSlot = false
         )
     }
 }
@@ -109,37 +129,100 @@ private fun MoreList(viewModel: MainViewModel, selected: MoreItem?) {
     )
     val accent = MaterialTheme.colorScheme.primary
     val canvas = MaterialTheme.colorScheme.background
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 20.dp)) {
-        Column(Modifier.padding(horizontal = 18.dp)) {
-            MetaLabel("Everything else Dana keeps", modifier = Modifier.askSlotInset())
-            Text("More", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp, bottom = 12.dp).askSlotInset())
-            Rule()
-        }
-        rows.forEach { (item, meta, matches) ->
-            val on = wide && selected in matches
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (on) Modifier.background(canvas).drawBehind {
-                            drawLine(accent, Offset(1.5.dp.toPx(), 0f), Offset(1.5.dp.toPx(), size.height), 3.dp.toPx())
-                        } else Modifier
-                    )
-                    .clickable { shell.selectMore(item) }
-            ) {
-                // A count sits at the end of the row; a description goes under the name.
-                val isCount = meta.all { it.isDigit() }
-                Row(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text(item.label, style = MaterialTheme.typography.headlineSmall.copy(fontSize = 25.sp), maxLines = 1)
-                        if (!isCount) MetaLabel(meta, modifier = Modifier.padding(top = 2.dp))
+    val search by viewModel.searchController.state.collectAsState()
+    val query = shell.searchDraft.text
+    Column(Modifier.fillMaxSize()) {
+        // The header buttons (folded: the conversation and Ask Dana) on the 16dp margin, as on every place.
+        PlaceHeader("More", trailing = if (!wide) ({ HeaderAsk(viewModel, conversation = true) }) else null)
+        // Search your things: reminders, calls, people, notes, notifications, shopping (GET /api/search).
+        SearchField(
+            value = shell.searchDraft,
+            onChange = { shell.searchDraft = it },
+            modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp)
+        )
+        if (SearchController.isSearchable(query)) {
+            BackHandler { shell.searchDraft = TextFieldValue("") }
+            Box(Modifier.weight(1f).fillMaxWidth()) {
+                SearchPane(
+                    query = query,
+                    state = search,
+                    wide = false,
+                    onResult = { r ->
+                        shell.searchDraft = TextFieldValue("")
+                        viewModel.openSearchResult(r)
+                    },
+                    onAsk = {
+                        shell.openThread()
+                        if (viewModel.chatController.sendChatMessage(query.trim())) shell.searchDraft = TextFieldValue("")
                     }
-                    if (isCount && meta.isNotEmpty()) MetaLabel(meta)
+                )
+            }
+        } else MoreRows(rows, selected, wide, accent, canvas) { shell.selectMore(it) }
+    }
+}
+
+@Composable
+private fun ColumnScope.MoreRows(
+    rows: List<Triple<MoreItem, String, Set<MoreItem>>>,
+    selected: MoreItem?,
+    wide: Boolean,
+    accent: androidx.compose.ui.graphics.Color,
+    canvas: androidx.compose.ui.graphics.Color,
+    onSelect: (MoreItem) -> Unit
+) {
+    val c = circuitColors
+    Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp)) {
+        // One tonal group; unfolded the open item's row is lifted (and marked by the accent at its start).
+        GroupedSection {
+            rows.forEach { (item, meta, matches) ->
+                val on = wide && selected in matches
+                item(key = item, color = if (on) canvas else null) {
+                    // A count sits at the end of the row; a description goes under the name.
+                    val isCount = meta.all { it.isDigit() }
+                    GroupRow(
+                        title = item.label,
+                        subtitle = if (!isCount) meta.replaceFirstChar { it.uppercase() } else null,
+                        trailing = if (isCount && meta.isNotEmpty()) ({ Text(meta, style = MaterialTheme.typography.bodyMedium, color = c.inkSoft) }) else null,
+                        modifier = if (on) Modifier.drawBehind {
+                            drawLine(accent, Offset(1.5.dp.toPx(), 0f), Offset(1.5.dp.toPx(), size.height), 3.dp.toPx())
+                        } else Modifier,
+                        onClick = { onSelect(item) }
+                    )
                 }
-                Rule(Modifier.padding(horizontal = 18.dp))
             }
         }
     }
+}
+
+/** More's search field: a tonal pill with a search icon and × to clear. */
+@Composable
+private fun SearchField(value: TextFieldValue, onChange: (TextFieldValue) -> Unit, modifier: Modifier = Modifier) {
+    val c = circuitColors
+    BasicTextField(
+        value = value,
+        onValueChange = onChange,
+        singleLine = true,
+        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.ink, textDirection = TextDirection.Content),
+        cursorBrush = SolidColor(c.accent),
+        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+        modifier = modifier.fillMaxWidth(),
+        decorationBox = { inner ->
+            Row(
+                Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(24.dp))
+                    .background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(start = 14.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Outlined.Search, contentDescription = null, tint = c.inkSoft, modifier = Modifier.size(20.dp))
+                Box(Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    if (value.text.isEmpty()) Text("Search reminders, calls, people…", style = MaterialTheme.typography.bodyLarge, color = c.mute, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    inner()
+                }
+                if (value.text.isNotEmpty()) IconButton(onClick = { onChange(TextFieldValue("")) }, modifier = Modifier.size(40.dp)) {
+                    Icon(Icons.Filled.Close, contentDescription = "Clear the search", tint = c.inkSoft, modifier = Modifier.size(18.dp))
+                }
+            }
+        }
+    )
 }
 
 @Composable

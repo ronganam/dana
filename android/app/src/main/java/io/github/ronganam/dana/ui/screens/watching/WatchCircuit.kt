@@ -182,6 +182,8 @@ fun PlacedTexts(
     room: Dp,
     modifier: Modifier = Modifier,
     maxLines: Int = 1,
+    /** Keep the first label inside the box (false: it stays centred on its x, past the start edge). */
+    clampStart: Boolean = true,
 ) {
     Layout(
         content = {
@@ -197,7 +199,8 @@ fun PlacedTexts(
         layout(constraints.maxWidth, h) {
             ps.forEachIndexed { i, p ->
                 val x = (xs.getOrNull(i) ?: 0.dp).roundToPx() - p.width / 2
-                p.placeRelative(x.coerceIn(0, (constraints.maxWidth - p.width).coerceAtLeast(0)), 0)
+                val max = (constraints.maxWidth - p.width).coerceAtLeast(0)
+                p.placeRelative(if (clampStart || i > 0) x.coerceIn(0, max) else x.coerceAtMost(max), 0)
             }
         }
     }

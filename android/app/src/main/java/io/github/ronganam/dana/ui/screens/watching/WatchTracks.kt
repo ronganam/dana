@@ -54,6 +54,8 @@ val LocalTrackStart = compositionLocalOf { 0L }
 
 private val STATE_COLUMN = 96.dp
 private val TRACK_GAP = 16.dp
+/** Kept free at the end of the track's labels: the half of "When" that reaches back over the track, and a gap. */
+private val HEADER_ROOM = 32.dp
 
 /**
  * An unfolded watch row: its name and time, then today's track running into
@@ -148,17 +150,23 @@ fun TrackHeader(modifier: Modifier = Modifier) {
     val start = LocalTrackStart.current
     val now = System.currentTimeMillis()
     Row(modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+        // The track's labels and the circuit's each keep their own column: "Now" ends HEADER_ROOM
+        // before the track does, so "When" can sit centred over the source node.
         BoxWithConstraints(Modifier.weight(1f)) {
             val w = maxWidth
-            val hours = trackHours(start, now, maxLabels = (w / 56.dp).toInt() - 1)
+            val labelsEnd = w - HEADER_ROOM
+            val hours = trackHours(start, now, maxLabels = (labelsEnd / 56.dp).toInt() - 1)
             val span = (now - start).coerceAtLeast(1).toFloat()
-            val xs = hours.map { 4.dp + (w - 8.dp) * ((it - start) / span) } + (w - 4.dp)
-            val labels = hours.map { clockWords(it, ZoneId.systemDefault()) } + "Now"
-            PlacedTexts(xs, labels, style, c.mute, room = 48.dp)
+            val xs = hours.map { 4.dp + (w - 8.dp) * ((it - start) / span) }.filter { it < labelsEnd - 48.dp }
+            val labels = hours.take(xs.size).map { clockWords(it, ZoneId.systemDefault()) }
+            Box(Modifier.fillMaxWidth()) {
+                PlacedTexts(xs, labels, style, c.mute, room = 48.dp)
+                Text("Now", style = style, color = c.mute, maxLines = 1, modifier = Modifier.align(Alignment.CenterEnd).padding(end = HEADER_ROOM))
+            }
         }
         Spacer(Modifier.width(TRACK_GAP - cols.source + NodeSize.Small.circle / 2))
         Box(Modifier.width(cols.width - cols.source + NodeSize.Small.circle / 2)) {
-            PlacedTexts(shifted(cols, true), listOf("When", "Rule", "AI check", "Then"), style, c.mute, room = 64.dp)
+            PlacedTexts(shifted(cols, true), listOf("When", "Rule", "AI check", "Then"), style, c.mute, room = 64.dp, clampStart = false)
         }
         Text("Last fired", style = style, color = c.mute, textAlign = TextAlign.End, modifier = Modifier.width(STATE_COLUMN))
     }

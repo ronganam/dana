@@ -109,6 +109,9 @@ class ShellController(
     /** What is typed in the ask bar; kept here so it survives fold/unfold. */
     var askDraft by mutableStateOf(TextFieldValue(""))
 
+    /** What is typed in More's search field (`GET /api/search`); kept here so it survives fold/unfold. */
+    var searchDraft by mutableStateOf(TextFieldValue(""))
+
     /**
      * A place's own text field has the keyboard (Shopping's add field): the
      * ask bar steps aside meanwhile, so there is one field and one voice input.

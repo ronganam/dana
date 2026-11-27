@@ -9,6 +9,7 @@ import io.github.ronganam.dana.ui.screens.watching.NewWatchPage
 import io.github.ronganam.dana.ui.screens.watching.WatchDetailPage
 import io.github.ronganam.dana.ui.screens.watching.WatchingList
 import io.github.ronganam.dana.ui.shell.Destination
+import io.github.ronganam.dana.ui.shell.HeaderAsk
 import io.github.ronganam.dana.ui.shell.LocalShellLayout
 import io.github.ronganam.dana.ui.shell.ShellLayout
 import io.github.ronganam.dana.ui.viewmodels.MainViewModel
@@ -58,6 +59,7 @@ fun rememberWatchingDestination(viewModel: MainViewModel): Destination {
                 onOpen = { c.open(it) },
                 onNew = { c.startNew() },
                 onOpenRun = openRun,
+                headerAsk = if (LocalShellLayout.current == ShellLayout.STACKED) ({ HeaderAsk(viewModel, conversation = true) }) else null,
             )
         },
         stage = if (!page) null else {
@@ -68,5 +70,7 @@ fun rememberWatchingDestination(viewModel: MainViewModel): Destination {
             }
         },
         wide = true,
+        // Its header has the buttons (PlaceHeader's trailing slot).
+        askSlot = false,
     )
 }

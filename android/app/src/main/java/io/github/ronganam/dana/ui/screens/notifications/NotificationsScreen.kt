@@ -1,6 +1,6 @@
 package io.github.ronganam.dana.ui.screens.notifications
 
-import io.github.ronganam.dana.ui.components.circuit.askSlotInset
+import io.github.ronganam.dana.ui.components.circuit.PlaceHeader
 import androidx.compose.foundation.lazy.itemsIndexed
 import io.github.ronganam.dana.ui.components.RollingText
 import io.github.ronganam.dana.ui.components.arrive
@@ -108,7 +108,8 @@ fun NotificationsListPane(
     failed: Boolean,
     accessGranted: Boolean,
     quietOpen: Boolean,
-    actions: NotificationsActions
+    actions: NotificationsActions,
+    headerAsk: (@Composable () -> Unit)? = null
 ) {
     val pull = rememberPullToRefreshState()
     var pullRefreshing by remember { mutableStateOf(false) }
@@ -124,11 +125,15 @@ fun NotificationsListPane(
             )
         }
     ) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 20.dp, bottom = 32.dp)) {
+        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(top = 0.dp, bottom = 32.dp)) {
             item(key = "head") {
+                // The header buttons (folded: the conversation and Ask Dana) on the 16dp margin, as on every place.
+                PlaceHeader(
+                    "Inbox",
+                    supporting = if (counts != null) "${counts.total} on your phone · ${counts.noise} noise" else "Your phone's notifications",
+                    trailing = headerAsk
+                )
                 Column(Modifier.padding(horizontal = GUTTER)) {
-                    MetaLabel(if (counts != null) "${counts.total} on your phone · ${counts.noise} noise" else "Your phone's notifications", modifier = Modifier.askSlotInset())
-                    Text("Inbox", style = MaterialTheme.typography.displayMedium, modifier = Modifier.padding(top = 2.dp).askSlotInset())
                     if (!accessGranted) AccessBox(actions.allowAccess)
                     if (overview != null) NoiseBox(overview, wide, actions.clearNoise)
                     overview?.ruleSuggestions?.firstOrNull()?.let { s -> NoticedBox(s, actions.answer) }

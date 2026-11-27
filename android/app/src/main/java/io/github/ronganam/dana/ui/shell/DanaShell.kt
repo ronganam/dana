@@ -27,16 +27,16 @@ import io.github.ronganam.dana.ui.viewmodels.MainViewModel
 import io.github.ronganam.dana.ui.viewmodels.Place
 import io.github.ronganam.dana.ui.viewmodels.ScreenContext
 import io.github.ronganam.dana.ui.viewmodels.ScreenRef
-import io.github.ronganam.dana.ui.viewmodels.SearchController
 import io.github.ronganam.dana.ui.viewmodels.ShellSnapshot
 import kotlinx.coroutines.launch
 
 /**
  * The phone's main screen: its places (Now, Reminders, Watching, Inbox, More —
  * which also opens Shopping, Money and Projects), a bottom bar folded and a
- * rail (Ask Dana on top) unfolded, the ask bar that is always there, and one
- * conversation with Dana — a sheet when folded, the right pane when unfolded —
- * under a day strip. Folded, Ask Dana also sits in each place's header.
+ * rail (Ask Dana on top) unfolded, and one conversation with Dana — a page
+ * over the place when folded, a sheet or the right pane unfolded — whose ask
+ * bar comes with it. Folded, Ask Dana and the conversation button sit in each
+ * place's header. Reminders alone has the day strip (unfolded).
  *
  * Each place is a [Destination] (list + stage) built in `destinations/`; this
  * function only wires shared state (routes, shares, messages, Back) and picks
@@ -53,7 +53,6 @@ fun DanaShell(viewModel: MainViewModel) {
     val nowPayload by viewModel.nowController.payload.collectAsState()
     // The needs-you number (the Inbox's, else Now's copy of it); nothing when zero.
     val inboxBadge = overview?.counts?.needsYou ?: nowPayload?.notifications?.needsYou ?: 0
-    val search by viewModel.searchController.state.collectAsState()
     val places = remember { Place.entries.toList() }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -67,8 +66,8 @@ fun DanaShell(viewModel: MainViewModel) {
             viewModel.clearNavigation()
         }
     }
-    // The ask bar's text searches your things (2+ characters, debounced in the controller).
-    LaunchedEffect(shell.askDraft.text) { viewModel.searchController.setQuery(shell.askDraft.text) }
+    // More's search field searches your things (2+ characters, debounced in the controller).
+    LaunchedEffect(shell.searchDraft.text) { viewModel.searchController.setQuery(shell.searchDraft.text) }
     // Text shared from another app lands in the ask bar, thread open.
     val draft by viewModel.chatController.draftText.collectAsState()
     LaunchedEffect(draft) {
@@ -116,34 +115,8 @@ fun DanaShell(viewModel: MainViewModel) {
                 Place.INBOX -> rememberNotificationsDestination(viewModel)
                 Place.MORE -> rememberMoreDestination(viewModel)
             }
-            // Search: unfolded the results take the stage; on the cover they cover the content (not over an open thread sheet).
-            val query = shell.askDraft.text
-            val searching = SearchController.isSearchable(query) && (layout == ShellLayout.FULL || !threadOpen)
-            val dest = if (!searching) placeDest else Destination(
-                place = placeDest.place,
-                picked = true,
-                onBack = { shell.askDraft = TextFieldValue("") },
-                list = placeDest.list,
-                stage = {
-                    SearchPane(
-                        query = query,
-                        state = search,
-                        wide = layout != ShellLayout.STACKED,
-                        onResult = { r ->
-                            shell.askDraft = TextFieldValue("")
-                            viewModel.openSearchResult(r)
-                        },
-                        onAsk = {
-                            shell.openThread()
-                            if (viewModel.chatController.sendChatMessage(query.trim())) shell.askDraft = TextFieldValue("")
-                        }
-                    )
-                },
-                title = placeDest.title,
-                kicker = placeDest.kicker,
-                wide = placeDest.wide,
-                conversation = placeDest.conversation
-            )
+            // Search lives in More's header field (its results replace More's rows).
+            val dest = placeDest
             // What Dana sees with the next message (shown as "On screen · …").
             val live = rememberLiveScreen(viewModel)
             SideEffect {
@@ -161,10 +134,11 @@ fun DanaShell(viewModel: MainViewModel) {
                 ask = { if (!(shell.askHidden && layout != ShellLayout.FULL)) AskBar(viewModel) },
                 // Folded only: unfolded the rail beside the frame has the places.
                 nav = { if (layout == ShellLayout.STACKED) ShellNav(place, places, inboxBadge, onPlace = { shell.go(it) }) },
-                strip = { DayStrip(viewModel, onNow = { shell.showToday() }) },
-                headerAsk = { conversation -> HeaderAsk(viewModel, conversation = conversation) },
+                // The day strip belongs to Reminders (drop a reminder on an hour); the other places have their own day.
+                strip = { if (dest.place == Place.REMINDERS) DayStrip(viewModel, onNow = { shell.showToday() }) },
+                headerAsk = { HeaderAsk(viewModel, conversation = true) },
                 snackbar = snackbar,
-                snackbarLift = if (!searching) shell.snackbarLift else 0.dp
+                snackbarLift = shell.snackbarLift
             )
             Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing)) {
                 ServerStatusBanner(
@@ -176,9 +150,12 @@ fun DanaShell(viewModel: MainViewModel) {
                 val travel = remember { PlaceTravel(place) }.update(place, places)
                 Row(Modifier.weight(1f).fillMaxWidth()) {
                 if (layout != ShellLayout.STACKED) {
+                    // Beside a conversation pane the mic listens there; where the thread is a sheet, the conversation button opens it.
+                    val paneShown = dest.conversation || (layout == ShellLayout.FULL && !dest.wide)
                     ShellRail(place, places, inboxBadge, onPlace = { shell.go(it) }, header = {
-                        // Beside a conversation pane the mic listens there (no sheet).
-                        CompositionLocalProvider(LocalShellLayout provides if (dest.conversation) ShellLayout.FULL else layout) { HeaderAsk(viewModel) }
+                        CompositionLocalProvider(LocalShellLayout provides if (paneShown) ShellLayout.FULL else ShellLayout.SPLIT) {
+                            HeaderAsk(viewModel, conversation = !paneShown, vertical = true)
+                        }
                     })
                 }
                 Box(Modifier.weight(1f).fillMaxHeight().enterOnChange(place, travel)) {
