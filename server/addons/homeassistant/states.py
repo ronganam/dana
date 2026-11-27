@@ -8,10 +8,26 @@ one task per user who has the addon active, looked at again every
 (:func:`poke`); a disconnected user's task is cancelled, a new host or token
 starts a new one. Each task: connect, authenticate (a refused token marks the
 connection for reconnecting, :func:`client.authenticate`), ``get_states`` (the
-entity list: :func:`known_entities`), ``subscribe_events`` for
-``state_changed``, then read; on any failure it connects again after a
-backoff (1 s doubling to :data:`BACKOFF_MAX`, the longest after a refused
-token).
+entity list: :func:`known_entities`), subscribe, then read; on any failure it
+connects again after a backoff (1 s doubling to :data:`BACKOFF_MAX`, the
+longest after a refused token).
+
+What it subscribes to follows the consumers' interest
+(``events.interest(user.id, EVENT, "entity_id")``, set by the ``watches``
+addon from the entity ids its active watches name; :func:`wanted_entities`):
+
+- ``None`` (no narrowing): ``subscribe_events`` for ``state_changed``, every
+  entity;
+- some entity ids: ``subscribe_entities`` for just those (Home Assistant
+  2022.4+, no admin needed; its compressed messages become the same event
+  data, :meth:`Tracker.compressed`); a Home Assistant that refuses it gets
+  ``state_changed`` with the others dropped here;
+- none: no WebSocket at all; the entity list (the compiler's known values) is
+  read over REST every :data:`ENTITY_REFRESH_SECONDS` instead.
+
+A change of interest (:func:`events.on_interest`) re-subscribes within the
+open session after :data:`DEBOUNCE_SECONDS` (``unsubscribe_events`` the old
+id, subscribe the new), or closes / opens the WebSocket.
 
 What is emitted (:class:`Tracker`, one per user): only a change of the
 state itself (attribute-only updates are not), never to or from
@@ -33,7 +49,7 @@ import logging
 import math
 import time
 from dataclasses import dataclass
-from typing import Any, Deque, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Deque, Dict, FrozenSet, Iterable, List, Optional, Set, Tuple
 
 import websockets  # type: ignore
 
@@ -61,6 +77,12 @@ OPEN_TIMEOUT = 20.0
 # get_states of a big home is one large message.
 MAX_MESSAGE = 32 * 1024 * 1024
 KEEP_RECENT = 5000
+# A change of interest is applied this long after it first arrived (several watches saved at once: one re-subscribe).
+DEBOUNCE_SECONDS = 1.0
+# With no entity wanted (no WebSocket), how often the entity list is read over REST.
+ENTITY_REFRESH_SECONDS = 900.0
+# Attributes the tracker keeps, and what each is when Home Assistant removes it.
+_ATTRS = {"friendly_name": "name", "unit_of_measurement": "unit", "device_class": "device_class"}
 
 
 def _number(state: Any) -> Optional[float]:
@@ -94,6 +116,8 @@ class Tracker:
         self.signature = signature
         self.entities: Dict[str, Entity] = {}
         self.recent: Deque[PastEvent] = collections.deque(maxlen=KEEP_RECENT)
+        self.read_at = -math.inf          # monotonic time the whole entity list was last read
+        self.no_subscribe_entities = False  # Home Assistant refused subscribe_entities (too old)
 
     def _entity(self, entity_id: str, state: Dict[str, Any]) -> Entity:
         attrs = state.get("attributes") or {}
@@ -126,10 +150,48 @@ class Tracker:
             return None
         ent = self._entity(entity_id, new)
         state = str(new.get("state") if new.get("state") is not None else "")
+        return self._state(entity_id, ent, state, str((old or {}).get("state") or ""), now)
+
+    def compressed(self, ev: Dict[str, Any], now: float) -> List[Dict[str, Any]]:
+        """One ``subscribe_entities`` message (``a``: entities in full, the first message and new ones;
+        ``c``: changes, ``+`` with ``s`` the new state and ``a`` the changed attributes, ``-`` with ``a``
+        the removed attribute names; ``r``: removed ids): the events to emit, like :meth:`change`
+        (an ``a`` entity is read like ``get_states``, an attribute-only change is none)."""
+        added = ev.get("a")
+        if isinstance(added, dict):
+            self.load({"entity_id": eid, "state": c.get("s"), "attributes": c.get("a") or {}}
+                      for eid, c in added.items() if isinstance(c, dict))
+        out: List[Dict[str, Any]] = []
+        changes = ev.get("c")
+        for eid, c in (changes.items() if isinstance(changes, dict) else ()):
+            if not isinstance(c, dict) or not client.valid_entity_id(eid):
+                continue
+            plus, minus = c.get("+") or {}, c.get("-") or {}
+            ent = self.entities.get(eid)
+            if ent is None:
+                ent = self.entities[eid] = Entity(eid, eid.split(".", 1)[0], "", "")
+            attrs = dict(plus.get("a")) if isinstance(plus.get("a"), dict) else {}
+            for key in minus.get("a") or ():
+                if key in _ATTRS:
+                    attrs.setdefault(key, None)
+            for key, field in _ATTRS.items():
+                if key in attrs:
+                    setattr(ent, field, str(attrs[key] or (eid if key == "friendly_name" else "")))
+            if "s" in plus:
+                data = self._state(eid, ent, str(plus["s"] if plus["s"] is not None else ""), "", now)
+                if data is not None:
+                    out.append(data)
+        removed = ev.get("r")
+        for eid in (removed if isinstance(removed, list) else ()):
+            self.entities.pop(str(eid), None)
+        return out
+
+    def _state(self, entity_id: str, ent: Entity, state: str, before: str, now: float) -> Optional[Dict[str, Any]]:
+        """``entity_id``'s state is now ``state`` (``before``: what Home Assistant says it was, used only
+        for an entity Dana has no state of yet): the event's data to emit, or None."""
         if state.lower() in NO_STATE:
             return None
         if ent.reported is None:
-            before = str((old or {}).get("state") or "")
             ent.reported = state if before.lower() in NO_STATE else before
         if state == ent.reported:
             ent.held = None
@@ -163,6 +225,8 @@ _trackers: Dict[str, Tracker] = {}
 _tasks: Dict[str, Tuple[Tuple[str, str, str], "asyncio.Task[None]"]] = {}
 _wake: Optional[asyncio.Event] = None
 _loop: Optional[asyncio.AbstractEventLoop] = None
+# Per user with a task: set when the interest in their state changes changed (:func:`_interest_changed`).
+_changed: Dict[str, asyncio.Event] = {}
 
 
 def tracker_for(conn: Connection) -> Tracker:
@@ -206,8 +270,93 @@ def _messages(raw: Any) -> List[Dict[str, Any]]:
     return [m for m in items if isinstance(m, dict)]
 
 
-async def session(conn: Connection) -> None:
-    """One WebSocket session of ``conn``: subscribe and emit until it breaks.
+def wanted_entities(user: User) -> Optional[FrozenSet[str]]:
+    """The entity ids whose changes are wanted for ``user`` (the consumers' interest, valid ids only):
+    None = every entity, empty = none."""
+    want = events.interest(user.id, EVENT, "entity_id")
+    return None if want is None else frozenset(e for e in want if client.valid_entity_id(e))
+
+
+class _Subscriber:
+    """One WebSocket session's requests: their ids, and what its live subscription follows."""
+
+    def __init__(self, ws: Any, t: Tracker) -> None:
+        self.ws, self.t = ws, t
+        self.next_id = 1
+        self.sub_id: Optional[int] = None         # the live subscription's request id
+        self.entities_id: Optional[int] = None    # the last subscribe_entities request
+        self.states_id: Optional[int] = None      # the get_states request
+        self.unsub_ids: Set[int] = set()
+        self.following: Optional[FrozenSet[str]] = None  # None: every entity
+        self.only: Optional[FrozenSet[str]] = None       # emit only these (state_changed standing in)
+
+    async def send(self, msg: Dict[str, Any]) -> int:
+        mid = self.next_id
+        self.next_id += 1
+        await self.ws.send(json.dumps({"id": mid, **msg}))
+        return mid
+
+    async def follow(self, want: Optional[FrozenSet[str]]) -> None:
+        """Subscribe to ``want`` (None: every entity; not empty), unsubscribing the live one first."""
+        if self.sub_id is not None:
+            self.unsub_ids.add(await self.send({"type": "unsubscribe_events", "subscription": self.sub_id}))
+            self.sub_id = None
+        self.following, self.only = want, None
+        if want is not None and not self.t.no_subscribe_entities:
+            self.sub_id = self.entities_id = await self.send({"type": "subscribe_entities",
+                                                              "entity_ids": sorted(want)})
+        else:
+            self.only = want
+            self.sub_id = await self.send({"type": "subscribe_events", "event_type": "state_changed"})
+
+    async def handle(self, msg: Dict[str, Any], now: float) -> List[Dict[str, Any]]:
+        """One message from Home Assistant: the events to emit.
+
+        Raises:
+            RuntimeError: Home Assistant refused a request (other than an unsubscribe or a
+                subscribe_entities, which falls back to ``state_changed``).
+        """
+        if msg.get("type") == "result":
+            mid = msg.get("id")
+            if msg.get("success"):
+                if mid == self.states_id and isinstance(msg.get("result"), list):
+                    self.t.load(msg["result"])
+                    self.t.read_at = now
+            elif mid in self.unsub_ids:
+                logger.debug(f"[HA] unsubscribe {mid} refused: {msg.get('error')}")
+            elif mid is not None and mid == self.entities_id:
+                logger.info(f"[HA] subscribe_entities refused ({msg.get('error')}); following state_changed instead")
+                self.t.no_subscribe_entities = True
+                if self.sub_id == mid:
+                    self.sub_id = None
+                    await self.follow(self.following)
+            else:
+                raise RuntimeError(f"Home Assistant refused request {mid}: {msg.get('error')}")
+            return []
+        if msg.get("type") != "event":
+            return []
+        ev = msg.get("event") or {}
+        if not isinstance(ev, dict):
+            return []
+        if ev.get("event_type") == "state_changed":
+            d = ev.get("data") or {}
+            eid = str(d.get("entity_id") or "")
+            if self.only is not None and eid not in self.only:
+                new = d.get("new_state")
+                if isinstance(new, dict) and client.valid_entity_id(eid):
+                    self.t.load([{**new, "entity_id": eid}])  # kept current, not emitted
+                return []
+            data = self.t.change(eid, d.get("old_state"), d.get("new_state"), now)
+            return [data] if data is not None else []
+        if "event_type" not in ev and any(k in ev for k in ("a", "c", "r")):
+            return self.t.compressed(ev, now)
+        return []
+
+
+async def session(conn: Connection, changed: Optional[asyncio.Event] = None) -> None:
+    """One WebSocket session of ``conn``: subscribe to the wanted entities (:func:`wanted_entities`) and
+    emit until it breaks; ``changed`` set = the interest may have changed: re-subscribe after
+    :data:`DEBOUNCE_SECONDS`. Returns when no entity is wanted any more.
 
     Raises:
         PermissionError: Home Assistant refused the token.
@@ -215,46 +364,89 @@ async def session(conn: Connection) -> None:
     """
     user = conn.user
     t = tracker_for(conn)
+    changed = changed if changed is not None else asyncio.Event()
     async with websockets.connect(client.ws_uri(conn), max_size=MAX_MESSAGE, open_timeout=OPEN_TIMEOUT) as ws:
         await asyncio.wait_for(client.authenticate(ws, conn), OPEN_TIMEOUT)
-        await ws.send(json.dumps({"id": 1, "type": "get_states"}))
-        await ws.send(json.dumps({"id": 2, "type": "subscribe_events", "event_type": "state_changed"}))
-        while True:
-            try:
-                raw = await asyncio.wait_for(ws.recv(), timeout=FLUSH_SECONDS)
-            except asyncio.TimeoutError:
-                raw = None
-            for msg in _messages(raw) if raw is not None else []:
-                if msg.get("type") == "result":
-                    if not msg.get("success"):
-                        raise RuntimeError(f"Home Assistant refused request {msg.get('id')}: {msg.get('error')}")
-                    if msg.get("id") == 1 and isinstance(msg.get("result"), list):
-                        t.load(msg["result"])
-                elif msg.get("type") == "event":
-                    ev = msg.get("event") or {}
-                    if ev.get("event_type") != "state_changed":
-                        continue
-                    d = ev.get("data") or {}
-                    data = t.change(str(d.get("entity_id") or ""), d.get("old_state"), d.get("new_state"),
-                                    time.monotonic())
-                    if data is not None:
-                        emit(user, data)
-            for data in t.due(time.monotonic()):
-                emit(user, data)
+        sub = _Subscriber(ws, t)
+        sub.states_id = await sub.send({"type": "get_states"})
+        changed.clear()
+        want = wanted_entities(user)
+        if want is not None and not want:
+            return
+        await sub.follow(want)
+        since: Optional[float] = None  # when the interest change being debounced arrived
+        recv: "asyncio.Future[Any]" = asyncio.ensure_future(ws.recv())
+        woke: "asyncio.Future[Any]" = asyncio.ensure_future(changed.wait())
+        try:
+            while True:
+                timeout = FLUSH_SECONDS
+                if since is not None:
+                    timeout = max(0.0, min(timeout, since + DEBOUNCE_SECONDS - time.monotonic()))
+                done, _ = await asyncio.wait({recv, woke}, timeout=timeout, return_when=asyncio.FIRST_COMPLETED)
+                if woke in done:
+                    changed.clear()
+                    woke = asyncio.ensure_future(changed.wait())
+                    since = time.monotonic() if since is None else since
+                if recv in done:
+                    raw = recv.result()  # a closed socket raises here
+                    recv = asyncio.ensure_future(ws.recv())
+                    for msg in _messages(raw):
+                        for data in await sub.handle(msg, time.monotonic()):
+                            emit(user, data)
+                for data in t.due(time.monotonic()):
+                    emit(user, data)
+                if since is not None and time.monotonic() - since >= DEBOUNCE_SECONDS:
+                    since = None
+                    want = wanted_entities(user)
+                    if want is not None and not want:
+                        return
+                    if want != sub.following:
+                        await sub.follow(want)
+        finally:
+            recv.cancel()
+            woke.cancel()
+            await asyncio.gather(recv, woke, return_exceptions=True)
 
 
-async def follow(user: User, signature: Tuple[str, str, str]) -> None:
+async def idle(conn: Connection, changed: asyncio.Event) -> None:
+    """No entity is wanted: no WebSocket; read the entity list (the known values) over REST when it is
+    older than :data:`ENTITY_REFRESH_SECONDS`, then wait until the interest changes or it is due again."""
+    t = tracker_for(conn)
+    wait = ENTITY_REFRESH_SECONDS
+    if time.monotonic() - t.read_at >= ENTITY_REFRESH_SECONDS:
+        try:
+            t.load(await client.fetch_states(conn))
+            t.read_at = time.monotonic()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            wait = 60.0
+            logger.warning(f"[HA] entity list of user {conn.user.id}: {type(e).__name__}: {str(e)[:200]}")
+    try:
+        await asyncio.wait_for(changed.wait(), timeout=wait)
+    except asyncio.TimeoutError:
+        pass
+
+
+async def follow(user: User, signature: Tuple[str, str, str], changed: Optional[asyncio.Event] = None) -> None:
     """Keep ``user``'s subscription for the connection ``signature`` names, reconnecting with backoff;
-    returns once that connection is gone or changed."""
+    ``changed`` is set when the interest changes. Returns once that connection is gone or changed."""
+    changed = changed if changed is not None else asyncio.Event()
     backoff = BACKOFF_MIN
     while True:
         conn = store.get(user, ADDON)
         if conn is None or client.signature(conn) != signature:
             return
+        changed.clear()
+        want = wanted_entities(user)
+        if want is not None and not want:
+            await idle(conn, changed)
+            continue
         started = time.monotonic()
         wait = None
         try:
-            await session(conn)
+            await session(conn, changed)
+            continue  # no entity wanted any more
         except asyncio.CancelledError:
             raise
         except PermissionError:
@@ -289,11 +481,14 @@ async def reconcile() -> None:
             task.cancel()
             await asyncio.gather(task, return_exceptions=True)
             del _tasks[uid]
+            _changed.pop(uid, None)
             if uid not in wanted:
                 _trackers.pop(uid, None)
     for uid, (user, sig) in wanted.items():
         if uid not in _tasks:
-            _tasks[uid] = (sig, asyncio.get_running_loop().create_task(follow(user, sig), name=f"ha-states-{uid}"))
+            changed = _changed[uid] = asyncio.Event()
+            _tasks[uid] = (sig, asyncio.get_running_loop().create_task(follow(user, sig, changed),
+                                                                       name=f"ha-states-{uid}"))
 
 
 async def stop_all() -> None:
@@ -303,6 +498,7 @@ async def stop_all() -> None:
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
     _tasks.clear()
+    _changed.clear()
 
 
 def poke(user: Optional[User] = None) -> None:
@@ -320,10 +516,26 @@ def poke(user: Optional[User] = None) -> None:
         _loop.call_soon_threadsafe(wake.set)
 
 
+def _interest_changed(user_id: str, event_type: str) -> None:
+    """``events.on_interest``: wake that user's task to re-subscribe (safe from any thread)."""
+    changed, loop = _changed.get(user_id), _loop
+    if event_type != EVENT or changed is None or loop is None or loop.is_closed():
+        return
+    try:
+        running: Optional[asyncio.AbstractEventLoop] = asyncio.get_running_loop()
+    except RuntimeError:
+        running = None
+    if running is loop:
+        changed.set()
+    else:
+        loop.call_soon_threadsafe(changed.set)
+
+
 async def run(app: Any = None) -> None:
     """The service: keep one subscription per user connection until cancelled."""
     global _wake, _loop
     _wake, _loop = asyncio.Event(), asyncio.get_running_loop()
+    events.on_interest(_interest_changed)
     try:
         while True:
             await reconcile()

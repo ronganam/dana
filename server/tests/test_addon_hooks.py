@@ -269,7 +269,37 @@ def test_core_imports_no_addons() -> None:
     check("core imports zero addons", not offenders, offenders)
 
 
+def test_interest() -> None:
+    calls = []
+    events.on_interest(lambda uid, et: calls.append((uid, et)))
+    events.on_interest(lambda uid, et: 1 / 0)  # a failing listener is logged, never raised
+
+    def listener(uid, et):
+        calls.append(("again", uid))
+    events.on_interest(listener)
+    events.on_interest(listener)  # once per function
+    t = "hk.thing.changed"
+    check("interest: None before anything is said", events.interest(ROBIN.id, t, "id") is None)
+    events.set_interest(ROBIN.id, t, "id", ["a", "b"])
+    check("interest: a set of values, the listeners told (one call per listener, a failing one skipped)",
+          events.interest(ROBIN.id, t, "id") == frozenset({"a", "b"})
+          and calls == [(ROBIN.id, t), ("again", ROBIN.id)], calls)
+    calls.clear()
+    events.set_interest(ROBIN.id, t, "id", iter(["b", "a"]))
+    check("interest: the same values again is no change (no call)", calls == [], calls)
+    check("interest: per user and per field", events.interest(GAL.id, t, "id") is None
+          and events.interest(ROBIN.id, t, "other") is None)
+    events.set_interest(ROBIN.id, t, "id", [])
+    check("interest: an empty iterable = nothing wanted",
+          events.interest(ROBIN.id, t, "id") == frozenset() and len(calls) == 2)
+    events.set_interest(ROBIN.id, t, "id", None)
+    check("interest: None again = no narrowing, told", events.interest(ROBIN.id, t, "id") is None and len(calls) == 4)
+    events.set_interest(ROBIN.id, t, "id", None)
+    check("interest: None when already None is no change", len(calls) == 4)
+
+
 test_scope()
+test_interest()
 test_composers()
 test_core_imports_no_addons()
 test_describe()

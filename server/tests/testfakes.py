@@ -4,7 +4,9 @@
   services / config / camera, and the WebSocket auth and entity registry
   messages, with its own token and entities; it records every request. Used
   by test_homeassistant_users.py, test_addons_api.py, test_attention.py and
-  the local environment's stubs.
+  the local environment's stubs. Its WebSocket also serves ``subscribe_events``
+  for ``state_changed``, ``subscribe_entities`` (Home Assistant's compressed
+  messages) and ``unsubscribe_events``, recording each command.
 - :class:`FakeWAHA`: one WAHA instance.
 """
 
@@ -26,7 +28,11 @@ class FakeHA:
         self.exposed = exposed  # entity id -> registry name
         self.requests: List[Tuple[str, str]] = []  # (path, bearer token or WS auth token)
         self.service_calls: List[Tuple[str, Dict[str, Any]]] = []
-        self.subscribers: List[Tuple[Any, int]] = []  # (WebSocket, subscription id) of state_changed
+        self.subscribers: List[Tuple[Any, int]] = []  # (WebSocket, subscription id), any kind
+        # (id(WebSocket), subscription id) -> the entity ids of a subscribe_entities (absent: state_changed)
+        self.filters: Dict[Tuple[int, int], set] = {}
+        self.commands: List[Dict[str, Any]] = []  # every WebSocket command after auth, in order
+        self.refuse_subscribe_entities = False  # an old Home Assistant without it
         self.down = False
         app = web.Application()
         app.router.add_get("/api/websocket", self.ws)
@@ -92,6 +98,7 @@ class FakeHA:
         async for m in ws:
             data = json.loads(m.data)
             kind, mid = data.get("type"), data.get("id")
+            self.commands.append(data)
             if kind == "homeassistant/expose_entity/list":
                 await ws.send_json({"id": mid, "type": "result", "success": True, "result": {
                     "exposed_entities": {eid: {"conversation": True} for eid in self.exposed}}})
@@ -103,8 +110,33 @@ class FakeHA:
             elif kind == "subscribe_events" and data.get("event_type") == "state_changed":
                 await ws.send_json({"id": mid, "type": "result", "success": True, "result": None})
                 self.subscribers.append((ws, mid))
+            elif kind == "subscribe_entities":
+                if self.refuse_subscribe_entities:
+                    await ws.send_json({"id": mid, "type": "result", "success": False,
+                                        "error": {"code": "unknown_command", "message": "Unknown command."}})
+                    continue
+                wanted = set(data.get("entity_ids") or [])
+                await ws.send_json({"id": mid, "type": "result", "success": True, "result": None})
+                await ws.send_json({"id": mid, "type": "event", "event": {"a": {
+                    eid: {"s": s["state"], "a": s["attributes"], "c": "ctx", "lc": 1.0}
+                    for eid, s in self.states.items() if eid in wanted}}})
+                self.subscribers.append((ws, mid))
+                self.filters[(id(ws), mid)] = wanted
+            elif kind == "unsubscribe_events":
+                sub = data.get("subscription")
+                found = (ws, sub) in self.subscribers
+                self.subscribers = [(s, i) for s, i in self.subscribers if (s, i) != (ws, sub)]
+                self.filters.pop((id(ws), sub), None)
+                await ws.send_json({"id": mid, "type": "result", "success": True, "result": None} if found else
+                                   {"id": mid, "type": "result", "success": False,
+                                    "error": {"code": "not_found", "message": "Subscription not found."}})
         self.subscribers = [(s, i) for s, i in self.subscribers if s is not ws]
+        self.filters = {k: v for k, v in self.filters.items() if k[0] != id(ws)}
         return ws
+
+    def subscriptions(self) -> List[Optional[set]]:
+        """The live subscriptions: None for a state_changed one, else the entity ids of a subscribe_entities."""
+        return [self.filters.get((id(ws), mid)) for ws, mid in self.subscribers]
 
     async def push(self, entity_id: str, state: str, attributes: Optional[Dict[str, Any]] = None) -> None:
         """Set an entity's state (``attributes`` replace its own when given; a new entity starts with
@@ -114,8 +146,27 @@ class FakeHA:
         new = {"entity_id": entity_id, "state": state, "attributes": attrs}
         self.states[entity_id] = new
         for ws, mid in list(self.subscribers):
-            await ws.send_json({"id": mid, "type": "event", "event": {
-                "event_type": "state_changed", "data": {"entity_id": entity_id, "old_state": old, "new_state": new}}})
+            wanted = self.filters.get((id(ws), mid))
+            if wanted is None:
+                await ws.send_json({"id": mid, "type": "event", "event": {
+                    "event_type": "state_changed", "data": {"entity_id": entity_id, "old_state": old, "new_state": new}}})
+                continue
+            if entity_id not in wanted:
+                continue
+            if old is None:
+                await ws.send_json({"id": mid, "type": "event", "event": {"a": {entity_id: {"s": state, "a": attrs}}}})
+                continue
+            plus: Dict[str, Any] = {"lu": 2.0}
+            if old["state"] != state:
+                plus.update(s=state, lc=2.0)
+            changed = {k: v for k, v in attrs.items() if old["attributes"].get(k) != v}
+            if changed:
+                plus["a"] = changed
+            diff: Dict[str, Any] = {"+": plus}
+            removed = [k for k in old["attributes"] if k not in attrs]
+            if removed:
+                diff["-"] = {"a": removed}
+            await ws.send_json({"id": mid, "type": "event", "event": {"c": {entity_id: diff}}})
 
     async def drop_sockets(self) -> None:
         """Close every open WebSocket (Home Assistant restarting)."""

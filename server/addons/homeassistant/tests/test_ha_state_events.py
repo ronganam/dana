@@ -9,7 +9,13 @@ the numeric throttle: one event a minute unless the tens bucket changes,
 a held value emitted when its time is up with the last reported old state);
 the service (one subscription per connection, events with the declared
 shape to the right user only, reconnecting after Home Assistant drops the
-socket, stopped once the addon is disconnected); the known values (the
+socket, stopped once the addon is disconnected); the consumers' interest
+(``events.set_interest``): some entity ids → ``subscribe_entities`` for just
+those on the same socket (the old subscription unsubscribed, quick changes
+debounced into one, again after a reconnect, the compressed messages giving
+the same event data), none → no socket (the entity list over REST), a Home
+Assistant without ``subscribe_entities`` → ``state_changed`` filtered here,
+None → every entity; the known values (the
 phone's battery sensor first and labelled, each user's own entities only,
 none before the first read) and the compiler's catalog showing them;
 validation naming close matches for an entity id that is not one; the
@@ -188,6 +194,27 @@ def test_tracker() -> None:
     check("throttle: after a minute any change emits", out and (out["old_state"], out["new_state"]) == ("47", "44"), out)
     check("tracker: the emitted events are its recent history", [d["new_state"] for _, d in t2.recent] == ["52", "49", "47", "44"])
 
+    # subscribe_entities' compressed messages: the same events as state_changed.
+    t3 = states.Tracker(("u", "h", "t"))
+    out = t3.compressed({"a": {"sensor.bat": {"s": "80", "a": battery, "c": "x", "lc": 1.0},
+                               "binary_sensor.door": {"s": "off", "a": {"device_class": "door"}}}}, 0.0)
+    check("compressed: the first message (a) is read like get_states, no event",
+          out == [] and t3.entities["sensor.bat"].reported == "80" and t3.entities["sensor.bat"].unit == "%")
+    out = t3.compressed({"c": {"sensor.bat": {"+": {"s": "79", "lc": 2.0, "lu": 2.0}}}}, 1.0)
+    check("compressed: a state change → the same data as state_changed gives", out == [{
+        "entity_id": "sensor.bat", "name": "Battery", "domain": "sensor", "old_state": "80", "new_state": "79",
+        "unit": "%", "device_class": "battery"}], out)
+    out = t3.compressed({"c": {"binary_sensor.door": {"+": {"a": {"friendly_name": "Front door"}, "lu": 3.0}}}}, 2.0)
+    check("compressed: an attribute-only change is no event, its attributes are kept",
+          out == [] and t3.entities["binary_sensor.door"].name == "Front door")
+    out = t3.compressed({"c": {"binary_sensor.door": {"+": {"s": "on", "lc": 4.0}, "-": {"a": ["device_class"]}}}}, 3.0)
+    check("compressed: a removed attribute is empty in the event",
+          [(d["old_state"], d["new_state"], d["device_class"], d["name"]) for d in out] == [("off", "on", "", "Front door")],
+          out)
+    check("compressed: to unavailable is no event, r forgets the entity",
+          t3.compressed({"c": {"sensor.bat": {"+": {"s": "unavailable"}}}}, 4.0) == []
+          and t3.compressed({"r": ["sensor.bat"]}, 5.0) == [] and "sensor.bat" not in t3.entities)
+
 
 # --- 2. The service over the fake Home Assistants --------------------------------------------------
 
@@ -258,6 +285,103 @@ async def test_service() -> Optional["asyncio.Task[None]"]:
           seen(BOB))
     await HA_A.push("binary_sensor.front_door", "off")
     return task
+
+
+def ws_count(ha: FakeHA) -> int:
+    return sum(1 for path, _ in ha.requests if path == "/api/websocket")
+
+
+def sent(ha: FakeHA, kind: str) -> List[Dict[str, Any]]:
+    return [c for c in ha.commands if c.get("type") == kind]
+
+
+async def test_interest() -> None:
+    """The consumers' interest (events.set_interest, set by the watches addon) narrows the subscription."""
+    states.DEBOUNCE_SECONDS = 0.05
+    battery, door = "sensor.phone_battery_level", "binary_sensor.front_door"
+    check("interest: None (nothing said) = state_changed for every entity",
+          HA_A.subscriptions() == [None] and HA_B.subscriptions() == [None], (HA_A.subscriptions(), HA_B.subscriptions()))
+
+    sockets, old_id = ws_count(HA_A), HA_A.subscribers[0][1]
+    HA_A.commands.clear()
+    events.set_interest(BOB.id, states.EVENT, "entity_id", [door])
+    events.set_interest(BOB.id, states.EVENT, "entity_id", [battery, "not an id"])
+    events.set_interest(BOB.id, states.EVENT, "entity_id", [battery, door])
+    ok = await until(lambda: HA_A.subscriptions() == [{battery, door}])
+    await asyncio.sleep(0.2)
+    check("interest: some entity ids → subscribe_entities for just those, on the same socket, the old one unsubscribed",
+          ok and ws_count(HA_A) == sockets and sent(HA_A, "unsubscribe_events") == [
+              {"id": sent(HA_A, "unsubscribe_events")[0]["id"], "type": "unsubscribe_events", "subscription": old_id}],
+          (HA_A.commands, HA_A.subscriptions()))
+    check("interest: three changes in a row → one re-subscribe (debounced)",
+          [c["entity_ids"] for c in sent(HA_A, "subscribe_entities")] == [sorted([battery, door])], HA_A.commands)
+
+    SEEN.clear()
+    await HA_A.push("sensor.dishwasher_status", "running")      # not wanted: Home Assistant does not send it
+    await HA_A.push(door, "off", {"friendly_name": "Front door", "device_class": "door", "x": 1})  # attributes only
+    await HA_A.push(battery, "69")  # another tens: not held by the throttle
+    await until(lambda: seen(BOB))
+    await asyncio.sleep(0.1)
+    await events.drain()
+    check("interest: only the wanted entities' changes, in the declared shape", seen(BOB) == [{
+        "entity_id": battery, "name": "Bob phone battery", "domain": "sensor", "old_state": "79", "new_state": "69",
+        "unit": "%", "device_class": "battery"}], seen(BOB))
+
+    HA_A.commands.clear()
+    events.set_interest(BOB.id, states.EVENT, "entity_id", ["sensor.dishwasher_status"])
+    ok = await until(lambda: HA_A.subscriptions() == [{"sensor.dishwasher_status"}])
+    SEEN.clear()
+    await HA_A.push("sensor.dishwasher_status", "finished")
+    await HA_A.push(door, "on")
+    await until(lambda: seen(BOB))
+    await asyncio.sleep(0.1)
+    await events.drain()
+    check("interest: a change of interest re-subscribes to the new entities",
+          ok and len(sent(HA_A, "unsubscribe_events")) == 1 and ws_count(HA_A) == sockets
+          and [(d["entity_id"], d["old_state"], d["new_state"]) for d in seen(BOB)]
+          == [("sensor.dishwasher_status", "running", "finished")], (seen(BOB), HA_A.commands))
+    await HA_A.push(door, "off")
+
+    await HA_A.drop_sockets()
+    ok = await until(lambda: HA_A.subscriptions() == [{"sensor.dishwasher_status"}])
+    check("interest: after Home Assistant drops the socket it subscribes to the same entities again", ok,
+          HA_A.subscriptions())
+
+    # Maya: nothing wanted → no WebSocket at all; the entity list is still read (over REST).
+    states._trackers[MAYA.id].read_at = float("-inf")
+    rest_before = sum(1 for path, _ in HA_B.requests if path == "/api/states")
+    events.set_interest(MAYA.id, states.EVENT, "entity_id", [])
+    ok = await until(lambda: not HA_B.subscribers)
+    sockets_b = ws_count(HA_B)
+    await until(lambda: sum(1 for path, _ in HA_B.requests if path == "/api/states") > rest_before)
+    SEEN.clear()
+    await HA_B.push("light.b_den", "off")
+    await asyncio.sleep(0.3)
+    check("interest: none wanted → no subscription and no socket, the entity list read over REST instead",
+          ok and not seen(MAYA) and ws_count(HA_B) == sockets_b and states.known_entities(MAYA)
+          and sum(1 for path, _ in HA_B.requests if path == "/api/states") > rest_before, HA_B.requests[-5:])
+
+    HA_B.refuse_subscribe_entities = True
+    events.set_interest(MAYA.id, states.EVENT, "entity_id", ["light.b_den"])
+    ok = await until(lambda: HA_B.subscriptions() == [None])
+    SEEN.clear()
+    await HA_B.push("sensor.b_temperature", "35")
+    await HA_B.push("light.b_den", "on")
+    await until(lambda: seen(MAYA))
+    await asyncio.sleep(0.1)
+    await events.drain()
+    check("interest: a Home Assistant without subscribe_entities → state_changed, the others dropped here",
+          ok and [(d["entity_id"], d["new_state"]) for d in seen(MAYA)] == [("light.b_den", "on")], seen(MAYA))
+    HA_B.refuse_subscribe_entities = False
+
+    events.set_interest(MAYA.id, states.EVENT, "entity_id", None)
+    events.set_interest(BOB.id, states.EVENT, "entity_id", None)
+    ok = await until(lambda: HA_A.subscriptions() == [None] and HA_B.subscriptions() == [None])
+    SEEN.clear()
+    await HA_A.push("sensor.dishwasher_status", "running")
+    await until(lambda: seen(BOB))
+    check("interest: None again → every entity again", ok and [d["entity_id"] for d in seen(BOB)]
+          == ["sensor.dishwasher_status"], (HA_A.subscriptions(), HA_B.subscriptions(), seen(BOB)))
 
 
 async def test_disconnect() -> None:
@@ -374,6 +498,7 @@ async def main() -> None:
     test_tracker()
     task = await test_service()
     try:
+        await test_interest()
         await test_watch_end_to_end()
         await test_disconnect()
     finally:

@@ -23,5 +23,5 @@ async def warm_home_map(user: User) -> None:
 
 @addon.service
 async def follow_state_changes(app: Any) -> None:
-    """One WebSocket subscription to ``state_changed`` per user connection (:func:`states.run`)."""
+    """One WebSocket subscription per user connection, to the entities wanted (:func:`states.run`)."""
     await states.run(app)
