@@ -68,17 +68,23 @@ object PushSetup {
         ServerConfig.prefs(app).run { if (contains("agent_sessions_shown")) edit { remove("agent_sessions_shown") } }
     }
 
-    /** Register unless already done (also called from the notification sync and Settings → Push). */
-    fun ensureRegistered(context: Context, force: Boolean = false) {
+    /**
+     * Register unless already done (also called from the notification sync,
+     * [PhoneEvents.catchUp] when the server forgot this phone, and Settings →
+     * Push). Unforced, at most one attempt per 15 minutes
+     * ([PhoneEvents.mayRegisterAgain]). [fetchAfter] false: no catch-up
+     * afterwards (the caller is the catch-up).
+     */
+    fun ensureRegistered(context: Context, force: Boolean = false, fetchAfter: Boolean = true) {
         val app = context.applicationContext
-        if (!force && PhoneEvents.isRegistered(app, transport)) return
+        if (!force && (PhoneEvents.isRegistered(app, transport) || !PhoneEvents.mayRegisterAgain(app))) return
         when (transport) {
-            PushTransport.FCM -> registerFcm(app)
-            PushTransport.UNIFIEDPUSH -> registerUnifiedPush(app)
+            PushTransport.FCM -> registerFcm(app, fetchAfter)
+            PushTransport.UNIFIEDPUSH -> registerUnifiedPush(app, fetchAfter)
         }
     }
 
-    private fun registerFcm(app: Context) {
+    private fun registerFcm(app: Context, fetchAfter: Boolean) {
         if (FirebaseApp.getApps(app).isEmpty() || !trying.compareAndSet(false, true)) return
         scope.launch {
             try {
@@ -86,11 +92,11 @@ object PushSetup {
                     delay(wait)
                     val token = token()
                     if (token != null) {
-                        PhoneEvents.register(app, PushTransport.FCM, token)
+                        PhoneEvents.register(app, PushTransport.FCM, token, fetchAfter)
                         return@launch
                     }
                 }
-                PhoneEvents.catchUp(app)
+                if (fetchAfter) PhoneEvents.catchUp(app)
             } finally {
                 trying.set(false)
             }
@@ -98,13 +104,15 @@ object PushSetup {
     }
 
     /** Ask the distributor for an endpoint; it answers in `DanaUnifiedPushService.onNewEndpoint`. */
-    private fun registerUnifiedPush(app: Context) {
+    private fun registerUnifiedPush(app: Context, fetchAfter: Boolean) {
         val saved = UnifiedPush.getSavedDistributor(app)
         val pick = Distributors.pick(UnifiedPush.getDistributors(app), saved, app.packageName)
         if (pick == null) {
+            // Nothing to register with: no request to the server; the catch-up only
+            // for a caller that isn't one (app start; never from catchUp itself).
             Log.i(TAG, "No UnifiedPush distributor installed: events wait for the next check")
             PhoneEvents.setProblem(app, NO_DISTRIBUTOR)
-            scope.launch { PhoneEvents.catchUp(app) }
+            if (fetchAfter) scope.launch { PhoneEvents.catchUp(app) }
             return
         }
         if (pick != saved) UnifiedPush.saveDistributor(app, pick)
@@ -145,7 +153,7 @@ object PushSetup {
         pkg
     }
 
-    private const val NO_DISTRIBUTOR = "No push app (UnifiedPush distributor) is installed."
+    private const val NO_DISTRIBUTOR = "No push app (UnifiedPush distributor) is installed: events are checked about once an hour."
 
     @Suppress("DEPRECATION") // getToken(): see DanaMessagingService.onNewToken
     private suspend fun token(): String? = suspendCancellableCoroutine { cont ->

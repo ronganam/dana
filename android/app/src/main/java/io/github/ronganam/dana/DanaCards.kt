@@ -22,6 +22,8 @@ const val EXTRA_OPEN_PERSON_ID = "io.github.ronganam.dana.OPEN_PERSON_ID"
 const val EXTRA_OPEN_REVIEW = "io.github.ronganam.dana.OPEN_REVIEW"
 /** Opens a screen by route ("chat", "tasks", "inbox", "calls", "people"); used by widgets. */
 const val EXTRA_OPEN_SCREEN = "io.github.ronganam.dana.OPEN_SCREEN"
+/** Opens a conversation by session id in the thread pane (a watch's agent run, from its live activity). */
+const val EXTRA_OPEN_SESSION = "io.github.ronganam.dana.OPEN_SESSION"
 
 /**
  * Server pushes for the newer cards (server docs/people.md):

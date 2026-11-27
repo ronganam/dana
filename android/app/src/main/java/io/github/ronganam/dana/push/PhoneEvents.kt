@@ -45,6 +45,7 @@ object PhoneEvents {
     private const val KEY_REGISTERED_AT = "push_registered_at"
     private const val KEY_LAST_PING = "push_last_ping_at"
     private const val KEY_PROBLEM = "push_problem"
+    private const val KEY_AUTO_REGISTER_AT = "push_auto_register_at"
     /** Send the token / endpoint again regularly so the server's copy never goes stale. */
     private const val REFRESH_MS = 7L * 24 * 3600 * 1000
     private val lock = Mutex()
@@ -64,9 +65,10 @@ object PhoneEvents {
      * Send this phone's push address to the server: an FCM token or a
      * UnifiedPush endpoint (on start and whenever it changes). A refusal
      * (the server has no FCM key, an endpoint it won't call) is kept as the
-     * [problem] Settings → Push shows.
+     * [problem] Settings → Push shows. Then it catches up, unless [fetchAfter]
+     * is false (a registration [catchUp] itself asked for: no fetch loop).
      */
-    suspend fun register(context: Context, transport: PushTransport, address: String) {
+    suspend fun register(context: Context, transport: PushTransport, address: String, fetchAfter: Boolean = true) {
         if (!configured(context)) return
         val prefs = ServerConfig.prefs(context)
         try {
@@ -89,7 +91,19 @@ object PhoneEvents {
         } catch (e: Exception) {
             Log.w(TAG, "Push registration failed", e)
         }
-        catchUp(context)
+        if (fetchAfter) catchUp(context)
+    }
+
+    /**
+     * Whether an automatic registration may go now (and it is noted): at most
+     * one per [RegistrationGate.MIN_INTERVAL_MS], the time kept across restarts.
+     * App start and Settings → Push register regardless.
+     */
+    @Synchronized
+    fun mayRegisterAgain(context: Context): Boolean {
+        val prefs = ServerConfig.prefs(context)
+        return RegistrationGate(System::currentTimeMillis, { prefs.getLong(KEY_AUTO_REGISTER_AT, 0) },
+            { at -> prefs.edit(commit = true) { putLong(KEY_AUTO_REGISTER_AT, at) } }).tryAcquire()
     }
 
     /** The registration is gone (the distributor dropped it): register again when possible. */
@@ -118,6 +132,7 @@ object PhoneEvents {
         if (!prefs.contains(KEY_SEQ)) return  // not registered yet
         lock.withLock {
             val api = ServerConfig.load(context).api()
+            var askedToRegister = false
             repeat(5) {  // at most 5 pages of 50
                 val after = prefs.getLong(KEY_SEQ, 0)
                 val res = try {
@@ -130,11 +145,14 @@ object PhoneEvents {
                 // Signed in with a token of no device (set up before pairing): ask to pair again.
                 PairAgain.note(context, res.device)
                 // The server no longer knows this phone (token dropped, DB restored):
-                // register again, otherwise pings would silently stop.
-                if (!res.registered) {
-                    Log.w(TAG, "Server forgot this device; registering again")
+                // register again, otherwise pings would silently stop. Once per fetch
+                // and at most every 15 minutes (ensureRegistered's gate), without a
+                // fetch of its own: a server that keeps refusing never makes a loop.
+                if (!res.registered && !askedToRegister) {
+                    askedToRegister = true
                     prefs.edit { remove(KEY_ADDRESS) }
-                    PushSetup.ensureRegistered(context)
+                    Log.w(TAG, "Server forgot this device; registering again (at most every 15 min)")
+                    PushSetup.ensureRegistered(context, fetchAfter = false)
                 }
                 val events = res.events
                 if (events.isEmpty()) {

@@ -1,5 +1,7 @@
 package io.github.ronganam.dana.push
 
+import io.github.ronganam.dana.data.chat.BackgroundRuns
+import io.github.ronganam.dana.data.network.SessionItem
 import io.github.ronganam.dana.data.models.LiveAction
 import io.github.ronganam.dana.data.models.LiveActivity
 import io.github.ronganam.dana.data.models.LiveChoice
@@ -128,6 +130,31 @@ class LiveActivitiesTest {
         assertEquals(Open.Home, LiveActivities.openTarget("", server))
         assertEquals(Open.Home, LiveActivities.openTarget("http://plain.example.org", server))
         assertEquals(Open.Home, LiveActivities.openTarget("/israel_rail", ""))
+    }
+
+    @Test
+    fun openOnAConversationOpensItInTheApp() {
+        val server = "https://dana.example.org/"
+        assertEquals(Open.Session("watch-w1"), LiveActivities.openTarget("/chat/watch-w1", server))
+        assertEquals(Open.Session("watch-w1"), LiveActivities.openTarget("/chat?session=watch-w1", server))
+        assertEquals(Open.Session("watch-w1"), LiveActivities.openTarget("/chat?x=1&session_id=watch-w1#end", server))
+        assertEquals(Open.Session("watch w1"), LiveActivities.openTarget("/sessions/watch%20w1", server))
+        assertEquals("the shared thread is the chat screen", Open.Screen("chat"), LiveActivities.openTarget("/chat/main", server))
+        assertEquals(Open.Screen("chat"), LiveActivities.openTarget("/chat", server))
+        assertEquals(Open.Screen("chat"), LiveActivities.openTarget("/chat?session=", server))
+        assertEquals("a page the phone has no screen for stays on the web",
+            Open.Web("https://dana.example.org/watches"), LiveActivities.openTarget("/watches", server))
+    }
+
+    @Test
+    fun backgroundRunsAreTheWatchSessionsNewestFirst() {
+        val list = listOf(
+            SessionItem("main", 50, "", title = "Thread"),
+            SessionItem("watch-a", 10, "", title = "👀 Rain"),
+            SessionItem("3f2c", 40, "", title = "Old chat"),
+            SessionItem("watch-b", 30, "", status = "running", title = "👀 Parcel"),
+        )
+        assertEquals(listOf("watch-b", "watch-a"), BackgroundRuns.of(list).map { it.id })
     }
 
     @Test

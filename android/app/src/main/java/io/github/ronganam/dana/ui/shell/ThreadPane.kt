@@ -25,6 +25,8 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,6 +38,7 @@ import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import io.github.ronganam.dana.data.chat.BackgroundRuns
 import io.github.ronganam.dana.data.chat.ThreadModel
 import io.github.ronganam.dana.data.chat.UndoItem
 import io.github.ronganam.dana.ui.components.ContextAttachmentCard
@@ -68,7 +71,9 @@ import java.time.ZoneId
  * caption on replies from a learned phrase, selection and step-limit prompts.
  * Older messages load when scrolled to the top. On the cover the item the
  * thread was opened about sits at the top with a × to drop it. Typing and
- * the mic are in the ask bar, not here.
+ * the mic are in the ask bar, not here. "Runs" lists the conversations a
+ * watch's AI agent had on its own ([BackgroundRunsDialog]); one opens as a
+ * visit with its title on the "Back to the thread" bar.
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -89,6 +94,9 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
     val inThread by chat.inThread.collectAsState()
     val memory by chat.memory.collectAsState()
     val clearing by chat.clearing.collectAsState()
+    val backgroundRuns by chat.backgroundRuns.collectAsState()
+    val currentSession by chat.currentSessionId.collectAsState()
+    var showRuns by remember { mutableStateOf(false) }
     val memoryNow = rememberMemoryNow(memory)
     val pinned by shell.pinned.collectAsState()
     val context = LocalContext.current
@@ -145,12 +153,28 @@ fun ThreadPane(viewModel: MainViewModel, onClose: (() -> Unit)?, modifier: Modif
                 if (chatModels.isNotEmpty()) ModelPickerChip(models = chatModels, selectedId = chatModel, onSelect = { viewModel.chatController.setChatModel(it) })
                 Spacer(Modifier.weight(1f))
             }
+            // A watch's agent runs have their own conversations: listed here, opened as a visit.
+            if (inThread && chat.isThreadMode && backgroundRuns.isNotEmpty()) {
+                TextButton(onClick = { chat.fetchBackgroundRuns(); showRuns = true }) { Text("Runs") }
+            }
             if (inThread && chat.isThreadMode && memory.remembersAt(memoryNow)) {
                 NewTopicButton(enabled = !clearing && statusText.isEmpty(), onClick = { chat.clearThread() })
             }
             if (onClose != null) TextButton(onClick = onClose) { Text("Done") }
         }
-        if (!inThread && chat.isThreadMode) OtherConversationBar(onBack = { chat.returnToThread() })
+        if (!inThread && chat.isThreadMode) {
+            val label = if (BackgroundRuns.isBackgroundRun(currentSession)) {
+                backgroundRuns.firstOrNull { it.id == currentSession }?.title?.takeIf { it.isNotBlank() } ?: "Background run"
+            } else "Another conversation"
+            OtherConversationBar(label, onBack = { chat.returnToThread() })
+        }
+        if (showRuns) {
+            BackgroundRunsDialog(
+                runs = backgroundRuns,
+                onOpen = { id -> showRuns = false; viewModel.showConversation(id) },
+                onDismiss = { showRuns = false }
+            )
+        }
         // The cover screen: what the thread was opened about (unfolded it shows above the ask bar).
         val pin = pinned
         if (stacked && pin != null) OnScreenLine(pin, onDrop = { shell.dropScreen() }, modifier = Modifier.padding(start = 16.dp, end = 4.dp, top = 6.dp))
@@ -351,12 +375,19 @@ private fun QuietNote(title: String, detail: String) {
 
 /** "Another conversation · Back to the thread" (an approval opened from Now in a Telegram chat). */
 @Composable
-private fun OtherConversationBar(onBack: () -> Unit) {
+private fun OtherConversationBar(label: String, onBack: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainerHigh).padding(start = 18.dp, end = 6.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        MonoLabel("Another conversation", modifier = Modifier.weight(1f))
+        Text(
+            label,
+            style = MaterialTheme.typography.labelLarge.copy(textDirection = TextDirection.Content),
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.weight(1f)
+        )
         TextButton(onClick = onBack) { Text("Back to the thread") }
     }
 }

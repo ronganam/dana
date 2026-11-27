@@ -29,7 +29,7 @@ class NotificationSyncWorker(appContext: Context, params: WorkerParameters) : Co
     override suspend fun doWork(): Result {
         val ctx = applicationContext
         // Also a safety net for direct push: anything a lost ping didn't bring.
-        io.github.ronganam.dana.push.PushSetup.ensureRegistered(ctx)
+        io.github.ronganam.dana.push.PushSetup.ensureRegistered(ctx, fetchAfter = false)  // the catch-up is next
         io.github.ronganam.dana.push.PhoneEvents.catchUp(ctx)
         val api = ServerConfig.load(ctx).api()
         // Bank / card app notifications for the money addon: their own queue and endpoint.

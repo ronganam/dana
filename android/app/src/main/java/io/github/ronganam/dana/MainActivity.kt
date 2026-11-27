@@ -128,7 +128,12 @@ class MainActivity : ComponentActivity() {
         val personId = intent.getStringExtra(EXTRA_OPEN_PERSON_ID)
         val openReview = intent.getBooleanExtra(EXTRA_OPEN_REVIEW, false)
         val openScreen = intent.getStringExtra(EXTRA_OPEN_SCREEN)
+        val openSession = intent.getStringExtra(EXTRA_OPEN_SESSION)
         when {
+            openSession != null -> {
+                vm.showConversation(openSession)
+                vm.navigateTo("chat")
+            }
             kind != null && id != null -> vm.openContextChat(kind, id, intent.getStringExtra(CallDebriefActivity.EXTRA_CONTEXT_TITLE).orEmpty())
             callId != null -> vm.openCall(callId)
             personId != null -> vm.openPerson(personId)
@@ -143,6 +148,7 @@ class MainActivity : ComponentActivity() {
         intent.removeExtra(EXTRA_OPEN_PERSON_ID)
         intent.removeExtra(EXTRA_OPEN_REVIEW)
         intent.removeExtra(EXTRA_OPEN_SCREEN)
+        intent.removeExtra(EXTRA_OPEN_SESSION)
         // Handle once (not again after a configuration change).
         intent.removeExtra(CallDebriefActivity.EXTRA_CONTEXT_KIND)
         intent.removeExtra(CallDebriefActivity.EXTRA_CONTEXT_ID)
