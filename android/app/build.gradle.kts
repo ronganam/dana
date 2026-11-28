@@ -215,7 +215,7 @@ dependencies {
     // Phone only: direct push from the server. FCM wake-up pings for a build with your own
     // Firebase project (google-services.json); UnifiedPush through a distributor app (ntfy) otherwise.
     "phoneImplementation"("com.google.firebase:firebase-messaging:26.0.2")
-    "phoneImplementation"("org.unifiedpush.android:connector:3.3.5")
+    "phoneImplementation"("org.unifiedpush.android:connector:3.3.6")
     // Phone only: geofences for the user's zones (data/signals/Places.kt), activity transitions (Driving.kt).
     "phoneImplementation"("com.google.android.gms:play-services-location:21.4.0")
     // Signals → sleep: Health Connect's sleep sessions (data/signals/HealthSleep.kt).
